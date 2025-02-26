@@ -1,25 +1,59 @@
 
+import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LineChart, UserCircle, DollarSign, FileText, Building2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { LineChart, UserCircle, DollarSign, FileText, Building2, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleProfileUpdate = () => {
+    navigate('/settings');
+    toast({
+      title: "Redirecting to settings",
+      description: "Update your profile information in the settings page",
+    });
+  };
+
+  const handleViewAllReports = () => {
+    navigate('/reports');
+  };
+
+  const handleViewPerformance = () => {
+    navigate('/performance');
+  };
+
+  const handleViewWallet = () => {
+    navigate('/wallet');
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="container mx-auto px-4">
-        {/* Profile Header */}
-        <div className="flex items-center gap-6 mb-8">
-          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-            <UserCircle className="w-12 h-12 text-primary" />
+    <div className="flex">
+      <AppSidebar />
+      <div className="flex-1 min-h-screen bg-gray-50 p-8">
+        {/* Profile Header with Settings Link */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+              <UserCircle className="w-12 h-12 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">John Doe</h1>
+              <p className="text-gray-600">Active Investor since 2023</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">John Doe</h1>
-            <p className="text-gray-600">Active Investor since 2023</p>
-          </div>
+          <Button onClick={handleProfileUpdate}>
+            Edit Profile
+          </Button>
         </div>
 
-        {/* Stats Grid */}
+        {/* Stats Grid with Navigation */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleViewWallet}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-500">
                 Total Invested
@@ -32,20 +66,22 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Active Projects
-              </CardTitle>
-              <Building2 className="w-4 h-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">8</div>
-              <p className="text-xs text-gray-600">Across 3 platforms</p>
-            </CardContent>
-          </Card>
+          <Link to="/properties">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-gray-500">
+                  Active Projects
+                </CardTitle>
+                <Building2 className="w-4 h-4 text-gray-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">8</div>
+                <p className="text-xs text-gray-600">Across 3 platforms</p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleViewPerformance}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-500">
                 Total Returns
@@ -58,7 +94,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleViewAllReports}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-500">
                 Reports
@@ -72,10 +108,13 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Recent Activity */}
+        {/* Recent Activity with Navigation */}
         <Card className="mb-8">
-          <CardHeader>
+          <CardHeader className="flex justify-between items-center">
             <CardTitle>Recent Activity</CardTitle>
+            <Button variant="ghost" size="sm" onClick={handleViewAllReports} className="gap-2">
+              View All <ArrowRight className="w-4 h-4" />
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -83,20 +122,27 @@ const Dashboard = () => {
                 {
                   title: "Quarterly Report: The International Gem Tower",
                   date: "2024-03-15",
-                  type: "report"
+                  type: "report",
+                  path: "/reports"
                 },
                 {
                   title: "Investment Return: 401 N Michigan Ave",
                   date: "2024-03-10",
-                  type: "return"
+                  type: "return",
+                  path: "/wallet"
                 },
                 {
                   title: "New Investment: Tech Hub Project",
                   date: "2024-03-01",
-                  type: "investment"
+                  type: "investment",
+                  path: "/properties"
                 }
               ].map((activity) => (
-                <div key={activity.title} className="flex items-center justify-between border-b pb-4 last:border-0">
+                <div 
+                  key={activity.title} 
+                  className="flex items-center justify-between border-b pb-4 last:border-0 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors"
+                  onClick={() => navigate(activity.path)}
+                >
                   <div>
                     <p className="font-medium text-gray-900">{activity.title}</p>
                     <p className="text-sm text-gray-500">{activity.date}</p>
