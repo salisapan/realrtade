@@ -1,4 +1,3 @@
-
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,14 +30,19 @@ const Dashboard = () => {
     navigate('/wallet');
   };
 
+  const handleNavigate = (path: string) => {
+    navigate(path);
+  };
+
   return (
     <div className="flex">
       <AppSidebar />
       <div className="flex-1 min-h-screen bg-gray-50 p-8">
-        {/* Profile Header with Settings Link */}
+        {/* Profile Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-6">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center cursor-pointer"
+                 onClick={() => handleNavigate('/settings')}>
               <UserCircle className="w-12 h-12 text-primary" />
             </div>
             <div>
@@ -51,7 +55,7 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        {/* Stats Grid with Navigation */}
+        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleViewWallet}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -108,7 +112,7 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Recent Activity with Navigation */}
+        {/* Recent Activity */}
         <Card className="mb-8">
           <CardHeader className="flex justify-between items-center">
             <CardTitle>Recent Activity</CardTitle>
