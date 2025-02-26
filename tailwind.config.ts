@@ -24,6 +24,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         background: "#FFFFFF",
+        foreground: "#1F2937", // Adding the missing foreground color
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
