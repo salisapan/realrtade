@@ -7,6 +7,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import Performance from "./pages/Performance";
+import Reports from "./pages/Reports";
+import Wallet from "./pages/Wallet";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -21,6 +25,10 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/properties" element={<Index />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/performance" element={<Performance />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/wallet" element={<Wallet />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
