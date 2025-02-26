@@ -1,7 +1,9 @@
-
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { PropertyCard } from "@/components/PropertyCard";
 import { CategoryFilter } from "@/components/CategoryFilter";
+import { UserCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const categories = [
   { id: "sector", name: "sector", active: true },
@@ -55,7 +57,14 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-900">properties</h1>
-            <button className="text-primary">See All ►</button>
+            <div className="flex items-center gap-4">
+              <button className="text-primary">See All ►</button>
+              <Link to="/dashboard">
+                <Button variant="ghost" size="icon">
+                  <UserCircle className="w-5 h-5" />
+                </Button>
+              </Link>
+            </div>
           </div>
           <CategoryFilter
             categories={categories.map(cat => ({
