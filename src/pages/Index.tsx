@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PropertyCard } from "@/components/PropertyCard";
@@ -15,6 +16,7 @@ const categories = [
   { id: "company", name: "Company" },
 ];
 
+// Properties organized by category
 const propertiesBySector = [
   {
     id: "prop1",
@@ -280,7 +282,7 @@ const Index = () => {
                 <img 
                   src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
                   alt="RealTrade Logo" 
-                  className="h-10 mr-4 rounded-lg" 
+                  className="h-10 mr-4" 
                 />
                 <h1 className="text-2xl font-bold text-gray-900">Properties</h1>
               </div>

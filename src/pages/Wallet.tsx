@@ -10,20 +10,12 @@ const Wallet = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const handleTransaction = (property: string, transactionType: string) => {
+  const handleTransaction = (property: string) => {
     if (property === "Bank Transfer") {
       toast({
         title: "Bank Transfer",
         description: "Opening bank transfer dialog...",
       });
-    } else if (transactionType === "Investment") {
-      navigate(`/property/${property.replace(/\s+/g, '-').toLowerCase()}`);
-    } else if (transactionType === "Return") {
-      toast({
-        title: "Investment Return",
-        description: `Viewing details for return from ${property}...`,
-      });
-      navigate(`/performance`);
     } else {
       navigate(`/properties`);
     }
@@ -123,7 +115,7 @@ const Wallet = () => {
             <Card 
               key={transaction.date + transaction.amount}
               className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => handleTransaction(transaction.property, transaction.type)}
+              onClick={() => handleTransaction(transaction.property)}
             >
               <CardContent className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-4">
