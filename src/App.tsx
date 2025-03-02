@@ -13,6 +13,8 @@ import Reports from "./pages/Reports";
 import Wallet from "./pages/Wallet";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import PropertyDetail from "./pages/PropertyDetail";
+import EntrepreneurPortal from "./pages/EntrepreneurPortal";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +33,8 @@ const App = () => (
             <Route path="/reports" element={<Reports />} />
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/property/:id" element={<PropertyDetail />} />
+            <Route path="/entrepreneur" element={<EntrepreneurPortal />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PropertyCard } from "@/components/PropertyCard";
@@ -267,7 +266,6 @@ const Index = () => {
   const navigate = useNavigate();
 
   const handlePropertyClick = (propertyId: string) => {
-    // The propertyId is just used for the URL, but we need to make sure the details are actually available
     navigate(`/property/${propertyId}`);
   };
 

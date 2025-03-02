@@ -1,44 +1,83 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import { Home, Upload, Users, ClipboardList, BarChart3, FileText, Plus } from "lucide-react";
-import { AppSidebar } from "@/components/AppSidebar";
-import { toast } from "sonner";
+import { 
+  Home, 
+  Upload, 
+  FileText, 
+  Users, 
+  CheckCircle, 
+  Clock, 
+  Building, 
+  DollarSign,
+  PlusCircle,
+  Save,
+  Check,
+  X
+} from "lucide-react";
 
 const EntrepreneurPortal = () => {
-  const [activeTab, setActiveTab] = useState("deals");
-  const [deals, setDeals] = useState([
-    { id: 1, title: "Downtown Office Complex", status: "Live", investors: 12, funded: "67%", dueDiligence: "Completed" },
-    { id: 2, title: "Westside Retail Plaza", status: "Draft", investors: 0, funded: "0%", dueDiligence: "Not Started" },
-    { id: 3, title: "Eastside Apartments", status: "In Review", investors: 0, funded: "0%", dueDiligence: "In Progress" }
-  ]);
-  
-  const handleSubmitDeal = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Deal draft saved successfully!");
+  const [activeTab, setActiveTab] = useState("upload-deals");
+  const [uploadStep, setUploadStep] = useState(1);
+  const [dealName, setDealName] = useState("");
+  const [location, setLocation] = useState("");
+  const [dealType, setDealType] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [targetROI, setTargetROI] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelectedImage(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
   };
-  
-  const handleSubmitDueDiligence = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Due diligence documents uploaded!");
+
+  const handleNextStep = () => {
+    setUploadStep(prev => prev + 1);
+  };
+
+  const handlePrevStep = () => {
+    setUploadStep(prev => Math.max(1, prev - 1));
+  };
+
+  const handleSubmitDeal = () => {
+    // Here you would normally submit the deal to your backend
+    alert("Deal submitted successfully!");
+    setUploadStep(1);
+    setDealName("");
+    setLocation("");
+    setDealType("");
+    setDescription("");
+    setPrice("");
+    setTargetROI("");
+    setSelectedImage(null);
+    setPreviewUrl("");
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex">
       <AppSidebar />
-      <div className="flex-1 bg-gray-50">
+      <div className="flex-1 min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm">
           <div className="container mx-auto px-4 py-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-6">
               <div className="flex items-center">
-                <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-10 mr-4 rounded-lg" />
+                <img 
+                  src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+                  alt="RealTrade Logo" 
+                  className="h-10 mr-4 rounded-lg" 
+                />
                 <h1 className="text-2xl font-bold text-gray-900">Entrepreneur Portal</h1>
               </div>
               <div className="flex items-center gap-4">
@@ -56,274 +95,435 @@ const EntrepreneurPortal = () => {
         <main className="container mx-auto px-4 py-8">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-4 mb-8">
-              <TabsTrigger value="deals" className="flex items-center gap-2">
-                <ClipboardList className="w-4 h-4" />
-                My Deals
+              <TabsTrigger value="upload-deals" className="flex items-center gap-2">
+                <Upload size={18} />
+                Upload Deals
               </TabsTrigger>
-              <TabsTrigger value="investors" className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Investors
+              <TabsTrigger value="manage-deals" className="flex items-center gap-2">
+                <Building size={18} />
+                Manage Deals
               </TabsTrigger>
-              <TabsTrigger value="upload" className="flex items-center gap-2">
-                <Upload className="w-4 h-4" />
-                Upload Deal
+              <TabsTrigger value="manage-investors" className="flex items-center gap-2">
+                <Users size={18} />
+                Manage Investors
               </TabsTrigger>
-              <TabsTrigger value="diligence" className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
+              <TabsTrigger value="due-diligence" className="flex items-center gap-2">
+                <FileText size={18} />
                 Due Diligence
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="deals">
-              <div className="flex justify-between mb-6">
-                <h2 className="text-xl font-semibold">My Properties</h2>
-                <Button onClick={() => setActiveTab("upload")} className="flex items-center gap-2">
-                  <Plus className="w-4 h-4" />
-                  Add New Deal
-                </Button>
-              </div>
-              
-              <div className="grid gap-4">
-                {deals.map(deal => (
-                  <Card key={deal.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <div>
-                        <CardTitle>{deal.title}</CardTitle>
-                        <CardDescription>Status: {deal.status}</CardDescription>
-                      </div>
-                      <div className={`px-3 py-1 rounded-full text-sm ${
-                        deal.status === "Live" ? "bg-green-100 text-green-800" :
-                        deal.status === "Draft" ? "bg-gray-100 text-gray-800" :
-                        "bg-yellow-100 text-yellow-800"
-                      }`}>
-                        {deal.status}
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-4 mt-2">
-                        <div>
-                          <p className="text-sm text-gray-500">Investors</p>
-                          <p className="font-medium">{deal.investors}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Funded</p>
-                          <p className="font-medium">{deal.funded}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Due Diligence</p>
-                          <p className="font-medium">{deal.dueDiligence}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="flex justify-end space-x-2">
-                      <Button variant="outline" size="sm">Edit</Button>
-                      <Button size="sm">Manage</Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="investors">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Investor Management</CardTitle>
-                  <CardDescription>View and manage investors in your properties</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Investment Amount</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Properties</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap">John Doe</td>
-                          <td className="px-6 py-4 whitespace-nowrap">john@example.com</td>
-                          <td className="px-6 py-4 whitespace-nowrap">$250,000</td>
-                          <td className="px-6 py-4 whitespace-nowrap">2</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap">Jane Smith</td>
-                          <td className="px-6 py-4 whitespace-nowrap">jane@example.com</td>
-                          <td className="px-6 py-4 whitespace-nowrap">$175,000</td>
-                          <td className="px-6 py-4 whitespace-nowrap">1</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap">Robert Johnson</td>
-                          <td className="px-6 py-4 whitespace-nowrap">robert@example.com</td>
-                          <td className="px-6 py-4 whitespace-nowrap">$120,000</td>
-                          <td className="px-6 py-4 whitespace-nowrap">1</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+            <TabsContent value="upload-deals">
+              <Card className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold">Upload New Deal</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-500">Step {uploadStep} of 3</span>
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                </div>
 
-            <TabsContent value="upload">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upload New Deal</CardTitle>
-                  <CardDescription>Provide details about your property investment opportunity</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmitDeal}>
-                    <div className="grid gap-6">
-                      <div className="grid gap-3">
-                        <Label htmlFor="title">Property Title</Label>
-                        <Input id="title" placeholder="Enter property title" />
+                {uploadStep === 1 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-medium">Basic Information</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="deal-name">Deal Name</Label>
+                        <Input 
+                          id="deal-name" 
+                          placeholder="Enter deal name" 
+                          value={dealName}
+                          onChange={(e) => setDealName(e.target.value)}
+                        />
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-3">
-                          <Label htmlFor="location">Location</Label>
-                          <Input id="location" placeholder="City, State" />
-                        </div>
-                        <div className="grid gap-3">
-                          <Label htmlFor="price">Target Raise</Label>
-                          <Input id="price" placeholder="$ Amount" type="number" />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location">Location</Label>
+                        <Input 
+                          id="location" 
+                          placeholder="City, State, Country" 
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                        />
                       </div>
                       
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="grid gap-3">
-                          <Label htmlFor="cashOnCash">Target Cash on Cash</Label>
-                          <Input id="cashOnCash" placeholder="%" type="text" />
-                        </div>
-                        <div className="grid gap-3">
-                          <Label htmlFor="upside">Projected Upside</Label>
-                          <Input id="upside" placeholder="%" type="text" />
-                        </div>
-                        <div className="grid gap-3">
-                          <Label htmlFor="category">Category</Label>
-                          <Input id="category" placeholder="Office, Retail, etc." />
-                        </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="deal-type">Deal Type</Label>
+                        <Input 
+                          id="deal-type" 
+                          placeholder="Commercial, Residential, etc." 
+                          value={dealType}
+                          onChange={(e) => setDealType(e.target.value)}
+                        />
                       </div>
                       
-                      <div className="grid gap-3">
-                        <Label htmlFor="description">Property Description</Label>
-                        <Textarea id="description" placeholder="Describe the property and investment opportunity" rows={4} />
-                      </div>
-                      
-                      <div className="grid gap-3">
-                        <Label htmlFor="image">Property Images</Label>
-                        <div className="border border-dashed border-gray-300 rounded-md p-6 text-center cursor-pointer hover:bg-gray-50">
-                          <Upload className="mx-auto h-10 w-10 text-gray-400" />
-                          <p className="mt-2 text-sm text-gray-500">Click to upload or drag and drop</p>
-                          <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                      <div className="space-y-2">
+                        <Label htmlFor="property-image">Property Image</Label>
+                        <div className="flex items-center gap-4">
+                          <Input 
+                            id="property-image" 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleImageChange}
+                          />
+                          {previewUrl && (
+                            <div className="h-20 w-20 overflow-hidden rounded-md border">
+                              <img 
+                                src={previewUrl} 
+                                alt="Property preview" 
+                                className="h-full w-full object-cover" 
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </form>
-                </CardContent>
-                <CardFooter className="flex justify-between">
-                  <Button variant="outline">Save as Draft</Button>
-                  <Button onClick={handleSubmitDeal}>Submit for Review</Button>
-                </CardFooter>
-              </Card>
-            </TabsContent>
 
-            <TabsContent value="diligence">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Due Diligence Requirements</CardTitle>
-                  <CardDescription>Upload required documents for verification and compliance</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmitDueDiligence}>
-                    <div className="space-y-6">
-                      <div>
-                        <h3 className="text-lg font-medium">Legal Documents</h3>
-                        <Separator className="my-2" />
-                        <div className="grid gap-4 mt-3">
-                          <div>
-                            <Label htmlFor="titleDeed">Title Deed / Ownership Proof</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="titleDeed" type="file" className="w-full" />
-                            </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea 
+                        id="description" 
+                        placeholder="Describe the property and investment opportunity" 
+                        rows={4}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button onClick={handleNextStep} className="flex items-center gap-2">
+                        Next <PlusCircle className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {uploadStep === 2 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-medium">Financial Details</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="price">Price (USD)</Label>
+                        <Input 
+                          id="price" 
+                          placeholder="e.g. 2,500,000" 
+                          value={price}
+                          onChange={(e) => setPrice(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="target-roi">Target ROI (%)</Label>
+                        <Input 
+                          id="target-roi" 
+                          placeholder="e.g. 12.5" 
+                          value={targetROI}
+                          onChange={(e) => setTargetROI(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="funding-goal">Funding Goal (USD)</Label>
+                        <Input 
+                          id="funding-goal" 
+                          placeholder="e.g. 1,800,000" 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="min-investment">Minimum Investment (USD)</Label>
+                        <Input 
+                          id="min-investment" 
+                          placeholder="e.g. 10,000" 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="funding-period">Funding Period (days)</Label>
+                        <Input 
+                          id="funding-period" 
+                          placeholder="e.g. 90" 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="expected-term">Expected Term (years)</Label>
+                        <Input 
+                          id="expected-term" 
+                          placeholder="e.g. 5" 
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between">
+                      <Button variant="outline" onClick={handlePrevStep} className="flex items-center gap-2">
+                        Back
+                      </Button>
+                      <Button onClick={handleNextStep} className="flex items-center gap-2">
+                        Next <PlusCircle className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {uploadStep === 3 && (
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-medium">Documents & Submission</h3>
+                    
+                    <div className="space-y-4">
+                      <div className="border rounded-md p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="text-primary" />
+                            <span>Property Appraisal</span>
                           </div>
-                          <div>
-                            <Label htmlFor="incorporation">Company Incorporation Documents</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="incorporation" type="file" className="w-full" />
-                            </div>
-                          </div>
+                          <Button variant="outline" size="sm">Upload</Button>
                         </div>
                       </div>
                       
-                      <div>
-                        <h3 className="text-lg font-medium">Financial Documents</h3>
-                        <Separator className="my-2" />
-                        <div className="grid gap-4 mt-3">
-                          <div>
-                            <Label htmlFor="proForma">Financial Pro Forma</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="proForma" type="file" className="w-full" />
-                            </div>
+                      <div className="border rounded-md p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="text-primary" />
+                            <span>Financial Projections</span>
                           </div>
-                          <div>
-                            <Label htmlFor="taxReturns">Tax Returns (Last 3 years)</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="taxReturns" type="file" className="w-full" />
-                            </div>
-                          </div>
-                          <div>
-                            <Label htmlFor="bankStatements">Bank Statements</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="bankStatements" type="file" className="w-full" />
-                            </div>
-                          </div>
+                          <Button variant="outline" size="sm">Upload</Button>
                         </div>
                       </div>
                       
-                      <div>
-                        <h3 className="text-lg font-medium">Property Documents</h3>
-                        <Separator className="my-2" />
-                        <div className="grid gap-4 mt-3">
-                          <div>
-                            <Label htmlFor="appraisal">Property Appraisal</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="appraisal" type="file" className="w-full" />
-                            </div>
+                      <div className="border rounded-md p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="text-primary" />
+                            <span>Legal Documents</span>
                           </div>
-                          <div>
-                            <Label htmlFor="inspection">Inspection Reports</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="inspection" type="file" className="w-full" />
-                            </div>
+                          <Button variant="outline" size="sm">Upload</Button>
+                        </div>
+                      </div>
+                      
+                      <div className="border rounded-md p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <FileText className="text-primary" />
+                            <span>Market Analysis</span>
                           </div>
-                          <div>
-                            <Label htmlFor="permits">Permits & Zoning Documents</Label>
-                            <div className="mt-1 flex items-center">
-                              <Input id="permits" type="file" className="w-full" />
-                            </div>
-                          </div>
+                          <Button variant="outline" size="sm">Upload</Button>
                         </div>
                       </div>
                     </div>
-                  </form>
-                </CardContent>
-                <CardFooter className="flex justify-end space-x-2">
-                  <Button variant="outline">Save Progress</Button>
-                  <Button onClick={handleSubmitDueDiligence}>Complete Due Diligence</Button>
-                </CardFooter>
+
+                    <div className="flex justify-between mt-8">
+                      <Button variant="outline" onClick={handlePrevStep}>
+                        Back
+                      </Button>
+                      <Button onClick={handleSubmitDeal} className="flex items-center gap-2">
+                        Submit Deal <Save className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="manage-deals">
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-6">Manage Your Deals</h2>
+                
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab" 
+                          alt="Property" 
+                          className="w-16 h-16 object-cover rounded" 
+                        />
+                        <div>
+                          <h3 className="font-medium">The International Gem Tower</h3>
+                          <p className="text-sm text-gray-500">New York | $2,700,000</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">91% Funded</span>
+                        <Button variant="outline" size="sm">Edit</Button>
+                        <Button variant="outline" size="sm">View</Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src="https://images.unsplash.com/photo-1487958449943-2429e8be8625" 
+                          alt="Property" 
+                          className="w-16 h-16 object-cover rounded" 
+                        />
+                        <div>
+                          <h3 className="font-medium">401 N Michigan Ave</h3>
+                          <p className="text-sm text-gray-500">Chicago | $8,770,000</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">81% Funded</span>
+                        <Button variant="outline" size="sm">Edit</Button>
+                        <Button variant="outline" size="sm">View</Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <img 
+                          src="https://images.unsplash.com/photo-1518005020951-eccb494ad742" 
+                          alt="Property" 
+                          className="w-16 h-16 object-cover rounded" 
+                        />
+                        <div>
+                          <h3 className="font-medium">Tech Hub Square</h3>
+                          <p className="text-sm text-gray-500">Silicon Valley | $12,500,000</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">95% Funded</span>
+                        <Button variant="outline" size="sm">Edit</Button>
+                        <Button variant="outline" size="sm">View</Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex justify-center">
+                  <Button className="flex items-center gap-2">
+                    <PlusCircle className="w-4 h-4" /> Add New Deal
+                  </Button>
+                </div>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="manage-investors">
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-6">Manage Investors</h2>
+                
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4">
+                    <h3 className="font-medium mb-4">International Gem Tower Investors</h3>
+                    
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Investor</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Investment</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          <tr>
+                            <td className="px-6 py-4 whitespace-nowrap">John Smith</td>
+                            <td className="px-6 py-4 whitespace-nowrap">$250,000</td>
+                            <td className="px-6 py-4 whitespace-nowrap">2023-05-12</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Active
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <Button variant="ghost" size="sm">Contact</Button>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="px-6 py-4 whitespace-nowrap">Jane Doe</td>
+                            <td className="px-6 py-4 whitespace-nowrap">$175,000</td>
+                            <td className="px-6 py-4 whitespace-nowrap">2023-05-14</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                Active
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <Button variant="ghost" size="sm">Contact</Button>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="px-6 py-4 whitespace-nowrap">Robert Johnson</td>
+                            <td className="px-6 py-4 whitespace-nowrap">$350,000</td>
+                            <td className="px-6 py-4 whitespace-nowrap">2023-05-10</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                Pending
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <Button variant="ghost" size="sm">Contact</Button>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="due-diligence">
+              <Card className="p-6">
+                <h2 className="text-xl font-semibold mb-6">Due Diligence</h2>
+                
+                <div className="space-y-4">
+                  <div className="border rounded-md p-4">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-medium">Tech Hub Square - Due Diligence Checklist</h3>
+                      <span className="text-sm bg-yellow-100 text-yellow-800 px-2 py-1 rounded">In Progress</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle className="text-green-500 w-5 h-5" />
+                          <span>Financial Statement Review</span>
+                        </div>
+                        <span className="text-sm text-gray-500">Completed on May 15, 2023</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                        <div className="flex items-center gap-3">
+                          <CheckCircle className="text-green-500 w-5 h-5" />
+                          <span>Property Title Search</span>
+                        </div>
+                        <span className="text-sm text-gray-500">Completed on May 17, 2023</span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                        <div className="flex items-center gap-3">
+                          <Clock className="text-yellow-500 w-5 h-5" />
+                          <span>Environmental Assessment</span>
+                        </div>
+                        <Button size="sm" variant="outline">Upload Results</Button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                        <div className="flex items-center gap-3">
+                          <Clock className="text-yellow-500 w-5 h-5" />
+                          <span>Property Inspection</span>
+                        </div>
+                        <Button size="sm" variant="outline">Upload Report</Button>
+                      </div>
+                      
+                      <div className="flex items-center justify-between p-2 hover:bg-gray-50 rounded-md">
+                        <div className="flex items-center gap-3">
+                          <X className="text-gray-300 w-5 h-5" />
+                          <span>Legal Compliance Review</span>
+                        </div>
+                        <Button size="sm" variant="outline">Schedule</Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </Card>
             </TabsContent>
           </Tabs>
