@@ -1,504 +1,330 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AppSidebar } from "@/components/AppSidebar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/components/ui/use-toast";
-import { Building2, UploadCloud, Users, FileText, CheckCircle, AlertTriangle, Calendar, Plus, CreditCard, Clock, DollarSign, TrendingUp } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Home, Upload, Users, ClipboardList, BarChart3, FileText, Plus } from "lucide-react";
+import { AppSidebar } from "@/components/AppSidebar";
+import { toast } from "sonner";
 
 const EntrepreneurPortal = () => {
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("properties");
+  const [activeTab, setActiveTab] = useState("deals");
+  const [deals, setDeals] = useState([
+    { id: 1, title: "Downtown Office Complex", status: "Live", investors: 12, funded: "67%", dueDiligence: "Completed" },
+    { id: 2, title: "Westside Retail Plaza", status: "Draft", investors: 0, funded: "0%", dueDiligence: "Not Started" },
+    { id: 3, title: "Eastside Apartments", status: "In Review", investors: 0, funded: "0%", dueDiligence: "In Progress" }
+  ]);
   
-  // For demo purposes - these would normally come from an API
-  const properties = [
-    {
-      id: "prop1",
-      title: "The International Gem Tower",
-      location: "50 West 47th Street, New York",
-      status: "Listed",
-      investors: 47,
-      funded: "91%",
-      totalRaised: "$2,457,000",
-      lastUpdated: "2024-03-10",
-    },
-    {
-      id: "prop2",
-      title: "401 N Michigan Ave",
-      location: "401 N Michigan Ave, Chicago",
-      status: "Listed",
-      investors: 63,
-      funded: "81%",
-      totalRaised: "$7,103,700",
-      lastUpdated: "2024-03-05",
-    },
-    {
-      id: "prop3",
-      title: "Tech Hub Square",
-      location: "Silicon Valley, CA",
-      status: "Listed",
-      investors: 78,
-      funded: "95%",
-      totalRaised: "$11,875,000",
-      lastUpdated: "2024-02-28",
-    },
-    {
-      id: "prop5",
-      title: "Modern Industrial Complex",
-      location: "Austin, TX",
-      status: "Due Diligence",
-      investors: 0,
-      funded: "0%",
-      totalRaised: "$0",
-      lastUpdated: "2024-03-15",
-    },
-  ];
-  
-  const investors = [
-    { id: 1, name: "Michael Smith", investmentTotal: "$350,000", properties: 3, joinDate: "2023-08-15", status: "Active" },
-    { id: 2, name: "Sarah Johnson", investmentTotal: "$175,000", properties: 2, joinDate: "2023-09-22", status: "Active" },
-    { id: 3, name: "Robert Chen", investmentTotal: "$500,000", properties: 4, joinDate: "2023-06-10", status: "Active" },
-    { id: 4, name: "Priya Patel", investmentTotal: "$225,000", properties: 2, joinDate: "2023-10-05", status: "Active" },
-    { id: 5, name: "James Wilson", investmentTotal: "$150,000", properties: 1, joinDate: "2024-01-18", status: "Active" },
-    { id: 6, name: "Lisa Martinez", investmentTotal: "$75,000", properties: 1, joinDate: "2024-02-03", status: "Pending KYC" },
-  ];
-  
-  const dueDiligenceItems = [
-    { id: 1, property: "Tech Hub Square", task: "Property Appraisal", status: "Completed", dueDate: "2023-12-10" },
-    { id: 2, property: "Tech Hub Square", task: "Environmental Assessment", status: "Completed", dueDate: "2023-12-15" },
-    { id: 3, property: "Tech Hub Square", task: "Title Search", status: "Completed", dueDate: "2023-12-05" },
-    { id: 4, property: "Modern Industrial Complex", task: "Property Appraisal", status: "In Progress", dueDate: "2024-03-25" },
-    { id: 5, property: "Modern Industrial Complex", task: "Environmental Assessment", status: "Pending", dueDate: "2024-04-05" },
-    { id: 6, property: "Modern Industrial Complex", task: "Title Search", status: "Completed", dueDate: "2024-03-10" },
-    { id: 7, property: "Modern Industrial Complex", task: "Building Inspection", status: "Scheduled", dueDate: "2024-03-30" },
-  ];
-  
-  const upcomingReports = [
-    { id: 1, name: "Q1 2024 Investor Update - The International Gem Tower", dueDate: "2024-04-15", status: "Not Started" },
-    { id: 2, name: "Q1 2024 Investor Update - 401 N Michigan Ave", dueDate: "2024-04-15", status: "Not Started" },
-    { id: 3, name: "Q1 2024 Investor Update - Tech Hub Square", dueDate: "2024-04-15", status: "Not Started" },
-    { id: 4, name: "Property Performance Report - Modern Industrial Complex", dueDate: "2024-04-30", status: "Not Started" },
-  ];
-  
-  const handleUploadProperty = () => {
-    toast({
-      title: "Property Upload Initiated",
-      description: "Opening property upload form...",
-    });
+  const handleSubmitDeal = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast.success("Deal draft saved successfully!");
   };
   
-  const handleInvestorManagement = (investorId: number) => {
-    toast({
-      title: "Investor Selected",
-      description: `Opening investor detail view for ${investors.find(i => i.id === investorId)?.name}`,
-    });
-  };
-  
-  const handleViewPropertyDetails = (propertyId: string) => {
-    toast({
-      title: "Property Selected",
-      description: `Opening management dashboard for ${properties.find(p => p.id === propertyId)?.title}`,
-    });
-  };
-  
-  const handleCreateReport = () => {
-    toast({
-      title: "Report Creation",
-      description: "Opening report creation tool...",
-    });
-  };
-  
-  const handleCompleteDueDiligence = (taskId: number) => {
-    toast({
-      title: "Due Diligence Task",
-      description: `Opening task details for ${dueDiligenceItems.find(item => item.id === taskId)?.task}`,
-    });
+  const handleSubmitDueDiligence = (e: React.FormEvent) => {
+    e.preventDefault();
+    toast.success("Due diligence documents uploaded!");
   };
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50">
-        <header className="bg-white shadow-sm p-6">
-          <div className="container mx-auto">
+      <div className="flex-1 bg-gray-50">
+        <header className="bg-white shadow-sm">
+          <div className="container mx-auto px-4 py-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center">
-                <img 
-                  src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
-                  alt="RealTrade Logo" 
-                  className="h-10 mr-4" 
-                />
-                <h1 className="text-2xl font-bold">Entrepreneur Portal</h1>
+                <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-10 mr-4 rounded-lg" />
+                <h1 className="text-2xl font-bold text-gray-900">Entrepreneur Portal</h1>
               </div>
-              <Button onClick={handleUploadProperty}>
-                <Plus className="mr-2 w-4 h-4" /> List New Property
-              </Button>
+              <div className="flex items-center gap-4">
+                <Link to="/">
+                  <Button variant="outline" size="sm" className="flex items-center gap-1">
+                    <Home className="w-4 h-4" />
+                    Home
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </header>
-        
-        <main className="container mx-auto p-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Properties Listed</CardTitle>
-                <CardDescription>Current active property listings</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end gap-4">
-                  <span className="text-3xl font-bold">{properties.filter(p => p.status === "Listed").length}</span>
-                  <span className="text-green-600 text-sm">+1 this month</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Total Investors</CardTitle>
-                <CardDescription>Investors across all properties</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end gap-4">
-                  <span className="text-3xl font-bold">{investors.length}</span>
-                  <span className="text-green-600 text-sm">+2 this month</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Capital Raised</CardTitle>
-                <CardDescription>Total funding for all properties</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-end gap-4">
-                  <span className="text-3xl font-bold">$21.4M</span>
-                  <span className="text-green-600 text-sm">+$1.2M this month</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-            <TabsList className="mb-6">
-              <TabsTrigger value="properties">My Properties</TabsTrigger>
-              <TabsTrigger value="investors">Investor Management</TabsTrigger>
-              <TabsTrigger value="due-diligence">Due Diligence</TabsTrigger>
-              <TabsTrigger value="reports">Reports & Documents</TabsTrigger>
+
+        <main className="container mx-auto px-4 py-8">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-4 mb-8">
+              <TabsTrigger value="deals" className="flex items-center gap-2">
+                <ClipboardList className="w-4 h-4" />
+                My Deals
+              </TabsTrigger>
+              <TabsTrigger value="investors" className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Investors
+              </TabsTrigger>
+              <TabsTrigger value="upload" className="flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Deal
+              </TabsTrigger>
+              <TabsTrigger value="diligence" className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Due Diligence
+              </TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="properties" className="space-y-6">
-              {properties.map((property) => (
-                <Card 
-                  key={property.id}
-                  className="overflow-hidden hover:shadow-md transition-all cursor-pointer"
-                  onClick={() => handleViewPropertyDetails(property.id)}
-                >
-                  <CardContent className="p-0">
-                    <div className="flex flex-col md:flex-row">
-                      <div className="p-6 flex-1">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <h3 className="text-lg font-semibold">{property.title}</h3>
-                            <p className="text-gray-500 text-sm">{property.location}</p>
-                          </div>
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            property.status === "Listed" 
-                              ? "bg-green-100 text-green-800" 
-                              : "bg-amber-100 text-amber-800"
-                          }`}>
-                            {property.status}
-                          </span>
+
+            <TabsContent value="deals">
+              <div className="flex justify-between mb-6">
+                <h2 className="text-xl font-semibold">My Properties</h2>
+                <Button onClick={() => setActiveTab("upload")} className="flex items-center gap-2">
+                  <Plus className="w-4 h-4" />
+                  Add New Deal
+                </Button>
+              </div>
+              
+              <div className="grid gap-4">
+                {deals.map(deal => (
+                  <Card key={deal.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <div>
+                        <CardTitle>{deal.title}</CardTitle>
+                        <CardDescription>Status: {deal.status}</CardDescription>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-sm ${
+                        deal.status === "Live" ? "bg-green-100 text-green-800" :
+                        deal.status === "Draft" ? "bg-gray-100 text-gray-800" :
+                        "bg-yellow-100 text-yellow-800"
+                      }`}>
+                        {deal.status}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-3 gap-4 mt-2">
+                        <div>
+                          <p className="text-sm text-gray-500">Investors</p>
+                          <p className="font-medium">{deal.investors}</p>
                         </div>
-                        
-                        <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                          <p className="text-sm text-gray-500">Funded</p>
+                          <p className="font-medium">{deal.funded}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Due Diligence</p>
+                          <p className="font-medium">{deal.dueDiligence}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end space-x-2">
+                      <Button variant="outline" size="sm">Edit</Button>
+                      <Button size="sm">Manage</Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="investors">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Investor Management</CardTitle>
+                  <CardDescription>View and manage investors in your properties</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-md border">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Investment Amount</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Properties</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap">John Doe</td>
+                          <td className="px-6 py-4 whitespace-nowrap">john@example.com</td>
+                          <td className="px-6 py-4 whitespace-nowrap">$250,000</td>
+                          <td className="px-6 py-4 whitespace-nowrap">2</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap">Jane Smith</td>
+                          <td className="px-6 py-4 whitespace-nowrap">jane@example.com</td>
+                          <td className="px-6 py-4 whitespace-nowrap">$175,000</td>
+                          <td className="px-6 py-4 whitespace-nowrap">1</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Active</span>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td className="px-6 py-4 whitespace-nowrap">Robert Johnson</td>
+                          <td className="px-6 py-4 whitespace-nowrap">robert@example.com</td>
+                          <td className="px-6 py-4 whitespace-nowrap">$120,000</td>
+                          <td className="px-6 py-4 whitespace-nowrap">1</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="upload">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Upload New Deal</CardTitle>
+                  <CardDescription>Provide details about your property investment opportunity</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmitDeal}>
+                    <div className="grid gap-6">
+                      <div className="grid gap-3">
+                        <Label htmlFor="title">Property Title</Label>
+                        <Input id="title" placeholder="Enter property title" />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-3">
+                          <Label htmlFor="location">Location</Label>
+                          <Input id="location" placeholder="City, State" />
+                        </div>
+                        <div className="grid gap-3">
+                          <Label htmlFor="price">Target Raise</Label>
+                          <Input id="price" placeholder="$ Amount" type="number" />
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="grid gap-3">
+                          <Label htmlFor="cashOnCash">Target Cash on Cash</Label>
+                          <Input id="cashOnCash" placeholder="%" type="text" />
+                        </div>
+                        <div className="grid gap-3">
+                          <Label htmlFor="upside">Projected Upside</Label>
+                          <Input id="upside" placeholder="%" type="text" />
+                        </div>
+                        <div className="grid gap-3">
+                          <Label htmlFor="category">Category</Label>
+                          <Input id="category" placeholder="Office, Retail, etc." />
+                        </div>
+                      </div>
+                      
+                      <div className="grid gap-3">
+                        <Label htmlFor="description">Property Description</Label>
+                        <Textarea id="description" placeholder="Describe the property and investment opportunity" rows={4} />
+                      </div>
+                      
+                      <div className="grid gap-3">
+                        <Label htmlFor="image">Property Images</Label>
+                        <div className="border border-dashed border-gray-300 rounded-md p-6 text-center cursor-pointer hover:bg-gray-50">
+                          <Upload className="mx-auto h-10 w-10 text-gray-400" />
+                          <p className="mt-2 text-sm text-gray-500">Click to upload or drag and drop</p>
+                          <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline">Save as Draft</Button>
+                  <Button onClick={handleSubmitDeal}>Submit for Review</Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="diligence">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Due Diligence Requirements</CardTitle>
+                  <CardDescription>Upload required documents for verification and compliance</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmitDueDiligence}>
+                    <div className="space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium">Legal Documents</h3>
+                        <Separator className="my-2" />
+                        <div className="grid gap-4 mt-3">
                           <div>
-                            <p className="text-gray-500 text-xs">Investors</p>
-                            <p className="font-medium">{property.investors}</p>
+                            <Label htmlFor="titleDeed">Title Deed / Ownership Proof</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="titleDeed" type="file" className="w-full" />
+                            </div>
                           </div>
                           <div>
-                            <p className="text-gray-500 text-xs">Funded</p>
-                            <p className="font-medium">{property.funded}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500 text-xs">Total Raised</p>
-                            <p className="font-medium">{property.totalRaised}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500 text-xs">Last Updated</p>
-                            <p className="font-medium">{new Date(property.lastUpdated).toLocaleDateString()}</p>
+                            <Label htmlFor="incorporation">Company Incorporation Documents</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="incorporation" type="file" className="w-full" />
+                            </div>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="bg-gray-100 p-6 flex flex-row md:flex-col justify-between items-center md:w-48">
-                        <Button 
-                          variant="outline" 
-                          className="w-full mb-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toast({
-                              title: "Update Property",
-                              description: `Opening update form for ${property.title}`,
-                            });
-                          }}
-                        >
-                          Update Details
-                        </Button>
-                        <Button 
-                          className="w-full"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toast({
-                              title: "Create Report",
-                              description: `Opening report creation for ${property.title}`,
-                            });
-                          }}
-                        >
-                          Create Report
-                        </Button>
+                      <div>
+                        <h3 className="text-lg font-medium">Financial Documents</h3>
+                        <Separator className="my-2" />
+                        <div className="grid gap-4 mt-3">
+                          <div>
+                            <Label htmlFor="proForma">Financial Pro Forma</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="proForma" type="file" className="w-full" />
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor="taxReturns">Tax Returns (Last 3 years)</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="taxReturns" type="file" className="w-full" />
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor="bankStatements">Bank Statements</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="bankStatements" type="file" className="w-full" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-lg font-medium">Property Documents</h3>
+                        <Separator className="my-2" />
+                        <div className="grid gap-4 mt-3">
+                          <div>
+                            <Label htmlFor="appraisal">Property Appraisal</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="appraisal" type="file" className="w-full" />
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor="inspection">Inspection Reports</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="inspection" type="file" className="w-full" />
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor="permits">Permits & Zoning Documents</Label>
+                            <div className="mt-1 flex items-center">
+                              <Input id="permits" type="file" className="w-full" />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-              
-              <Card className="border-dashed border-2 hover:border-primary transition-all cursor-pointer" onClick={handleUploadProperty}>
-                <CardContent className="p-8 flex flex-col items-center justify-center text-center">
-                  <div className="bg-primary/10 p-3 rounded-full mb-4">
-                    <UploadCloud className="w-8 h-8 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-medium mb-2">List a New Property</h3>
-                  <p className="text-gray-500 max-w-md">
-                    Upload details about a new property to list it for investor funding.
-                  </p>
+                  </form>
                 </CardContent>
+                <CardFooter className="flex justify-end space-x-2">
+                  <Button variant="outline">Save Progress</Button>
+                  <Button onClick={handleSubmitDueDiligence}>Complete Due Diligence</Button>
+                </CardFooter>
               </Card>
-            </TabsContent>
-            
-            <TabsContent value="investors">
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Investor Management</h2>
-                  <div className="flex gap-4">
-                    <Input 
-                      placeholder="Search investors..." 
-                      className="w-64"
-                    />
-                    <Button variant="outline">
-                      <Users className="mr-2 w-4 h-4" /> Invite Investors
-                    </Button>
-                  </div>
-                </div>
-                
-                <Card>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-gray-50 text-left">
-                            <th className="p-4 font-medium">Investor</th>
-                            <th className="p-4 font-medium">Total Investment</th>
-                            <th className="p-4 font-medium">Properties</th>
-                            <th className="p-4 font-medium">Join Date</th>
-                            <th className="p-4 font-medium">Status</th>
-                            <th className="p-4 font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {investors.map((investor) => (
-                            <tr key={investor.id} className="border-t hover:bg-gray-50 cursor-pointer" onClick={() => handleInvestorManagement(investor.id)}>
-                              <td className="p-4 font-medium">{investor.name}</td>
-                              <td className="p-4">{investor.investmentTotal}</td>
-                              <td className="p-4">{investor.properties}</td>
-                              <td className="p-4">{new Date(investor.joinDate).toLocaleDateString()}</td>
-                              <td className="p-4">
-                                <span className={`px-2 py-1 rounded-full text-xs ${
-                                  investor.status === "Active" 
-                                    ? "bg-green-100 text-green-800" 
-                                    : "bg-amber-100 text-amber-800"
-                                }`}>
-                                  {investor.status}
-                                </span>
-                              </td>
-                              <td className="p-4">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toast({
-                                      title: "Contact Investor",
-                                      description: `Opening message composer for ${investor.name}`,
-                                    });
-                                  }}
-                                >
-                                  Contact
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="due-diligence">
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Due Diligence Tasks</h2>
-                  <Button variant="outline">
-                    <Plus className="mr-2 w-4 h-4" /> Add Task
-                  </Button>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4">
-                  {dueDiligenceItems.map((item) => (
-                    <Card 
-                      key={item.id} 
-                      className="hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => handleCompleteDueDiligence(item.id)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className={`p-2 rounded-full ${
-                              item.status === "Completed" 
-                                ? "bg-green-100" 
-                                : item.status === "In Progress" 
-                                  ? "bg-blue-100" 
-                                  : "bg-gray-100"
-                            }`}>
-                              {item.status === "Completed" ? (
-                                <CheckCircle className="w-5 h-5 text-green-600" />
-                              ) : item.status === "In Progress" ? (
-                                <Clock className="w-5 h-5 text-blue-600" />
-                              ) : (
-                                <AlertTriangle className="w-5 h-5 text-gray-500" />
-                              )}
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{item.task}</h4>
-                              <p className="text-sm text-gray-500">{item.property}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <p className="text-sm text-gray-500">Due Date</p>
-                              <p className="font-medium">{new Date(item.dueDate).toLocaleDateString()}</p>
-                            </div>
-                            <span className={`px-2 py-1 rounded-full text-xs ${
-                              item.status === "Completed" 
-                                ? "bg-green-100 text-green-800" 
-                                : item.status === "In Progress" 
-                                  ? "bg-blue-100 text-blue-800" 
-                                  : item.status === "Scheduled"
-                                    ? "bg-purple-100 text-purple-800"
-                                    : "bg-gray-100 text-gray-800"
-                            }`}>
-                              {item.status}
-                            </span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="reports">
-              <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Reports & Documents</h2>
-                  <Button onClick={handleCreateReport}>
-                    <FileText className="mr-2 w-4 h-4" /> Create New Report
-                  </Button>
-                </div>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Upcoming Reports</CardTitle>
-                    <CardDescription>Reports due in the next 30 days</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {upcomingReports.map((report) => (
-                        <div key={report.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-gray-500" />
-                            <div>
-                              <p className="font-medium">{report.name}</p>
-                              <p className="text-sm text-gray-500">Due: {new Date(report.dueDate).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <Button 
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              toast({
-                                title: "Create Report",
-                                description: `Starting work on ${report.name}`,
-                              });
-                            }}
-                          >
-                            Start Report
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Recent Documents</CardTitle>
-                    <CardDescription>Documents created in the last 30 days</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {[
-                        { id: 1, name: "Property Appraisal - Modern Industrial Complex", type: "PDF", date: "2024-03-10" },
-                        { id: 2, name: "Title Report - Modern Industrial Complex", type: "PDF", date: "2024-03-10" },
-                        { id: 3, name: "Q4 2023 Investor Update - Tech Hub Square", type: "PDF", date: "2024-02-28" },
-                      ].map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <FileText className="w-5 h-5 text-gray-500" />
-                            <div>
-                              <p className="font-medium">{doc.name}</p>
-                              <p className="text-sm text-gray-500">{doc.type} • {new Date(doc.date).toLocaleDateString()}</p>
-                            </div>
-                          </div>
-                          <Button 
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              toast({
-                                title: "Download Document",
-                                description: `Downloading ${doc.name}`,
-                              });
-                            }}
-                          >
-                            Download
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" className="w-full">
-                      View All Documents
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </div>
             </TabsContent>
           </Tabs>
         </main>

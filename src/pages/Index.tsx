@@ -1,8 +1,9 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { PropertyCard } from "@/components/PropertyCard";
 import { CategoryFilter } from "@/components/CategoryFilter";
-import { UserCircle } from "lucide-react";
+import { UserCircle, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -266,6 +267,7 @@ const Index = () => {
   const navigate = useNavigate();
 
   const handlePropertyClick = (propertyId: string) => {
+    // The propertyId is just used for the URL, but we need to make sure the details are actually available
     navigate(`/property/${propertyId}`);
   };
 
@@ -286,6 +288,12 @@ const Index = () => {
               </div>
               <div className="flex items-center gap-4">
                 <button className="text-primary">See All ►</button>
+                <Link to="/">
+                  <Button variant="outline" size="sm" className="flex items-center gap-1">
+                    <Home className="w-4 h-4" />
+                    Home
+                  </Button>
+                </Link>
                 <Link to="/dashboard">
                   <Button variant="ghost" size="icon">
                     <UserCircle className="w-5 h-5" />
