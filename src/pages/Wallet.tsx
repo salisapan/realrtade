@@ -1,7 +1,7 @@
 
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { DollarSign, ArrowUpRight, ArrowDownRight, LineChart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";

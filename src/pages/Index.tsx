@@ -17,7 +17,7 @@ const categories = [
 
 const properties = [
   {
-    image: "https://images.unsplash.com/photo-1496307653780-42ee777d4833",
+    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     title: "The International Gem Tower",
     location: "50 West 47th Street, New York",
     company: "EXTELL",
@@ -33,7 +33,7 @@ const properties = [
     price: "2,700,000",
   },
   {
-    image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625",
+    image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     title: "401 N Michigan Ave",
     location: "401 N Michigan Ave, Chicago",
     company: "IAG",
@@ -49,7 +49,7 @@ const properties = [
     price: "8,770,000",
   },
   {
-    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab",
+    image: "https://images.unsplash.com/photo-1518005020951-eccb494ad742?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     title: "Tech Hub Square",
     location: "Silicon Valley, CA",
     company: "TechVest",
@@ -65,7 +65,7 @@ const properties = [
     price: "12,500,000",
   },
   {
-    image: "https://images.unsplash.com/photo-1464146072230-91cabc968266",
+    image: "https://images.unsplash.com/photo-1464146072230-91cabc968266?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     title: "Southbank Tower",
     location: "Miami, FL",
     company: "Coastal Investments",
@@ -81,7 +81,7 @@ const properties = [
     price: "5,900,000",
   },
   {
-    image: "https://images.unsplash.com/photo-1577532003283-5e8c38744e32",
+    image: "https://images.unsplash.com/photo-1483058712412-4245e9b90334?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     title: "Modern Industrial Complex",
     location: "Austin, TX",
     company: "TexasRE",
@@ -97,7 +97,7 @@ const properties = [
     price: "15,300,000",
   },
   {
-    image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00",
+    image: "https://images.unsplash.com/photo-1498050108023-c5249f4df085?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
     title: "Green Energy Office Park",
     location: "Portland, OR",
     company: "EcoVest",
