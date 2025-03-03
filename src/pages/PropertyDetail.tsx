@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -105,44 +104,44 @@ const PropertyDetail = () => {
       <AppSidebar />
       <div className="flex-1 min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm">
-          <div className="container mx-auto px-4 py-4">
+          <div className="container mx-auto px-4 py-3">
             <div className="flex justify-between items-center">
               <div className="flex items-center">
                 <img 
                   src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
                   alt="RealTrade Logo" 
-                  className="h-10 mr-4 rounded-lg" 
+                  className="h-8 mr-3 rounded-lg" 
                 />
-                <h1 className="text-2xl font-bold text-gray-900">{property.name}</h1>
+                <h1 className="text-lg md:text-xl font-bold text-gray-900">{property.name}</h1>
               </div>
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 h-8 text-xs"
                   onClick={handleBookmark}
                 >
-                  <Bookmark className={`w-4 h-4 ${bookmarked ? "fill-primary" : ""}`} />
+                  <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "fill-primary" : ""}`} />
                   {bookmarked ? "Saved" : "Save"}
                 </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1 h-8 text-xs"
                   onClick={handleShare}
                 >
-                  <Share2 className="w-4 h-4" />
+                  <Share2 className="w-3.5 h-3.5" />
                   Share
                 </Button>
                 <Link to="/">
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <Home className="w-4 h-4" />
+                  <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs">
+                    <Home className="w-3.5 h-3.5" />
                     Home
                   </Button>
                 </Link>
                 <Link to="/properties">
-                  <Button variant="outline" size="sm" className="flex items-center gap-1">
-                    <Building className="w-4 h-4" />
+                  <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs">
+                    <Building className="w-3.5 h-3.5" />
                     Properties
                   </Button>
                 </Link>
@@ -151,45 +150,45 @@ const PropertyDetail = () => {
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-8">
+        <main className="container mx-auto px-4 py-4 md:py-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="lg:col-span-2 space-y-4 md:space-y-6">
               <div className="rounded-xl overflow-hidden bg-white shadow-sm">
                 <img 
                   src={property.image} 
                   alt={property.name} 
-                  className="w-full h-[400px] object-cover" 
+                  className="w-full h-[300px] object-cover" 
                 />
                 
                 <PropertyDetailContent property={property} />
               </div>
               
               <Card>
-                <CardHeader>
-                  <CardTitle>Investment Details</CardTitle>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Investment Details</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-0">
                   <Tabs defaultValue="analysis">
-                    <TabsList className="mb-4 w-full">
-                      <TabsTrigger value="analysis" className="flex-1">Financial Analysis</TabsTrigger>
-                      <TabsTrigger value="documents" className="flex-1">Documents</TabsTrigger>
-                      <TabsTrigger value="qa" className="flex-1">Q&A</TabsTrigger>
+                    <TabsList className="mb-3 w-full h-9">
+                      <TabsTrigger value="analysis" className="text-xs h-7">Financial Analysis</TabsTrigger>
+                      <TabsTrigger value="documents" className="text-xs h-7">Documents</TabsTrigger>
+                      <TabsTrigger value="qa" className="text-xs h-7">Q&A</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="analysis">
-                      <div className="space-y-8">
+                      <div className="space-y-6">
                         <div>
-                          <h3 className="text-lg font-medium mb-4">5-Year Cash Flow Projections</h3>
-                          <div className="h-80">
+                          <h3 className="text-sm font-medium mb-3">5-Year Cash Flow Projections</h3>
+                          <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
                               <AreaChart
                                 data={cashFlowData}
                                 margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
                               >
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="year" />
-                                <YAxis />
-                                <RechartsTooltip />
+                                <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                                <YAxis tick={{ fontSize: 12 }} />
+                                <RechartsTooltip contentStyle={{ fontSize: 12 }} />
                                 <Area 
                                   type="monotone" 
                                   dataKey="cashFlow" 
@@ -202,10 +201,10 @@ const PropertyDetail = () => {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div>
-                            <h3 className="text-lg font-medium mb-4">ROI Components</h3>
-                            <div className="h-64">
+                            <h3 className="text-sm font-medium mb-3">ROI Components</h3>
+                            <div className="h-56">
                               <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                   <Pie
@@ -213,7 +212,7 @@ const PropertyDetail = () => {
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
-                                    outerRadius={80}
+                                    outerRadius={70}
                                     fill="#8884d8"
                                     dataKey="value"
                                     label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
@@ -222,15 +221,15 @@ const PropertyDetail = () => {
                                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                   </Pie>
-                                  <RechartsTooltip />
+                                  <RechartsTooltip contentStyle={{ fontSize: 12 }} />
                                 </PieChart>
                               </ResponsiveContainer>
                             </div>
                           </div>
                           
                           <div>
-                            <h3 className="text-lg font-medium mb-4">Risk Assessment</h3>
-                            <div className="h-64">
+                            <h3 className="text-sm font-medium mb-3">Risk Assessment</h3>
+                            <div className="h-56">
                               <ResponsiveContainer width="100%" height="100%">
                                 <RechartsBarChart
                                   data={riskAssessmentData}
@@ -238,10 +237,10 @@ const PropertyDetail = () => {
                                   layout="vertical"
                                 >
                                   <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis type="number" domain={[0, 10]} />
-                                  <YAxis dataKey="name" type="category" width={150} />
-                                  <RechartsTooltip />
-                                  <Legend />
+                                  <XAxis type="number" domain={[0, 10]} tick={{ fontSize: 12 }} />
+                                  <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                                  <RechartsTooltip contentStyle={{ fontSize: 12 }} />
+                                  <Legend wrapperStyle={{ fontSize: 12 }} />
                                   <Bar dataKey="score" fill="#82ca9d" name="Risk Score (lower is better)" />
                                 </RechartsBarChart>
                               </ResponsiveContainer>
@@ -252,118 +251,118 @@ const PropertyDetail = () => {
                     </TabsContent>
                     
                     <TabsContent value="documents">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                           <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-primary" />
+                            <FileText className="w-4 h-4 text-primary" />
                             <div>
-                              <h4 className="font-medium">Investment Prospectus</h4>
-                              <p className="text-sm text-gray-500">Detailed overview of the investment opportunity</p>
+                              <h4 className="text-sm font-medium">Investment Prospectus</h4>
+                              <p className="text-xs text-gray-500">Detailed overview of the investment</p>
                             </div>
                           </div>
-                          <Button size="sm">View</Button>
+                          <Button size="sm" className="h-7 text-xs px-2">View</Button>
                         </div>
                         
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                           <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-primary" />
+                            <FileText className="w-4 h-4 text-primary" />
                             <div>
-                              <h4 className="font-medium">Financial Projections</h4>
-                              <p className="text-sm text-gray-500">Spreadsheet with detailed cash flow projections</p>
+                              <h4 className="text-sm font-medium">Financial Projections</h4>
+                              <p className="text-xs text-gray-500">Cash flow projections</p>
                             </div>
                           </div>
-                          <Button size="sm">View</Button>
+                          <Button size="sm" className="h-7 text-xs px-2">View</Button>
                         </div>
                         
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                           <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-primary" />
+                            <FileText className="w-4 h-4 text-primary" />
                             <div>
-                              <h4 className="font-medium">Property Appraisal</h4>
-                              <p className="text-sm text-gray-500">Professional appraisal of the property value</p>
+                              <h4 className="text-sm font-medium">Property Appraisal</h4>
+                              <p className="text-xs text-gray-500">Professional property valuation</p>
                             </div>
                           </div>
-                          <Button size="sm">View</Button>
+                          <Button size="sm" className="h-7 text-xs px-2">View</Button>
                         </div>
                         
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                           <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-primary" />
+                            <FileText className="w-4 h-4 text-primary" />
                             <div>
-                              <h4 className="font-medium">Market Analysis</h4>
-                              <p className="text-sm text-gray-500">Analysis of the local real estate market</p>
+                              <h4 className="text-sm font-medium">Market Analysis</h4>
+                              <p className="text-xs text-gray-500">Analysis of local real estate market</p>
                             </div>
                           </div>
-                          <Button size="sm">View</Button>
+                          <Button size="sm" className="h-7 text-xs px-2">View</Button>
                         </div>
                         
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                        <div className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
                           <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-primary" />
+                            <FileText className="w-4 h-4 text-primary" />
                             <div>
-                              <h4 className="font-medium">Legal Documentation</h4>
-                              <p className="text-sm text-gray-500">Investment terms and legal agreements</p>
+                              <h4 className="text-sm font-medium">Legal Documentation</h4>
+                              <p className="text-xs text-gray-500">Investment terms and agreements</p>
                             </div>
                           </div>
-                          <Button size="sm">View</Button>
+                          <Button size="sm" className="h-7 text-xs px-2">View</Button>
                         </div>
                       </div>
                     </TabsContent>
                     
                     <TabsContent value="qa">
-                      <div className="space-y-4">
-                        <div className="border rounded-md p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
+                      <div className="space-y-3">
+                        <div className="border rounded-md p-3">
+                          <div className="flex items-start gap-2">
+                            <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-semibold">
                               JD
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium">John Doe</h4>
+                              <div className="flex items-center gap-1">
+                                <h4 className="text-sm font-medium">John Doe</h4>
                                 <span className="text-xs text-gray-500">2 days ago</span>
                               </div>
-                              <p className="mt-1">What is the expected timeline for the first distribution after funding completes?</p>
+                              <p className="mt-1 text-xs">What is the expected timeline for the first distribution after funding completes?</p>
                               
-                              <div className="mt-3 pl-6 border-l-2 border-gray-200">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-primary">Property Developer</h4>
+                              <div className="mt-2 pl-3 border-l-2 border-gray-200">
+                                <div className="flex items-center gap-1">
+                                  <h4 className="text-xs font-medium text-primary">Property Developer</h4>
                                   <span className="text-xs text-gray-500">1 day ago</span>
                                 </div>
-                                <p className="mt-1">The first distribution is scheduled for approximately 90 days after the funding period closes, assuming we reach our funding goal on time.</p>
+                                <p className="mt-0.5 text-xs">The first distribution is scheduled for approximately 90 days after the funding period closes, assuming we reach our funding goal on time.</p>
                               </div>
                             </div>
                           </div>
                         </div>
                         
-                        <div className="border rounded-md p-4">
-                          <div className="flex items-start gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
+                        <div className="border rounded-md p-3">
+                          <div className="flex items-start gap-2">
+                            <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xs font-semibold">
                               SM
                             </div>
                             <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-medium">Sarah Miller</h4>
+                              <div className="flex items-center gap-1">
+                                <h4 className="text-sm font-medium">Sarah Miller</h4>
                                 <span className="text-xs text-gray-500">1 week ago</span>
                               </div>
-                              <p className="mt-1">Are there any plans for property renovations or improvements that might impact the cash flow in year 1?</p>
+                              <p className="mt-1 text-xs">Are there any plans for property renovations that might impact the cash flow in year 1?</p>
                               
-                              <div className="mt-3 pl-6 border-l-2 border-gray-200">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-medium text-primary">Property Developer</h4>
+                              <div className="mt-2 pl-3 border-l-2 border-gray-200">
+                                <div className="flex items-center gap-1">
+                                  <h4 className="text-xs font-medium text-primary">Property Developer</h4>
                                   <span className="text-xs text-gray-500">5 days ago</span>
                                 </div>
-                                <p className="mt-1">We have budgeted for minor cosmetic improvements in year 1, but these costs are already factored into the cash flow projections. No major renovations are planned that would significantly impact distributions.</p>
+                                <p className="mt-0.5 text-xs">We have budgeted for minor cosmetic improvements in year 1, but these costs are already factored into the cash flow projections. No major renovations are planned.</p>
                               </div>
                             </div>
                           </div>
                         </div>
                         
-                        <div className="mt-6">
-                          <h4 className="font-medium mb-2">Ask a Question</h4>
-                          <textarea className="w-full p-3 border rounded-md" rows={3} placeholder="Type your question here..."></textarea>
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium mb-1.5">Ask a Question</h4>
+                          <textarea className="w-full p-2 border rounded-md text-sm" rows={2} placeholder="Type your question here..."></textarea>
                           <div className="flex justify-end mt-2">
-                            <Button>
-                              <MessageSquare className="w-4 h-4 mr-2" />
+                            <Button size="sm" className="h-7 text-xs">
+                              <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
                               Submit Question
                             </Button>
                           </div>
@@ -375,31 +374,31 @@ const PropertyDetail = () => {
               </Card>
             </div>
             
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Investment</CardTitle>
+            <div className="space-y-4">
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Quick Investment</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-500 mb-1">Minimum</div>
-                      <div className="text-lg font-bold">${property.minInvestment.toLocaleString()}</div>
+                  <div className="space-y-3">
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-xs text-gray-500 mb-1">Minimum</div>
+                      <div className="text-base font-bold">${property.minInvestment.toLocaleString()}</div>
                     </div>
                     
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-500 mb-1">Expected Return</div>
-                      <div className="text-lg font-bold">{property.roi}% per annum</div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-xs text-gray-500 mb-1">Expected Return</div>
+                      <div className="text-base font-bold">{property.roi}% per annum</div>
                     </div>
                     
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-500 mb-1">Distribution</div>
-                      <div className="text-lg font-bold">Quarterly</div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-xs text-gray-500 mb-1">Distribution</div>
+                      <div className="text-base font-bold">Quarterly</div>
                     </div>
                     
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-500 mb-1">Term</div>
-                      <div className="text-lg font-bold">{property.term} years</div>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <div className="text-xs text-gray-500 mb-1">Term</div>
+                      <div className="text-base font-bold">{property.term} years</div>
                     </div>
                     
                     <Button className="w-full">Invest Now</Button>
@@ -411,12 +410,12 @@ const PropertyDetail = () => {
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader>
-                  <CardTitle>Property Details</CardTitle>
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Property Details</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Property Type</span>
                       <span className="font-medium">{property.type}</span>
@@ -445,74 +444,20 @@ const PropertyDetail = () => {
                 </CardContent>
               </Card>
               
-              <Card>
-                <CardHeader>
-                  <CardTitle>Key Features</CardTitle>
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Timeline</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
-                    {property.keyFeatures.map((feature: string, index: number) => (
-                      <li key={index} className="flex items-start gap-2">
-                        <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Documents</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ul className="space-y-4">
-                    <li className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-primary" />
-                        <span>Investment Prospectus</span>
-                      </div>
-                      <Button variant="ghost" size="sm">View</Button>
-                    </li>
-                    <li className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-primary" />
-                        <span>Financial Projections</span>
-                      </div>
-                      <Button variant="ghost" size="sm">View</Button>
-                    </li>
-                    <li className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-primary" />
-                        <span>Property Appraisal</span>
-                      </div>
-                      <Button variant="ghost" size="sm">View</Button>
-                    </li>
-                    <li className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-primary" />
-                        <span>Market Analysis</span>
-                      </div>
-                      <Button variant="ghost" size="sm">View</Button>
-                    </li>
-                  </ul>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Timeline</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex gap-4">
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
                       <div className="flex flex-col items-center">
-                        <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center">1</div>
-                        <div className="w-0.5 h-full bg-gray-200 mt-2"></div>
+                        <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs">1</div>
+                        <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
                       </div>
                       <div>
-                        <h3 className="font-medium">Funding Phase</h3>
-                        <p className="text-sm text-gray-500 mb-1">In Progress</p>
+                        <h3 className="text-sm font-medium">Funding Phase</h3>
+                        <p className="text-xs text-gray-500 mb-0.5">In Progress</p>
                         <div className="flex items-center text-xs text-gray-500">
                           <CalendarDays className="w-3 h-3 mr-1" />
                           <span>Ends {property.fundingEndDate}</span>
@@ -520,14 +465,14 @@ const PropertyDetail = () => {
                       </div>
                     </div>
                     
-                    <div className="flex gap-4">
+                    <div className="flex gap-3">
                       <div className="flex flex-col items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center">2</div>
-                        <div className="w-0.5 h-full bg-gray-200 mt-2"></div>
+                        <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs">2</div>
+                        <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
                       </div>
                       <div>
-                        <h3 className="font-medium">Acquisition</h3>
-                        <p className="text-sm text-gray-500 mb-1">Planned</p>
+                        <h3 className="text-sm font-medium">Acquisition</h3>
+                        <p className="text-xs text-gray-500 mb-0.5">Planned</p>
                         <div className="flex items-center text-xs text-gray-500">
                           <CalendarDays className="w-3 h-3 mr-1" />
                           <span>Expected {property.acquisitionDate}</span>
@@ -535,14 +480,14 @@ const PropertyDetail = () => {
                       </div>
                     </div>
                     
-                    <div className="flex gap-4">
+                    <div className="flex gap-3">
                       <div className="flex flex-col items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center">3</div>
-                        <div className="w-0.5 h-full bg-gray-200 mt-2"></div>
+                        <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs">3</div>
+                        <div className="w-0.5 h-full bg-gray-200 mt-1"></div>
                       </div>
                       <div>
-                        <h3 className="font-medium">First Distribution</h3>
-                        <p className="text-sm text-gray-500 mb-1">Planned</p>
+                        <h3 className="text-sm font-medium">First Distribution</h3>
+                        <p className="text-xs text-gray-500 mb-0.5">Planned</p>
                         <div className="flex items-center text-xs text-gray-500">
                           <CalendarDays className="w-3 h-3 mr-1" />
                           <span>Expected {property.firstDistributionDate}</span>
@@ -550,13 +495,13 @@ const PropertyDetail = () => {
                       </div>
                     </div>
                     
-                    <div className="flex gap-4">
+                    <div className="flex gap-3">
                       <div className="flex flex-col items-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center">4</div>
+                        <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-xs">4</div>
                       </div>
                       <div>
-                        <h3 className="font-medium">Exit Strategy</h3>
-                        <p className="text-sm text-gray-500 mb-1">Planned</p>
+                        <h3 className="text-sm font-medium">Exit Strategy</h3>
+                        <p className="text-xs text-gray-500 mb-0.5">Planned</p>
                         <div className="flex items-center text-xs text-gray-500">
                           <CalendarDays className="w-3 h-3 mr-1" />
                           <span>Expected {property.exitDate}</span>
@@ -574,7 +519,6 @@ const PropertyDetail = () => {
   );
 };
 
-// Sample property data
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28BFF'];
 
 const sampleProperties = [
@@ -709,7 +653,6 @@ const sampleProperties = [
   }
 ];
 
-// Sample chart data
 const cashFlowData = [
   { year: '2023', cashFlow: 1250000 },
   { year: '2024', cashFlow: 1325000 },

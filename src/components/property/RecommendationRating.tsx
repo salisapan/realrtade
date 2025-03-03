@@ -51,29 +51,29 @@ export const RecommendationRating = ({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Star className="h-5 w-5 text-amber-500" />
+    <Card className="shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-1.5">
+          <Star className="h-4 w-4 text-amber-500" />
           Deal Recommendation
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {/* Score display */}
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
             <div>
-              <div className="text-sm text-gray-500">Investment Score</div>
-              <div className={`text-3xl font-bold ${getScoreColor(score)}`}>
+              <div className="text-xs text-gray-500">Investment Score</div>
+              <div className={`text-xl font-bold ${getScoreColor(score)}`}>
                 {score}/10
               </div>
-              <div className="text-sm mt-1">{getScoreText(score)}</div>
+              <div className="text-xs mt-0.5">{getScoreText(score)}</div>
             </div>
             <div className="flex">
               {[...Array(5)].map((_, i) => (
                 <Star 
                   key={i} 
-                  className={`h-5 w-5 ${i < Math.ceil(score/2) ? "text-amber-500 fill-amber-500" : "text-gray-300"}`} 
+                  className={`h-4 w-4 ${i < Math.ceil(score/2) ? "text-amber-500 fill-amber-500" : "text-gray-300"}`} 
                 />
               ))}
             </div>
@@ -81,54 +81,54 @@ export const RecommendationRating = ({
           
           {/* Key factors */}
           <div>
-            <h4 className="text-sm font-medium mb-2">Key Factors</h4>
-            <ul className="space-y-2">
+            <h4 className="text-xs font-medium mb-1.5">Key Factors</h4>
+            <ul className="space-y-1.5">
               <li className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Market Trend</span>
+                <div className="flex items-center gap-1.5">
+                  <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs">Market Trend</span>
                 </div>
-                <Badge variant={getBadgeVariant(marketTrend)}>{marketTrend}</Badge>
+                <Badge variant={getBadgeVariant(marketTrend)} className="text-xs h-5 px-1.5">{marketTrend}</Badge>
               </li>
               <li className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Entrepreneur Experience</span>
+                <div className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs">Entrepreneur</span>
                 </div>
-                <Badge variant={getBadgeVariant(entrepreneurExperience)}>{entrepreneurExperience}</Badge>
+                <Badge variant={getBadgeVariant(entrepreneurExperience)} className="text-xs h-5 px-1.5">{entrepreneurExperience}</Badge>
               </li>
               <li className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Risk Level</span>
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs">Risk Level</span>
                 </div>
-                <Badge variant={getBadgeVariant(riskLevel === "Low" ? "High" : riskLevel === "High" ? "Low" : "Medium")}>{riskLevel}</Badge>
+                <Badge variant={getBadgeVariant(riskLevel === "Low" ? "High" : riskLevel === "High" ? "Low" : "Medium")} className="text-xs h-5 px-1.5">{riskLevel}</Badge>
               </li>
               <li className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BarChart2 className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Area Demand</span>
+                <div className="flex items-center gap-1.5">
+                  <BarChart2 className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs">Area Demand</span>
                 </div>
-                <Badge variant={getBadgeVariant(demandLevel)}>{demandLevel}</Badge>
+                <Badge variant={getBadgeVariant(demandLevel)} className="text-xs h-5 px-1.5">{demandLevel}</Badge>
               </li>
               <li className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-blue-500" />
-                  <span className="text-sm">Return Potential</span>
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="text-xs">Return Potential</span>
                 </div>
-                <Badge variant={getBadgeVariant(returnPotential)}>{returnPotential}</Badge>
+                <Badge variant={getBadgeVariant(returnPotential)} className="text-xs h-5 px-1.5">{returnPotential}</Badge>
               </li>
             </ul>
           </div>
           
           {/* Summary */}
-          <div className="bg-gray-50 p-3 rounded-lg text-sm">
+          <div className="bg-gray-50 p-2.5 rounded-lg text-xs">
             <p>{getRecommendationSummary(score, riskLevel, demandLevel)}</p>
           </div>
           
           <p className="text-xs text-gray-500 text-center">
-            This recommendation is based on historical data and market analysis.
-            It is not a guarantee of future performance.
+            Based on historical data and market analysis.
+            Not a guarantee of future performance.
           </p>
         </div>
       </CardContent>
@@ -138,12 +138,12 @@ export const RecommendationRating = ({
 
 function getRecommendationSummary(score: number, riskLevel: string, demandLevel: string): string {
   if (score >= 8) {
-    return `This appears to be a high-quality investment opportunity with ${riskLevel.toLowerCase()} risk and ${demandLevel.toLowerCase()} demand in the area. The financial metrics and market conditions indicate strong potential for returns.`;
+    return `High-quality investment with ${riskLevel.toLowerCase()} risk and ${demandLevel.toLowerCase()} area demand. Strong potential returns based on current metrics.`;
   } else if (score >= 6) {
-    return `This investment shows good potential with ${riskLevel.toLowerCase()} risk factors. The ${demandLevel.toLowerCase()} demand in the area suggests reasonable stability, though investors should review the financials carefully.`;
+    return `Good potential with ${riskLevel.toLowerCase()} risk factors. ${demandLevel} demand suggests reasonable stability. Review financials carefully.`;
   } else if (score >= 4) {
-    return `This investment presents a balanced opportunity with moderate risk. The ${demandLevel.toLowerCase()} demand may impact returns, so investors should consider their risk tolerance before proceeding.`;
+    return `Balanced opportunity with moderate risk. The ${demandLevel.toLowerCase()} demand may impact returns. Consider your risk tolerance.`;
   } else {
-    return `This investment carries higher than average risk factors and may not be suitable for all investors. The ${demandLevel.toLowerCase()} demand and market conditions suggest careful consideration is needed.`;
+    return `Higher than average risk factors. The ${demandLevel.toLowerCase()} demand suggests careful consideration is needed.`;
   }
 }
