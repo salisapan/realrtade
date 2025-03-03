@@ -5,12 +5,12 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { InvestmentCalculator } from "./InvestmentCalculator";
 import { RecommendationRating } from "./RecommendationRating";
+import { InvestmentIntentForm } from "./InvestmentIntentForm";
 import { 
   MapPin, 
   Building, 
   DollarSign, 
   Users, 
-  ArrowRight, 
   Clock,
   Check
 } from "lucide-react";
@@ -74,9 +74,11 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
           <span>{property.daysLeft} days left</span>
         </div>
         
-        <Button size="sm" className="flex items-center gap-1">
-          Invest Now <ArrowRight className="w-3.5 h-3.5" />
-        </Button>
+        <InvestmentIntentForm 
+          propertyId={property.id || "prop1"} 
+          propertyName={property.name}
+          minInvestment={property.minInvestment}
+        />
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
