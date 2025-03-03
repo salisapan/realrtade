@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -13,7 +14,9 @@ import {
   FileText,
   MessageSquare,
   Bookmark,
-  Share2
+  Share2,
+  Check,
+  CalendarDays
 } from "lucide-react";
 import { 
   AreaChart, 
