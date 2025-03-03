@@ -1,24 +1,19 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Home, 
-  MapPin, 
   Building, 
-  DollarSign, 
-  Users, 
-  ArrowRight, 
-  CalendarDays, 
-  Clock, 
   BarChart, 
   FileText,
-  Check
+  MessageSquare,
+  Bookmark,
+  Share2
 } from "lucide-react";
 import { 
   AreaChart, 
@@ -26,7 +21,7 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
+  Tooltip as RechartsTooltip, 
   ResponsiveContainer,
   BarChart as RechartsBarChart,
   Bar,
@@ -40,6 +35,8 @@ const PropertyDetail = () => {
   const { id } = useParams();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [bookmarked, setBookmarked] = useState(false);
+  const { toast } = useToast();
   
   useEffect(() => {
     // Simulate loading property data
@@ -50,6 +47,24 @@ const PropertyDetail = () => {
       setLoading(false);
     }, 500);
   }, [id]);
+  
+  const handleBookmark = () => {
+    setBookmarked(!bookmarked);
+    toast({
+      title: bookmarked ? "Deal removed from saved" : "Deal saved",
+      description: bookmarked ? "This deal has been removed from your saved deals" : "This deal has been added to your saved deals",
+      variant: "success",
+    });
+  };
+  
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast({
+      title: "Link copied",
+      description: "Deal link has been copied to clipboard",
+      variant: "success",
+    });
+  };
   
   if (loading) {
     return (
@@ -97,7 +112,25 @@ const PropertyDetail = () => {
                 />
                 <h1 className="text-2xl font-bold text-gray-900">{property.name}</h1>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1"
+                  onClick={handleBookmark}
+                >
+                  <Bookmark className={`w-4 h-4 ${bookmarked ? "fill-primary" : ""}`} />
+                  {bookmarked ? "Saved" : "Save"}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1"
+                  onClick={handleShare}
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </Button>
                 <Link to="/">
                   <Button variant="outline" size="sm" className="flex items-center gap-1">
                     <Home className="w-4 h-4" />
@@ -125,230 +158,212 @@ const PropertyDetail = () => {
                   className="w-full h-[400px] object-cover" 
                 />
                 
-                <div className="p-6">
-                  <div className="flex flex-wrap justify-between items-start gap-4 mb-6">
-                    <div>
-                      <h2 className="text-2xl font-bold">{property.name}</h2>
-                      <div className="flex items-center text-gray-500 mt-1">
-                        <MapPin className="w-4 h-4 mr-1" />
-                        <span>{property.location}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col items-end">
-                      <span className="text-2xl font-bold text-primary">${property.price.toLocaleString()}</span>
-                      <Badge className="mt-1">{property.type}</Badge>
-                    </div>
-                  </div>
-                  
-                  <p className="text-gray-700 mb-6">{property.description}</p>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-gray-500 text-sm mb-1">Target ROI</div>
-                      <div className="text-xl font-bold">{property.roi}%</div>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-gray-500 text-sm mb-1">Term Length</div>
-                      <div className="text-xl font-bold">{property.term} years</div>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <div className="text-gray-500 text-sm mb-1">Min Investment</div>
-                      <div className="text-xl font-bold">${property.minInvestment.toLocaleString()}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="mb-6">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-medium">Funding Progress</span>
-                      <span className="text-sm font-medium">{property.fundingProgress}%</span>
-                    </div>
-                    <Progress value={property.fundingProgress} className="h-2" />
-                    <div className="flex justify-between text-sm text-gray-500 mt-2">
-                      <span>${property.currentFunding.toLocaleString()} raised</span>
-                      <span>Goal: ${property.fundingGoal.toLocaleString()}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center text-gray-500 text-sm">
-                      <Users className="w-4 h-4 mr-1" />
-                      <span>{property.investors} investors</span>
-                      <Clock className="w-4 h-4 ml-4 mr-1" />
-                      <span>{property.daysLeft} days left</span>
-                    </div>
-                    
-                    <Button className="flex items-center gap-1">
-                      Invest Now <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
+                <PropertyDetailContent property={property} />
               </div>
               
               <Card>
                 <CardHeader>
-                  <CardTitle>Investment Metrics</CardTitle>
+                  <CardTitle>Investment Details</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="projections">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="projections">Financial Projections</TabsTrigger>
-                      <TabsTrigger value="roi">ROI Analysis</TabsTrigger>
-                      <TabsTrigger value="comparison">Market Comparison</TabsTrigger>
+                  <Tabs defaultValue="analysis">
+                    <TabsList className="mb-4 w-full">
+                      <TabsTrigger value="analysis" className="flex-1">Financial Analysis</TabsTrigger>
+                      <TabsTrigger value="documents" className="flex-1">Documents</TabsTrigger>
+                      <TabsTrigger value="qa" className="flex-1">Q&A</TabsTrigger>
                     </TabsList>
                     
-                    <TabsContent value="projections">
-                      <h3 className="text-lg font-medium mb-4">5-Year Cash Flow Projections</h3>
-                      <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={cashFlowData}
-                            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="year" />
-                            <YAxis />
-                            <Tooltip />
-                            <Area 
-                              type="monotone" 
-                              dataKey="cashFlow" 
-                              stroke="#8884d8" 
-                              fill="#8884d8" 
-                              fillOpacity={0.3}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      </div>
-                      
-                      <div className="mt-8">
-                        <h3 className="text-lg font-medium mb-4">Revenue Breakdown</h3>
-                        <div className="h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsBarChart
-                              data={revenueBreakdownData}
-                              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis />
-                              <Tooltip />
-                              <Legend />
-                              <Bar dataKey="value" fill="#8884d8" />
-                            </RechartsBarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="roi">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <TabsContent value="analysis">
+                      <div className="space-y-8">
                         <div>
-                          <h3 className="text-lg font-medium mb-4">ROI Components</h3>
+                          <h3 className="text-lg font-medium mb-4">5-Year Cash Flow Projections</h3>
                           <div className="h-80">
                             <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={roiComponentsData}
-                                  cx="50%"
-                                  cy="50%"
-                                  labelLine={false}
-                                  outerRadius={80}
-                                  fill="#8884d8"
-                                  dataKey="value"
-                                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                >
-                                  {roiComponentsData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                  ))}
-                                </Pie>
-                                <Tooltip />
-                              </PieChart>
+                              <AreaChart
+                                data={cashFlowData}
+                                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                              >
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="year" />
+                                <YAxis />
+                                <RechartsTooltip />
+                                <Area 
+                                  type="monotone" 
+                                  dataKey="cashFlow" 
+                                  stroke="#8884d8" 
+                                  fill="#8884d8" 
+                                  fillOpacity={0.3}
+                                />
+                              </AreaChart>
                             </ResponsiveContainer>
                           </div>
                         </div>
                         
-                        <div>
-                          <h3 className="text-lg font-medium mb-4">ROI Comparison</h3>
-                          <div className="h-80">
-                            <ResponsiveContainer width="100%" height="100%">
-                              <RechartsBarChart
-                                data={roiComparisonData}
-                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                              >
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Bar dataKey="value" fill="#82ca9d" />
-                              </RechartsBarChart>
-                            </ResponsiveContainer>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div>
+                            <h3 className="text-lg font-medium mb-4">ROI Components</h3>
+                            <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={roiComponentsData}
+                                    cx="50%"
+                                    cy="50%"
+                                    labelLine={false}
+                                    outerRadius={80}
+                                    fill="#8884d8"
+                                    dataKey="value"
+                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                                  >
+                                    {roiComponentsData.map((entry, index) => (
+                                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                  </Pie>
+                                  <RechartsTooltip />
+                                </PieChart>
+                              </ResponsiveContainer>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-8">
-                        <h3 className="text-lg font-medium mb-4">Annual ROI Projection</h3>
-                        <div className="h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                              data={annualRoiData}
-                              margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="year" />
-                              <YAxis />
-                              <Tooltip />
-                              <Area 
-                                type="monotone" 
-                                dataKey="roi" 
-                                stroke="#82ca9d" 
-                                fill="#82ca9d" 
-                                fillOpacity={0.3}
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
+                          
+                          <div>
+                            <h3 className="text-lg font-medium mb-4">Risk Assessment</h3>
+                            <div className="h-64">
+                              <ResponsiveContainer width="100%" height="100%">
+                                <RechartsBarChart
+                                  data={riskAssessmentData}
+                                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                                  layout="vertical"
+                                >
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis type="number" domain={[0, 10]} />
+                                  <YAxis dataKey="name" type="category" width={150} />
+                                  <RechartsTooltip />
+                                  <Legend />
+                                  <Bar dataKey="score" fill="#82ca9d" name="Risk Score (lower is better)" />
+                                </RechartsBarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </TabsContent>
                     
-                    <TabsContent value="comparison">
-                      <h3 className="text-lg font-medium mb-4">Market Performance Comparison</h3>
-                      <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RechartsBarChart
-                            data={marketComparisonData}
-                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="roi" fill="#8884d8" name="ROI %" />
-                            <Bar dataKey="market" fill="#82ca9d" name="Market Average %" />
-                          </RechartsBarChart>
-                        </ResponsiveContainer>
+                    <TabsContent value="documents">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <div>
+                              <h4 className="font-medium">Investment Prospectus</h4>
+                              <p className="text-sm text-gray-500">Detailed overview of the investment opportunity</p>
+                            </div>
+                          </div>
+                          <Button size="sm">View</Button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <div>
+                              <h4 className="font-medium">Financial Projections</h4>
+                              <p className="text-sm text-gray-500">Spreadsheet with detailed cash flow projections</p>
+                            </div>
+                          </div>
+                          <Button size="sm">View</Button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <div>
+                              <h4 className="font-medium">Property Appraisal</h4>
+                              <p className="text-sm text-gray-500">Professional appraisal of the property value</p>
+                            </div>
+                          </div>
+                          <Button size="sm">View</Button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <div>
+                              <h4 className="font-medium">Market Analysis</h4>
+                              <p className="text-sm text-gray-500">Analysis of the local real estate market</p>
+                            </div>
+                          </div>
+                          <Button size="sm">View</Button>
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-primary" />
+                            <div>
+                              <h4 className="font-medium">Legal Documentation</h4>
+                              <p className="text-sm text-gray-500">Investment terms and legal agreements</p>
+                            </div>
+                          </div>
+                          <Button size="sm">View</Button>
+                        </div>
                       </div>
-                      
-                      <div className="mt-8">
-                        <h3 className="text-lg font-medium mb-4">Risk-Return Profile</h3>
-                        <div className="h-80">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <RechartsBarChart
-                              data={riskReturnData}
-                              margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="name" />
-                              <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                              <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                              <Tooltip />
-                              <Legend />
-                              <Bar yAxisId="left" dataKey="return" fill="#8884d8" name="Expected Return %" />
-                              <Bar yAxisId="right" dataKey="risk" fill="#82ca9d" name="Risk Score (1-10)" />
-                            </RechartsBarChart>
-                          </ResponsiveContainer>
+                    </TabsContent>
+                    
+                    <TabsContent value="qa">
+                      <div className="space-y-4">
+                        <div className="border rounded-md p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
+                              JD
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium">John Doe</h4>
+                                <span className="text-xs text-gray-500">2 days ago</span>
+                              </div>
+                              <p className="mt-1">What is the expected timeline for the first distribution after funding completes?</p>
+                              
+                              <div className="mt-3 pl-6 border-l-2 border-gray-200">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium text-primary">Property Developer</h4>
+                                  <span className="text-xs text-gray-500">1 day ago</span>
+                                </div>
+                                <p className="mt-1">The first distribution is scheduled for approximately 90 days after the funding period closes, assuming we reach our funding goal on time.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="border rounded-md p-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
+                              SM
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium">Sarah Miller</h4>
+                                <span className="text-xs text-gray-500">1 week ago</span>
+                              </div>
+                              <p className="mt-1">Are there any plans for property renovations or improvements that might impact the cash flow in year 1?</p>
+                              
+                              <div className="mt-3 pl-6 border-l-2 border-gray-200">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="font-medium text-primary">Property Developer</h4>
+                                  <span className="text-xs text-gray-500">5 days ago</span>
+                                </div>
+                                <p className="mt-1">We have budgeted for minor cosmetic improvements in year 1, but these costs are already factored into the cash flow projections. No major renovations are planned that would significantly impact distributions.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-6">
+                          <h4 className="font-medium mb-2">Ask a Question</h4>
+                          <textarea className="w-full p-3 border rounded-md" rows={3} placeholder="Type your question here..."></textarea>
+                          <div className="flex justify-end mt-2">
+                            <Button>
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              Submit Question
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </TabsContent>
@@ -592,7 +607,16 @@ const sampleProperties = [
     fundingEndDate: "Aug 30, 2023",
     acquisitionDate: "Sep 15, 2023",
     firstDistributionDate: "Dec 15, 2023",
-    exitDate: "Q3 2028"
+    exitDate: "Q3 2028",
+    recommendationScore: 8.5,
+    marketTrend: "Strong Growth",
+    entrepreneurExperience: "Excellent",
+    riskLevel: "Low",
+    demandLevel: "High",
+    returnPotential: "Strong",
+    cashOnCash: 9.5,
+    debtServiceRatio: 1.45,
+    loanToValue: 65
   },
   {
     id: "prop2",
@@ -626,7 +650,16 @@ const sampleProperties = [
     fundingEndDate: "Sep 15, 2023",
     acquisitionDate: "Oct 1, 2023",
     firstDistributionDate: "Jan 15, 2024",
-    exitDate: "Q3 2030"
+    exitDate: "Q3 2030",
+    recommendationScore: 7.8,
+    marketTrend: "Stable",
+    entrepreneurExperience: "Good",
+    riskLevel: "Medium",
+    demandLevel: "High",
+    returnPotential: "Good",
+    cashOnCash: 7.5,
+    debtServiceRatio: 1.35,
+    loanToValue: 70
   },
   {
     id: "prop3",
@@ -660,7 +693,16 @@ const sampleProperties = [
     fundingEndDate: "Jul 20, 2023",
     acquisitionDate: "Aug 10, 2023",
     firstDistributionDate: "Nov 15, 2023",
-    exitDate: "Q4 2031"
+    exitDate: "Q4 2031",
+    recommendationScore: 9.2,
+    marketTrend: "Strong Growth",
+    entrepreneurExperience: "Excellent",
+    riskLevel: "Low",
+    demandLevel: "Very High",
+    returnPotential: "Excellent",
+    cashOnCash: 11.5,
+    debtServiceRatio: 1.6,
+    loanToValue: 60
   }
 ];
 
@@ -674,47 +716,18 @@ const cashFlowData = [
   { year: '2028', cashFlow: 1675000 },
 ];
 
-const revenueBreakdownData = [
-  { name: 'Rental Income', value: 80 },
-  { name: 'Parking Fees', value: 8 },
-  { name: 'Service Charges', value: 7 },
-  { name: 'Other Income', value: 5 },
-];
-
 const roiComponentsData = [
-  { name: 'Income', value: 50 },
+  { name: 'Rental Income', value: 50 },
   { name: 'Appreciation', value: 35 },
   { name: 'Tax Benefits', value: 15 },
 ];
 
-const roiComparisonData = [
-  { name: 'This Property', value: 15.2 },
-  { name: 'S&P 500 (avg)', value: 10.5 },
-  { name: 'REITs (avg)', value: 12.1 },
-  { name: 'Bonds (avg)', value: 5.2 },
-];
-
-const annualRoiData = [
-  { year: '2023', roi: 13.8 },
-  { year: '2024', roi: 14.5 },
-  { year: '2025', roi: 15.2 },
-  { year: '2026', roi: 15.8 },
-  { year: '2027', roi: 16.5 },
-  { year: '2028', roi: 17.2 },
-];
-
-const marketComparisonData = [
-  { name: 'Dallas', roi: 15.2, market: 12.8 },
-  { name: 'Houston', roi: 0, market: 11.5 },
-  { name: 'Austin', roi: 0, market: 13.2 },
-  { name: 'San Antonio', roi: 0, market: 10.8 },
-];
-
-const riskReturnData = [
-  { name: 'This Property', return: 15.2, risk: 5.4 },
-  { name: 'Residential Avg', return: 9.8, risk: 4.2 },
-  { name: 'Commercial Avg', return: 11.5, risk: 6.1 },
-  { name: 'Industrial Avg', return: 13.8, risk: 5.8 },
+const riskAssessmentData = [
+  { name: 'Market Volatility', score: 3.2 },
+  { name: 'Tenant Default', score: 2.8 },
+  { name: 'Regulatory Changes', score: 4.5 },
+  { name: 'Interest Rate', score: 5.1 },
+  { name: 'Property Damage', score: 2.0 },
 ];
 
 export default PropertyDetail;
