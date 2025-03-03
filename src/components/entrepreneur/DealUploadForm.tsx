@@ -90,7 +90,7 @@ export const DealUploadForm = ({ onDealSubmitted }: DealUploadFormProps) => {
     toast({
       title: "Deal Submitted",
       description: "Your deal has been submitted successfully!",
-      variant: "success",
+      variant: "default", // Changed from "success" to "default"
     });
 
     // Reset form
