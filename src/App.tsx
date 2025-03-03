@@ -15,6 +15,9 @@ import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import PropertyDetail from "./pages/PropertyDetail";
 import EntrepreneurPortal from "./pages/EntrepreneurPortal";
+import EntrepreneurRegistration from "./pages/EntrepreneurRegistration";
+import DueDiligencePortal from "./pages/DueDiligencePortal";
+import TransactionReports from "./pages/TransactionReports";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +38,9 @@ const App = () => (
             <Route path="/settings" element={<Settings />} />
             <Route path="/property/:id" element={<PropertyDetail />} />
             <Route path="/entrepreneur" element={<EntrepreneurPortal />} />
+            <Route path="/entrepreneur/register" element={<EntrepreneurRegistration />} />
+            <Route path="/entrepreneur/due-diligence" element={<DueDiligencePortal />} />
+            <Route path="/entrepreneur/reports" element={<TransactionReports />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
