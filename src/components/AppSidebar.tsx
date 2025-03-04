@@ -1,9 +1,14 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck } from "lucide-react";
+import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu } from "lucide-react";
 
 const menuItems = [
+  {
+    title: "Home",
+    url: "/",
+    icon: Home,
+  },
   {
     title: "Dashboard",
     url: "/dashboard",
@@ -37,6 +42,11 @@ const menuItems = [
 ];
 
 const entrepreneurMenuItems = [
+  {
+    title: "Home",
+    url: "/",
+    icon: Home,
+  },
   {
     title: "Entrepreneur Portal",
     url: "/entrepreneur",
@@ -83,18 +93,6 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-              
-              {/* Always show Home link */}
-              {isEntrepreneurSection && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <Link to="/">
-                      <Home />
-                      <span>Home</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
               
               {/* Show switch between Investor and Entrepreneur views */}
               <SidebarMenuItem>

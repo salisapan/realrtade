@@ -1,8 +1,9 @@
 
 import { Link } from "react-router-dom";
-import { UserCircle, Home, Search, Bell } from "lucide-react";
+import { UserCircle, Home, Search, Bell, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/CategoryFilter";
+import { useState } from "react";
 
 interface Category {
   id: string;
@@ -16,6 +17,8 @@ interface PropertiesHeaderProps {
 }
 
 export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHeaderProps) => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   return (
     <header className="bg-white shadow-sm sticky top-0 z-10">
       <div className="container mx-auto px-4 py-3 md:py-4">
@@ -31,12 +34,13 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
                 REALTRADE
               </h1>
             </Link>
-            
-            <div className="hidden md:block mx-auto max-w-xs">
-              <p className="text-sm text-secondary italic ml-6">
-                Invest in real estate worldwide from anywhere
-              </p>
-            </div>
+          </div>
+          
+          {/* Tagline moved to its own row */}
+          <div className="hidden md:block text-center">
+            <p className="text-sm text-secondary italic">
+              Connecting real estate entrepreneurs with investors worldwide, as easily as buying stocks
+            </p>
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
@@ -74,8 +78,44 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
                 <UserCircle className="w-5 h-5" />
               </Button>
             </Link>
+            
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="md:hidden"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
           </div>
         </div>
+        
+        {isMenuOpen && (
+          <div className="md:hidden py-4 border-t mb-4">
+            <nav className="flex flex-col space-y-3">
+              <Link to="/" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                <Home className="w-5 h-5" />
+                <span>Home</span>
+              </Link>
+              <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                <Home className="w-5 h-5" />
+                <span>Dashboard</span>
+              </Link>
+              <Link to="/performance" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                <Home className="w-5 h-5" />
+                <span>Performance</span>
+              </Link>
+              <Link to="/reports" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                <Home className="w-5 h-5" />
+                <span>Reports</span>
+              </Link>
+              <Link to="/entrepreneur" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                <Home className="w-5 h-5" />
+                <span>Entrepreneur View</span>
+              </Link>
+            </nav>
+          </div>
+        )}
         
         <div className="overflow-x-auto pb-1 -mx-4 px-4">
           <CategoryFilter

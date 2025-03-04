@@ -1,7 +1,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Building2, LineChart, Users, DollarSign, ArrowRight } from "lucide-react";
+import { Building2, LineChart, Users, DollarSign, ArrowRight, Star, Shield, Clock } from "lucide-react";
+import { HowItWorks } from "@/components/landing/HowItWorks";
+import { Testimonials } from "@/components/landing/Testimonials";
+import { PartnerLogos } from "@/components/landing/PartnerLogos";
+import { HomeFooter } from "@/components/landing/HomeFooter";
 
 const Landing = () => {
   return (
@@ -10,48 +14,62 @@ const Landing = () => {
       <div className="container mx-auto px-4 pt-20 pb-16">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Smart Real Estate Crowdfunding Analytics
+            Connecting real estate entrepreneurs with investors worldwide, as easily as buying stocks.
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             Make informed investment decisions with comprehensive market data and analysis from top US crowdfunding platforms.
           </p>
-          <Link to="/properties">
+          <Link to="/investor-signup">
             <Button size="lg" className="text-lg px-8">
-              Explore Properties <ArrowRight className="ml-2" />
+              Get Started <ArrowRight className="ml-2" />
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* Features Grid */}
+      {/* How It Works Section */}
+      <HowItWorks />
+
+      {/* Partner Logos Section */}
+      <PartnerLogos />
+
+      {/* Value Proposition Section */}
       <div className="container mx-auto px-4 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <Building2 className="w-12 h-12 text-primary mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Premium Properties</h3>
+        <div className="max-w-3xl mx-auto text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose REALTRADE?</h2>
+          <p className="text-xl text-gray-600">
+            We connect you with high-quality real estate investment opportunities, giving you the transparency and control you deserve.
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
+            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Verified Investments</h3>
             <p className="text-gray-600">
-              Access exclusive real estate opportunities from top US platforms.
+              All deals undergo rigorous due diligence by our team of experts before being listed on our platform.
             </p>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <LineChart className="w-12 h-12 text-primary mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Market Analysis</h3>
+          
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
+            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <DollarSign className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Low Minimums</h3>
             <p className="text-gray-600">
-              Deep insights into market trends and investment performance.
+              Start with as little as $10 and build your real estate portfolio one investment at a time.
             </p>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <Users className="w-12 h-12 text-primary mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Community Insights</h3>
+          
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100 text-center">
+            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Regular Returns</h3>
             <p className="text-gray-600">
-              Learn from successful investors and share experiences.
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <DollarSign className="w-12 h-12 text-primary mb-4" />
-            <h3 className="text-xl font-semibold mb-2">ROI Tracking</h3>
-            <p className="text-gray-600">
-              Monitor your investments and track returns in real-time.
+              Receive quarterly distributions and track the performance of your investments in real-time.
             </p>
           </div>
         </div>
@@ -85,12 +103,18 @@ const Landing = () => {
         <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
           Join thousands of investors who are already using our platform to make data-driven investment decisions.
         </p>
-        <Link to="/properties">
+        <Link to="/investor-signup">
           <Button size="lg" className="text-lg px-8">
             Get Started Now <ArrowRight className="ml-2" />
           </Button>
         </Link>
       </div>
+
+      {/* Testimonials Section */}
+      <Testimonials />
+
+      {/* Footer */}
+      <HomeFooter />
     </div>
   );
 };

@@ -1,11 +1,12 @@
-
 import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { InvestmentCalculator } from "./InvestmentCalculator";
 import { RecommendationRating } from "./RecommendationRating";
 import { InvestmentIntentForm } from "./InvestmentIntentForm";
+import { PropertyMap } from "./PropertyMap";
 import { 
   MapPin, 
   Building, 
@@ -20,6 +21,24 @@ interface PropertyDetailContentProps {
 }
 
 export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) => {
+  const { toast } = useToast();
+  
+  const handleInvestNowClick = () => {
+    toast({
+      title: "Investment Process Started",
+      description: "You are now being directed to the investment flow.",
+    });
+    
+    // In a real app, this would open a modal or navigate to an investment flow
+    setTimeout(() => {
+      const modal = document.getElementById('investment-intent-form');
+      if (modal) {
+        // @ts-ignore - This is a workaround for the modal
+        modal.click();
+      }
+    }, 100);
+  };
+  
   return (
     <div className="p-4 md:p-6">
       <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
@@ -33,7 +52,12 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
         
         <div className="flex flex-col items-end">
           <span className="text-xl md:text-2xl font-bold text-primary">${property.price.toLocaleString()}</span>
-          <Badge className="mt-1">{property.type}</Badge>
+          <div className="flex gap-1 mt-1">
+            <Badge>{property.type}</Badge>
+            {property.isVerified && (
+              <Badge variant="success">Verified</Badge>
+            )}
+          </div>
         </div>
       </div>
       
@@ -74,11 +98,26 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
           <span>{property.daysLeft} days left</span>
         </div>
         
-        <InvestmentIntentForm 
-          propertyId={property.id || "prop1"} 
-          propertyName={property.name}
-          minInvestment={property.minInvestment}
-        />
+        <Button 
+          variant="default" 
+          className="bg-primary text-white hover:bg-primary-dark"
+          onClick={handleInvestNowClick}
+        >
+          Invest Now
+        </Button>
+        
+        <div className="hidden">
+          <InvestmentIntentForm 
+            propertyId={property.id || "prop1"} 
+            propertyName={property.name}
+            minInvestment={property.minInvestment}
+          />
+        </div>
+      </div>
+      
+      <div className="mb-6">
+        <h3 className="text-sm font-medium mb-3">Location</h3>
+        <PropertyMap location={property.location} />
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -113,22 +152,30 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
           <div className="bg-white p-4 rounded-lg border">
             <h3 className="text-sm font-medium mb-2">Financial Metrics</h3>
             <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Cap Rate</span>
-                <span className="font-medium">{property.capRate}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Cash-on-Cash Return</span>
-                <span className="font-medium">{property.cashOnCash || Math.round(property.roi * 0.75)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Debt Service Ratio</span>
-                <span className="font-medium">{property.debtServiceRatio || "1.25"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Loan-to-Value</span>
-                <span className="font-medium">{property.loanToValue || "65"}%</span>
-              </div>
+              {property.capRate && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cap Rate</span>
+                  <span className="font-medium">{property.capRate}%</span>
+                </div>
+              )}
+              {(property.cashOnCash || property.roi) && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cash-on-Cash Return</span>
+                  <span className="font-medium">{property.cashOnCash || Math.round(property.roi * 0.75)}%</span>
+                </div>
+              )}
+              {property.debtServiceRatio && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Debt Service Ratio</span>
+                  <span className="font-medium">{property.debtServiceRatio}</span>
+                </div>
+              )}
+              {property.loanToValue && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Loan-to-Value</span>
+                  <span className="font-medium">{property.loanToValue}%</span>
+                </div>
+              )}
             </div>
           </div>
           
