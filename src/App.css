@@ -1,42 +1,73 @@
+
 #root {
-  max-width: 1280px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  padding: 0;
+  text-align: left;
+}
+
+/* Responsive padding for main content */
+.main-content {
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .main-content {
+    padding: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .main-content {
+    padding: 2rem;
+  }
 }
 
 .logo {
-  height: 6em;
-  padding: 1.5em;
+  height: 2.5rem;
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  filter: drop-shadow(0 0 1em rgba(66, 133, 244, 0.6));
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Deal card styles */
+.deal-card {
+  @apply rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+.deal-image {
+  @apply w-full h-48 object-cover;
+}
+
+@media (min-width: 768px) {
+  .deal-image {
+    height: 180px;
   }
 }
 
-.card {
-  padding: 2em;
+/* Marketing slogan styles */
+.marketing-slogan {
+  @apply text-lg md:text-xl lg:text-2xl font-medium text-gray-700 my-4;
 }
 
-.read-the-docs {
-  color: #888;
+/* Improved button styles */
+.action-button {
+  @apply px-4 py-2 rounded-md font-medium transition-all duration-200;
+}
+
+/* Loading animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

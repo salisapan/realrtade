@@ -51,17 +51,17 @@ export const RecommendationRating = ({
   };
 
   return (
-    <Card className="shadow-sm">
+    <Card className="shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-1.5">
-          <Star className="h-4 w-4 text-amber-500" />
+          <Star className="h-4 w-4 text-primary fill-primary" />
           Deal Recommendation
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
           {/* Score display */}
-          <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+          <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
             <div>
               <div className="text-xs text-gray-500">Investment Score</div>
               <div className={`text-xl font-bold ${getScoreColor(score)}`}>
@@ -73,7 +73,7 @@ export const RecommendationRating = ({
               {[...Array(5)].map((_, i) => (
                 <Star 
                   key={i} 
-                  className={`h-4 w-4 ${i < Math.ceil(score/2) ? "text-amber-500 fill-amber-500" : "text-gray-300"}`} 
+                  className={`h-4 w-4 ${i < Math.ceil(score/2) ? "text-primary fill-primary" : "text-gray-300"}`} 
                 />
               ))}
             </div>
@@ -85,35 +85,35 @@ export const RecommendationRating = ({
             <ul className="space-y-1.5">
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
+                  <TrendingUp className="h-3.5 w-3.5 text-primary" />
                   <span className="text-xs">Market Trend</span>
                 </div>
                 <Badge variant={getBadgeVariant(marketTrend)} className="text-xs h-5 px-1.5">{marketTrend}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-blue-500" />
+                  <Users className="h-3.5 w-3.5 text-primary" />
                   <span className="text-xs">Entrepreneur</span>
                 </div>
                 <Badge variant={getBadgeVariant(entrepreneurExperience)} className="text-xs h-5 px-1.5">{entrepreneurExperience}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 text-blue-500" />
+                  <AlertTriangle className="h-3.5 w-3.5 text-primary" />
                   <span className="text-xs">Risk Level</span>
                 </div>
                 <Badge variant={getBadgeVariant(riskLevel === "Low" ? "High" : riskLevel === "High" ? "Low" : "Medium")} className="text-xs h-5 px-1.5">{riskLevel}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <BarChart2 className="h-3.5 w-3.5 text-blue-500" />
+                  <BarChart2 className="h-3.5 w-3.5 text-primary" />
                   <span className="text-xs">Area Demand</span>
                 </div>
                 <Badge variant={getBadgeVariant(demandLevel)} className="text-xs h-5 px-1.5">{demandLevel}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
+                  <CheckCircle className="h-3.5 w-3.5 text-primary" />
                   <span className="text-xs">Return Potential</span>
                 </div>
                 <Badge variant={getBadgeVariant(returnPotential)} className="text-xs h-5 px-1.5">{returnPotential}</Badge>
@@ -122,7 +122,7 @@ export const RecommendationRating = ({
           </div>
           
           {/* Summary */}
-          <div className="bg-gray-50 p-2.5 rounded-lg text-xs">
+          <div className="bg-muted p-2.5 rounded-lg text-xs">
             <p>{getRecommendationSummary(score, riskLevel, demandLevel)}</p>
           </div>
           

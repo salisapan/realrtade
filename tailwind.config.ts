@@ -8,26 +8,46 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: "2rem",
+      padding: {
+        DEFAULT: "1rem",
+        sm: "1.5rem",
+        md: "2rem",
+      },
       screens: {
-        "2xl": "1400px",
+        sm: "640px",
+        md: "768px",
+        lg: "1024px",
+        xl: "1280px",
+        "2xl": "1440px",
       },
     },
     extend: {
       colors: {
         primary: {
           DEFAULT: "#4285F4",
-          foreground: "hsl(var(--primary-foreground))",
+          light: "#6EA0FF",
+          dark: "#3A76D8",
+          foreground: "#FFFFFF",
+        },
+        secondary: {
+          DEFAULT: "#8A94A6", // Silver/gray accent color
+          light: "#B5BDC9",
+          dark: "#6D7688",
+          foreground: "#FFFFFF",
         },
         card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
+          DEFAULT: "#FFFFFF",
+          foreground: "#1F2937",
         },
         background: "#FFFFFF",
-        foreground: "#1F2937", // Adding the missing foreground color
+        foreground: "#1F2937",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
+        muted: {
+          DEFAULT: "#F3F4F6",
+          foreground: "#6B7280",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -43,10 +63,15 @@ export default {
           "0%": { opacity: "1", transform: "translateY(0)" },
           "100%": { opacity: "0", transform: "translateY(10px)" },
         },
+        "slide-in": {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(0)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.3s ease-out",
         "fade-out": "fade-out 0.3s ease-out",
+        "slide-in": "slide-in 0.4s ease-out",
       },
     },
   },
