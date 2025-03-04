@@ -23,21 +23,22 @@ export const HomeHeader = () => {
               </h1>
             </Link>
             
+            {/* Home button added in prominent position */}
+            <Link to="/" className="ml-4">
+              <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
+                <Home className="w-5 h-5" />
+                <span className="hidden md:inline font-medium">Home</span>
+              </Button>
+            </Link>
+            
             <div className="hidden md:flex ml-6">
               <p className="text-sm text-secondary">
-                Connecting real estate entrepreneurs with investors worldwide
+                Connecting real estate entrepreneurs with investors worldwide, as easily as buying stocks
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <Link to="/">
-              <Button variant="ghost" size="sm" className="flex items-center gap-1">
-                <Home className="w-4 h-4" />
-                <span className="hidden md:inline">Home</span>
-              </Button>
-            </Link>
-            
+          <div className="flex items-center gap-2">            
             <Link to="/investor-signup">
               <Button variant="default" size="sm" className="hidden md:inline-flex">
                 Sign Up
@@ -58,7 +59,7 @@ export const HomeHeader = () => {
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t mt-3">
             <nav className="flex flex-col space-y-3">
-              <Link to="/" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+              <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Home</span>
               </Link>

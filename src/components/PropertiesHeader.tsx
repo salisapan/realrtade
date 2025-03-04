@@ -34,6 +34,14 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
                 REALTRADE
               </h1>
             </Link>
+            
+            {/* Home button added in prominent position */}
+            <Link to="/" className="ml-4">
+              <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
+                <Home className="w-5 h-5" />
+                <span className="hidden md:inline font-medium">Home</span>
+              </Button>
+            </Link>
           </div>
           
           {/* Tagline moved to its own row */}
@@ -52,13 +60,6 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
               />
               <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
             </div>
-            
-            <Link to="/">
-              <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-1">
-                <Home className="w-4 h-4" />
-                <span className="hidden md:inline">Home</span>
-              </Button>
-            </Link>
             
             <Link to="/dashboard">
               <Button variant="ghost" size="icon" className="relative">
@@ -93,13 +94,17 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t mb-4">
             <nav className="flex flex-col space-y-3">
-              <Link to="/" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+              <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Home</span>
               </Link>
               <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Dashboard</span>
+              </Link>
+              <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                <Home className="w-5 h-5" />
+                <span>Properties</span>
               </Link>
               <Link to="/performance" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                 <Home className="w-5 h-5" />
@@ -135,4 +140,4 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
       </div>
     </header>
   );
-};
+}

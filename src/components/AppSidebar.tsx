@@ -86,8 +86,8 @@ export function AppSidebar() {
               {displayItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link to={item.url}>
-                      <item.icon />
+                    <Link to={item.url} className={item.title === "Home" ? "font-bold text-primary" : ""}>
+                      <item.icon className={item.title === "Home" ? "text-primary" : ""} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
