@@ -15,7 +15,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
-// Define validation schema for personal information
 const personalInfoSchema = z.object({
   fullName: z.string().min(3, "Full name must be at least 3 characters"),
   email: z.string().email("Please enter a valid email address"),
@@ -28,7 +27,6 @@ const personalInfoSchema = z.object({
   age: z.coerce.number().min(18, "You must be at least 18 years old"),
 });
 
-// Define validation schema for financial information
 const financialInfoSchema = z.object({
   incomeRange: z.string().min(1, "Please select your income range"),
   netWorthRange: z.string().min(1, "Please select your net worth range"),
@@ -37,7 +35,6 @@ const financialInfoSchema = z.object({
   legalStatus: z.string().min(1, "Please select your legal status"),
 });
 
-// Define validation schema for investment details
 const investmentDetailsSchema = z.object({
   investmentAmount: z.coerce.number().min(1, "Please enter a valid investment amount"),
   paymentMethod: z.string().min(1, "Please select a payment method"),
@@ -49,7 +46,6 @@ const investmentDetailsSchema = z.object({
   }),
 });
 
-// Combined schema
 const combinedSchema = z.object({
   ...personalInfoSchema.shape,
   ...financialInfoSchema.shape,
@@ -69,7 +65,6 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   
-  // Initialize the form with defaults
   const form = useForm<FormData>({
     resolver: zodResolver(combinedSchema),
     defaultValues: {
@@ -127,9 +122,7 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
   const onSubmit = async (data: FormData) => {
     console.log("Form submitted:", data);
     
-    // In a real implementation, this would send the data to your backend
     try {
-      // Simulate API call with a timeout
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast({
@@ -138,10 +131,8 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
         variant: "success",
       });
       
-      // Close the form
       setIsOpen(false);
       
-      // Navigate to a confirmation or dashboard page
       navigate("/dashboard?tab=investments");
     } catch (error) {
       toast({
@@ -372,7 +363,9 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
             <Checkbox 
               id="isAccreditedInvestor" 
               checked={watch("isAccreditedInvestor")}
-              onCheckedChange={(checked) => form.setValue("isAccreditedInvestor", checked as boolean)}
+              onCheckedChange={(checked) => {
+                form.setValue("isAccreditedInvestor", checked === true);
+              }}
             />
             <div className="flex items-center">
               <Label htmlFor="isAccreditedInvestor" className="text-sm font-medium">
@@ -510,9 +503,7 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
               id="agreeToTerms" 
               checked={watch("agreeToTerms")}
               onCheckedChange={(checked) => {
-                if (checked !== undefined) {
-                  form.setValue("agreeToTerms", checked);
-                }
+                form.setValue("agreeToTerms", checked === true);
               }}
               className={errors.agreeToTerms ? "border-red-500 data-[state=checked]:bg-red-500" : ""}
             />
