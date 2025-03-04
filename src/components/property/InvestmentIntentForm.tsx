@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -510,9 +511,8 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
               id="agreeToTerms" 
               checked={watch("agreeToTerms")}
               onCheckedChange={(checked) => {
-                if (checked !== undefined) {
-                  form.setValue("agreeToTerms", checked);
-                }
+                // Fix: Ensure we're passing a boolean value to form.setValue
+                form.setValue("agreeToTerms", checked === true);
               }}
               className={errors.agreeToTerms ? "border-red-500 data-[state=checked]:bg-red-500" : ""}
             />
