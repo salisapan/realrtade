@@ -1,17 +1,18 @@
-import React, { useState } from "react";
+
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronRight, ChevronLeft, Info } from "lucide-react";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { Info } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -19,18 +20,19 @@ const personalInfoSchema = z.object({
   fullName: z.string().min(3, "Full name must be at least 3 characters"),
   email: z.string().email("Please enter a valid email address"),
   phone: z.string().min(10, "Please enter a valid phone number"),
-  street: z.string().min(3, "Street address is required"),
-  city: z.string().min(2, "City is required"),
-  state: z.string().min(2, "State/province is required"),
-  zipCode: z.string().min(5, "ZIP/Postal code is required"),
-  country: z.string().min(2, "Country is required"),
+  address: z.object({
+    street: z.string().min(1, "Street address is required"),
+    city: z.string().min(1, "City is required"),
+    state: z.string().min(1, "State is required"),
+    zipCode: z.string().min(5, "Please enter a valid ZIP code"),
+  }),
   age: z.coerce.number().min(18, "You must be at least 18 years old"),
 });
 
 const financialInfoSchema = z.object({
   incomeRange: z.string().min(1, "Please select your income range"),
   netWorthRange: z.string().min(1, "Please select your net worth range"),
-  experienceLevel: z.string().min(1, "Please select your investment experience level"),
+  investmentExperience: z.string().min(1, "Please select your investment experience"),
   isAccreditedInvestor: z.boolean(),
   legalStatus: z.string().min(1, "Please select your legal status"),
 });
@@ -38,11 +40,10 @@ const financialInfoSchema = z.object({
 const investmentDetailsSchema = z.object({
   investmentAmount: z.coerce.number().min(1, "Please enter a valid investment amount"),
   paymentMethod: z.string().min(1, "Please select a payment method"),
-  investmentHorizon: z.string().min(1, "Please select your investment timeframe"),
-  riskTolerance: z.string().min(1, "Please select your risk tolerance"),
-  additionalNotes: z.string().optional(),
+  recurringInvestment: z.boolean().optional(),
   agreeToTerms: z.boolean().refine(val => val === true, {
     message: "You must agree to the terms and conditions",
+    path: ["agreeToTerms"],
   }),
 });
 
@@ -60,8 +61,11 @@ interface InvestmentIntentFormProps {
   minInvestment: number;
 }
 
-export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }: InvestmentIntentFormProps) => {
-  const [step, setStep] = useState(1);
+export const InvestmentIntentForm = ({ 
+  propertyId, 
+  propertyName, 
+  minInvestment 
+}: InvestmentIntentFormProps) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   
@@ -71,52 +75,90 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
       fullName: "",
       email: "",
       phone: "",
-      street: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      country: "",
-      age: 18,
+      address: {
+        street: "",
+        city: "",
+        state: "",
+        zipCode: "",
+      },
+      age: 0,
       incomeRange: "",
       netWorthRange: "",
-      experienceLevel: "",
+      investmentExperience: "",
       isAccreditedInvestor: false,
       legalStatus: "",
       investmentAmount: minInvestment,
       paymentMethod: "",
-      investmentHorizon: "",
-      riskTolerance: "medium",
-      additionalNotes: "",
+      recurringInvestment: false,
       agreeToTerms: false,
     },
-    mode: "onChange",
   });
   
-  const { register, handleSubmit, formState: { errors, isValid }, watch, trigger } = form;
+  const { errors } = form.formState;
+  const watch = form.watch;
   
-  const nextStep = async () => {
-    let fieldsToValidate: string[] = [];
-    
-    switch (step) {
-      case 1:
-        fieldsToValidate = ["fullName", "email", "phone", "street", "city", "state", "zipCode", "country", "age"];
-        break;
-      case 2:
-        fieldsToValidate = ["incomeRange", "netWorthRange", "experienceLevel", "legalStatus"];
-        break;
-      case 3:
-        fieldsToValidate = ["investmentAmount", "paymentMethod", "investmentHorizon", "riskTolerance", "agreeToTerms"];
-        break;
-    }
-    
-    const isStepValid = await trigger(fieldsToValidate as any);
-    if (isStepValid) {
-      setStep(step + 1);
+  // Define the form steps
+  const [currentStep, setCurrentStep] = useState<'personal' | 'financial' | 'investment'>('personal');
+  
+  // Handle form navigation
+  const goToNextStep = () => {
+    if (currentStep === 'personal') {
+      // Validate personal info fields
+      const personalInfoFields = form.getValues();
+      const personalInfoResult = personalInfoSchema.safeParse({
+        fullName: personalInfoFields.fullName,
+        email: personalInfoFields.email,
+        phone: personalInfoFields.phone,
+        address: personalInfoFields.address,
+        age: personalInfoFields.age,
+      });
+      
+      if (personalInfoResult.success) {
+        setCurrentStep('financial');
+      } else {
+        // Trigger validation to show errors
+        void form.trigger([
+          'fullName',
+          'email',
+          'phone',
+          'address.street',
+          'address.city',
+          'address.state',
+          'address.zipCode',
+          'age',
+        ]);
+      }
+    } else if (currentStep === 'financial') {
+      // Validate financial info fields
+      const financialInfoFields = form.getValues();
+      const financialInfoResult = financialInfoSchema.safeParse({
+        incomeRange: financialInfoFields.incomeRange,
+        netWorthRange: financialInfoFields.netWorthRange,
+        investmentExperience: financialInfoFields.investmentExperience,
+        isAccreditedInvestor: financialInfoFields.isAccreditedInvestor,
+        legalStatus: financialInfoFields.legalStatus,
+      });
+      
+      if (financialInfoResult.success) {
+        setCurrentStep('investment');
+      } else {
+        // Trigger validation to show errors
+        void form.trigger([
+          'incomeRange',
+          'netWorthRange',
+          'investmentExperience',
+          'legalStatus',
+        ]);
+      }
     }
   };
   
-  const prevStep = () => {
-    setStep(step - 1);
+  const goToPreviousStep = () => {
+    if (currentStep === 'financial') {
+      setCurrentStep('personal');
+    } else if (currentStep === 'investment') {
+      setCurrentStep('financial');
+    }
   };
   
   const onSubmit = async (data: FormData) => {
@@ -127,7 +169,7 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
       
       toast({
         title: "Investment Intent Submitted",
-        description: `Your $${data.investmentAmount.toLocaleString()} investment intent for ${propertyName} has been received.`,
+        description: `You've successfully expressed interest in ${propertyName}.`,
         variant: "success",
       });
       
@@ -136,565 +178,459 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
       navigate("/dashboard?tab=investments");
     } catch (error) {
       toast({
-        title: "Submission Failed",
-        description: "There was an error processing your request. Please try again.",
+        title: "Error",
+        description: "There was an error submitting your investment intent. Please try again.",
         variant: "destructive",
       });
     }
   };
   
-  const renderStepContent = () => {
-    switch (step) {
-      case 1:
-        return renderPersonalInfoStep();
-      case 2:
-        return renderFinancialInfoStep();
-      case 3:
-        return renderInvestmentDetailsStep();
-      case 4:
-        return renderReviewStep();
-      default:
-        return null;
-    }
-  };
-  
-  const renderPersonalInfoStep = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium">Personal Information</h3>
-      <p className="text-sm text-gray-500 mb-4">
-        Please provide your personal details for the investment intent.
-      </p>
-      
-      <div className="space-y-3">
-        <div className="grid grid-cols-1 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="fullName">Full Name*</Label>
-            <Input
-              id="fullName"
-              {...register("fullName")}
-              placeholder="John Doe"
-              className={errors.fullName ? "border-red-500" : ""}
-            />
-            {errors.fullName && (
-              <p className="text-red-500 text-xs mt-1">{errors.fullName.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email Address*</Label>
-            <Input
-              id="email"
-              type="email"
-              {...register("email")}
-              placeholder="johndoe@example.com"
-              className={errors.email ? "border-red-500" : ""}
-            />
-            {errors.email && (
-              <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-1.5">
-            <Label htmlFor="phone">Phone Number*</Label>
-            <Input
-              id="phone"
-              {...register("phone")}
-              placeholder="(555) 123-4567"
-              className={errors.phone ? "border-red-500" : ""}
-            />
-            {errors.phone && (
-              <p className="text-red-500 text-xs mt-1">{errors.phone.message}</p>
-            )}
-          </div>
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="street">Street Address*</Label>
-          <Input
-            id="street"
-            {...register("street")}
-            placeholder="123 Main St"
-            className={errors.street ? "border-red-500" : ""}
-          />
-          {errors.street && (
-            <p className="text-red-500 text-xs mt-1">{errors.street.message}</p>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="city">City*</Label>
-            <Input
-              id="city"
-              {...register("city")}
-              placeholder="New York"
-              className={errors.city ? "border-red-500" : ""}
-            />
-            {errors.city && (
-              <p className="text-red-500 text-xs mt-1">{errors.city.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-1.5">
-            <Label htmlFor="state">State/Province*</Label>
-            <Input
-              id="state"
-              {...register("state")}
-              placeholder="NY"
-              className={errors.state ? "border-red-500" : ""}
-            />
-            {errors.state && (
-              <p className="text-red-500 text-xs mt-1">{errors.state.message}</p>
-            )}
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="zipCode">ZIP/Postal Code*</Label>
-            <Input
-              id="zipCode"
-              {...register("zipCode")}
-              placeholder="10001"
-              className={errors.zipCode ? "border-red-500" : ""}
-            />
-            {errors.zipCode && (
-              <p className="text-red-500 text-xs mt-1">{errors.zipCode.message}</p>
-            )}
-          </div>
-          
-          <div className="space-y-1.5">
-            <Label htmlFor="country">Country*</Label>
-            <Input
-              id="country"
-              {...register("country")}
-              placeholder="United States"
-              className={errors.country ? "border-red-500" : ""}
-            />
-            {errors.country && (
-              <p className="text-red-500 text-xs mt-1">{errors.country.message}</p>
-            )}
-          </div>
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="age">Age*</Label>
-          <Input
-            id="age"
-            type="number"
-            min={18}
-            {...register("age", { valueAsNumber: true })}
-            className={errors.age ? "border-red-500" : ""}
-          />
-          {errors.age && (
-            <p className="text-red-500 text-xs mt-1">{errors.age.message}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-  
-  const renderFinancialInfoStep = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium">Financial & Legal Information</h3>
-      <p className="text-sm text-gray-500 mb-4">
-        These details help us ensure compliance with financial regulations.
-      </p>
-      
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="incomeRange">Annual Income Range*</Label>
-          <Select defaultValue={watch("incomeRange")} onValueChange={(value) => form.setValue("incomeRange", value)}>
-            <SelectTrigger id="incomeRange" className={errors.incomeRange ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select income range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0-50k">$0 - $50,000</SelectItem>
-              <SelectItem value="50k-100k">$50,000 - $100,000</SelectItem>
-              <SelectItem value="100k-250k">$100,000 - $250,000</SelectItem>
-              <SelectItem value="250k-500k">$250,000 - $500,000</SelectItem>
-              <SelectItem value="500k+">$500,000+</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.incomeRange && (
-            <p className="text-red-500 text-xs mt-1">{errors.incomeRange.message}</p>
-          )}
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="netWorthRange">Net Worth Range*</Label>
-          <Select defaultValue={watch("netWorthRange")} onValueChange={(value) => form.setValue("netWorthRange", value)}>
-            <SelectTrigger id="netWorthRange" className={errors.netWorthRange ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select net worth range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0-100k">$0 - $100,000</SelectItem>
-              <SelectItem value="100k-500k">$100,000 - $500,000</SelectItem>
-              <SelectItem value="500k-1m">$500,000 - $1,000,000</SelectItem>
-              <SelectItem value="1m-5m">$1,000,000 - $5,000,000</SelectItem>
-              <SelectItem value="5m+">$5,000,000+</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.netWorthRange && (
-            <p className="text-red-500 text-xs mt-1">{errors.netWorthRange.message}</p>
-          )}
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="experienceLevel">Investment Experience Level*</Label>
-          <Select defaultValue={watch("experienceLevel")} onValueChange={(value) => form.setValue("experienceLevel", value)}>
-            <SelectTrigger id="experienceLevel" className={errors.experienceLevel ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select experience level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="beginner">Beginner (0-2 years)</SelectItem>
-              <SelectItem value="intermediate">Intermediate (3-5 years)</SelectItem>
-              <SelectItem value="experienced">Experienced (5-10 years)</SelectItem>
-              <SelectItem value="expert">Expert (10+ years)</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.experienceLevel && (
-            <p className="text-red-500 text-xs mt-1">{errors.experienceLevel.message}</p>
-          )}
-        </div>
-        
-        <div className="space-y-1.5">
-          <div className="flex items-center space-x-2">
-            <Checkbox 
-              id="isAccreditedInvestor" 
-              checked={watch("isAccreditedInvestor")}
-              onCheckedChange={(checked) => {
-                form.setValue("isAccreditedInvestor", checked === true);
-              }}
-            />
-            <div className="flex items-center">
-              <Label htmlFor="isAccreditedInvestor" className="text-sm font-medium">
-                I am an Accredited Investor
-              </Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 ml-1.5 text-gray-400" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    <p className="text-xs">An accredited investor meets certain income or net worth requirements set by the SEC: $200k+ annual income ($300k+ with spouse) for the past 2 years or $1M+ net worth (excluding primary residence).</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="legalStatus">Legal Status*</Label>
-          <Select defaultValue={watch("legalStatus")} onValueChange={(value) => form.setValue("legalStatus", value)}>
-            <SelectTrigger id="legalStatus" className={errors.legalStatus ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select legal status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="individual">Individual</SelectItem>
-              <SelectItem value="jointAccount">Joint Account</SelectItem>
-              <SelectItem value="llc">LLC</SelectItem>
-              <SelectItem value="corporation">Corporation</SelectItem>
-              <SelectItem value="trust">Trust</SelectItem>
-              <SelectItem value="ira">IRA</SelectItem>
-              <SelectItem value="other">Other</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.legalStatus && (
-            <p className="text-red-500 text-xs mt-1">{errors.legalStatus.message}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-  
-  const renderInvestmentDetailsStep = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium">Investment Details</h3>
-      <p className="text-sm text-gray-500 mb-4">
-        Specify your investment preferences for this property.
-      </p>
-      
-      <div className="space-y-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="investmentAmount">Investment Amount ($)*</Label>
-          <Input
-            id="investmentAmount"
-            type="number"
-            min={minInvestment}
-            step={1000}
-            {...register("investmentAmount", { valueAsNumber: true })}
-            className={errors.investmentAmount ? "border-red-500" : ""}
-          />
-          {errors.investmentAmount ? (
-            <p className="text-red-500 text-xs mt-1">{errors.investmentAmount.message}</p>
-          ) : (
-            <p className="text-xs text-gray-500 mt-1">Minimum investment: ${minInvestment.toLocaleString()}</p>
-          )}
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="paymentMethod">Preferred Payment Method*</Label>
-          <Select defaultValue={watch("paymentMethod")} onValueChange={(value) => form.setValue("paymentMethod", value)}>
-            <SelectTrigger id="paymentMethod" className={errors.paymentMethod ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select payment method" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="bankTransfer">Bank Transfer</SelectItem>
-              <SelectItem value="wireTransfer">Wire Transfer</SelectItem>
-              <SelectItem value="check">Check</SelectItem>
-              <SelectItem value="escrow">Escrow</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.paymentMethod && (
-            <p className="text-red-500 text-xs mt-1">{errors.paymentMethod.message}</p>
-          )}
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="investmentHorizon">Investment Horizon*</Label>
-          <Select defaultValue={watch("investmentHorizon")} onValueChange={(value) => form.setValue("investmentHorizon", value)}>
-            <SelectTrigger id="investmentHorizon" className={errors.investmentHorizon ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select investment timeframe" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="1-3years">1-3 years</SelectItem>
-              <SelectItem value="3-5years">3-5 years</SelectItem>
-              <SelectItem value="5-10years">5-10 years</SelectItem>
-              <SelectItem value="10+years">10+ years</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.investmentHorizon && (
-            <p className="text-red-500 text-xs mt-1">{errors.investmentHorizon.message}</p>
-          )}
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="riskTolerance">Risk Tolerance*</Label>
-          <Select defaultValue={watch("riskTolerance")} onValueChange={(value) => form.setValue("riskTolerance", value)}>
-            <SelectTrigger id="riskTolerance" className={errors.riskTolerance ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select risk tolerance" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low (Conservative)</SelectItem>
-              <SelectItem value="medium">Medium (Moderate)</SelectItem>
-              <SelectItem value="high">High (Aggressive)</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.riskTolerance && (
-            <p className="text-red-500 text-xs mt-1">{errors.riskTolerance.message}</p>
-          )}
-        </div>
-        
-        <div className="space-y-1.5">
-          <Label htmlFor="additionalNotes">Additional Notes/Comments</Label>
-          <Textarea
-            id="additionalNotes"
-            {...register("additionalNotes")}
-            placeholder="Any specific requirements or questions about this investment opportunity..."
-            className="h-20 resize-none"
-          />
-        </div>
-        
-        <div className="space-y-1.5 pt-2">
-          <div className="flex items-start space-x-2">
-            <Checkbox 
-              id="agreeToTerms" 
-              checked={watch("agreeToTerms")}
-              onCheckedChange={(checked) => {
-                form.setValue("agreeToTerms", checked === true);
-              }}
-              className={errors.agreeToTerms ? "border-red-500 data-[state=checked]:bg-red-500" : ""}
-            />
-            <div>
-              <Label 
-                htmlFor="agreeToTerms" 
-                className="text-sm font-medium"
-              >
-                I understand that this is a non-binding Letter of Intent and agree to the terms and conditions*
-              </Label>
-              {errors.agreeToTerms && (
-                <p className="text-red-500 text-xs mt-1">{errors.agreeToTerms.message}</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-  
-  const renderReviewStep = () => (
-    <div className="space-y-4">
-      <h3 className="text-lg font-medium">Review Your Investment Intent</h3>
-      <p className="text-sm text-gray-500 mb-4">
-        Please review your information before submission.
-      </p>
-      
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="text-sm font-medium mb-2">Property Details</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-gray-500">Property:</div>
-              <div className="font-medium">{propertyName}</div>
-              <div className="text-gray-500">Property ID:</div>
-              <div className="font-medium">{propertyId}</div>
-              <div className="text-gray-500">Investment Amount:</div>
-              <div className="font-medium text-green-600">${watch("investmentAmount").toLocaleString()}</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="text-sm font-medium mb-2">Investor Information</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-gray-500">Name:</div>
-              <div className="font-medium">{watch("fullName")}</div>
-              <div className="text-gray-500">Email:</div>
-              <div className="font-medium">{watch("email")}</div>
-              <div className="text-gray-500">Phone:</div>
-              <div className="font-medium">{watch("phone")}</div>
-              <div className="text-gray-500">Location:</div>
-              <div className="font-medium">{`${watch("city")}, ${watch("state")}, ${watch("country")}`}</div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <h4 className="text-sm font-medium mb-2">Investment Preferences</h4>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-gray-500">Payment Method:</div>
-              <div className="font-medium">{
-                {
-                  "bankTransfer": "Bank Transfer",
-                  "wireTransfer": "Wire Transfer",
-                  "check": "Check",
-                  "escrow": "Escrow"
-                }[watch("paymentMethod")] || watch("paymentMethod")
-              }</div>
-              <div className="text-gray-500">Investment Horizon:</div>
-              <div className="font-medium">{
-                {
-                  "1-3years": "1-3 years",
-                  "3-5years": "3-5 years",
-                  "5-10years": "5-10 years",
-                  "10+years": "10+ years"
-                }[watch("investmentHorizon")] || watch("investmentHorizon")
-              }</div>
-              <div className="text-gray-500">Risk Tolerance:</div>
-              <div className="font-medium">{
-                {
-                  "low": "Low (Conservative)",
-                  "medium": "Medium (Moderate)",
-                  "high": "High (Aggressive)"
-                }[watch("riskTolerance")] || watch("riskTolerance")
-              }</div>
-              {watch("additionalNotes") && (
-                <>
-                  <div className="text-gray-500">Additional Notes:</div>
-                  <div className="font-medium">{watch("additionalNotes")}</div>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <p className="text-sm text-gray-500 italic">
-          By submitting this form, you acknowledge that this is a non-binding Letter of Intent (LOI) to express interest in this investment opportunity. The REALTRADE team will review your information and contact you to complete the investment process.
-        </p>
-      </div>
-    </div>
-  );
-  
-  const renderProgress = () => (
-    <div className="mb-4">
-      <div className="flex justify-between text-xs text-gray-500 mb-1">
-        <span>Personal Info</span>
-        <span>Financial Status</span>
-        <span>Investment Details</span>
-        <span>Review</span>
-      </div>
-      <div className="relative pt-1">
-        <div className="overflow-hidden h-2 text-xs flex bg-gray-200 rounded">
-          <div
-            className="flex flex-col justify-center bg-primary text-white text-center whitespace-nowrap rounded transition-all duration-500"
-            style={{ width: `${(step / 4) * 100}%` }}
-          ></div>
-        </div>
-        <div className="flex justify-between mt-1">
-          {[1, 2, 3, 4].map((stepNumber) => (
-            <div
-              key={stepNumber}
-              className={`flex items-center justify-center w-6 h-6 rounded-full border-2 -mt-3 text-xs font-semibold ${
-                stepNumber <= step
-                  ? "border-primary bg-primary text-white"
-                  : "border-gray-300 bg-white text-gray-500"
-              }`}
-            >
-              {stepNumber < step ? <Check className="h-3 w-3" /> : stepNumber}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-  
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger asChild>
-        <Button className="w-full">Invest Now</Button>
+        <Button className="w-full">Express Interest</Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-md md:max-w-lg p-0 overflow-y-auto">
-        <div className="h-full flex flex-col">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold">Investment Intent</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              {propertyName} - Property ID: {propertyId}
-            </p>
-            {renderProgress()}
+      <SheetContent className="w-full md:max-w-xl overflow-y-auto">
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold">Express Interest in {propertyName}</h3>
+            <p className="text-sm text-muted-foreground mt-1">Complete this form to initiate your investment.</p>
           </div>
           
-          <div className="flex-1 p-6 overflow-y-auto">
-            <form onSubmit={handleSubmit(onSubmit)}>
-              {renderStepContent()}
-            </form>
-          </div>
-          
-          <div className="p-6 border-t mt-auto bg-gray-50">
-            <div className="flex justify-between">
-              {step > 1 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={prevStep}
-                  className="w-28"
-                >
-                  <ChevronLeft className="mr-1 h-4 w-4" /> Back
-                </Button>
-              )}
-              
-              {step < 4 ? (
-                <Button
-                  type="button"
-                  onClick={nextStep}
-                  className="ml-auto w-28"
-                >
-                  Next <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  onClick={handleSubmit(onSubmit)}
-                  className="ml-auto w-36"
-                >
-                  Submit Intent
-                </Button>
-              )}
+          <div className="flex items-center justify-between text-sm">
+            <div 
+              className={`flex flex-col items-center ${currentStep === 'personal' ? 'text-primary' : 'text-gray-400'}`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep === 'personal' ? 'bg-primary text-white' : 'bg-gray-200'}`}>
+                1
+              </div>
+              <span>Personal</span>
+            </div>
+            <div className="flex-1 h-px bg-gray-200 mx-2"></div>
+            <div 
+              className={`flex flex-col items-center ${currentStep === 'financial' ? 'text-primary' : 'text-gray-400'}`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep === 'financial' ? 'bg-primary text-white' : 'bg-gray-200'}`}>
+                2
+              </div>
+              <span>Financial</span>
+            </div>
+            <div className="flex-1 h-px bg-gray-200 mx-2"></div>
+            <div 
+              className={`flex flex-col items-center ${currentStep === 'investment' ? 'text-primary' : 'text-gray-400'}`}
+            >
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-1 ${currentStep === 'investment' ? 'bg-primary text-white' : 'bg-gray-200'}`}>
+                3
+              </div>
+              <span>Investment</span>
             </div>
           </div>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* Step 1: Personal Information */}
+              {currentStep === 'personal' && (
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your full name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="Enter your email" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter your phone number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="space-y-2">
+                    <FormLabel>Address</FormLabel>
+                    <div className="grid grid-cols-1 gap-2">
+                      <FormField
+                        control={form.control}
+                        name="address.street"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input placeholder="Street Address" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <div className="grid grid-cols-2 gap-2">
+                        <FormField
+                          control={form.control}
+                          name="address.city"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input placeholder="City" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={form.control}
+                          name="address.state"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Input placeholder="State" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      
+                      <FormField
+                        control={form.control}
+                        name="address.zipCode"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormControl>
+                              <Input placeholder="ZIP Code" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="age"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Age</FormLabel>
+                        <FormControl>
+                          <Input type="number" min="18" placeholder="Enter your age" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              
+              {/* Step 2: Financial Information */}
+              {currentStep === 'financial' && (
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="incomeRange"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Annual Income Range</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select income range" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="under-50k">Under $50,000</SelectItem>
+                            <SelectItem value="50k-100k">$50,000 - $100,000</SelectItem>
+                            <SelectItem value="100k-200k">$100,000 - $200,000</SelectItem>
+                            <SelectItem value="200k-300k">$200,000 - $300,000</SelectItem>
+                            <SelectItem value="over-300k">Over $300,000</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="netWorthRange"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Net Worth Range</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select net worth range" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="under-100k">Under $100,000</SelectItem>
+                            <SelectItem value="100k-500k">$100,000 - $500,000</SelectItem>
+                            <SelectItem value="500k-1m">$500,000 - $1,000,000</SelectItem>
+                            <SelectItem value="1m-5m">$1,000,000 - $5,000,000</SelectItem>
+                            <SelectItem value="over-5m">Over $5,000,000</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="investmentExperience"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Investment Experience</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select experience level" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="beginner">Beginner (0-2 years)</SelectItem>
+                            <SelectItem value="intermediate">Intermediate (2-5 years)</SelectItem>
+                            <SelectItem value="experienced">Experienced (5-10 years)</SelectItem>
+                            <SelectItem value="expert">Expert (10+ years)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="legalStatus"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Legal Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select legal status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="individual">Individual</SelectItem>
+                            <SelectItem value="joint">Joint</SelectItem>
+                            <SelectItem value="trust">Trust</SelectItem>
+                            <SelectItem value="entity">Entity (LLC, Corp, etc.)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="flex items-start space-x-2 pt-2">
+                    <Checkbox 
+                      id="isAccreditedInvestor" 
+                      checked={watch("isAccreditedInvestor")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("isAccreditedInvestor", checked === true);
+                      }}
+                    />
+                    <div className="flex items-center">
+                      <Label htmlFor="isAccreditedInvestor" className="text-sm font-medium">
+                        I am an accredited investor
+                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 ml-1 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p>An accredited investor has an annual income of $200,000+ ($300,000+ with spouse) for the past 2 years or a net worth exceeding $1,000,000 (excluding primary residence).</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Step 3: Investment Details */}
+              {currentStep === 'investment' && (
+                <div className="space-y-4">
+                  <div>
+                    <Badge variant="outline" className="mb-3">Minimum investment: ${minInvestment.toLocaleString()}</Badge>
+                    <FormField
+                      control={form.control}
+                      name="investmentAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Investment Amount</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                              <Input 
+                                type="number"
+                                min={minInvestment}
+                                step="100"
+                                className="pl-7" 
+                                {...field}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  if (isNaN(value) || value < minInvestment) {
+                                    field.onChange(minInvestment);
+                                  } else {
+                                    field.onChange(value);
+                                  }
+                                }}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <FormField
+                    control={form.control}
+                    name="paymentMethod"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Payment Method</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select payment method" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="bank-transfer">Bank Transfer (ACH)</SelectItem>
+                            <SelectItem value="wire">Wire Transfer</SelectItem>
+                            <SelectItem value="credit-card">Credit Card</SelectItem>
+                            <SelectItem value="check">Check</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <div className="flex items-start space-x-2 pt-2">
+                    <Checkbox 
+                      id="recurringInvestment" 
+                      checked={watch("recurringInvestment")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("recurringInvestment", checked === true);
+                      }}
+                    />
+                    <div>
+                      <Label htmlFor="recurringInvestment" className="text-sm font-medium">
+                        Set up recurring investment
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Automatically invest the same amount on a monthly basis
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4">
+                    <div className="p-4 border rounded-md bg-gray-50">
+                      <h4 className="font-medium mb-2">Investment Summary</h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Property:</span>
+                          <span>{propertyName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Amount:</span>
+                          <span>${watch("investmentAmount")?.toLocaleString() || minInvestment.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Fees:</span>
+                          <span>$0</span>
+                        </div>
+                        <div className="border-t pt-1 mt-1">
+                          <div className="flex justify-between font-medium">
+                            <span>Total:</span>
+                            <span>${watch("investmentAmount")?.toLocaleString() || minInvestment.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-2 pt-4">
+                    <Checkbox 
+                      id="agreeToTerms" 
+                      checked={watch("agreeToTerms")}
+                      onCheckedChange={(checked) => {
+                        form.setValue("agreeToTerms", checked === true);
+                      }}
+                      className={errors.agreeToTerms ? "border-red-500 data-[state=checked]:bg-red-500" : ""}
+                    />
+                    <div>
+                      <Label htmlFor="agreeToTerms" className={`text-sm font-medium ${errors.agreeToTerms ? "text-red-500" : ""}`}>
+                        I agree to the terms and conditions
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        By checking this box, I acknowledge that I have read and agree to the 
+                        <a href="#" className="text-primary ml-1">Investment Agreement</a> and 
+                        <a href="#" className="text-primary ml-1">Privacy Policy</a>.
+                      </p>
+                      {errors.agreeToTerms && (
+                        <p className="text-xs text-red-500 mt-1">{errors.agreeToTerms.message}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-between pt-4">
+                {currentStep !== 'personal' ? (
+                  <Button type="button" variant="outline" onClick={goToPreviousStep}>
+                    Back
+                  </Button>
+                ) : (
+                  <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
+                    Cancel
+                  </Button>
+                )}
+                
+                {currentStep !== 'investment' ? (
+                  <Button type="button" onClick={goToNextStep}>
+                    Continue
+                  </Button>
+                ) : (
+                  <Button type="submit">
+                    Submit Intent
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Form>
         </div>
       </SheetContent>
     </Sheet>
