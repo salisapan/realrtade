@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { z } from "zod";
@@ -45,8 +44,8 @@ const investmentDetailsSchema = z.object({
   investmentHorizon: z.string().min(1, "Please select your investment timeframe"),
   riskTolerance: z.string().min(1, "Please select your risk tolerance"),
   additionalNotes: z.string().optional(),
-  agreeToTerms: z.literal(true, {
-    errorMap: () => ({ message: "You must agree to the terms and conditions" }),
+  agreeToTerms: z.boolean().refine(val => val === true, {
+    message: "You must agree to the terms and conditions",
   }),
 });
 
@@ -153,7 +152,6 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
     }
   };
   
-  // Render the current step content
   const renderStepContent = () => {
     switch (step) {
       case 1:
@@ -511,7 +509,11 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
             <Checkbox 
               id="agreeToTerms" 
               checked={watch("agreeToTerms")}
-              onCheckedChange={(checked) => form.setValue("agreeToTerms", checked as boolean)}
+              onCheckedChange={(checked) => {
+                if (checked !== undefined) {
+                  form.setValue("agreeToTerms", checked);
+                }
+              }}
               className={errors.agreeToTerms ? "border-red-500 data-[state=checked]:bg-red-500" : ""}
             />
             <div>
@@ -616,7 +618,6 @@ export const InvestmentIntentForm = ({ propertyId, propertyName, minInvestment }
     </div>
   );
   
-  // Progress bar indicator
   const renderProgress = () => (
     <div className="mb-4">
       <div className="flex justify-between text-xs text-gray-500 mb-1">
