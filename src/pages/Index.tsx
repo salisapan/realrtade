@@ -19,10 +19,12 @@ const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("sector");
   const [investorProfile, setInvestorProfile] = useState<any>(null);
   const [properties, setProperties] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   // Check if user has completed investor registration
   useEffect(() => {
+    setIsLoading(true);
     const profile = localStorage.getItem("investorProfile");
     
     if (!profile) {
@@ -32,6 +34,7 @@ const Index = () => {
         description: "Please complete your investor profile to access all properties.",
         variant: "destructive",
       });
+      setIsLoading(false);
       return;
     }
     
@@ -45,6 +48,10 @@ const Index = () => {
       if (isAccredited) {
         // Accredited investors see all properties
         setProperties(getCategoryProperties(selectedCategory));
+        toast({
+          title: "Welcome Accredited Investor",
+          description: "You're viewing all available investment properties.",
+        });
       } else {
         // Non-accredited investors see only verified properties with low minimum investments
         const verifiedDeals = nonAccreditedDeals.map(deal => ({
@@ -59,10 +66,12 @@ const Index = () => {
           description: "You're viewing verified properties with low minimum investments.",
         });
       }
+      setIsLoading(false);
     } catch (error) {
       console.error("Error parsing investor profile:", error);
+      setIsLoading(false);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, toast]);
   
   // Helper function to get properties for the selected category
   const getCategoryProperties = (category: string) => {
@@ -90,6 +99,14 @@ const Index = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex">
       <AppSidebar />
@@ -107,19 +124,15 @@ const Index = () => {
             <TabsContent value="sector">
               <PropertyListing properties={properties} />
             </TabsContent>
-            
             <TabsContent value="low-risk">
               <PropertyListing properties={properties} />
             </TabsContent>
-            
             <TabsContent value="geography">
               <PropertyListing properties={properties} />
             </TabsContent>
-            
             <TabsContent value="profitable">
               <PropertyListing properties={properties} />
             </TabsContent>
-            
             <TabsContent value="company">
               <PropertyListing properties={properties} />
             </TabsContent>
