@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone } from "lucide-react";
 export const HomeFooter = () => {
-  return <footer className="bg-gray-900 text-white pt-16 pb-8">
+  return <footer className="text-white pt-16 pb-8 bg-slate-900">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           <div className="space-y-4">

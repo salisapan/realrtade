@@ -10,9 +10,7 @@ const Landing = () => {
       {/* Hero Section */}
       <div className="container mx-auto px-4 pt-20 pb-16">
         <div className="max-w-3xl mx-auto text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            RealTrade - Invest in real estate worldwide from anywhere.
-          </h1>
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">RealTrade - Invest in real estate worldwide from anywhere.</h1>
           <p className="text-xl text-gray-600 mb-8">Make informed investment with comprehensive market data and analysis on deal from the top US real estate entrepreneurs.</p>
           <Link to="/investor-signup">
             <Button size="lg" className="text-lg px-8">
@@ -75,7 +73,7 @@ const Landing = () => {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
             <div>
-              <div className="text-4xl font-bold text-primary mb-2">$2.5B+</div>
+              <div className="text-4xl font-bold text-primary mb-2">$1.5B+</div>
               <div className="text-gray-600">Total Investment Volume</div>
             </div>
             <div>
