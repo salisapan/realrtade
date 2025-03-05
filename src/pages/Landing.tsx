@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Building2, LineChart, Users, DollarSign, ArrowRight, Star, Shield, Clock } from "lucide-react";
@@ -6,19 +5,15 @@ import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Testimonials } from "@/components/landing/Testimonials";
 import { PartnerLogos } from "@/components/landing/PartnerLogos";
 import { HomeFooter } from "@/components/landing/HomeFooter";
-
 const Landing = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+  return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Hero Section */}
       <div className="container mx-auto px-4 pt-20 pb-16">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
             RealTrade - Invest in real estate worldwide from anywhere.
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
-            Make informed investment decisions with comprehensive market data and analysis from top US crowdfunding platforms.
-          </p>
+          <p className="text-xl text-gray-600 mb-8">Make informed investment with comprehensive market data and analysis on deal from the top US real estate entrepreneurs.</p>
           <Link to="/investor-signup">
             <Button size="lg" className="text-lg px-8">
               Get Started <ArrowRight className="ml-2" />
@@ -115,8 +110,6 @@ const Landing = () => {
 
       {/* Footer */}
       <HomeFooter />
-    </div>
-  );
+    </div>;
 };
-
 export default Landing;
