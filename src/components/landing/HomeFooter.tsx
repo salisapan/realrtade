@@ -14,12 +14,9 @@ export const HomeFooter = () => {
                 alt="RealTrade Logo" 
                 className="h-10 mr-3 rounded-lg" 
               />
-              <h1 className="text-2xl font-bold">
-                REALTRADE
-              </h1>
             </Link>
             <p className="text-gray-400">
-              Connecting real estate entrepreneurs with investors worldwide, as easily as buying stocks.
+              Invest in real estate worldwide from anywhere.
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-gray-400 hover:text-white transition-colors">
@@ -73,7 +70,7 @@ export const HomeFooter = () => {
         <div className="border-t border-gray-800 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="text-gray-400 text-sm mb-4 md:mb-0">
-              © 2023 REALTRADE. All rights reserved.
+              © 2023 RealTrade. All rights reserved.
             </div>
             <div className="text-gray-400 text-sm">
               <p>Regulated by FINRA and SEC; all deals meet due diligence standards</p>

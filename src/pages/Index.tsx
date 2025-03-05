@@ -15,6 +15,90 @@ import {
 } from "@/data/propertyData";
 import { nonAccreditedDeals } from "@/data/nonAccreditedDeals";
 
+// Add new sample deals with $10 minimum investment
+const affordableDeals = [
+  {
+    id: "aff-001",
+    title: "Micro-Share Apartment Complex",
+    location: "Austin, TX",
+    imageUrl: "https://images.unsplash.com/photo-1460317442991-0ec209397118?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
+    price: "$10",
+    roi: "8.2%",
+    type: "Residential",
+    raised: "$1.2M",
+    goal: "$1.5M",
+    description: "Fractional shares in a stable, income-producing apartment complex with professional management.",
+    isVerified: true,
+    minInvestment: 10,
+    lat: 30.2672,
+    lng: -97.7431,
+  },
+  {
+    id: "aff-002",
+    title: "Retail Space Fractional",
+    location: "Chicago, IL",
+    imageUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
+    price: "$10",
+    roi: "7.5%",
+    type: "Commercial",
+    raised: "$850K",
+    goal: "$1M",
+    description: "Own a piece of this prime retail space in downtown Chicago with established tenants.",
+    isVerified: true,
+    minInvestment: 10,
+    lat: 41.8781,
+    lng: -87.6298,
+  },
+  {
+    id: "aff-003",
+    title: "Micro REITs Bundle",
+    location: "Multiple US Cities",
+    imageUrl: "https://images.unsplash.com/photo-1560520653-9e0e4c89eb11?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2273&q=80",
+    price: "$10",
+    roi: "9.0%",
+    type: "Mixed",
+    raised: "$2.3M",
+    goal: "$3M",
+    description: "Diversified portfolio of micro-shares across multiple properties in growing markets.",
+    isVerified: true,
+    minInvestment: 10,
+    lat: 37.0902,
+    lng: -95.7129,
+  },
+  {
+    id: "aff-004",
+    title: "Student Housing Share",
+    location: "Boston, MA",
+    imageUrl: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
+    price: "$10",
+    roi: "8.7%",
+    type: "Residential",
+    raised: "$1.7M",
+    goal: "$2M",
+    description: "Student housing complex near major universities with consistent rental demand.",
+    isVerified: true,
+    minInvestment: 10,
+    lat: 42.3601,
+    lng: -71.0589,
+  },
+  {
+    id: "aff-005",
+    title: "Small Business Plaza",
+    location: "Miami, FL",
+    imageUrl: "https://images.unsplash.com/photo-1604964432806-254d07c11f32?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80",
+    price: "$10",
+    roi: "7.8%",
+    type: "Commercial",
+    raised: "$900K",
+    goal: "$1.2M",
+    description: "Small business plaza in growing area of Miami with long-term tenants.",
+    isVerified: true,
+    minInvestment: 10,
+    lat: 25.7617,
+    lng: -80.1918,
+  }
+];
+
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("sector");
   const [investorProfile, setInvestorProfile] = useState<any>(null);
@@ -28,10 +112,9 @@ const Index = () => {
     const profile = localStorage.getItem("investorProfile");
     
     if (!profile) {
-      // Redirect to investor registration if no profile exists
       toast({
         title: "Registration Required",
-        description: "Please complete your investor profile to access all properties.",
+        description: "Please complete your investor profile to access properties.",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -42,8 +125,7 @@ const Index = () => {
       const parsedProfile = JSON.parse(profile);
       setInvestorProfile(parsedProfile);
       
-      // All investors can access the platform - accredited investors get all properties
-      // non-accredited investors get verified low-minimum deals
+      // All investors can access the platform
       const isAccredited = parsedProfile.isAccredited === "yes";
       
       if (isAccredited) {
@@ -54,19 +136,19 @@ const Index = () => {
           description: "You're viewing all available investment properties.",
         });
       } else {
-        // Non-accredited investors see only verified properties with low minimum investments
-        setProperties(nonAccreditedDeals);
+        // Non-accredited investors see affordable deals with $10 minimum investment
+        setProperties(affordableDeals);
         
         toast({
           title: "Welcome to RealTrade",
-          description: "You're viewing verified properties with low minimum investments.",
+          description: "You're viewing verified properties with low minimum investments of just $10.",
         });
       }
       setIsLoading(false);
     } catch (error) {
       console.error("Error parsing investor profile:", error);
       // Even if there's an error, show some default properties
-      setProperties(nonAccreditedDeals);
+      setProperties(affordableDeals);
       setIsLoading(false);
     }
   }, [selectedCategory, toast]);
@@ -94,8 +176,10 @@ const Index = () => {
     
     if (investorProfile && investorProfile.isAccredited === "yes") {
       setProperties(getCategoryProperties(category));
+    } else {
+      // Non-accredited investors always see the affordable deals regardless of category
+      setProperties(affordableDeals);
     }
-    // Non-accredited investors always see the same verified deals regardless of category
   };
 
   if (isLoading) {
@@ -117,6 +201,11 @@ const Index = () => {
           }))}
           onSelectCategory={handleCategoryChange}
         />
+        
+        {/* Add the slogan above the property listing */}
+        <div className="container mx-auto px-4 pt-6">
+          <p className="text-gray-600 text-sm text-center mb-4">RealTrade - Invest in real estate worldwide from anywhere.</p>
+        </div>
 
         <main className="container mx-auto px-4 py-8">
           <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full">

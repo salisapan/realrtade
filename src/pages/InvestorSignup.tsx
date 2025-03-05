@@ -60,15 +60,23 @@ const InvestorSignup = () => {
     // Store investor information in localStorage for demo purposes
     localStorage.setItem("investorProfile", JSON.stringify(values));
     
-    toast({
-      title: "Registration Successful",
-      description: "Your investor profile has been created. You can now browse properties.",
-    });
+    // Different message based on accreditation status
+    if (values.isAccredited === "yes") {
+      toast({
+        title: "Registration Successful",
+        description: "Welcome, accredited investor! You now have access to all investment opportunities.",
+      });
+    } else {
+      toast({
+        title: "Registration Successful",
+        description: "Welcome! You now have access to our verified deals with lower minimum investments.",
+      });
+    }
     
     // Show completion message before redirecting
     setRegistrationComplete(true);
     
-    // Redirect after a short delay
+    // Redirect to properties page after a short delay for all users
     setTimeout(() => {
       navigate("/properties");
     }, 2000);

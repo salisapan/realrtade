@@ -20,20 +20,13 @@ export const HomeHeader = () => {
               />
             </Link>
             
-            {/* Home button added in prominent position */}
+            {/* Home button in prominent position */}
             <Link to="/" className="ml-4">
               <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
                 <Home className="w-5 h-5" />
                 <span className="hidden md:inline font-medium">Home</span>
               </Button>
             </Link>
-          </div>
-          
-          {/* Tagline moved below the header for better visibility */}
-          <div className="hidden md:flex">
-            <p className="text-sm text-gray-600">
-              RealTrade - Invest in real estate worldwide from anywhere.
-            </p>
           </div>
           
           <div className="flex items-center gap-2">            

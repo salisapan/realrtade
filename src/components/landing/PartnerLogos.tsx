@@ -2,13 +2,13 @@
 import { useRef, useEffect } from 'react';
 
 const partners = [
-  { id: 1, name: "Blackstone Real Estate", logo: "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=120&h=60&fit=crop" },
-  { id: 2, name: "CBRE Group", logo: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=120&h=60&fit=crop" },
-  { id: 3, name: "JLL", logo: "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?w=120&h=60&fit=crop" },
-  { id: 4, name: "Goldman Sachs", logo: "https://images.unsplash.com/photo-1588702547919-26089e690ecc?w=120&h=60&fit=crop" },
-  { id: 5, name: "Morgan Stanley", logo: "https://images.unsplash.com/photo-1586880244406-556ebe35f282?w=120&h=60&fit=crop" },
-  { id: 6, name: "Brookfield Asset Management", logo: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=120&h=60&fit=crop" },
-  { id: 7, name: "Prologis", logo: "https://images.unsplash.com/photo-1608222351212-18fe0ec7b13b?w=120&h=60&fit=crop" },
+  { id: 1, name: "Blackstone Real Estate", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Blackstone_Group_logo.svg/320px-Blackstone_Group_logo.svg.png" },
+  { id: 2, name: "CBRE Group", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/CBRE_Group_logo.svg/320px-CBRE_Group_logo.svg.png" },
+  { id: 3, name: "JLL", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/JLL_logo.svg/320px-JLL_logo.svg.png" },
+  { id: 4, name: "Goldman Sachs", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Goldman_Sachs.svg/320px-Goldman_Sachs.svg.png" },
+  { id: 5, name: "Morgan Stanley", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Morgan_Stanley_Logo.svg/320px-Morgan_Stanley_Logo.svg.png" },
+  { id: 6, name: "Brookfield Asset Management", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Brookfield_Asset_Management_logo.svg/320px-Brookfield_Asset_Management_logo.svg.png" },
+  { id: 7, name: "Prologis", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Prologis.svg/320px-Prologis.svg.png" },
 ];
 
 export const PartnerLogos = () => {
