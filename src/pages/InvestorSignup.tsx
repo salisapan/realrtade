@@ -21,6 +21,7 @@ const formSchema = z.object({
   phone: z.string().min(10, { message: "Please enter a valid phone number." }),
   address: z.string().min(5, { message: "Please enter your full address." }),
   age: z.coerce.number().min(18, { message: "You must be at least 18 years old to invest." }),
+  // Removed minimum validation for financial fields
   annualIncome: z.coerce.number().min(0, { message: "Please enter your annual income." }),
   netWorth: z.coerce.number().min(0, { message: "Please enter your net worth." }),
   investmentExperience: z.enum(["none", "beginner", "intermediate", "advanced"], {
@@ -60,7 +61,7 @@ const InvestorSignup = () => {
     // Store investor information in localStorage for demo purposes
     localStorage.setItem("investorProfile", JSON.stringify(values));
     
-    // Different message based on accreditation status
+    // Different message based on accreditation status, but allow everyone access
     if (values.isAccredited === "yes") {
       toast({
         title: "Registration Successful",

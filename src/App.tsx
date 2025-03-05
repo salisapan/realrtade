@@ -22,12 +22,12 @@ import InvestorSignup from "./pages/InvestorSignup";
 
 const queryClient = new QueryClient();
 
-// Check if user has completed registration
+// Check if user has completed registration - simplified to only check if profile exists
 const hasRegistered = () => {
   return localStorage.getItem("investorProfile") !== null;
 };
 
-// Protected route component
+// Protected route component - now only checks if registration exists, not financial status
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (!hasRegistered()) {
     return <Navigate to="/investor-signup" replace />;

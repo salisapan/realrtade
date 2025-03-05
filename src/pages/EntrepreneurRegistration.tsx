@@ -69,7 +69,7 @@ const EntrepreneurRegistration = () => {
       return;
     }
     
-    // Submit registration
+    // Submit registration without any financial restrictions
     toast.success("Registration successful! You can now log in.");
     navigate("/entrepreneur");
   };
