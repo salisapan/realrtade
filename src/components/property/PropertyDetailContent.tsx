@@ -102,6 +102,16 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
         </Button>
       </div>
       
+      {/* Map placed immediately after the funding progress and before the investment form */}
+      <div className="mb-6">
+        <h3 className="text-sm font-medium mb-3">Property Location</h3>
+        <PropertyMap 
+          location={property.location || "New York, NY"} 
+          lat={property.lat} 
+          lng={property.lng} 
+        />
+      </div>
+      
       {showInvestmentForm && (
         <div className="mb-6 border rounded-lg p-4 shadow-sm">
           <h3 className="text-lg font-medium mb-3">Investment Details</h3>
@@ -112,11 +122,6 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
           />
         </div>
       )}
-      
-      <div className="mb-6">
-        <h3 className="text-sm font-medium mb-3">Location</h3>
-        <PropertyMap location={property.location || "New York, NY"} />
-      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <InvestmentCalculator 

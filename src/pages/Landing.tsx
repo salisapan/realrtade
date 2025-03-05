@@ -14,7 +14,7 @@ const Landing = () => {
       <div className="container mx-auto px-4 pt-20 pb-16">
         <div className="max-w-3xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Connecting real estate entrepreneurs with investors worldwide, as easily as buying stocks.
+            RealTrade - Invest in real estate worldwide from anywhere.
           </h1>
           <p className="text-xl text-gray-600 mb-8">
             Make informed investment decisions with comprehensive market data and analysis from top US crowdfunding platforms.

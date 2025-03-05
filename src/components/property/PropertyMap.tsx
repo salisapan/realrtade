@@ -26,48 +26,9 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
       const mapContent = document.createElement('div');
       mapContent.style.width = '100%';
       mapContent.style.height = '100%';
-      mapContent.style.backgroundColor = '#e9ecef';
-      mapContent.style.display = 'flex';
-      mapContent.style.alignItems = 'center';
-      mapContent.style.justifyContent = 'center';
-      mapContent.style.padding = '1rem';
-      
-      // Add a grid overlay to simulate a map
-      const grid = document.createElement('div');
-      grid.style.position = 'absolute';
-      grid.style.top = '0';
-      grid.style.left = '0';
-      grid.style.right = '0';
-      grid.style.bottom = '0';
-      grid.style.backgroundImage = 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)';
-      grid.style.backgroundSize = '20px 20px';
-      grid.style.pointerEvents = 'none';
-      
-      // Create a "map pin" for the location
-      const locationPin = document.createElement('div');
-      locationPin.style.position = 'absolute';
-      locationPin.style.top = '50%';
-      locationPin.style.left = '50%';
-      locationPin.style.width = '20px';
-      locationPin.style.height = '20px';
-      locationPin.style.transform = 'translate(-50%, -100%)';
-      locationPin.innerHTML = `
-        <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="css-i6dzq1">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-          <circle cx="12" cy="10" r="3"></circle>
-        </svg>
-      `;
-      locationPin.style.color = '#ff4757';
-      
-      const locationText = document.createElement('div');
-      locationText.textContent = location;
-      locationText.style.backgroundColor = 'white';
-      locationText.style.padding = '0.5rem 1rem';
-      locationText.style.borderRadius = '4px';
-      locationText.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-      locationText.style.fontWeight = '500';
-      locationText.style.maxWidth = '80%';
-      locationText.style.wordBreak = 'break-word';
+      mapContent.style.backgroundImage = 'url("https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+ff4757(' + lng + ',' + lat + ')/' + lng + ',' + lat + ',14,0/600x400@2x?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA")';
+      mapContent.style.backgroundSize = 'cover';
+      mapContent.style.backgroundPosition = 'center';
       
       // Add zoom control buttons
       const zoomControls = document.createElement('div');
@@ -103,65 +64,22 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
       zoomControls.appendChild(zoomIn);
       zoomControls.appendChild(zoomOut);
       
-      // Add interactivity to zoom buttons
-      zoomIn.addEventListener('click', () => {
-        mapContent.style.transform = 'scale(1.2)';
-        mapContent.style.transition = 'transform 0.3s ease';
-      });
+      // Create location label
+      const locationLabel = document.createElement('div');
+      locationLabel.textContent = location;
+      locationLabel.style.position = 'absolute';
+      locationLabel.style.bottom = '10px';
+      locationLabel.style.left = '10px';
+      locationLabel.style.backgroundColor = 'white';
+      locationLabel.style.padding = '5px 10px';
+      locationLabel.style.borderRadius = '4px';
+      locationLabel.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+      locationLabel.style.fontSize = '14px';
+      locationLabel.style.fontWeight = 'bold';
       
-      zoomOut.addEventListener('click', () => {
-        mapContent.style.transform = 'scale(1)';
-        mapContent.style.transition = 'transform 0.3s ease';
-      });
-      
-      // Add drag functionality
-      let isDragging = false;
-      let startX, startY, offsetX = 0, offsetY = 0;
-
-      mapContainer.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        startX = e.clientX - offsetX;
-        startY = e.clientY - offsetY;
-        mapContainer.style.cursor = 'grabbing';
-      });
-
-      mapContainer.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        offsetX = e.clientX - startX;
-        offsetY = e.clientY - startY;
-        mapContent.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-      });
-
-      mapContainer.addEventListener('mouseup', () => {
-        isDragging = false;
-        mapContainer.style.cursor = 'grab';
-      });
-
-      mapContainer.addEventListener('mouseleave', () => {
-        isDragging = false;
-        mapContainer.style.cursor = 'grab';
-      });
-      
-      // Add a note about using real maps in production
-      const disclaimer = document.createElement('div');
-      disclaimer.textContent = 'Interactive map showing property location';
-      disclaimer.style.position = 'absolute';
-      disclaimer.style.bottom = '10px';
-      disclaimer.style.left = '10px';
-      disclaimer.style.right = '10px';
-      disclaimer.style.backgroundColor = 'rgba(255,255,255,0.8)';
-      disclaimer.style.padding = '4px 8px';
-      disclaimer.style.borderRadius = '4px';
-      disclaimer.style.fontSize = '10px';
-      disclaimer.style.textAlign = 'center';
-      
-      mapContent.appendChild(grid);
-      mapContent.appendChild(locationPin);
-      mapContent.appendChild(locationText);
       mapContainer.appendChild(mapContent);
       mapContainer.appendChild(zoomControls);
-      mapContainer.appendChild(disclaimer);
-      mapContainer.style.cursor = 'grab';
+      mapContainer.appendChild(locationLabel);
     }
   }, [location, lat, lng]);
   

@@ -30,9 +30,6 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
                 alt="RealTrade Logo" 
                 className="h-8 md:h-10 mr-3 rounded-lg" 
               />
-              <h1 className="text-xl md:text-2xl font-bold text-gray-900 hidden sm:block">
-                REALTRADE
-              </h1>
             </Link>
             
             {/* Home button added in prominent position */}
@@ -44,10 +41,10 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
             </Link>
           </div>
           
-          {/* Tagline moved to its own row */}
+          {/* Tagline moved to its own row - no overlapping with logo */}
           <div className="hidden md:block text-center">
             <p className="text-sm text-secondary italic">
-              Connecting real estate entrepreneurs with investors worldwide, as easily as buying stocks
+              RealTrade - Invest in real estate worldwide from anywhere.
             </p>
           </div>
           

@@ -42,7 +42,8 @@ const Index = () => {
       const parsedProfile = JSON.parse(profile);
       setInvestorProfile(parsedProfile);
       
-      // Filter properties based on accreditation status
+      // All investors can access the platform - accredited investors get all properties
+      // non-accredited investors get verified low-minimum deals
       const isAccredited = parsedProfile.isAccredited === "yes";
       
       if (isAccredited) {
@@ -54,21 +55,18 @@ const Index = () => {
         });
       } else {
         // Non-accredited investors see only verified properties with low minimum investments
-        const verifiedDeals = nonAccreditedDeals.map(deal => ({
-          ...deal,
-          // Add badges to show the deal is verified and for non-accredited investors
-          badges: ["Verified", "Low Minimum"]
-        }));
-        setProperties(verifiedDeals);
+        setProperties(nonAccreditedDeals);
         
         toast({
-          title: "Welcome Non-Accredited Investor",
+          title: "Welcome to RealTrade",
           description: "You're viewing verified properties with low minimum investments.",
         });
       }
       setIsLoading(false);
     } catch (error) {
       console.error("Error parsing investor profile:", error);
+      // Even if there's an error, show some default properties
+      setProperties(nonAccreditedDeals);
       setIsLoading(false);
     }
   }, [selectedCategory, toast]);
@@ -97,6 +95,7 @@ const Index = () => {
     if (investorProfile && investorProfile.isAccredited === "yes") {
       setProperties(getCategoryProperties(category));
     }
+    // Non-accredited investors always see the same verified deals regardless of category
   };
 
   if (isLoading) {

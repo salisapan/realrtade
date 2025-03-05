@@ -18,9 +18,6 @@ export const HomeHeader = () => {
                 alt="RealTrade Logo" 
                 className="h-8 mr-3 rounded-lg" 
               />
-              <h1 className="text-xl font-bold text-gray-900">
-                RealTrade
-              </h1>
             </Link>
             
             {/* Home button added in prominent position */}
@@ -32,7 +29,7 @@ export const HomeHeader = () => {
             </Link>
           </div>
           
-          {/* Moved tagline here for better visibility and no overlap */}
+          {/* Tagline moved below the header for better visibility */}
           <div className="hidden md:flex">
             <p className="text-sm text-gray-600">
               RealTrade - Invest in real estate worldwide from anywhere.
