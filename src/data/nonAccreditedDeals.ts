@@ -21,7 +21,7 @@ export const nonAccreditedDeals = [
     occupancyRate: 100,
     capRate: 5.8,
     noi: 145000,
-    image: "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2",
+    image: "https://images.unsplash.com/photo-1449157291145-7efd050a4d0e?w=800&h=600&fit=crop",
     keyFeatures: [
       "100% occupied with waiting list",
       "Professional property management",
@@ -64,7 +64,7 @@ export const nonAccreditedDeals = [
     occupancyRate: 100,
     capRate: 5.2,
     noi: 62400,
-    image: "https://images.unsplash.com/photo-1541497613813-528de591c41e",
+    image: "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=800&h=600&fit=crop",
     keyFeatures: [
       "Triple-net leases with established tenants",
       "High foot traffic location",
@@ -95,7 +95,7 @@ export const nonAccreditedDeals = [
     price: 3800000,
     roi: 7.2,
     term: 5,
-    minInvestment: 15,
+    minInvestment: 10,
     fundingProgress: 58,
     currentFunding: 2204000,
     fundingGoal: 3800000,
@@ -107,7 +107,7 @@ export const nonAccreditedDeals = [
     occupancyRate: 97,
     capRate: 6.1,
     noi: 231800,
-    image: "https://images.unsplash.com/photo-1590001155093-a3c66ab0c3ff",
+    image: "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=800&h=600&fit=crop",
     keyFeatures: [
       "High demand area with low vacancy rates",
       "Luxury amenities attracting premium tenants",
@@ -150,7 +150,7 @@ export const nonAccreditedDeals = [
     occupancyRate: 100,
     capRate: 5.5,
     noi: 247500,
-    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d",
+    image: "https://images.unsplash.com/photo-1433832597046-4f10e10ac764?w=800&h=600&fit=crop",
     keyFeatures: [
       "15-year lease with credit tenant",
       "Strategic location in growing logistics hub",
@@ -181,7 +181,7 @@ export const nonAccreditedDeals = [
     price: 1800000,
     roi: 6.0,
     term: 2,
-    minInvestment: 12,
+    minInvestment: 10,
     fundingProgress: 82,
     currentFunding: 1476000,
     fundingGoal: 1800000,
@@ -193,7 +193,7 @@ export const nonAccreditedDeals = [
     occupancyRate: null,
     capRate: null,
     noi: null,
-    image: "https://images.unsplash.com/photo-1543746379-594facc9218c",
+    image: "https://images.unsplash.com/photo-1543746379-594facc9218c?w=800&h=600&fit=crop",
     keyFeatures: [
       "Fully entitled lots ready for development",
       "Located in a rapidly growing suburb",

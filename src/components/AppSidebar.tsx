@@ -1,7 +1,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu } from "lucide-react";
+import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck } from "lucide-react";
 
 const menuItems = [
   {
@@ -86,7 +86,10 @@ export function AppSidebar() {
               {displayItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link to={item.url} className={item.title === "Home" ? "font-bold text-primary" : ""}>
+                    <Link 
+                      to={item.url} 
+                      className={item.title === "Home" ? "font-bold text-primary" : ""}
+                    >
                       <item.icon className={item.title === "Home" ? "text-primary" : ""} />
                       <span>{item.title}</span>
                     </Link>
@@ -98,7 +101,7 @@ export function AppSidebar() {
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link to={isEntrepreneurSection ? "/properties" : "/entrepreneur"}>
-                    {isEntrepreneurSection ? <Building2 /> : <Building2 />}
+                    <Building2 />
                     <span>{isEntrepreneurSection ? "Investor View" : "Entrepreneur View"}</span>
                   </Link>
                 </SidebarMenuButton>

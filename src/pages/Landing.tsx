@@ -36,7 +36,7 @@ const Landing = () => {
       {/* Value Proposition Section */}
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-3xl mx-auto text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose REALTRADE?</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose RealTrade?</h2>
           <p className="text-xl text-gray-600">
             We connect you with high-quality real estate investment opportunities, giving you the transparency and control you deserve.
           </p>

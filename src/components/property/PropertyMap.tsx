@@ -21,6 +21,7 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
       mapContainer.style.position = 'relative';
       mapContainer.style.overflow = 'hidden';
       mapContainer.style.borderRadius = '8px';
+      mapContainer.style.border = '1px solid #e2e8f0';
       
       const mapContent = document.createElement('div');
       mapContent.style.width = '100%';
@@ -113,9 +114,37 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
         mapContent.style.transition = 'transform 0.3s ease';
       });
       
+      // Add drag functionality
+      let isDragging = false;
+      let startX, startY, offsetX = 0, offsetY = 0;
+
+      mapContainer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX - offsetX;
+        startY = e.clientY - offsetY;
+        mapContainer.style.cursor = 'grabbing';
+      });
+
+      mapContainer.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        offsetX = e.clientX - startX;
+        offsetY = e.clientY - startY;
+        mapContent.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+      });
+
+      mapContainer.addEventListener('mouseup', () => {
+        isDragging = false;
+        mapContainer.style.cursor = 'grab';
+      });
+
+      mapContainer.addEventListener('mouseleave', () => {
+        isDragging = false;
+        mapContainer.style.cursor = 'grab';
+      });
+      
       // Add a note about using real maps in production
       const disclaimer = document.createElement('div');
-      disclaimer.textContent = 'Note: In production, this would be an interactive Google Map or Mapbox map.';
+      disclaimer.textContent = 'Interactive map showing property location';
       disclaimer.style.position = 'absolute';
       disclaimer.style.bottom = '10px';
       disclaimer.style.left = '10px';
@@ -132,6 +161,7 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
       mapContainer.appendChild(mapContent);
       mapContainer.appendChild(zoomControls);
       mapContainer.appendChild(disclaimer);
+      mapContainer.style.cursor = 'grab';
     }
   }, [location, lat, lng]);
   

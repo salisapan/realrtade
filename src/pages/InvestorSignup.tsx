@@ -11,7 +11,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, Home, ArrowLeft } from "lucide-react";
+import { HelpCircle, Home, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 
@@ -37,6 +37,7 @@ const InvestorSignup = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registrationComplete, setRegistrationComplete] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -56,21 +57,38 @@ const InvestorSignup = () => {
   function onSubmit(values: FormValues) {
     setIsSubmitting(true);
     
-    // Simulate API call
+    // Store investor information in localStorage for demo purposes
+    localStorage.setItem("investorProfile", JSON.stringify(values));
+    
+    toast({
+      title: "Registration Successful",
+      description: "Your investor profile has been created. You can now browse properties.",
+    });
+    
+    // Show completion message before redirecting
+    setRegistrationComplete(true);
+    
+    // Redirect after a short delay
     setTimeout(() => {
-      console.log(values);
-      setIsSubmitting(false);
-      
-      // Store investor information in localStorage for demo purposes
-      localStorage.setItem("investorProfile", JSON.stringify(values));
-      
-      toast({
-        title: "Registration Successful",
-        description: "Your investor profile has been created. You can now browse properties.",
-      });
-      
       navigate("/properties");
-    }, 1500);
+    }, 2000);
+  }
+
+  if (registrationComplete) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
+        <HomeHeader />
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-md p-8 max-w-md w-full text-center">
+            <div className="mb-4">
+              <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Registration complete!</h2>
+            <p className="text-gray-600 mb-4">Taking you to the app...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

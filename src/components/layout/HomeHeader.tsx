@@ -19,7 +19,7 @@ export const HomeHeader = () => {
                 className="h-8 mr-3 rounded-lg" 
               />
               <h1 className="text-xl font-bold text-gray-900">
-                REALTRADE
+                RealTrade
               </h1>
             </Link>
             
@@ -30,12 +30,13 @@ export const HomeHeader = () => {
                 <span className="hidden md:inline font-medium">Home</span>
               </Button>
             </Link>
-            
-            <div className="hidden md:flex ml-6">
-              <p className="text-sm text-secondary">
-                Connecting real estate entrepreneurs with investors worldwide, as easily as buying stocks
-              </p>
-            </div>
+          </div>
+          
+          {/* Moved tagline here for better visibility and no overlap */}
+          <div className="hidden md:flex">
+            <p className="text-sm text-gray-600">
+              RealTrade - Invest in real estate worldwide from anywhere.
+            </p>
           </div>
           
           <div className="flex items-center gap-2">            
