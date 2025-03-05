@@ -194,7 +194,7 @@ const InvestorSignup = () => {
                   }) => <FormItem>
                           <FormLabel>Net Worth ($)</FormLabel>
                           <FormControl>
-                            <Input type="number" min="0" placeholder="500000" {...field} />
+                            <Input type="number" min="0" placeholder="500000" className="Minimum 100" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>} />
