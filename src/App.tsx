@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +19,7 @@ import EntrepreneurRegistration from "./pages/EntrepreneurRegistration";
 import DueDiligencePortal from "./pages/DueDiligencePortal";
 import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
+
 const queryClient = new QueryClient();
 
 // Check if user has completed registration - simplified to only check if profile exists
@@ -36,52 +38,80 @@ const ProtectedRoute = ({
   }
   return <>{children}</>;
 };
-const App = () => <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <SidebarProvider className="Even those who write \"no\" access the site.">
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/investor-signup" element={<InvestorSignup />} />
-            <Route path="/properties" element={<ProtectedRoute>
+
+const App = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <SidebarProvider className="Even those who write \"no\" access the site.">
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/investor-signup" element={<InvestorSignup />} />
+              <Route path="/properties" element={
+                <ProtectedRoute>
                   <Index />
-                </ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/dashboard" element={
+                <ProtectedRoute>
                   <Dashboard />
-                </ProtectedRoute>} />
-            <Route path="/performance" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/performance" element={
+                <ProtectedRoute>
                   <Performance />
-                </ProtectedRoute>} />
-            <Route path="/reports" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/reports" element={
+                <ProtectedRoute>
                   <Reports />
-                </ProtectedRoute>} />
-            <Route path="/wallet" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/wallet" element={
+                <ProtectedRoute>
                   <Wallet />
-                </ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
                   <Settings />
-                </ProtectedRoute>} />
-            <Route path="/property/:id" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/property/:id" element={
+                <ProtectedRoute>
                   <PropertyDetail />
-                </ProtectedRoute>} />
-            <Route path="/entrepreneur" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/entrepreneur" element={
+                <ProtectedRoute>
                   <EntrepreneurPortal />
-                </ProtectedRoute>} />
-            <Route path="/entrepreneur/register" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/entrepreneur/register" element={
+                <ProtectedRoute>
                   <EntrepreneurRegistration />
-                </ProtectedRoute>} />
-            <Route path="/entrepreneur/due-diligence" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/entrepreneur/due-diligence" element={
+                <ProtectedRoute>
                   <DueDiligencePortal />
-                </ProtectedRoute>} />
-            <Route path="/entrepreneur/reports" element={<ProtectedRoute>
+                </ProtectedRoute>
+              } />
+              <Route path="/entrepreneur/reports" element={
+                <ProtectedRoute>
                   <TransactionReports />
-                </ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </SidebarProvider>
-    </TooltipProvider>
-  </QueryClientProvider>;
+                </ProtectedRoute>
+              } />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </SidebarProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
+
 export default App;
