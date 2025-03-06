@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -7,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
 import { useToast } from "@/hooks/use-toast";
 import { nonAccreditedDeals } from "@/data/nonAccreditedDeals";
-import { sampleProperties } from "@/data/propertyData";
+import { propertiesBySector, propertiesByLowRisk, propertiesByGeography, propertiesByProfitable, propertiesByCompany } from "@/data/propertyData";
 import { 
   Home, 
   Building, 
@@ -48,10 +49,19 @@ const PropertyDetail = () => {
       
       let foundProperty;
       
-      // First check verified properties
-      foundProperty = sampleProperties.find(p => p.id === id);
+      // Check in all property lists
+      const allProperties = [
+        ...propertiesBySector,
+        ...propertiesByLowRisk,
+        ...propertiesByGeography,
+        ...propertiesByProfitable,
+        ...propertiesByCompany
+      ];
       
-      // If not found in sample properties, check non-accredited deals
+      // First check in all properties
+      foundProperty = allProperties.find(p => p.id === id);
+      
+      // If not found in properties, check non-accredited deals
       if (!foundProperty) {
         foundProperty = nonAccreditedDeals.find(p => p.id === id);
       }
