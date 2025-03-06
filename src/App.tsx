@@ -43,68 +43,101 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider className="Even those who write \"no\" access the site.">
+        <SidebarProvider className="Even those who write no access the site.">
           <Toaster />
           <Sonner />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/investor-signup" element={<InvestorSignup />} />
-              <Route path="/properties" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/performance" element={
-                <ProtectedRoute>
-                  <Performance />
-                </ProtectedRoute>
-              } />
-              <Route path="/reports" element={
-                <ProtectedRoute>
-                  <Reports />
-                </ProtectedRoute>
-              } />
-              <Route path="/wallet" element={
-                <ProtectedRoute>
-                  <Wallet />
-                </ProtectedRoute>
-              } />
-              <Route path="/settings" element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } />
-              <Route path="/property/:id" element={
-                <ProtectedRoute>
-                  <PropertyDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/entrepreneur" element={
-                <ProtectedRoute>
-                  <EntrepreneurPortal />
-                </ProtectedRoute>
-              } />
-              <Route path="/entrepreneur/register" element={
-                <ProtectedRoute>
-                  <EntrepreneurRegistration />
-                </ProtectedRoute>
-              } />
-              <Route path="/entrepreneur/due-diligence" element={
-                <ProtectedRoute>
-                  <DueDiligencePortal />
-                </ProtectedRoute>
-              } />
-              <Route path="/entrepreneur/reports" element={
-                <ProtectedRoute>
-                  <TransactionReports />
-                </ProtectedRoute>
-              } />
+              <Route 
+                path="/properties" 
+                element={
+                  <ProtectedRoute>
+                    <Index />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/dashboard" 
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/performance" 
+                element={
+                  <ProtectedRoute>
+                    <Performance />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/reports" 
+                element={
+                  <ProtectedRoute>
+                    <Reports />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/wallet" 
+                element={
+                  <ProtectedRoute>
+                    <Wallet />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/property/:id" 
+                element={
+                  <ProtectedRoute>
+                    <PropertyDetail />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/entrepreneur" 
+                element={
+                  <ProtectedRoute>
+                    <EntrepreneurPortal />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/entrepreneur/register" 
+                element={
+                  <ProtectedRoute>
+                    <EntrepreneurRegistration />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/entrepreneur/due-diligence" 
+                element={
+                  <ProtectedRoute>
+                    <DueDiligencePortal />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/entrepreneur/reports" 
+                element={
+                  <ProtectedRoute>
+                    <TransactionReports />
+                  </ProtectedRoute>
+                } 
+              />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
