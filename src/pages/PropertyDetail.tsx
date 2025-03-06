@@ -37,17 +37,32 @@ const PropertyDetail = () => {
   const { id } = useParams();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [bookmarked, setBookmarked] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
-    // Simulate loading property data
-    setTimeout(() => {
-      // Find property by ID
-      const foundProperty = sampleProperties.find(p => p.id === id);
+    const fetchProperty = () => {
+      setLoading(true);
+      
+      let foundProperty;
+      
+      // First check affordable deals
+      foundProperty = affordableDeals.find(p => p.id === id);
+      
+      // If not found in affordable deals, check sample properties
+      if (!foundProperty) {
+        foundProperty = sampleProperties.find(p => p.id === id);
+      }
+      
+      // If still not found, check non-accredited deals
+      if (!foundProperty) {
+        foundProperty = nonAccreditedDeals.find(p => p.id === id);
+      }
+      
       setProperty(foundProperty || null);
       setLoading(false);
-    }, 500);
+    };
+
+    fetchProperty();
   }, [id]);
   
   const handleBookmark = () => {
@@ -86,14 +101,16 @@ const PropertyDetail = () => {
     return (
       <div className="flex">
         <AppSidebar />
-        <div className="flex-1 flex flex-col items-center justify-center min-h-screen">
-          <h1 className="text-4xl font-bold mb-4">Oops! Property not found</h1>
-          <p className="text-lg mb-8">We couldn't find the property you're looking for.</p>
-          <Link to="/properties">
-            <Button>
-              Return to Properties
-            </Button>
-          </Link>
+        <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-gray-50">
+          <div className="text-center max-w-lg mx-auto px-4">
+            <h1 className="text-4xl font-bold mb-4 text-gray-900">Oops! Property not found</h1>
+            <p className="text-lg mb-8 text-gray-600">We couldn't find the property you're looking for.</p>
+            <Link to="/properties">
+              <Button variant="default" size="lg">
+                Return to Properties
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -147,6 +164,12 @@ const PropertyDetail = () => {
                 </Link>
               </div>
             </div>
+            {property.isVerified && (
+              <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium flex items-center">
+                <Check className="w-4 h-4 mr-1" />
+                Due Diligence Verified
+              </div>
+            )}
           </div>
         </header>
 

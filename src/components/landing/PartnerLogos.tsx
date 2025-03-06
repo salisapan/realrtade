@@ -2,11 +2,11 @@
 import { useRef, useEffect } from 'react';
 
 const partners = [
-  { id: 1, name: "Blackstone", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Blackstone_Group_logo.svg/320px-Blackstone_Group_logo.svg.png" },
-  { id: 2, name: "CBRE Group", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/CBRE_Group_logo.svg/320px-CBRE_Group_logo.svg.png" },
-  { id: 3, name: "JLL", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/JLL_logo.svg/320px-JLL_logo.svg.png" },
-  { id: 4, name: "Goldman Sachs", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Goldman_Sachs.svg/320px-Goldman_Sachs.svg.png" },
-  { id: 5, name: "JPMorgan", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/J.P._Morgan_Logo_2008_1.svg/320px-J.P._Morgan_Logo_2008_1.svg.png" },
+  { id: 1, name: "CBRE Group", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/CBRE_Group_logo.svg/320px-CBRE_Group_logo.svg.png" },
+  { id: 2, name: "JLL", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/JLL_logo.svg/320px-JLL_logo.svg.png" },
+  { id: 3, name: "Goldman Sachs", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/61/Goldman_Sachs.svg/320px-Goldman_Sachs.svg.png" },
+  { id: 4, name: "JPMorgan", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/J.P._Morgan_Logo_2008_1.svg/320px-J.P._Morgan_Logo_2008_1.svg.png" },
+  { id: 5, name: "Blackstone", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Blackstone_Group_logo.svg/320px-Blackstone_Group_logo.svg.png" },
   { id: 6, name: "Carlyle Group", logo: "https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/The_Carlyle_Group_logo.svg/320px-The_Carlyle_Group_logo.svg.png" },
 ];
 
@@ -28,7 +28,6 @@ export const PartnerLogos = () => {
     const scroll = () => {
       scrollPosition += scrollSpeed;
       
-      // Reset position when we've scrolled through the content once
       if (scrollPosition >= scrollWidth / 2) {
         scrollPosition = 0;
       }
@@ -60,7 +59,6 @@ export const PartnerLogos = () => {
             ref={scrollRef}
             className="flex items-center gap-12 py-4 overflow-x-scroll no-scrollbar"
           >
-            {/* Double the logos for infinite scroll effect */}
             {[...partners, ...partners].map((partner, index) => (
               <div 
                 key={`${partner.id}-${index}`} 
@@ -69,11 +67,12 @@ export const PartnerLogos = () => {
                 <div className="bg-white p-6 rounded-lg shadow-sm w-36 h-24 flex items-center justify-center">
                   <img 
                     src={partner.logo} 
-                    alt={partner.name} 
-                    className="max-w-full max-h-full object-contain" 
+                    alt={`${partner.name} logo`}
+                    className="max-w-full max-h-full object-contain"
+                    loading="lazy"
                   />
                 </div>
-                <span className="text-xs text-gray-500 mt-2 font-medium">{partner.name}</span>
+                <span className="text-sm text-gray-500 mt-2 font-medium">{partner.name}</span>
               </div>
             ))}
           </div>
