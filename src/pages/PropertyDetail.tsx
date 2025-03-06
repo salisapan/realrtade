@@ -6,8 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
 import { useToast } from "@/hooks/use-toast";
-import { nonAccreditedDeals } from "@/data/nonAccreditedDeals";
-import { propertiesBySector, propertiesByLowRisk, propertiesByGeography, propertiesByProfitable, propertiesByCompany } from "@/data/propertyData";
 import { 
   Home, 
   Building, 
@@ -43,57 +41,13 @@ const PropertyDetail = () => {
   const { toast } = useToast();
   
   useEffect(() => {
-    const fetchProperty = () => {
-      setLoading(true);
-      
-      let foundProperty;
-      
-      // Check in all property lists
-      const allProperties = [
-        ...propertiesBySector,
-        ...propertiesByLowRisk,
-        ...propertiesByGeography,
-        ...propertiesByProfitable,
-        ...propertiesByCompany
-      ];
-      
-      // First check in all properties
-      foundProperty = allProperties.find(p => p.id === id);
-      
-      // If not found in properties, check non-accredited deals
-      if (!foundProperty) {
-        foundProperty = nonAccreditedDeals.find(p => p.id === id);
-      }
-      
-      // Set default values for undefined properties to prevent errors
-      if (foundProperty) {
-        // Ensure all required properties have fallback values
-        setProperty({
-          ...foundProperty,
-          image: foundProperty.image || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800",
-          keyFeatures: foundProperty.keyFeatures || [],
-          fundingEndDate: foundProperty.fundingEndDate || "TBD",
-          acquisitionDate: foundProperty.acquisitionDate || "TBD",
-          firstDistributionDate: foundProperty.firstDistributionDate || "TBD",
-          exitDate: foundProperty.exitDate || "TBD",
-          recommendationScore: foundProperty.recommendationScore || 7.0,
-          marketTrend: foundProperty.marketTrend || "Stable",
-          entrepreneurExperience: foundProperty.entrepreneurExperience || "Good",
-          riskLevel: foundProperty.riskLevel || "Medium",
-          demandLevel: foundProperty.demandLevel || "Medium",
-          returnPotential: foundProperty.returnPotential || "Good",
-          cashOnCash: foundProperty.cashOnCash || 5.0,
-          debtServiceRatio: foundProperty.debtServiceRatio || 1.3,
-          loanToValue: foundProperty.loanToValue || 65
-        });
-      } else {
-        setProperty(null);
-      }
-      
+    // Simulate loading property data
+    setTimeout(() => {
+      // Find property by ID
+      const foundProperty = sampleProperties.find(p => p.id === id);
+      setProperty(foundProperty || null);
       setLoading(false);
-    };
-
-    fetchProperty();
+    }, 500);
   }, [id]);
   
   const handleBookmark = () => {
@@ -132,16 +86,14 @@ const PropertyDetail = () => {
     return (
       <div className="flex">
         <AppSidebar />
-        <div className="flex-1 flex flex-col items-center justify-center min-h-screen bg-gray-50">
-          <div className="text-center max-w-lg mx-auto px-4">
-            <h1 className="text-4xl font-bold mb-4 text-gray-900">Oops! Property not found</h1>
-            <p className="text-lg mb-8 text-gray-600">We couldn't find the property you're looking for.</p>
-            <Link to="/properties">
-              <Button variant="default" size="lg">
-                Return to Properties
-              </Button>
-            </Link>
-          </div>
+        <div className="flex-1 flex flex-col items-center justify-center min-h-screen">
+          <h1 className="text-4xl font-bold mb-4">Oops! Property not found</h1>
+          <p className="text-lg mb-8">We couldn't find the property you're looking for.</p>
+          <Link to="/properties">
+            <Button>
+              Return to Properties
+            </Button>
+          </Link>
         </div>
       </div>
     );
@@ -195,12 +147,6 @@ const PropertyDetail = () => {
                 </Link>
               </div>
             </div>
-            {property.isVerified && (
-              <div className="absolute top-4 right-4 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium flex items-center">
-                <Check className="w-4 h-4 mr-1" />
-                Due Diligence Verified
-              </div>
-            )}
           </div>
         </header>
 
@@ -437,12 +383,12 @@ const PropertyDetail = () => {
                   <div className="space-y-3">
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Minimum</div>
-                      <div className="text-base font-bold">${property.minInvestment?.toLocaleString() || "10"}</div>
+                      <div className="text-base font-bold">${property.minInvestment.toLocaleString()}</div>
                     </div>
                     
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Expected Return</div>
-                      <div className="text-base font-bold">{property.roi || "5-8"}% per annum</div>
+                      <div className="text-base font-bold">{property.roi}% per annum</div>
                     </div>
                     
                     <div className="p-3 bg-gray-50 rounded-lg">
@@ -452,7 +398,7 @@ const PropertyDetail = () => {
                     
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Term</div>
-                      <div className="text-base font-bold">{property.term || "3-5"} years</div>
+                      <div className="text-base font-bold">{property.term} years</div>
                     </div>
                     
                     <Button className="w-full">Invest Now</Button>
@@ -472,38 +418,28 @@ const PropertyDetail = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Property Type</span>
-                      <span className="font-medium">{property.type || "Residential"}</span>
+                      <span className="font-medium">{property.type}</span>
                     </div>
-                    {property.yearBuilt && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Year Built</span>
-                        <span className="font-medium">{property.yearBuilt}</span>
-                      </div>
-                    )}
-                    {property.squareFootage && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Square Footage</span>
-                        <span className="font-medium">{property.squareFootage.toLocaleString()} sq ft</span>
-                      </div>
-                    )}
-                    {property.occupancyRate !== null && property.occupancyRate !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Occupancy Rate</span>
-                        <span className="font-medium">{property.occupancyRate}%</span>
-                      </div>
-                    )}
-                    {property.capRate !== null && property.capRate !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Cap Rate</span>
-                        <span className="font-medium">{property.capRate}%</span>
-                      </div>
-                    )}
-                    {property.noi !== null && property.noi !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Net Operating Income</span>
-                        <span className="font-medium">${property.noi.toLocaleString()}</span>
-                      </div>
-                    )}
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Year Built</span>
+                      <span className="font-medium">{property.yearBuilt}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Square Footage</span>
+                      <span className="font-medium">{property.squareFootage.toLocaleString()} sq ft</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Occupancy Rate</span>
+                      <span className="font-medium">{property.occupancyRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Cap Rate</span>
+                      <span className="font-medium">{property.capRate}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Net Operating Income</span>
+                      <span className="font-medium">${property.noi.toLocaleString()}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

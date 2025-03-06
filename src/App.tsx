@@ -100,7 +100,14 @@ const App = () => {
                   </ProtectedRoute>
                 } 
               />
-              <Route path="/property/:id" element={<PropertyDetail />} />
+              <Route 
+                path="/property/:id" 
+                element={
+                  <ProtectedRoute>
+                    <PropertyDetail />
+                  </ProtectedRoute>
+                } 
+              />
               <Route 
                 path="/entrepreneur" 
                 element={
