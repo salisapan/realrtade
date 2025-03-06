@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -66,7 +65,31 @@ const PropertyDetail = () => {
         foundProperty = nonAccreditedDeals.find(p => p.id === id);
       }
       
-      setProperty(foundProperty || null);
+      // Set default values for undefined properties to prevent errors
+      if (foundProperty) {
+        // Ensure all required properties have fallback values
+        setProperty({
+          ...foundProperty,
+          image: foundProperty.image || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800",
+          keyFeatures: foundProperty.keyFeatures || [],
+          fundingEndDate: foundProperty.fundingEndDate || "TBD",
+          acquisitionDate: foundProperty.acquisitionDate || "TBD",
+          firstDistributionDate: foundProperty.firstDistributionDate || "TBD",
+          exitDate: foundProperty.exitDate || "TBD",
+          recommendationScore: foundProperty.recommendationScore || 7.0,
+          marketTrend: foundProperty.marketTrend || "Stable",
+          entrepreneurExperience: foundProperty.entrepreneurExperience || "Good",
+          riskLevel: foundProperty.riskLevel || "Medium",
+          demandLevel: foundProperty.demandLevel || "Medium",
+          returnPotential: foundProperty.returnPotential || "Good",
+          cashOnCash: foundProperty.cashOnCash || 5.0,
+          debtServiceRatio: foundProperty.debtServiceRatio || 1.3,
+          loanToValue: foundProperty.loanToValue || 65
+        });
+      } else {
+        setProperty(null);
+      }
+      
       setLoading(false);
     };
 
@@ -414,12 +437,12 @@ const PropertyDetail = () => {
                   <div className="space-y-3">
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Minimum</div>
-                      <div className="text-base font-bold">${property.minInvestment.toLocaleString()}</div>
+                      <div className="text-base font-bold">${property.minInvestment?.toLocaleString() || "10"}</div>
                     </div>
                     
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Expected Return</div>
-                      <div className="text-base font-bold">{property.roi}% per annum</div>
+                      <div className="text-base font-bold">{property.roi || "5-8"}% per annum</div>
                     </div>
                     
                     <div className="p-3 bg-gray-50 rounded-lg">
@@ -429,7 +452,7 @@ const PropertyDetail = () => {
                     
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Term</div>
-                      <div className="text-base font-bold">{property.term} years</div>
+                      <div className="text-base font-bold">{property.term || "3-5"} years</div>
                     </div>
                     
                     <Button className="w-full">Invest Now</Button>
@@ -449,28 +472,38 @@ const PropertyDetail = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Property Type</span>
-                      <span className="font-medium">{property.type}</span>
+                      <span className="font-medium">{property.type || "Residential"}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Year Built</span>
-                      <span className="font-medium">{property.yearBuilt}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Square Footage</span>
-                      <span className="font-medium">{property.squareFootage.toLocaleString()} sq ft</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Occupancy Rate</span>
-                      <span className="font-medium">{property.occupancyRate}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Cap Rate</span>
-                      <span className="font-medium">{property.capRate}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Net Operating Income</span>
-                      <span className="font-medium">${property.noi.toLocaleString()}</span>
-                    </div>
+                    {property.yearBuilt && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Year Built</span>
+                        <span className="font-medium">{property.yearBuilt}</span>
+                      </div>
+                    )}
+                    {property.squareFootage && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Square Footage</span>
+                        <span className="font-medium">{property.squareFootage.toLocaleString()} sq ft</span>
+                      </div>
+                    )}
+                    {property.occupancyRate !== null && property.occupancyRate !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Occupancy Rate</span>
+                        <span className="font-medium">{property.occupancyRate}%</span>
+                      </div>
+                    )}
+                    {property.capRate !== null && property.capRate !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Cap Rate</span>
+                        <span className="font-medium">{property.capRate}%</span>
+                      </div>
+                    )}
+                    {property.noi !== null && property.noi !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Net Operating Income</span>
+                        <span className="font-medium">${property.noi.toLocaleString()}</span>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
