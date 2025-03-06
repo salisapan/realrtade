@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -15,7 +14,6 @@ import {
 } from "@/data/propertyData";
 import { nonAccreditedDeals } from "@/data/nonAccreditedDeals";
 
-// Add new sample deals with $10 minimum investment
 const affordableDeals = [
   {
     id: "aff-001",
@@ -106,7 +104,6 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
-  // Check if user has completed investor registration
   useEffect(() => {
     setIsLoading(true);
     const profile = localStorage.getItem("investorProfile");
@@ -125,18 +122,15 @@ const Index = () => {
       const parsedProfile = JSON.parse(profile);
       setInvestorProfile(parsedProfile);
       
-      // All investors can access the platform
       const isAccredited = parsedProfile.isAccredited === "yes";
       
       if (isAccredited) {
-        // Accredited investors see all properties
         setProperties(getCategoryProperties(selectedCategory));
         toast({
           title: "Welcome Accredited Investor",
           description: "You're viewing all available investment properties.",
         });
       } else {
-        // Non-accredited investors see affordable deals with $10 minimum investment
         setProperties(affordableDeals);
         
         toast({
@@ -147,13 +141,11 @@ const Index = () => {
       setIsLoading(false);
     } catch (error) {
       console.error("Error parsing investor profile:", error);
-      // Even if there's an error, show some default properties
       setProperties(affordableDeals);
       setIsLoading(false);
     }
   }, [selectedCategory, toast]);
   
-  // Helper function to get properties for the selected category
   const getCategoryProperties = (category: string) => {
     switch (category) {
       case "sector":
@@ -177,7 +169,6 @@ const Index = () => {
     if (investorProfile && investorProfile.isAccredited === "yes") {
       setProperties(getCategoryProperties(category));
     } else {
-      // Non-accredited investors always see the affordable deals regardless of category
       setProperties(affordableDeals);
     }
   };
@@ -202,7 +193,6 @@ const Index = () => {
           onSelectCategory={handleCategoryChange}
         />
         
-        {/* Add the slogan above the property listing */}
         <div className="container mx-auto px-4 pt-6">
           <p className="text-gray-600 text-sm text-center mb-4">RealTrade - Invest in real estate worldwide from anywhere.</p>
         </div>
