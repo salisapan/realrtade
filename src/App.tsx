@@ -19,6 +19,7 @@ import EntrepreneurRegistration from "./pages/EntrepreneurRegistration";
 import DueDiligencePortal from "./pages/DueDiligencePortal";
 import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
+import VerifiedDeals from "./pages/VerifiedDeals";
 
 const queryClient = new QueryClient();
 
@@ -43,13 +44,14 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <SidebarProvider className="Even those who write no access the site.">
+        <SidebarProvider className="min-h-screen flex w-full">
           <Toaster />
           <Sonner />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/investor-signup" element={<InvestorSignup />} />
+              <Route path="/verified-deals" element={<VerifiedDeals />} />
               <Route 
                 path="/properties" 
                 element={

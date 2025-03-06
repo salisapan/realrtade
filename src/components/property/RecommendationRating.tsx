@@ -28,11 +28,11 @@ export const RecommendationRating = ({
   demandLevel,
   returnPotential
 }: RecommendationRatingProps) => {
-  // Helper to determine score color
+  // Helper to determine score color - using blue colors now
   const getScoreColor = (score: number) => {
-    if (score >= 8) return "text-green-600";
-    if (score >= 6) return "text-amber-600";
-    return "text-red-600";
+    if (score >= 8) return "text-blue-600";
+    if (score >= 6) return "text-blue-500";
+    return "text-blue-400";
   };
 
   // Helper to determine score text
@@ -54,7 +54,7 @@ export const RecommendationRating = ({
     <Card className="shadow-sm hover:shadow-md transition-shadow">
       <CardHeader className="pb-2">
         <CardTitle className="text-base flex items-center gap-1.5">
-          <Star className="h-4 w-4 text-primary fill-primary" />
+          <Star className="h-4 w-4 text-blue-500 fill-blue-500" />
           Deal Recommendation
         </CardTitle>
       </CardHeader>
@@ -73,7 +73,7 @@ export const RecommendationRating = ({
               {[...Array(5)].map((_, i) => (
                 <Star 
                   key={i} 
-                  className={`h-4 w-4 ${i < Math.ceil(score/2) ? "text-primary fill-primary" : "text-gray-300"}`} 
+                  className={`h-4 w-4 ${i < Math.ceil(score/2) ? "text-blue-500 fill-blue-500" : "text-gray-300"}`} 
                 />
               ))}
             </div>
@@ -85,35 +85,35 @@ export const RecommendationRating = ({
             <ul className="space-y-1.5">
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                  <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-xs">Market Trend</span>
                 </div>
                 <Badge variant={getBadgeVariant(marketTrend)} className="text-xs h-5 px-1.5">{marketTrend}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5 text-primary" />
+                  <Users className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-xs">Entrepreneur</span>
                 </div>
                 <Badge variant={getBadgeVariant(entrepreneurExperience)} className="text-xs h-5 px-1.5">{entrepreneurExperience}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <AlertTriangle className="h-3.5 w-3.5 text-primary" />
+                  <AlertTriangle className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-xs">Risk Level</span>
                 </div>
                 <Badge variant={getBadgeVariant(riskLevel === "Low" ? "High" : riskLevel === "High" ? "Low" : "Medium")} className="text-xs h-5 px-1.5">{riskLevel}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <BarChart2 className="h-3.5 w-3.5 text-primary" />
+                  <BarChart2 className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-xs">Area Demand</span>
                 </div>
                 <Badge variant={getBadgeVariant(demandLevel)} className="text-xs h-5 px-1.5">{demandLevel}</Badge>
               </li>
               <li className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <CheckCircle className="h-3.5 w-3.5 text-primary" />
+                  <CheckCircle className="h-3.5 w-3.5 text-blue-500" />
                   <span className="text-xs">Return Potential</span>
                 </div>
                 <Badge variant={getBadgeVariant(returnPotential)} className="text-xs h-5 px-1.5">{returnPotential}</Badge>

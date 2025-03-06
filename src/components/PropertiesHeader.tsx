@@ -41,13 +41,6 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
             </Link>
           </div>
           
-          {/* Tagline moved to its own row - no overlapping with logo */}
-          <div className="hidden md:block text-center">
-            <p className="text-sm text-secondary italic">
-              RealTrade - Invest in real estate worldwide from anywhere.
-            </p>
-          </div>
-          
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
             <div className="relative w-full sm:w-auto max-w-xs md:max-w-sm">
               <input 

@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { HelpCircle, Home, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { HomeHeader } from "@/components/layout/HomeHeader";
+
 const formSchema = z.object({
   fullName: z.string().min(3, {
     message: "Name must be at least 3 characters."
@@ -29,7 +30,6 @@ const formSchema = z.object({
   age: z.coerce.number().min(18, {
     message: "You must be at least 18 years old to invest."
   }),
-  // Removed minimum validation for financial fields
   annualIncome: z.coerce.number().min(0, {
     message: "Please enter your annual income."
   }),
@@ -43,14 +43,15 @@ const formSchema = z.object({
     required_error: "Please indicate whether you are an accredited investor."
   })
 });
+
 type FormValues = z.infer<typeof formSchema>;
+
 const InvestorSignup = () => {
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
+  
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -65,13 +66,14 @@ const InvestorSignup = () => {
       isAccredited: undefined
     }
   });
+  
   function onSubmit(values: FormValues) {
     setIsSubmitting(true);
 
     // Store investor information in localStorage for demo purposes
     localStorage.setItem("investorProfile", JSON.stringify(values));
 
-    // Different message based on accreditation status, but allow everyone access
+    // Different message based on accreditation status
     if (values.isAccredited === "yes") {
       toast({
         title: "Registration Successful",
@@ -87,13 +89,19 @@ const InvestorSignup = () => {
     // Show completion message before redirecting
     setRegistrationComplete(true);
 
-    // Redirect to properties page after a short delay for all users
+    // Redirect based on accreditation status
     setTimeout(() => {
-      navigate("/properties");
+      if (values.isAccredited === "yes") {
+        navigate("/properties");
+      } else {
+        navigate("/verified-deals");
+      }
     }, 2000);
   }
+
   if (registrationComplete) {
-    return <div className="min-h-screen bg-gray-50 flex flex-col">
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col">
         <HomeHeader />
         <div className="flex-1 flex flex-col items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-md p-8 max-w-md w-full text-center">
@@ -101,12 +109,19 @@ const InvestorSignup = () => {
               <Loader2 className="w-12 h-12 text-primary mx-auto animate-spin" />
             </div>
             <h2 className="text-2xl font-bold mb-2">Registration complete!</h2>
-            <p className="text-gray-600 mb-4">Taking you to the app...</p>
+            <p className="text-gray-600 mb-4">
+              {form.getValues().isAccredited === "yes" 
+                ? "Taking you to all investment opportunities..." 
+                : "Taking you to verified deals with lower minimums..."}
+            </p>
           </div>
         </div>
-      </div>;
+      </div>
+    );
   }
-  return <div className="min-h-screen bg-gray-50">
+
+  return (
+    <div className="min-h-screen bg-gray-50">
       <HomeHeader />
       
       <main className="container mx-auto px-4 py-8">
@@ -120,8 +135,15 @@ const InvestorSignup = () => {
         <div className="max-w-3xl mx-auto">
           <Card className="shadow-md">
             <CardHeader>
-              <CardTitle className="text-2xl">Investor Registration</CardTitle>
-              <CardDescription>
+              <div className="flex justify-center mb-4">
+                <img 
+                  src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+                  alt="RealTrade Logo" 
+                  className="h-12 rounded-lg" 
+                />
+              </div>
+              <CardTitle className="text-2xl text-center">Investor Registration</CardTitle>
+              <CardDescription className="text-center">
                 Complete your investor profile to access real estate opportunities
               </CardDescription>
             </CardHeader>
@@ -129,79 +151,119 @@ const InvestorSignup = () => {
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={form.control} name="fullName" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="fullName"
+                      render={({
+                        field
+                      }) => <FormItem>
                           <FormLabel>Full Name</FormLabel>
                           <FormControl>
                             <Input placeholder="John Doe" {...field} />
                           </FormControl>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>}
+                    />
                     
-                    <FormField control={form.control} name="email" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({
+                        field
+                      }) => <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
                             <Input type="email" placeholder="john.doe@example.com" {...field} />
                           </FormControl>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>}
+                    />
                     
-                    <FormField control={form.control} name="phone" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="phone"
+                      render={({
+                        field
+                      }) => <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
                             <Input placeholder="(555) 123-4567" {...field} />
                           </FormControl>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>}
+                    />
                     
-                    <FormField control={form.control} name="address" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({
+                        field
+                      }) => <FormItem>
                           <FormLabel>Address</FormLabel>
                           <FormControl>
                             <Input placeholder="123 Main St, City, State, Zip" {...field} />
                           </FormControl>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>}
+                    />
                     
-                    <FormField control={form.control} name="age" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="age"
+                      render={({
+                        field
+                      }) => <FormItem>
                           <FormLabel>Age</FormLabel>
                           <FormControl>
                             <Input type="number" min="18" {...field} />
                           </FormControl>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>}
+                    />
                     
-                    <FormField control={form.control} name="annualIncome" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="annualIncome"
+                      render={({ field }) => (
+                        <FormItem>
                           <FormLabel>Annual Income ($)</FormLabel>
                           <FormControl>
-                            <Input type="number" min="0" placeholder="100000" className="Minimum 10" />
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              placeholder="100000" 
+                              {...field} 
+                            />
                           </FormControl>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>
+                      )}
+                    />
                     
-                    <FormField control={form.control} name="netWorth" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="netWorth"
+                      render={({ field }) => (
+                        <FormItem>
                           <FormLabel>Net Worth ($)</FormLabel>
                           <FormControl>
-                            <Input type="number" min="0" placeholder="500000" className="Minimum 100" />
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              placeholder="500000" 
+                              {...field} 
+                            />
                           </FormControl>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>
+                      )}
+                    />
                     
-                    <FormField control={form.control} name="investmentExperience" render={({
-                    field
-                  }) => <FormItem>
+                    <FormField
+                      control={form.control}
+                      name="investmentExperience"
+                      render={({ field }) => (
+                        <FormItem>
                           <FormLabel>Investment Experience</FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
@@ -217,12 +279,16 @@ const InvestorSignup = () => {
                             </SelectContent>
                           </Select>
                           <FormMessage />
-                        </FormItem>} />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                   
-                  <FormField control={form.control} name="isAccredited" render={({
-                  field
-                }) => <FormItem>
+                  <FormField
+                    control={form.control}
+                    name="isAccredited"
+                    render={({ field }) => (
+                      <FormItem>
                         <div className="flex items-center gap-2">
                           <FormLabel>Are you an accredited investor?</FormLabel>
                           <TooltipProvider>
@@ -248,10 +314,14 @@ const InvestorSignup = () => {
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Non-accredited investors will have access to verified deals with lower minimum investments.
+                          <div className="p-3 bg-blue-50 rounded-md mt-2 text-sm text-blue-600">
+                            <strong>Non-accredited investors:</strong> You'll have access to our verified deals with lower minimum investments, starting from as low as $10.
+                          </div>
                         </FormDescription>
                         <FormMessage />
-                      </FormItem>} />
+                      </FormItem>
+                    )}
+                  />
                   
                   <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? "Creating Profile..." : "Complete Registration"}
@@ -270,6 +340,8 @@ const InvestorSignup = () => {
           </Card>
         </div>
       </main>
-    </div>;
+    </div>
+  );
 };
+
 export default InvestorSignup;

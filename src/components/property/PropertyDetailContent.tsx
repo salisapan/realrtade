@@ -1,197 +1,250 @@
 
-import React, { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { InvestmentCalculator } from "./InvestmentCalculator";
-import { RecommendationRating } from "./RecommendationRating";
-import { InvestmentIntentForm } from "./InvestmentIntentForm";
 import { PropertyMap } from "./PropertyMap";
+import { RecommendationRating } from "./RecommendationRating";
+import { LetterOfIntentForm } from "./LetterOfIntentForm";
+import { Badge } from "@/components/ui/badge";
 import { 
-  MapPin, 
-  Building, 
+  AreaChart, 
+  LandPlot, 
+  Percent, 
   DollarSign, 
+  Building, 
+  CalendarDays, 
   Users, 
-  Clock,
-  Check
+  Timer, 
+  Map
 } from "lucide-react";
 
 interface PropertyDetailContentProps {
-  property: any;
+  property: {
+    id: string;
+    name: string;
+    location: string;
+    description: string;
+    price: number;
+    roi: number;
+    term: number;
+    minInvestment: number;
+    daysLeft: number;
+    fundingProgress: number;
+    currentFunding: number;
+    fundingGoal: number;
+    investors: number;
+    keyFeatures: string[];
+    recommendationScore: number;
+    marketTrend: string;
+    entrepreneurExperience: string;
+    riskLevel: string;
+    demandLevel: string;
+    returnPotential: string;
+    [key: string]: any;
+  };
 }
 
 export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) => {
-  const { toast } = useToast();
-  const [showInvestmentForm, setShowInvestmentForm] = useState(false);
-  
-  const handleInvestNowClick = () => {
-    toast({
-      title: "Investment Process Started",
-      description: "You are now being directed to the investment flow.",
-    });
-    
-    setShowInvestmentForm(true);
-  };
-  
   return (
     <div className="p-4 md:p-6">
-      <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold">{property.name}</h2>
-          <div className="flex items-center text-gray-500 text-sm mt-1">
-            <MapPin className="w-3.5 h-3.5 mr-1" />
+          <div className="flex items-center flex-wrap gap-2 mb-2">
+            <Badge variant="outline" className="bg-primary/10">
+              {property.type}
+            </Badge>
+            <Badge variant="outline" className="bg-primary/10 flex items-center gap-1">
+              <Timer className="w-3 h-3" />
+              <span>{property.daysLeft} days left</span>
+            </Badge>
+          </div>
+          <h1 className="text-2xl font-bold mb-1">{property.name}</h1>
+          <div className="flex items-center text-gray-500 mb-4">
+            <Map className="w-4 h-4 mr-1" />
             <span>{property.location}</span>
           </div>
         </div>
         
-        <div className="flex flex-col items-end">
-          <span className="text-xl md:text-2xl font-bold text-primary">${property.price?.toLocaleString() || "N/A"}</span>
-          <div className="flex gap-1 mt-1">
-            <Badge>{property.type || "Residential"}</Badge>
-            {property.isVerified && (
-              <Badge variant="success">Verified</Badge>
-            )}
+        <div className="bg-gray-50 rounded-lg p-3 w-full md:w-auto md:min-w-[180px]">
+          <div className="flex flex-col gap-2">
+            <div>
+              <div className="text-xs text-gray-500">Funding Progress</div>
+              <div className="flex justify-between items-center">
+                <div className="text-lg font-bold">{property.fundingProgress}%</div>
+                <div className="text-xs text-gray-500">
+                  ${(property.currentFunding / 1000000).toFixed(1)}M / ${(property.fundingGoal / 1000000).toFixed(1)}M
+                </div>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                <div 
+                  className="bg-primary h-2 rounded-full" 
+                  style={{ width: `${property.fundingProgress}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-2 text-center text-xs">
+              <div className="bg-white p-2 rounded border">
+                <div className="text-gray-500 mb-1">Investors</div>
+                <div className="font-bold">{property.investors}</div>
+              </div>
+              <div className="bg-white p-2 rounded border">
+                <div className="text-gray-500 mb-1">Min. Investment</div>
+                <div className="font-bold">${property.minInvestment.toLocaleString()}</div>
+              </div>
+            </div>
+            
+            <LetterOfIntentForm 
+              propertyId={property.id}
+              propertyName={property.name}
+              minInvestment={property.minInvestment}
+            />
           </div>
         </div>
       </div>
       
-      <p className="text-sm text-gray-700 mb-5 max-w-3xl">{property.description || "Property description not available."}</p>
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <div className="text-gray-500 text-xs mb-1">Target ROI</div>
-          <div className="text-base font-bold">{property.roi || "N/A"}%</div>
-        </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <div className="text-gray-500 text-xs mb-1">Term Length</div>
-          <div className="text-base font-bold">{property.term || "N/A"} years</div>
-        </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <div className="text-gray-500 text-xs mb-1">Min Investment</div>
-          <div className="text-base font-bold">${property.minInvestment?.toLocaleString() || "10"}</div>
-        </div>
-      </div>
-      
-      <div className="mb-5">
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-sm font-medium">Funding Progress</span>
-          <span className="text-xs font-medium">{property.fundingProgress || 0}%</span>
-        </div>
-        <Progress value={property.fundingProgress || 0} className="h-2" />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>${property.currentFunding?.toLocaleString() || "0"} raised</span>
-          <span>Goal: ${property.fundingGoal?.toLocaleString() || "N/A"}</span>
-        </div>
-      </div>
-      
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center text-gray-500 text-xs">
-          <Users className="w-3.5 h-3.5 mr-1" />
-          <span>{property.investors || 0} investors</span>
-          <Clock className="w-3.5 h-3.5 ml-3 mr-1" />
-          <span>{property.daysLeft || 0} days left</span>
-        </div>
-        
-        <Button 
-          variant="default" 
-          className="bg-primary text-white hover:bg-primary-dark"
-          onClick={handleInvestNowClick}
-        >
-          Invest Now
-        </Button>
-      </div>
-      
-      {/* Map placed immediately after the funding progress and before the investment form */}
-      <div className="mb-6">
-        <h3 className="text-sm font-medium mb-3">Property Location</h3>
-        <PropertyMap 
-          location={property.location || "New York, NY"} 
-          lat={property.lat} 
-          lng={property.lng} 
-        />
-      </div>
-      
-      {showInvestmentForm && (
-        <div className="mb-6 border rounded-lg p-4 shadow-sm">
-          <h3 className="text-lg font-medium mb-3">Investment Details</h3>
-          <InvestmentIntentForm 
-            propertyId={property.id || "prop1"} 
-            propertyName={property.name || "Property"}
-            minInvestment={property.minInvestment || 10}
-          />
-        </div>
-      )}
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <InvestmentCalculator 
-          roi={property.roi || 6.5} 
-          minInvestment={property.minInvestment || 10} 
-          term={property.term || 5} 
-        />
-        
-        <RecommendationRating 
-          score={property.recommendationScore || 8}
-          marketTrend={property.marketTrend || "Strong Growth"}
-          entrepreneurExperience={property.entrepreneurExperience || "Excellent"}
-          riskLevel={property.riskLevel || "Low"}
-          demandLevel={property.demandLevel || "High"}
-          returnPotential={property.returnPotential || "Strong"}
-        />
-        
-        <div className="space-y-4">
-          <div className="bg-white p-4 rounded-lg border">
-            <h3 className="text-sm font-medium mb-2">Key Features</h3>
-            <ul className="space-y-2">
-              {(property.keyFeatures || [
-                "Professional property management",
-                "Recent renovations completed",
-                "Verified financials",
-                "Low maintenance costs"
-              ]).map((feature: string, index: number) => (
-                <li key={index} className="flex items-start gap-2 text-sm">
-                  <Check className="w-4 h-4 text-green-500 shrink-0 mt-0.5" />
-                  <span>{feature}</span>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 space-y-6">
+          <div>
+            <h2 className="text-lg font-bold mb-2">About This Property</h2>
+            <p className="text-gray-600">{property.description}</p>
+          </div>
+          
+          <div>
+            <h2 className="text-lg font-bold mb-3">Key Investment Metrics</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <DollarSign className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Property Value</span>
+                </div>
+                <div className="text-lg font-bold">${(property.price / 1000000).toFixed(1)}M</div>
+              </div>
+              
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Percent className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Target ROI</span>
+                </div>
+                <div className="text-lg font-bold">{property.roi}%</div>
+              </div>
+              
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <CalendarDays className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Term</span>
+                </div>
+                <div className="text-lg font-bold">{property.term} years</div>
+              </div>
+              
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Building className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Type</span>
+                </div>
+                <div className="text-lg font-bold">{property.type}</div>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <h2 className="text-lg font-bold mb-3">Key Features</h2>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+              {property.keyFeatures.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2">
+                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <LandPlot className="w-3 h-3 text-primary" />
+                  </div>
+                  <span className="text-sm">{feature}</span>
                 </li>
               ))}
             </ul>
           </div>
           
-          <div className="bg-white p-4 rounded-lg border">
-            <h3 className="text-sm font-medium mb-2">Financial Metrics</h3>
-            <div className="space-y-2 text-sm">
-              {property.capRate && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Cap Rate</span>
-                  <span className="font-medium">{property.capRate}%</span>
+          <div>
+            <h2 className="text-lg font-bold mb-3">Financial Highlights</h2>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Cash on Cash</div>
+                  <div className="text-lg font-bold">{property.cashOnCash}%</div>
                 </div>
-              )}
-              {(property.cashOnCash || property.roi) && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Cash-on-Cash Return</span>
-                  <span className="font-medium">{property.cashOnCash || Math.round(property.roi * 0.75)}%</span>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Cap Rate</div>
+                  <div className="text-lg font-bold">{property.capRate}%</div>
                 </div>
-              )}
-              {property.debtServiceRatio && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Debt Service Ratio</span>
-                  <span className="font-medium">{property.debtServiceRatio}</span>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">NOI</div>
+                  <div className="text-lg font-bold">${property.noi.toLocaleString()}</div>
                 </div>
-              )}
-              {property.loanToValue && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Loan-to-Value</span>
-                  <span className="font-medium">{property.loanToValue}%</span>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">DSC Ratio</div>
+                  <div className="text-lg font-bold">{property.debtServiceRatio}</div>
                 </div>
-              )}
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">LTV</div>
+                  <div className="text-lg font-bold">{property.loanToValue}%</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Occupancy</div>
+                  <div className="text-lg font-bold">{property.occupancyRate}%</div>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-gray-500">Projected Annual Returns</div>
+                <div className="flex items-center">
+                  <AreaChart className="w-4 h-4 text-primary mr-1" />
+                  <span className="text-xs font-bold text-primary">{property.roi}% Target</span>
+                </div>
+              </div>
             </div>
           </div>
           
-          <Button variant="outline" size="sm" className="w-full">
-            Download Financial Reports
-          </Button>
+          <div>
+            <h2 className="text-lg font-bold mb-3">Location</h2>
+            <PropertyMap 
+              location={property.location} 
+              lat={40.7128} 
+              lng={-74.0060} 
+            />
+          </div>
+        </div>
+        
+        <div className="space-y-6">
+          <RecommendationRating 
+            score={property.recommendationScore}
+            marketTrend={property.marketTrend}
+            entrepreneurExperience={property.entrepreneurExperience}
+            riskLevel={property.riskLevel}
+            demandLevel={property.demandLevel}
+            returnPotential={property.returnPotential}
+          />
+          
+          <div className="bg-white border rounded-lg p-4">
+            <h3 className="font-semibold mb-3">Need Help?</h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Our investment advisors are available to answer any questions about this property.
+            </p>
+            <Button type="button" variant="outline" className="w-full">
+              Schedule a Call
+            </Button>
+          </div>
         </div>
       </div>
     </div>
+  );
+};
+
+// Define missing components
+const Button = ({ children, type, variant, className }: any) => {
+  return (
+    <button 
+      type={type} 
+      className={`px-4 py-2 rounded-md ${
+        variant === 'outline' 
+          ? 'border border-gray-300 hover:bg-gray-50' 
+          : 'bg-primary text-white hover:bg-primary/90'
+      } ${className}`}
+    >
+      {children}
+    </button>
   );
 };
