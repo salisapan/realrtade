@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
 import { useToast } from "@/hooks/use-toast";
+import { nonAccreditedDeals } from "@/data/nonAccreditedDeals";
+import { sampleProperties } from "@/data/propertyData";
 import { 
   Home, 
   Building, 
@@ -37,6 +39,7 @@ const PropertyDetail = () => {
   const { id } = useParams();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [bookmarked, setBookmarked] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -45,15 +48,10 @@ const PropertyDetail = () => {
       
       let foundProperty;
       
-      // First check affordable deals
-      foundProperty = affordableDeals.find(p => p.id === id);
+      // First check verified properties
+      foundProperty = sampleProperties.find(p => p.id === id);
       
-      // If not found in affordable deals, check sample properties
-      if (!foundProperty) {
-        foundProperty = sampleProperties.find(p => p.id === id);
-      }
-      
-      // If still not found, check non-accredited deals
+      // If not found in sample properties, check non-accredited deals
       if (!foundProperty) {
         foundProperty = nonAccreditedDeals.find(p => p.id === id);
       }
