@@ -4,7 +4,7 @@ import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
 import { Badge } from "@/components/ui/badge";
 import { 
-  AreaChart, 
+  AreaChart as AreaChartIcon, 
   LandPlot, 
   Percent, 
   DollarSign, 
@@ -18,7 +18,7 @@ import {
   ChevronDown,
   TrendingUp,
   Activity,
-  BarChart,
+  BarChart as BarChartIcon,
   PieChart as PieChartIcon
 } from "lucide-react";
 import { useState } from "react";
@@ -40,7 +40,8 @@ import {
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
-  PolarRadiusAxis
+  PolarRadiusAxis,
+  AreaChart
 } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -296,7 +297,7 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
                 <div className="flex items-center justify-between">
                   <div className="text-xs text-gray-500">Projected Annual Returns</div>
                   <div className="flex items-center">
-                    <AreaChart className="w-4 h-4 text-primary mr-1" />
+                    <AreaChartIcon className="w-4 h-4 text-primary mr-1" />
                     <span className="text-xs font-bold text-primary">{property.roi}% Target</span>
                   </div>
                 </div>
@@ -323,7 +324,7 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
             <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('analysis')}>
               <h2 className="text-lg font-bold mb-3">
                 <span className="flex items-center gap-1">
-                  <BarChart className="w-5 h-5 text-primary" />
+                  <BarChartIcon className="w-5 h-5 text-primary" />
                   Enhanced Investment Analysis
                 </span>
               </h2>
@@ -338,7 +339,7 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
                   </h3>
                   <div className="h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
+                      <RechartsBarChart
                         data={cashFlowYearsData}
                         margin={{
                           top: 5,
@@ -356,7 +357,7 @@ export const PropertyDetailContent = ({ property }: PropertyDetailContentProps) 
                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                           ))}
                         </Bar>
-                      </BarChart>
+                      </RechartsBarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
