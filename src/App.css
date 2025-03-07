@@ -33,13 +33,13 @@
   filter: drop-shadow(0 0 1em rgba(66, 133, 244, 0.6));
 }
 
-/* Deal card styles */
+/* Deal card styles with improved mobile responsiveness */
 .deal-card {
   @apply rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300;
 }
 
 .deal-image {
-  @apply w-full h-48 object-cover;
+  @apply w-full h-36 sm:h-48 object-cover;
 }
 
 @media (min-width: 768px) {
@@ -48,14 +48,14 @@
   }
 }
 
-/* Marketing slogan styles */
+/* Marketing slogan styles with better mobile sizing */
 .marketing-slogan {
-  @apply text-lg md:text-xl lg:text-2xl font-medium text-gray-700 my-4;
+  @apply text-base sm:text-lg md:text-xl lg:text-2xl font-medium text-gray-700 my-3 sm:my-4;
 }
 
-/* Improved button styles */
+/* Improved button styles with better touch targets for mobile */
 .action-button {
-  @apply px-4 py-2 rounded-md font-medium transition-all duration-200;
+  @apply px-3 py-2 sm:px-4 sm:py-2 rounded-md font-medium transition-all duration-200;
 }
 
 /* Loading animations */
@@ -70,4 +70,36 @@
 
 .loading-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Enhanced mobile responsiveness */
+@media screen and (max-width: 390px) {
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  h1 {
+    font-size: 1.75rem;
+    line-height: 2.25rem;
+  }
+  
+  h2 {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+  
+  h3 {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  
+  .action-button {
+    min-height: 44px; /* Minimum touch target size */
+  }
+  
+  /* Adjust grid layouts for mobile */
+  .grid {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
 }
