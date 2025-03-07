@@ -99,15 +99,32 @@ export const LetterOfIntentForm = ({
     setIsOpen(false);
     navigate("/dashboard?tab=investments");
   };
+  
+  const handleInvestClick = () => {
+    setIsOpen(true);
+    // Reset form if it was previously submitted
+    if (loiSubmitted) {
+      setShowConfirmation(false);
+      setLoiSubmitted(false);
+      form.reset({
+        investmentAmount: minInvestment,
+        paymentMethod: "bank",
+        additionalInfo: "",
+        termsAccepted: false,
+      });
+    }
+  };
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <Button className="w-full">Invest Now</Button>
+          <Button className="w-full" onClick={handleInvestClick}>
+            Invest Now
+          </Button>
         </DialogTrigger>
         
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md loi-form-container">
           {!showConfirmation ? (
             <>
               <DialogHeader>
@@ -137,7 +154,7 @@ export const LetterOfIntentForm = ({
                           </div>
                         </FormControl>
                         <FormDescription>
-                          Minimum investment: ${minInvestment}
+                          Minimum investment: ${minInvestment.toLocaleString()}
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

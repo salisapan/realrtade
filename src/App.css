@@ -144,6 +144,29 @@
     margin-left: 0 !important;
     margin-right: 0 !important;
   }
+
+  /* Improved property detail layout for mobile */
+  .property-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Enhanced mobile navigation */
+  .mobile-menu-button {
+    display: block !important;
+  }
+
+  /* Improved investment details section */
+  .investment-detail-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .investment-chart {
+    max-height: 250px;
+    width: 100%;
+    overflow-x: hidden;
+  }
 }
 
 /* Additional fixes specifically for iPhone */
@@ -162,6 +185,16 @@
   .text-xl, .text-2xl, .text-3xl {
     font-size: 1rem !important;
     line-height: 1.5rem !important;
+  }
+
+  /* Fix for property details content */
+  .property-metrics {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Better spacing for investment charts */
+  .investment-chart {
+    max-height: 200px;
   }
 }
 
@@ -205,5 +238,72 @@
   
   .category-filter::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Fix for iPhone menu */
+  .mobile-header-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-around;
+    padding: 0.5rem;
+    z-index: 50;
+  }
+
+  /* Property detail page fixes */
+  .property-detail-tabs {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .property-detail-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 3D graph container */
+.graph-3d-container {
+  width: 100%;
+  height: 300px;
+  position: relative;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+@media screen and (max-width: 768px) {
+  .graph-3d-container {
+    height: 250px;
+  }
+}
+
+@media screen and (max-width: 390px) {
+  .graph-3d-container {
+    height: 200px;
+  }
+}
+
+/* Investment letter of intent form fixes */
+.loi-form-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fixes for Investment Details section */
+.investment-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media screen and (max-width: 768px) {
+  .investment-details-section {
+    flex-direction: column;
   }
 }

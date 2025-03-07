@@ -1,3 +1,5 @@
+
+import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +11,20 @@ import { useToast } from "@/components/ui/use-toast";
 const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [userName, setUserName] = useState("Investor");
+
+  useEffect(() => {
+    // Get user profile from localStorage
+    try {
+      const profile = localStorage.getItem("investorProfile");
+      if (profile) {
+        const parsedProfile = JSON.parse(profile);
+        setUserName(parsedProfile.fullName || "Investor");
+      }
+    } catch (error) {
+      console.error("Error getting user name:", error);
+    }
+  }, []);
 
   const handleProfileUpdate = () => {
     navigate('/settings');
@@ -37,17 +53,17 @@ const Dashboard = () => {
   return (
     <div className="flex">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 p-8">
+      <div className="flex-1 min-h-screen bg-gray-50 p-4 sm:p-8 pb-16 md:pb-8">
         {/* Profile Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-6">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center cursor-pointer"
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+          <div className="flex items-center gap-4 md:gap-6">
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-primary/10 flex items-center justify-center cursor-pointer"
                  onClick={() => handleNavigate('/settings')}>
-              <UserCircle className="w-12 h-12 text-primary" />
+              <UserCircle className="w-10 h-10 md:w-12 md:h-12 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">John Doe</h1>
-              <p className="text-gray-600">Active Investor since 2023</p>
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900">{userName}</h1>
+              <p className="text-sm md:text-base text-gray-600">Active Investor since 2023</p>
             </div>
           </div>
           <Button onClick={handleProfileUpdate}>
@@ -56,7 +72,7 @@ const Dashboard = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={handleViewWallet}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-gray-500">
