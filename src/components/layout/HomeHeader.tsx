@@ -1,7 +1,7 @@
 
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Menu, User, X } from "lucide-react";
+import { Home, Menu, User, X, Building2, LineChart, FileText, Settings, DollarSign } from "lucide-react";
 import { useState } from "react";
 
 export const HomeHeader = () => {
@@ -41,6 +41,7 @@ export const HomeHeader = () => {
               size="icon" 
               className="md:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Toggle menu"
             >
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
@@ -50,19 +51,31 @@ export const HomeHeader = () => {
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t mt-3">
             <nav className="flex flex-col space-y-3">
-              <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
+              <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50" onClick={() => setIsMenuOpen(false)}>
                 <Home className="w-5 h-5" />
                 <span>Home</span>
               </Link>
-              <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                <Home className="w-5 h-5" />
+              <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50" onClick={() => setIsMenuOpen(false)}>
+                <Building2 className="w-5 h-5" />
                 <span>Properties</span>
               </Link>
-              <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                <Home className="w-5 h-5" />
+              <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50" onClick={() => setIsMenuOpen(false)}>
+                <LineChart className="w-5 h-5" />
                 <span>Dashboard</span>
               </Link>
-              <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+              <Link to="/reports" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50" onClick={() => setIsMenuOpen(false)}>
+                <FileText className="w-5 h-5" />
+                <span>Reports</span>
+              </Link>
+              <Link to="/wallet" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50" onClick={() => setIsMenuOpen(false)}>
+                <DollarSign className="w-5 h-5" />
+                <span>Wallet</span>
+              </Link>
+              <Link to="/settings" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50" onClick={() => setIsMenuOpen(false)}>
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </Link>
+              <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50" onClick={() => setIsMenuOpen(false)}>
                 <User className="w-5 h-5" />
                 <span>Sign Up</span>
               </Link>

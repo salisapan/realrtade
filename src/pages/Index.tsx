@@ -6,6 +6,9 @@ import { PropertyListing } from "@/components/PropertyListing";
 import { PropertiesHeader } from "@/components/PropertiesHeader";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Menu, X, Home } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { 
   categories, 
   propertiesBySector, 
@@ -105,6 +108,7 @@ const Index = () => {
   const [investorProfile, setInvestorProfile] = useState<any>(null);
   const [properties, setProperties] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -130,19 +134,29 @@ const Index = () => {
       // All investors can access the platform
       const isAccredited = parsedProfile.isAccredited === "yes";
       
+      // Update properties with isAccredited flag and lowered minimum investment
       if (isAccredited) {
-        // Accredited investors see all properties
-        setProperties(getCategoryProperties(selectedCategory));
+        // Accredited investors see all properties with $2,500 minimum investment
+        const accreditedProperties = getCategoryProperties(selectedCategory).map(prop => ({
+          ...prop,
+          isAccredited: true,
+          minInvestment: prop.minInvestment > 2500 ? 2500 : prop.minInvestment
+        }));
+        setProperties(accreditedProperties);
+        
         toast({
-          title: "Welcome Accredited Investor",
+          title: `Welcome ${parsedProfile.firstName || 'Accredited Investor'}`,
           description: "You're viewing all available investment properties.",
         });
       } else {
         // Non-accredited investors see affordable deals with $10 minimum investment
-        setProperties(affordableDeals);
+        setProperties(affordableDeals.map(prop => ({
+          ...prop,
+          isAccredited: false
+        })));
         
         toast({
-          title: "Welcome to RealTrade",
+          title: `Welcome ${parsedProfile.firstName || 'Investor'}`,
           description: "You're viewing verified properties with low minimum investments of just $10.",
         });
       }
@@ -150,7 +164,10 @@ const Index = () => {
     } catch (error) {
       console.error("Error parsing investor profile:", error);
       // Even if there's an error, show some default properties
-      setProperties(affordableDeals);
+      setProperties(affordableDeals.map(prop => ({
+        ...prop,
+        isAccredited: false
+      })));
       setIsLoading(false);
     }
   }, [selectedCategory, toast]);
@@ -177,10 +194,18 @@ const Index = () => {
     setSelectedCategory(category);
     
     if (investorProfile && investorProfile.isAccredited === "yes") {
-      setProperties(getCategoryProperties(category));
+      const accreditedProperties = getCategoryProperties(category).map(prop => ({
+        ...prop,
+        isAccredited: true,
+        minInvestment: prop.minInvestment > 2500 ? 2500 : prop.minInvestment
+      }));
+      setProperties(accreditedProperties);
     } else {
       // Non-accredited investors always see the affordable deals regardless of category
-      setProperties(affordableDeals);
+      setProperties(affordableDeals.map(prop => ({
+        ...prop,
+        isAccredited: false
+      })));
     }
   };
 
@@ -194,43 +219,214 @@ const Index = () => {
 
   return (
     <div className="flex flex-col md:flex-row">
-      <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 w-full">
-        <PropertiesHeader 
-          categories={categories.map(cat => ({
-            ...cat,
-            active: cat.id === selectedCategory
-          }))}
-          onSelectCategory={handleCategoryChange}
-        />
-        
-        {/* Add the slogan above the property listing */}
-        <div className="container mx-auto px-4 pt-3 md:pt-6">
-          <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4">RealTrade - Invest in real estate worldwide from anywhere.</p>
+      {isMobile ? (
+        // Mobile view with custom sidebar
+        <div className="mobile-sidebar-wrapper">
+          {/* Floating menu button for iPhone */}
+          <button 
+            className="mobile-menu-button md:hidden"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          
+          {/* Mobile menu overlay */}
+          {mobileMenuOpen && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50" onClick={() => setMobileMenuOpen(false)}>
+              <div className="absolute right-0 top-0 bottom-0 w-[280px] bg-white shadow-lg p-4" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4 pb-2 border-b">
+                  <Link to="/" className="flex items-center" onClick={() => setMobileMenuOpen(false)}>
+                    <img 
+                      src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+                      alt="RealTrade Logo" 
+                      className="h-8 rounded-lg" 
+                    />
+                    <span className="ml-2 font-bold">RealTrade</span>
+                  </Link>
+                  <button onClick={() => setMobileMenuOpen(false)}>
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <div className="flex flex-col space-y-1">
+                  <Link
+                    to="/"
+                    className="flex items-center p-3 rounded-md text-primary bg-primary/10"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Home className="w-5 h-5 mr-3 text-primary" />
+                    <span>Home</span>
+                  </Link>
+                  <Link
+                    to="/properties"
+                    className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Building2 className="w-5 h-5 mr-3" />
+                    <span>Properties</span>
+                  </Link>
+                  <Link
+                    to="/dashboard"
+                    className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Home className="w-5 h-5 mr-3" />
+                    <span>Dashboard</span>
+                  </Link>
+                  <Link
+                    to="/performance"
+                    className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <LineChart className="w-5 h-5 mr-3" />
+                    <span>Performance</span>
+                  </Link>
+                  <Link
+                    to="/reports"
+                    className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <FileText className="w-5 h-5 mr-3" />
+                    <span>Reports</span>
+                  </Link>
+                  <Link
+                    to="/wallet"
+                    className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <DollarSign className="w-5 h-5 mr-3" />
+                    <span>Wallet</span>
+                  </Link>
+                  <Link
+                    to="/settings"
+                    className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Settings className="w-5 h-5 mr-3" />
+                    <span>Settings</span>
+                  </Link>
+                  <Link
+                    to="/entrepreneur"
+                    className="flex items-center p-3 rounded-md text-gray-700 hover:bg-gray-100"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <Building2 className="w-5 h-5 mr-3" />
+                    <span>Entrepreneur View</span>
+                  </Link>
+                </div>
+                
+                <div className="mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-2 p-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      {investorProfile?.firstName?.[0] || 'U'}
+                    </div>
+                    <div>
+                      <div className="font-medium">{`${investorProfile?.firstName || 'Welcome'} ${investorProfile?.lastName || ''}`}</div>
+                      <div className="text-xs text-gray-500">{investorProfile?.email || 'Investor'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex-1 min-h-screen bg-gray-50 w-full">
+            <div className="sticky top-0 z-10 bg-white border-b">
+              <div className="flex justify-between items-center p-3">
+                <Link to="/" className="flex items-center">
+                  <img 
+                    src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+                    alt="RealTrade Logo" 
+                    className="h-7 rounded-lg" 
+                  />
+                  <span className="ml-2 font-bold">Properties</span>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="md:hidden"
+                  onClick={() => setMobileMenuOpen(true)}
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <PropertiesHeader 
+                categories={categories.map(cat => ({
+                  ...cat,
+                  active: cat.id === selectedCategory
+                }))}
+                onSelectCategory={handleCategoryChange}
+              />
+            </div>
+            
+            <main className="container mx-auto px-2 md:px-4 py-4 md:py-8">
+              <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full">
+                <TabsContent value="sector" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="low-risk" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="geography" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="profitable" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="company" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+              </Tabs>
+            </main>
+          </div>
         </div>
+      ) : (
+        // Desktop view with regular sidebar
+        <>
+          <AppSidebar />
+          <div className="flex-1 min-h-screen bg-gray-50 w-full">
+            <PropertiesHeader 
+              categories={categories.map(cat => ({
+                ...cat,
+                active: cat.id === selectedCategory
+              }))}
+              onSelectCategory={handleCategoryChange}
+            />
+            
+            {/* Add the slogan above the property listing */}
+            <div className="container mx-auto px-4 pt-3 md:pt-6">
+              <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4">RealTrade - Invest in real estate worldwide from anywhere.</p>
+            </div>
 
-        <main className="container mx-auto px-2 md:px-4 py-4 md:py-8">
-          <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full">
-            <TabsContent value="sector" className="property-listing-grid">
-              <PropertyListing properties={properties} />
-            </TabsContent>
-            <TabsContent value="low-risk" className="property-listing-grid">
-              <PropertyListing properties={properties} />
-            </TabsContent>
-            <TabsContent value="geography" className="property-listing-grid">
-              <PropertyListing properties={properties} />
-            </TabsContent>
-            <TabsContent value="profitable" className="property-listing-grid">
-              <PropertyListing properties={properties} />
-            </TabsContent>
-            <TabsContent value="company" className="property-listing-grid">
-              <PropertyListing properties={properties} />
-            </TabsContent>
-          </Tabs>
-        </main>
-      </div>
+            <main className="container mx-auto px-2 md:px-4 py-4 md:py-8">
+              <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full">
+                <TabsContent value="sector" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="low-risk" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="geography" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="profitable" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+                <TabsContent value="company" className="property-listing-grid">
+                  <PropertyListing properties={properties} />
+                </TabsContent>
+              </Tabs>
+            </main>
+          </div>
+        </>
+      )}
     </div>
   );
 };
+
+// These imports need to be added at the top of the file
+const { Building2, LineChart, FileText, Settings, DollarSign } = require("lucide-react");
 
 export default Index;
