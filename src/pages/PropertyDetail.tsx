@@ -106,13 +106,15 @@ const PropertyDetail = () => {
         <header className="bg-white shadow-sm">
           <div className="container mx-auto px-4 py-3">
             <div className="flex justify-between items-center">
-              <div className="flex items-center">
-                <img 
-                  src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
-                  alt="RealTrade Logo" 
-                  className="h-8 mr-3 rounded-lg" 
-                />
-                <h1 className="text-lg md:text-xl font-bold text-gray-900">{property.name}</h1>
+              <div className="flex items-center gap-2 max-w-[75%]">
+                <Link to="/" className="flex-shrink-0">
+                  <img 
+                    src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+                    alt="RealTrade Logo" 
+                    className="h-8 rounded-lg" 
+                  />
+                </Link>
+                <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate ml-2">{property.name}</h1>
               </div>
               <div className="flex items-center gap-2">
                 <Button 
@@ -122,7 +124,7 @@ const PropertyDetail = () => {
                   onClick={handleBookmark}
                 >
                   <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "fill-primary" : ""}`} />
-                  {bookmarked ? "Saved" : "Save"}
+                  <span className="hidden sm:inline">{bookmarked ? "Saved" : "Save"}</span>
                 </Button>
                 <Button 
                   variant="outline" 
@@ -131,18 +133,12 @@ const PropertyDetail = () => {
                   onClick={handleShare}
                 >
                   <Share2 className="w-3.5 h-3.5" />
-                  Share
+                  <span className="hidden sm:inline">Share</span>
                 </Button>
-                <Link to="/">
-                  <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs">
-                    <Home className="w-3.5 h-3.5" />
-                    Home
-                  </Button>
-                </Link>
                 <Link to="/properties">
                   <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs">
                     <Building className="w-3.5 h-3.5" />
-                    Properties
+                    <span className="hidden sm:inline">Back</span>
                   </Button>
                 </Link>
               </div>

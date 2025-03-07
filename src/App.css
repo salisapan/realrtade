@@ -1,4 +1,3 @@
-
 #root {
   max-width: 1440px;
   margin: 0 auto;
@@ -87,8 +86,12 @@
   }
   
   h1 {
-    font-size: 1.5rem !important;
-    line-height: 2rem !important;
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+    max-width: 70% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
   
   h2 {
@@ -106,7 +109,7 @@
   }
   
   .action-button, .btn, button {
-    min-height: 48px; /* Better touch target for iPhone */
+    min-height: 44px; /* Better touch target for iPhone */
     font-size: 0.875rem !important;
   }
   
@@ -166,6 +169,32 @@
     max-height: 250px;
     width: 100%;
     overflow-x: hidden;
+  }
+  
+  /* Fix toolbar layout on iPhone */
+  header .container {
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+  
+  /* Optimize property header for mobile */
+  header .flex-shrink-0 img {
+    max-height: 32px;
+    margin-right: 0.5rem;
+  }
+  
+  /* Simplify toolbar buttons on mobile */
+  header button {
+    padding: 0.25rem !important;
+    min-width: 32px !important;
+    min-height: 32px !important;
+  }
+  
+  /* Fix for minimum investment display */
+  .bg-green-100, .text-green-800, .border-green-200 {
+    background-color: white !important;
+    color: #333333 !important;
+    border-color: #e5e5e5 !important;
   }
 }
 

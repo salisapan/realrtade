@@ -32,8 +32,8 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
               />
             </Link>
             
-            {/* Home button added in prominent position */}
-            <Link to="/" className="ml-4">
+            {/* Make "Home" label smarter */}
+            <Link to="/" className="hidden sm:flex ml-4">
               <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
                 <Home className="w-5 h-5" />
                 <span className="hidden md:inline font-medium">Home</span>
@@ -95,18 +95,6 @@ export const PropertiesHeader = ({ categories, onSelectCategory }: PropertiesHea
               <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Properties</span>
-              </Link>
-              <Link to="/performance" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                <Home className="w-5 h-5" />
-                <span>Performance</span>
-              </Link>
-              <Link to="/reports" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                <Home className="w-5 h-5" />
-                <span>Reports</span>
-              </Link>
-              <Link to="/entrepreneur" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                <Home className="w-5 h-5" />
-                <span>Entrepreneur View</span>
               </Link>
             </nav>
           </div>

@@ -58,9 +58,9 @@ export const PropertyCard = ({
               {status}
             </Badge>
           </div>
-          {minInvestment && minInvestment < 10000 && (
+          {minInvestment && (
             <div className="absolute top-3 left-3">
-              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 shadow-sm">
+              <Badge variant="outline" className="bg-white text-gray-800 border-gray-200 shadow-sm">
                 Min: ${minInvestment.toLocaleString()}
               </Badge>
             </div>

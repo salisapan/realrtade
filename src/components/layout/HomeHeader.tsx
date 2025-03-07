@@ -37,31 +37,33 @@ export const HomeHeader = () => {
     <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
-          <div className="flex items-center">
+          <div className="flex items-center gap-2 max-w-[70%]">
             {needsBackButton ? (
-              <Link to={location.pathname.includes('/property/') ? '/properties' : '/'} className="mr-2">
+              <Link to={location.pathname.includes('/property/') ? '/properties' : '/'} className="flex-shrink-0">
                 <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
                   <ArrowLeft className="w-5 h-5" />
                   <span className="hidden md:inline font-medium">Back</span>
                 </Button>
               </Link>
             ) : (
-              <Link to="/" className="flex items-center">
+              <Link to="/" className="flex-shrink-0">
                 <img 
                   src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
                   alt="RealTrade Logo" 
-                  className="h-8 mr-3 rounded-lg" 
+                  className="h-8 rounded-lg" 
                 />
               </Link>
             )}
             
-            {/* Home button in prominent position */}
-            <Link to="/" className="ml-2">
-              <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
-                <Home className="w-5 h-5" />
-                <span className="hidden md:inline font-medium">Home</span>
-              </Button>
-            </Link>
+            {/* Only show home button if not at home already */}
+            {location.pathname !== "/" && !needsBackButton && (
+              <Link to="/" className="ml-2">
+                <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
+                  <Home className="w-5 h-5" />
+                  <span className="hidden md:inline font-medium">Home</span>
+                </Button>
+              </Link>
+            )}
           </div>
           
           <div className="flex items-center gap-2">
@@ -120,7 +122,7 @@ export const HomeHeader = () => {
         )}
       </div>
       
-      {/* Mobile fixed bottom navigation */}
+      {/* Mobile fixed bottom navigation - simplified */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-50 flex justify-around py-2 px-1">
         <Link to="/" className="flex flex-col items-center justify-center p-1">
           <Home className="w-5 h-5 text-primary" />
@@ -133,10 +135,6 @@ export const HomeHeader = () => {
         <Link to="/dashboard" className="flex flex-col items-center justify-center p-1">
           <LineChart className="w-5 h-5 text-gray-600" />
           <span className="text-xs mt-1">Dashboard</span>
-        </Link>
-        <Link to="/settings" className="flex flex-col items-center justify-center p-1">
-          <Settings className="w-5 h-5 text-gray-600" />
-          <span className="text-xs mt-1">Settings</span>
         </Link>
       </div>
     </header>
