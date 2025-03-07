@@ -4,7 +4,6 @@ import { Link } from "react-router-dom";
 import { Building2, LineChart, Users, DollarSign, ArrowRight, Star, Shield, Clock } from "lucide-react";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Testimonials } from "@/components/landing/Testimonials";
-import { PartnerLogos } from "@/components/landing/PartnerLogos";
 import { HomeFooter } from "@/components/landing/HomeFooter";
 
 const Landing = () => {
@@ -25,9 +24,6 @@ const Landing = () => {
 
       {/* How It Works Section */}
       <HowItWorks />
-
-      {/* Partner Logos Section */}
-      <PartnerLogos />
 
       {/* Value Proposition Section */}
       <div className="container mx-auto px-4 py-10 md:py-16">

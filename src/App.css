@@ -72,34 +72,138 @@
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Enhanced mobile responsiveness */
-@media screen and (max-width: 390px) {
+/* Enhanced mobile responsiveness - specifically for iPhone */
+@media screen and (max-width: 420px) {
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  
   .container {
     padding-left: 0.75rem;
     padding-right: 0.75rem;
+    width: 100%;
+    max-width: 100%;
   }
   
   h1 {
-    font-size: 1.75rem;
-    line-height: 2.25rem;
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
   }
   
   h2 {
-    font-size: 1.5rem;
-    line-height: 2rem;
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
   }
   
   h3 {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
+    font-size: 1.125rem !important;
+    line-height: 1.5rem !important;
   }
   
-  .action-button {
-    min-height: 44px; /* Minimum touch target size */
+  p {
+    font-size: 0.875rem !important;
+  }
+  
+  .action-button, .btn, button {
+    min-height: 48px; /* Better touch target for iPhone */
+    font-size: 0.875rem !important;
   }
   
   /* Adjust grid layouts for mobile */
   .grid {
     grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    gap: 1rem !important;
+  }
+  
+  /* Improve tappable areas */
+  a, button, input[type="button"], input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Fix for iPhone text size adjustments */
+  textarea, input, select {
+    font-size: 16px !important; /* Prevents iPhone zoom on focus */
+  }
+  
+  /* Better padding for content areas */
+  .py-10 {
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+  }
+  
+  .py-16 {
+    padding-top: 2rem !important;
+    padding-bottom: 2rem !important;
+  }
+  
+  /* Fix for property cards on small screens */
+  .deal-card, .property-card {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+}
+
+/* Additional fixes specifically for iPhone */
+@media screen and (max-width: 390px) {
+  .container {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  button, a.btn, .btn, .action-button {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    font-size: 0.8125rem !important;
+  }
+  
+  .text-xl, .text-2xl, .text-3xl {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
+}
+
+/* Fix for Index page on mobile */
+@media screen and (max-width: 420px) {
+  .property-listing-grid {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    padding: 0.5rem !important;
+  }
+  
+  .property-card {
+    max-width: 100% !important;
+    margin-bottom: 1rem;
+  }
+  
+  .app-sidebar {
+    width: 60px !important;
+  }
+  
+  .app-sidebar-text {
+    display: none !important;
+  }
+  
+  .main-content-with-sidebar {
+    margin-left: 60px !important;
+    width: calc(100% - 60px) !important;
+  }
+  
+  .properties-header {
+    padding: 0.5rem !important;
+  }
+  
+  .category-filter {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.5rem;
+  }
+  
+  .category-filter::-webkit-scrollbar {
+    display: none;
   }
 }

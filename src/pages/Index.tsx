@@ -5,6 +5,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PropertyListing } from "@/components/PropertyListing";
 import { PropertiesHeader } from "@/components/PropertiesHeader";
 import { useToast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { 
   categories, 
   propertiesBySector, 
@@ -105,6 +106,7 @@ const Index = () => {
   const [properties, setProperties] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const isMobile = useIsMobile();
 
   // Check if user has completed investor registration
   useEffect(() => {
@@ -191,9 +193,9 @@ const Index = () => {
   }
 
   return (
-    <div className="flex">
+    <div className="flex flex-col md:flex-row">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50">
+      <div className="flex-1 min-h-screen bg-gray-50 w-full">
         <PropertiesHeader 
           categories={categories.map(cat => ({
             ...cat,
@@ -203,25 +205,25 @@ const Index = () => {
         />
         
         {/* Add the slogan above the property listing */}
-        <div className="container mx-auto px-4 pt-6">
-          <p className="text-gray-600 text-sm text-center mb-4">RealTrade - Invest in real estate worldwide from anywhere.</p>
+        <div className="container mx-auto px-4 pt-3 md:pt-6">
+          <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4">RealTrade - Invest in real estate worldwide from anywhere.</p>
         </div>
 
-        <main className="container mx-auto px-4 py-8">
+        <main className="container mx-auto px-2 md:px-4 py-4 md:py-8">
           <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full">
-            <TabsContent value="sector">
+            <TabsContent value="sector" className="property-listing-grid">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="low-risk">
+            <TabsContent value="low-risk" className="property-listing-grid">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="geography">
+            <TabsContent value="geography" className="property-listing-grid">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="profitable">
+            <TabsContent value="profitable" className="property-listing-grid">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="company">
+            <TabsContent value="company" className="property-listing-grid">
               <PropertyListing properties={properties} />
             </TabsContent>
           </Tabs>
