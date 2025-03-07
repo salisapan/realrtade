@@ -77,7 +77,6 @@
   html, body {
     overflow-x: hidden;
     width: 100%;
-    -webkit-text-size-adjust: 100%;
   }
   
   .container {
@@ -145,81 +144,6 @@
     margin-left: 0 !important;
     margin-right: 0 !important;
   }
-  
-  /* Property detail page fixes for iPhone */
-  .property-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr !important;
-  }
-  
-  /* Improve chart container heights for mobile */
-  .chart-container {
-    height: 250px !important;
-  }
-  
-  /* Make tabs more mobile-friendly */
-  .tabs-list {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 0.5rem;
-  }
-  
-  .tab-trigger {
-    flex: 0 0 auto;
-    font-size: 0.75rem !important;
-    padding: 0.5rem 0.75rem !important;
-  }
-  
-  /* Floating menu button for iPhone */
-  .mobile-menu-button {
-    position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    z-index: 50;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: var(--primary);
-    color: white;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
-  
-  /* Improved mobile navigation drawer */
-  .mobile-nav-drawer {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 80%;
-    max-width: 300px;
-    background-color: white;
-    z-index: 100;
-    box-shadow: -4px 0 10px rgba(0, 0, 0, 0.1);
-    transform: translateX(100%);
-    transition: transform 0.3s ease-in-out;
-  }
-  
-  .mobile-nav-drawer.open {
-    transform: translateX(0);
-  }
-  
-  /* Sidebar width adjustments for mobile */
-  .mobile-sidebar {
-    width: 60px !important;
-  }
-  
-  .mobile-sidebar-text {
-    display: none !important;
-  }
-  
-  /* Main content adjustments when sidebar is present */
-  .mobile-content-with-sidebar {
-    margin-left: 60px !important;
-    width: calc(100% - 60px) !important;
-  }
 }
 
 /* Additional fixes specifically for iPhone */
@@ -239,36 +163,9 @@
     font-size: 1rem !important;
     line-height: 1.5rem !important;
   }
-  
-  /* Further reduce component paddings */
-  .card-content {
-    padding: 0.75rem !important;
-  }
-  
-  /* Mobile property details */
-  .property-details-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .property-details-actions {
-    width: 100%;
-    justify-content: space-between;
-    margin-top: 0.75rem;
-  }
-  
-  /* Improved property detail UI for iPhone 13 */
-  .property-gallery {
-    height: 200px !important;
-  }
-  
-  /* Tab improvements for iPhone 13 */
-  .property-tabs .tabs-content {
-    padding: 0.75rem !important;
-  }
 }
 
-/* Fix for properties and property detail pages on mobile */
+/* Fix for Index page on mobile */
 @media screen and (max-width: 420px) {
   .property-listing-grid {
     display: grid;
@@ -308,26 +205,5 @@
   
   .category-filter::-webkit-scrollbar {
     display: none;
-  }
-  
-  /* Property detail page specific fixes */
-  .property-detail-content {
-    padding: 0.75rem !important;
-  }
-  
-  .property-detail-metrics {
-    grid-template-columns: 1fr 1fr !important;
-  }
-  
-  .property-image-container {
-    height: 220px !important;
-  }
-  
-  /* Invest Now buttons - improve tappability */
-  .invest-button {
-    width: 100% !important;
-    margin-top: 0.5rem !important;
-    margin-bottom: 0.5rem !important;
-    height: 48px !important;
   }
 }

@@ -25,7 +25,6 @@ export const propertiesBySector = [
     year: "2012",
     price: "2,700,000",
     category: "Commercial",
-    minInvestment: 10000
   },
   {
     id: "prop2",
@@ -44,7 +43,6 @@ export const propertiesBySector = [
     year: "1965/2016",
     price: "8,770,000",
     category: "Office",
-    minInvestment: 25000
   },
   {
     id: "prop3",
@@ -63,7 +61,6 @@ export const propertiesBySector = [
     year: "2020",
     price: "12,500,000",
     category: "Tech Office",
-    minInvestment: 50000
   },
 ];
 
@@ -85,7 +82,6 @@ export const propertiesByLowRisk = [
     year: "2012",
     price: "2,700,000",
     riskProfile: "Low",
-    minInvestment: 10000
   },
   {
     id: "prop4",
@@ -104,7 +100,6 @@ export const propertiesByLowRisk = [
     year: "2019",
     price: "5,900,000",
     riskProfile: "Low",
-    minInvestment: 15000
   },
 ];
 
@@ -125,8 +120,7 @@ export const propertiesByGeography = [
     status: "Built",
     year: "2012",
     price: "2,700,000",
-    region: "Northeast",
-    minInvestment: 10000
+    region: "Northeast"
   },
   {
     id: "prop2",
@@ -144,8 +138,7 @@ export const propertiesByGeography = [
     status: "Built",
     year: "1965/2016",
     price: "8,770,000",
-    region: "Midwest",
-    minInvestment: 25000
+    region: "Midwest"
   },
   {
     id: "prop4",
@@ -163,8 +156,7 @@ export const propertiesByGeography = [
     status: "Built",
     year: "2019",
     price: "5,900,000",
-    region: "Southeast",
-    minInvestment: 15000
+    region: "Southeast"
   },
 ];
 
@@ -185,8 +177,7 @@ export const propertiesByProfitable = [
     status: "Built",
     year: "2020",
     price: "12,500,000",
-    profitMargin: "High",
-    minInvestment: 50000
+    profitMargin: "High"
   },
   {
     id: "prop5",
@@ -204,8 +195,7 @@ export const propertiesByProfitable = [
     status: "Built",
     year: "2021",
     price: "15,300,000",
-    profitMargin: "High",
-    minInvestment: 40000
+    profitMargin: "High"
   },
 ];
 
@@ -226,7 +216,6 @@ export const propertiesByCompany = [
     status: "Built",
     year: "2012",
     price: "2,700,000",
-    minInvestment: 10000
   },
   {
     id: "prop2",
@@ -244,7 +233,6 @@ export const propertiesByCompany = [
     status: "Built",
     year: "1965/2016",
     price: "8,770,000",
-    minInvestment: 25000
   },
   {
     id: "prop3",
@@ -262,6 +250,5 @@ export const propertiesByCompany = [
     status: "Built",
     year: "2020",
     price: "12,500,000",
-    minInvestment: 50000
   },
 ];
