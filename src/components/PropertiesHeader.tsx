@@ -38,10 +38,7 @@ export const PropertiesHeader = ({
             </div>
             
             <Link to="/dashboard">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full"></span>
-              </Button>
+              
             </Link>
             
             <Link to="/investor-signup" className="hidden sm:block">
@@ -51,9 +48,7 @@ export const PropertiesHeader = ({
             </Link>
             
             <Link to="/dashboard">
-              <Button variant="ghost" size="icon">
-                <UserCircle className="w-5 h-5" />
-              </Button>
+              
             </Link>
             
             <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
