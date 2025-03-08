@@ -6,40 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Home, 
-  Building, 
-  BarChart, 
-  FileText,
-  MessageSquare,
-  Bookmark,
-  Share2,
-  Check,
-  CalendarDays
-} from "lucide-react";
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip as RechartsTooltip, 
-  ResponsiveContainer,
-  BarChart as RechartsBarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
-} from "recharts";
-
+import { Home, Building, BarChart, FileText, MessageSquare, Bookmark, Share2, Check, CalendarDays } from "lucide-react";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
 const PropertyDetail = () => {
-  const { id } = useParams();
+  const {
+    id
+  } = useParams();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
-  const { toast } = useToast();
-  
+  const {
+    toast
+  } = useToast();
   useEffect(() => {
     // Simulate loading property data
     setTimeout(() => {
@@ -49,28 +27,24 @@ const PropertyDetail = () => {
       setLoading(false);
     }, 500);
   }, [id]);
-  
   const handleBookmark = () => {
     setBookmarked(!bookmarked);
     toast({
       title: bookmarked ? "Deal removed from saved" : "Deal saved",
       description: bookmarked ? "This deal has been removed from your saved deals" : "This deal has been added to your saved deals",
-      variant: "success",
+      variant: "success"
     });
   };
-  
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     toast({
       title: "Link copied",
       description: "Deal link has been copied to clipboard",
-      variant: "success",
+      variant: "success"
     });
   };
-  
   if (loading) {
-    return (
-      <div className="flex">
+    return <div className="flex">
         <AppSidebar />
         <div className="flex-1 flex items-center justify-center min-h-screen">
           <div className="text-center">
@@ -78,13 +52,10 @@ const PropertyDetail = () => {
             <p className="mt-4 text-lg">Loading property details...</p>
           </div>
         </div>
-      </div>
-    );
+      </div>;
   }
-  
   if (!property) {
-    return (
-      <div className="flex">
+    return <div className="flex">
         <AppSidebar />
         <div className="flex-1 flex flex-col items-center justify-center min-h-screen">
           <h1 className="text-4xl font-bold mb-4">Oops! Property not found</h1>
@@ -95,12 +66,9 @@ const PropertyDetail = () => {
             </Button>
           </Link>
         </div>
-      </div>
-    );
+      </div>;
   }
-  
-  return (
-    <div className="flex">
+  return <div className="flex">
       <AppSidebar />
       <div className="flex-1 min-h-screen bg-gray-50">
         <header className="bg-white shadow-sm">
@@ -108,53 +76,32 @@ const PropertyDetail = () => {
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2 max-w-[75%]">
                 <Link to="/" className="flex-shrink-0">
-                  <img 
-                    src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
-                    alt="RealTrade Logo" 
-                    className="h-8 rounded-lg" 
-                  />
+                  <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 rounded-lg" />
                 </Link>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate ml-2">{property.name}</h1>
               </div>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex items-center gap-1 h-8 text-xs"
-                  onClick={handleBookmark}
-                >
+                <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs" onClick={handleBookmark}>
                   <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "fill-primary" : ""}`} />
                   <span className="hidden sm:inline">{bookmarked ? "Saved" : "Save"}</span>
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex items-center gap-1 h-8 text-xs"
-                  onClick={handleShare}
-                >
+                <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs" onClick={handleShare}>
                   <Share2 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Share</span>
                 </Button>
                 <Link to="/properties">
-                  <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs">
-                    <Building className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Back</span>
-                  </Button>
+                  
                 </Link>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-4 md:py-6">
+        <main className="mx-0">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
             <div className="lg:col-span-2 space-y-4 md:space-y-6">
               <div className="rounded-xl overflow-hidden bg-white shadow-sm">
-                <img 
-                  src={property.image} 
-                  alt={property.name} 
-                  className="w-full h-[300px] object-cover" 
-                />
+                <img src={property.image} alt={property.name} className="w-full h-[300px] object-cover" />
                 
                 <PropertyDetailContent property={property} />
               </div>
@@ -177,21 +124,23 @@ const PropertyDetail = () => {
                           <h3 className="text-sm font-medium mb-3">5-Year Cash Flow Projections</h3>
                           <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
-                              <AreaChart
-                                data={cashFlowData}
-                                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
-                              >
+                              <AreaChart data={cashFlowData} margin={{
+                              top: 10,
+                              right: 30,
+                              left: 0,
+                              bottom: 0
+                            }}>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                                <YAxis tick={{ fontSize: 12 }} />
-                                <RechartsTooltip contentStyle={{ fontSize: 12 }} />
-                                <Area 
-                                  type="monotone" 
-                                  dataKey="cashFlow" 
-                                  stroke="#8884d8" 
-                                  fill="#8884d8" 
-                                  fillOpacity={0.3}
-                                />
+                                <XAxis dataKey="year" tick={{
+                                fontSize: 12
+                              }} />
+                                <YAxis tick={{
+                                fontSize: 12
+                              }} />
+                                <RechartsTooltip contentStyle={{
+                                fontSize: 12
+                              }} />
+                                <Area type="monotone" dataKey="cashFlow" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
                               </AreaChart>
                             </ResponsiveContainer>
                           </div>
@@ -203,21 +152,15 @@ const PropertyDetail = () => {
                             <div className="h-56">
                               <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                  <Pie
-                                    data={roiComponentsData}
-                                    cx="50%"
-                                    cy="50%"
-                                    labelLine={false}
-                                    outerRadius={70}
-                                    fill="#8884d8"
-                                    dataKey="value"
-                                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                  >
-                                    {roiComponentsData.map((entry, index) => (
-                                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
+                                  <Pie data={roiComponentsData} cx="50%" cy="50%" labelLine={false} outerRadius={70} fill="#8884d8" dataKey="value" label={({
+                                  name,
+                                  percent
+                                }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
+                                    {roiComponentsData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                                   </Pie>
-                                  <RechartsTooltip contentStyle={{ fontSize: 12 }} />
+                                  <RechartsTooltip contentStyle={{
+                                  fontSize: 12
+                                }} />
                                 </PieChart>
                               </ResponsiveContainer>
                             </div>
@@ -227,16 +170,25 @@ const PropertyDetail = () => {
                             <h3 className="text-sm font-medium mb-3">Risk Assessment</h3>
                             <div className="h-56">
                               <ResponsiveContainer width="100%" height="100%">
-                                <RechartsBarChart
-                                  data={riskAssessmentData}
-                                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                                  layout="vertical"
-                                >
+                                <RechartsBarChart data={riskAssessmentData} margin={{
+                                top: 20,
+                                right: 30,
+                                left: 20,
+                                bottom: 5
+                              }} layout="vertical">
                                   <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis type="number" domain={[0, 10]} tick={{ fontSize: 12 }} />
-                                  <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
-                                  <RechartsTooltip contentStyle={{ fontSize: 12 }} />
-                                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                                  <XAxis type="number" domain={[0, 10]} tick={{
+                                  fontSize: 12
+                                }} />
+                                  <YAxis dataKey="name" type="category" width={120} tick={{
+                                  fontSize: 12
+                                }} />
+                                  <RechartsTooltip contentStyle={{
+                                  fontSize: 12
+                                }} />
+                                  <Legend wrapperStyle={{
+                                  fontSize: 12
+                                }} />
                                   <Bar dataKey="score" fill="#82ca9d" name="Risk Score (lower is better)" />
                                 </RechartsBarChart>
                               </ResponsiveContainer>
@@ -511,165 +463,158 @@ const PropertyDetail = () => {
           </div>
         </main>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28BFF'];
-
-const sampleProperties = [
-  {
-    id: "prop1",
-    name: "Skyline Tower",
-    location: "New York, NY",
-    type: "Commercial",
-    description: "Prime office space in Manhattan's financial district. This recently renovated 32-story tower offers Class A office space with panoramic views of the city skyline. The property features state-of-the-art facilities, including a fitness center, conference rooms, and 24/7 security.",
-    price: 12500000,
-    roi: 12.5,
-    term: 5,
-    minInvestment: 25000,
-    fundingProgress: 78,
-    currentFunding: 9750000,
-    fundingGoal: 12500000,
-    investors: 132,
-    daysLeft: 23,
-    yearBuilt: 2005,
-    squareFootage: 125000,
-    occupancyRate: 94,
-    capRate: 7.8,
-    noi: 975000,
-    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab",
-    keyFeatures: [
-      "Prime location in Manhattan's financial district",
-      "Recently renovated with modern amenities",
-      "High occupancy rate with blue-chip tenants",
-      "Long-term lease agreements in place",
-      "Energy-efficient building systems",
-      "Excellent public transportation access"
-    ],
-    fundingEndDate: "Aug 30, 2023",
-    acquisitionDate: "Sep 15, 2023",
-    firstDistributionDate: "Dec 15, 2023",
-    exitDate: "Q3 2028",
-    recommendationScore: 8.5,
-    marketTrend: "Strong Growth",
-    entrepreneurExperience: "Excellent",
-    riskLevel: "Low",
-    demandLevel: "High",
-    returnPotential: "Strong",
-    cashOnCash: 9.5,
-    debtServiceRatio: 1.45,
-    loanToValue: 65
-  },
-  {
-    id: "prop2",
-    name: "Harborview Residences",
-    location: "San Francisco, CA",
-    type: "Residential",
-    description: "Luxury residential complex with 120 units overlooking San Francisco Bay. This property features a mix of one, two, and three-bedroom apartments with high-end finishes and amenities including a rooftop pool, fitness center, and concierge service.",
-    price: 18700000,
-    roi: 9.8,
-    term: 7,
-    minInvestment: 50000,
-    fundingProgress: 65,
-    currentFunding: 12155000,
-    fundingGoal: 18700000,
-    investors: 98,
-    daysLeft: 45,
-    yearBuilt: 2018,
-    squareFootage: 145000,
-    occupancyRate: 96,
-    capRate: 6.2,
-    noi: 1159400,
-    image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00",
-    keyFeatures: [
-      "Panoramic views of San Francisco Bay",
-      "Luxury amenities including rooftop pool",
-      "High occupancy rate in prime location",
-      "Strong rental demand in the area",
-      "Modern energy-efficient systems",
-      "Professional property management"
-    ],
-    fundingEndDate: "Sep 15, 2023",
-    acquisitionDate: "Oct 1, 2023",
-    firstDistributionDate: "Jan 15, 2024",
-    exitDate: "Q3 2030",
-    recommendationScore: 7.8,
-    marketTrend: "Stable",
-    entrepreneurExperience: "Good",
-    riskLevel: "Medium",
-    demandLevel: "High",
-    returnPotential: "Good",
-    cashOnCash: 7.5,
-    debtServiceRatio: 1.35,
-    loanToValue: 70
-  },
-  {
-    id: "prop3",
-    name: "Greenfield Industrial Park",
-    location: "Dallas, TX",
-    type: "Industrial",
-    description: "Modern industrial complex with 5 buildings totaling 350,000 square feet. Located in a rapidly growing logistics hub with excellent access to major highways, rail, and air transportation. The property is fully leased to credit-worthy tenants in the e-commerce and logistics sectors.",
-    price: 42500000,
-    roi: 15.2,
-    term: 8,
-    minInvestment: 100000,
-    fundingProgress: 83,
-    currentFunding: 35275000,
-    fundingGoal: 42500000,
-    investors: 87,
-    daysLeft: 12,
-    yearBuilt: 2019,
-    squareFootage: 350000,
-    occupancyRate: 100,
-    capRate: 8.5,
-    noi: 3612500,
-    image: "https://images.unsplash.com/photo-1553522911-ec3c9ba44d3b",
-    keyFeatures: [
-      "Strategic location in major logistics hub",
-      "100% occupied with long-term leases",
-      "Credit-worthy national tenants",
-      "Modern Class A facilities",
-      "Excellent transportation access",
-      "E-commerce resistant investment"
-    ],
-    fundingEndDate: "Jul 20, 2023",
-    acquisitionDate: "Aug 10, 2023",
-    firstDistributionDate: "Nov 15, 2023",
-    exitDate: "Q4 2031",
-    recommendationScore: 9.2,
-    marketTrend: "Strong Growth",
-    entrepreneurExperience: "Excellent",
-    riskLevel: "Low",
-    demandLevel: "Very High",
-    returnPotential: "Excellent",
-    cashOnCash: 11.5,
-    debtServiceRatio: 1.6,
-    loanToValue: 60
-  }
-];
-
-const cashFlowData = [
-  { year: '2023', cashFlow: 1250000 },
-  { year: '2024', cashFlow: 1325000 },
-  { year: '2025', cashFlow: 1405000 },
-  { year: '2026', cashFlow: 1490000 },
-  { year: '2027', cashFlow: 1580000 },
-  { year: '2028', cashFlow: 1675000 },
-];
-
-const roiComponentsData = [
-  { name: 'Rental Income', value: 50 },
-  { name: 'Appreciation', value: 35 },
-  { name: 'Tax Benefits', value: 15 },
-];
-
-const riskAssessmentData = [
-  { name: 'Market Volatility', score: 3.2 },
-  { name: 'Tenant Default', score: 2.8 },
-  { name: 'Regulatory Changes', score: 4.5 },
-  { name: 'Interest Rate', score: 5.1 },
-  { name: 'Property Damage', score: 2.0 },
-];
-
+const sampleProperties = [{
+  id: "prop1",
+  name: "Skyline Tower",
+  location: "New York, NY",
+  type: "Commercial",
+  description: "Prime office space in Manhattan's financial district. This recently renovated 32-story tower offers Class A office space with panoramic views of the city skyline. The property features state-of-the-art facilities, including a fitness center, conference rooms, and 24/7 security.",
+  price: 12500000,
+  roi: 12.5,
+  term: 5,
+  minInvestment: 25000,
+  fundingProgress: 78,
+  currentFunding: 9750000,
+  fundingGoal: 12500000,
+  investors: 132,
+  daysLeft: 23,
+  yearBuilt: 2005,
+  squareFootage: 125000,
+  occupancyRate: 94,
+  capRate: 7.8,
+  noi: 975000,
+  image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab",
+  keyFeatures: ["Prime location in Manhattan's financial district", "Recently renovated with modern amenities", "High occupancy rate with blue-chip tenants", "Long-term lease agreements in place", "Energy-efficient building systems", "Excellent public transportation access"],
+  fundingEndDate: "Aug 30, 2023",
+  acquisitionDate: "Sep 15, 2023",
+  firstDistributionDate: "Dec 15, 2023",
+  exitDate: "Q3 2028",
+  recommendationScore: 8.5,
+  marketTrend: "Strong Growth",
+  entrepreneurExperience: "Excellent",
+  riskLevel: "Low",
+  demandLevel: "High",
+  returnPotential: "Strong",
+  cashOnCash: 9.5,
+  debtServiceRatio: 1.45,
+  loanToValue: 65
+}, {
+  id: "prop2",
+  name: "Harborview Residences",
+  location: "San Francisco, CA",
+  type: "Residential",
+  description: "Luxury residential complex with 120 units overlooking San Francisco Bay. This property features a mix of one, two, and three-bedroom apartments with high-end finishes and amenities including a rooftop pool, fitness center, and concierge service.",
+  price: 18700000,
+  roi: 9.8,
+  term: 7,
+  minInvestment: 50000,
+  fundingProgress: 65,
+  currentFunding: 12155000,
+  fundingGoal: 18700000,
+  investors: 98,
+  daysLeft: 45,
+  yearBuilt: 2018,
+  squareFootage: 145000,
+  occupancyRate: 96,
+  capRate: 6.2,
+  noi: 1159400,
+  image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00",
+  keyFeatures: ["Panoramic views of San Francisco Bay", "Luxury amenities including rooftop pool", "High occupancy rate in prime location", "Strong rental demand in the area", "Modern energy-efficient systems", "Professional property management"],
+  fundingEndDate: "Sep 15, 2023",
+  acquisitionDate: "Oct 1, 2023",
+  firstDistributionDate: "Jan 15, 2024",
+  exitDate: "Q3 2030",
+  recommendationScore: 7.8,
+  marketTrend: "Stable",
+  entrepreneurExperience: "Good",
+  riskLevel: "Medium",
+  demandLevel: "High",
+  returnPotential: "Good",
+  cashOnCash: 7.5,
+  debtServiceRatio: 1.35,
+  loanToValue: 70
+}, {
+  id: "prop3",
+  name: "Greenfield Industrial Park",
+  location: "Dallas, TX",
+  type: "Industrial",
+  description: "Modern industrial complex with 5 buildings totaling 350,000 square feet. Located in a rapidly growing logistics hub with excellent access to major highways, rail, and air transportation. The property is fully leased to credit-worthy tenants in the e-commerce and logistics sectors.",
+  price: 42500000,
+  roi: 15.2,
+  term: 8,
+  minInvestment: 100000,
+  fundingProgress: 83,
+  currentFunding: 35275000,
+  fundingGoal: 42500000,
+  investors: 87,
+  daysLeft: 12,
+  yearBuilt: 2019,
+  squareFootage: 350000,
+  occupancyRate: 100,
+  capRate: 8.5,
+  noi: 3612500,
+  image: "https://images.unsplash.com/photo-1553522911-ec3c9ba44d3b",
+  keyFeatures: ["Strategic location in major logistics hub", "100% occupied with long-term leases", "Credit-worthy national tenants", "Modern Class A facilities", "Excellent transportation access", "E-commerce resistant investment"],
+  fundingEndDate: "Jul 20, 2023",
+  acquisitionDate: "Aug 10, 2023",
+  firstDistributionDate: "Nov 15, 2023",
+  exitDate: "Q4 2031",
+  recommendationScore: 9.2,
+  marketTrend: "Strong Growth",
+  entrepreneurExperience: "Excellent",
+  riskLevel: "Low",
+  demandLevel: "Very High",
+  returnPotential: "Excellent",
+  cashOnCash: 11.5,
+  debtServiceRatio: 1.6,
+  loanToValue: 60
+}];
+const cashFlowData = [{
+  year: '2023',
+  cashFlow: 1250000
+}, {
+  year: '2024',
+  cashFlow: 1325000
+}, {
+  year: '2025',
+  cashFlow: 1405000
+}, {
+  year: '2026',
+  cashFlow: 1490000
+}, {
+  year: '2027',
+  cashFlow: 1580000
+}, {
+  year: '2028',
+  cashFlow: 1675000
+}];
+const roiComponentsData = [{
+  name: 'Rental Income',
+  value: 50
+}, {
+  name: 'Appreciation',
+  value: 35
+}, {
+  name: 'Tax Benefits',
+  value: 15
+}];
+const riskAssessmentData = [{
+  name: 'Market Volatility',
+  score: 3.2
+}, {
+  name: 'Tenant Default',
+  score: 2.8
+}, {
+  name: 'Regulatory Changes',
+  score: 4.5
+}, {
+  name: 'Interest Rate',
+  score: 5.1
+}, {
+  name: 'Property Damage',
+  score: 2.0
+}];
 export default PropertyDetail;
