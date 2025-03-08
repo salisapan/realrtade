@@ -1,20 +1,14 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, Menu, User, X, ArrowLeft, Settings, Building2, LineChart } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
-
 export const HomeHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  
+
   // Check if we're on a property or performance page that needs back navigation
-  const needsBackButton = 
-    location.pathname.includes('/property/') || 
-    location.pathname.includes('/performance') ||
-    location.pathname.includes('/reports') ||
-    location.pathname.includes('/wallet');
+  const needsBackButton = location.pathname.includes('/property/') || location.pathname.includes('/performance') || location.pathname.includes('/reports') || location.pathname.includes('/wallet');
 
   // Get user profile from localStorage
   const getUserName = () => {
@@ -30,40 +24,24 @@ export const HomeHeader = () => {
       return "Investor";
     }
   };
-
   const userName = getUserName();
-
-  return (
-    <header className="bg-white shadow-sm sticky top-0 z-50">
+  return <header className="bg-white shadow-sm sticky top-0 z-50">
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 max-w-[70%]">
-            {needsBackButton ? (
-              <Link to={location.pathname.includes('/property/') ? '/properties' : '/'} className="flex-shrink-0">
+            {needsBackButton ? <Link to={location.pathname.includes('/property/') ? '/properties' : '/'} className="flex-shrink-0">
                 <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
                   <ArrowLeft className="w-5 h-5" />
                   <span className="hidden md:inline font-medium">Back</span>
                 </Button>
-              </Link>
-            ) : (
-              <Link to="/" className="flex-shrink-0">
-                <img 
-                  src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
-                  alt="RealTrade Logo" 
-                  className="h-8 rounded-lg" 
-                />
-              </Link>
-            )}
+              </Link> : <Link to="/" className="flex-shrink-0">
+                <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 rounded-lg" />
+              </Link>}
             
             {/* Only show home button if not at home already */}
-            {location.pathname !== "/" && !needsBackButton && (
-              <Link to="/" className="ml-2">
-                <Button variant="ghost" size="sm" className="flex items-center gap-1 text-primary">
-                  <Home className="w-5 h-5" />
-                  <span className="hidden md:inline font-medium">Home</span>
-                </Button>
-              </Link>
-            )}
+            {location.pathname !== "/" && !needsBackButton && <Link to="/" className="ml-2">
+                
+              </Link>}
           </div>
           
           <div className="flex items-center gap-2">
@@ -79,19 +57,13 @@ export const HomeHeader = () => {
               </Button>
             </Link>
             
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="md:hidden"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
           </div>
         </div>
         
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t mt-3">
+        {isMenuOpen && <div className="md:hidden py-4 border-t mt-3">
             <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-md">
               <User className="w-5 h-5 text-primary" />
               <span className="font-medium">{userName}</span>
@@ -118,8 +90,7 @@ export const HomeHeader = () => {
                 <span>Settings</span>
               </Link>
             </nav>
-          </div>
-        )}
+          </div>}
       </div>
       
       {/* Mobile fixed bottom navigation - simplified */}
@@ -137,6 +108,5 @@ export const HomeHeader = () => {
           <span className="text-xs mt-1">Dashboard</span>
         </Link>
       </div>
-    </header>
-  );
+    </header>;
 };
