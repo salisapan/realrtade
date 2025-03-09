@@ -1,3 +1,4 @@
+
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
@@ -90,7 +91,8 @@ const riskAssessmentData = [{
   score: 4.2,
   fullMark: 10
 }];
-const COLORS = ['#1EAEDB', '#0088FE', '#0FA0CE', '#33C3F0', '#0070C0'];
+// Update colors to use blue scheme only
+const COLORS = ['#1EAEDB', '#0088FE', '#0070C0', '#33C3F0', '#0FA0CE'];
 
 const ThreeDGraph = ({
   chartId,
@@ -167,7 +169,7 @@ const ThreeDGraph = ({
       points.forEach(point => {
         const sphereGeometry = new THREE.SphereGeometry(0.1, 16, 16);
         const sphereMaterial = new THREE.MeshPhongMaterial({
-          color: 0x00c49f
+          color: 0x1EAEDB
         });
         const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
         sphere.position.copy(point);
@@ -415,8 +417,8 @@ export const PropertyDetailContent = ({
                         <RechartsTooltip contentStyle={{
                         fontSize: 12
                       }} />
-                        <Area type="monotone" dataKey="expected" stackId="1" stroke="#8884d8" fill="#8884d8" name="Expected ROI %" />
-                        <Area type="monotone" dataKey="actual" stackId="2" stroke="#82ca9d" fill="#82ca9d" name="Actual ROI %" />
+                        <Area type="monotone" dataKey="expected" stackId="1" stroke="#1EAEDB" fill="#1EAEDB" name="Expected ROI %" />
+                        <Area type="monotone" dataKey="actual" stackId="2" stroke="#0088FE" fill="#0088FE" name="Actual ROI %" />
                         <Legend wrapperStyle={{
                         fontSize: 10
                       }} />
@@ -503,7 +505,7 @@ export const PropertyDetailContent = ({
                         <RechartsTooltip contentStyle={{
                         fontSize: 12
                       }} />
-                        <Bar dataKey="score" name="Risk Score (lower is better)" fill="#8884d8" />
+                        <Bar dataKey="score" name="Risk Score (lower is better)" fill="#1EAEDB" />
                         <Legend wrapperStyle={{
                         fontSize: 10
                       }} />
