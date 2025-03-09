@@ -1,49 +1,35 @@
-
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { useState } from "react";
-
 interface Category {
   id: string;
   name: string;
   active: boolean;
 }
-
 interface PropertiesHeaderProps {
   categories: Category[];
   onSelectCategory: (categoryId: string) => void;
 }
-
 export const PropertiesHeader = ({
   categories,
   onSelectCategory
 }: PropertiesHeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  
-  return (
-    <header className="bg-white shadow-sm sticky top-0 z-10">
+  return <header className="bg-white shadow-sm sticky top-0 z-10">
       <div className="container mx-auto px-4 py-3 md:py-4">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4 sm:mb-6">
           <div className="flex items-center w-full sm:w-auto">
             <Link to="/" className="flex items-center header-logo-container">
-              <img 
-                src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
-                alt="RealTrade Logo" 
-                className="h-8 md:h-10 mr-3 rounded-lg" 
-              />
-              <span className="text-lg font-semibold properties-header-title">RealTrade</span>
+              <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 md:h-10 mr-3 rounded-lg" />
+              
             </Link>
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
             <div className="relative w-full sm:w-auto max-w-xs md:max-w-sm">
-              <input 
-                type="search" 
-                placeholder="Search properties..." 
-                className="pl-9 pr-4 py-2 w-full text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary" 
-              />
+              <input type="search" placeholder="Search properties..." className="pl-9 pr-4 py-2 w-full text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary" />
               <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
             </div>
             
@@ -53,44 +39,28 @@ export const PropertiesHeader = ({
               </Button>
             </Link>
             
-            <Button 
-              variant="default" 
-              size="icon" 
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
+            <Button variant="default" size="icon" className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
           </div>
         </div>
         
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t mb-4">
+        {isMenuOpen && <div className="md:hidden py-4 border-t mb-4">
             <nav className="flex flex-col space-y-3">
-              <Link 
-                to="/" 
-                className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50"
-              >
+              <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Home</span>
               </Link>
-              <Link 
-                to="/dashboard" 
-                className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50"
-              >
+              <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Dashboard</span>
               </Link>
-              <Link 
-                to="/properties" 
-                className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50"
-              >
+              <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Properties</span>
               </Link>
             </nav>
-          </div>
-        )}
+          </div>}
         
         <div className="overflow-x-auto pb-1 -mx-4 px-4">
           <CategoryFilter categories={categories} onSelect={onSelectCategory} />
@@ -105,6 +75,5 @@ export const PropertiesHeader = ({
           </button>
         </div>
       </div>
-    </header>
-  );
+    </header>;
 };
