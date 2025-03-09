@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -22,12 +21,9 @@ const PropertyDetail = () => {
   const CHART_COLORS = ['#1A2E5A', '#007BFF', '#4A90E2', '#A9A9A9', '#D3D3D3'];
 
   useEffect(() => {
-    // Simulate loading property data
     setTimeout(() => {
-      // Find property by ID
       const foundProperty = sampleProperties.find(p => p.id === id);
       
-      // Update the property data to use consistent minimum investment
       if (foundProperty) {
         foundProperty.minInvestment = 2500;
       }
@@ -56,7 +52,6 @@ const PropertyDetail = () => {
   };
   
   const handleInvest = () => {
-    // Scroll to the Letter of Intent form
     const loiForm = document.querySelector('.loi-form-container');
     if (loiForm) {
       loiForm.scrollIntoView({ behavior: 'smooth' });
@@ -64,7 +59,6 @@ const PropertyDetail = () => {
   };
   
   const handleScheduleCall = () => {
-    // Open Calendly for scheduling
     window.open('https://calendly.com/realtrade/investment-call', '_blank');
   };
 
@@ -401,40 +395,6 @@ const PropertyDetail = () => {
                 </CardContent>
               </Card>
               
-              <Card className="shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Property Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Property Type</span>
-                      <span className="font-medium">{property.type}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Year Built</span>
-                      <span className="font-medium">{property.yearBuilt}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Square Footage</span>
-                      <span className="font-medium">{property.squareFootage.toLocaleString()} sq ft</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Occupancy Rate</span>
-                      <span className="font-medium">{property.occupancyRate}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Cap Rate</span>
-                      <span className="font-medium">{property.capRate}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Net Operating Income</span>
-                      <span className="font-medium">${property.noi.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
               <PropertyMarketInsights 
                 propertyAddress={property.location.split(',')[0]} 
                 propertyCity={property.location.split(',')[1]?.trim() || 'New York'} 
@@ -672,3 +632,4 @@ const riskAssessmentData = [{
 }];
 
 export default PropertyDetail;
+

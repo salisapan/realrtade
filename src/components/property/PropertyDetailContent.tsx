@@ -232,6 +232,39 @@ export const PropertyDetailContent = ({
             </ul>
           </div>
           
+          {/* Property Details section - moved above Financial Highlights */}
+          <div>
+            <h2 className="text-lg font-bold mb-3">Property Details</h2>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Property Type</div>
+                  <div className="text-lg font-bold">{property.type}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Year Built</div>
+                  <div className="text-lg font-bold">{property.yearBuilt}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Square Footage</div>
+                  <div className="text-lg font-bold">{property.squareFootage.toLocaleString()} sq ft</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Occupancy Rate</div>
+                  <div className="text-lg font-bold">{property.occupancyRate}%</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Cap Rate</div>
+                  <div className="text-lg font-bold">{property.capRate}%</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Net Operating Income</div>
+                  <div className="text-lg font-bold">${property.noi.toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           <div>
             <h2 className="text-lg font-bold mb-3">Financial Analysis</h2>
             <div className="bg-gray-50 p-4 rounded-lg">
