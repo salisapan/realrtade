@@ -1,7 +1,7 @@
+
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
-import { PropertyMarketNews } from "./PropertyMarketNews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -94,7 +94,7 @@ export const PropertyDetailContent = ({
   const handleScheduleCall = () => {
     // Open Calendly for scheduling a call
     try {
-      window.open('https://calendly.com/realtrade/investment-call', '_blank');
+      window.open('https://calendly.com/realtrade/investment-call', '_blank', 'noopener,noreferrer');
     } catch (error) {
       toast({
         title: "Error",
@@ -102,11 +102,6 @@ export const PropertyDetailContent = ({
         variant: "destructive",
       });
     }
-  };
-
-  const getPropertyCity = () => {
-    const locationParts = property.location.split(',');
-    return locationParts.length > 1 ? locationParts[1].trim() : 'New York';
   };
 
   return (
@@ -304,11 +299,6 @@ export const PropertyDetailContent = ({
             riskLevel={property.riskLevel} 
             demandLevel={property.demandLevel} 
             returnPotential={property.returnPotential} 
-          />
-          
-          <PropertyMarketNews 
-            propertyType={property.type || "Commercial"}
-            propertyLocation={getPropertyCity()}
           />
           
           <div className="bg-white border rounded-lg p-4">
