@@ -12,6 +12,14 @@ const Landing = () => {
       {/* Hero Section */}
       <div className="container mx-auto px-4 pt-12 md:pt-20 pb-10 md:pb-16">
         <div className="max-w-3xl mx-auto text-center">
+          {/* Added Logo Above Title */}
+          <div className="mb-6 flex justify-center">
+            <img 
+              src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+              alt="RealTrade Logo" 
+              className="h-16 md:h-20 object-contain rounded-lg"
+            />
+          </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 md:mb-6">RealTrade - Invest in real estate worldwide from anywhere.</h1>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 px-2">Make informed investment with comprehensive market data and analysis on deal from the top US real estate entrepreneurs.</p>
           <Link to="/investor-signup">
