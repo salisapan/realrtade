@@ -80,26 +80,29 @@ export const PropertiesHeader = ({
         </div>
         
         {isMenuOpen && <div className="md:hidden py-4 border-t mb-4">
-            {isLoggedIn && (
+            {isLoggedIn ? (
               <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-md">
                 <User className="w-5 h-5 text-primary" />
                 <span className="font-medium">{userName}</span>
               </div>
-            )}
+            ) : null}
             <nav className="flex flex-col space-y-3">
               <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Home</span>
               </Link>
-              <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                <Home className="w-5 h-5" />
-                <span>Dashboard</span>
-              </Link>
-              <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                <Home className="w-5 h-5" />
-                <span>Properties</span>
-              </Link>
-              {!isLoggedIn && (
+              {isLoggedIn ? (
+                <>
+                  <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                    <Home className="w-5 h-5" />
+                    <span>Dashboard</span>
+                  </Link>
+                  <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                    <Home className="w-5 h-5" />
+                    <span>Properties</span>
+                  </Link>
+                </>
+              ) : (
                 <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                   <User className="w-5 h-5" />
                   <span>Sign Up</span>
