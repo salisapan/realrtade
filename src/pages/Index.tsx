@@ -204,8 +204,15 @@ const Index = () => {
           onSelectCategory={handleCategoryChange}
         />
         
-        {/* Add the slogan above the property listing */}
-        <div className="container mx-auto px-4 pt-3 md:pt-6">
+        {/* Company Logo and Slogan Section */}
+        <div className="container mx-auto px-4 pt-3 md:pt-6 flex flex-col items-center">
+          <div className="mb-2 md:mb-4 flex items-center justify-center">
+            <img 
+              src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+              alt="RealTrade Logo" 
+              className="h-12 md:h-16 object-contain rounded-lg"
+            />
+          </div>
           <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4">RealTrade - Invest in real estate worldwide from anywhere.</p>
         </div>
 
