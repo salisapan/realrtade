@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
+import { PropertyMarketNews } from "@/components/property/PropertyMarketNews";
+import { PropertyMarketInsights } from "@/components/property/PropertyMarketInsights";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Building, BarChart, FileText, MessageSquare, Bookmark, Share2, Check, CalendarDays } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
@@ -429,6 +431,16 @@ const PropertyDetail = () => {
                   </div>
                 </CardContent>
               </Card>
+              
+              <PropertyMarketInsights 
+                propertyAddress={property.location.split(',')[0]} 
+                propertyCity={property.location.split(',')[1]?.trim() || 'New York'} 
+              />
+              
+              <PropertyMarketNews 
+                propertyType={property.type} 
+                propertyLocation={property.location.split(',')[1]?.trim() || ''}
+              />
               
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
