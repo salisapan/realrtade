@@ -32,8 +32,8 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <FormField
             control={form.control}
             name="fullName"
@@ -41,7 +41,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Full Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="John Doe" {...field} />
+                  <Input placeholder="Enter your full name" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -55,7 +55,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input type="email" placeholder="john.doe@example.com" {...field} />
+                  <Input type="email" placeholder="youremail@example.com" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -69,7 +69,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Phone Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="(555) 123-4567" {...field} />
+                  <Input placeholder="123-456-7890" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -83,7 +83,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Address</FormLabel>
                 <FormControl>
-                  <Input placeholder="123 Main St, City, State, Zip" {...field} />
+                  <Input placeholder="Enter your address" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -97,7 +97,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Age</FormLabel>
                 <FormControl>
-                  <Input type="number" min="18" {...field} />
+                  <Input type="number" min="18" placeholder="Enter your age" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -114,7 +114,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
                   <Input 
                     type="number" 
                     min="0" 
-                    placeholder="100000" 
+                    placeholder="Enter your annual income" 
                     {...field} 
                   />
                 </FormControl>
@@ -133,7 +133,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
                   <Input 
                     type="number" 
                     min="0" 
-                    placeholder="500000" 
+                    placeholder="Enter your net worth" 
                     {...field} 
                   />
                 </FormControl>
@@ -151,7 +151,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select experience level" />
+                      <SelectValue placeholder="Select your experience level" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -197,7 +197,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
                 </SelectContent>
               </Select>
               <FormDescription>
-                <div className="p-3 bg-blue-50 rounded-md mt-2 text-sm text-blue-600">
+                <div className="p-4 bg-blue-50 rounded-md mt-3 text-sm text-blue-600">
                   <strong>Non-accredited investors:</strong> You'll have access to our verified deals with lower minimum investments, starting from as low as $10.
                 </div>
               </FormDescription>

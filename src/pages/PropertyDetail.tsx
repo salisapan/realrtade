@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
-import { PropertyMarketNews } from "@/components/property/PropertyMarketNews";
-import { PropertyMarketInsights } from "@/components/property/PropertyMarketInsights";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Building, BarChart, FileText, MessageSquare, Bookmark, Share2, Check, CalendarDays } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
@@ -135,10 +133,21 @@ const PropertyDetail = () => {
         </header>
 
         <main className="mx-0">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 p-4">
-            <div className="lg:col-span-2 space-y-4 md:space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 p-4 md:p-6">
+            <div className="lg:col-span-2 space-y-6 md:space-y-8">
               <div className="rounded-xl overflow-hidden bg-white shadow-sm">
-                <img src={property.image} alt={property.name} className="w-full h-[300px] object-cover" />
+                <div className="w-full h-[300px] bg-gray-200 relative">
+                  <img 
+                    src={property.image} 
+                    alt={property.name} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab";
+                    }}
+                  />
+                </div>
                 
                 <PropertyDetailContent property={{...property, minInvestment: 2500}} />
               </div>
@@ -213,22 +222,21 @@ const PropertyDetail = () => {
                                 left: 20,
                                 bottom: 5
                               }} layout="vertical">
-                                  <CartesianGrid strokeDasharray="3 3" />
-                                  <XAxis type="number" domain={[0, 10]} tick={{
-                                  fontSize: 12
-                                }} />
-                                  <YAxis dataKey="name" type="category" width={120} tick={{
-                                  fontSize: 12
-                                }} />
-                                  <RechartsTooltip contentStyle={{
-                                  fontSize: 12
-                                }} />
-                                  <Legend wrapperStyle={{
-                                  fontSize: 12
-                                }} />
-                                  <Bar dataKey="score" fill="#007BFF" name="Risk Score (lower is better)" />
-                                </RechartsBarChart>
-                              </ResponsiveContainer>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" domain={[0, 10]} tick={{
+                                fontSize: 12
+                              }} />
+                                <YAxis dataKey="name" type="category" width={120} tick={{
+                                fontSize: 12
+                              }} />
+                                <RechartsTooltip contentStyle={{
+                                fontSize: 12
+                              }} />
+                                <Legend wrapperStyle={{
+                                fontSize: 12
+                              }} />
+                                <Bar dataKey="score" fill="#007BFF" name="Risk Score (lower is better)" />
+                              </RechartsBarChart>
                             </div>
                           </div>
                         </div>
@@ -359,13 +367,13 @@ const PropertyDetail = () => {
               </Card>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-6 md:space-y-8">
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Quick Investment</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Minimum</div>
                       <div className="text-base font-bold text-gray-800">${(2500).toLocaleString()}</div>
@@ -405,7 +413,7 @@ const PropertyDetail = () => {
                   <CardTitle className="text-base">Property Details</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2 text-sm">
+                  <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Property Type</span>
                       <span className="font-medium">{property.type}</span>
@@ -434,22 +442,12 @@ const PropertyDetail = () => {
                 </CardContent>
               </Card>
               
-              <PropertyMarketInsights 
-                propertyAddress={property.location.split(',')[0]} 
-                propertyCity={property.location.split(',')[1]?.trim() || 'New York'} 
-              />
-              
-              <PropertyMarketNews 
-                propertyType={property.type} 
-                propertyLocation={property.location.split(',')[1]?.trim() || ''}
-              />
-              
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Timeline</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="flex gap-3">
                       <div className="flex flex-col items-center">
                         <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs">1</div>
