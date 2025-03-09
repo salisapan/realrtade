@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Extended performance data for more months
 const performanceData = [
@@ -45,8 +46,8 @@ const assetAllocationData = [
   { name: "Data Centers", value: 5 },
 ];
 
-// Colors for the pie chart
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+// Colors for the pie chart - updated to match app theme
+const COLORS = ['#1A2E5A', '#007BFF', '#4A90E2', '#A9A9A9', '#D3D3D3'];
 
 // Key performance metrics
 const performanceMetrics = [
@@ -59,28 +60,30 @@ const performanceMetrics = [
 ];
 
 const Performance = () => {
+  const isMobile = useIsMobile();
+  
   return (
     <div className="flex">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 p-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Investment Performance</h1>
+      <div className="flex-1 min-h-screen bg-gray-50 p-4 md:p-8 overflow-x-hidden">
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+          <h1 className="text-xl md:text-2xl font-bold">Investment Performance</h1>
           <div className="space-x-2">
             <Button variant="outline" size="sm">Export PDF</Button>
             <Button variant="outline" size="sm">Print Report</Button>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
           {performanceMetrics.map((metric) => (
             <Card key={metric.name}>
-              <CardContent className="p-6">
+              <CardContent className="p-4 md:p-6">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-sm text-gray-500">{metric.name}</p>
-                    <p className="text-2xl font-bold">{metric.value}</p>
+                    <p className="text-xl md:text-2xl font-bold">{metric.value}</p>
                   </div>
-                  <div className={`flex items-center ${metric.positive ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className={`flex items-center ${metric.positive ? 'text-blue-600' : 'text-red-600'}`}>
                     {metric.positive ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
                     <span className="text-sm font-medium">{metric.change}</span>
                   </div>
@@ -91,14 +94,14 @@ const Performance = () => {
         </div>
         
         <Tabs defaultValue="returns" className="mb-6">
-          <TabsList className="mb-4">
-            <TabsTrigger value="returns" className="flex items-center gap-2">
+          <TabsList className="mb-4 flex overflow-x-auto pb-1 no-scrollbar">
+            <TabsTrigger value="returns" className="flex items-center gap-2 whitespace-nowrap">
               <LineChartIcon className="w-4 h-4" /> Returns
             </TabsTrigger>
-            <TabsTrigger value="volume" className="flex items-center gap-2">
+            <TabsTrigger value="volume" className="flex items-center gap-2 whitespace-nowrap">
               <BarChart3 className="w-4 h-4" /> Investment Volume
             </TabsTrigger>
-            <TabsTrigger value="allocation" className="flex items-center gap-2">
+            <TabsTrigger value="allocation" className="flex items-center gap-2 whitespace-nowrap">
               <PieChartIcon className="w-4 h-4" /> Asset Allocation
             </TabsTrigger>
           </TabsList>
@@ -110,30 +113,36 @@ const Performance = () => {
                 <CardDescription>Monthly returns compared to market benchmark</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[400px]">
+                <div className="h-[300px] md:h-[400px] w-full overflow-hidden">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={performanceData}>
+                    <LineChart data={performanceData} margin={{
+                      top: 10,
+                      right: 5,
+                      left: 0,
+                      bottom: 0
+                    }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
+                      <XAxis dataKey="month" tick={{fontSize: isMobile ? 8 : 12}} />
+                      <YAxis tick={{fontSize: isMobile ? 8 : 12}} width={isMobile ? 25 : 35} />
                       <Tooltip 
                         formatter={(value) => [`${value}%`, 'Returns']}
                         labelFormatter={(label) => `Month: ${label}`}
+                        contentStyle={{fontSize: isMobile ? 10 : 12}}
                       />
-                      <Legend />
+                      <Legend wrapperStyle={{fontSize: isMobile ? 10 : 12}} />
                       <Line 
                         type="monotone" 
                         dataKey="returns" 
-                        stroke="#4285F4" 
+                        stroke="#1A2E5A" 
                         name="Your Portfolio" 
                         strokeWidth={2}
-                        dot={{ r: 4 }}
-                        activeDot={{ r: 6 }}
+                        dot={{ r: isMobile ? 2 : 4 }}
+                        activeDot={{ r: isMobile ? 4 : 6 }}
                       />
                       <Line 
                         type="monotone" 
                         dataKey="benchmark" 
-                        stroke="#34A853" 
+                        stroke="#007BFF" 
                         name="Market Benchmark" 
                         strokeWidth={2}
                         strokeDasharray="4 4"
@@ -152,17 +161,23 @@ const Performance = () => {
                 <CardDescription>Monthly investment amounts in USD</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[400px]">
+                <div className="h-[300px] md:h-[400px] w-full overflow-hidden">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={performanceData}>
+                    <BarChart data={performanceData} margin={{
+                      top: 10,
+                      right: 5,
+                      left: 0,
+                      bottom: 0
+                    }}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
+                      <XAxis dataKey="month" tick={{fontSize: isMobile ? 8 : 12}} />
+                      <YAxis tick={{fontSize: isMobile ? 8 : 12}} width={isMobile ? 35 : 45} />
                       <Tooltip
                         formatter={(value) => [`$${value.toLocaleString()}`, 'Volume']}
                         labelFormatter={(label) => `Month: ${label}`}
+                        contentStyle={{fontSize: isMobile ? 10 : 12}}
                       />
-                      <Bar dataKey="volume" fill="#8884d8" name="Investment Volume" />
+                      <Bar dataKey="volume" fill="#1A2E5A" name="Investment Volume" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -177,25 +192,30 @@ const Performance = () => {
                 <CardDescription>Current portfolio distribution by property type</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[400px]">
+                <div className="h-[300px] md:h-[400px] w-full overflow-hidden">
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
+                    <PieChart margin={{
+                      top: 0,
+                      right: isMobile ? 5 : 30,
+                      left: isMobile ? 5 : 30,
+                      bottom: 0
+                    }}>
                       <Pie
                         data={assetAllocationData}
                         cx="50%"
                         cy="50%"
-                        labelLine={true}
-                        outerRadius={150}
+                        labelLine={!isMobile}
+                        outerRadius={isMobile ? 80 : 150}
                         fill="#8884d8"
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => isMobile ? null : `${name} ${(percent * 100).toFixed(0)}%`}
                       >
                         {assetAllocationData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => [`${value}%`, 'Allocation']} />
-                      <Legend />
+                      <Tooltip formatter={(value) => [`${value}%`, 'Allocation']} contentStyle={{fontSize: isMobile ? 10 : 12}} />
+                      <Legend wrapperStyle={{fontSize: isMobile ? 10 : 12}} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -213,32 +233,32 @@ const Performance = () => {
             <CardContent>
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <span>Volatility</span>
-                  <div className="w-2/3 bg-gray-200 rounded-full h-2.5">
+                  <span className="text-sm">Volatility</span>
+                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
                     <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '45%' }}></div>
                   </div>
-                  <span className="font-medium">Low</span>
+                  <span className="text-sm font-medium">Low</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>Liquidity Risk</span>
-                  <div className="w-2/3 bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-yellow-500 h-2.5 rounded-full" style={{ width: '72%' }}></div>
+                  <span className="text-sm">Liquidity Risk</span>
+                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
+                    <div className="bg-blue-400 h-2.5 rounded-full" style={{ width: '72%' }}></div>
                   </div>
-                  <span className="font-medium">Medium</span>
+                  <span className="text-sm font-medium">Medium</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>Market Risk</span>
-                  <div className="w-2/3 bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-green-500 h-2.5 rounded-full" style={{ width: '38%' }}></div>
+                  <span className="text-sm">Market Risk</span>
+                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
+                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '38%' }}></div>
                   </div>
-                  <span className="font-medium">Low</span>
+                  <span className="text-sm font-medium">Low</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>Concentration Risk</span>
-                  <div className="w-2/3 bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-red-500 h-2.5 rounded-full" style={{ width: '85%' }}></div>
+                  <span className="text-sm">Concentration Risk</span>
+                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
+                    <div className="bg-blue-800 h-2.5 rounded-full" style={{ width: '85%' }}></div>
                   </div>
-                  <span className="font-medium">High</span>
+                  <span className="text-sm font-medium">High</span>
                 </div>
               </div>
             </CardContent>
@@ -253,7 +273,7 @@ const Performance = () => {
               <div className="space-y-4">
                 <div className="flex justify-between">
                   <span>Projected Returns</span>
-                  <span className="font-bold text-green-600">12.8%</span>
+                  <span className="font-bold text-blue-600">12.8%</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Expected Yield</span>
@@ -261,7 +281,7 @@ const Performance = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>Growth Potential</span>
-                  <span className="font-bold text-green-600">High</span>
+                  <span className="font-bold text-blue-600">High</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Confidence Level</span>

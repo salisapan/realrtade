@@ -32,8 +32,7 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
     setError(null);
     
     try {
-      // Mock data instead of using FirecrawlService
-      // This simulates fetching market data for the property
+      // Mock data for market insights
       setTimeout(() => {
         const mockMarketData = {
           data: [

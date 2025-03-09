@@ -10,7 +10,6 @@ import {
   FileText, 
   Building2, 
   ArrowRight, 
-  Globe 
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
@@ -200,20 +199,6 @@ const Dashboard = () => {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start text-left h-auto py-3 px-4"
-                  onClick={() => navigate("/web-crawler")}
-                >
-                  <div className="flex items-start gap-3">
-                    <Globe className="h-5 w-5 text-blue-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium mb-1">Web Crawler</h3>
-                      <p className="text-sm text-gray-500">Research properties and markets by crawling websites</p>
-                    </div>
-                  </div>
-                </Button>
-
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start text-left h-auto py-3 px-4"
                   onClick={() => navigate("/reports")}
                 >
                   <div className="flex items-start gap-3">
@@ -231,7 +216,7 @@ const Dashboard = () => {
                   onClick={() => navigate("/performance")}
                 >
                   <div className="flex items-start gap-3">
-                    <LineChart className="h-5 w-5 text-purple-500 mt-0.5" />
+                    <LineChart className="h-5 w-5 text-blue-500 mt-0.5" />
                     <div>
                       <h3 className="font-medium mb-1">Investment Analysis</h3>
                       <p className="text-sm text-gray-500">Track performance across your portfolio</p>

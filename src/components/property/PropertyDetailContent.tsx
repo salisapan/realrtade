@@ -1,8 +1,6 @@
-
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
-import { PropertyMarketInsights } from "./PropertyMarketInsights";
 import { PropertyMarketNews } from "./PropertyMarketNews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -311,11 +309,6 @@ export const PropertyDetailContent = ({
           <PropertyMarketNews 
             propertyType={property.type || "Commercial"}
             propertyLocation={getPropertyCity()}
-          />
-          
-          <PropertyMarketInsights 
-            propertyAddress={property.name}
-            propertyCity={getPropertyCity()}
           />
           
           <div className="bg-white border rounded-lg p-4">
