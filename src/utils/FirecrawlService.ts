@@ -65,24 +65,34 @@ export class FirecrawlService {
       });
 
       if (!crawlResponse.success) {
-        console.error('Property data crawl failed:', crawlResponse.error);
+        console.error('Property data crawl failed:', crawlResponse);
         return { 
           success: false, 
-          error: crawlResponse.error || 'Failed to crawl property data' 
+          error: typeof crawlResponse === 'object' && 'message' in crawlResponse 
+            ? String(crawlResponse.message) 
+            : 'Failed to crawl property data' 
         };
       }
 
-      // Analyze the crawled data for market insights
-      const response = await this.firecrawlApp.analyzeUrl(url, {
-        query: `Provide market insights about real estate in ${propertyCity}, specifically around ${propertyAddress}. Include trends in property values, investment opportunities, and market forecasts.`,
-        limit: 5
+      // Process the crawled data for market insights
+      // Note: We're using the crawled data directly instead of analyzeUrl 
+      // since analyzeUrl isn't available in the current FirecrawlApp version
+      const crawlData = crawlResponse.data || [];
+      
+      // Simple analysis of the data
+      const marketInsights = crawlData.map((item: any) => {
+        return {
+          title: item.title || 'Market Data',
+          content: item.content || item.markdown || 'No content available',
+          url: item.url
+        };
       });
 
       return { 
         success: true,
         data: {
-          crawlId: crawlResponse.id,
-          data: response.data
+          crawlId: crawlResponse.requestId || Date.now().toString(),
+          data: marketInsights
         }
       };
     } catch (error) {
@@ -109,24 +119,41 @@ export class FirecrawlService {
       console.log("Crawl response:", crawlResponse);
       
       if (!crawlResponse.success) {
-        throw new Error(crawlResponse.error || "Crawl failed");
+        // Safe access to error message
+        const errorMessage = typeof crawlResponse === 'object' && 'message' in crawlResponse 
+          ? String(crawlResponse.message) 
+          : "Crawl failed";
+        throw new Error(errorMessage);
       }
 
-      // If we have a search query, use it to analyze the content
+      // If we have a search query, we'll need to manually filter results
+      // since analyzeUrl isn't available
       let results;
-      if (searchQuery) {
-        // Analyze results with the search query
-        results = await this.client.analyzeUrl(url, {
-          query: searchQuery,
-          limit: maxPages
-        });
+      if (searchQuery && searchQuery.trim() !== "") {
+        // Perform basic filtering based on the search query
+        const lowerCaseQuery = searchQuery.toLowerCase();
+        results = {
+          data: (crawlResponse.data || []).filter((item: any) => {
+            const content = (item.content || item.markdown || "").toLowerCase();
+            const title = (item.title || "").toLowerCase();
+            return content.includes(lowerCaseQuery) || title.includes(lowerCaseQuery);
+          }).map((item: any) => {
+            return {
+              ...item,
+              score: 1, // Since we can't calculate a real relevance score
+              excerpt: extractExcerpt(item.content || item.markdown || "", lowerCaseQuery)
+            };
+          })
+        };
       } else {
         // Just return the crawl results
-        results = crawlResponse;
+        results = {
+          data: crawlResponse.data
+        };
       }
       
       return {
-        crawlId: crawlResponse.id,
+        crawlId: crawlResponse.requestId || Date.now().toString(),
         results: searchQuery ? results.data : crawlResponse.data,
         status: {
           success: crawlResponse.success,
@@ -140,4 +167,19 @@ export class FirecrawlService {
       throw error;
     }
   }
+}
+
+// Helper function to extract a relevant excerpt containing the search term
+function extractExcerpt(text: string, searchTerm: string, contextLength: number = 100): string {
+  const lowerText = text.toLowerCase();
+  const index = lowerText.indexOf(searchTerm);
+  
+  if (index === -1) return text.substring(0, 150) + "...";
+  
+  const start = Math.max(0, index - contextLength);
+  const end = Math.min(text.length, index + searchTerm.length + contextLength);
+  
+  return (start > 0 ? "..." : "") + 
+         text.substring(start, end) + 
+         (end < text.length ? "..." : "");
 }
