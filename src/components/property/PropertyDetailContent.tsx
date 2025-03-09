@@ -3,11 +3,12 @@ import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
 import { PropertyMarketInsights } from "./PropertyMarketInsights";
+import { PropertyMarketNews } from "./PropertyMarketNews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PropertyDetailContentProps {
@@ -62,39 +63,6 @@ const roiTimelineData = [{
   year: '2028',
   expected: 13.8,
   actual: 0
-}];
-
-const cashFlowQuarterlyData = [
-  { name: 'Q1 23', projected: 45000, actual: 47500 },
-  { name: 'Q2 23', projected: 48000, actual: 49200 },
-  { name: 'Q3 23', projected: 51000, actual: 50800 },
-  { name: 'Q4 23', projected: 55000, actual: 56700 },
-  { name: 'Q1 24', projected: 59000, actual: 0 },
-  { name: 'Q2 24', projected: 63000, actual: 0 },
-  { name: 'Q3 24', projected: 68000, actual: 0 },
-  { name: 'Q4 24', projected: 72000, actual: 0 }
-];
-
-const riskAssessmentData = [{
-  category: 'Market',
-  score: 3.2,
-  fullMark: 10
-}, {
-  category: 'Tenant',
-  score: 2.1,
-  fullMark: 10
-}, {
-  category: 'Location',
-  score: 1.5,
-  fullMark: 10
-}, {
-  category: 'Building',
-  score: 2.8,
-  fullMark: 10
-}, {
-  category: 'Financing',
-  score: 4.2,
-  fullMark: 10
 }];
 
 export const PropertyDetailContent = ({
@@ -226,81 +194,25 @@ export const PropertyDetailContent = ({
           
           <div>
             <h2 className="text-lg font-bold mb-3">Financial Analysis</h2>
-            
-            <div className="space-y-6">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-base font-semibold mb-3">Return on Investment Timeline</h3>
-                <div className="investment-chart">
-                  <ResponsiveContainer width="100%" height={250}>
-                    <AreaChart data={roiTimelineData} margin={{
-                      top: 10,
-                      right: 10,
-                      left: 0,
-                      bottom: 20
-                    }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="year" tick={{fontSize: 10}} />
-                      <YAxis tick={{fontSize: 10}} />
-                      <RechartsTooltip contentStyle={{fontSize: 12}} />
-                      <Area type="monotone" dataKey="expected" stackId="1" stroke="#1EAEDB" fill="#1EAEDB" name="Expected ROI %" />
-                      <Area type="monotone" dataKey="actual" stackId="2" stroke="#0088FE" fill="#0088FE" name="Actual ROI %" />
-                      <Legend wrapperStyle={{fontSize: 10}} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-base font-semibold mb-3">Quarterly Cash Flow Projections</h3>
-                <div className="investment-chart">
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart 
-                      data={cashFlowQuarterlyData} 
-                      margin={{
-                        top: 10,
-                        right: 10,
-                        left: 0,
-                        bottom: 60
-                      }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="name" 
-                        angle={-45} 
-                        textAnchor="end" 
-                        height={60} 
-                        tick={{fontSize: 10}}
-                        interval={0}
-                      />
-                      <YAxis tick={{fontSize: 10}} />
-                      <RechartsTooltip contentStyle={{fontSize: 12}} />
-                      <Bar dataKey="projected" name="Projected ($)" fill="#1EAEDB" />
-                      <Bar dataKey="actual" name="Actual ($)" fill="#0088FE" />
-                      <Legend wrapperStyle={{fontSize: 10}} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-base font-semibold mb-3">Risk Assessment Analysis</h3>
-                <div className="investment-chart">
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart layout="vertical" data={riskAssessmentData} margin={{
-                      top: 10,
-                      right: 30,
-                      left: 70,
-                      bottom: 10
-                    }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" domain={[0, 10]} tick={{fontSize: 10}} />
-                      <YAxis dataKey="category" type="category" tick={{fontSize: 10}} />
-                      <RechartsTooltip contentStyle={{fontSize: 12}} />
-                      <Bar dataKey="score" name="Risk Score (lower is better)" fill="#1EAEDB" />
-                      <Legend wrapperStyle={{fontSize: 10}} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h3 className="text-base font-semibold mb-3">Return on Investment Timeline</h3>
+              <div className="investment-chart">
+                <ResponsiveContainer width="100%" height={250}>
+                  <AreaChart data={roiTimelineData} margin={{
+                    top: 10,
+                    right: 10,
+                    left: 0,
+                    bottom: 20
+                  }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="year" tick={{fontSize: 10}} />
+                    <YAxis tick={{fontSize: 10}} />
+                    <RechartsTooltip contentStyle={{fontSize: 12}} />
+                    <Area type="monotone" dataKey="expected" stackId="1" stroke="#1EAEDB" fill="#1EAEDB" name="Expected ROI %" />
+                    <Area type="monotone" dataKey="actual" stackId="2" stroke="#0088FE" fill="#0088FE" name="Actual ROI %" />
+                    <Legend wrapperStyle={{fontSize: 10}} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>
@@ -359,6 +271,11 @@ export const PropertyDetailContent = ({
             riskLevel={property.riskLevel} 
             demandLevel={property.demandLevel} 
             returnPotential={property.returnPotential} 
+          />
+          
+          <PropertyMarketNews 
+            propertyType={property.type || "Commercial"}
+            propertyLocation={getPropertyCity()}
           />
           
           <PropertyMarketInsights 

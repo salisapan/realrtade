@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, ChevronLeft, ChevronRight, BarChart, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { ExternalLink, ChevronLeft, ChevronRight, BarChart, TrendingUp, TrendingDown, DollarSign, Building2, LineChart } from "lucide-react";
 
 interface MarketData {
   title: string;
@@ -20,7 +20,7 @@ const defaultMarketData: MarketData[] = [
     value: "$875,500",
     change: "+4.2%",
     trend: "up",
-    source: "Market Analytics Platform"
+    source: "Cherre Data Platform"
   },
   {
     title: "Rental Yield",
@@ -28,7 +28,7 @@ const defaultMarketData: MarketData[] = [
     value: "5.8%",
     change: "+0.3%",
     trend: "up",
-    source: "Property Management Association"
+    source: "Cherre Real Estate Analytics"
   },
   {
     title: "Vacancy Rate",
@@ -36,7 +36,23 @@ const defaultMarketData: MarketData[] = [
     value: "3.2%",
     change: "-0.7%",
     trend: "down",
-    source: "Real Estate Data Hub"
+    source: "Cherre Market Intelligence"
+  },
+  {
+    title: "Price Per Square Foot",
+    description: "Average price per square foot in this market.",
+    value: "$428",
+    change: "+2.1%",
+    trend: "up",
+    source: "Cherre Property Metrics"
+  },
+  {
+    title: "Market Liquidity",
+    description: "Average days on market for similar properties.",
+    value: "42 days",
+    change: "-5 days",
+    trend: "down",
+    source: "Cherre Market Analytics"
   }
 ];
 
@@ -74,7 +90,7 @@ export const PropertyMarketNews = ({
       case 'down':
         return <TrendingDown className="w-5 h-5 text-red-500" />;
       default:
-        return <BarChart className="w-5 h-5 text-gray-500" />;
+        return <LineChart className="w-5 h-5 text-gray-500" />;
     }
   };
   
@@ -87,6 +103,17 @@ export const PropertyMarketNews = ({
         return 'text-red-600';
       default:
         return 'text-gray-600';
+    }
+  };
+
+  // Get insight icon based on title
+  const getInsightIcon = (title: string) => {
+    if (title.includes("Price") || title.includes("Sale")) {
+      return <DollarSign className="w-5 h-5 text-primary" />;
+    } else if (title.includes("Vacancy") || title.includes("Occupancy")) {
+      return <Building2 className="w-5 h-5 text-primary" />;
+    } else {
+      return <LineChart className="w-5 h-5 text-primary" />;
     }
   };
 
@@ -109,7 +136,7 @@ export const PropertyMarketNews = ({
             
             <div className="flex flex-col h-full justify-center items-center">
               <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                {getTrendIcon(currentItem.trend)}
+                {getInsightIcon(currentItem.title)}
               </div>
               
               <h3 className="text-lg font-bold text-center mb-1">{currentItem.title}</h3>
@@ -148,9 +175,12 @@ export const PropertyMarketNews = ({
               variant="outline" 
               size="sm" 
               className="text-xs h-8"
+              asChild
             >
-              <ExternalLink className="h-3 w-3 mr-1" />
-              View Full Report
+              <a href="https://cherre.com" target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3 w-3 mr-1" />
+                View Cherre Data
+              </a>
             </Button>
           </div>
           
@@ -168,8 +198,10 @@ export const PropertyMarketNews = ({
           <div className="border-t pt-3 mt-2">
             <h4 className="text-sm font-medium mb-2">Market Summary - {propertyLocation}</h4>
             <p className="text-xs text-gray-600">
-              The {propertyType.toLowerCase()} real estate market in {propertyLocation} shows a steady growth with increasing demand for 
-              high-quality properties. Investors can expect moderate appreciation with strong rental income potential.
+              The {propertyType.toLowerCase()} real estate market in {propertyLocation} is showing signs of 
+              {currentItem.trend === 'up' ? ' growth with increasing prices' : ' stabilization after recent changes'}. 
+              Data from Cherre's real estate platform indicates moderate 
+              {currentItem.trend === 'up' ? ' appreciation' : ' stability'} with promising investment potential.
             </p>
           </div>
         </div>

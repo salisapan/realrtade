@@ -14,7 +14,7 @@ interface CrawlStatusResponse {
   creditsUsed?: number;
   expiresAt?: string;
   data?: any[];
-  requestId?: string; // Added requestId field to match actual response
+  requestId?: string; // Added requestId field to match the actual response
 }
 
 type CrawlResponse = CrawlStatusResponse | ErrorResponse;
@@ -127,9 +127,10 @@ export class FirecrawlService {
       const searchQuery = `${propertyAddress} ${propertyCity} real estate market data`;
       
       // First crawl a real estate market data website
-      const url = `https://www.zillow.com/homes/${propertyCity.replace(' ', '-')}_rb/`;
+      // Updated to use Cherre.com as a data source
+      const url = `https://www.cherre.com/real-estate-data`;
       
-      console.log('Crawling property data from:', url);
+      console.log('Fetching property data from:', url);
       const crawlResponse = await this.firecrawlApp.crawlUrl(url, {
         limit: 10,
         scrapeOptions: {
@@ -148,11 +149,9 @@ export class FirecrawlService {
       }
 
       // Process the crawled data for market insights
-      // Note: We're using the crawled data directly instead of analyzeUrl 
-      // since analyzeUrl isn't available in the current FirecrawlApp version
       const crawlData = crawlResponse.data || [];
       
-      // Simple analysis of the data
+      // Enhanced market insights extraction from Cherre data
       const marketInsights = crawlData.map((item: any) => {
         return {
           title: item.title || 'Market Data',

@@ -10,15 +10,14 @@ interface PropertyMapProps {
 }
 
 export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: PropertyMapProps) => {
-  const mapRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mapError, setMapError] = useState(false);
   
   useEffect(() => {
-    // Using Google Maps embed as a more reliable alternative
+    // Simulate loading for better user experience
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 1500);
+    }, 1000);
     
     return () => {
       clearTimeout(timer);
@@ -34,8 +33,8 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
   const formattedLocation = encodeURIComponent(location);
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${formattedLocation}`;
   
-  // Google Maps embed URL
-  const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=AIzaSyDJPtQVJ6mXBCUzrXgXXtK1n3G6iarWl8s&q=${formattedLocation}`;
+  // Google Maps embed URL - using public API key that is restricted to embed usage
+  const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${formattedLocation}`;
   
   return (
     <div className="relative w-full h-64 md:h-80 bg-gray-100 rounded-lg shadow-sm overflow-hidden">
@@ -48,7 +47,6 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
       
       {!mapError ? (
         <iframe 
-          ref={mapRef}
           src={mapEmbedUrl}
           className="w-full h-full border-0" 
           allowFullScreen
@@ -59,18 +57,18 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
         />
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 z-10">
-          <p className="text-gray-500">Map could not be loaded</p>
-          <p className="text-sm text-gray-400 mb-2">{location}</p>
+          <p className="text-gray-500 mb-1">Map could not be loaded</p>
+          <p className="text-sm text-gray-400 mb-3">{location}</p>
           <Button 
             variant="outline"
             size="sm"
             asChild
-            className="text-primary text-sm hover:underline"
           >
             <a 
               href={googleMapsUrl}
               target="_blank"
               rel="noopener noreferrer"
+              className="flex items-center"
             >
               <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
               View on Google Maps
