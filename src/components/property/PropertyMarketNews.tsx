@@ -2,33 +2,41 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, ChevronLeft, ChevronRight, Newspaper } from "lucide-react";
+import { ExternalLink, ChevronLeft, ChevronRight, BarChart, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 
-interface NewsItem {
+interface MarketData {
   title: string;
   description: string;
-  link: string;
-  image?: string;
+  value: string;
+  change: string;
+  trend: 'up' | 'down' | 'neutral';
+  source: string;
 }
 
-const defaultNewsItems: NewsItem[] = [
+const defaultMarketData: MarketData[] = [
   {
-    title: "Cherre Partners With Nuveen Real Estate",
-    description: "Strategic partnership to unlock new data capabilities in real estate market analysis.",
-    link: "https://blog.cherre.com/2024/09/16/cherre-expands-strategic-partnership-with-nuveen-real-estate-to-unlock-new-capabilities/",
-    image: "https://cherre.com/web-assets/img/featured_nuveen.png"
+    title: "Average Sale Price",
+    description: "Current average property sale price in the area.",
+    value: "$875,500",
+    change: "+4.2%",
+    trend: "up",
+    source: "Market Analytics Platform"
   },
   {
-    title: "Cherre Announces $30M Series C Round",
-    description: "New funding to accelerate innovation in real estate data management.",
-    link: "https://blog.cherre.com/2024/09/17/cherre-announces-30m-series-c-round/",
-    image: "https://cherre.com/web-assets/img/featured_series_c.png"
+    title: "Rental Yield",
+    description: "Average rental yield for similar properties.",
+    value: "5.8%",
+    change: "+0.3%",
+    trend: "up",
+    source: "Property Management Association"
   },
   {
-    title: "Discover the Power of User-Controlled Data Ingestion",
-    description: "New tools for managing real estate data more effectively.",
-    link: "https://info.cherre.com/dsp-demo-videos-request-access",
-    image: "https://cherre.com/web-assets/img/featured_dsp.png"
+    title: "Vacancy Rate",
+    description: "Current vacancy rate in the area.",
+    value: "3.2%",
+    change: "-0.7%",
+    trend: "down",
+    source: "Real Estate Data Hub"
   }
 ];
 
@@ -42,55 +50,78 @@ export const PropertyMarketNews = ({
   propertyLocation = "New York"
 }: PropertyMarketNewsProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [newsItems] = useState<NewsItem[]>(defaultNewsItems);
+  const [marketData] = useState<MarketData[]>(defaultMarketData);
   
   const handlePrevious = () => {
     setCurrentIndex((prevIndex) => 
-      prevIndex === 0 ? newsItems.length - 1 : prevIndex - 1
+      prevIndex === 0 ? marketData.length - 1 : prevIndex - 1
     );
   };
 
   const handleNext = () => {
     setCurrentIndex((prevIndex) => 
-      prevIndex === newsItems.length - 1 ? 0 : prevIndex + 1
+      prevIndex === marketData.length - 1 ? 0 : prevIndex + 1
     );
   };
 
-  const currentItem = newsItems[currentIndex];
+  const currentItem = marketData[currentIndex];
+  
+  // Function to get the appropriate trend icon
+  const getTrendIcon = (trend: 'up' | 'down' | 'neutral') => {
+    switch(trend) {
+      case 'up':
+        return <TrendingUp className="w-5 h-5 text-green-500" />;
+      case 'down':
+        return <TrendingDown className="w-5 h-5 text-red-500" />;
+      default:
+        return <BarChart className="w-5 h-5 text-gray-500" />;
+    }
+  };
+  
+  // Function to get color based on trend
+  const getTrendColor = (trend: 'up' | 'down' | 'neutral') => {
+    switch(trend) {
+      case 'up':
+        return 'text-green-600';
+      case 'down':
+        return 'text-red-600';
+      default:
+        return 'text-gray-600';
+    }
+  };
 
   return (
     <Card className="shadow-sm overflow-hidden">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Newspaper className="w-5 h-5 text-primary" />
-          Market News
+          <BarChart className="w-5 h-5 text-primary" />
+          Market Data
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="rounded-lg overflow-hidden bg-gray-50 relative min-h-[180px]">
-            {currentItem.image ? (
-              <img 
-                src={currentItem.image} 
-                alt={currentItem.title}
-                className="w-full h-48 object-cover"
-              />
-            ) : (
-              <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
-                <Newspaper className="w-12 h-12 text-gray-400" />
-              </div>
-            )}
-            
+          <div className="rounded-lg overflow-hidden bg-gray-50 relative min-h-[180px] p-4">
             <div className="absolute top-2 right-2">
               <div className="bg-primary text-white text-xs px-2 py-1 rounded">
                 {propertyType} Market
               </div>
             </div>
-          </div>
-          
-          <div>
-            <h3 className="text-base font-medium line-clamp-2">{currentItem.title}</h3>
-            <p className="text-sm text-gray-600 mt-1 line-clamp-2">{currentItem.description}</p>
+            
+            <div className="flex flex-col h-full justify-center items-center">
+              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                {getTrendIcon(currentItem.trend)}
+              </div>
+              
+              <h3 className="text-lg font-bold text-center mb-1">{currentItem.title}</h3>
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <span className="text-2xl font-bold">{currentItem.value}</span>
+                <span className={`font-medium ${getTrendColor(currentItem.trend)}`}>
+                  {currentItem.change}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 text-center mb-3">{currentItem.description}</p>
+              <p className="text-xs text-gray-500">Source: {currentItem.source}</p>
+            </div>
           </div>
           
           <div className="flex items-center justify-between">
@@ -116,16 +147,15 @@ export const PropertyMarketNews = ({
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => window.open(currentItem.link, '_blank')}
               className="text-xs h-8"
             >
               <ExternalLink className="h-3 w-3 mr-1" />
-              Read More
+              View Full Report
             </Button>
           </div>
           
           <div className="flex justify-center mt-1">
-            {newsItems.map((_, index) => (
+            {marketData.map((_, index) => (
               <div 
                 key={index} 
                 className={`h-1.5 w-1.5 rounded-full mx-1 ${
@@ -133,6 +163,14 @@ export const PropertyMarketNews = ({
                 }`}
               />
             ))}
+          </div>
+          
+          <div className="border-t pt-3 mt-2">
+            <h4 className="text-sm font-medium mb-2">Market Summary - {propertyLocation}</h4>
+            <p className="text-xs text-gray-600">
+              The {propertyType.toLowerCase()} real estate market in {propertyLocation} shows a steady growth with increasing demand for 
+              high-quality properties. Investors can expect moderate appreciation with strong rental income potential.
+            </p>
           </div>
         </div>
       </CardContent>

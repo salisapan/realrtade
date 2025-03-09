@@ -1,13 +1,13 @@
+
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
 import { PropertyMarketInsights } from "./PropertyMarketInsights";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useEffect, useState, useRef } from "react";
-import * as THREE from "three";
+import { useState } from "react";
 import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PropertyDetailContentProps {
@@ -96,182 +96,6 @@ const riskAssessmentData = [{
   score: 4.2,
   fullMark: 10
 }];
-
-const ThreeDGraph = ({
-  chartId,
-  data,
-  type
-}: {
-  chartId: string;
-  data: any[];
-  type: 'bar' | 'line' | 'pie';
-}) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
-  
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const existingCanvas = containerRef.current.querySelector('canvas');
-    if (existingCanvas) {
-      existingCanvas.remove();
-    }
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
-
-    const camera = new THREE.PerspectiveCamera(75, containerRef.current.clientWidth / containerRef.current.clientHeight, 0.1, 1000);
-    camera.position.z = 5;
-    camera.position.y = 2;
-
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true
-    });
-    renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    containerRef.current.appendChild(renderer.domElement);
-
-    const gridHelper = new THREE.GridHelper(10, 10);
-    scene.add(gridHelper);
-
-    if (type === 'bar') {
-      data.forEach((item, index) => {
-        const barHeight = item.expected ? item.expected / 2 : item.projected / 20000;
-        const geometry = new THREE.BoxGeometry(0.5, barHeight, 0.5);
-        const material = new THREE.MeshPhongMaterial({
-          color: new THREE.Color(COLORS[index % COLORS.length])
-        });
-        const bar = new THREE.Mesh(geometry, material);
-
-        bar.position.x = index - data.length / 2 + 0.5;
-        bar.position.y = barHeight / 2;
-        scene.add(bar);
-
-        const labelDiv = document.createElement('div');
-        labelDiv.className = 'chart-label';
-        labelDiv.textContent = item.year || item.name;
-        labelDiv.style.position = 'absolute';
-        labelDiv.style.left = `${index / data.length * 100}%`;
-        labelDiv.style.bottom = '5px';
-        labelDiv.style.color = '#333';
-        labelDiv.style.fontSize = '10px';
-        labelDiv.style.fontWeight = 'bold';
-        containerRef.current.appendChild(labelDiv);
-      });
-    } else if (type === 'line') {
-      const points = [];
-      for (let i = 0; i < data.length; i++) {
-        const value = data[i].expected || data[i].score;
-        points.push(new THREE.Vector3(i - data.length / 2 + 0.5, value / 2, 0));
-      }
-      const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-      const lineMaterial = new THREE.LineBasicMaterial({
-        color: 0x0088fe,
-        linewidth: 2
-      });
-      const line = new THREE.Line(lineGeometry, lineMaterial);
-      scene.add(line);
-
-      points.forEach(point => {
-        const sphereGeometry = new THREE.SphereGeometry(0.1, 16, 16);
-        const sphereMaterial = new THREE.MeshPhongMaterial({
-          color: 0x1EAEDB
-        });
-        const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-        sphere.position.copy(point);
-        scene.add(sphere);
-      });
-    } else if (type === 'pie') {
-      const radius = 2;
-      const totalValue = data.reduce((sum, item) => sum + (item.score || 1), 0);
-      let startAngle = 0;
-      data.forEach((item, index) => {
-        const value = item.score || 1;
-        const angle = value / totalValue * Math.PI * 2;
-        const shape = new THREE.Shape();
-        shape.moveTo(0, 0);
-        shape.arc(0, 0, radius, startAngle, startAngle + angle, false);
-        shape.lineTo(0, 0);
-        const extrudeSettings = {
-          steps: 1,
-          depth: 0.5,
-          bevelEnabled: false
-        };
-        const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        const material = new THREE.MeshPhongMaterial({
-          color: new THREE.Color(COLORS[index % COLORS.length]),
-          side: THREE.DoubleSide
-        });
-        const segment = new THREE.Mesh(geometry, material);
-        segment.rotation.x = Math.PI / 2;
-        scene.add(segment);
-        startAngle += angle;
-      });
-    }
-
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(1, 1, 1);
-    scene.add(directionalLight);
-
-    let rotationSpeed = 0.005;
-
-    let isDragging = false;
-    let previousMousePosition = {
-      x: 0,
-      y: 0
-    };
-    containerRef.current.addEventListener('mousedown', () => {
-      isDragging = true;
-    });
-    containerRef.current.addEventListener('mousemove', e => {
-      if (isDragging) {
-        const deltaMove = {
-          x: e.offsetX - previousMousePosition.x,
-          y: e.offsetY - previousMousePosition.y
-        };
-        scene.rotation.y += deltaMove.x * 0.01;
-        scene.rotation.x += deltaMove.y * 0.01;
-      }
-      previousMousePosition = {
-        x: e.offsetX,
-        y: e.offsetY
-      };
-    });
-    containerRef.current.addEventListener('mouseup', () => {
-      isDragging = false;
-    });
-
-    const animate = () => {
-      requestAnimationFrame(animate);
-      if (!isDragging) {
-        scene.rotation.y += rotationSpeed;
-      }
-      renderer.render(scene, camera);
-    };
-    animate();
-
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      camera.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
-    };
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      if (containerRef.current) {
-        const labels = containerRef.current.querySelectorAll('.chart-label');
-        labels.forEach(label => label.remove());
-      }
-    };
-  }, [chartId, data, type]);
-  
-  const containerHeight = isMobile ? "200px" : "300px";
-  
-  return <div ref={containerRef} className="graph-3d-container" style={{ height: containerHeight }}></div>;
-};
 
 export const PropertyDetailContent = ({
   property
@@ -401,124 +225,81 @@ export const PropertyDetailContent = ({
           </div>
           
           <div>
-            <h2 className="text-lg font-bold mb-3">Advanced Financial Analysis</h2>
+            <h2 className="text-lg font-bold mb-3">Financial Analysis</h2>
             
             <div className="space-y-6">
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-base font-semibold mb-2">Return on Investment Timeline</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  This 3D visualization shows the projected ROI over the investment term. The graph compares expected vs. actual returns.
-                </p>
-                
-                <ThreeDGraph chartId="roi-timeline" data={roiTimelineData} type="bar" />
-                
-                <div className="mt-4 md:hidden">
-                  <h4 className="text-sm font-medium mb-2">ROI Progression (Mobile View)</h4>
-                  <div className="investment-chart">
-                    <ResponsiveContainer width="100%" height={200}>
-                      <AreaChart data={roiTimelineData} margin={{
+                <h3 className="text-base font-semibold mb-3">Return on Investment Timeline</h3>
+                <div className="investment-chart">
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={roiTimelineData} margin={{
                       top: 10,
                       right: 10,
                       left: 0,
                       bottom: 20
                     }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="year" tick={{
-                        fontSize: 10
-                      }} />
-                        <YAxis tick={{
-                        fontSize: 10
-                      }} />
-                        <RechartsTooltip contentStyle={{
-                        fontSize: 12
-                      }} />
-                        <Area type="monotone" dataKey="expected" stackId="1" stroke="#1EAEDB" fill="#1EAEDB" name="Expected ROI %" />
-                        <Area type="monotone" dataKey="actual" stackId="2" stroke="#0088FE" fill="#0088FE" name="Actual ROI %" />
-                        <Legend wrapperStyle={{
-                        fontSize: 10
-                      }} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="year" tick={{fontSize: 10}} />
+                      <YAxis tick={{fontSize: 10}} />
+                      <RechartsTooltip contentStyle={{fontSize: 12}} />
+                      <Area type="monotone" dataKey="expected" stackId="1" stroke="#1EAEDB" fill="#1EAEDB" name="Expected ROI %" />
+                      <Area type="monotone" dataKey="actual" stackId="2" stroke="#0088FE" fill="#0088FE" name="Actual ROI %" />
+                      <Legend wrapperStyle={{fontSize: 10}} />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
               
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-base font-semibold mb-2">Quarterly Cash Flow Projections</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  This visualization shows the projected quarterly cash flow over time, comparing projections to actual results where available.
-                </p>
-                
-                <ThreeDGraph chartId="cash-flow" data={cashFlowQuarterlyData} type="bar" />
-                
-                <div className="mt-4 md:hidden">
-                  <h4 className="text-sm font-medium mb-2">Cash Flow (Mobile View)</h4>
-                  <div className="investment-chart">
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart 
-                        data={cashFlowQuarterlyData} 
-                        margin={{
-                          top: 10,
-                          right: 10,
-                          left: 0,
-                          bottom: 60
-                        }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="name" 
-                          angle={-45} 
-                          textAnchor="end" 
-                          height={60} 
-                          tick={{fontSize: 10}}
-                          interval={0}
-                        />
-                        <YAxis tick={{fontSize: 10}} />
-                        <RechartsTooltip contentStyle={{fontSize: 12}} />
-                        <Bar dataKey="projected" name="Projected ($)" fill="#1EAEDB" />
-                        <Bar dataKey="actual" name="Actual ($)" fill="#0088FE" />
-                        <Legend wrapperStyle={{fontSize: 10}} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                <h3 className="text-base font-semibold mb-3">Quarterly Cash Flow Projections</h3>
+                <div className="investment-chart">
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart 
+                      data={cashFlowQuarterlyData} 
+                      margin={{
+                        top: 10,
+                        right: 10,
+                        left: 0,
+                        bottom: 60
+                      }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="name" 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={60} 
+                        tick={{fontSize: 10}}
+                        interval={0}
+                      />
+                      <YAxis tick={{fontSize: 10}} />
+                      <RechartsTooltip contentStyle={{fontSize: 12}} />
+                      <Bar dataKey="projected" name="Projected ($)" fill="#1EAEDB" />
+                      <Bar dataKey="actual" name="Actual ($)" fill="#0088FE" />
+                      <Legend wrapperStyle={{fontSize: 10}} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
               
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-base font-semibold mb-2">Risk Assessment Analysis</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  This comprehensive risk assessment shows different risk factors for this property investment. Lower scores indicate lower risk.
-                </p>
-                
-                <ThreeDGraph chartId="risk-analysis" data={riskAssessmentData} type="line" />
-                
-                <div className="mt-4 md:hidden">
-                  <h4 className="text-sm font-medium mb-2">Risk Analysis (Mobile View)</h4>
-                  <div className="investment-chart">
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart layout="vertical" data={riskAssessmentData} margin={{
+                <h3 className="text-base font-semibold mb-3">Risk Assessment Analysis</h3>
+                <div className="investment-chart">
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart layout="vertical" data={riskAssessmentData} margin={{
                       top: 10,
                       right: 30,
                       left: 70,
                       bottom: 10
                     }}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" domain={[0, 10]} tick={{
-                        fontSize: 10
-                      }} />
-                        <YAxis dataKey="category" type="category" tick={{
-                        fontSize: 10
-                      }} />
-                        <RechartsTooltip contentStyle={{
-                        fontSize: 12
-                      }} />
-                        <Bar dataKey="score" name="Risk Score (lower is better)" fill="#1EAEDB" />
-                        <Legend wrapperStyle={{
-                        fontSize: 10
-                      }} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" domain={[0, 10]} tick={{fontSize: 10}} />
+                      <YAxis dataKey="category" type="category" tick={{fontSize: 10}} />
+                      <RechartsTooltip contentStyle={{fontSize: 12}} />
+                      <Bar dataKey="score" name="Risk Score (lower is better)" fill="#1EAEDB" />
+                      <Legend wrapperStyle={{fontSize: 10}} />
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
             </div>

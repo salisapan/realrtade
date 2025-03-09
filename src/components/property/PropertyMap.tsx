@@ -1,8 +1,7 @@
 
 import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface PropertyMapProps {
   location: string;
@@ -10,62 +9,33 @@ interface PropertyMapProps {
   lng?: number;
 }
 
-// This would typically come from an environment variable or Supabase secrets
-// For now, we'll use a public token that's limited to this domain
-const MAPBOX_TOKEN = 'pk.eyJ1IjoibG92YWJsZS1haS1kZXYiLCJhIjoiY2xzdDRiN2I5MHU4cDJrcWR0ZzBvOGQ3ciJ9.Jw8NoE3H682yr7vVLYYYpw';
-
 export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: PropertyMapProps) => {
-  const mapRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLIFrameElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [mapError, setMapError] = useState(false);
   
   useEffect(() => {
-    if (!mapRef.current) return;
-    
-    // Initialize Mapbox with access token
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    
-    try {
-      // Create the map instance
-      const map = new mapboxgl.Map({
-        container: mapRef.current,
-        style: 'mapbox://styles/mapbox/streets-v12', // Standard street style
-        center: [lng, lat],
-        zoom: 14,
-        interactive: true,
-        attributionControl: false
-      });
-      
-      // Add zoom and rotation controls
-      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-      
-      // Add a marker at the property location
-      new mapboxgl.Marker({ color: '#0070f3' })
-        .setLngLat([lng, lat])
-        .setPopup(new mapboxgl.Popup({ offset: 25 }).setText(location))
-        .addTo(map);
-      
-      // Handle map load completion
-      map.on('load', () => {
-        setIsLoading(false);
-      });
-      
-      // Handle map load error
-      map.on('error', () => {
-        setMapError(true);
-        setIsLoading(false);
-      });
-      
-      // Cleanup function to remove the map when component unmounts
-      return () => {
-        map.remove();
-      };
-    } catch (error) {
-      console.error('Error initializing map:', error);
-      setMapError(true);
+    // Using Google Maps embed as a more reliable alternative
+    const timer = setTimeout(() => {
       setIsLoading(false);
-    }
-  }, [location, lat, lng]);
+    }, 1500);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [location]);
+  
+  const handleMapError = () => {
+    setMapError(true);
+    setIsLoading(false);
+  };
+
+  // Format location for URL
+  const formattedLocation = encodeURIComponent(location);
+  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${formattedLocation}`;
+  
+  // Google Maps embed URL
+  const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=AIzaSyDJPtQVJ6mXBCUzrXgXXtK1n3G6iarWl8s&q=${formattedLocation}`;
   
   return (
     <div className="relative w-full h-64 md:h-80 bg-gray-100 rounded-lg shadow-sm overflow-hidden">
@@ -76,24 +46,36 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
         </div>
       )}
       
-      <div 
-        ref={mapRef}
-        className="w-full h-full" 
-        aria-label={`Map showing location of property at ${location}`}
-      />
-      
-      {mapError && (
+      {!mapError ? (
+        <iframe 
+          ref={mapRef}
+          src={mapEmbedUrl}
+          className="w-full h-full border-0" 
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          onError={handleMapError}
+          aria-label={`Map showing location of property at ${location}`}
+        />
+      ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-100 z-10">
           <p className="text-gray-500">Map could not be loaded</p>
           <p className="text-sm text-gray-400 mb-2">{location}</p>
-          <a 
-            href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Button 
+            variant="outline"
+            size="sm"
+            asChild
             className="text-primary text-sm hover:underline"
           >
-            View on Google Maps
-          </a>
+            <a 
+              href={googleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+              View on Google Maps
+            </a>
+          </Button>
         </div>
       )}
       
