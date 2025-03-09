@@ -7,9 +7,10 @@ import { PropertyMarketNews } from "./PropertyMarketNews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon } from "lucide-react";
+import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon, Truck, Road, FileText } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from "@/hooks/use-toast";
 
 interface PropertyDetailContentProps {
   property: {
@@ -37,7 +38,7 @@ interface PropertyDetailContentProps {
   };
 }
 
-const COLORS = ['#1EAEDB', '#0088FE', '#0FA0CE', '#33C3F0', '#0070C0'];
+const COLORS = ['#1A2E5A', '#007BFF', '#A9A9A9', '#0D47A1', '#5C93D8'];
 
 const roiTimelineData = [{
   year: '2023',
@@ -65,14 +66,44 @@ const roiTimelineData = [{
   actual: 0
 }];
 
+// Helper function to get appropriate icon based on feature content
+const getFeatureIcon = (feature: string) => {
+  const lowerFeature = feature.toLowerCase();
+  
+  if (lowerFeature.includes('modern') || lowerFeature.includes('facility') || lowerFeature.includes('amenities') || lowerFeature.includes('building')) {
+    return <Building className="w-3 h-3 text-primary" />;
+  } else if (lowerFeature.includes('transport') || lowerFeature.includes('access') || lowerFeature.includes('highway') || lowerFeature.includes('airport')) {
+    return <Truck className="w-3 h-3 text-primary" />;
+  } else if (lowerFeature.includes('lease') || lowerFeature.includes('agreement') || lowerFeature.includes('contract')) {
+    return <FileText className="w-3 h-3 text-primary" />;
+  } else if (lowerFeature.includes('occupancy') || lowerFeature.includes('tenant') || lowerFeature.includes('resident')) {
+    return <Users className="w-3 h-3 text-primary" />;
+  } else if (lowerFeature.includes('location') || lowerFeature.includes('situated') || lowerFeature.includes('area')) {
+    return <Map className="w-3 h-3 text-primary" />;
+  } else if (lowerFeature.includes('road') || lowerFeature.includes('street') || lowerFeature.includes('highway')) {
+    return <Road className="w-3 h-3 text-primary" />;
+  } else {
+    return <LandPlot className="w-3 h-3 text-primary" />;
+  }
+};
+
 export const PropertyDetailContent = ({
   property
 }: PropertyDetailContentProps) => {
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   
   const handleScheduleCall = () => {
     // Open Calendly for scheduling a call
-    window.open('https://calendly.com/realtrade/investment-call', '_blank');
+    try {
+      window.open('https://calendly.com/realtrade/investment-call', '_blank');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Unable to open scheduling tool. Please try again later.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getPropertyCity = () => {
@@ -80,7 +111,8 @@ export const PropertyDetailContent = ({
     return locationParts.length > 1 ? locationParts[1].trim() : 'New York';
   };
 
-  return <div className="p-4 md:p-6">
+  return (
+    <div className="p-4 md:p-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
         <div>
           <div className="flex items-center flex-wrap gap-2 mb-2">
@@ -184,12 +216,14 @@ export const PropertyDetailContent = ({
           <div>
             <h2 className="text-lg font-bold mb-3">Key Features</h2>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-              {property.keyFeatures.map((feature, index) => <li key={index} className="flex items-center gap-2">
+              {property.keyFeatures.map((feature, index) => (
+                <li key={index} className="flex items-center gap-2">
                   <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <LandPlot className="w-3 h-3 text-primary" />
+                    {getFeatureIcon(feature)}
                   </div>
                   <span className="text-sm">{feature}</span>
-                </li>)}
+                </li>
+              ))}
             </ul>
           </div>
           
@@ -209,8 +243,8 @@ export const PropertyDetailContent = ({
                     <XAxis dataKey="year" tick={{fontSize: 10}} />
                     <YAxis tick={{fontSize: 10}} />
                     <RechartsTooltip contentStyle={{fontSize: 12}} />
-                    <Area type="monotone" dataKey="expected" stackId="1" stroke="#1EAEDB" fill="#1EAEDB" name="Expected ROI %" />
-                    <Area type="monotone" dataKey="actual" stackId="2" stroke="#0088FE" fill="#0088FE" name="Actual ROI %" />
+                    <Area type="monotone" dataKey="expected" stackId="1" stroke="#1A2E5A" fill="#1A2E5A" name="Expected ROI %" />
+                    <Area type="monotone" dataKey="actual" stackId="2" stroke="#007BFF" fill="#007BFF" name="Actual ROI %" />
                     <Legend wrapperStyle={{fontSize: 10}} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -312,5 +346,6 @@ export const PropertyDetailContent = ({
           </div>
         </div>
       </div>
-    </div>;
+    </div>
+  );
 };

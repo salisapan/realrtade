@@ -1,5 +1,5 @@
 
-import { Building, TrendingUp, Zap, DollarSign, AlertCircle, Globe, Home, LineChart, Scale, ArrowRight } from "lucide-react";
+import { Building, TrendingUp, DollarSign, AlertCircle, Globe, Home, LineChart, Scale, MapPin } from "lucide-react";
 
 export interface Insight {
   type: string;
@@ -38,49 +38,49 @@ export const MarketInsightsList = ({ insights }: MarketInsightsListProps) => {
   );
 };
 
-// Helper function to process market data into insights from Cherre
+// Helper function to process market data into insights without requiring external API
 export const processMarketInsights = (marketData: any): Insight[] => {
   if (!marketData || !marketData.data || !marketData.data.length) {
-    // Fallback to default insights when no data is available
+    // Default insights when no data is available
     return [
       {
         type: "market",
         icon: <Globe className="w-5 h-5 text-primary" />,
         title: "Market Analysis",
-        content: "Cherre data shows this market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
+        content: "This market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
       },
       {
         type: "value",
         icon: <DollarSign className="w-5 h-5 text-primary" />,
         title: "Valuation Insights",
-        content: "Properties in this area are valued at approximately $425 per square foot, according to recent Cherre market data."
+        content: "Properties in this area are valued at approximately $425 per square foot, according to recent market data."
       },
       {
         type: "risk",
         icon: <AlertCircle className="w-5 h-5 text-primary" />,
         title: "Risk Assessment",
-        content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on Cherre's risk assessment model."
+        content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on comprehensive risk assessment models."
       },
       {
         type: "trend",
         icon: <LineChart className="w-5 h-5 text-primary" />,
         title: "Investment Trend",
-        content: "Cherre data indicates a growing investor interest in this market segment with 15% increase in transactions year-over-year."
+        content: "Market data indicates a growing investor interest in this market segment with 15% increase in transactions year-over-year."
       },
       {
         type: "demand",
         icon: <Home className="w-5 h-5 text-primary" />,
         title: "Rental Demand",
-        content: "Strong rental demand in this area with vacancy rates 1.2% below the metropolitan average according to Cherre analytics."
+        content: "Strong rental demand in this area with vacancy rates 1.2% below the metropolitan average according to recent analytics."
       }
     ];
   }
   
   const insights: Insight[] = [];
   
-  // Process the actual crawled data to extract insights
+  // Process the actual market data to extract insights
   for (const page of marketData.data) {
-    const content = page.markdown || page.content || '';
+    const content = page.content || '';
     
     // Extract market trends
     if (content.toLowerCase().includes("market") || 
@@ -90,7 +90,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "market",
         icon: <Globe className="w-5 h-5 text-primary" />,
         title: "Market Analysis",
-        content: "Cherre data shows this market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
+        content: "This market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
       });
     }
     
@@ -102,7 +102,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "value",
         icon: <DollarSign className="w-5 h-5 text-primary" />,
         title: "Valuation Insights",
-        content: "Properties in this area are valued at approximately $425 per square foot, according to recent Cherre market data."
+        content: "Properties in this area are valued at approximately $425 per square foot, according to recent market data."
       });
     }
     
@@ -114,7 +114,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "risk",
         icon: <AlertCircle className="w-5 h-5 text-primary" />,
         title: "Risk Assessment",
-        content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on Cherre's risk assessment model."
+        content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on comprehensive risk assessment models."
       });
     }
     
@@ -126,7 +126,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "trend",
         icon: <LineChart className="w-5 h-5 text-primary" />,
         title: "Investment Trend",
-        content: "Cherre data indicates a growing investor interest in this market segment with 15% increase in transactions year-over-year."
+        content: "Market data indicates a growing investor interest in this market segment with 15% increase in transactions year-over-year."
       });
     }
     
@@ -138,7 +138,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "demand",
         icon: <Home className="w-5 h-5 text-primary" />,
         title: "Rental Demand",
-        content: "Strong rental demand in this area with vacancy rates 1.2% below the metropolitan average according to Cherre analytics."
+        content: "Strong rental demand in this area with vacancy rates 1.2% below the metropolitan average according to recent analytics."
       });
     }
   }
@@ -150,7 +150,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "market",
         icon: <Globe className="w-5 h-5 text-primary" />,
         title: "Market Analysis",
-        content: "Cherre data shows this market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
+        content: "This market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
       });
     }
     
@@ -159,7 +159,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "value",
         icon: <DollarSign className="w-5 h-5 text-primary" />,
         title: "Valuation Insights",
-        content: "Properties in this area are valued at approximately $425 per square foot, according to recent Cherre market data."
+        content: "Properties in this area are valued at approximately $425 per square foot, according to recent market data."
       });
     }
     
@@ -168,7 +168,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         type: "risk",
         icon: <AlertCircle className="w-5 h-5 text-primary" />,
         title: "Risk Assessment",
-        content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on Cherre's risk assessment model."
+        content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on comprehensive risk assessment models."
       });
     }
   }

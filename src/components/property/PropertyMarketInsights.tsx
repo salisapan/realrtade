@@ -6,8 +6,6 @@ import { ArrowRight, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { FirecrawlService } from "@/utils/FirecrawlService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PropertyApiKeySetup } from './PropertyApiKeySetup';
-import { OpenAIApiKeySetup } from './OpenAIApiKeySetup';
 import { MarketInsightsList, processMarketInsights } from './MarketInsightsList';
 import { AIAnalysisDisplay } from './AIAnalysisDisplay';
 import { PropertyDataLoading } from './PropertyDataLoading';
@@ -20,24 +18,14 @@ interface PropertyMarketInsightsProps {
 
 export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: PropertyMarketInsightsProps) => {
   const { toast } = useToast();
-  const [isApiKeySet, setIsApiKeySet] = useState<boolean>(false);
-  const [isOpenAIApiKeySet, setIsOpenAIApiKeySet] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [marketData, setMarketData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("market-data");
 
-  // Check if API keys exist on component mount
+  // Fetch data on component mount
   useEffect(() => {
-    const savedApiKey = FirecrawlService.getApiKey();
-    if (savedApiKey) {
-      setIsApiKeySet(true);
-    }
-    
-    const savedOpenAIApiKey = FirecrawlService.getOpenAIApiKey();
-    if (savedOpenAIApiKey) {
-      setIsOpenAIApiKeySet(true);
-    }
+    fetchPropertyData();
   }, []);
 
   const fetchPropertyData = async () => {
@@ -73,26 +61,10 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
     }
   };
 
-  const handleApiKeyValidated = () => {
-    setIsApiKeySet(true);
-    fetchPropertyData();
-  };
-
-  const handleOpenAIApiKeyValidated = () => {
-    setIsOpenAIApiKeySet(true);
-    if (marketData) {
-      fetchPropertyData();
-    }
-  };
-
   const insights = marketData ? processMarketInsights(marketData) : [];
   const aiAnalysis = marketData?.aiAnalysis || null;
 
   const renderContent = () => {
-    if (!isApiKeySet) {
-      return <PropertyApiKeySetup onApiKeyValidated={handleApiKeyValidated} />;
-    }
-    
     if (isLoading) {
       return <PropertyDataLoading />;
     }
@@ -104,10 +76,6 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
     if (marketData) {
       return (
         <div className="space-y-4">
-          {!isOpenAIApiKeySet && (
-            <OpenAIApiKeySetup onApiKeyValidated={handleOpenAIApiKeyValidated} />
-          )}
-          
           <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="market-data" className="text-xs">
@@ -130,7 +98,7 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
               <AIAnalysisDisplay 
                 aiAnalysis={aiAnalysis} 
                 onGenerateAnalysis={fetchPropertyData} 
-                isOpenAIApiKeySet={isOpenAIApiKeySet}
+                isOpenAIApiKeySet={true}
               />
             </TabsContent>
           </Tabs>

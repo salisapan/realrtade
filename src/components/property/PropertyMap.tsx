@@ -34,7 +34,7 @@ export const PropertyMap = ({ location, lat = 40.7128, lng = -74.0060 }: Propert
   const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${formattedLocation}`;
   
   // Google Maps embed URL - using public API key that is restricted to embed usage
-  const mapEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${formattedLocation}`;
+  const mapEmbedUrl = `https://maps.google.com/maps?q=${formattedLocation}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
   
   return (
     <div className="relative w-full h-64 md:h-80 bg-gray-100 rounded-lg shadow-sm overflow-hidden">
