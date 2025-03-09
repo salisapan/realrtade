@@ -1,5 +1,5 @@
 
-import { Building, TrendingUp, Zap, DollarSign, AlertCircle, Globe, Home } from "lucide-react";
+import { Building, TrendingUp, Zap, DollarSign, AlertCircle, Globe, Home, LineChart, Scale, ArrowRight } from "lucide-react";
 
 export interface Insight {
   type: string;
@@ -24,7 +24,7 @@ export const MarketInsightsList = ({ insights }: MarketInsightsListProps) => {
   return (
     <div className="space-y-4">
       {insights.map((insight, index) => (
-        <div key={index} className="bg-gray-50 p-3 rounded-md">
+        <div key={index} className="bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
           <div className="flex items-start gap-3">
             <div className="mt-1">{insight.icon}</div>
             <div>
@@ -45,31 +45,31 @@ export const processMarketInsights = (marketData: any): Insight[] => {
     return [
       {
         type: "market",
-        icon: <Globe className="w-5 h-5 text-blue-500" />,
+        icon: <Globe className="w-5 h-5 text-primary" />,
         title: "Market Analysis",
         content: "Cherre data shows this market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
       },
       {
         type: "value",
-        icon: <DollarSign className="w-5 h-5 text-green-500" />,
+        icon: <DollarSign className="w-5 h-5 text-primary" />,
         title: "Valuation Insights",
         content: "Properties in this area are valued at approximately $425 per square foot, according to recent Cherre market data."
       },
       {
         type: "risk",
-        icon: <AlertCircle className="w-5 h-5 text-amber-500" />,
+        icon: <AlertCircle className="w-5 h-5 text-primary" />,
         title: "Risk Assessment",
         content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on Cherre's risk assessment model."
       },
       {
         type: "trend",
-        icon: <TrendingUp className="w-5 h-5 text-purple-500" />,
+        icon: <LineChart className="w-5 h-5 text-primary" />,
         title: "Investment Trend",
         content: "Cherre data indicates a growing investor interest in this market segment with 15% increase in transactions year-over-year."
       },
       {
         type: "demand",
-        icon: <Home className="w-5 h-5 text-indigo-500" />,
+        icon: <Home className="w-5 h-5 text-primary" />,
         title: "Rental Demand",
         content: "Strong rental demand in this area with vacancy rates 1.2% below the metropolitan average according to Cherre analytics."
       }
@@ -88,7 +88,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         content.toLowerCase().includes("analysis")) {
       insights.push({
         type: "market",
-        icon: <Globe className="w-5 h-5 text-blue-500" />,
+        icon: <Globe className="w-5 h-5 text-primary" />,
         title: "Market Analysis",
         content: "Cherre data shows this market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
       });
@@ -100,7 +100,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         content.toLowerCase().includes("worth")) {
       insights.push({
         type: "value",
-        icon: <DollarSign className="w-5 h-5 text-green-500" />,
+        icon: <DollarSign className="w-5 h-5 text-primary" />,
         title: "Valuation Insights",
         content: "Properties in this area are valued at approximately $425 per square foot, according to recent Cherre market data."
       });
@@ -112,7 +112,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         content.toLowerCase().includes("assessment")) {
       insights.push({
         type: "risk",
-        icon: <AlertCircle className="w-5 h-5 text-amber-500" />,
+        icon: <AlertCircle className="w-5 h-5 text-primary" />,
         title: "Risk Assessment",
         content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on Cherre's risk assessment model."
       });
@@ -124,7 +124,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         content.toLowerCase().includes("potential")) {
       insights.push({
         type: "trend",
-        icon: <TrendingUp className="w-5 h-5 text-purple-500" />,
+        icon: <LineChart className="w-5 h-5 text-primary" />,
         title: "Investment Trend",
         content: "Cherre data indicates a growing investor interest in this market segment with 15% increase in transactions year-over-year."
       });
@@ -136,7 +136,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
         content.toLowerCase().includes("tenant")) {
       insights.push({
         type: "demand",
-        icon: <Home className="w-5 h-5 text-indigo-500" />,
+        icon: <Home className="w-5 h-5 text-primary" />,
         title: "Rental Demand",
         content: "Strong rental demand in this area with vacancy rates 1.2% below the metropolitan average according to Cherre analytics."
       });
@@ -148,7 +148,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
     if (!insights.some(i => i.type === "market")) {
       insights.push({
         type: "market",
-        icon: <Globe className="w-5 h-5 text-blue-500" />,
+        icon: <Globe className="w-5 h-5 text-primary" />,
         title: "Market Analysis",
         content: "Cherre data shows this market has demonstrated stable growth with a 5.2% annual appreciation rate over the past 3 years."
       });
@@ -157,7 +157,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
     if (!insights.some(i => i.type === "value")) {
       insights.push({
         type: "value",
-        icon: <DollarSign className="w-5 h-5 text-green-500" />,
+        icon: <DollarSign className="w-5 h-5 text-primary" />,
         title: "Valuation Insights",
         content: "Properties in this area are valued at approximately $425 per square foot, according to recent Cherre market data."
       });
@@ -166,7 +166,7 @@ export const processMarketInsights = (marketData: any): Insight[] => {
     if (!insights.some(i => i.type === "risk")) {
       insights.push({
         type: "risk",
-        icon: <AlertCircle className="w-5 h-5 text-amber-500" />,
+        icon: <AlertCircle className="w-5 h-5 text-primary" />,
         title: "Risk Assessment",
         content: "This property shows lower than average market volatility with a risk score of 3.2/10 based on Cherre's risk assessment model."
       });

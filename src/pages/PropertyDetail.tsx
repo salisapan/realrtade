@@ -18,6 +18,8 @@ const PropertyDetail = () => {
   const [bookmarked, setBookmarked] = useState(false);
   const { toast } = useToast();
   
+  const CHART_COLORS = ['#1A2E5A', '#007BFF', '#4A90E2', '#A9A9A9', '#D3D3D3'];
+
   useEffect(() => {
     // Simulate loading property data
     setTimeout(() => {
@@ -133,7 +135,7 @@ const PropertyDetail = () => {
         </header>
 
         <main className="mx-0">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 p-4">
             <div className="lg:col-span-2 space-y-4 md:space-y-6">
               <div className="rounded-xl overflow-hidden bg-white shadow-sm">
                 <img src={property.image} alt={property.name} className="w-full h-[300px] object-cover" />
@@ -175,7 +177,7 @@ const PropertyDetail = () => {
                                 <RechartsTooltip contentStyle={{
                                 fontSize: 12
                               }} />
-                                <Area type="monotone" dataKey="cashFlow" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                                <Area type="monotone" dataKey="cashFlow" stroke="#1A2E5A" fill="#1A2E5A" fillOpacity={0.3} />
                               </AreaChart>
                             </ResponsiveContainer>
                           </div>
@@ -187,11 +189,11 @@ const PropertyDetail = () => {
                             <div className="h-56">
                               <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
-                                  <Pie data={roiComponentsData} cx="50%" cy="50%" labelLine={false} outerRadius={70} fill="#8884d8" dataKey="value" label={({
+                                  <Pie data={roiComponentsData} cx="50%" cy="50%" labelLine={false} outerRadius={70} fill="#007BFF" dataKey="value" label={({
                                   name,
                                   percent
                                 }) => `${name}: ${(percent * 100).toFixed(0)}%`}>
-                                    {roiComponentsData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                    {roiComponentsData.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
                                   </Pie>
                                   <RechartsTooltip contentStyle={{
                                   fontSize: 12
@@ -224,7 +226,7 @@ const PropertyDetail = () => {
                                   <Legend wrapperStyle={{
                                   fontSize: 12
                                 }} />
-                                  <Bar dataKey="score" fill="#82ca9d" name="Risk Score (lower is better)" />
+                                  <Bar dataKey="score" fill="#007BFF" name="Risk Score (lower is better)" />
                                 </RechartsBarChart>
                               </ResponsiveContainer>
                             </div>
@@ -516,7 +518,7 @@ const PropertyDetail = () => {
     </div>;
 };
 
-const COLORS = ['#1EAEDB', '#0088FE', '#0FA0CE', '#33C3F0', '#0070C0'];
+const COLORS = ['#1A2E5A', '#007BFF', '#4A90E2', '#A9A9A9', '#D3D3D3'];
 
 const sampleProperties = [{
   id: "prop1",

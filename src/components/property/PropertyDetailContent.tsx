@@ -71,6 +71,7 @@ export const PropertyDetailContent = ({
   const isMobile = useIsMobile();
   
   const handleScheduleCall = () => {
+    // Open Calendly for scheduling a call
     window.open('https://calendly.com/realtrade/investment-call', '_blank');
   };
 
