@@ -1,141 +1,68 @@
 
-import FirecrawlApp from '@mendable/firecrawl-js';
-
-interface ErrorResponse {
-  success: false;
-  error: string;
-}
-
-interface CrawlStatusResponse {
-  success: true;
-  status: string;
-  completed: number;
-  total: number;
-  creditsUsed: number;
-  expiresAt: string;
-  data: any[];
-}
-
-type CrawlResponse = CrawlStatusResponse | ErrorResponse;
+import { FirecrawlClient } from "@mendable/firecrawl-js";
 
 export class FirecrawlService {
-  private static API_KEY_STORAGE_KEY = 'firecrawl_api_key';
-  private static firecrawlApp: FirecrawlApp | null = null;
+  private apiKey: string;
+  private client: FirecrawlClient;
 
-  static saveApiKey(apiKey: string): void {
-    localStorage.setItem(this.API_KEY_STORAGE_KEY, apiKey);
-    this.firecrawlApp = new FirecrawlApp({ apiKey });
-    console.log('API key saved successfully');
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+    this.client = new FirecrawlClient(apiKey);
   }
 
-  static getApiKey(): string | null {
-    return localStorage.getItem(this.API_KEY_STORAGE_KEY);
-  }
-
-  static async testApiKey(apiKey: string): Promise<boolean> {
+  async crawlWebsite(url: string, searchQuery: string = "", maxPages: number = 10) {
     try {
-      console.log('Testing API key with Firecrawl API');
-      this.firecrawlApp = new FirecrawlApp({ apiKey });
-      // A simple test crawl to verify the API key
-      const testResponse = await this.firecrawlApp.crawlUrl('https://example.com', {
-        limit: 1
+      // Step 1: Create a crawl
+      const crawl = await this.client.createCrawl({
+        name: `Crawl of ${url}`,
+        url: url,
+        maxPages: maxPages,
       });
-      return testResponse.success;
-    } catch (error) {
-      console.error('Error testing API key:', error);
-      return false;
-    }
-  }
 
-  static async crawlPropertyData(address: string, city: string): Promise<{ success: boolean; error?: string; data?: any }> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      return { success: false, error: 'API key not found' };
-    }
+      console.log("Crawl created:", crawl);
 
-    try {
-      console.log('Making property data crawl request to Firecrawl API');
-      if (!this.firecrawlApp) {
-        this.firecrawlApp = new FirecrawlApp({ apiKey });
+      // Step 2: Start the crawl
+      await this.client.startCrawl(crawl.id);
+      console.log("Crawl started");
+
+      // Step 3: Wait for crawl to complete
+      let crawlStatus = await this.client.getCrawl(crawl.id);
+      while (crawlStatus.status !== "completed" && crawlStatus.status !== "failed") {
+        console.log("Waiting for crawl to complete...", crawlStatus.status);
+        await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
+        crawlStatus = await this.client.getCrawl(crawl.id);
       }
 
-      // Format search query for real estate data
-      const searchQuery = `${address} ${city} real estate market data`;
-      const crawlUrl = `https://www.realtor.com/realestateandhomes-search/${city.replace(' ', '-')}`;
-      
-      const crawlResponse = await this.firecrawlApp.crawlUrl(crawlUrl, {
-        limit: 20,
-        scrapeOptions: {
-          formats: ['markdown', 'html']
-        }
-      }) as CrawlResponse;
-
-      if (!crawlResponse.success) {
-        console.error('Crawl failed:', (crawlResponse as ErrorResponse).error);
-        return { 
-          success: false, 
-          error: (crawlResponse as ErrorResponse).error || 'Failed to crawl real estate data' 
-        };
+      if (crawlStatus.status === "failed") {
+        throw new Error("Crawl failed");
       }
 
-      console.log('Property data crawl successful:', crawlResponse);
+      console.log("Crawl completed");
+
+      // Step 4: Scrape the crawled content
+      const scrapeOptions = {
+        maxResults: 100,
+        minScore: 0.5,
+      };
+
+      // If we have a search query, use it to analyze the content
+      let results;
+      if (searchQuery) {
+        // Analyze results with the search query
+        results = await this.client.analyzeCrawl(crawl.id, searchQuery);
+      } else {
+        // Just get all pages from the crawl
+        results = await this.client.scrape(crawl.id, scrapeOptions);
+      }
       
-      // Process the crawl data to extract property insights
-      // In a real implementation, we would analyze the crawled data here using the searchQuery
-      // For now, we'll just return the raw data
-      
-      return { 
-        success: true,
-        data: crawlResponse 
+      return {
+        crawlId: crawl.id,
+        results: results,
+        status: crawlStatus
       };
     } catch (error) {
-      console.error('Error during crawl:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to connect to Firecrawl API' 
-      };
-    }
-  }
-  
-  // New method for general website crawling
-  static async crawlWebsite(url: string): Promise<{ success: boolean; error?: string; data?: any }> {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      return { success: false, error: 'API key not found' };
-    }
-
-    try {
-      console.log('Making crawl request to Firecrawl API');
-      if (!this.firecrawlApp) {
-        this.firecrawlApp = new FirecrawlApp({ apiKey });
-      }
-
-      const crawlResponse = await this.firecrawlApp.crawlUrl(url, {
-        limit: 100,
-        scrapeOptions: {
-          formats: ['markdown', 'html']
-        }
-      }) as CrawlResponse;
-
-      if (!crawlResponse.success) {
-        console.error('Crawl failed:', (crawlResponse as ErrorResponse).error);
-        return { 
-          success: false, 
-          error: (crawlResponse as ErrorResponse).error || 'Failed to crawl website' 
-        };
-      }
-
-      console.log('Crawl successful:', crawlResponse);
-      return { 
-        success: true,
-        data: crawlResponse 
-      };
-    } catch (error) {
-      console.error('Error during crawl:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Failed to connect to Firecrawl API' 
-      };
+      console.error("Error in crawlWebsite:", error);
+      throw error;
     }
   }
 }

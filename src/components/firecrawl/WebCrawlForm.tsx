@@ -1,222 +1,248 @@
 
-import { useState } from 'react';
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Globe, AlertCircle } from "lucide-react";
+import { 
+  Card, 
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle 
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, AlertCircle, LinkIcon, Search, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { FirecrawlService } from "@/utils/FirecrawlService";
-import { Progress } from "@/components/ui/progress";
-
-interface CrawlResult {
-  success: boolean;
-  status?: string;
-  completed?: number;
-  total?: number;
-  creditsUsed?: number;
-  expiresAt?: string;
-  data?: any[];
-}
 
 export const WebCrawlForm = () => {
   const { toast } = useToast();
-  const [url, setUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [isApiKeySet, setIsApiKeySet] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [progress, setProgress] = useState(0);
-  const [crawlResult, setCrawlResult] = useState<CrawlResult | null>(null);
+  const [url, setUrl] = useState("");
+  const [apiKey, setApiKey] = useState(localStorage.getItem("firecrawlApiKey") || "");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [maxPages, setMaxPages] = useState(10);
+  const [isLoading, setIsLoading] = useState(false);
+  const [results, setResults] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Check if API key exists on component mount
-  useState(() => {
-    const savedApiKey = FirecrawlService.getApiKey();
-    if (savedApiKey) {
-      setIsApiKeySet(true);
-    }
-  });
-
-  const handleSaveApiKey = async () => {
-    if (!apiKey.trim()) {
+  const handleCrawl = async () => {
+    if (!apiKey) {
+      setError("Please enter a Firecrawl API key");
       toast({
-        title: "Error",
-        description: "Please enter a valid API key",
+        title: "API Key Required",
+        description: "Please enter your Firecrawl API key to proceed.",
         variant: "destructive",
       });
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const isValid = await FirecrawlService.testApiKey(apiKey);
-      if (isValid) {
-        FirecrawlService.saveApiKey(apiKey);
-        setIsApiKeySet(true);
-        toast({
-          title: "Success",
-          description: "API key saved successfully",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Invalid API key",
-          variant: "destructive",
-        });
-      }
-    } catch (err) {
+    if (!url) {
+      setError("Please enter a URL to crawl");
       toast({
-        title: "Error",
-        description: "Failed to validate API key",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!url.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid URL",
+        description: "Please enter a URL to crawl",
         variant: "destructive",
       });
       return;
     }
-    
-    setIsLoading(true);
-    setProgress(0);
-    setCrawlResult(null);
-    
-    // Simulate progress for better UX
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => (prev >= 90 ? 90 : prev + 10));
-    }, 1000);
-    
+
     try {
-      const result = await FirecrawlService.crawlWebsite(url);
+      setIsLoading(true);
+      setError(null);
+      setResults(null);
       
-      if (result.success && result.data) {
-        setCrawlResult(result.data);
-        toast({
-          title: "Success",
-          description: "Website crawled successfully",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to crawl website",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
+      // Save API key for future use
+      localStorage.setItem("firecrawlApiKey", apiKey);
+      
+      // Create a new FirecrawlService instance
+      const firecrawlService = new FirecrawlService(apiKey);
+      
+      // Start crawling
       toast({
-        title: "Error",
-        description: "An unexpected error occurred",
+        title: "Crawling Started",
+        description: "This may take a few minutes depending on website size.",
+      });
+
+      const response = await firecrawlService.crawlWebsite(url, searchQuery, maxPages);
+      
+      setResults(response);
+      
+      toast({
+        title: "Crawl Complete",
+        description: `Successfully crawled ${response.results?.length || 0} pages`,
+        variant: "success",
+      });
+    } catch (err) {
+      console.error("Crawl error:", err);
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
+      toast({
+        title: "Crawl Failed",
+        description: err instanceof Error ? err.message : "An error occurred during crawling",
         variant: "destructive",
       });
     } finally {
-      clearInterval(progressInterval);
-      setProgress(100);
       setIsLoading(false);
     }
   };
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Globe className="w-5 h-5 text-primary" />
-          Web Crawler
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {!isApiKeySet ? (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Enter your Firecrawl API key to start crawling websites.
-            </p>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                placeholder="Enter Firecrawl API key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="flex-grow"
-              />
-              <Button 
-                onClick={handleSaveApiKey} 
-                disabled={isLoading}
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Save Key
-              </Button>
-            </div>
-            <p className="text-xs text-gray-500">
-              Get your API key from <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Firecrawl.dev</a>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Web Crawler Configuration</CardTitle>
+          <CardDescription>
+            Configure your web crawling parameters
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="api-key">Firecrawl API Key</Label>
+            <Input
+              id="api-key"
+              type="password"
+              placeholder="Enter your Firecrawl API key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+            <p className="text-sm text-muted-foreground">
+              Get your API key from <a href="https://firecrawl.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">firecrawl.dev</a>
             </p>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label htmlFor="url" className="block text-sm font-medium text-gray-700 mb-1">
-                Website URL
-              </label>
+          
+          <Separator />
+          
+          <div className="space-y-2">
+            <Label htmlFor="url">Website URL</Label>
+            <div className="flex gap-2">
+              <div className="relative flex-grow">
+                <LinkIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="url"
+                  placeholder="https://example.com"
+                  className="pl-8"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+              <Button onClick={handleCrawl} disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Crawling...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="mr-2 h-4 w-4" />
+                    Start Crawl
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="search-query">Search Query (Optional)</Label>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                id="url"
-                type="url"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://example.com"
+                id="search-query"
+                placeholder="Enter a search query to analyze the content"
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 disabled={isLoading}
-                required
               />
             </div>
-            
-            {isLoading && (
-              <div className="space-y-2">
-                <Progress value={progress} className="w-full h-2" />
-                <p className="text-xs text-gray-500 text-center">Crawling website... {progress}%</p>
-              </div>
-            )}
-            
-            <Button 
-              type="submit" 
-              disabled={isLoading} 
-              className="w-full"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              {isLoading ? "Crawling..." : "Start Crawl"}
-            </Button>
-          </form>
-        )}
-
-        {crawlResult && (
-          <div className="mt-6 p-4 bg-gray-50 rounded-md">
-            <h3 className="text-md font-semibold mb-2">Crawl Results</h3>
-            <div className="space-y-2 text-sm">
-              <p>Status: <span className="font-medium">{crawlResult.status}</span></p>
-              <p>Pages: <span className="font-medium">{crawlResult.completed} / {crawlResult.total}</span></p>
-              <p>Credits Used: <span className="font-medium">{crawlResult.creditsUsed}</span></p>
-              
-              {crawlResult.data && crawlResult.data.length > 0 && (
-                <div className="mt-4">
-                  <p className="font-medium mb-2">Found {crawlResult.data.length} pages:</p>
-                  <div className="max-h-60 overflow-y-auto mt-2 border rounded-md">
-                    {crawlResult.data.map((item: any, index: number) => (
-                      <div key={index} className="p-2 border-b text-xs">
-                        <p className="font-medium truncate">{item.url}</p>
-                        <p className="text-gray-500 truncate">Title: {item.title || 'N/A'}</p>
-                      </div>
-                    ))}
+            <p className="text-sm text-muted-foreground">
+              Provide a natural language query to analyze the crawled content
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <Label htmlFor="max-pages">Maximum Pages</Label>
+              <span className="text-sm text-muted-foreground">{maxPages} pages</span>
+            </div>
+            <Slider
+              id="max-pages"
+              defaultValue={[maxPages]}
+              min={1}
+              max={50}
+              step={1}
+              onValueChange={(value) => setMaxPages(value[0])}
+              disabled={isLoading}
+            />
+            <p className="text-sm text-muted-foreground">
+              Limit how many pages to crawl (higher values take longer)
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+      
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      {results && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Crawl Results</CardTitle>
+            <CardDescription>
+              Found {results.results?.length || 0} pages from {url}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-96 overflow-y-auto space-y-4">
+              {results.results?.length > 0 ? (
+                results.results.map((page: any, index: number) => (
+                  <div key={index} className="border rounded-md p-4">
+                    <h3 className="font-medium mb-1 truncate">
+                      <a href={page.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        {page.title || page.url}
+                      </a>
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-2">{page.url}</p>
+                    {searchQuery ? (
+                      <>
+                        <p className="text-sm mb-1"><strong>Relevance Score:</strong> {(page.score * 100).toFixed(0)}%</p>
+                        <div className="bg-gray-50 p-2 rounded text-sm">
+                          <strong>Excerpt:</strong> {page.excerpt || "No excerpt available"}
+                        </div>
+                      </>
+                    ) : (
+                      <Textarea
+                        value={page.content?.substring(0, 200) + "..." || "No content available"}
+                        readOnly
+                        className="text-sm h-20"
+                      />
+                    )}
                   </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No results found. Try adjusting your search parameters.
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <p className="text-sm text-muted-foreground">
+              Crawl ID: {results.crawlId}
+            </p>
+            <Button variant="outline" onClick={() => setResults(null)}>
+              Clear Results
+            </Button>
+          </CardFooter>
+        </Card>
+      )}
+    </div>
   );
 };

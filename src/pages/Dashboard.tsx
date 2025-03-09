@@ -3,7 +3,15 @@ import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LineChart, UserCircle, DollarSign, FileText, Building2, ArrowRight } from "lucide-react";
+import { 
+  LineChart, 
+  UserCircle, 
+  DollarSign, 
+  FileText, 
+  Building2, 
+  ArrowRight, 
+  Globe 
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -129,58 +137,111 @@ const Dashboard = () => {
         </div>
 
         {/* Recent Activity */}
-        <Card className="mb-8">
-          <CardHeader className="flex justify-between items-center">
-            <CardTitle>Recent Activity</CardTitle>
-            <Button variant="ghost" size="sm" onClick={handleViewAllReports} className="gap-2">
-              View All <ArrowRight className="w-4 h-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {[
-                {
-                  title: "Quarterly Report: The International Gem Tower",
-                  date: "2024-03-15",
-                  type: "report",
-                  path: "/reports"
-                },
-                {
-                  title: "Investment Return: 401 N Michigan Ave",
-                  date: "2024-03-10",
-                  type: "return",
-                  path: "/wallet"
-                },
-                {
-                  title: "New Investment: Tech Hub Project",
-                  date: "2024-03-01",
-                  type: "investment",
-                  path: "/properties"
-                }
-              ].map((activity) => (
-                <div 
-                  key={activity.title} 
-                  className="flex items-center justify-between border-b pb-4 last:border-0 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors"
-                  onClick={() => navigate(activity.path)}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex justify-between items-center">
+              <CardTitle>Recent Activity</CardTitle>
+              <Button variant="ghost" size="sm" onClick={handleViewAllReports} className="gap-2">
+                View All <ArrowRight className="w-4 h-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  {
+                    title: "Quarterly Report: The International Gem Tower",
+                    date: "2024-03-15",
+                    type: "report",
+                    path: "/reports"
+                  },
+                  {
+                    title: "Investment Return: 401 N Michigan Ave",
+                    date: "2024-03-10",
+                    type: "return",
+                    path: "/wallet"
+                  },
+                  {
+                    title: "New Investment: Tech Hub Project",
+                    date: "2024-03-01",
+                    type: "investment",
+                    path: "/properties"
+                  }
+                ].map((activity) => (
+                  <div 
+                    key={activity.title} 
+                    className="flex items-center justify-between border-b pb-4 last:border-0 cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors"
+                    onClick={() => navigate(activity.path)}
+                  >
+                    <div>
+                      <p className="font-medium text-gray-900">{activity.title}</p>
+                      <p className="text-sm text-gray-500">{activity.date}</p>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-sm ${
+                      activity.type === 'return' 
+                        ? 'bg-green-100 text-green-800' 
+                        : activity.type === 'report'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {activity.type}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Tools & Resources</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-left h-auto py-3 px-4"
+                  onClick={() => navigate("/web-crawler")}
                 >
-                  <div>
-                    <p className="font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-sm text-gray-500">{activity.date}</p>
+                  <div className="flex items-start gap-3">
+                    <Globe className="h-5 w-5 text-blue-500 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium mb-1">Web Crawler</h3>
+                      <p className="text-sm text-gray-500">Research properties and markets by crawling websites</p>
+                    </div>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-sm ${
-                    activity.type === 'return' 
-                      ? 'bg-green-100 text-green-800' 
-                      : activity.type === 'report'
-                      ? 'bg-blue-100 text-blue-800'
-                      : 'bg-purple-100 text-purple-800'
-                  }`}>
-                    {activity.type}
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-left h-auto py-3 px-4"
+                  onClick={() => navigate("/reports")}
+                >
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-5 w-5 text-green-500 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium mb-1">Property Reports</h3>
+                      <p className="text-sm text-gray-500">View detailed analytics on your investments</p>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-left h-auto py-3 px-4"
+                  onClick={() => navigate("/performance")}
+                >
+                  <div className="flex items-start gap-3">
+                    <LineChart className="h-5 w-5 text-purple-500 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium mb-1">Investment Analysis</h3>
+                      <p className="text-sm text-gray-500">Track performance across your portfolio</p>
+                    </div>
+                  </div>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

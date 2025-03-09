@@ -28,7 +28,7 @@ export const RecommendationRating = ({
   demandLevel,
   returnPotential
 }: RecommendationRatingProps) => {
-  // Helper to determine score color - using blue colors now
+  // Helper to determine score color
   const getScoreColor = (score: number) => {
     if (score >= 8) return "text-blue-600";
     if (score >= 6) return "text-blue-500";
