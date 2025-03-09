@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -63,7 +64,7 @@ const PropertyDetail = () => {
   };
   
   const handleScheduleCall = () => {
-    // Open Calendly or custom form in a modal
+    // Open Calendly for scheduling
     window.open('https://calendly.com/realtrade/investment-call', '_blank');
   };
 
@@ -134,9 +135,9 @@ const PropertyDetail = () => {
           </div>
         </header>
 
-        <main className="mx-0">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 p-4">
-            <div className="lg:col-span-2 space-y-4 md:space-y-6">
+        <main className="mx-0 max-w-[1400px] mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8 p-4 md:p-6">
+            <div className="lg:col-span-2 space-y-4 md:space-y-8">
               <div className="rounded-xl overflow-hidden bg-white shadow-sm">
                 <img src={property.image} alt={property.name} className="w-full h-[300px] object-cover" />
                 
@@ -359,7 +360,7 @@ const PropertyDetail = () => {
               </Card>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-6 md:space-y-8">
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Quick Investment</CardTitle>
@@ -437,11 +438,6 @@ const PropertyDetail = () => {
               <PropertyMarketInsights 
                 propertyAddress={property.location.split(',')[0]} 
                 propertyCity={property.location.split(',')[1]?.trim() || 'New York'} 
-              />
-              
-              <PropertyMarketNews 
-                propertyType={property.type} 
-                propertyLocation={property.location.split(',')[1]?.trim() || ''}
               />
               
               <Card className="shadow-sm">

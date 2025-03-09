@@ -41,7 +41,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Full Name</FormLabel>
                 <FormControl>
-                  <Input placeholder="John Doe" {...field} />
+                  <Input placeholder="Enter your full name" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -55,7 +55,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input type="email" placeholder="john.doe@example.com" {...field} />
+                  <Input type="email" placeholder="your.email@example.com" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -69,7 +69,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Phone Number</FormLabel>
                 <FormControl>
-                  <Input placeholder="(555) 123-4567" {...field} />
+                  <Input placeholder="Enter your phone number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -83,7 +83,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Address</FormLabel>
                 <FormControl>
-                  <Input placeholder="123 Main St, City, State, Zip" {...field} />
+                  <Input placeholder="Enter your address" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -97,7 +97,13 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
               <FormItem>
                 <FormLabel>Age</FormLabel>
                 <FormControl>
-                  <Input type="number" min="18" {...field} />
+                  <Input 
+                    type="number" 
+                    min="18" 
+                    placeholder="Enter your age"
+                    onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                    value={field.value || ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -114,8 +120,9 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
                   <Input 
                     type="number" 
                     min="0" 
-                    placeholder="100000" 
-                    {...field} 
+                    placeholder="Enter your annual income" 
+                    onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                    value={field.value || ""}
                   />
                 </FormControl>
                 <FormMessage />
@@ -133,8 +140,9 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
                   <Input 
                     type="number" 
                     min="0" 
-                    placeholder="500000" 
-                    {...field} 
+                    placeholder="Enter your net worth" 
+                    onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                    value={field.value || ""}
                   />
                 </FormControl>
                 <FormMessage />
@@ -148,7 +156,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Investment Experience</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} value={field.value}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select experience level" />
@@ -185,7 +193,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
                   </Tooltip>
                 </TooltipProvider>
               </div>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select yes or no" />

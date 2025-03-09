@@ -1,3 +1,4 @@
+
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
@@ -5,7 +6,7 @@ import { PropertyMarketNews } from "./PropertyMarketNews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon, Truck, Navigation, FileText } from "lucide-react";
+import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon, Truck, Navigation, FileText, Phone } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
@@ -92,15 +93,21 @@ export const PropertyDetailContent = ({
   const { toast } = useToast();
   
   const handleScheduleCall = () => {
-    // Open Calendly for scheduling a call
     try {
+      // Open Calendly in a new tab for scheduling
       window.open('https://calendly.com/realtrade/investment-call', '_blank');
+      
+      toast({
+        title: "Schedule a Call",
+        description: "Opening scheduling tool in a new tab",
+      });
     } catch (error) {
       toast({
         title: "Error",
         description: "Unable to open scheduling tool. Please try again later.",
         variant: "destructive",
       });
+      console.error("Failed to open Calendly:", error);
     }
   };
 
@@ -110,8 +117,8 @@ export const PropertyDetailContent = ({
   };
 
   return (
-    <div className="p-4 md:p-6">
-      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
+    <div className="p-4 md:p-6 md:p-8">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6 md:mb-8">
         <div>
           <div className="flex items-center flex-wrap gap-2 mb-2">
             <Badge variant="outline" className="bg-primary/10">
@@ -167,10 +174,10 @@ export const PropertyDetailContent = ({
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+        <div className="md:col-span-2 space-y-6 md:space-y-8">
           <div>
-            <h2 className="text-lg font-bold mb-2">About This Property</h2>
+            <h2 className="text-lg font-bold mb-3">About This Property</h2>
             <p className="text-gray-600">{property.description}</p>
           </div>
           
@@ -296,7 +303,7 @@ export const PropertyDetailContent = ({
           </div>
         </div>
         
-        <div className="space-y-6">
+        <div className="space-y-6 md:space-y-8">
           <RecommendationRating 
             score={property.recommendationScore} 
             marketTrend={property.marketTrend} 
@@ -319,9 +326,10 @@ export const PropertyDetailContent = ({
             <Button 
               type="button" 
               variant="outline" 
-              className="w-full"
+              className="w-full flex items-center justify-center gap-2"
               onClick={handleScheduleCall}
             >
+              <Phone className="w-4 h-4" />
               Schedule a Call
             </Button>
           </div>
