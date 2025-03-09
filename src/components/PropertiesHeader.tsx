@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,6 @@ export const PropertiesHeader = ({
       setIsLoggedIn(false);
     }
   }, []);
-  
   return <header className="bg-white shadow-sm sticky top-0 z-10 w-full">
       <div className="container mx-auto px-3 py-2 md:px-4 md:py-3">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-4 mb-2 sm:mb-4">
@@ -66,9 +64,7 @@ export const PropertiesHeader = ({
                 </Button>
               </Link>}
             
-            <Button variant="default" size="icon" className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
+            
           </div>
         </div>
         
