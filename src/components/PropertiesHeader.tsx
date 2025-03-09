@@ -1,21 +1,17 @@
-
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { useState, useEffect } from "react";
-
 interface Category {
   id: string;
   name: string;
   active: boolean;
 }
-
 interface PropertiesHeaderProps {
   categories: Category[];
   onSelectCategory: (categoryId: string) => void;
 }
-
 export const PropertiesHeader = ({
   categories,
   onSelectCategory
@@ -23,7 +19,7 @@ export const PropertiesHeader = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
-  
+
   // Check if user is logged in on component mount
   useEffect(() => {
     try {
@@ -42,14 +38,13 @@ export const PropertiesHeader = ({
       setIsLoggedIn(false);
     }
   }, []);
-
   return <header className="bg-white shadow-sm sticky top-0 z-10">
       <div className="container mx-auto px-4 py-3 md:py-4">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4 sm:mb-6">
           <div className="flex items-center w-full sm:w-auto">
             <Link to="/" className="flex items-center header-logo-container">
               <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 md:h-10 mr-3 rounded-lg" />
-              <span className="text-lg font-semibold properties-header-title">RealTrade</span>
+              
             </Link>
           </div>
           
@@ -60,18 +55,14 @@ export const PropertiesHeader = ({
             </div>
             
             {/* Show user name if logged in, otherwise show Sign Up button */}
-            {isLoggedIn ? (
-              <div className="hidden sm:flex items-center gap-1 mr-2">
+            {isLoggedIn ? <div className="hidden sm:flex items-center gap-1 mr-2">
                 <User className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">{userName}</span>
-              </div>
-            ) : (
-              <Link to="/investor-signup" className="hidden sm:block">
+              </div> : <Link to="/investor-signup" className="hidden sm:block">
                 <Button variant="default" size="sm">
                   Sign Up
                 </Button>
-              </Link>
-            )}
+              </Link>}
             
             <Button variant="default" size="icon" className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -80,19 +71,16 @@ export const PropertiesHeader = ({
         </div>
         
         {isMenuOpen && <div className="md:hidden py-4 border-t mb-4">
-            {isLoggedIn ? (
-              <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-md">
+            {isLoggedIn ? <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-md">
                 <User className="w-5 h-5 text-primary" />
                 <span className="font-medium">{userName}</span>
-              </div>
-            ) : null}
+              </div> : null}
             <nav className="flex flex-col space-y-3">
               <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Home</span>
               </Link>
-              {isLoggedIn ? (
-                <>
+              {isLoggedIn ? <>
                   <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                     <Home className="w-5 h-5" />
                     <span>Dashboard</span>
@@ -101,13 +89,10 @@ export const PropertiesHeader = ({
                     <Home className="w-5 h-5" />
                     <span>Properties</span>
                   </Link>
-                </>
-              ) : (
-                <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                </> : <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                   <User className="w-5 h-5" />
                   <span>Sign Up</span>
-                </Link>
-              )}
+                </Link>}
             </nav>
           </div>}
         
