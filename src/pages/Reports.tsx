@@ -99,118 +99,120 @@ const Reports = () => {
   ];
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 p-4 md:p-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-3">
-          <h1 className="text-xl md:text-2xl font-bold">Reports</h1>
-          <Button variant="outline" onClick={() => {
-            toast({
-              title: "Generate Report",
-              description: "Opening report generation tool...",
-            });
-          }}>
-            Generate New Report
-          </Button>
+      <div className="flex-1 bg-gray-50 w-full">
+        <div className="container mx-auto px-3 sm:px-4 py-4 md:py-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 gap-3">
+            <h1 className="text-xl md:text-2xl font-bold">Reports</h1>
+            <Button variant="outline" onClick={() => {
+              toast({
+                title: "Generate Report",
+                description: "Opening report generation tool...",
+              });
+            }}>
+              Generate New Report
+            </Button>
+          </div>
+          
+          <Tabs defaultValue="quarterly" className="mb-6">
+            <TabsList className="mb-4 w-full tabs-list">
+              <TabsTrigger className="tabs-trigger flex-1" value="quarterly">Quarterly Reports</TabsTrigger>
+              <TabsTrigger className="tabs-trigger flex-1" value="annual">Annual Reports</TabsTrigger>
+              <TabsTrigger className="tabs-trigger flex-1" value="property">Property Reports</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="quarterly">
+              <div className="grid gap-4">
+                {quarterlyReports.map((report) => (
+                  <Card key={report.title} className="report-card">
+                    <CardHeader className="report-card-header pb-2">
+                      <div className="report-icon-container">
+                        <report.icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{report.title}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm">{report.date} • {report.type}</CardDescription>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="report-card-content">
+                      <p className="report-description">{report.description}</p>
+                      <p className="text-xs text-gray-500">File size: {report.size}</p>
+                    </CardContent>
+                    <CardFooter className="report-card-footer">
+                      <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => handleDownload(report.title)}>
+                        <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Download
+                      </Button>
+                      <Button size={isMobile ? "sm" : "default"} onClick={() => handleReportClick(report.title)}>
+                        View Report <ChevronRight className="w-3 h-3 md:w-4 md:h-4 ml-1" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="annual">
+              <div className="grid gap-4">
+                {annualReports.map((report) => (
+                  <Card key={report.title} className="report-card">
+                    <CardHeader className="report-card-header pb-2">
+                      <div className="report-icon-container">
+                        <report.icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{report.title}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm">{report.date} • {report.type}</CardDescription>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="report-card-content">
+                      <p className="report-description">{report.description}</p>
+                      <p className="text-xs text-gray-500">File size: {report.size}</p>
+                    </CardContent>
+                    <CardFooter className="report-card-footer">
+                      <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => handleDownload(report.title)}>
+                        <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Download
+                      </Button>
+                      <Button size={isMobile ? "sm" : "default"} onClick={() => handleReportClick(report.title)}>
+                        View Report <ChevronRight className="w-3 h-3 md:w-4 md:h-4 ml-1" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="property">
+              <div className="grid gap-4">
+                {propertyReports.map((report) => (
+                  <Card key={report.title} className="report-card">
+                    <CardHeader className="report-card-header pb-2">
+                      <div className="report-icon-container">
+                        <report.icon className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <CardTitle className="text-base md:text-lg truncate">{report.title}</CardTitle>
+                        <CardDescription className="text-xs md:text-sm">{report.date} • {report.type}</CardDescription>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="report-card-content">
+                      <p className="report-description">{report.description}</p>
+                      <p className="text-xs text-gray-500">File size: {report.size}</p>
+                    </CardContent>
+                    <CardFooter className="report-card-footer">
+                      <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => handleDownload(report.title)}>
+                        <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Download
+                      </Button>
+                      <Button size={isMobile ? "sm" : "default"} onClick={() => handleReportClick(report.title)}>
+                        View Report <ChevronRight className="w-3 h-3 md:w-4 md:h-4 ml-1" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
-        
-        <Tabs defaultValue="quarterly" className="mb-6">
-          <TabsList className="mb-4 w-full overflow-x-auto no-scrollbar flex whitespace-nowrap">
-            <TabsTrigger value="quarterly" className="flex-1">Quarterly Reports</TabsTrigger>
-            <TabsTrigger value="annual" className="flex-1">Annual Reports</TabsTrigger>
-            <TabsTrigger value="property" className="flex-1">Property Reports</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="quarterly">
-            <div className="grid gap-4 md:gap-6">
-              {quarterlyReports.map((report) => (
-                <Card key={report.title} className="overflow-hidden transition-all hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center gap-3 md:gap-4 pb-2">
-                    <div className="p-2 bg-primary/10 rounded-md flex-shrink-0">
-                      <report.icon className="w-6 h-6 md:w-8 md:h-8 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-base md:text-lg truncate">{report.title}</CardTitle>
-                      <CardDescription className="text-xs md:text-sm">{report.date} • {report.type}</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xs md:text-sm text-gray-600 mb-2 line-clamp-2 md:line-clamp-3">{report.description}</p>
-                    <p className="text-xs text-gray-500">File size: {report.size}</p>
-                  </CardContent>
-                  <CardFooter className="flex justify-between border-t pt-3 md:pt-4 flex-wrap gap-2">
-                    <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => handleDownload(report.title)}>
-                      <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Download
-                    </Button>
-                    <Button size={isMobile ? "sm" : "default"} onClick={() => handleReportClick(report.title)}>
-                      View Report <ChevronRight className="w-3 h-3 md:w-4 md:h-4 ml-1" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="annual">
-            <div className="grid gap-4 md:gap-6">
-              {annualReports.map((report) => (
-                <Card key={report.title} className="overflow-hidden transition-all hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center gap-3 md:gap-4 pb-2">
-                    <div className="p-2 bg-primary/10 rounded-md flex-shrink-0">
-                      <report.icon className="w-6 h-6 md:w-8 md:h-8 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-base md:text-lg truncate">{report.title}</CardTitle>
-                      <CardDescription className="text-xs md:text-sm">{report.date} • {report.type}</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xs md:text-sm text-gray-600 mb-2 line-clamp-2 md:line-clamp-3">{report.description}</p>
-                    <p className="text-xs text-gray-500">File size: {report.size}</p>
-                  </CardContent>
-                  <CardFooter className="flex justify-between border-t pt-3 md:pt-4 flex-wrap gap-2">
-                    <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => handleDownload(report.title)}>
-                      <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Download
-                    </Button>
-                    <Button size={isMobile ? "sm" : "default"} onClick={() => handleReportClick(report.title)}>
-                      View Report <ChevronRight className="w-3 h-3 md:w-4 md:h-4 ml-1" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="property">
-            <div className="grid gap-4 md:gap-6">
-              {propertyReports.map((report) => (
-                <Card key={report.title} className="overflow-hidden transition-all hover:shadow-md">
-                  <CardHeader className="flex flex-row items-center gap-3 md:gap-4 pb-2">
-                    <div className="p-2 bg-primary/10 rounded-md flex-shrink-0">
-                      <report.icon className="w-6 h-6 md:w-8 md:h-8 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <CardTitle className="text-base md:text-lg truncate">{report.title}</CardTitle>
-                      <CardDescription className="text-xs md:text-sm">{report.date} • {report.type}</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-xs md:text-sm text-gray-600 mb-2 line-clamp-2 md:line-clamp-3">{report.description}</p>
-                    <p className="text-xs text-gray-500">File size: {report.size}</p>
-                  </CardContent>
-                  <CardFooter className="flex justify-between border-t pt-3 md:pt-4 flex-wrap gap-2">
-                    <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={() => handleDownload(report.title)}>
-                      <Download className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Download
-                    </Button>
-                    <Button size={isMobile ? "sm" : "default"} onClick={() => handleReportClick(report.title)}>
-                      View Report <ChevronRight className="w-3 h-3 md:w-4 md:h-4 ml-1" />
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
       </div>
     </div>
   );
