@@ -54,7 +54,7 @@ export const PropertiesHeader = ({
             </Link>
             
             <Button 
-              variant="primary" 
+              variant="default" 
               size="icon" 
               className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
