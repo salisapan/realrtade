@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -222,21 +223,22 @@ const PropertyDetail = () => {
                                 left: 20,
                                 bottom: 5
                               }} layout="vertical">
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" domain={[0, 10]} tick={{
-                                fontSize: 12
-                              }} />
-                                <YAxis dataKey="name" type="category" width={120} tick={{
-                                fontSize: 12
-                              }} />
-                                <RechartsTooltip contentStyle={{
-                                fontSize: 12
-                              }} />
-                                <Legend wrapperStyle={{
-                                fontSize: 12
-                              }} />
-                                <Bar dataKey="score" fill="#007BFF" name="Risk Score (lower is better)" />
-                              </RechartsBarChart>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis type="number" domain={[0, 10]} tick={{
+                                  fontSize: 12
+                                }} />
+                                  <YAxis dataKey="name" type="category" width={120} tick={{
+                                  fontSize: 12
+                                }} />
+                                  <RechartsTooltip contentStyle={{
+                                  fontSize: 12
+                                }} />
+                                  <Legend wrapperStyle={{
+                                  fontSize: 12
+                                }} />
+                                  <Bar dataKey="score" fill="#007BFF" name="Risk Score (lower is better)" />
+                                </RechartsBarChart>
+                              </ResponsiveContainer>
                             </div>
                           </div>
                         </div>
