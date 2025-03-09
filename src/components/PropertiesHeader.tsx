@@ -1,23 +1,48 @@
 
 import { Link } from "react-router-dom";
-import { Home, Search, Menu, X } from "lucide-react";
+import { Home, Search, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/CategoryFilter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 interface Category {
   id: string;
   name: string;
   active: boolean;
 }
+
 interface PropertiesHeaderProps {
   categories: Category[];
   onSelectCategory: (categoryId: string) => void;
 }
+
 export const PropertiesHeader = ({
   categories,
   onSelectCategory
 }: PropertiesHeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState("");
+  
+  // Check if user is logged in on component mount
+  useEffect(() => {
+    try {
+      const profile = localStorage.getItem("investorProfile");
+      if (profile) {
+        const parsedProfile = JSON.parse(profile);
+        setUserName(parsedProfile.fullName || "Investor");
+        setIsLoggedIn(true);
+      } else {
+        setUserName("");
+        setIsLoggedIn(false);
+      }
+    } catch (error) {
+      console.error("Error getting user name:", error);
+      setUserName("");
+      setIsLoggedIn(false);
+    }
+  }, []);
+
   return <header className="bg-white shadow-sm sticky top-0 z-10">
       <div className="container mx-auto px-4 py-3 md:py-4">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4 sm:mb-6">
@@ -34,11 +59,19 @@ export const PropertiesHeader = ({
               <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400" />
             </div>
             
-            <Link to="/investor-signup" className="hidden sm:block">
-              <Button variant="default" size="sm">
-                Sign Up
-              </Button>
-            </Link>
+            {/* Show user name if logged in, otherwise show Sign Up button */}
+            {isLoggedIn ? (
+              <div className="hidden sm:flex items-center gap-1 mr-2">
+                <User className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">{userName}</span>
+              </div>
+            ) : (
+              <Link to="/investor-signup" className="hidden sm:block">
+                <Button variant="default" size="sm">
+                  Sign Up
+                </Button>
+              </Link>
+            )}
             
             <Button variant="default" size="icon" className="flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -47,6 +80,12 @@ export const PropertiesHeader = ({
         </div>
         
         {isMenuOpen && <div className="md:hidden py-4 border-t mb-4">
+            {isLoggedIn && (
+              <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-md">
+                <User className="w-5 h-5 text-primary" />
+                <span className="font-medium">{userName}</span>
+              </div>
+            )}
             <nav className="flex flex-col space-y-3">
               <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
                 <Home className="w-5 h-5" />
@@ -60,6 +99,12 @@ export const PropertiesHeader = ({
                 <Home className="w-5 h-5" />
                 <span>Properties</span>
               </Link>
+              {!isLoggedIn && (
+                <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                  <User className="w-5 h-5" />
+                  <span>Sign Up</span>
+                </Link>
+              )}
             </nav>
           </div>}
         

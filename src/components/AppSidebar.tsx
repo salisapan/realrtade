@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X } from "lucide-react";
@@ -30,6 +31,8 @@ export function AppSidebar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isEntrepreneurSection = path.includes("/entrepreneur");
   const displayItems = isEntrepreneurSection ? entrepreneurMenuItems : menuItems;
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState("Investor");
 
   // Listen for window resize events to collapse sidebar on mobile
   useEffect(() => {
@@ -37,22 +40,24 @@ export function AppSidebar() {
   }, [isMobile]);
 
   // Get user profile from localStorage
-  const getUserName = () => {
+  useEffect(() => {
     try {
       const profile = localStorage.getItem("investorProfile");
       if (profile) {
         const parsedProfile = JSON.parse(profile);
-        return parsedProfile.fullName || "Investor";
+        setUserName(parsedProfile.fullName || "Investor");
+        setIsLoggedIn(true);
+      } else {
+        setUserName("Investor");
+        setIsLoggedIn(false);
       }
-      return "Investor";
     } catch (error) {
       console.error("Error getting user name:", error);
-      return "Investor";
+      setUserName("Investor");
+      setIsLoggedIn(false);
     }
-  };
+  }, []);
   
-  const userName = getUserName();
-
   // Mobile sidebar toggle button - removed duplicate and positioned it correctly
   const ToggleButton = () => (
     <button 
@@ -78,7 +83,7 @@ export function AppSidebar() {
               onClick={e => e.stopPropagation()}
             >
               <div className="p-4 border-b">
-                <h2 className="font-semibold text-lg">{userName}</h2>
+                <h2 className="font-semibold text-lg">{isLoggedIn ? userName : "Welcome"}</h2>
                 <p className="text-sm text-gray-500">{isEntrepreneurSection ? "Entrepreneur" : "Investor"}</p>
               </div>
               
@@ -96,6 +101,18 @@ export function AppSidebar() {
                     <span>{item.title}</span>
                   </Link>
                 ))}
+                
+                {/* Show sign up only if not logged in */}
+                {!isLoggedIn && (
+                  <Link 
+                    to="/investor-signup" 
+                    className="flex items-center gap-3 p-3 rounded-lg mt-4 border-t pt-4 hover:bg-gray-100" 
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <UserPlus size={20} />
+                    <span>Sign Up</span>
+                  </Link>
+                )}
                 
                 {/* Show switch between Investor and Entrepreneur views */}
                 <Link 
@@ -121,7 +138,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             {/* User info section */}
             <div className="p-3 mb-2 border-b">
-              <h3 className="font-medium text-sm">{userName}</h3>
+              <h3 className="font-medium text-sm">{isLoggedIn ? userName : "Welcome"}</h3>
               <p className="text-xs text-gray-500">{isEntrepreneurSection ? "Entrepreneur" : "Investor"}</p>
             </div>
             
@@ -134,6 +151,18 @@ export function AppSidebar() {
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>)}
+              
+              {/* Show sign up only if not logged in */}
+              {!isLoggedIn && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild>
+                    <Link to="/investor-signup">
+                      <UserPlus />
+                      <span>Sign Up</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
               
               {/* Show switch between Investor and Entrepreneur views */}
               <SidebarMenuItem>
