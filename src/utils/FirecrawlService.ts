@@ -1,6 +1,25 @@
 
 import FirecrawlApp from "@mendable/firecrawl-js";
 
+// Updated interface definitions to match actual response structure
+interface ErrorResponse {
+  success: false;
+  message?: string; // Using message instead of error
+}
+
+interface CrawlStatusResponse {
+  success: true;
+  status?: string;
+  completed?: number;
+  total?: number;
+  creditsUsed?: number;
+  expiresAt?: string;
+  data?: any[];
+  requestId?: string; // Add requestId field to match actual response
+}
+
+type CrawlResponse = CrawlStatusResponse | ErrorResponse;
+
 export class FirecrawlService {
   private static API_KEY_STORAGE_KEY = 'firecrawl_api_key';
   private static firecrawlApp: FirecrawlApp | null = null;
@@ -88,10 +107,13 @@ export class FirecrawlService {
         };
       });
 
+      // Use a fallback ID if requestId is not available
+      const crawlId = crawlResponse.requestId || `crawl-${Date.now()}`;
+
       return { 
         success: true,
         data: {
-          crawlId: crawlResponse.requestId || Date.now().toString(),
+          crawlId: crawlId,
           data: marketInsights
         }
       };
@@ -152,8 +174,11 @@ export class FirecrawlService {
         };
       }
       
+      // Use a fallback ID if requestId is not available
+      const crawlId = crawlResponse.requestId || `crawl-${Date.now()}`;
+      
       return {
-        crawlId: crawlResponse.requestId || Date.now().toString(),
+        crawlId: crawlId,
         results: searchQuery ? results.data : crawlResponse.data,
         status: {
           success: crawlResponse.success,
