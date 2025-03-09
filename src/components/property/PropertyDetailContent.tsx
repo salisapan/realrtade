@@ -7,7 +7,7 @@ import { PropertyMarketNews } from "./PropertyMarketNews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon, Truck, Road, FileText } from "lucide-react";
+import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon, Truck, Navigation, FileText } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
@@ -81,7 +81,7 @@ const getFeatureIcon = (feature: string) => {
   } else if (lowerFeature.includes('location') || lowerFeature.includes('situated') || lowerFeature.includes('area')) {
     return <Map className="w-3 h-3 text-primary" />;
   } else if (lowerFeature.includes('road') || lowerFeature.includes('street') || lowerFeature.includes('highway')) {
-    return <Road className="w-3 h-3 text-primary" />;
+    return <Navigation className="w-3 h-3 text-primary" />;
   } else {
     return <LandPlot className="w-3 h-3 text-primary" />;
   }

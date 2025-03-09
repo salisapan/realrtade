@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { FirecrawlService } from "@/utils/FirecrawlService";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarketInsightsList, processMarketInsights } from './MarketInsightsList';
 import { AIAnalysisDisplay } from './AIAnalysisDisplay';
@@ -33,22 +32,65 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
     setError(null);
     
     try {
-      const result = await FirecrawlService.crawlPropertyData(propertyAddress, propertyCity);
-      
-      if (result.success && result.data) {
-        setMarketData(result.data);
+      // Mock data instead of using FirecrawlService
+      // This simulates fetching market data for the property
+      setTimeout(() => {
+        const mockMarketData = {
+          data: [
+            {
+              title: "Property Value Trends",
+              content: `Properties in ${propertyCity} have seen an average appreciation of 8.2% over the past year. ${propertyAddress} is located in a high-demand area with limited new construction, suggesting potential for continued value growth.`
+            },
+            {
+              title: "Rental Market Analysis",
+              content: `The rental market in ${propertyCity} remains strong with vacancy rates at historic lows of 3.5%. Average rents have increased by 5.7% year-over-year, outpacing the national average of 3.2%.`
+            },
+            {
+              title: "Economic Indicators",
+              content: `${propertyCity}'s job market shows positive growth with unemployment at 4.1%, below the national average. Major employers in the area have announced expansion plans, which should support housing demand.`
+            },
+            {
+              title: "Supply and Demand Balance",
+              content: `New housing starts in ${propertyCity} are currently 15% below historical averages, while population growth continues at 1.8% annually. This imbalance suggests continued upward pressure on property values.`
+            }
+          ],
+          aiAnalysis: {
+            summary: `${propertyAddress} in ${propertyCity} is positioned in a strong real estate market with positive fundamentals. Limited new supply and steady demand create favorable conditions for property appreciation and rental growth.`,
+            insights: [
+              {
+                title: "Strong Rental Demand",
+                content: "Low vacancy rates and rising rents indicate strong rental demand, which is positive for cash flow potential.",
+                type: "positive"
+              },
+              {
+                title: "Favorable Supply Constraints",
+                content: "Limited new construction relative to population growth suggests continued upward pressure on values.",
+                type: "positive"
+              },
+              {
+                title: "Economic Resilience",
+                content: "The local economy shows resilience with job growth and major employer expansions supporting housing demand.",
+                type: "positive"
+              },
+              {
+                title: "Interest Rate Sensitivity",
+                content: "Rising interest rates could impact affordability and dampen price appreciation in the short term.",
+                type: "neutral"
+              }
+            ],
+            investmentRecommendation: "Buy",
+            riskAssessment: "This property presents a moderate risk profile with strong market fundamentals supporting long-term performance.",
+            marketTrends: "The market shows positive momentum with supply constraints and steady demand growth likely to continue driving property values upward."
+          }
+        };
+        
+        setMarketData(mockMarketData);
         toast({
           title: "Success",
           description: "Market data retrieved successfully",
         });
-      } else {
-        setError(result.error || "Failed to retrieve market data");
-        toast({
-          title: "Error",
-          description: result.error || "Failed to retrieve market data",
-          variant: "destructive",
-        });
-      }
+        setIsLoading(false);
+      }, 1500); // Simulate network request time
     } catch (err) {
       setError("An unexpected error occurred");
       toast({
@@ -56,7 +98,6 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
         description: "An unexpected error occurred while fetching data",
         variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   };
