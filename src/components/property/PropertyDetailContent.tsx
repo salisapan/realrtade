@@ -1,4 +1,3 @@
-
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
@@ -64,7 +63,6 @@ const roiTimelineData = [{
   actual: 0
 }];
 
-// Helper function to get appropriate icon based on feature content
 const getFeatureIcon = (feature: string) => {
   const lowerFeature = feature.toLowerCase();
   
@@ -92,11 +90,9 @@ export const PropertyDetailContent = ({
   const { toast } = useToast();
   
   const handleScheduleCall = () => {
-    // Open Calendly for scheduling a call - fixed function to properly open URL
     try {
       window.open('https://calendly.com/realtrade/investment-call', '_blank', 'noopener,noreferrer');
       
-      // Success toast
       toast({
         title: "Scheduling tool opened",
         description: "You can now book a call with our investment advisors",

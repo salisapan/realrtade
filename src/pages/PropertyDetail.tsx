@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -440,7 +439,6 @@ const PropertyDetail = () => {
                 </CardContent>
               </Card>
               
-              {/* Consolidated Market Insights section - only showing once */}
               <PropertyMarketInsights 
                 propertyAddress={property.location.split(',')[0]} 
                 propertyCity={property.location.split(',')[1]?.trim() || 'New York'} 
