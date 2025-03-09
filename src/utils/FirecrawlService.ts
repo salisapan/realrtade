@@ -67,7 +67,7 @@ export class FirecrawlService {
         limit: 20,
         scrapeOptions: {
           formats: ['markdown', 'html'],
-          searchQuery: searchQuery
+          query: searchQuery // Changed from searchQuery to query which is the correct property name
         }
       }) as CrawlResponse;
 
