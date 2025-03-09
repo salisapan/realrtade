@@ -1,4 +1,3 @@
-
 import FirecrawlApp from "@mendable/firecrawl-js";
 
 // Updated interface definitions to match actual response structure
@@ -15,7 +14,7 @@ interface CrawlStatusResponse {
   creditsUsed?: number;
   expiresAt?: string;
   data?: any[];
-  requestId?: string; // Add requestId field to match actual response
+  requestId?: string; // Added requestId field to match actual response
 }
 
 type CrawlResponse = CrawlStatusResponse | ErrorResponse;
