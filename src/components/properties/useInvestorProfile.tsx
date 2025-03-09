@@ -1,0 +1,34 @@
+
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+
+export const useInvestorProfile = () => {
+  const [investorProfile, setInvestorProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const profile = localStorage.getItem("investorProfile");
+    if (!profile) {
+      toast({
+        title: "Registration Required",
+        description: "Please complete your investor profile to access properties.",
+        variant: "destructive"
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const parsedProfile = JSON.parse(profile);
+      setInvestorProfile(parsedProfile);
+      setIsLoading(false);
+    } catch (error) {
+      console.error("Error parsing investor profile:", error);
+      setInvestorProfile(null);
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  return { investorProfile, isLoading };
+};
