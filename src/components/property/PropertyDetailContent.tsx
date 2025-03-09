@@ -34,7 +34,6 @@ interface PropertyDetailContentProps {
   };
 }
 
-// Mock data for 3D graphs
 const roiTimelineData = [{
   year: '2023',
   expected: 8.2,
@@ -60,39 +59,16 @@ const roiTimelineData = [{
   expected: 13.8,
   actual: 0
 }];
-const cashFlowQuarterlyData = [{
-  name: 'Q1 2023',
-  projected: 45000,
-  actual: 47500
-}, {
-  name: 'Q2 2023',
-  projected: 48000,
-  actual: 49200
-}, {
-  name: 'Q3 2023',
-  projected: 51000,
-  actual: 50800
-}, {
-  name: 'Q4 2023',
-  projected: 55000,
-  actual: 56700
-}, {
-  name: 'Q1 2024',
-  projected: 59000,
-  actual: 0
-}, {
-  name: 'Q2 2024',
-  projected: 63000,
-  actual: 0
-}, {
-  name: 'Q3 2024',
-  projected: 68000,
-  actual: 0
-}, {
-  name: 'Q4 2024',
-  projected: 72000,
-  actual: 0
-}];
+const cashFlowQuarterlyData = [
+  { name: 'Q1 23', projected: 45000, actual: 47500 },
+  { name: 'Q2 23', projected: 48000, actual: 49200 },
+  { name: 'Q3 23', projected: 51000, actual: 50800 },
+  { name: 'Q4 23', projected: 55000, actual: 56700 },
+  { name: 'Q1 24', projected: 59000, actual: 0 },
+  { name: 'Q2 24', projected: 63000, actual: 0 },
+  { name: 'Q3 24', projected: 68000, actual: 0 },
+  { name: 'Q4 24', projected: 72000, actual: 0 }
+];
 const riskAssessmentData = [{
   category: 'Market',
   score: 3.2,
@@ -129,35 +105,28 @@ const ThreeDGraph = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    // Clear any existing canvas
     const existingCanvas = containerRef.current.querySelector('canvas');
     if (existingCanvas) {
       existingCanvas.remove();
     }
 
-    // Set up the scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf0f0f0);
 
-    // Set up the camera
     const camera = new THREE.PerspectiveCamera(75, containerRef.current.clientWidth / containerRef.current.clientHeight, 0.1, 1000);
     camera.position.z = 5;
     camera.position.y = 2;
 
-    // Set up the renderer
     const renderer = new THREE.WebGLRenderer({
       antialias: true
     });
     renderer.setSize(containerRef.current.clientWidth, containerRef.current.clientHeight);
     containerRef.current.appendChild(renderer.domElement);
 
-    // Add a grid helper
     const gridHelper = new THREE.GridHelper(10, 10);
     scene.add(gridHelper);
 
-    // Create chart based on type
     if (type === 'bar') {
-      // Create 3D bar chart
       data.forEach((item, index) => {
         const barHeight = item.expected ? item.expected / 2 : item.projected / 20000;
         const geometry = new THREE.BoxGeometry(0.5, barHeight, 0.5);
@@ -166,12 +135,10 @@ const ThreeDGraph = ({
         });
         const bar = new THREE.Mesh(geometry, material);
 
-        // Position each bar
         bar.position.x = index - data.length / 2 + 0.5;
         bar.position.y = barHeight / 2;
         scene.add(bar);
 
-        // Add text label
         const labelDiv = document.createElement('div');
         labelDiv.className = 'chart-label';
         labelDiv.textContent = item.year || item.name;
@@ -184,7 +151,6 @@ const ThreeDGraph = ({
         containerRef.current.appendChild(labelDiv);
       });
     } else if (type === 'line') {
-      // Create 3D line chart
       const points = [];
       for (let i = 0; i < data.length; i++) {
         const value = data[i].expected || data[i].score;
@@ -198,7 +164,6 @@ const ThreeDGraph = ({
       const line = new THREE.Line(lineGeometry, lineMaterial);
       scene.add(line);
 
-      // Add spheres at each point
       points.forEach(point => {
         const sphereGeometry = new THREE.SphereGeometry(0.1, 16, 16);
         const sphereMaterial = new THREE.MeshPhongMaterial({
@@ -209,7 +174,6 @@ const ThreeDGraph = ({
         scene.add(sphere);
       });
     } else if (type === 'pie') {
-      // Create 3D pie chart
       const radius = 2;
       const totalValue = data.reduce((sum, item) => sum + (item.score || 1), 0);
       let startAngle = 0;
@@ -237,17 +201,14 @@ const ThreeDGraph = ({
       });
     }
 
-    // Add lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
     scene.add(ambientLight);
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(1, 1, 1);
     scene.add(directionalLight);
 
-    // Auto-rotate animation
     let rotationSpeed = 0.005;
 
-    // Add controls for interaction
     let isDragging = false;
     let previousMousePosition = {
       x: 0,
@@ -274,7 +235,6 @@ const ThreeDGraph = ({
       isDragging = false;
     });
 
-    // Animation loop
     const animate = () => {
       requestAnimationFrame(animate);
       if (!isDragging) {
@@ -284,7 +244,6 @@ const ThreeDGraph = ({
     };
     animate();
 
-    // Handle window resize
     const handleResize = () => {
       if (!containerRef.current) return;
       camera.aspect = containerRef.current.clientWidth / containerRef.current.clientHeight;
@@ -293,7 +252,6 @@ const ThreeDGraph = ({
     };
     window.addEventListener('resize', handleResize);
 
-    // Cleanup function
     return () => {
       window.removeEventListener('resize', handleResize);
       if (containerRef.current) {
@@ -302,10 +260,7 @@ const ThreeDGraph = ({
       }
     };
   }, [chartId, data, type]);
-  return <div ref={containerRef} className="graph-3d-container">
-      
-      
-    </div>;
+  return <div ref={containerRef} className="graph-3d-container"></div>;
 };
 
 export const PropertyDetailContent = ({
@@ -438,10 +393,8 @@ export const PropertyDetailContent = ({
                   This 3D visualization shows the projected ROI over the investment term. The graph compares expected vs. actual returns.
                 </p>
                 
-                {/* Interactive 3D Graph */}
                 <ThreeDGraph chartId="roi-timeline" data={roiTimelineData} type="bar" />
                 
-                {/* 2D Fallback Graph for mobile */}
                 <div className="mt-4 md:hidden">
                   <h4 className="text-sm font-medium mb-2">ROI Progression (Mobile View)</h4>
                   <div className="investment-chart">
@@ -479,35 +432,43 @@ export const PropertyDetailContent = ({
                   This visualization shows the projected quarterly cash flow over time, comparing projections to actual results where available.
                 </p>
                 
-                {/* Interactive 3D Graph */}
                 <ThreeDGraph chartId="cash-flow" data={cashFlowQuarterlyData} type="bar" />
                 
-                {/* 2D Fallback Graph for mobile */}
                 <div className="mt-4 md:hidden">
                   <h4 className="text-sm font-medium mb-2">Cash Flow (Mobile View)</h4>
                   <div className="investment-chart">
                     <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={cashFlowQuarterlyData} margin={{
-                      top: 10,
-                      right: 10,
-                      left: 0,
-                      bottom: 20
-                    }}>
+                      <BarChart 
+                        data={cashFlowQuarterlyData} 
+                        margin={{
+                          top: 10,
+                          right: 10,
+                          left: 0,
+                          bottom: 40
+                        }}
+                      >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={50} tick={{
-                        fontSize: 10
-                      }} />
+                        <XAxis 
+                          dataKey="name" 
+                          angle={-45} 
+                          textAnchor="end" 
+                          height={60} 
+                          tick={{
+                            fontSize: 10
+                          }}
+                          interval={0}
+                        />
                         <YAxis tick={{
-                        fontSize: 10
-                      }} />
+                          fontSize: 10
+                        }} />
                         <RechartsTooltip contentStyle={{
-                        fontSize: 12
-                      }} />
-                        <Bar dataKey="projected" name="Projected ($)" fill="#8884d8" />
-                        <Bar dataKey="actual" name="Actual ($)" fill="#82ca9d" />
+                          fontSize: 12
+                        }} />
+                        <Bar dataKey="projected" name="Projected ($)" fill="#1E40AF" />
+                        <Bar dataKey="actual" name="Actual ($)" fill="#3B82F6" />
                         <Legend wrapperStyle={{
-                        fontSize: 10
-                      }} />
+                          fontSize: 10
+                        }} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -520,10 +481,8 @@ export const PropertyDetailContent = ({
                   This comprehensive risk assessment shows different risk factors for this property investment. Lower scores indicate lower risk.
                 </p>
                 
-                {/* Interactive 3D Graph */}
                 <ThreeDGraph chartId="risk-analysis" data={riskAssessmentData} type="line" />
                 
-                {/* 2D Fallback Graph for mobile */}
                 <div className="mt-4 md:hidden">
                   <h4 className="text-sm font-medium mb-2">Risk Analysis (Mobile View)</h4>
                   <div className="investment-chart">
