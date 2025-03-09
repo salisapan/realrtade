@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -5,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PropertyDetailContent } from "@/components/property/PropertyDetailContent";
-import { PropertyMarketNews } from "@/components/property/PropertyMarketNews";
 import { PropertyMarketInsights } from "@/components/property/PropertyMarketInsights";
 import { useToast } from "@/hooks/use-toast";
 import { Home, Building, BarChart, FileText, MessageSquare, Bookmark, Share2, Check, CalendarDays } from "lucide-react";
@@ -64,7 +64,7 @@ const PropertyDetail = () => {
   
   const handleScheduleCall = () => {
     // Open Calendly or custom form in a modal
-    window.open('https://calendly.com/realtrade/investment-call', '_blank');
+    window.open('https://calendly.com/realtrade/investment-call', '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {
@@ -135,10 +135,16 @@ const PropertyDetail = () => {
         </header>
 
         <main className="mx-0">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 p-4 md:p-6">
             <div className="lg:col-span-2 space-y-4 md:space-y-6">
               <div className="rounded-xl overflow-hidden bg-white shadow-sm">
-                <img src={property.image} alt={property.name} className="w-full h-[300px] object-cover" />
+                <img 
+                  src={property.id === "prop3" ? 
+                       "https://images.unsplash.com/photo-1553522911-ec3c9ba44d3b?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80" : 
+                       property.image} 
+                  alt={property.name} 
+                  className="w-full h-[300px] object-cover" 
+                />
                 
                 <PropertyDetailContent property={{...property, minInvestment: 2500}} />
               </div>
@@ -359,13 +365,13 @@ const PropertyDetail = () => {
               </Card>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-5">
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Quick Investment</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Minimum</div>
                       <div className="text-base font-bold text-gray-800">${(2500).toLocaleString()}</div>
@@ -434,14 +440,10 @@ const PropertyDetail = () => {
                 </CardContent>
               </Card>
               
+              {/* Consolidated Market Insights section - only showing once */}
               <PropertyMarketInsights 
                 propertyAddress={property.location.split(',')[0]} 
                 propertyCity={property.location.split(',')[1]?.trim() || 'New York'} 
-              />
-              
-              <PropertyMarketNews 
-                propertyType={property.type} 
-                propertyLocation={property.location.split(',')[1]?.trim() || ''}
               />
               
               <Card className="shadow-sm">

@@ -25,7 +25,7 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
   // Fetch data on component mount
   useEffect(() => {
     fetchPropertyData();
-  }, []);
+  }, [propertyAddress, propertyCity]);
 
   const fetchPropertyData = async () => {
     setIsLoading(true);
