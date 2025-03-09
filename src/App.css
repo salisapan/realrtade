@@ -1,3 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 27%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-gray-900 antialiased;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-2xl md:text-3xl lg:text-4xl;
+  }
+
+  h2 {
+    @apply text-xl md:text-2xl lg:text-3xl;
+  }
+
+  h3 {
+    @apply text-lg md:text-xl lg:text-2xl;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-hide: none;
+    scrollbar-width: none;
+  }
+  
+  .card-shadow {
+    @apply shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1)];
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+  }
+  
+  .section-padding {
+    @apply py-10 md:py-16 lg:py-20;
+  }
+}
+
+@layer components {
+  .brand-gradient {
+    @apply bg-gradient-to-r from-primary to-primary-dark;
+  }
+  
+  .stat-card {
+    @apply bg-white rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow;
+  }
+  
+  .property-card {
+    @apply bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all duration-300;
+  }
+
+  .invest-button {
+    @apply bg-primary text-white hover:bg-primary-dark transition-colors duration-200 font-medium rounded-md;
+  }
+  
+  .secondary-button {
+    @apply bg-secondary text-white hover:bg-secondary-dark transition-colors duration-200 font-medium rounded-md;
+  }
+  
+  .outline-button {
+    @apply border border-primary text-primary hover:bg-primary/5 transition-colors duration-200 font-medium rounded-md;
+  }
+}
+
 #root {
   max-width: 1440px;
   margin: 0 auto;
@@ -88,10 +179,9 @@
   h1 {
     font-size: 1.25rem !important;
     line-height: 1.75rem !important;
-    max-width: 70% !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
   }
   
   h2 {
@@ -113,88 +203,70 @@
     font-size: 0.875rem !important;
   }
   
-  /* Adjust grid layouts for mobile */
-  .grid {
+  /* Improve Properties page layout specifically */
+  .property-listing-grid {
+    display: grid !important;
     grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
     gap: 1rem !important;
+    padding: 0.75rem !important;
   }
   
-  /* Improve tappable areas */
-  a, button, input[type="button"], input[type="submit"] {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  
-  /* Fix for iPhone text size adjustments */
-  textarea, input, select {
-    font-size: 16px !important; /* Prevents iPhone zoom on focus */
-  }
-  
-  /* Better padding for content areas */
-  .py-10 {
-    padding-top: 1.5rem !important;
-    padding-bottom: 1.5rem !important;
-  }
-  
-  .py-16 {
-    padding-top: 2rem !important;
-    padding-bottom: 2rem !important;
-  }
-  
-  /* Fix for property cards on small screens */
-  .deal-card, .property-card {
+  .property-card {
     width: 100% !important;
+    max-width: 100% !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Fix for property header */
+  .properties-header-container {
+    padding: 0.5rem !important;
   }
 
-  /* Improved property detail layout for mobile */
-  .property-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr !important;
+  .properties-header-title {
+    max-width: 70% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
 
-  /* Enhanced mobile navigation */
-  .mobile-menu-button {
-    display: block !important;
+  /* Fix for alignment in PropertiesHeader */
+  .header-logo-container {
+    margin-right: 0.5rem !important;
+  }
+  
+  /* Adjust spacing for menu button */
+  .menu-right-aligned {
+    position: absolute;
+    right: 0.5rem;
+    top: 0.5rem;
   }
 
-  /* Improved investment details section */
-  .investment-detail-tabs {
-    width: 100%;
+  /* Adjust padding for the sidebar */
+  .app-sidebar {
+    width: 60px !important;
+  }
+  
+  .app-sidebar-text {
+    display: none !important;
+  }
+  
+  .main-content-with-sidebar {
+    margin-left: 60px !important;
+    width: calc(100% - 60px) !important;
+  }
+  
+  /* Fix for category filter */
+  .category-filter {
     overflow-x: auto;
-  }
-
-  .investment-chart {
-    max-height: 250px;
-    width: 100%;
-    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.5rem;
   }
   
-  /* Fix toolbar layout on iPhone */
-  header .container {
-    padding-left: 0.5rem !important;
-    padding-right: 0.5rem !important;
-  }
-  
-  /* Optimize property header for mobile */
-  header .flex-shrink-0 img {
-    max-height: 32px;
-    margin-right: 0.5rem;
-  }
-  
-  /* Simplify toolbar buttons on mobile */
-  header button {
-    padding: 0.25rem !important;
-    min-width: 32px !important;
-    min-height: 32px !important;
-  }
-  
-  /* Fix for minimum investment display */
-  .bg-green-100, .text-green-800, .border-green-200 {
-    background-color: white !important;
-    color: #333333 !important;
-    border-color: #e5e5e5 !important;
+  .category-filter::-webkit-scrollbar {
+    display: none;
   }
 }
 

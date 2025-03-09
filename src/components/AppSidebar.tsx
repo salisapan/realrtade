@@ -3,56 +3,25 @@ import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGrou
 import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
-const menuItems = [{
-  title: "Home",
-  url: "/",
-  icon: Home
-}, {
-  title: "Dashboard",
-  url: "/dashboard",
-  icon: Home
-}, {
-  title: "Properties",
-  url: "/properties",
-  icon: Building2
-}, {
-  title: "Performance",
-  url: "/performance",
-  icon: LineChart
-}, {
-  title: "Reports",
-  url: "/reports",
-  icon: FileText
-}, {
-  title: "Wallet",
-  url: "/wallet",
-  icon: DollarSign
-}, {
-  title: "Settings",
-  url: "/settings",
-  icon: Settings
-}];
-const entrepreneurMenuItems = [{
-  title: "Home",
-  url: "/",
-  icon: Home
-}, {
-  title: "Entrepreneur Portal",
-  url: "/entrepreneur",
-  icon: Building2
-}, {
-  title: "Due Diligence",
-  url: "/entrepreneur/due-diligence",
-  icon: ClipboardCheck
-}, {
-  title: "Reports",
-  url: "/entrepreneur/reports",
-  icon: FileText
-}, {
-  title: "Register",
-  url: "/entrepreneur/register",
-  icon: UserPlus
-}];
+
+const menuItems = [
+  { title: "Home", url: "/", icon: Home },
+  { title: "Dashboard", url: "/dashboard", icon: Home },
+  { title: "Properties", url: "/properties", icon: Building2 },
+  { title: "Performance", url: "/performance", icon: LineChart },
+  { title: "Reports", url: "/reports", icon: FileText },
+  { title: "Wallet", url: "/wallet", icon: DollarSign },
+  { title: "Settings", url: "/settings", icon: Settings }
+];
+
+const entrepreneurMenuItems = [
+  { title: "Home", url: "/", icon: Home },
+  { title: "Entrepreneur Portal", url: "/entrepreneur", icon: Building2 },
+  { title: "Due Diligence", url: "/entrepreneur/due-diligence", icon: ClipboardCheck },
+  { title: "Reports", url: "/entrepreneur/reports", icon: FileText },
+  { title: "Register", url: "/entrepreneur/register", icon: UserPlus }
+];
+
 export function AppSidebar() {
   const location = useLocation();
   const path = location.pathname;
@@ -81,39 +50,70 @@ export function AppSidebar() {
       return "Investor";
     }
   };
+  
   const userName = getUserName();
 
-  // Mobile sidebar toggle button
-  const ToggleButton = () => <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="fixed top-3 left-3 z-50 md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg mx-0">
+  // Mobile sidebar toggle button - removed duplicate and positioned it correctly
+  const ToggleButton = () => (
+    <button 
+      onClick={() => setIsMenuOpen(!isMenuOpen)} 
+      className="fixed top-3 right-3 z-50 md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg menu-right-aligned"
+    >
       {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
-    </button>;
+    </button>
+  );
+  
   if (isMobile) {
-    return <>
+    return (
+      <>
         <ToggleButton />
         
-        {isMenuOpen && <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setIsMenuOpen(false)}>
-            <div className="fixed top-0 left-0 h-full w-64 bg-white shadow-lg z-50" onClick={e => e.stopPropagation()}>
+        {isMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40" 
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <div 
+              className="fixed top-0 left-0 h-full w-64 bg-white shadow-lg z-50" 
+              onClick={e => e.stopPropagation()}
+            >
               <div className="p-4 border-b">
                 <h2 className="font-semibold text-lg">{userName}</h2>
                 <p className="text-sm text-gray-500">{isEntrepreneurSection ? "Entrepreneur" : "Investor"}</p>
               </div>
               
               <div className="p-2">
-                {displayItems.map(item => <Link key={item.title} to={item.url} className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${path === item.url ? "bg-primary/10 text-primary font-medium" : "hover:bg-gray-100"}`} onClick={() => setIsMenuOpen(false)}>
+                {displayItems.map(item => (
+                  <Link 
+                    key={item.title} 
+                    to={item.url} 
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
+                      path === item.url ? "bg-primary/10 text-primary font-medium" : "hover:bg-gray-100"
+                    }`} 
+                    onClick={() => setIsMenuOpen(false)}
+                  >
                     <item.icon size={20} className={path === item.url ? "text-primary" : ""} />
                     <span>{item.title}</span>
-                  </Link>)}
+                  </Link>
+                ))}
                 
                 {/* Show switch between Investor and Entrepreneur views */}
-                <Link to={isEntrepreneurSection ? "/properties" : "/entrepreneur"} className="flex items-center gap-3 p-3 rounded-lg mt-4 border-t pt-4 hover:bg-gray-100" onClick={() => setIsMenuOpen(false)}>
+                <Link 
+                  to={isEntrepreneurSection ? "/properties" : "/entrepreneur"} 
+                  className="flex items-center gap-3 p-3 rounded-lg mt-4 border-t pt-4 hover:bg-gray-100" 
+                  onClick={() => setIsMenuOpen(false)}
+                >
                   <Building2 size={20} />
                   <span>{isEntrepreneurSection ? "Investor View" : "Entrepreneur View"}</span>
                 </Link>
               </div>
             </div>
-          </div>}
-      </>;
+          </div>
+        )}
+      </>
+    );
   }
+
   return <Sidebar>
       <SidebarContent>
         <SidebarGroup>

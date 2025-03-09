@@ -8,25 +8,30 @@ import { PropertyDetailContent } from "@/components/property/PropertyDetailConte
 import { useToast } from "@/hooks/use-toast";
 import { Home, Building, BarChart, FileText, MessageSquare, Bookmark, Share2, Check, CalendarDays } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
+
 const PropertyDetail = () => {
-  const {
-    id
-  } = useParams();
+  const { id } = useParams();
   const [property, setProperty] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [bookmarked, setBookmarked] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
+  
   useEffect(() => {
     // Simulate loading property data
     setTimeout(() => {
       // Find property by ID
       const foundProperty = sampleProperties.find(p => p.id === id);
+      
+      // Update the property data to use consistent minimum investment
+      if (foundProperty) {
+        foundProperty.minInvestment = 2500;
+      }
+      
       setProperty(foundProperty || null);
       setLoading(false);
     }, 500);
   }, [id]);
+  
   const handleBookmark = () => {
     setBookmarked(!bookmarked);
     toast({
@@ -35,6 +40,7 @@ const PropertyDetail = () => {
       variant: "success"
     });
   };
+  
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     toast({
@@ -43,6 +49,20 @@ const PropertyDetail = () => {
       variant: "success"
     });
   };
+  
+  const handleInvest = () => {
+    // Scroll to the Letter of Intent form
+    const loiForm = document.querySelector('.loi-form-container');
+    if (loiForm) {
+      loiForm.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
+  const handleScheduleCall = () => {
+    // Open Calendly or custom form in a modal
+    window.open('https://calendly.com/realtrade/investment-call', '_blank');
+  };
+
   if (loading) {
     return <div className="flex">
         <AppSidebar />
@@ -54,6 +74,7 @@ const PropertyDetail = () => {
         </div>
       </div>;
   }
+  
   if (!property) {
     return <div className="flex">
         <AppSidebar />
@@ -68,6 +89,7 @@ const PropertyDetail = () => {
         </div>
       </div>;
   }
+
   return <div className="flex">
       <AppSidebar />
       <div className="flex-1 min-h-screen bg-gray-50">
@@ -76,22 +98,33 @@ const PropertyDetail = () => {
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2 max-w-[75%]">
                 <Link to="/" className="flex-shrink-0">
-                  <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 rounded-lg" />
+                  <img 
+                    src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+                    alt="RealTrade Logo" 
+                    className="h-8 rounded-lg" 
+                  />
                 </Link>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate ml-2">{property.name}</h1>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs" onClick={handleBookmark}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 h-8 text-xs" 
+                  onClick={handleBookmark}
+                >
                   <Bookmark className={`w-3.5 h-3.5 ${bookmarked ? "fill-primary" : ""}`} />
                   <span className="hidden sm:inline">{bookmarked ? "Saved" : "Save"}</span>
                 </Button>
-                <Button variant="outline" size="sm" className="flex items-center gap-1 h-8 text-xs" onClick={handleShare}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex items-center gap-1 h-8 text-xs" 
+                  onClick={handleShare}
+                >
                   <Share2 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Share</span>
                 </Button>
-                <Link to="/properties">
-                  
-                </Link>
               </div>
             </div>
           </div>
@@ -103,7 +136,7 @@ const PropertyDetail = () => {
               <div className="rounded-xl overflow-hidden bg-white shadow-sm">
                 <img src={property.image} alt={property.name} className="w-full h-[300px] object-cover" />
                 
-                <PropertyDetailContent property={property} />
+                <PropertyDetailContent property={{...property, minInvestment: 2500}} />
               </div>
               
               <Card>
@@ -331,7 +364,7 @@ const PropertyDetail = () => {
                   <div className="space-y-3">
                     <div className="p-3 bg-gray-50 rounded-lg">
                       <div className="text-xs text-gray-500 mb-1">Minimum</div>
-                      <div className="text-base font-bold">${property.minInvestment.toLocaleString()}</div>
+                      <div className="text-base font-bold text-gray-800">${(2500).toLocaleString()}</div>
                     </div>
                     
                     <div className="p-3 bg-gray-50 rounded-lg">
@@ -349,7 +382,12 @@ const PropertyDetail = () => {
                       <div className="text-base font-bold">{property.term} years</div>
                     </div>
                     
-                    <Button className="w-full">Invest Now</Button>
+                    <Button 
+                      className="w-full" 
+                      onClick={handleInvest}
+                    >
+                      Invest Now
+                    </Button>
                     
                     <p className="text-xs text-gray-500 text-center">
                       Investment opportunities involve risk, including the possible loss of principal.
@@ -465,7 +503,9 @@ const PropertyDetail = () => {
       </div>
     </div>;
 };
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28BFF'];
+
+const COLORS = ['#1EAEDB', '#0088FE', '#0FA0CE', '#33C3F0', '#0070C0'];
+
 const sampleProperties = [{
   id: "prop1",
   name: "Skyline Tower",
@@ -475,7 +515,7 @@ const sampleProperties = [{
   price: 12500000,
   roi: 12.5,
   term: 5,
-  minInvestment: 25000,
+  minInvestment: 2500,
   fundingProgress: 78,
   currentFunding: 9750000,
   fundingGoal: 12500000,
@@ -510,7 +550,7 @@ const sampleProperties = [{
   price: 18700000,
   roi: 9.8,
   term: 7,
-  minInvestment: 50000,
+  minInvestment: 5000,
   fundingProgress: 65,
   currentFunding: 12155000,
   fundingGoal: 18700000,
@@ -545,7 +585,7 @@ const sampleProperties = [{
   price: 42500000,
   roi: 15.2,
   term: 8,
-  minInvestment: 100000,
+  minInvestment: 10000,
   fundingProgress: 83,
   currentFunding: 35275000,
   fundingGoal: 42500000,
@@ -572,6 +612,7 @@ const sampleProperties = [{
   debtServiceRatio: 1.6,
   loanToValue: 60
 }];
+
 const cashFlowData = [{
   year: '2023',
   cashFlow: 1250000
@@ -591,6 +632,7 @@ const cashFlowData = [{
   year: '2028',
   cashFlow: 1675000
 }];
+
 const roiComponentsData = [{
   name: 'Rental Income',
   value: 50
@@ -601,6 +643,7 @@ const roiComponentsData = [{
   name: 'Tax Benefits',
   value: 15
 }];
+
 const riskAssessmentData = [{
   name: 'Market Volatility',
   score: 3.2
@@ -617,4 +660,5 @@ const riskAssessmentData = [{
   name: 'Property Damage',
   score: 2.0
 }];
+
 export default PropertyDetail;

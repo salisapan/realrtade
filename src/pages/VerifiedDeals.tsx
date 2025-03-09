@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { HomeFooter } from "@/components/landing/HomeFooter";
@@ -64,7 +63,7 @@ const VerifiedDeals = () => {
                         <DollarSign className="h-3 w-3" />
                         <span>Min Investment</span>
                       </div>
-                      <div className="font-bold">${deal.minInvestment}</div>
+                      <div className="font-bold text-gray-800">${deal.minInvestment}</div>
                     </div>
                     <div className="bg-gray-50 p-2 rounded">
                       <div className="flex items-center gap-1 text-gray-500 text-xs mb-1">
@@ -123,7 +122,7 @@ const VerifiedDeals = () => {
                     </Badge>
                   </div>
                   
-                  <Link to={`/property/${deal.id}`}>
+                  <Link to={`/property/${deal.linkedPropertyId || "prop1"}`}>
                     <Button className="w-full">View Deal</Button>
                   </Link>
                 </div>
@@ -173,7 +172,6 @@ const VerifiedDeals = () => {
   );
 };
 
-// Define missing icon component
 const AlertTriangle = ({ className }: { className?: string }) => {
   return (
     <svg 
@@ -193,14 +191,13 @@ const AlertTriangle = ({ className }: { className?: string }) => {
   );
 };
 
-// Sample data for verified deals
 const verifiedDeals = [
   {
     id: "verified1",
     name: "Urban Micro Apartment",
     location: "Chicago, IL",
     image: "https://images.unsplash.com/photo-1594540637859-7069a4765971",
-    minInvestment: 10,
+    minInvestment: 2500,
     targetReturn: 8.5,
     term: "2-3 years",
     investors: 347,
@@ -209,13 +206,14 @@ const verifiedDeals = [
     rating: 4,
     reviews: 28,
     featured: true,
+    linkedPropertyId: "prop1"
   },
   {
     id: "verified2",
     name: "Main Street Retail",
     location: "Austin, TX",
     image: "https://images.unsplash.com/photo-1582407947304-fd86f028f716",
-    minInvestment: 25,
+    minInvestment: 2500,
     targetReturn: 7.2,
     term: "1-2 years",
     investors: 182,
@@ -224,13 +222,14 @@ const verifiedDeals = [
     rating: 5,
     reviews: 41,
     featured: false,
+    linkedPropertyId: "prop2"
   },
   {
     id: "verified3",
     name: "Suburban Townhomes",
     location: "Charlotte, NC",
     image: "https://images.unsplash.com/photo-1592595896616-c37162298647",
-    minInvestment: 50,
+    minInvestment: 2500,
     targetReturn: 9.1,
     term: "3-4 years",
     investors: 104,
@@ -239,13 +238,14 @@ const verifiedDeals = [
     rating: 4,
     reviews: 16,
     featured: false,
+    linkedPropertyId: "prop3"
   },
   {
     id: "verified4",
     name: "Student Housing Complex",
     location: "Boston, MA",
     image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267",
-    minInvestment: 15,
+    minInvestment: 2500,
     targetReturn: 10.5,
     term: "2-3 years",
     investors: 219,
@@ -254,13 +254,14 @@ const verifiedDeals = [
     rating: 3,
     reviews: 22,
     featured: false,
+    linkedPropertyId: "prop1"
   },
   {
     id: "verified5",
     name: "Medical Office Building",
     location: "Seattle, WA",
     image: "https://images.unsplash.com/photo-1497366754035-f200968a6e72",
-    minInvestment: 30,
+    minInvestment: 2500,
     targetReturn: 6.8,
     term: "1-2 years",
     investors: 175,
@@ -269,6 +270,7 @@ const verifiedDeals = [
     rating: 5,
     reviews: 37,
     featured: true,
+    linkedPropertyId: "prop2"
   },
 ];
 

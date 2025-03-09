@@ -7,6 +7,7 @@ import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
 import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
+
 interface PropertyDetailContentProps {
   property: {
     id: string;
@@ -113,7 +114,8 @@ const riskAssessmentData = [{
   score: 4.2,
   fullMark: 10
 }];
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28BFF'];
+const COLORS = ['#1EAEDB', '#0088FE', '#0FA0CE', '#33C3F0', '#0070C0'];
+
 const ThreeDGraph = ({
   chartId,
   data,
@@ -305,9 +307,14 @@ const ThreeDGraph = ({
       
     </div>;
 };
+
 export const PropertyDetailContent = ({
   property
 }: PropertyDetailContentProps) => {
+  const handleScheduleCall = () => {
+    window.open('https://calendly.com/realtrade/investment-call', '_blank');
+  };
+
   return <div className="p-4 md:p-6">
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
         <div>
@@ -338,9 +345,10 @@ export const PropertyDetailContent = ({
                 </div>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                <div className="bg-primary h-2 rounded-full" style={{
-                width: `${property.fundingProgress}%`
-              }}></div>
+                <div 
+                  className="bg-primary h-2 rounded-full" 
+                  style={{width: `${property.fundingProgress}%`}}
+                ></div>
               </div>
             </div>
             
@@ -351,11 +359,15 @@ export const PropertyDetailContent = ({
               </div>
               <div className="bg-white p-2 rounded border">
                 <div className="text-gray-500 mb-1">Min. Investment</div>
-                <div className="font-bold">${property.minInvestment.toLocaleString()}</div>
+                <div className="font-bold text-gray-800">${(2500).toLocaleString()}</div>
               </div>
             </div>
             
-            <LetterOfIntentForm propertyId={property.id} propertyName={property.name} minInvestment={property.minInvestment} />
+            <LetterOfIntentForm 
+              propertyId={property.id} 
+              propertyName={property.name} 
+              minInvestment={2500} 
+            />
           </div>
         </div>
       </div>
@@ -591,14 +603,26 @@ export const PropertyDetailContent = ({
         </div>
         
         <div className="space-y-6">
-          <RecommendationRating score={property.recommendationScore} marketTrend={property.marketTrend} entrepreneurExperience={property.entrepreneurExperience} riskLevel={property.riskLevel} demandLevel={property.demandLevel} returnPotential={property.returnPotential} />
+          <RecommendationRating 
+            score={property.recommendationScore} 
+            marketTrend={property.marketTrend} 
+            entrepreneurExperience={property.entrepreneurExperience} 
+            riskLevel={property.riskLevel} 
+            demandLevel={property.demandLevel} 
+            returnPotential={property.returnPotential} 
+          />
           
           <div className="bg-white border rounded-lg p-4">
             <h3 className="font-semibold mb-3">Need Help?</h3>
             <p className="text-sm text-gray-600 mb-3">
               Our investment advisors are available to answer any questions about this property.
             </p>
-            <Button type="button" variant="outline" className="w-full">
+            <Button 
+              type="button" 
+              variant="outline" 
+              className="w-full"
+              onClick={handleScheduleCall}
+            >
               Schedule a Call
             </Button>
           </div>
@@ -606,9 +630,13 @@ export const PropertyDetailContent = ({
           <div className="bg-white border rounded-lg p-4">
             <h3 className="font-semibold mb-3">Ready to Invest?</h3>
             <p className="text-sm text-gray-600 mb-3">
-              Start your investment journey with as little as ${property.minInvestment.toLocaleString()}.
+              Start your investment journey with as little as ${(2500).toLocaleString()}.
             </p>
-            <LetterOfIntentForm propertyId={property.id} propertyName={property.name} minInvestment={property.minInvestment} />
+            <LetterOfIntentForm 
+              propertyId={property.id} 
+              propertyName={property.name} 
+              minInvestment={2500} 
+            />
           </div>
         </div>
       </div>
