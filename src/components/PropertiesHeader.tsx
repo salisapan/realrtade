@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export const PropertiesHeader = ({
           <div className="flex items-center w-full sm:w-auto">
             <Link to="/" className="flex items-center header-logo-container">
               <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 md:h-10 mr-3 rounded-lg" />
-              
+              <span className="text-lg font-semibold properties-header-title">RealTrade</span>
             </Link>
           </div>
           

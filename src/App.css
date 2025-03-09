@@ -380,13 +380,34 @@
 
 @media screen and (max-width: 768px) {
   .graph-3d-container {
-    height: 250px;
+    height: 220px;
+  }
+  
+  /* Fix chart display on mobile */
+  .recharts-wrapper {
+    overflow-x: visible !important;
+  }
+  
+  /* Ensure the chart axis labels are visible */
+  .recharts-layer.recharts-cartesian-axis-tick {
+    visibility: visible !important;
+  }
+  
+  /* Make chart container more compact on mobile */
+  .investment-chart {
+    margin-bottom: 30px;
+    height: 220px !important;
   }
 }
 
 @media screen and (max-width: 390px) {
   .graph-3d-container {
-    height: 200px;
+    height: 180px;
+  }
+  
+  /* Ensure XAxis labels fit on very small screens */
+  .recharts-xAxis .recharts-cartesian-axis-tick-value {
+    font-size: 8px !important;
   }
 }
 
@@ -406,5 +427,27 @@
 @media screen and (max-width: 768px) {
   .investment-details-section {
     flex-direction: column;
+  }
+  
+  /* Fix for property details page on mobile */
+  .recharts-surface {
+    overflow: visible;
+  }
+  
+  /* Fix colors for charts */
+  .recharts-bar-rectangle path {
+    fill: #1EAEDB !important;
+  }
+  
+  .recharts-pie-sector path {
+    fill: #1EAEDB !important;
+  }
+  
+  .recharts-pie-sector:nth-child(2) path {
+    fill: #0088FE !important;
+  }
+  
+  .recharts-pie-sector:nth-child(3) path {
+    fill: #0FA0CE !important;
   }
 }

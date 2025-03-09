@@ -8,6 +8,7 @@ import { useEffect, useState, useRef } from "react";
 import * as THREE from "three";
 import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PropertyDetailContentProps {
   property: {
@@ -35,6 +36,9 @@ interface PropertyDetailContentProps {
   };
 }
 
+// Use blue color palette
+const COLORS = ['#1EAEDB', '#0088FE', '#0FA0CE', '#33C3F0', '#0070C0'];
+
 const roiTimelineData = [{
   year: '2023',
   expected: 8.2,
@@ -60,6 +64,7 @@ const roiTimelineData = [{
   expected: 13.8,
   actual: 0
 }];
+
 const cashFlowQuarterlyData = [
   { name: 'Q1 23', projected: 45000, actual: 47500 },
   { name: 'Q2 23', projected: 48000, actual: 49200 },
@@ -70,6 +75,7 @@ const cashFlowQuarterlyData = [
   { name: 'Q3 24', projected: 68000, actual: 0 },
   { name: 'Q4 24', projected: 72000, actual: 0 }
 ];
+
 const riskAssessmentData = [{
   category: 'Market',
   score: 3.2,
@@ -91,8 +97,6 @@ const riskAssessmentData = [{
   score: 4.2,
   fullMark: 10
 }];
-// Update colors to use blue scheme only
-const COLORS = ['#1EAEDB', '#0088FE', '#0070C0', '#33C3F0', '#0FA0CE'];
 
 const ThreeDGraph = ({
   chartId,
@@ -104,6 +108,8 @@ const ThreeDGraph = ({
   type: 'bar' | 'line' | 'pie';
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -262,12 +268,18 @@ const ThreeDGraph = ({
       }
     };
   }, [chartId, data, type]);
-  return <div ref={containerRef} className="graph-3d-container"></div>;
+  
+  // Adjust height for mobile to ensure it fits properly
+  const containerHeight = isMobile ? "200px" : "300px";
+  
+  return <div ref={containerRef} className="graph-3d-container" style={{ height: containerHeight }}></div>;
 };
 
 export const PropertyDetailContent = ({
   property
 }: PropertyDetailContentProps) => {
+  const isMobile = useIsMobile();
+  
   const handleScheduleCall = () => {
     window.open('https://calendly.com/realtrade/investment-call', '_blank');
   };
@@ -405,7 +417,7 @@ export const PropertyDetailContent = ({
                       top: 10,
                       right: 10,
                       left: 0,
-                      bottom: 10
+                      bottom: 20
                     }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="year" tick={{
@@ -446,7 +458,7 @@ export const PropertyDetailContent = ({
                           top: 10,
                           right: 10,
                           left: 0,
-                          bottom: 40
+                          bottom: 60
                         }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
@@ -455,22 +467,14 @@ export const PropertyDetailContent = ({
                           angle={-45} 
                           textAnchor="end" 
                           height={60} 
-                          tick={{
-                            fontSize: 10
-                          }}
+                          tick={{fontSize: 10}}
                           interval={0}
                         />
-                        <YAxis tick={{
-                          fontSize: 10
-                        }} />
-                        <RechartsTooltip contentStyle={{
-                          fontSize: 12
-                        }} />
-                        <Bar dataKey="projected" name="Projected ($)" fill="#1E40AF" />
-                        <Bar dataKey="actual" name="Actual ($)" fill="#3B82F6" />
-                        <Legend wrapperStyle={{
-                          fontSize: 10
-                        }} />
+                        <YAxis tick={{fontSize: 10}} />
+                        <RechartsTooltip contentStyle={{fontSize: 12}} />
+                        <Bar dataKey="projected" name="Projected ($)" fill="#1EAEDB" />
+                        <Bar dataKey="actual" name="Actual ($)" fill="#0088FE" />
+                        <Legend wrapperStyle={{fontSize: 10}} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
