@@ -1,7 +1,7 @@
-
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
+import { PropertyMarketInsights } from "./PropertyMarketInsights";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useRef } from "react";
@@ -36,7 +36,6 @@ interface PropertyDetailContentProps {
   };
 }
 
-// Use blue color palette
 const COLORS = ['#1EAEDB', '#0088FE', '#0FA0CE', '#33C3F0', '#0070C0'];
 
 const roiTimelineData = [{
@@ -269,7 +268,6 @@ const ThreeDGraph = ({
     };
   }, [chartId, data, type]);
   
-  // Adjust height for mobile to ensure it fits properly
   const containerHeight = isMobile ? "200px" : "300px";
   
   return <div ref={containerRef} className="graph-3d-container" style={{ height: containerHeight }}></div>;
@@ -282,6 +280,11 @@ export const PropertyDetailContent = ({
   
   const handleScheduleCall = () => {
     window.open('https://calendly.com/realtrade/investment-call', '_blank');
+  };
+
+  const getPropertyCity = () => {
+    const locationParts = property.location.split(',');
+    return locationParts.length > 1 ? locationParts[1].trim() : 'New York';
   };
 
   return <div className="p-4 md:p-6">
@@ -575,6 +578,11 @@ export const PropertyDetailContent = ({
             riskLevel={property.riskLevel} 
             demandLevel={property.demandLevel} 
             returnPotential={property.returnPotential} 
+          />
+          
+          <PropertyMarketInsights 
+            propertyAddress={property.name}
+            propertyCity={getPropertyCity()}
           />
           
           <div className="bg-white border rounded-lg p-4">
