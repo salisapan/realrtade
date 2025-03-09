@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,7 @@ export const PropertiesHeader = ({
           <div className="flex items-center w-full sm:w-auto">
             <Link to="/" className="flex items-center header-logo-container">
               <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 md:h-10 mr-2 rounded-lg" />
-              <span className="text-lg font-semibold text-primary properties-header-title">RealTrade</span>
+              
             </Link>
           </div>
           
@@ -66,12 +65,7 @@ export const PropertiesHeader = ({
               </Link>}
             
             {/* Restore the mobile menu button */}
-            <Button 
-              variant="default" 
-              size="icon" 
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
+            <Button variant="default" size="icon" className="md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
           </div>
