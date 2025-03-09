@@ -14,12 +14,12 @@ export const PropertyListing = ({ properties }: PropertyListingProps) => {
   };
 
   return (
-    <div className="grid gap-4 sm:gap-5 w-full">
+    <div className="grid gap-3 sm:gap-4 w-full px-1 sm:px-2">
       {properties.map((property) => (
         <div 
           key={property.id} 
           onClick={() => handlePropertyClick(property.id)} 
-          className="cursor-pointer w-full mb-2"
+          className="cursor-pointer w-full mb-1 sm:mb-2"
         >
           <PropertyCard {...property} />
         </div>
