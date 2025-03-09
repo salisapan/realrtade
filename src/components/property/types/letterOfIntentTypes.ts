@@ -1,0 +1,18 @@
+
+import { z } from "zod";
+
+export const formSchema = z.object({
+  investmentAmount: z.coerce
+    .number()
+    .min(1, "Please enter a valid investment amount"),
+  paymentMethod: z.enum(["bank", "wire", "credit", "blockchain"], {
+    required_error: "Please select a payment method",
+  }),
+  email: z.string().email("Please enter a valid email").optional(),
+  additionalInfo: z.string().optional(),
+  termsAccepted: z.boolean().refine((val) => val === true, {
+    message: "You must accept the terms and conditions",
+  }),
+});
+
+export type FormValues = z.infer<typeof formSchema>;
