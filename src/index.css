@@ -25,6 +25,7 @@
     -webkit-overflow-scrolling: touch;
     width: 100%;
     overflow-x: hidden;
+    max-width: 100vw;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -136,6 +137,7 @@
     overflow-x: hidden;
     width: 100%;
     max-width: 100vw;
+    position: relative;
   }
   
   .container {
@@ -143,6 +145,11 @@
     padding-right: 0.75rem;
     width: 100%;
     max-width: 100%;
+  }
+  
+  /* Fix font sizes for small screens */
+  h1, h2, h3, h4, h5, h6 {
+    word-break: break-word;
   }
   
   /* Adjust card layout for report items */
@@ -203,6 +210,8 @@
   /* Fix chart display on mobile */
   .recharts-wrapper {
     overflow-x: visible !important;
+    width: 100% !important;
+    max-width: 100% !important;
   }
   
   /* Ensure the chart axis labels are visible */
@@ -234,11 +243,11 @@
 
 /* Mobile-specific styles for the Reports page */
 .report-card {
-  @apply mb-4 overflow-hidden;
+  @apply mb-3 sm:mb-4 overflow-hidden;
 }
 
 .report-card-header {
-  @apply p-3 sm:p-4 flex items-center gap-3;
+  @apply p-3 sm:p-4 flex items-center gap-2 sm:gap-3;
 }
 
 .report-card-content {
@@ -272,5 +281,40 @@
 @media (min-width: 1024px) {
   .property-listing-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Fix for nested links issue */
+.property-card a {
+  pointer-events: none;
+}
+
+/* Additional mobile fixes for Performance page */
+@media screen and (max-width: 420px) {
+  .investment-chart {
+    height: 220px !important;
+    overflow: visible !important;
+    max-width: 100vw !important;
+  }
+  
+  .recharts-surface {
+    overflow: visible !important;
+  }
+  
+  .recharts-wrapper {
+    max-width: 100% !important;
+    overflow: visible !important;
+  }
+  
+  .recharts-legend-wrapper {
+    width: 100% !important;
+    position: relative !important;
+    bottom: 0 !important;
+  }
+  
+  /* Fix for text overflow in tabs */
+  .tabs-trigger {
+    font-size: 0.7rem !important;
+    padding: 0.5rem 0.75rem !important;
   }
 }

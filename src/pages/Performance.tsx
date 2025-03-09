@@ -63,237 +63,240 @@ const Performance = () => {
   const isMobile = useIsMobile();
   
   return (
-    <div className="flex">
+    <div className="flex flex-col md:flex-row min-h-screen">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 p-4 md:p-8 overflow-x-hidden">
-        <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
-          <h1 className="text-xl md:text-2xl font-bold">Investment Performance</h1>
-          <div className="space-x-2">
-            <Button variant="outline" size="sm">Export PDF</Button>
-            <Button variant="outline" size="sm">Print Report</Button>
+      <div className="flex-1 bg-gray-50 w-full overflow-x-hidden">
+        <div className="container mx-auto px-2 sm:px-4 py-3 md:py-6">
+          <div className="flex justify-between items-center mb-4 md:mb-6 flex-wrap gap-2">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Investment Performance</h1>
+            <div className="space-x-2">
+              <Button variant="outline" size="sm">Export PDF</Button>
+              <Button variant="outline" size="sm">Print Report</Button>
+            </div>
           </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-6">
-          {performanceMetrics.map((metric) => (
-            <Card key={metric.name}>
-              <CardContent className="p-4 md:p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm text-gray-500">{metric.name}</p>
-                    <p className="text-xl md:text-2xl font-bold">{metric.value}</p>
-                  </div>
-                  <div className={`flex items-center ${metric.positive ? 'text-blue-600' : 'text-red-600'}`}>
-                    {metric.positive ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
-                    <span className="text-sm font-medium">{metric.change}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-        
-        <Tabs defaultValue="returns" className="mb-6">
-          <TabsList className="mb-4 flex overflow-x-auto pb-1 no-scrollbar">
-            <TabsTrigger value="returns" className="flex items-center gap-2 whitespace-nowrap">
-              <LineChartIcon className="w-4 h-4" /> Returns
-            </TabsTrigger>
-            <TabsTrigger value="volume" className="flex items-center gap-2 whitespace-nowrap">
-              <BarChart3 className="w-4 h-4" /> Investment Volume
-            </TabsTrigger>
-            <TabsTrigger value="allocation" className="flex items-center gap-2 whitespace-nowrap">
-              <PieChartIcon className="w-4 h-4" /> Asset Allocation
-            </TabsTrigger>
-          </TabsList>
           
-          <TabsContent value="returns">
-            <Card>
-              <CardHeader>
-                <CardTitle>Returns Over Time</CardTitle>
-                <CardDescription>Monthly returns compared to market benchmark</CardDescription>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-4 md:mb-6">
+            {performanceMetrics.map((metric) => (
+              <Card key={metric.name} className="overflow-hidden">
+                <CardContent className="p-3 md:p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm text-gray-500">{metric.name}</p>
+                      <p className="text-lg md:text-xl font-bold">{metric.value}</p>
+                    </div>
+                    <div className={`flex items-center ${metric.positive ? 'text-blue-600' : 'text-red-600'}`}>
+                      {metric.positive ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
+                      <span className="text-sm font-medium">{metric.change}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          <Tabs defaultValue="returns" className="mb-4 md:mb-6">
+            <TabsList className="mb-3 md:mb-4 flex overflow-x-auto pb-1 no-scrollbar w-full">
+              <TabsTrigger value="returns" className="flex items-center gap-1 whitespace-nowrap flex-1">
+                <LineChartIcon className="w-3 h-3 md:w-4 md:h-4" /> Returns
+              </TabsTrigger>
+              <TabsTrigger value="volume" className="flex items-center gap-1 whitespace-nowrap flex-1">
+                <BarChart3 className="w-3 h-3 md:w-4 md:h-4" /> Investment
+              </TabsTrigger>
+              <TabsTrigger value="allocation" className="flex items-center gap-1 whitespace-nowrap flex-1">
+                <PieChartIcon className="w-3 h-3 md:w-4 md:h-4" /> Allocation
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="returns">
+              <Card className="overflow-hidden">
+                <CardHeader className="p-3 md:p-4">
+                  <CardTitle className="text-base md:text-lg">Returns Over Time</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Monthly returns compared to market benchmark</CardDescription>
+                </CardHeader>
+                <CardContent className="p-1 md:p-4">
+                  <div className="h-[250px] md:h-[400px] w-full overflow-hidden investment-chart">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={performanceData} margin={{
+                        top: 10,
+                        right: 5,
+                        left: 0,
+                        bottom: 5
+                      }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{fontSize: isMobile ? 8 : 12}} />
+                        <YAxis tick={{fontSize: isMobile ? 8 : 12}} width={isMobile ? 25 : 35} />
+                        <Tooltip 
+                          formatter={(value) => [`${value}%`, 'Returns']}
+                          labelFormatter={(label) => `Month: ${label}`}
+                          contentStyle={{fontSize: isMobile ? 10 : 12}}
+                        />
+                        <Legend wrapperStyle={{fontSize: isMobile ? 8 : 10, marginBottom: 10}} />
+                        <Line 
+                          type="monotone" 
+                          dataKey="returns" 
+                          stroke="#1A2E5A" 
+                          name="Your Portfolio" 
+                          strokeWidth={2}
+                          dot={{ r: isMobile ? 2 : 4 }}
+                          activeDot={{ r: isMobile ? 4 : 6 }}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="benchmark" 
+                          stroke="#007BFF" 
+                          name="Market Benchmark" 
+                          strokeWidth={2}
+                          strokeDasharray="4 4"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="volume">
+              <Card className="overflow-hidden">
+                <CardHeader className="p-3 md:p-4">
+                  <CardTitle className="text-base md:text-lg">Investment Volume</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Monthly investment amounts in USD</CardDescription>
+                </CardHeader>
+                <CardContent className="p-1 md:p-4">
+                  <div className="h-[250px] md:h-[400px] w-full overflow-hidden investment-chart">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={performanceData} margin={{
+                        top: 10,
+                        right: 5,
+                        left: 0,
+                        bottom: 5
+                      }}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" tick={{fontSize: isMobile ? 8 : 12}} />
+                        <YAxis tick={{fontSize: isMobile ? 8 : 12}} width={isMobile ? 35 : 45} />
+                        <Tooltip
+                          formatter={(value) => [`$${value.toLocaleString()}`, 'Volume']}
+                          labelFormatter={(label) => `Month: ${label}`}
+                          contentStyle={{fontSize: isMobile ? 10 : 12}}
+                        />
+                        <Legend wrapperStyle={{fontSize: isMobile ? 8 : 10, marginBottom: 10}} />
+                        <Bar dataKey="volume" fill="#1A2E5A" name="Investment Volume" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="allocation">
+              <Card className="overflow-hidden">
+                <CardHeader className="p-3 md:p-4">
+                  <CardTitle className="text-base md:text-lg">Asset Allocation</CardTitle>
+                  <CardDescription className="text-xs md:text-sm">Current portfolio distribution by property type</CardDescription>
+                </CardHeader>
+                <CardContent className="p-1 md:p-4">
+                  <div className="h-[250px] md:h-[400px] w-full overflow-hidden investment-chart">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart margin={{
+                        top: 0,
+                        right: isMobile ? 5 : 30,
+                        left: isMobile ? 5 : 30,
+                        bottom: 10
+                      }}>
+                        <Pie
+                          data={assetAllocationData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={!isMobile}
+                          outerRadius={isMobile ? 80 : 150}
+                          fill="#8884d8"
+                          dataKey="value"
+                          label={({ name, percent }) => isMobile ? null : `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {assetAllocationData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => [`${value}%`, 'Allocation']} contentStyle={{fontSize: isMobile ? 10 : 12}} />
+                        <Legend wrapperStyle={{fontSize: isMobile ? 8 : 10, marginTop: isMobile ? -10 : 0, marginBottom: 10}} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <Card className="overflow-hidden">
+              <CardHeader className="p-3 md:p-4">
+                <CardTitle className="text-base md:text-lg">Risk Assessment</CardTitle>
+                <CardDescription className="text-xs md:text-sm">Current risk profile analysis</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px] md:h-[400px] w-full overflow-hidden">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={performanceData} margin={{
-                      top: 10,
-                      right: 5,
-                      left: 0,
-                      bottom: 0
-                    }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={{fontSize: isMobile ? 8 : 12}} />
-                      <YAxis tick={{fontSize: isMobile ? 8 : 12}} width={isMobile ? 25 : 35} />
-                      <Tooltip 
-                        formatter={(value) => [`${value}%`, 'Returns']}
-                        labelFormatter={(label) => `Month: ${label}`}
-                        contentStyle={{fontSize: isMobile ? 10 : 12}}
-                      />
-                      <Legend wrapperStyle={{fontSize: isMobile ? 10 : 12}} />
-                      <Line 
-                        type="monotone" 
-                        dataKey="returns" 
-                        stroke="#1A2E5A" 
-                        name="Your Portfolio" 
-                        strokeWidth={2}
-                        dot={{ r: isMobile ? 2 : 4 }}
-                        activeDot={{ r: isMobile ? 4 : 6 }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="benchmark" 
-                        stroke="#007BFF" 
-                        name="Market Benchmark" 
-                        strokeWidth={2}
-                        strokeDasharray="4 4"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+              <CardContent className="p-3 md:p-4">
+                <div className="space-y-3 md:space-y-4">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm">Volatility</span>
+                    <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '45%' }}></div>
+                    </div>
+                    <span className="text-xs md:text-sm font-medium">Low</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm">Liquidity Risk</span>
+                    <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-400 h-2 rounded-full" style={{ width: '72%' }}></div>
+                    </div>
+                    <span className="text-xs md:text-sm font-medium">Medium</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm">Market Risk</span>
+                    <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: '38%' }}></div>
+                    </div>
+                    <span className="text-xs md:text-sm font-medium">Low</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs md:text-sm">Concentration Risk</span>
+                    <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-800 h-2 rounded-full" style={{ width: '85%' }}></div>
+                    </div>
+                    <span className="text-xs md:text-sm font-medium">High</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="volume">
-            <Card>
-              <CardHeader>
-                <CardTitle>Investment Volume</CardTitle>
-                <CardDescription>Monthly investment amounts in USD</CardDescription>
+            
+            <Card className="overflow-hidden">
+              <CardHeader className="p-3 md:p-4">
+                <CardTitle className="text-base md:text-lg">Forecast</CardTitle>
+                <CardDescription className="text-xs md:text-sm">Expected performance for next 12 months</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="h-[300px] md:h-[400px] w-full overflow-hidden">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={performanceData} margin={{
-                      top: 10,
-                      right: 5,
-                      left: 0,
-                      bottom: 0
-                    }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" tick={{fontSize: isMobile ? 8 : 12}} />
-                      <YAxis tick={{fontSize: isMobile ? 8 : 12}} width={isMobile ? 35 : 45} />
-                      <Tooltip
-                        formatter={(value) => [`$${value.toLocaleString()}`, 'Volume']}
-                        labelFormatter={(label) => `Month: ${label}`}
-                        contentStyle={{fontSize: isMobile ? 10 : 12}}
-                      />
-                      <Bar dataKey="volume" fill="#1A2E5A" name="Investment Volume" />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <CardContent className="p-3 md:p-4">
+                <div className="space-y-3 md:space-y-4">
+                  <div className="flex justify-between">
+                    <span className="text-xs md:text-sm">Projected Returns</span>
+                    <span className="font-bold text-blue-600 text-xs md:text-sm">12.8%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs md:text-sm">Expected Yield</span>
+                    <span className="font-bold text-xs md:text-sm">7.3%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs md:text-sm">Growth Potential</span>
+                    <span className="font-bold text-blue-600 text-xs md:text-sm">High</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs md:text-sm">Confidence Level</span>
+                    <span className="font-bold text-xs md:text-sm">85%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-xs md:text-sm">Target Cap Rate</span>
+                    <span className="font-bold text-xs md:text-sm">6.2%</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-          
-          <TabsContent value="allocation">
-            <Card>
-              <CardHeader>
-                <CardTitle>Asset Allocation</CardTitle>
-                <CardDescription>Current portfolio distribution by property type</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] md:h-[400px] w-full overflow-hidden">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{
-                      top: 0,
-                      right: isMobile ? 5 : 30,
-                      left: isMobile ? 5 : 30,
-                      bottom: 0
-                    }}>
-                      <Pie
-                        data={assetAllocationData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={!isMobile}
-                        outerRadius={isMobile ? 80 : 150}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => isMobile ? null : `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {assetAllocationData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => [`${value}%`, 'Allocation']} contentStyle={{fontSize: isMobile ? 10 : 12}} />
-                      <Legend wrapperStyle={{fontSize: isMobile ? 10 : 12}} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Risk Assessment</CardTitle>
-              <CardDescription>Current risk profile analysis</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Volatility</span>
-                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '45%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium">Low</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Liquidity Risk</span>
-                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-blue-400 h-2.5 rounded-full" style={{ width: '72%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium">Medium</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Market Risk</span>
-                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: '38%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium">Low</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">Concentration Risk</span>
-                  <div className="w-1/2 md:w-2/3 bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-blue-800 h-2.5 rounded-full" style={{ width: '85%' }}></div>
-                  </div>
-                  <span className="text-sm font-medium">High</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Forecast</CardTitle>
-              <CardDescription>Expected performance for next 12 months</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between">
-                  <span>Projected Returns</span>
-                  <span className="font-bold text-blue-600">12.8%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Expected Yield</span>
-                  <span className="font-bold">7.3%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Growth Potential</span>
-                  <span className="font-bold text-blue-600">High</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Confidence Level</span>
-                  <span className="font-bold">85%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Target Cap Rate</span>
-                  <span className="font-bold">6.2%</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          </div>
         </div>
       </div>
     </div>

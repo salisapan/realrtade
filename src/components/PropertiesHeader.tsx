@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,15 @@ export const PropertiesHeader = ({
                 </Button>
               </Link>}
             
-            
+            {/* Restore the mobile menu button */}
+            <Button 
+              variant="default" 
+              size="icon" 
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
           </div>
         </div>
         

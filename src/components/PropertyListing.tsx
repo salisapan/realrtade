@@ -14,7 +14,7 @@ export const PropertyListing = ({ properties }: PropertyListingProps) => {
   };
 
   return (
-    <div className="property-listing-grid w-full">
+    <div className="grid gap-4 w-full property-listing-grid">
       {properties.map((property) => (
         <div 
           key={property.id} 
