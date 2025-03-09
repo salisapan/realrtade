@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone } from "lucide-react";
 export const HomeFooter = () => {
@@ -34,6 +35,7 @@ export const HomeFooter = () => {
               <li><Link to="/properties" className="text-gray-400 hover:text-white transition-colors">Browse Properties</Link></li>
               <li><Link to="/dashboard" className="text-gray-400 hover:text-white transition-colors">Dashboard</Link></li>
               <li><Link to="/how-it-works" className="text-gray-400 hover:text-white transition-colors">How It Works</Link></li>
+              <li><Link to="/web-crawler" className="text-gray-400 hover:text-white transition-colors">Web Crawler</Link></li>
             </ul>
           </div>
           

@@ -66,9 +66,7 @@ export class FirecrawlService {
       const crawlResponse = await this.firecrawlApp.crawlUrl(crawlUrl, {
         limit: 20,
         scrapeOptions: {
-          formats: ['markdown', 'html'],
-          // Remove the query property as it doesn't exist in CrawlScrapeOptions
-          // Instead, we'll use the searchQuery in our analysis of the results
+          formats: ['markdown', 'html']
         }
       }) as CrawlResponse;
 
@@ -81,6 +79,53 @@ export class FirecrawlService {
       }
 
       console.log('Property data crawl successful:', crawlResponse);
+      
+      // Process the crawl data to extract property insights
+      // In a real implementation, we would analyze the crawled data here using the searchQuery
+      // For now, we'll just return the raw data
+      
+      return { 
+        success: true,
+        data: crawlResponse 
+      };
+    } catch (error) {
+      console.error('Error during crawl:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to connect to Firecrawl API' 
+      };
+    }
+  }
+  
+  // New method for general website crawling
+  static async crawlWebsite(url: string): Promise<{ success: boolean; error?: string; data?: any }> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      return { success: false, error: 'API key not found' };
+    }
+
+    try {
+      console.log('Making crawl request to Firecrawl API');
+      if (!this.firecrawlApp) {
+        this.firecrawlApp = new FirecrawlApp({ apiKey });
+      }
+
+      const crawlResponse = await this.firecrawlApp.crawlUrl(url, {
+        limit: 100,
+        scrapeOptions: {
+          formats: ['markdown', 'html']
+        }
+      }) as CrawlResponse;
+
+      if (!crawlResponse.success) {
+        console.error('Crawl failed:', (crawlResponse as ErrorResponse).error);
+        return { 
+          success: false, 
+          error: (crawlResponse as ErrorResponse).error || 'Failed to crawl website' 
+        };
+      }
+
+      console.log('Crawl successful:', crawlResponse);
       return { 
         success: true,
         data: crawlResponse 

@@ -20,6 +20,7 @@ import DueDiligencePortal from "./pages/DueDiligencePortal";
 import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
 import VerifiedDeals from "./pages/VerifiedDeals";
+import WebCrawler from "./pages/WebCrawler";
 
 const queryClient = new QueryClient();
 
@@ -137,6 +138,14 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <TransactionReports />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/web-crawler" 
+                element={
+                  <ProtectedRoute>
+                    <WebCrawler />
                   </ProtectedRoute>
                 } 
               />
