@@ -70,7 +70,7 @@ export const PropertyCard = ({
         )}
       </div>
       
-      <div className="p-4 md:p-5">
+      <div className="p-3 sm:p-4 md:p-5">
         <h3 className="text-lg md:text-xl font-semibold mb-2 line-clamp-2">{title}</h3>
         
         <div className="flex items-center gap-2 mb-3">
@@ -86,7 +86,7 @@ export const PropertyCard = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 mb-4">
+        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-3 mb-4">
           <div className="flex items-center gap-2">
             <DollarSign size={16} className="text-secondary flex-shrink-0" />
             <div className="text-sm">

@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Check, CreditCard, DollarSign, Landmark, LayoutList } from "lucide-react";
+import { AlertCircle, Check, CreditCard, DollarSign, Landmark, LayoutList, Bitcoin, Globe, Mail } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Dialog, 
@@ -28,9 +28,10 @@ const formSchema = z.object({
   investmentAmount: z.coerce
     .number()
     .min(1, "Please enter a valid investment amount"),
-  paymentMethod: z.enum(["bank", "wire", "credit", "other"], {
+  paymentMethod: z.enum(["bank", "wire", "credit", "blockchain"], {
     required_error: "Please select a payment method",
   }),
+  email: z.string().email("Please enter a valid email").optional(),
   additionalInfo: z.string().optional(),
   termsAccepted: z.boolean().refine((val) => val === true, {
     message: "You must accept the terms and conditions",
@@ -55,12 +56,14 @@ export const LetterOfIntentForm = ({
   const [isOpen, setIsOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [loiSubmitted, setLoiSubmitted] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       investmentAmount: minInvestment,
       paymentMethod: "bank",
+      email: "",
       additionalInfo: "",
       termsAccepted: false,
     },
@@ -71,8 +74,8 @@ export const LetterOfIntentForm = ({
     
     // Show success message
     toast({
-      title: "Letter of Intent Submitted",
-      description: `Your investment intent of $${data.investmentAmount.toLocaleString()} has been received.`,
+      title: "Investment Intent Submitted",
+      description: `Your investment of $${data.investmentAmount.toLocaleString()} has been processed.`,
       variant: "success",
     });
     
@@ -84,11 +87,22 @@ export const LetterOfIntentForm = ({
       propertyName,
       investmentAmount: data.investmentAmount,
       paymentMethod: data.paymentMethod,
+      email: data.email,
       additionalInfo: data.additionalInfo,
-      status: "pending",
+      status: "completed",
       date: new Date().toISOString()
     });
     localStorage.setItem("letterOfIntents", JSON.stringify(lois));
+    
+    // Simulate sending an email
+    setTimeout(() => {
+      setEmailSent(true);
+      toast({
+        title: "Email Confirmation Sent",
+        description: data.email ? `A confirmation has been sent to ${data.email}` : "A confirmation has been sent to your registered email",
+        variant: "success",
+      });
+    }, 1500);
     
     // Show confirmation screen
     setLoiSubmitted(true);
@@ -106,9 +120,11 @@ export const LetterOfIntentForm = ({
     if (loiSubmitted) {
       setShowConfirmation(false);
       setLoiSubmitted(false);
+      setEmailSent(false);
       form.reset({
         investmentAmount: minInvestment,
         paymentMethod: "bank",
+        email: "",
         additionalInfo: "",
         termsAccepted: false,
       });
@@ -128,9 +144,9 @@ export const LetterOfIntentForm = ({
           {!showConfirmation ? (
             <>
               <DialogHeader>
-                <DialogTitle>Letter of Intent</DialogTitle>
+                <DialogTitle>Invest in {propertyName}</DialogTitle>
                 <DialogDescription>
-                  Express your interest in investing in {propertyName}
+                  Complete your investment details below
                 </DialogDescription>
               </DialogHeader>
               
@@ -183,26 +199,51 @@ export const LetterOfIntentForm = ({
                             <div className="flex items-center space-x-2 border rounded-md p-2">
                               <RadioGroupItem value="wire" id="wire" />
                               <Label htmlFor="wire" className="flex items-center">
-                                <Landmark className="mr-2 h-4 w-4" />
-                                Wire Transfer
+                                <Globe className="mr-2 h-4 w-4" />
+                                International Wire Transfer
                               </Label>
                             </div>
                             <div className="flex items-center space-x-2 border rounded-md p-2">
                               <RadioGroupItem value="credit" id="credit" />
                               <Label htmlFor="credit" className="flex items-center">
                                 <CreditCard className="mr-2 h-4 w-4" />
-                                Credit Card
+                                Secure Credit Card
                               </Label>
                             </div>
                             <div className="flex items-center space-x-2 border rounded-md p-2">
-                              <RadioGroupItem value="other" id="other" />
-                              <Label htmlFor="other" className="flex items-center">
-                                <LayoutList className="mr-2 h-4 w-4" />
-                                Other
+                              <RadioGroupItem value="blockchain" id="blockchain" />
+                              <Label htmlFor="blockchain" className="flex items-center">
+                                <Bitcoin className="mr-2 h-4 w-4" />
+                                Blockchain Transfer
                               </Label>
                             </div>
                           </RadioGroup>
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email for Confirmation</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+                            <Input
+                              type="email"
+                              placeholder="your@email.com"
+                              className="pl-8"
+                              {...field}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Leave empty to use your account email
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -229,8 +270,8 @@ export const LetterOfIntentForm = ({
                   <div className="bg-blue-50 border border-blue-100 rounded-md p-3 flex items-start gap-2">
                     <AlertCircle className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
                     <div className="text-sm text-blue-600">
-                      <p className="font-medium mb-1">Important Notice</p>
-                      <p>This Letter of Intent is non-binding and does not guarantee participation in this investment opportunity. Our team will review your intent and contact you with next steps.</p>
+                      <p className="font-medium mb-1">Secure Transaction</p>
+                      <p>Your investment will be processed securely. You will receive confirmation by email once completed.</p>
                     </div>
                   </div>
                   
@@ -274,7 +315,7 @@ export const LetterOfIntentForm = ({
                     >
                       Cancel
                     </Button>
-                    <Button type="submit">Submit Intent</Button>
+                    <Button type="submit">Complete Investment</Button>
                   </DialogFooter>
                 </form>
               </Form>
@@ -284,10 +325,10 @@ export const LetterOfIntentForm = ({
               <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
                 <Check className="h-6 w-6 text-green-600" />
               </div>
-              <DialogTitle className="mb-2">Investment Intent Submitted!</DialogTitle>
+              <DialogTitle className="mb-2">Investment Successful!</DialogTitle>
               <DialogDescription className="mb-6">
                 <p className="mb-4">
-                  Your Letter of Intent has been received. Our team will review your submission and contact you shortly with next steps.
+                  Your investment has been processed successfully. Details have been sent to your email.
                 </p>
                 <div className="bg-gray-50 p-4 rounded-md mb-4">
                   <div className="flex justify-between mb-2">
@@ -298,13 +339,28 @@ export const LetterOfIntentForm = ({
                     <span className="text-sm text-gray-500">Amount</span>
                     <span className="text-sm font-medium">${form.getValues().investmentAmount.toLocaleString()}</span>
                   </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-gray-500">Payment Method</span>
+                    <span className="text-sm font-medium">
+                      {form.getValues().paymentMethod === "bank" && "Bank Transfer"}
+                      {form.getValues().paymentMethod === "wire" && "Wire Transfer"}
+                      {form.getValues().paymentMethod === "credit" && "Credit Card"}
+                      {form.getValues().paymentMethod === "blockchain" && "Blockchain Transfer"}
+                    </span>
+                  </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Status</span>
-                    <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200">Pending Review</Badge>
+                    <Badge variant="success" className="text-green-600">Completed</Badge>
                   </div>
                 </div>
+                {emailSent && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-green-600 mb-4">
+                    <Mail className="h-4 w-4" />
+                    <span>Confirmation email sent</span>
+                  </div>
+                )}
                 <p className="text-sm text-gray-600">
-                  You can view and manage your investment intents in your dashboard.
+                  You can view and manage your investments in your dashboard.
                 </p>
               </DialogDescription>
               <DialogFooter className="justify-center">
