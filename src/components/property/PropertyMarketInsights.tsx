@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, TrendingUp, Globe, RefreshCw } from "lucide-react";
+import { ArrowRight, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MarketInsightsList, processMarketInsights } from './MarketInsightsList';
@@ -20,21 +20,12 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [marketData, setMarketData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>("cherry-data"); // Setting CHERRY data as default
-  const [cherryData, setCherryData] = useState<any>({
-    averageSalePrice: "$875,500",
-    saleIncrease: "+4.2%",
-    averageRent: "$3,250",
-    rentIncrease: "+2.7%",
-    daysOnMarket: "28",
-    inventoryChange: "-15%"
-  });
-  const [isCherryLoading, setIsCherryLoading] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>("market-data");
 
   // Fetch data on component mount
   useEffect(() => {
     fetchPropertyData();
-  }, [propertyAddress, propertyCity]);
+  }, []);
 
   const fetchPropertyData = async () => {
     setIsLoading(true);
@@ -110,30 +101,6 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
     }
   };
 
-  const refreshCherryData = () => {
-    setIsCherryLoading(true);
-    
-    // Simulate fetching updated data from CHERRY
-    setTimeout(() => {
-      // Update with "fresh" data (for demo purposes, we're just using slightly different values)
-      setCherryData({
-        averageSalePrice: "$878,200",
-        saleIncrease: "+4.5%",
-        averageRent: "$3,275",
-        rentIncrease: "+2.9%",
-        daysOnMarket: "26",
-        inventoryChange: "-16%"
-      });
-      
-      setIsCherryLoading(false);
-      
-      toast({
-        title: "CHERRY Data Updated",
-        description: "Market data from CHERRY has been refreshed successfully",
-      });
-    }, 1200);
-  };
-
   const insights = marketData ? processMarketInsights(marketData) : [];
   const aiAnalysis = marketData?.aiAnalysis || null;
 
@@ -150,12 +117,9 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
       return (
         <div className="space-y-4">
           <Tabs defaultValue={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="market-data" className="text-xs">
                 Market Data
-              </TabsTrigger>
-              <TabsTrigger value="cherry-data" className="text-xs">
-                CHERRY Data
               </TabsTrigger>
               <TabsTrigger 
                 value="ai-analysis" 
@@ -168,95 +132,6 @@ export const PropertyMarketInsights = ({ propertyAddress, propertyCity }: Proper
             
             <TabsContent value="market-data" className="mt-4">
               <MarketInsightsList insights={insights} />
-            </TabsContent>
-            
-            <TabsContent value="cherry-data" className="mt-4">
-              <div className="flex justify-between items-center mb-3">
-                <div className="text-xs text-blue-600 font-medium flex items-center">
-                  <Globe className="w-3.5 h-3.5 mr-1" />
-                  Source: CHERRE Data Platform
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-xs h-7 px-2"
-                  onClick={refreshCherryData}
-                  disabled={isCherryLoading}
-                >
-                  {isCherryLoading ? (
-                    <>
-                      <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="w-3 h-3 mr-1" />
-                      Refresh CHERRY Data
-                    </>
-                  )}
-                </Button>
-              </div>
-              
-              {isCherryLoading ? (
-                <div className="py-6 text-center">
-                  <RefreshCw className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Refreshing CHERRY market data...</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-3 p-1">
-                    <div className="bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                      <div className="text-sm text-gray-500">Average Sale Price</div>
-                      <div className="flex items-baseline mt-1">
-                        <span className="text-lg font-medium">{cherryData.averageSalePrice}</span>
-                        <span className="text-xs text-green-500 ml-2">{cherryData.saleIncrease}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                      <div className="text-sm text-gray-500">Average Rent</div>
-                      <div className="flex items-baseline mt-1">
-                        <span className="text-lg font-medium">{cherryData.averageRent}</span>
-                        <span className="text-xs text-green-500 ml-2">{cherryData.rentIncrease}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                      <div className="text-sm text-gray-500">Days on Market</div>
-                      <div className="flex items-baseline mt-1">
-                        <span className="text-lg font-medium">{cherryData.daysOnMarket}</span>
-                        <span className="text-xs text-blue-500 ml-2">days</span>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-gray-50 p-3 rounded-md hover:bg-gray-100 transition-colors">
-                      <div className="text-sm text-gray-500">Inventory</div>
-                      <div className="flex items-baseline mt-1">
-                        <span className="text-lg font-medium">37 units</span>
-                        <span className="text-xs text-red-500 ml-2">{cherryData.inventoryChange}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-blue-50 p-4 rounded-md mt-4">
-                    <div className="flex items-start gap-3">
-                      <Globe className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-                      <div>
-                        <h4 className="text-sm font-medium text-blue-800">CHERRY Market Analysis</h4>
-                        <p className="text-sm text-blue-700 mt-1">
-                          This market shows strong fundamentals with decreasing inventory and increasing prices, indicating a seller's market. The property is in an area with high demand and limited supply.
-                        </p>
-                        <div className="mt-3 pt-3 border-t border-blue-200">
-                          <h5 className="text-xs font-medium text-blue-800 mb-1">Rental Demand</h5>
-                          <p className="text-xs text-blue-700">
-                            Strong rental demand in this area with vacancy rates 1.2% below the metropolitan average. Property values have consistently appreciated over the last 36 months.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
             </TabsContent>
             
             <TabsContent value="ai-analysis" className="mt-4">
