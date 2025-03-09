@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,8 +56,8 @@ export const WebCrawlForm = () => {
       // Save API key for future use
       localStorage.setItem("firecrawlApiKey", apiKey);
       
-      // Create a new FirecrawlService instance
-      const firecrawlService = new FirecrawlService(apiKey);
+      // Use the static method instead of creating an instance
+      FirecrawlService.saveApiKey(apiKey);
       
       // Start crawling
       toast({
@@ -66,13 +65,13 @@ export const WebCrawlForm = () => {
         description: "This may take a few minutes depending on website size.",
       });
 
-      const response = await firecrawlService.crawlWebsite(url, searchQuery, maxPages);
+      const response = await FirecrawlService.crawlWebsite(url);
       
       setResults(response);
       
       toast({
         title: "Crawl Complete",
-        description: `Successfully crawled ${response.results?.length || 0} pages`,
+        description: `Successfully crawled ${response.data?.completed || 0} pages`,
         variant: "success",
       });
     } catch (err) {
@@ -196,13 +195,13 @@ export const WebCrawlForm = () => {
           <CardHeader>
             <CardTitle>Crawl Results</CardTitle>
             <CardDescription>
-              Found {results.results?.length || 0} pages from {url}
+              Found {results.data?.completed || 0} pages from {url}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="max-h-96 overflow-y-auto space-y-4">
-              {results.results?.length > 0 ? (
-                results.results.map((page: any, index: number) => (
+              {results.data?.completed > 0 ? (
+                results.data.results.map((page: any, index: number) => (
                   <div key={index} className="border rounded-md p-4">
                     <h3 className="font-medium mb-1 truncate">
                       <a href={page.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">

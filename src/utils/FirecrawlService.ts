@@ -22,6 +22,7 @@ type CrawlResponse = CrawlStatusResponse | ErrorResponse;
 
 export class FirecrawlService {
   private static API_KEY_STORAGE_KEY = 'firecrawl_api_key';
+  private static OPENAI_API_KEY_STORAGE_KEY = 'openai_api_key';
   
   static saveApiKey(apiKey: string): void {
     localStorage.setItem(this.API_KEY_STORAGE_KEY, apiKey);
@@ -30,6 +31,25 @@ export class FirecrawlService {
 
   static getApiKey(): string | null {
     return localStorage.getItem(this.API_KEY_STORAGE_KEY);
+  }
+
+  static saveOpenAIApiKey(apiKey: string): void {
+    localStorage.setItem(this.OPENAI_API_KEY_STORAGE_KEY, apiKey);
+    console.log('OpenAI API key saved successfully');
+  }
+
+  static getOpenAIApiKey(): string | null {
+    return localStorage.getItem(this.OPENAI_API_KEY_STORAGE_KEY);
+  }
+
+  static async testApiKey(apiKey: string): Promise<boolean> {
+    console.log('Mock testing API key');
+    return true; // Mock successful API key test
+  }
+
+  static async testOpenAIApiKey(apiKey: string): Promise<boolean> {
+    console.log('Mock testing OpenAI API key');
+    return true; // Mock successful OpenAI API key test
   }
 
   // This method only returns mock data now
