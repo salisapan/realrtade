@@ -1,21 +1,17 @@
-
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { useState, useEffect } from "react";
-
 interface Category {
   id: string;
   name: string;
   active: boolean;
 }
-
 interface PropertiesHeaderProps {
   categories: Category[];
   onSelectCategory: (categoryId: string) => void;
 }
-
 export const PropertiesHeader = ({
   categories,
   onSelectCategory
@@ -42,9 +38,7 @@ export const PropertiesHeader = ({
       setIsLoggedIn(false);
     }
   }, []);
-
-  return (
-    <header className="bg-white shadow-sm sticky top-0 z-10 w-full">
+  return <header className="bg-white shadow-sm sticky top-0 z-10 w-full">
       <div className="container mx-auto px-2 py-2 md:px-4 md:py-3">
         <div className="flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-4 mb-2 sm:mb-4">
           <div className="flex items-center w-full sm:w-auto">
@@ -60,47 +54,32 @@ export const PropertiesHeader = ({
             </div>
             
             {/* Show user name if logged in, otherwise show Sign Up button */}
-            {isLoggedIn ? (
-              <div className="hidden sm:flex items-center gap-1 mr-2">
+            {isLoggedIn ? <div className="hidden sm:flex items-center gap-1 mr-2">
                 <User className="w-4 h-4 text-gray-500" />
                 <span className="text-sm font-medium text-gray-700">{userName}</span>
-              </div>
-            ) : (
-              <Link to="/investor-signup" className="hidden sm:block">
+              </div> : <Link to="/investor-signup" className="hidden sm:block">
                 <Button variant="default" size="sm">
                   Sign Up
                 </Button>
-              </Link>
-            )}
+              </Link>}
             
             {/* Mobile menu button */}
-            <Button 
-              variant="default" 
-              size="icon" 
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-full bg-primary text-white shadow-lg" 
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
+            
           </div>
         </div>
         
         {/* Mobile menu */}
-        {isMenuOpen && (
-          <div className="md:hidden py-3 border-t mb-3">
-            {isLoggedIn ? (
-              <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-md">
+        {isMenuOpen && <div className="md:hidden py-3 border-t mb-3">
+            {isLoggedIn ? <div className="flex items-center gap-2 mb-3 p-2 bg-gray-50 rounded-md">
                 <User className="w-5 h-5 text-primary" />
                 <span className="font-medium">{userName}</span>
-              </div>
-            ) : null}
+              </div> : null}
             <nav className="flex flex-col space-y-2">
               <Link to="/" className="flex items-center gap-2 text-primary font-medium p-2 rounded-md bg-gray-50">
                 <Home className="w-5 h-5" />
                 <span>Home</span>
               </Link>
-              {isLoggedIn ? (
-                <>
+              {isLoggedIn ? <>
                   <Link to="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                     <Home className="w-5 h-5" />
                     <span>Dashboard</span>
@@ -109,16 +88,12 @@ export const PropertiesHeader = ({
                     <Home className="w-5 h-5" />
                     <span>Properties</span>
                   </Link>
-                </>
-              ) : (
-                <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
+                </> : <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                   <User className="w-5 h-5" />
                   <span>Sign Up</span>
-                </Link>
-              )}
+                </Link>}
             </nav>
-          </div>
-        )}
+          </div>}
         
         <div className="overflow-x-auto pb-1 -mx-2 sm:-mx-4 px-2 sm:px-4 no-scrollbar">
           <CategoryFilter categories={categories} onSelect={onSelectCategory} />
@@ -133,6 +108,5 @@ export const PropertiesHeader = ({
           </button>
         </div>
       </div>
-    </header>
-  );
+    </header>;
 };
