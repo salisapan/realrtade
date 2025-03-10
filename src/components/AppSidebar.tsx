@@ -1,7 +1,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X } from "lucide-react";
+import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X, Rocket } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -9,6 +9,7 @@ const menuItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "Properties", url: "/properties", icon: Building2 },
+  { title: "Autopilot", url: "/autopilot", icon: Rocket },
   { title: "Performance", url: "/performance", icon: LineChart },
   { title: "Reports", url: "/reports", icon: FileText },
   { title: "Wallet", url: "/wallet", icon: DollarSign },
