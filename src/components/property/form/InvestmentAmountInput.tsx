@@ -33,9 +33,10 @@ export const InvestmentAmountInput = ({ form, minInvestment }: InvestmentAmountI
                   if (!isNaN(value)) {
                     field.onChange(value);
                   } else {
-                    field.onChange(0);
+                    field.onChange(minInvestment);
                   }
                 }}
+                placeholder={`${minInvestment}`}
                 required
               />
             </div>

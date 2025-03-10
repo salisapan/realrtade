@@ -67,7 +67,7 @@ export const InvestmentForm = ({
           
           <SecureTransactionInfo />
           
-          <DialogFooter className="sm:justify-between">
+          <DialogFooter className="sm:justify-between pt-2">
             <Button 
               type="button" 
               variant="outline" 

@@ -67,6 +67,7 @@ export const InvestmentContract = ({
                 checked={field.value}
                 onCheckedChange={field.onChange}
                 id="terms"
+                className="border-primary"
               />
             </FormControl>
             <div className="space-y-1 leading-none">
