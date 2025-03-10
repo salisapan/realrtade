@@ -48,8 +48,8 @@ export const PropertyCard = ({
   
   return (
     <Link to={`/property/${id}`} className="block h-full">
-      <Card className="overflow-hidden transition-all duration-300 hover:shadow-lg animate-fade-in card-hover h-full">
-        <div className="relative aspect-[4/3] overflow-hidden">
+      <Card className="overflow-visible transition-all duration-300 hover:shadow-lg animate-fade-in card-hover h-full pb-2">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-t-lg">
           <img
             src={displayImage}
             alt={title}
@@ -122,11 +122,11 @@ export const PropertyCard = ({
           <div className="grid grid-cols-2 gap-3 text-sm border-t pt-3 mt-2">
             <div>
               <span className="block text-gray-500 text-xs">Area</span>
-              <span className="font-medium">{sqft}</span>
+              <span className="font-medium break-words">{sqft}</span>
             </div>
             <div>
               <span className="block text-gray-500 text-xs">Floors</span>
-              <span className="font-medium">{floors}</span>
+              <span className="font-medium break-words">{floors}</span>
             </div>
             <div>
               <span className="block text-gray-500 text-xs">Year</span>

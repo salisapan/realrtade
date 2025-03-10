@@ -46,7 +46,7 @@ const Index = () => {
   return (
     <div className="flex flex-col md:flex-row">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 w-full overflow-x-hidden">
+      <div className="flex-1 min-h-screen bg-gray-50 w-full overflow-x-hidden pb-20">
         <PropertiesHeader 
           categories={categories.map(cat => ({
             ...cat,

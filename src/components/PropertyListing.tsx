@@ -16,13 +16,13 @@ export const PropertyListing = ({ properties }: PropertyListingProps) => {
   };
 
   return (
-    <div className={`grid gap-4 sm:gap-6 w-full px-2 sm:px-0 pb-8 sm:pb-4 
+    <div className={`grid gap-4 sm:gap-6 w-full px-2 sm:px-0 pb-12 sm:pb-4 
       ${isMobile ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
       {properties.map((property) => (
         <div 
           key={property.id} 
           onClick={() => handlePropertyClick(property.id)} 
-          className="cursor-pointer w-full mb-2 transform transition-transform duration-300 hover:translate-y-[-4px]"
+          className="cursor-pointer w-full mb-6 sm:mb-2 transform transition-transform duration-300 hover:translate-y-[-4px] overflow-visible"
         >
           <PropertyCard {...property} />
         </div>
