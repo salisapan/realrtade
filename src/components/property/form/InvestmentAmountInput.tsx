@@ -17,7 +17,7 @@ export const InvestmentAmountInput = ({ form, minInvestment }: InvestmentAmountI
       name="investmentAmount"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Investment Amount</FormLabel>
+          <FormLabel>Investment Amount <span className="text-red-500">*</span></FormLabel>
           <FormControl>
             <div className="relative">
               <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -26,6 +26,7 @@ export const InvestmentAmountInput = ({ form, minInvestment }: InvestmentAmountI
                 min={minInvestment}
                 className="pl-8"
                 {...field}
+                required
               />
             </div>
           </FormControl>
