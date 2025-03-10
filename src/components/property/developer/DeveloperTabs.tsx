@@ -18,32 +18,38 @@ export const DeveloperTabs = ({ developer }: DeveloperTabsProps) => {
   
   return (
     <Tabs defaultValue="overview" className="mt-4">
-      {/* Custom mobile-friendly tabs layout */}
       <div className="relative overflow-x-auto pb-2 -mx-2 px-2">
-        <TabsList className={`grid w-full h-auto ${isMobile ? 'grid-cols-2 gap-1' : 'grid-cols-5'}`}>
-          {isMobile ? (
-            <>
-              <div className="contents">
-                <TabsTrigger value="overview" className="text-xs py-2 px-1">Overview</TabsTrigger>
-                <TabsTrigger value="projects" className="text-xs py-2 px-1">Past Projects</TabsTrigger>
-              </div>
-              <div className="contents">
-                <TabsTrigger value="performance" className="text-xs py-2 px-1">Performance</TabsTrigger>
-                <TabsTrigger value="risk" className="text-xs py-2 px-1">Risk Factors</TabsTrigger>
-              </div>
-              <div className="col-span-2 mt-1">
-                <TabsTrigger value="media" className="text-xs py-2 w-full">Media & Legal</TabsTrigger>
-              </div>
-            </>
-          ) : (
-            <>
-              <TabsTrigger value="overview" className="text-xs py-2">Overview</TabsTrigger>
-              <TabsTrigger value="projects" className="text-xs py-2">Past Projects</TabsTrigger>
-              <TabsTrigger value="performance" className="text-xs py-2">Performance</TabsTrigger>
-              <TabsTrigger value="risk" className="text-xs py-2">Risk Factors</TabsTrigger>
-              <TabsTrigger value="media" className="text-xs py-2">Media & Legal</TabsTrigger>
-            </>
-          )}
+        <TabsList className={`flex w-full h-auto rounded-lg p-1 ${isMobile ? 'flex-wrap gap-1 justify-center' : ''}`}>
+          <TabsTrigger 
+            value="overview" 
+            className="text-xs py-1.5 px-3 rounded-md flex-1 max-w-[110px]"
+          >
+            Overview
+          </TabsTrigger>
+          <TabsTrigger 
+            value="projects" 
+            className="text-xs py-1.5 px-3 rounded-md flex-1 max-w-[110px]"
+          >
+            Past Projects
+          </TabsTrigger>
+          <TabsTrigger 
+            value="performance" 
+            className="text-xs py-1.5 px-3 rounded-md flex-1 max-w-[110px]"
+          >
+            Performance
+          </TabsTrigger>
+          <TabsTrigger 
+            value="risk" 
+            className="text-xs py-1.5 px-3 rounded-md flex-1 max-w-[110px]"
+          >
+            Risk Factors
+          </TabsTrigger>
+          <TabsTrigger 
+            value="media" 
+            className="text-xs py-1.5 px-3 rounded-md flex-1 max-w-[110px]"
+          >
+            Media & Legal
+          </TabsTrigger>
         </TabsList>
       </div>
       

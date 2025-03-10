@@ -22,7 +22,7 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
           <span className="text-yellow-500 text-sm ml-1">★ {developer.rating}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
         <DeveloperProfileHeader developer={developer} />
         <DeveloperTabs developer={developer} />
       </DialogContent>

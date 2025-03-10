@@ -29,7 +29,7 @@ export const DashboardHeader = ({
           
           {onAddDeal && (
             <Button 
-              onClick={onAddDeal} 
+              onClick={onAddDeal}
               size="sm" 
               className="flex items-center gap-2"
             >
