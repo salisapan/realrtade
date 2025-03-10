@@ -88,7 +88,7 @@ const Index = () => {
           </Tabs>
         </main>
         
-        {/* Add our new How Property Ownership Works section */}
+        {/* Add our How Property Ownership Works section */}
         <HowPropertyOwnershipWorks />
       </div>
     </div>
