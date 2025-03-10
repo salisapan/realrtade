@@ -36,7 +36,7 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
             <TabsTrigger value="media" className="text-xs py-2">Media & Legal</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="overview" className="pt-4">
+          <TabsContent value="overview" className="pt-4 block">
             <div className="mb-4">
               <h3 className="text-sm font-semibold mb-2">About {developer.name}</h3>
               <p className="text-sm text-gray-700">{developer.bio}</p>
@@ -74,7 +74,7 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
             </div>
           </TabsContent>
           
-          <TabsContent value="projects" className="pt-4">
+          <TabsContent value="projects" className="pt-4 block">
             <h3 className="text-sm font-semibold mb-3">Past Project History</h3>
             <div className="space-y-3">
               {developer.pastProjects.map((project, index) => (
@@ -101,7 +101,7 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
             </div>
           </TabsContent>
           
-          <TabsContent value="performance" className="pt-4">
+          <TabsContent value="performance" className="pt-4 block">
             <h3 className="text-sm font-semibold mb-3">Annual ROI Performance</h3>
             <div className="h-64 bg-gray-50 p-3 rounded-lg">
               <ResponsiveContainer width="100%" height="100%">
@@ -152,7 +152,7 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
             </div>
           </TabsContent>
           
-          <TabsContent value="risk" className="pt-4">
+          <TabsContent value="risk" className="pt-4 block">
             <h3 className="text-sm font-semibold mb-3">Risk Assessment</h3>
             <div className="space-y-3">
               {developer.riskFactors.map((risk, index) => (
@@ -186,7 +186,7 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
             </div>
           </TabsContent>
           
-          <TabsContent value="media" className="pt-4">
+          <TabsContent value="media" className="pt-4 block">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <h3 className="text-sm font-semibold mb-3">Recent Media Coverage</h3>
