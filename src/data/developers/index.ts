@@ -4,7 +4,7 @@ import { pinnacleData } from "./pinnacleData";
 import { urbanHorizonData } from "./urbanHorizonData";
 import { extellData } from "./extellData";
 
-export { Developer } from "./types";
+export type { Developer } from "./types";
 
 export const developers: Developer[] = [
   pinnacleData,
@@ -19,3 +19,4 @@ export const getDeveloperById = (id: string): Developer | undefined => {
 export const getDeveloperByName = (name: string): Developer | undefined => {
   return developers.find(developer => developer.name.toLowerCase() === name.toLowerCase());
 };
+
