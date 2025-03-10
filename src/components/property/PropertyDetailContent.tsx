@@ -11,7 +11,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
 import { DeveloperProfileModal } from "./DeveloperProfileModal";
 import { getDeveloperByName } from "@/data/developerData";
-
 interface PropertyDetailContentProps {
   property: {
     id: string;
@@ -38,9 +37,7 @@ interface PropertyDetailContentProps {
     [key: string]: any;
   };
 }
-
 const COLORS = ['#1A2E5A', '#007BFF', '#A9A9A9', '#0D47A1', '#5C93D8'];
-
 const roiTimelineData = [{
   year: '2023',
   expected: 8.2,
@@ -70,7 +67,6 @@ const roiTimelineData = [{
 // Helper function to get appropriate icon based on feature content
 const getFeatureIcon = (feature: string) => {
   const lowerFeature = feature.toLowerCase();
-  
   if (lowerFeature.includes('modern') || lowerFeature.includes('facility') || lowerFeature.includes('amenities') || lowerFeature.includes('building')) {
     return <Building className="w-3 h-3 text-primary" />;
   } else if (lowerFeature.includes('transport') || lowerFeature.includes('access') || lowerFeature.includes('highway') || lowerFeature.includes('airport')) {
@@ -87,41 +83,37 @@ const getFeatureIcon = (feature: string) => {
     return <LandPlot className="w-3 h-3 text-primary" />;
   }
 };
-
 export const PropertyDetailContent = ({
   property
 }: PropertyDetailContentProps) => {
   const isMobile = useIsMobile();
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const developerName = property.company || "EXTELL";
   const developer = getDeveloperByName(developerName);
-  
   const handleScheduleCall = () => {
     try {
       // Open Calendly in a new tab for scheduling
       window.open('https://calendly.com/realtrade/investment-call', '_blank');
-      
       toast({
         title: "Schedule a Call",
-        description: "Opening scheduling tool in a new tab",
+        description: "Opening scheduling tool in a new tab"
       });
     } catch (error) {
       toast({
         title: "Error",
         description: "Unable to open scheduling tool. Please try again later.",
-        variant: "destructive",
+        variant: "destructive"
       });
       console.error("Failed to open Calendly:", error);
     }
   };
-
   const getPropertyCity = () => {
     const locationParts = property.location.split(',');
     return locationParts.length > 1 ? locationParts[1].trim() : 'New York';
   };
-
-  return (
-    <div className="p-4 md:p-6 md:p-8">
+  return <div className="p-4 md:p-6 md:p-8">
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6 md:mb-8">
         <div>
           <div className="flex items-center flex-wrap gap-2 mb-2">
@@ -138,16 +130,11 @@ export const PropertyDetailContent = ({
             <Map className="w-4 h-4 mr-1" />
             <span>{property.location}</span>
           </div>
-          {developer && (
-            <div className="flex items-center gap-1 mb-4">
+          {developer && <div className="flex items-center gap-1 mb-4">
               <Building className="w-4 h-4 text-gray-500 mr-1" />
               <DeveloperProfileModal developer={developer} />
-              <div className="flex items-center text-yellow-500 ml-2">
-                <Star className="w-3 h-3 fill-yellow-500" />
-                <span className="text-xs ml-1">{developer.rating}/5</span>
-              </div>
-            </div>
-          )}
+              
+            </div>}
         </div>
         
         <div className="bg-gray-50 rounded-lg p-3 w-full md:w-auto md:min-w-[180px]">
@@ -161,10 +148,9 @@ export const PropertyDetailContent = ({
                 </div>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                <div 
-                  className="bg-primary h-2 rounded-full" 
-                  style={{width: `${property.fundingProgress}%`}}
-                ></div>
+                <div className="bg-primary h-2 rounded-full" style={{
+                width: `${property.fundingProgress}%`
+              }}></div>
               </div>
             </div>
             
@@ -175,15 +161,11 @@ export const PropertyDetailContent = ({
               </div>
               <div className="bg-white p-2 rounded border">
                 <div className="text-gray-500 mb-1">Min. Investment</div>
-                <div className="font-bold text-gray-800">${(property.minInvestment).toLocaleString()}</div>
+                <div className="font-bold text-gray-800">${property.minInvestment.toLocaleString()}</div>
               </div>
             </div>
             
-            <LetterOfIntentForm 
-              propertyId={property.id} 
-              propertyName={property.name} 
-              minInvestment={property.minInvestment} 
-            />
+            <LetterOfIntentForm propertyId={property.id} propertyName={property.name} minInvestment={property.minInvestment} />
           </div>
         </div>
       </div>
@@ -235,14 +217,12 @@ export const PropertyDetailContent = ({
           <div>
             <h2 className="text-lg font-bold mb-3">Key Features</h2>
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
-              {property.keyFeatures.map((feature, index) => (
-                <li key={index} className="flex items-center gap-2">
+              {property.keyFeatures.map((feature, index) => <li key={index} className="flex items-center gap-2">
                   <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     {getFeatureIcon(feature)}
                   </div>
                   <span className="text-sm">{feature}</span>
-                </li>
-              ))}
+                </li>)}
             </ul>
           </div>
           
@@ -286,18 +266,26 @@ export const PropertyDetailContent = ({
               <div className="investment-chart">
                 <ResponsiveContainer width="100%" height={250}>
                   <AreaChart data={roiTimelineData} margin={{
-                    top: 10,
-                    right: 10,
-                    left: 0,
-                    bottom: 20
-                  }}>
+                  top: 10,
+                  right: 10,
+                  left: 0,
+                  bottom: 20
+                }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="year" tick={{fontSize: 10}} />
-                    <YAxis tick={{fontSize: 10}} />
-                    <RechartsTooltip contentStyle={{fontSize: 12}} />
+                    <XAxis dataKey="year" tick={{
+                    fontSize: 10
+                  }} />
+                    <YAxis tick={{
+                    fontSize: 10
+                  }} />
+                    <RechartsTooltip contentStyle={{
+                    fontSize: 12
+                  }} />
                     <Area type="monotone" dataKey="expected" stackId="1" stroke="#1A2E5A" fill="#1A2E5A" name="Expected ROI %" />
                     <Area type="monotone" dataKey="actual" stackId="2" stroke="#007BFF" fill="#007BFF" name="Actual ROI %" />
-                    <Legend wrapperStyle={{fontSize: 10}} />
+                    <Legend wrapperStyle={{
+                    fontSize: 10
+                  }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -351,31 +339,16 @@ export const PropertyDetailContent = ({
         </div>
         
         <div className="space-y-6 md:space-y-8">
-          <RecommendationRating 
-            score={property.recommendationScore} 
-            marketTrend={property.marketTrend} 
-            entrepreneurExperience={property.entrepreneurExperience} 
-            riskLevel={property.riskLevel} 
-            demandLevel={property.demandLevel} 
-            returnPotential={property.returnPotential} 
-          />
+          <RecommendationRating score={property.recommendationScore} marketTrend={property.marketTrend} entrepreneurExperience={property.entrepreneurExperience} riskLevel={property.riskLevel} demandLevel={property.demandLevel} returnPotential={property.returnPotential} />
           
-          <PropertyMarketNews 
-            propertyType={property.type || "Commercial"}
-            propertyLocation={getPropertyCity()}
-          />
+          <PropertyMarketNews propertyType={property.type || "Commercial"} propertyLocation={getPropertyCity()} />
           
           <div className="bg-white border rounded-lg p-4">
             <h3 className="font-semibold mb-3">Need Help?</h3>
             <p className="text-sm text-gray-600 mb-3">
               Our investment advisors are available to answer any questions about this property.
             </p>
-            <Button 
-              type="button" 
-              variant="outline" 
-              className="w-full flex items-center justify-center gap-2"
-              onClick={handleScheduleCall}
-            >
+            <Button type="button" variant="outline" className="w-full flex items-center justify-center gap-2" onClick={handleScheduleCall}>
               <Phone className="w-4 h-4" />
               Schedule a Call
             </Button>
@@ -384,16 +357,11 @@ export const PropertyDetailContent = ({
           <div className="bg-white border rounded-lg p-4">
             <h3 className="font-semibold mb-3">Ready to Invest?</h3>
             <p className="text-sm text-gray-600 mb-3">
-              Start your investment journey with as little as ${(property.minInvestment).toLocaleString()}.
+              Start your investment journey with as little as ${property.minInvestment.toLocaleString()}.
             </p>
-            <LetterOfIntentForm 
-              propertyId={property.id} 
-              propertyName={property.name} 
-              minInvestment={property.minInvestment} 
-            />
+            <LetterOfIntentForm propertyId={property.id} propertyName={property.name} minInvestment={property.minInvestment} />
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
