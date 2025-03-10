@@ -7,7 +7,9 @@ interface DeveloperOverviewProps {
 }
 
 export const DeveloperOverview = ({ developer }: DeveloperOverviewProps) => {
+  // Calculate average ROI and format it to one decimal place
   const averageROI = developer.performanceData.reduce((acc, curr) => acc + curr.roi, 0) / developer.performanceData.length;
+  const formattedROI = averageROI.toFixed(1);
 
   return (
     <div className="space-y-4">
@@ -48,7 +50,7 @@ export const DeveloperOverview = ({ developer }: DeveloperOverviewProps) => {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Average ROI</span>
-              <span>{averageROI.toFixed(1)}%</span>
+              <span>{formattedROI}%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Legal History</span>
