@@ -52,7 +52,10 @@ const Recommendations = () => {
       <AppSidebar />
       <div className="flex-1 min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-6">
-          <AIRecommendationHeader />
+          <AIRecommendationHeader 
+            userName="Investor" 
+            isLoading={loading} 
+          />
           
           <div className="mt-6">
             <RecommendationPreferenceForm 
