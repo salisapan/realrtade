@@ -1,10 +1,10 @@
-
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Building2, LineChart, Users, DollarSign, ArrowRight, Star, Shield, Clock } from "lucide-react";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Testimonials } from "@/components/landing/Testimonials";
 import { HomeFooter } from "@/components/landing/HomeFooter";
+import { HowPropertyOwnershipWorks } from "@/components/HowPropertyOwnershipWorks";
 
 const Landing = () => {
   return (
@@ -45,7 +45,7 @@ const Landing = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
           <div className="bg-white p-5 md:p-6 rounded-lg shadow-sm border border-gray-100 text-center">
             <div className="bg-primary/10 w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
-              <Shield className="w-6 h-6 md:w-8 md:h-8 text-primary" />
+              Shield className="w-6 h-6 md:w-8 md:h-8 text-primary" />
             </div>
             <h3 className="text-lg md:text-xl font-semibold mb-2">Verified Investments</h3>
             <p className="text-sm md:text-base text-gray-600">
@@ -55,7 +55,7 @@ const Landing = () => {
           
           <div className="bg-white p-5 md:p-6 rounded-lg shadow-sm border border-gray-100 text-center">
             <div className="bg-primary/10 w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
-              <DollarSign className="w-6 h-6 md:w-8 md:h-8 text-primary" />
+              DollarSign className="w-6 h-6 md:w-8 md:h-8 text-primary" />
             </div>
             <h3 className="text-lg md:text-xl font-semibold mb-2">Low Minimums</h3>
             <p className="text-sm md:text-base text-gray-600">
@@ -65,7 +65,7 @@ const Landing = () => {
           
           <div className="bg-white p-5 md:p-6 rounded-lg shadow-sm border border-gray-100 text-center">
             <div className="bg-primary/10 w-12 h-12 md:w-16 md:h-16 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
-              <Clock className="w-6 h-6 md:w-8 md:h-8 text-primary" />
+              Clock className="w-6 h-6 md:w-8 md:h-8 text-primary" />
             </div>
             <h3 className="text-lg md:text-xl font-semibold mb-2">Regular Returns</h3>
             <p className="text-sm md:text-base text-gray-600">
@@ -109,6 +109,9 @@ const Landing = () => {
           </Button>
         </Link>
       </div>
+
+      {/* How Property Ownership Works Section */}
+      <HowPropertyOwnershipWorks />
 
       {/* Testimonials Section */}
       <Testimonials />

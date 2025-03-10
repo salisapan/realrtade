@@ -1,10 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PropertyListing } from "@/components/PropertyListing";
 import { PropertiesHeader } from "@/components/PropertiesHeader";
-import { HowPropertyOwnershipWorks } from "@/components/HowPropertyOwnershipWorks";
 import { categories } from "@/data/propertyData";
 import { affordableDeals } from "@/components/properties/AffordableDealsList";
 import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
@@ -15,17 +13,14 @@ const Index = () => {
   const [properties, setProperties] = useState<any[]>([]);
   const { investorProfile, isLoading } = useInvestorProfile();
   
-  // Set properties based on investor accreditation
   useEffect(() => {
     if (!investorProfile) return;
     
     const isAccredited = investorProfile?.isAccredited === "yes";
     
     if (isAccredited) {
-      // Accredited investors see all properties
       setProperties(getCategoryProperties(selectedCategory));
     } else {
-      // Non-accredited investors see affordable deals with $10 minimum investment
       setProperties(affordableDeals);
     }
   }, [investorProfile, selectedCategory]);
@@ -35,7 +30,6 @@ const Index = () => {
     if (investorProfile && investorProfile.isAccredited === "yes") {
       setProperties(getCategoryProperties(category));
     } else {
-      // Non-accredited investors always see the affordable deals regardless of category
       setProperties(affordableDeals);
     }
   };
@@ -60,7 +54,6 @@ const Index = () => {
           onSelectCategory={handleCategoryChange} 
         />
         
-        {/* Company Logo and Slogan Section */}
         <div className="container mx-auto px-4 pt-3 md:pt-6 flex flex-col items-center">
           <div className="mb-2 md:mb-4 flex items-center justify-center"></div>
           <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4">
@@ -87,9 +80,6 @@ const Index = () => {
             </TabsContent>
           </Tabs>
         </main>
-        
-        {/* Add our How Property Ownership Works section */}
-        <HowPropertyOwnershipWorks />
       </div>
     </div>
   );
