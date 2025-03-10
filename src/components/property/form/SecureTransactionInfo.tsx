@@ -1,16 +1,21 @@
 
-import { AlertCircle, Shield, Lock } from "lucide-react";
+import { Shield, Lock, CreditCard } from "lucide-react";
 
 export const SecureTransactionInfo = () => {
   return (
-    <div className="bg-blue-50 border border-blue-100 rounded-md p-3 flex items-start gap-2">
-      <Lock className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-      <div className="text-sm text-blue-600">
-        <p className="font-medium mb-1">Secure Transaction</p>
-        <p className="mb-1">Your investment will be processed securely through our verified payment channels. All transactions are encrypted and protected.</p>
-        <div className="flex items-center gap-2 mt-2">
-          <Shield className="h-4 w-4 text-blue-500" />
-          <span className="text-xs">Bank transfers, credit cards, and blockchain transactions are all secured by industry-standard protocols</span>
+    <div className="rounded-md bg-gray-50 p-3 space-y-2">
+      <div className="flex items-center">
+        <Shield className="h-4 w-4 text-primary mr-2" />
+        <h3 className="text-sm font-medium">Secure Transaction</h3>
+      </div>
+      <div className="text-xs text-gray-600 space-y-1">
+        <div className="flex items-center">
+          <Lock className="h-3 w-3 text-gray-500 mr-1.5" />
+          <span>Your information is encrypted and securely stored</span>
+        </div>
+        <div className="flex items-center">
+          <CreditCard className="h-3 w-3 text-gray-500 mr-1.5" />
+          <span>We comply with financial regulations and standards</span>
         </div>
       </div>
     </div>

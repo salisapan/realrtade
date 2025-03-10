@@ -1,6 +1,6 @@
 
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { UseFormReturn } from "react-hook-form";
 import { FormValues } from "../types/letterOfIntentTypes";
 
@@ -14,28 +14,21 @@ export const TermsAgreement = ({ form }: TermsAgreementProps) => {
       control={form.control}
       name="termsAccepted"
       render={({ field }) => (
-        <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-3">
           <FormControl>
             <Checkbox
               checked={field.value}
               onCheckedChange={field.onChange}
+              id="terms"
             />
           </FormControl>
           <div className="space-y-1 leading-none">
-            <FormLabel>
-              I accept the terms and conditions
+            <FormLabel htmlFor="terms" className="text-sm font-medium">
+              Accept terms and conditions <span className="text-red-500">*</span>
             </FormLabel>
-            <FormDescription>
-              By submitting this form, you agree to our{" "}
-              <a href="#" className="text-blue-600 hover:underline">
-                Terms of Service
-              </a>{" "}
-              and{" "}
-              <a href="#" className="text-blue-600 hover:underline">
-                Privacy Policy
-              </a>
-              .
-            </FormDescription>
+            <p className="text-xs text-gray-500">
+              I agree to the terms of service and privacy policy. I understand this is not an offer or solicitation to buy securities.
+            </p>
             <FormMessage />
           </div>
         </FormItem>

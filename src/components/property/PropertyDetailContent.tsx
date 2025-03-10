@@ -1,4 +1,3 @@
-
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
@@ -6,10 +5,12 @@ import { PropertyMarketNews } from "./PropertyMarketNews";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon, Truck, Navigation, FileText, Phone } from "lucide-react";
+import { LandPlot, Percent, DollarSign, Building, CalendarDays, Users, Timer, Map, AreaChartIcon, Truck, Navigation, FileText, Phone, Star } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend } from "recharts";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from "@/hooks/use-toast";
+import { DeveloperProfileModal } from "./DeveloperProfileModal";
+import { getDeveloperByName } from "@/data/developerData";
 
 interface PropertyDetailContentProps {
   property: {
@@ -33,6 +34,7 @@ interface PropertyDetailContentProps {
     riskLevel: string;
     demandLevel: string;
     returnPotential: string;
+    company?: string;
     [key: string]: any;
   };
 }
@@ -91,6 +93,8 @@ export const PropertyDetailContent = ({
 }: PropertyDetailContentProps) => {
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  const developerName = property.company || "EXTELL";
+  const developer = getDeveloperByName(developerName);
   
   const handleScheduleCall = () => {
     try {
@@ -130,10 +134,20 @@ export const PropertyDetailContent = ({
             </Badge>
           </div>
           <h1 className="text-2xl font-bold mb-1">{property.name}</h1>
-          <div className="flex items-center text-gray-500 mb-4">
+          <div className="flex items-center text-gray-500 mb-2">
             <Map className="w-4 h-4 mr-1" />
             <span>{property.location}</span>
           </div>
+          {developer && (
+            <div className="flex items-center gap-1 mb-4">
+              <Building className="w-4 h-4 text-gray-500 mr-1" />
+              <DeveloperProfileModal developer={developer} />
+              <div className="flex items-center text-yellow-500 ml-2">
+                <Star className="w-3 h-3 fill-yellow-500" />
+                <span className="text-xs ml-1">{developer.rating}/5</span>
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="bg-gray-50 rounded-lg p-3 w-full md:w-auto md:min-w-[180px]">
@@ -161,14 +175,14 @@ export const PropertyDetailContent = ({
               </div>
               <div className="bg-white p-2 rounded border">
                 <div className="text-gray-500 mb-1">Min. Investment</div>
-                <div className="font-bold text-gray-800">${(2500).toLocaleString()}</div>
+                <div className="font-bold text-gray-800">${(property.minInvestment).toLocaleString()}</div>
               </div>
             </div>
             
             <LetterOfIntentForm 
               propertyId={property.id} 
               propertyName={property.name} 
-              minInvestment={2500} 
+              minInvestment={property.minInvestment} 
             />
           </div>
         </div>
@@ -370,12 +384,12 @@ export const PropertyDetailContent = ({
           <div className="bg-white border rounded-lg p-4">
             <h3 className="font-semibold mb-3">Ready to Invest?</h3>
             <p className="text-sm text-gray-600 mb-3">
-              Start your investment journey with as little as ${(2500).toLocaleString()}.
+              Start your investment journey with as little as ${(property.minInvestment).toLocaleString()}.
             </p>
             <LetterOfIntentForm 
               propertyId={property.id} 
               propertyName={property.name} 
-              minInvestment={2500} 
+              minInvestment={property.minInvestment} 
             />
           </div>
         </div>

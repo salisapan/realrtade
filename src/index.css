@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -136,7 +137,7 @@
   grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 
-@media (min-width: 768px) {
+@media (min-width: 640px) {
   .property-listing-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -177,6 +178,7 @@
     margin: 0 !important;
     width: 100% !important;
     overflow-x: hidden !important;
+    gap: 1rem !important;
   }
   
   /* Fix for PropertyCard content */
@@ -291,4 +293,46 @@
     font-size: 0.7rem !important;
     padding: 0.5rem 0.75rem !important;
   }
+}
+
+/* Improved property card layout */
+.property-listing-grid .property-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.property-card img {
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  width: 100%;
+}
+
+.property-card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Property detail page improvements */
+.property-detail-image {
+  height: 300px;
+  object-fit: cover;
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .property-detail-image {
+    height: 400px;
+  }
+}
+
+/* Developer profile improvements */
+.developer-rating {
+  display: flex;
+  align-items: center;
+}
+
+.developer-rating .star {
+  color: #f59e0b;
 }

@@ -19,4 +19,3 @@ export const getDeveloperById = (id: string): Developer | undefined => {
 export const getDeveloperByName = (name: string): Developer | undefined => {
   return developers.find(developer => developer.name.toLowerCase() === name.toLowerCase());
 };
-
