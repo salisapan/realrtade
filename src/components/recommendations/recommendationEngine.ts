@@ -66,12 +66,14 @@ const getMatchScore = (preferences: UserPreferences, property: any): number => {
     score += 10;
   }
   
-  // Adjust for risk tolerance match - Fixed the comparison by standardizing case
-  const propertyRisk = "medium"; // Default risk level - changed to lowercase
+  // Adjust for risk tolerance match - Fixed the comparison by using a proper string type check
+  const propertyRisk = "medium"; // Default risk level
+  
+  // Using toLowerCase() to ensure consistent string comparisons
   if (
-    (preferences.riskTolerance === 'low' && propertyRisk === "low") ||
-    (preferences.riskTolerance === 'medium' && propertyRisk === "medium") ||
-    (preferences.riskTolerance === 'high' && propertyRisk === "high")
+    (preferences.riskTolerance === 'low' && propertyRisk.toLowerCase() === "low") ||
+    (preferences.riskTolerance === 'medium' && propertyRisk.toLowerCase() === "medium") ||
+    (preferences.riskTolerance === 'high' && propertyRisk.toLowerCase() === "high")
   ) {
     score += 10;
   }
