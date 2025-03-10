@@ -1,4 +1,3 @@
-
 import { Building2, MapPin, DollarSign, LineChart, Users, Calendar } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +20,7 @@ interface PropertyCardProps {
   price: string;
   id?: string;
   minInvestment?: number;
-  imageUrl?: string; // Adding support for alternate image property name
+  imageUrl?: string;
 }
 
 export const PropertyCard = ({
@@ -43,12 +42,11 @@ export const PropertyCard = ({
   id = "",
   minInvestment = 2500,
 }: PropertyCardProps) => {
-  // Handle both image and imageUrl properties
   const displayImage = image || imageUrl;
   
   return (
     <Link to={`/property/${id}`} className="block h-full">
-      <Card className="overflow-visible transition-all duration-300 hover:shadow-lg animate-fade-in card-hover h-full pb-2">
+      <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-lg animate-fade-in">
         <div className="relative aspect-[4/3] overflow-hidden rounded-t-lg">
           <img
             src={displayImage}
@@ -72,23 +70,23 @@ export const PropertyCard = ({
           )}
         </div>
         
-        <div className="p-3 sm:p-4 md:p-5">
-          <h3 className="text-lg md:text-xl font-semibold mb-2 line-clamp-2">{title}</h3>
+        <div className="p-4">
+          <h3 className="text-lg font-semibold mb-2 break-words line-clamp-2">{title}</h3>
           
           <div className="flex items-center gap-2 mb-3">
             <MapPin size={16} className="text-secondary flex-shrink-0" />
-            <span className="text-gray-600 text-sm truncate">{location}</span>
+            <span className="text-gray-600 text-sm break-words">{location}</span>
           </div>
 
           <div className="flex items-center gap-2 mb-4">
             <Building2 size={16} className="text-secondary flex-shrink-0" />
-            <span className="text-gray-600 text-sm truncate">{company}</span>
+            <span className="text-gray-600 text-sm break-words">{company}</span>
             <span className="text-primary text-sm ml-auto truncate">
               {website && website.replace(/^https?:\/\//i, '')}
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-3 sm:gap-x-4 gap-y-3 mb-4">
+          <div className="grid grid-cols-2 gap-3 mb-4">
             <div className="flex items-center gap-2">
               <DollarSign size={16} className="text-secondary flex-shrink-0" />
               <div className="text-sm">
@@ -119,7 +117,7 @@ export const PropertyCard = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm border-t pt-3 mt-2">
+          <div className="grid grid-cols-2 gap-3 text-sm border-t pt-3">
             <div>
               <span className="block text-gray-500 text-xs">Area</span>
               <span className="font-medium break-words">{sqft}</span>

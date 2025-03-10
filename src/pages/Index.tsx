@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -46,7 +45,7 @@ const Index = () => {
   return (
     <div className="flex flex-col md:flex-row">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 w-full overflow-x-hidden pb-20">
+      <div className="flex-1 min-h-screen bg-gray-50 w-full overflow-x-hidden">
         <PropertiesHeader 
           categories={categories.map(cat => ({
             ...cat,
@@ -57,26 +56,26 @@ const Index = () => {
         
         <div className="container mx-auto px-4 pt-3 md:pt-6 flex flex-col items-center">
           <div className="mb-2 md:mb-4 flex items-center justify-center"></div>
-          <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4">
+          <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4 px-2">
             RealTrade - Invest in real estate worldwide from anywhere.
           </p>
         </div>
 
-        <main className="container mx-auto px-2 md:px-4 py-4 md:py-8">
+        <main className="container mx-auto py-4 md:py-8">
           <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full">
-            <TabsContent value="sector" className="property-listing-grid">
+            <TabsContent value="sector">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="low-risk" className="property-listing-grid">
+            <TabsContent value="low-risk">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="geography" className="property-listing-grid">
+            <TabsContent value="geography">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="profitable" className="property-listing-grid">
+            <TabsContent value="profitable">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="company" className="property-listing-grid">
+            <TabsContent value="company">
               <PropertyListing properties={properties} />
             </TabsContent>
           </Tabs>
