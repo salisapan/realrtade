@@ -3,13 +3,13 @@ import { UserPreferences, PropertyRecommendation } from "./types";
 import { propertiesBySector, propertiesByLowRisk, propertiesByGeography, propertiesByProfitable } from "@/data/propertyData";
 import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
 
-// Sample property images for variety
+// Property images for recommendations
 const propertyImages = [
-  "/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png",
-  "/placeholder.svg",
-  "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-  "https://images.unsplash.com/photo-1622015663084-307d19eabca2?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
-  "https://images.unsplash.com/photo-1577415124269-fc1140a69e91?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3"
+  "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+  "https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+  "https://images.unsplash.com/photo-1518005020951-eccb494ad742?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+  "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+  "https://images.unsplash.com/photo-1431576901776-e539bd916ba2?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3"
 ];
 
 // Map preference values to property categories
@@ -105,7 +105,7 @@ export const generateRecommendations = (preferences: UserPreferences): PropertyR
     return {
       id: property.id || `rec-${index}`,
       name: property.title || `${assetType.charAt(0).toUpperCase() + assetType.slice(1)} Investment Opportunity`,
-      imageUrl: property.imageUrl || propertyImages[index % propertyImages.length],
+      imageUrl: propertyImages[index % propertyImages.length],
       location: property.location || "New York, NY",
       projectedYield: property.yield || "8-12%",
       riskLevel: property.riskLevel || (preferences.riskTolerance === 'low' ? "Low" : preferences.riskTolerance === 'medium' ? "Medium" : "High"),

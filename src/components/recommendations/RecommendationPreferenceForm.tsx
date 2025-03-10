@@ -182,17 +182,16 @@ export const RecommendationPreferenceForm: React.FC<RecommendationPreferenceForm
                                 <Checkbox
                                   checked={field.value?.includes(option.id)}
                                   onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...field.value, option.id])
-                                      : field.onChange(
-                                          field.value?.filter(
-                                            (value) => value !== option.id
-                                          )
-                                        )
+                                    const newValue = checked
+                                      ? [...field.value, option.id]
+                                      : field.value?.filter(
+                                          (value) => value !== option.id
+                                        );
+                                    field.onChange(newValue);
                                   }}
                                 />
                               </FormControl>
-                              <FormLabel className="font-normal">
+                              <FormLabel className="font-normal cursor-pointer">
                                 {option.label}
                               </FormLabel>
                             </FormItem>

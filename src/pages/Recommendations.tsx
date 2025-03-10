@@ -19,6 +19,8 @@ const Recommendations = () => {
   const [recommendations, setRecommendations] = useState<PropertyRecommendation[]>([]);
   const [isFirstVisit, setIsFirstVisit] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [showingSeeMore, setShowingSeeMore] = useState(false);
+  const [allRecommendations, setAllRecommendations] = useState<PropertyRecommendation[]>([]);
   
   // Check if user has saved preferences
   useEffect(() => {
@@ -39,7 +41,8 @@ const Recommendations = () => {
       // Simulate AI processing time
       setTimeout(() => {
         const newRecommendations = generateRecommendations(preferences);
-        setRecommendations(newRecommendations);
+        setAllRecommendations(newRecommendations);
+        setRecommendations(newRecommendations.slice(0, 3));
         setIsLoading(false);
         
         toast({
@@ -53,6 +56,23 @@ const Recommendations = () => {
   const handlePreferencesSubmit = (newPreferences: UserPreferences) => {
     setPreferences(newPreferences);
     setIsFirstVisit(false);
+    setShowingSeeMore(false);
+  };
+
+  const handleSeeMoreOptions = () => {
+    if (allRecommendations.length > recommendations.length) {
+      setRecommendations(allRecommendations);
+      setShowingSeeMore(true);
+      toast({
+        title: "More Recommendations",
+        description: "Showing all available investment opportunities",
+      });
+    } else {
+      toast({
+        title: "No More Recommendations",
+        description: "We've already shown all the best matches for your preferences",
+      });
+    }
   };
 
   return (
@@ -137,12 +157,18 @@ const Recommendations = () => {
                 </div>
               )}
 
-              {!isLoading && recommendations.length > 0 && (
+              {!isLoading && recommendations.length > 0 && !showingSeeMore && (
                 <div className="flex justify-center mt-8">
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" className="gap-2" onClick={handleSeeMoreOptions}>
                     <ChevronsRight className="h-4 w-4" />
                     See More Options
                   </Button>
+                </div>
+              )}
+              
+              {!isLoading && showingSeeMore && allRecommendations.length === recommendations.length && (
+                <div className="flex justify-center mt-8">
+                  <p className="text-sm text-gray-500">You've seen all available recommendations</p>
                 </div>
               )}
             </div>

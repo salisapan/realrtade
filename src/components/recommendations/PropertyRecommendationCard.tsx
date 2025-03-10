@@ -3,7 +3,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, ExternalLink, Heart, Star, Building2, DollarSign, AlertTriangle, Clock } from "lucide-react";
+import { Brain, ExternalLink, Heart, Star, Building2, DollarSign, AlertTriangle, Clock, ImageOff } from "lucide-react";
 import { PropertyRecommendation } from "./types";
 import { Badge } from "@/components/ui/badge";
 
@@ -34,6 +34,22 @@ export const PropertyRecommendationCard: React.FC<PropertyRecommendationCardProp
     navigate(`/property/${recommendation.id}?invest=true`);
   };
 
+  // Property Image Error Handling
+  const [imageError, setImageError] = React.useState(false);
+  
+  const propertyImages = [
+    "https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    "https://images.unsplash.com/photo-1622015663084-307d19eabca2?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3",
+    "https://images.unsplash.com/photo-1577415124269-fc1140a69e91?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3"
+  ];
+  
+  // Choose a fallback image based on property id
+  const getFallbackImage = () => {
+    if (!recommendation.id) return propertyImages[0];
+    const index = parseInt(recommendation.id.slice(-1)) % propertyImages.length;
+    return propertyImages[index];
+  };
+
   return (
     <Card className="overflow-hidden border hover:shadow-md transition-all hover:translate-y-[-3px] cursor-pointer group" onClick={viewPropertyDetails}>
       {/* Property image */}
@@ -50,11 +66,18 @@ export const PropertyRecommendationCard: React.FC<PropertyRecommendationCardProp
             {recommendation.assetType}
           </Badge>
         </div>
-        <img 
-          src={recommendation.imageUrl} 
-          alt={recommendation.name} 
-          className="w-full h-full object-cover transition-transform group-hover:scale-105"
-        />
+        {imageError ? (
+          <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+            <ImageOff className="h-12 w-12 text-gray-400" />
+          </div>
+        ) : (
+          <img 
+            src={recommendation.imageUrl || getFallbackImage()} 
+            alt={recommendation.name} 
+            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+            onError={() => setImageError(true)}
+          />
+        )}
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-white">
           <div className="flex justify-between items-center">
             <h3 className="font-bold text-lg line-clamp-1">{recommendation.name}</h3>

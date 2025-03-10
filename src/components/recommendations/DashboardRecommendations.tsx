@@ -83,6 +83,10 @@ export const DashboardRecommendations = () => {
                   src={recommendation.imageUrl} 
                   alt={recommendation.name} 
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback image if the original fails to load
+                    (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1488972685288-c3fd157d7c7a?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3";
+                  }}
                 />
               </div>
               <div className="flex-1 min-w-0">
