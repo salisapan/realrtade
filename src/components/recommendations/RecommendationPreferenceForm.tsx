@@ -68,7 +68,14 @@ export const RecommendationPreferenceForm: React.FC<RecommendationPreferenceForm
   });
 
   const handleSubmit = (values: PreferenceFormValues) => {
-    onSubmit(values);
+    // Ensure all required fields are present
+    const preferences: UserPreferences = {
+      riskTolerance: values.riskTolerance,
+      investmentHorizon: values.investmentHorizon,
+      assetTypes: values.assetTypes,
+    };
+    
+    onSubmit(preferences);
   };
 
   return (
@@ -107,7 +114,7 @@ export const RecommendationPreferenceForm: React.FC<RecommendationPreferenceForm
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select your risk tolerance" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white">
                         <SelectItem value="low">Low - Safety First</SelectItem>
                         <SelectItem value="medium">Medium - Balanced Approach</SelectItem>
                         <SelectItem value="high">High - Maximum Growth Potential</SelectItem>
@@ -138,7 +145,7 @@ export const RecommendationPreferenceForm: React.FC<RecommendationPreferenceForm
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select your investment horizon" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white">
                         <SelectItem value="1-2">1-2 Years (Short Term)</SelectItem>
                         <SelectItem value="3-5">3-5 Years (Medium Term)</SelectItem>
                         <SelectItem value="5+">5+ Years (Long Term)</SelectItem>

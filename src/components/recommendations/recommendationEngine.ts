@@ -59,12 +59,15 @@ const getMatchScore = (preferences: UserPreferences, property: any): number => {
   let score = 75; // Base score
   
   // Add points for matching asset type
-  if (preferences.assetTypes.some(type => property.category?.toLowerCase().includes(type))) {
+  if (preferences.assetTypes.some(type => 
+    property.title?.toLowerCase().includes(type) || 
+    property.location?.toLowerCase().includes(type)
+  )) {
     score += 10;
   }
   
   // Adjust for risk tolerance match
-  const propertyRisk = property.riskLevel || "Medium";
+  const propertyRisk = "Medium"; // Default risk level
   if (
     (preferences.riskTolerance === 'low' && propertyRisk === "Low") ||
     (preferences.riskTolerance === 'medium' && propertyRisk === "Medium") ||
@@ -89,8 +92,8 @@ export const generateRecommendations = (preferences: UserPreferences): PropertyR
   // Filter for asset types if possible
   const filteredProperties = propertyPool.filter(property => 
     preferences.assetTypes.some(type => 
-      property.category?.toLowerCase().includes(type) || 
-      property.description?.toLowerCase().includes(type)
+      property.title?.toLowerCase().includes(type) || 
+      property.location?.toLowerCase().includes(type)
     )
   );
   
@@ -105,15 +108,15 @@ export const generateRecommendations = (preferences: UserPreferences): PropertyR
     return {
       id: property.id || `rec-${index}`,
       name: property.title || `${assetType.charAt(0).toUpperCase() + assetType.slice(1)} Investment Opportunity`,
-      imageUrl: propertyImages[index % propertyImages.length],
+      imageUrl: property.image || propertyImages[index % propertyImages.length],
       location: property.location || "New York, NY",
-      projectedYield: property.yield || "8-12%",
-      riskLevel: property.riskLevel || (preferences.riskTolerance === 'low' ? "Low" : preferences.riskTolerance === 'medium' ? "Medium" : "High"),
+      projectedYield: property.cashOnCash || "8-12%",
+      riskLevel: preferences.riskTolerance === 'low' ? "Low" : preferences.riskTolerance === 'medium' ? "Medium" : "High",
       matchScore: matchScore,
       rationale: getRationale(preferences, assetType),
       assetType: assetType.charAt(0).toUpperCase() + assetType.slice(1),
       price: property.price || "$250,000 - $500,000",
-      developerName: property.developer || "Premium Developers"
+      developerName: property.company || "Premium Developers"
     };
   });
   

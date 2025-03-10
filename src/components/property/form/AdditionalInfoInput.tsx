@@ -21,6 +21,7 @@ export const AdditionalInfoInput = ({ form }: AdditionalInfoInputProps) => {
               placeholder="Any specific questions or requirements..."
               className="resize-none"
               {...field}
+              value={field.value || ""}
             />
           </FormControl>
           <FormMessage />

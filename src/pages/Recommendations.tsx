@@ -14,7 +14,7 @@ import { UserPreferences, PropertyRecommendation } from "@/components/recommenda
 
 const Recommendations = () => {
   const { toast } = useToast();
-  const { profile } = useInvestorProfile();
+  const { investorProfile } = useInvestorProfile();
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [recommendations, setRecommendations] = useState<PropertyRecommendation[]>([]);
   const [isFirstVisit, setIsFirstVisit] = useState(true);
@@ -120,7 +120,7 @@ const Recommendations = () => {
           {preferences && (
             <div className="animate-fade-in">
               <AIRecommendationHeader 
-                userName={profile?.fullName || "Investor"}
+                userName={investorProfile?.fullName || "Investor"}
                 isLoading={isLoading}
               />
               

@@ -9,6 +9,7 @@ export const investmentFormSchema = z.object({
     message: "You must accept the terms",
   }),
   paymentMethod: z.string().optional().default("creditCard"),
+  additionalInfo: z.string().optional(),
 });
 
 export type InvestmentFormValues = z.infer<typeof investmentFormSchema>;
