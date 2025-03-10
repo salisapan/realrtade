@@ -3,6 +3,7 @@ import { Building, Users } from "lucide-react";
 
 interface DeveloperOverviewProps {
   developer: {
+    name: string;  // Added the missing 'name' property to the interface
     bio: string;
     foundedYear: number;
     location: string;
