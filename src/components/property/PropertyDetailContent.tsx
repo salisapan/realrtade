@@ -1,3 +1,4 @@
+
 import { PropertyMap } from "./PropertyMap";
 import { RecommendationRating } from "./RecommendationRating";
 import { LetterOfIntentForm } from "./LetterOfIntentForm";
@@ -165,7 +166,12 @@ export const PropertyDetailContent = ({
               </div>
             </div>
             
-            <LetterOfIntentForm propertyId={property.id} propertyName={property.name} minInvestment={property.minInvestment} />
+            <LetterOfIntentForm 
+              propertyId={property.id} 
+              propertyName={property.name} 
+              propertyAddress={property.location} 
+              minInvestment={property.minInvestment} 
+            />
           </div>
         </div>
       </div>
@@ -359,7 +365,12 @@ export const PropertyDetailContent = ({
             <p className="text-sm text-gray-600 mb-3">
               Start your investment journey with as little as ${property.minInvestment.toLocaleString()}.
             </p>
-            <LetterOfIntentForm propertyId={property.id} propertyName={property.name} minInvestment={property.minInvestment} />
+            <LetterOfIntentForm 
+              propertyId={property.id} 
+              propertyName={property.name} 
+              propertyAddress={property.location} 
+              minInvestment={property.minInvestment} 
+            />
           </div>
         </div>
       </div>
