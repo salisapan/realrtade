@@ -1,6 +1,6 @@
 
 import { Building, Users } from "lucide-react";
-import { Developer } from "@/data/developerData";
+import { Developer } from "@/data/developers/types";
 
 interface DeveloperOverviewProps {
   developer: Developer;
