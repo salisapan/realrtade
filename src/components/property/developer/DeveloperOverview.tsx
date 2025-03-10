@@ -1,19 +1,9 @@
 
 import { Building, Users } from "lucide-react";
+import { Developer } from "@/data/developerData";
 
 interface DeveloperOverviewProps {
-  developer: {
-    name: string;  // Added the missing 'name' property to the interface
-    bio: string;
-    foundedYear: number;
-    location: string;
-    teamSize: string;
-    completedProjects: number;
-    performanceData: {
-      year: string;
-      roi: number;
-    }[];
-  };
+  developer: Developer;
 }
 
 export const DeveloperOverview = ({ developer }: DeveloperOverviewProps) => {
