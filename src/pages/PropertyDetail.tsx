@@ -12,6 +12,7 @@ import { Home, Building, BarChart, FileText, MessageSquare, Bookmark, Share2, Ch
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
 import { DeveloperProfileModal } from "@/components/property/DeveloperProfileModal";
 import { getDeveloperByName } from "@/data/developerData";
+import { LetterOfIntentForm } from "@/components/property/LetterOfIntentForm";
 
 const PropertyDetail = () => {
   const { id } = useParams();
@@ -383,12 +384,12 @@ const PropertyDetail = () => {
                       <div className="text-base font-bold">{property.term} years</div>
                     </div>
                     
-                    <Button 
-                      className="w-full" 
-                      onClick={handleInvest}
-                    >
-                      Invest Now
-                    </Button>
+                    <LetterOfIntentForm 
+                      propertyId={property.id}
+                      propertyName={property.name}
+                      propertyAddress={property.location}
+                      minInvestment={2500}
+                    />
                     
                     <p className="text-xs text-gray-500 text-center">
                       Investment opportunities involve risk, including the possible loss of principal.

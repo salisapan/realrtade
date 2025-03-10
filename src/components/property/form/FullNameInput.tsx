@@ -1,28 +1,27 @@
 
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Mail } from "lucide-react";
+import { User } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 import { InvestmentFormValues } from "../types/letterOfIntentTypes";
 
-interface EmailInputProps {
+interface FullNameInputProps {
   form: UseFormReturn<InvestmentFormValues>;
 }
 
-export const EmailInput = ({ form }: EmailInputProps) => {
+export const FullNameInput = ({ form }: FullNameInputProps) => {
   return (
     <FormField
       control={form.control}
-      name="email"
+      name="fullName"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Email Address <span className="text-red-500">*</span></FormLabel>
+          <FormLabel>Full Name <span className="text-red-500">*</span></FormLabel>
           <FormControl>
             <div className="relative">
-              <Mail className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
+              <User className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
               <Input
-                type="email"
-                placeholder="your@email.com"
+                placeholder="John Doe"
                 className="pl-8"
                 {...field}
                 required

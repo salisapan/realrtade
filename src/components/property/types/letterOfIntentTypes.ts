@@ -32,3 +32,25 @@ export const PAYMENT_METHOD_DESCRIPTIONS: Record<PaymentMethodType, string> = {
   credit: "Secure credit card payment",
   blockchain: "Transfer via cryptocurrency"
 };
+
+// New schema for the improved investment form
+export const investmentFormSchema = z.object({
+  investmentAmount: z.coerce
+    .number()
+    .min(100, "Investment must be at least $100")
+    .int("Amount must be a whole number"),
+  fullName: z
+    .string()
+    .min(2, "Name must be at least 2 characters")
+    .regex(/^[a-zA-Z\s]+$/, "Name can only contain letters and spaces"),
+  email: z
+    .string()
+    .email("Please enter a valid email address"),
+  termsAccepted: z
+    .boolean()
+    .refine((val) => val === true, {
+      message: "You must accept the investment contract",
+    }),
+});
+
+export type InvestmentFormValues = z.infer<typeof investmentFormSchema>;

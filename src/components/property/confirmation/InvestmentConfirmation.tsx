@@ -1,61 +1,45 @@
 
 import { Button } from "@/components/ui/button";
-import { Check, Mail } from "lucide-react";
-import { PaymentMethodType, PAYMENT_METHOD_LABELS } from "../types/letterOfIntentTypes";
+import { Check } from "lucide-react";
 
 interface InvestmentConfirmationProps {
   propertyName: string;
+  propertyAddress: string;
   investmentAmount: number;
-  paymentMethod: PaymentMethodType;
-  emailSent: boolean;
   onContinue: () => void;
 }
 
 export const InvestmentConfirmation = ({
   propertyName,
+  propertyAddress,
   investmentAmount,
-  paymentMethod,
-  emailSent,
   onContinue,
 }: InvestmentConfirmationProps) => {
   return (
-    <div className="py-6 text-center">
-      <div className="flex justify-center mb-4">
-        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+    <div className="space-y-6 py-4">
+      <div className="flex flex-col items-center justify-center text-center space-y-3">
+        <div className="bg-green-100 p-3 rounded-full">
           <Check className="h-8 w-8 text-green-600" />
         </div>
+        <h2 className="text-xl font-semibold">Investment Successful!</h2>
       </div>
       
-      <h2 className="text-xl font-bold mb-1">Investment Complete!</h2>
-      <p className="text-gray-600 mb-6">
-        Your investment intent for {propertyName} has been submitted
-      </p>
-      
-      <div className="border rounded-md p-4 bg-gray-50 mb-6">
-        <div className="flex justify-between mb-2">
-          <span className="text-gray-600">Amount:</span>
-          <span className="font-bold">${investmentAmount.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between mb-2">
-          <span className="text-gray-600">Payment Method:</span>
-          <span className="font-medium">{PAYMENT_METHOD_LABELS[paymentMethod]}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Status:</span>
-          <span className="text-green-600 font-medium">Complete</span>
-        </div>
+      <div className="bg-green-50 border border-green-200 rounded-md p-4 text-green-900">
+        <p className="text-sm leading-relaxed">
+          Thank you for your investment of ${investmentAmount.toLocaleString()} in {propertyAddress}!<br /><br />
+          The amount has been securely transferred to REALTRADE's Nostro escrow account.<br /><br />
+          Once the investment is registered with the LLC, the funds will be successfully transferred to the developer.
+        </p>
       </div>
       
-      {emailSent && (
-        <div className="flex items-center justify-center gap-2 text-sm text-gray-600 mb-6">
-          <Mail className="h-4 w-4" />
-          <span>Confirmation email has been sent</span>
-        </div>
-      )}
-      
-      <Button onClick={onContinue} className="w-full">
-        Continue to Dashboard
-      </Button>
+      <div className="space-y-2">
+        <p className="text-sm text-gray-600">
+          You can view your investment details in your dashboard.
+        </p>
+        <Button className="w-full" onClick={onContinue}>
+          Continue to Dashboard
+        </Button>
+      </div>
     </div>
   );
 };

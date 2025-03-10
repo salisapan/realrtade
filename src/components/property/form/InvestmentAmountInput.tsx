@@ -3,10 +3,10 @@ import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessa
 import { Input } from "@/components/ui/input";
 import { DollarSign } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
-import { FormValues } from "../types/letterOfIntentTypes";
+import { InvestmentFormValues } from "../types/letterOfIntentTypes";
 
 interface InvestmentAmountInputProps {
-  form: UseFormReturn<FormValues>;
+  form: UseFormReturn<InvestmentFormValues>;
   minInvestment: number;
 }
 
@@ -24,8 +24,18 @@ export const InvestmentAmountInput = ({ form, minInvestment }: InvestmentAmountI
               <Input
                 type="number"
                 min={minInvestment}
+                step="1"
                 className="pl-8"
                 {...field}
+                onChange={(e) => {
+                  // Parse value and ensure it's a valid number
+                  const value = parseInt(e.target.value);
+                  if (!isNaN(value)) {
+                    field.onChange(value);
+                  } else {
+                    field.onChange(0);
+                  }
+                }}
                 required
               />
             </div>

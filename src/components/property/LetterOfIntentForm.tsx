@@ -8,74 +8,64 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { InvestmentForm } from "./form/InvestmentForm";
 import { InvestmentConfirmation } from "./confirmation/InvestmentConfirmation";
-import { formSchema, FormValues } from "./types/letterOfIntentTypes";
+import { investmentFormSchema, InvestmentFormValues } from "./types/letterOfIntentTypes";
 
 interface LetterOfIntentFormProps {
   propertyId: string;
   propertyName: string;
+  propertyAddress: string;
   minInvestment: number;
 }
 
 export const LetterOfIntentForm = ({
   propertyId,
   propertyName,
+  propertyAddress,
   minInvestment,
 }: LetterOfIntentFormProps) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [loiSubmitted, setLoiSubmitted] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [formData, setFormData] = useState<InvestmentFormValues | null>(null);
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<InvestmentFormValues>({
+    resolver: zodResolver(investmentFormSchema),
     defaultValues: {
       investmentAmount: minInvestment,
-      paymentMethod: "bank",
+      fullName: "",
       email: "",
-      additionalInfo: "",
       termsAccepted: false,
     },
   });
 
-  const onSubmit = (data: FormValues) => {
+  const onSubmit = (data: InvestmentFormValues) => {
     console.log("Form data:", data);
+    setFormData(data);
     
     // Show success message
     toast({
-      title: "Investment Intent Submitted",
+      title: "Investment Submitted",
       description: `Your investment of $${data.investmentAmount.toLocaleString()} has been processed.`,
       variant: "success",
     });
     
     // Store in localStorage for persistence
-    const lois = JSON.parse(localStorage.getItem("letterOfIntents") || "[]");
-    lois.push({
+    const investments = JSON.parse(localStorage.getItem("investments") || "[]");
+    investments.push({
       id: Date.now(),
       propertyId,
       propertyName,
+      propertyAddress,
       investmentAmount: data.investmentAmount,
-      paymentMethod: data.paymentMethod,
+      fullName: data.fullName,
       email: data.email,
-      additionalInfo: data.additionalInfo,
       status: "completed",
       date: new Date().toISOString()
     });
-    localStorage.setItem("letterOfIntents", JSON.stringify(lois));
-    
-    // Simulate sending an email
-    setTimeout(() => {
-      setEmailSent(true);
-      toast({
-        title: "Email Confirmation Sent",
-        description: data.email ? `A confirmation has been sent to ${data.email}` : "A confirmation has been sent to your registered email",
-        variant: "success",
-      });
-    }, 1500);
+    localStorage.setItem("investments", JSON.stringify(investments));
     
     // Show confirmation screen
-    setLoiSubmitted(true);
     setShowConfirmation(true);
   };
 
@@ -87,15 +77,12 @@ export const LetterOfIntentForm = ({
   const handleInvestClick = () => {
     setIsOpen(true);
     // Reset form if it was previously submitted
-    if (loiSubmitted) {
+    if (showConfirmation) {
       setShowConfirmation(false);
-      setLoiSubmitted(false);
-      setEmailSent(false);
       form.reset({
         investmentAmount: minInvestment,
-        paymentMethod: "bank",
+        fullName: "",
         email: "",
-        additionalInfo: "",
         termsAccepted: false,
       });
     }
@@ -115,6 +102,7 @@ export const LetterOfIntentForm = ({
             <InvestmentForm 
               form={form}
               propertyName={propertyName}
+              propertyAddress={propertyAddress}
               minInvestment={minInvestment}
               onSubmit={onSubmit}
               onCancel={() => setIsOpen(false)}
@@ -122,9 +110,8 @@ export const LetterOfIntentForm = ({
           ) : (
             <InvestmentConfirmation
               propertyName={propertyName}
-              investmentAmount={form.getValues().investmentAmount}
-              paymentMethod={form.getValues().paymentMethod}
-              emailSent={emailSent}
+              propertyAddress={propertyAddress}
+              investmentAmount={formData?.investmentAmount || 0}
               onContinue={handleContinue}
             />
           )}
