@@ -16,7 +16,7 @@ export const EmailInput = ({ form }: EmailInputProps) => {
       name="email"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Email for Confirmation</FormLabel>
+          <FormLabel>Email for Confirmation <span className="text-red-500">*</span></FormLabel>
           <FormControl>
             <div className="relative">
               <Mail className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
@@ -25,11 +25,12 @@ export const EmailInput = ({ form }: EmailInputProps) => {
                 placeholder="your@email.com"
                 className="pl-8"
                 {...field}
+                required
               />
             </div>
           </FormControl>
           <FormDescription>
-            Leave empty to use your account email
+            Confirmation and updates will be sent to this email
           </FormDescription>
           <FormMessage />
         </FormItem>

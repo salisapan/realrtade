@@ -8,7 +8,7 @@ export const formSchema = z.object({
   paymentMethod: z.enum(["bank", "wire", "credit", "blockchain"], {
     required_error: "Please select a payment method",
   }),
-  email: z.string().email("Please enter a valid email").optional(),
+  email: z.string().email("Please enter a valid email address"),
   additionalInfo: z.string().optional(),
   termsAccepted: z.boolean().refine((val) => val === true, {
     message: "You must accept the terms and conditions",
@@ -16,3 +16,19 @@ export const formSchema = z.object({
 });
 
 export type FormValues = z.infer<typeof formSchema>;
+
+export type PaymentMethodType = "bank" | "wire" | "credit" | "blockchain";
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethodType, string> = {
+  bank: "Bank Transfer",
+  wire: "Wire Transfer",
+  credit: "Credit Card",
+  blockchain: "Blockchain Transfer"
+};
+
+export const PAYMENT_METHOD_DESCRIPTIONS: Record<PaymentMethodType, string> = {
+  bank: "Direct transfer from your bank account",
+  wire: "International wire transfer",
+  credit: "Secure credit card payment",
+  blockchain: "Transfer via cryptocurrency"
+};

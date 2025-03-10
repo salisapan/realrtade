@@ -20,6 +20,7 @@ import DueDiligencePortal from "./pages/DueDiligencePortal";
 import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
 import VerifiedDeals from "./pages/VerifiedDeals";
+import CommunityForum from "./pages/CommunityForum";
 
 const queryClient = new QueryClient();
 
@@ -137,6 +138,14 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <TransactionReports />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/community" 
+                element={
+                  <ProtectedRoute>
+                    <CommunityForum />
                   </ProtectedRoute>
                 } 
               />

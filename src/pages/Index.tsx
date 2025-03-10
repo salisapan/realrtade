@@ -4,24 +4,22 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PropertyListing } from "@/components/PropertyListing";
 import { PropertiesHeader } from "@/components/PropertiesHeader";
+import { HowPropertyOwnershipWorks } from "@/components/HowPropertyOwnershipWorks";
 import { categories } from "@/data/propertyData";
 import { affordableDeals } from "@/components/properties/AffordableDealsList";
 import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
 import { useInvestorProfile } from "@/components/properties/useInvestorProfile";
-import { useWelcomeToast } from "@/components/properties/WelcomeToast";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("sector");
   const [properties, setProperties] = useState<any[]>([]);
   const { investorProfile, isLoading } = useInvestorProfile();
   
-  // Use the welcome toast
-  const isAccredited = investorProfile?.isAccredited === "yes";
-  const { showWelcomeToast } = useWelcomeToast(isAccredited);
-
   // Set properties based on investor accreditation
   useEffect(() => {
     if (!investorProfile) return;
+    
+    const isAccredited = investorProfile?.isAccredited === "yes";
     
     if (isAccredited) {
       // Accredited investors see all properties
@@ -30,13 +28,11 @@ const Index = () => {
       // Non-accredited investors see affordable deals with $10 minimum investment
       setProperties(affordableDeals);
     }
-    
-    showWelcomeToast();
-  }, [investorProfile, selectedCategory, isAccredited, showWelcomeToast]);
+  }, [investorProfile, selectedCategory]);
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
-    if (investorProfile && isAccredited) {
+    if (investorProfile && investorProfile.isAccredited === "yes") {
       setProperties(getCategoryProperties(category));
     } else {
       // Non-accredited investors always see the affordable deals regardless of category
@@ -55,7 +51,7 @@ const Index = () => {
   return (
     <div className="flex flex-col md:flex-row">
       <AppSidebar />
-      <div className="flex-1 min-h-screen bg-gray-50 w-full">
+      <div className="flex-1 min-h-screen bg-gray-50 w-full overflow-x-hidden">
         <PropertiesHeader 
           categories={categories.map(cat => ({
             ...cat,
@@ -91,6 +87,9 @@ const Index = () => {
             </TabsContent>
           </Tabs>
         </main>
+        
+        {/* Add our new How Property Ownership Works section */}
+        <HowPropertyOwnershipWorks />
       </div>
     </div>
   );

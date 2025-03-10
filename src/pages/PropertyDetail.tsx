@@ -10,6 +10,8 @@ import { PropertyMarketInsights } from "@/components/property/PropertyMarketInsi
 import { useToast } from "@/hooks/use-toast";
 import { Home, Building, BarChart, FileText, MessageSquare, Bookmark, Share2, Check, CalendarDays } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart as RechartsBarChart, Bar, PieChart, Pie, Cell, Legend } from "recharts";
+import { DeveloperProfileModal } from "@/components/property/DeveloperProfileModal";
+import { getDeveloperByName } from "@/data/developerData";
 
 const PropertyDetail = () => {
   const { id } = useParams();
@@ -632,4 +634,3 @@ const riskAssessmentData = [{
 }];
 
 export default PropertyDetail;
-
