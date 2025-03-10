@@ -7,6 +7,8 @@ interface DeveloperOverviewProps {
 }
 
 export const DeveloperOverview = ({ developer }: DeveloperOverviewProps) => {
+  const averageROI = developer.performanceData.reduce((acc, curr) => acc + curr.roi, 0) / developer.performanceData.length;
+
   return (
     <div className="space-y-4">
       <div>
@@ -16,7 +18,9 @@ export const DeveloperOverview = ({ developer }: DeveloperOverviewProps) => {
       
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium flex items-center"><Users className="w-4 h-4 mr-2" /> Company Details</h4>
+          <h4 className="font-medium flex items-center">
+            <Users className="w-4 h-4 mr-2" /> Company Details
+          </h4>
           <div className="mt-2 space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-500">Founded</span>
@@ -34,7 +38,9 @@ export const DeveloperOverview = ({ developer }: DeveloperOverviewProps) => {
         </div>
         
         <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium flex items-center"><Building className="w-4 h-4 mr-2" /> Track Record</h4>
+          <h4 className="font-medium flex items-center">
+            <Building className="w-4 h-4 mr-2" /> Track Record
+          </h4>
           <div className="mt-2 space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-500">Completed Projects</span>
@@ -42,7 +48,7 @@ export const DeveloperOverview = ({ developer }: DeveloperOverviewProps) => {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Average ROI</span>
-              <span>{developer.performanceData.reduce((acc, curr) => acc + curr.roi, 0) / developer.performanceData.length}%</span>
+              <span>{averageROI.toFixed(1)}%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Legal History</span>
