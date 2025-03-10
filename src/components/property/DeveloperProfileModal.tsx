@@ -7,12 +7,15 @@ import { BarChart, Calendar, FileText, History, ShieldAlert, Users } from "lucid
 import { DeveloperProfileHeader } from './developer/DeveloperProfileHeader';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { Developer } from '@/data/developers';
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DeveloperProfileModalProps {
   developer: Developer;
 }
 
 export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps) => {
+  const isMobile = useIsMobile();
+  
   return (
     <Dialog>
       <DialogTrigger asChild>
@@ -28,13 +31,34 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
         <DeveloperProfileHeader developer={developer} />
 
         <Tabs defaultValue="overview" className="mt-4">
-          <TabsList className="grid grid-cols-5 w-full h-auto">
-            <TabsTrigger value="overview" className="text-xs py-2">Overview</TabsTrigger>
-            <TabsTrigger value="projects" className="text-xs py-2">Past Projects</TabsTrigger>
-            <TabsTrigger value="performance" className="text-xs py-2">Performance</TabsTrigger>
-            <TabsTrigger value="risk" className="text-xs py-2">Risk Factors</TabsTrigger>
-            <TabsTrigger value="media" className="text-xs py-2">Media & Legal</TabsTrigger>
-          </TabsList>
+          {/* Custom mobile-friendly tabs layout */}
+          <div className="relative overflow-x-auto pb-2 -mx-2 px-2">
+            <TabsList className={`grid w-full h-auto ${isMobile ? 'grid-cols-2 gap-1' : 'grid-cols-5'}`}>
+              {isMobile ? (
+                <>
+                  <div className="contents">
+                    <TabsTrigger value="overview" className="text-xs py-2 px-1">Overview</TabsTrigger>
+                    <TabsTrigger value="projects" className="text-xs py-2 px-1">Past Projects</TabsTrigger>
+                  </div>
+                  <div className="contents">
+                    <TabsTrigger value="performance" className="text-xs py-2 px-1">Performance</TabsTrigger>
+                    <TabsTrigger value="risk" className="text-xs py-2 px-1">Risk Factors</TabsTrigger>
+                  </div>
+                  <div className="col-span-2 mt-1">
+                    <TabsTrigger value="media" className="text-xs py-2 w-full">Media & Legal</TabsTrigger>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <TabsTrigger value="overview" className="text-xs py-2">Overview</TabsTrigger>
+                  <TabsTrigger value="projects" className="text-xs py-2">Past Projects</TabsTrigger>
+                  <TabsTrigger value="performance" className="text-xs py-2">Performance</TabsTrigger>
+                  <TabsTrigger value="risk" className="text-xs py-2">Risk Factors</TabsTrigger>
+                  <TabsTrigger value="media" className="text-xs py-2">Media & Legal</TabsTrigger>
+                </>
+              )}
+            </TabsList>
+          </div>
           
           <TabsContent value="overview" className="pt-4 block">
             <div className="mb-4">
