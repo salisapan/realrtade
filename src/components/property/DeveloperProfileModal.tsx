@@ -28,12 +28,12 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
         <DeveloperProfileHeader developer={developer} />
 
         <Tabs defaultValue="overview" className="mt-4">
-          <TabsList className="w-full flex flex-wrap justify-between mb-4 overflow-x-auto">
-            <TabsTrigger value="overview" className="text-xs py-2 flex-1">Overview</TabsTrigger>
-            <TabsTrigger value="projects" className="text-xs py-2 flex-1">Past Projects</TabsTrigger>
-            <TabsTrigger value="performance" className="text-xs py-2 flex-1">Performance</TabsTrigger>
-            <TabsTrigger value="risk" className="text-xs py-2 flex-1">Risk Factors</TabsTrigger>
-            <TabsTrigger value="media" className="text-xs py-2 flex-1">Media & Legal</TabsTrigger>
+          <TabsList className="grid grid-cols-5 w-full h-auto">
+            <TabsTrigger value="overview" className="text-xs py-2">Overview</TabsTrigger>
+            <TabsTrigger value="projects" className="text-xs py-2">Past Projects</TabsTrigger>
+            <TabsTrigger value="performance" className="text-xs py-2">Performance</TabsTrigger>
+            <TabsTrigger value="risk" className="text-xs py-2">Risk Factors</TabsTrigger>
+            <TabsTrigger value="media" className="text-xs py-2">Media & Legal</TabsTrigger>
           </TabsList>
           
           <TabsContent value="overview" className="pt-4">

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Brain, ArrowRight, Heart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { PropertyRecommendation, UserPreferences } from "./types";
-import { getRecommendations } from "./recommendationEngine";
+import { generateRecommendations } from "./recommendationEngine";
 
 export const DashboardRecommendations = () => {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export const DashboardRecommendations = () => {
       const preferences = JSON.parse(savedPreferences) as UserPreferences;
       
       // Generate top 2 recommendations
-      const topRecommendations = getRecommendations(preferences).slice(0, 2);
+      const topRecommendations = generateRecommendations(preferences).slice(0, 2);
       setRecommendations(topRecommendations);
     }
   }, []);
