@@ -9,13 +9,15 @@ import { InvestmentFormValues } from "../types/letterOfIntentTypes";
 interface InvestmentContractProps {
   form: UseFormReturn<InvestmentFormValues>;
   projectAddress: string;
+  propertyName: string;
   visible: boolean;
   setVisible: (visible: boolean) => void;
 }
 
 export const InvestmentContract = ({ 
   form, 
-  projectAddress, 
+  projectAddress,
+  propertyName,
   visible, 
   setVisible 
 }: InvestmentContractProps) => {
@@ -41,7 +43,7 @@ export const InvestmentContract = ({
       
       {visible && (
         <div className="p-3 border rounded-md bg-gray-50 text-xs space-y-2 max-h-48 overflow-y-auto">
-          <h4 className="font-semibold">Investment Contract for {projectAddress}</h4>
+          <h4 className="font-semibold">Investment Contract for {propertyName} ({projectAddress})</h4>
           <p>
             By investing ${investmentAmount?.toLocaleString() || 0} in this project, you agree to the following terms:
           </p>
@@ -67,7 +69,7 @@ export const InvestmentContract = ({
                 checked={field.value}
                 onCheckedChange={field.onChange}
                 id="terms"
-                className="border-primary"
+                className="border-gray-300"
               />
             </FormControl>
             <div className="space-y-1 leading-none">

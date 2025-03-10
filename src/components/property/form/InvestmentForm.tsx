@@ -9,8 +9,9 @@ import { FullNameInput } from "./FullNameInput";
 import { EmailInput } from "./EmailInput";
 import { InvestmentContract } from "./InvestmentContract";
 import { SecureTransactionInfo } from "./SecureTransactionInfo";
-import { CreditCard } from "lucide-react";
+import { CreditCard, Wallet } from "lucide-react";
 import { InvestmentFormValues } from "../types/letterOfIntentTypes";
+import { PaymentMethodInput } from "./PaymentMethodInput";
 
 interface InvestmentFormProps {
   form: UseFormReturn<InvestmentFormValues>;
@@ -48,19 +49,12 @@ export const InvestmentForm = ({
           <FullNameInput form={form} />
           <EmailInput form={form} />
           
-          <div className="p-3 bg-gray-50 rounded-md">
-            <div className="flex items-center gap-2 mb-2">
-              <CreditCard className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-medium">Payment Method</h3>
-            </div>
-            <p className="text-xs text-gray-500">
-              All investments are processed via secure credit card payment
-            </p>
-          </div>
+          <PaymentMethodInput form={form} />
           
           <InvestmentContract 
             form={form} 
-            projectAddress={propertyAddress} 
+            projectAddress={propertyAddress}
+            propertyName={propertyName}
             visible={contractVisible} 
             setVisible={setContractVisible} 
           />
@@ -80,7 +74,7 @@ export const InvestmentForm = ({
               disabled={!formValid}
               className="font-medium"
             >
-              Make Investment - {propertyAddress}
+              Make Investment - {propertyName}
             </Button>
           </DialogFooter>
         </form>

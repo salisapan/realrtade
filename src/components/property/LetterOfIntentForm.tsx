@@ -36,6 +36,7 @@ export const LetterOfIntentForm = ({
       fullName: "",
       email: "",
       termsAccepted: false,
+      paymentMethod: "creditCard",
     },
   });
 
@@ -60,6 +61,7 @@ export const LetterOfIntentForm = ({
       investmentAmount: data.investmentAmount,
       fullName: data.fullName,
       email: data.email,
+      paymentMethod: data.paymentMethod,
       status: "completed",
       date: new Date().toISOString()
     });
@@ -84,6 +86,7 @@ export const LetterOfIntentForm = ({
         fullName: "",
         email: "",
         termsAccepted: false,
+        paymentMethod: "creditCard",
       });
     }
   };
