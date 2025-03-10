@@ -12,3 +12,4 @@ export const investmentFormSchema = z.object({
 });
 
 export type InvestmentFormValues = z.infer<typeof investmentFormSchema>;
+export type FormValues = InvestmentFormValues; // For backward compatibility

@@ -1,7 +1,6 @@
-
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X } from "lucide-react";
+import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X, Brain } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -9,6 +8,7 @@ const menuItems = [
   { title: "Home", url: "/", icon: Home },
   { title: "Dashboard", url: "/dashboard", icon: Home },
   { title: "Properties", url: "/properties", icon: Building2 },
+  { title: "Recommendations", url: "/recommendations", icon: Brain },
   { title: "Performance", url: "/performance", icon: LineChart },
   { title: "Reports", url: "/reports", icon: FileText },
   { title: "Wallet", url: "/wallet", icon: DollarSign },
@@ -34,12 +34,10 @@ export function AppSidebar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("Investor");
 
-  // Listen for window resize events to collapse sidebar on mobile
   useEffect(() => {
     setIsCollapsed(isMobile);
   }, [isMobile]);
 
-  // Get user profile from localStorage
   useEffect(() => {
     try {
       const profile = localStorage.getItem("investorProfile");
@@ -57,8 +55,7 @@ export function AppSidebar() {
       setIsLoggedIn(false);
     }
   }, []);
-  
-  // Mobile sidebar toggle button - removed duplicate and positioned it correctly
+
   const ToggleButton = () => (
     <button 
       onClick={() => setIsMenuOpen(!isMenuOpen)} 
@@ -67,7 +64,7 @@ export function AppSidebar() {
       {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
     </button>
   );
-  
+
   if (isMobile) {
     return (
       <>
@@ -102,7 +99,6 @@ export function AppSidebar() {
                   </Link>
                 ))}
                 
-                {/* Show sign up only if not logged in */}
                 {!isLoggedIn && (
                   <Link 
                     to="/investor-signup" 
@@ -114,7 +110,6 @@ export function AppSidebar() {
                   </Link>
                 )}
                 
-                {/* Show switch between Investor and Entrepreneur views */}
                 <Link 
                   to={isEntrepreneurSection ? "/properties" : "/entrepreneur"} 
                   className="flex items-center gap-3 p-3 rounded-lg mt-4 border-t pt-4 hover:bg-gray-100" 
@@ -136,7 +131,6 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupLabel>{isEntrepreneurSection ? "Entrepreneur" : "Menu"}</SidebarGroupLabel>
           <SidebarGroupContent>
-            {/* User info section */}
             <div className="p-3 mb-2 border-b">
               <h3 className="font-medium text-sm">{isLoggedIn ? userName : "Welcome"}</h3>
               <p className="text-xs text-gray-500">{isEntrepreneurSection ? "Entrepreneur" : "Investor"}</p>
@@ -145,14 +139,13 @@ export function AppSidebar() {
             <SidebarMenu>
               {displayItems.map(item => <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <Link to={item.url} className={item.title === "Home" ? "font-bold text-primary" : ""}>
-                      <item.icon className={item.title === "Home" ? "text-primary" : ""} />
+                    <Link to={item.url} className={path === item.url ? "font-bold text-primary" : ""}>
+                      <item.icon className={path === item.url ? "text-primary" : ""} />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>)}
               
-              {/* Show sign up only if not logged in */}
               {!isLoggedIn && (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
@@ -164,7 +157,6 @@ export function AppSidebar() {
                 </SidebarMenuItem>
               )}
               
-              {/* Show switch between Investor and Entrepreneur views */}
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
                   <Link to={isEntrepreneurSection ? "/properties" : "/entrepreneur"}>

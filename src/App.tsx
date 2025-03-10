@@ -21,6 +21,7 @@ import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
 import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
+import Recommendations from "./pages/Recommendations";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,14 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/recommendations" 
+                element={
+                  <ProtectedRoute>
+                    <Recommendations />
                   </ProtectedRoute>
                 } 
               />

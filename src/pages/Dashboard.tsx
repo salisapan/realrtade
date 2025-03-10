@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +14,7 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { DashboardRecommendations } from "@/components/recommendations/DashboardRecommendations";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -23,7 +23,6 @@ const Dashboard = () => {
   const isMobile = useIsMobile();
 
   useEffect(() => {
-    // Get user profile from localStorage
     try {
       const profile = localStorage.getItem("investorProfile");
       if (profile) {
@@ -51,7 +50,6 @@ const Dashboard = () => {
     <div className="flex">
       <AppSidebar />
       <div className="flex-1 min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-16 md:pb-8">
-        {/* Profile Header */}
         <div className="flex items-center justify-between mb-6 md:mb-8 flex-wrap gap-3">
           <div className="flex items-center gap-3 md:gap-6">
             <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-primary/10 flex items-center justify-center cursor-pointer"
@@ -68,7 +66,6 @@ const Dashboard = () => {
           </Button>
         </div>
 
-        {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
           <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => handleNavigate('/wallet')}>
             <CardHeader className="flex flex-row items-center justify-between pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
@@ -125,7 +122,6 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Recent Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
           <Card className="lg:col-span-2">
             <CardHeader className="flex justify-between items-center">
@@ -180,42 +176,46 @@ const Dashboard = () => {
             </CardContent>
           </Card>
           
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base md:text-lg">Tools & Resources</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 md:space-y-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start text-left h-auto py-2 md:py-3 px-3 md:px-4"
-                  onClick={() => navigate("/reports")}
-                >
-                  <div className="flex items-start gap-2 md:gap-3">
-                    <FileText className="h-4 w-4 md:h-5 md:w-5 text-green-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-sm md:text-base mb-0 md:mb-1">Property Reports</h3>
-                      <p className="text-xs md:text-sm text-gray-500">View detailed analytics on your investments</p>
+          <div className="space-y-4 md:space-y-6">
+            <DashboardRecommendations />
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base md:text-lg">Tools & Resources</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3 md:space-y-4">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-left h-auto py-2 md:py-3 px-3 md:px-4"
+                    onClick={() => navigate("/reports")}
+                  >
+                    <div className="flex items-start gap-2 md:gap-3">
+                      <FileText className="h-4 w-4 md:h-5 md:w-5 text-green-500 mt-0.5" />
+                      <div>
+                        <h3 className="font-medium text-sm md:text-base mb-0 md:mb-1">Property Reports</h3>
+                        <p className="text-xs md:text-sm text-gray-500">View detailed analytics on your investments</p>
+                      </div>
                     </div>
-                  </div>
-                </Button>
+                  </Button>
 
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start text-left h-auto py-2 md:py-3 px-3 md:px-4"
-                  onClick={() => navigate("/performance")}
-                >
-                  <div className="flex items-start gap-2 md:gap-3">
-                    <LineChart className="h-4 w-4 md:h-5 md:w-5 text-blue-500 mt-0.5" />
-                    <div>
-                      <h3 className="font-medium text-sm md:text-base mb-0 md:mb-1">Investment Analysis</h3>
-                      <p className="text-xs md:text-sm text-gray-500">Track performance across your portfolio</p>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start text-left h-auto py-2 md:py-3 px-3 md:px-4"
+                    onClick={() => navigate("/performance")}
+                  >
+                    <div className="flex items-start gap-2 md:gap-3">
+                      <LineChart className="h-4 w-4 md:h-5 md:w-5 text-blue-500 mt-0.5" />
+                      <div>
+                        <h3 className="font-medium text-sm md:text-base mb-0 md:mb-1">Investment Analysis</h3>
+                        <p className="text-xs md:text-sm text-gray-500">Track performance across your portfolio</p>
+                      </div>
                     </div>
-                  </div>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>
