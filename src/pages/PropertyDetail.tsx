@@ -147,10 +147,10 @@ const PropertyDetail = () => {
                 </CardHeader>
                 <CardContent className="pt-0">
                   <Tabs defaultValue="analysis">
-                    <TabsList className="mb-3 w-full h-9">
-                      <TabsTrigger value="analysis" className="text-xs h-7">Financial Analysis</TabsTrigger>
-                      <TabsTrigger value="documents" className="text-xs h-7">Documents</TabsTrigger>
-                      <TabsTrigger value="qa" className="text-xs h-7">Q&A</TabsTrigger>
+                    <TabsList className="mb-3 w-full h-9 flex justify-between">
+                      <TabsTrigger value="analysis" className="text-xs h-7 flex-1">Financial Analysis</TabsTrigger>
+                      <TabsTrigger value="documents" className="text-xs h-7 flex-1">Documents</TabsTrigger>
+                      <TabsTrigger value="qa" className="text-xs h-7 flex-1">Q&A</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="analysis">

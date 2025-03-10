@@ -1,216 +1,161 @@
 
-import React, { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { 
-  Form, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormControl, 
-  FormDescription 
-} from "@/components/ui/form";
-import { Slider } from "@/components/ui/slider";
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, AlertTriangle, Clock, Building2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { UserPreferences } from "./types";
-
-const assetTypeOptions = [
-  { id: "residential", label: "Residential" },
-  { id: "commercial", label: "Commercial" },
-  { id: "industrial", label: "Industrial" },
-  { id: "retail", label: "Retail" },
-  { id: "office", label: "Office Space" },
-  { id: "land", label: "Land Development" },
-  { id: "green", label: "Green Real Estate" },
-];
-
-const formSchema = z.object({
-  riskTolerance: z.enum(['low', 'medium', 'high'], {
-    required_error: "Please select your risk tolerance",
-  }),
-  investmentHorizon: z.enum(['1-2', '3-5', '5+'], {
-    required_error: "Please select your investment horizon",
-  }),
-  assetTypes: z.array(z.string()).refine((value) => value.length > 0, {
-    message: "Please select at least one asset type",
-  }),
-});
-
-type PreferenceFormValues = z.infer<typeof formSchema>;
+import { UserPreferences } from './types';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Sparkles } from 'lucide-react';
 
 interface RecommendationPreferenceFormProps {
-  initialPreferences: UserPreferences | null;
   onSubmit: (preferences: UserPreferences) => void;
+  initialPreferences?: UserPreferences;
 }
 
-export const RecommendationPreferenceForm: React.FC<RecommendationPreferenceFormProps> = ({
-  initialPreferences,
+export const RecommendationPreferenceForm = ({ 
   onSubmit,
-}) => {
-  const form = useForm<PreferenceFormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: initialPreferences || {
-      riskTolerance: 'medium',
-      investmentHorizon: '3-5',
-      assetTypes: ['residential', 'commercial'],
-    },
-  });
+  initialPreferences
+}: RecommendationPreferenceFormProps) => {
+  const [riskTolerance, setRiskTolerance] = useState<'low' | 'medium' | 'high'>(
+    initialPreferences?.riskTolerance || 'medium'
+  );
+  
+  const [investmentHorizon, setInvestmentHorizon] = useState<'1-2' | '3-5' | '5+'>(
+    initialPreferences?.investmentHorizon || '3-5'
+  );
+  
+  const [assetTypes, setAssetTypes] = useState<string[]>(
+    initialPreferences?.assetTypes || ['Commercial']
+  );
 
-  const handleSubmit = (values: PreferenceFormValues) => {
-    onSubmit(values);
+  const handleAssetTypeChange = (type: string) => {
+    if (assetTypes.includes(type)) {
+      setAssetTypes(assetTypes.filter(t => t !== type));
+    } else {
+      setAssetTypes([...assetTypes, type]);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Create the preferences object
+    const preferences: UserPreferences = {
+      riskTolerance,
+      investmentHorizon,
+      assetTypes
+    };
+    
+    onSubmit(preferences);
   };
 
   return (
-    <Card className="shadow-sm border-blue-100 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-50 to-transparent opacity-50 pointer-events-none"></div>
-      <CardHeader className="relative">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-100 rounded-full">
-            <Brain className="h-5 w-5 text-blue-600" />
-          </div>
-          <div>
-            <CardTitle>Your Investment Preferences</CardTitle>
-            <CardDescription>
-              Tell RealAI what you're looking for to get tailored recommendations
-            </CardDescription>
-          </div>
-        </div>
+    <Card className="shadow-sm mb-6">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center">
+          <Sparkles className="h-5 w-5 mr-2 text-primary" />
+          Personalize Your Recommendations
+        </CardTitle>
       </CardHeader>
-      <CardContent className="relative">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="riskTolerance"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="h-4 w-4 text-blue-600" />
-                    <FormLabel>Risk Tolerance</FormLabel>
-                  </div>
-                  <FormControl>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select your risk tolerance" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low - Safety First</SelectItem>
-                        <SelectItem value="medium">Medium - Balanced Approach</SelectItem>
-                        <SelectItem value="high">High - Maximum Growth Potential</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormDescription>
-                    How much risk are you ready to take? Low means safer bets!
-                  </FormDescription>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="investmentHorizon"
-              render={({ field }) => (
-                <FormItem className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    <FormLabel>Investment Horizon</FormLabel>
-                  </div>
-                  <FormControl>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select your investment horizon" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1-2">1-2 Years (Short Term)</SelectItem>
-                        <SelectItem value="3-5">3-5 Years (Medium Term)</SelectItem>
-                        <SelectItem value="5+">5+ Years (Long Term)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormDescription>
-                    How long do you plan to keep your investment?
-                  </FormDescription>
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="assetTypes"
-              render={() => (
-                <FormItem>
-                  <div className="mb-4">
-                    <div className="flex items-center gap-3">
-                      <Building2 className="h-4 w-4 text-blue-600" />
-                      <FormLabel className="text-base">Asset Types</FormLabel>
-                    </div>
-                    <FormDescription>
-                      Select the types of properties you're interested in
-                    </FormDescription>
-                  </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {assetTypeOptions.map((option) => (
-                      <FormField
-                        key={option.id}
-                        control={form.control}
-                        name="assetTypes"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={option.id}
-                              className="flex items-start space-x-3 space-y-0"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(option.id)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...field.value, option.id])
-                                      : field.onChange(
-                                          field.value?.filter(
-                                            (value) => value !== option.id
-                                          )
-                                        )
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                {option.label}
-                              </FormLabel>
-                            </FormItem>
-                          )
-                        }}
-                      />
-                    ))}
-                  </div>
-                </FormItem>
-              )}
-            />
-
-            <Button type="submit" className="w-full md:w-auto">
-              <Brain className="mr-2 h-4 w-4" />
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label className="mb-2 block">What's your risk tolerance?</Label>
+            <RadioGroup 
+              value={riskTolerance} 
+              onValueChange={(value) => setRiskTolerance(value as 'low' | 'medium' | 'high')}
+              className="flex flex-col sm:flex-row gap-2 sm:gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="low" id="risk-low" />
+                <Label htmlFor="risk-low" className="cursor-pointer">Low</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="medium" id="risk-medium" />
+                <Label htmlFor="risk-medium" className="cursor-pointer">Medium</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="high" id="risk-high" />
+                <Label htmlFor="risk-high" className="cursor-pointer">High</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <div>
+            <Label className="mb-2 block">How long do you plan to invest?</Label>
+            <RadioGroup 
+              value={investmentHorizon} 
+              onValueChange={(value) => setInvestmentHorizon(value as '1-2' | '3-5' | '5+')}
+              className="flex flex-col sm:flex-row gap-2 sm:gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="1-2" id="term-short" />
+                <Label htmlFor="term-short" className="cursor-pointer">1-2 years</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="3-5" id="term-medium" />
+                <Label htmlFor="term-medium" className="cursor-pointer">3-5 years</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="5+" id="term-long" />
+                <Label htmlFor="term-long" className="cursor-pointer">5+ years</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          
+          <div>
+            <Label className="mb-2 block">What types of properties interest you?</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="flex items-start space-x-2">
+                <Checkbox 
+                  id="type-commercial" 
+                  checked={assetTypes.includes('Commercial')}
+                  onCheckedChange={() => handleAssetTypeChange('Commercial')}
+                />
+                <Label htmlFor="type-commercial" className="cursor-pointer">Commercial</Label>
+              </div>
+              <div className="flex items-start space-x-2">
+                <Checkbox 
+                  id="type-residential" 
+                  checked={assetTypes.includes('Residential')}
+                  onCheckedChange={() => handleAssetTypeChange('Residential')}
+                />
+                <Label htmlFor="type-residential" className="cursor-pointer">Residential</Label>
+              </div>
+              <div className="flex items-start space-x-2">
+                <Checkbox 
+                  id="type-industrial" 
+                  checked={assetTypes.includes('Industrial')}
+                  onCheckedChange={() => handleAssetTypeChange('Industrial')}
+                />
+                <Label htmlFor="type-industrial" className="cursor-pointer">Industrial</Label>
+              </div>
+              <div className="flex items-start space-x-2">
+                <Checkbox 
+                  id="type-retail" 
+                  checked={assetTypes.includes('Retail')}
+                  onCheckedChange={() => handleAssetTypeChange('Retail')}
+                />
+                <Label htmlFor="type-retail" className="cursor-pointer">Retail</Label>
+              </div>
+              <div className="flex items-start space-x-2">
+                <Checkbox 
+                  id="type-mixed" 
+                  checked={assetTypes.includes('Mixed-Use')}
+                  onCheckedChange={() => handleAssetTypeChange('Mixed-Use')}
+                />
+                <Label htmlFor="type-mixed" className="cursor-pointer">Mixed-Use</Label>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex justify-end pt-2">
+            <Button type="submit" className="w-full sm:w-auto">
               Get Personalized Recommendations
             </Button>
-          </form>
-        </Form>
+          </div>
+        </form>
       </CardContent>
     </Card>
   );
