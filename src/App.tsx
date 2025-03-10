@@ -21,7 +21,6 @@ import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
 import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
-import Autopilot from "./pages/Autopilot";
 
 const queryClient = new QueryClient();
 
@@ -91,14 +90,6 @@ const App = () => {
                 element={
                   <ProtectedRoute>
                     <Wallet />
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/autopilot" 
-                element={
-                  <ProtectedRoute>
-                    <Autopilot />
                   </ProtectedRoute>
                 } 
               />
