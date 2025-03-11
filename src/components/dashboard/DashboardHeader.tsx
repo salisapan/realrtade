@@ -40,17 +40,21 @@ export const DashboardHeader = () => {
     <div className="flex items-center justify-between mb-6 md:mb-8 flex-wrap gap-3">
       <div className="flex items-center gap-3 md:gap-6">
         <div 
-          className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-primary/10 flex items-center justify-center cursor-pointer"
+          className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-blue-900/30 flex items-center justify-center cursor-pointer border border-blue-700/50 shadow-[0_0_10px_rgba(59,130,246,0.3)] hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300"
           onClick={() => handleNavigate('/settings')}
         >
-          <UserCircle className="w-8 h-8 md:w-10 md:h-10 text-primary" />
+          <UserCircle className="w-8 h-8 md:w-10 md:h-10 text-blue-400" />
         </div>
         <div>
-          <h1 className="text-lg md:text-2xl font-bold text-gray-900">{userName}</h1>
-          <p className="text-xs md:text-sm text-gray-600">Active Investor since 2023</p>
+          <h1 className="text-lg md:text-2xl font-bold text-white">Welcome, {userName}</h1>
+          <p className="text-xs md:text-sm text-gray-400">Real Estate Dashboard • {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
       </div>
-      <Button onClick={handleProfileUpdate} size={isMobile ? "sm" : "default"}>
+      <Button 
+        onClick={handleProfileUpdate} 
+        size={isMobile ? "sm" : "default"}
+        className="bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.3)] hover:shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300"
+      >
         Edit Profile
       </Button>
     </div>
