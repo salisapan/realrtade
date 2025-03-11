@@ -3,7 +3,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { UseFormReturn } from "react-hook-form";
 import { InvestmentFormValues } from "../types/letterOfIntentTypes";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Wallet, CreditCard, Bank } from "lucide-react";
+import { Wallet, CreditCard, BanknoteIcon } from "lucide-react";
 
 interface PaymentMethodSelectionProps {
   form: UseFormReturn<InvestmentFormValues>;
@@ -35,7 +35,7 @@ export const PaymentMethodSelection = ({ form }: PaymentMethodSelectionProps) =>
               
               <div className="flex items-center justify-between space-x-2 rounded-md border p-3 hover:bg-gray-50 transition-colors duration-200 cursor-pointer">
                 <div className="flex items-center space-x-2">
-                  <Bank className="h-4 w-4 text-primary" />
+                  <BanknoteIcon className="h-4 w-4 text-primary" />
                   <label htmlFor="bank" className="text-sm font-medium leading-none cursor-pointer">
                     Bank Transfer
                   </label>

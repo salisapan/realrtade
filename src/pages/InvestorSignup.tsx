@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +19,7 @@ const InvestorSignup = () => {
   const [isAccredited, setIsAccredited] = useState(false);
   const [showStandardForm, setShowStandardForm] = useState(false);
   
-  function onSubmit(values: InvestmentFormValues) {
+  function onSubmit(values: InvestorFormValues) {
     setIsSubmitting(true);
 
     // Store investor information in localStorage for demo purposes
