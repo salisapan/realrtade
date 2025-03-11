@@ -1,7 +1,6 @@
 
 import { StatCard } from "./StatCard";
-import { LineChart, UserCircle, DollarSign, FileText, Building2 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { LineChart, UserCircle, DollarSign, FileText, Building2, TrendingUp, BarChart3, Percent } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export const StatsGrid = () => {
@@ -22,30 +21,29 @@ export const StatsGrid = () => {
         onClick={() => handleNavigate('/wallet')}
       />
 
-      <Link to="/properties" className="block">
-        <StatCard
-          title="Active Projects"
-          value="8"
-          description="Across 3 platforms"
-          icon={Building2}
-          onClick={() => {}}
-        />
-      </Link>
+      <StatCard
+        title="Active Projects"
+        value="8"
+        description="Across 3 platforms"
+        icon={Building2}
+        onClick={() => handleNavigate('/properties')}
+      />
 
       <StatCard
         title="Total Returns"
         value="18.3%"
         description="from last quarter"
         percent="+2.1% from last quarter"
-        icon={LineChart}
+        icon={TrendingUp}
         onClick={() => handleNavigate('/performance')}
       />
 
       <StatCard
-        title="Reports"
-        value="24"
-        description="Last updated 2 days ago"
-        icon={FileText}
+        title="Annual Yield"
+        value="7.2%"
+        description="Portfolio average"
+        percent="+0.8% from last year"
+        icon={Percent}
         onClick={() => handleNavigate('/reports')}
       />
     </div>
