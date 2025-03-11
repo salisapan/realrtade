@@ -159,8 +159,12 @@ export const CashFlowSimulator = () => {
                   dataKey="amount"
                   radius={[4, 4, 4, 4]}
                   className="hover:opacity-80 transition-opacity duration-300"
-                  fill={(entry: any) => entry.color || '#3b82f6'}
-                />
+                  fill="#3b82f6" // Use a default color
+                >
+                  {data.map((entry, index) => (
+                    <cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
