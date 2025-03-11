@@ -13,7 +13,7 @@ import { CashFlowSimulator } from "./charts/CashFlowSimulator";
 
 export const DashboardContent = () => {
   return (
-    <div className="flex-1 min-h-screen bg-gray-900 text-white p-4 sm:p-6 md:p-8 pb-16 md:pb-8">
+    <div className="flex-1 min-h-screen bg-white text-gray-900 p-4 sm:p-6 md:p-8 pb-16 md:pb-8">
       <DashboardHeader />
       <StatsGrid />
       

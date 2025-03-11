@@ -12,9 +12,9 @@ const data = [
 
 export const RegionalYieldChart = () => {
   return (
-    <Card className="bg-gray-800/50 backdrop-blur-md border border-gray-700 shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+    <Card className="bg-white border border-gray-200 shadow-sm">
       <CardHeader>
-        <CardTitle className="text-base md:text-lg text-white">Rental Yield by Region</CardTitle>
+        <CardTitle className="text-base md:text-lg text-gray-900">Rental Yield by Region</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[200px] w-full">
@@ -28,24 +28,24 @@ export const RegionalYieldChart = () => {
                 bottom: 5,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="region" tick={{ fill: '#9CA3AF' }} />
-              <YAxis tick={{ fill: '#9CA3AF' }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+              <XAxis dataKey="region" tick={{ fill: '#6B7280' }} />
+              <YAxis tick={{ fill: '#6B7280' }} />
               <Tooltip 
                 contentStyle={{ 
-                  backgroundColor: '#1F2937', 
-                  borderColor: '#374151',
-                  color: '#F9FAFB',
+                  backgroundColor: '#FFFFFF', 
+                  borderColor: '#E5E7EB',
+                  color: '#111827',
                   boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                 }}
                 formatter={(value) => [`${value}%`, 'Yield']}
-                itemStyle={{ color: '#F9FAFB' }}
-                labelStyle={{ color: '#F9FAFB' }}
+                itemStyle={{ color: '#111827' }}
+                labelStyle={{ color: '#111827' }}
               />
-              <Legend wrapperStyle={{ color: '#9CA3AF' }} />
+              <Legend wrapperStyle={{ color: '#6B7280' }} />
               <Bar 
                 dataKey="yield" 
-                fill="#10B981" 
+                fill="#3B82F6" 
                 radius={[4, 4, 0, 0]}
                 animationDuration={1500}
               />
