@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -91,6 +92,33 @@
   .animate-grow {
     animation: grow 2s ease-in-out infinite alternate;
   }
+  
+  /* Enhanced hover effects */
+  .hover-lift {
+    @apply transition-transform duration-300 hover:-translate-y-1;
+  }
+  
+  .hover-glow {
+    @apply transition-shadow duration-300 hover:shadow-[0_0_15px_rgba(66,133,244,0.3)];
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-300 hover:scale-105;
+  }
+  
+  /* Button hover effects */
+  .button-hover-effect {
+    @apply relative overflow-hidden;
+  }
+  
+  .button-hover-effect:after {
+    content: '';
+    @apply absolute top-0 h-full w-full bg-white/20 -left-full skew-x-12 transition-all duration-700;
+  }
+  
+  .button-hover-effect:hover:after {
+    @apply left-full;
+  }
 }
 
 @keyframes float {
@@ -129,6 +157,26 @@
   }
   100% {
     width: 100%;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes fade-in-up {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -232,6 +280,54 @@
   
   .sign-in-email {
     @apply hover:shadow-[0_0_10px_rgba(66,133,244,0.3)];
+  }
+  
+  /* Enhanced card styles */
+  .enhanced-card {
+    @apply rounded-lg overflow-hidden border shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 bg-white;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply h-2 rounded-full bg-gray-200 overflow-hidden;
+  }
+  
+  .progress-bar-fill {
+    @apply h-full rounded-full animate-grow;
+  }
+  
+  /* Alert styles */
+  .alert {
+    @apply p-4 rounded-lg border flex items-start gap-3;
+  }
+  
+  .alert-info {
+    @apply bg-blue-50 border-blue-200 text-blue-800;
+  }
+  
+  .alert-success {
+    @apply bg-green-50 border-green-200 text-green-800;
+  }
+  
+  .alert-warning {
+    @apply bg-yellow-50 border-yellow-200 text-yellow-800;
+  }
+  
+  .alert-error {
+    @apply bg-red-50 border-red-200 text-red-800;
+  }
+  
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+  
+  .badge-primary {
+    @apply bg-primary/10 text-primary;
+  }
+  
+  .badge-secondary {
+    @apply bg-secondary/10 text-secondary;
   }
 }
 

@@ -16,7 +16,7 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
       <DialogTrigger asChild>
         <Button 
           variant="link" 
-          className="p-0 h-auto flex items-center gap-1 text-gray-800 hover:text-primary group"
+          className="p-0 h-auto flex items-center gap-1 text-gray-800 hover:text-primary group transition-colors duration-300"
         >
           <span className="group-hover:text-primary transition-colors duration-300">{developer.name}</span>
           <span className="text-yellow-500 text-sm ml-1 group-hover:scale-110 transition-transform duration-300">★ {developer.rating}</span>
