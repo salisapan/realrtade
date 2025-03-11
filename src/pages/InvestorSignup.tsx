@@ -118,20 +118,26 @@ const InvestorSignup = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-white to-blue-50 animate-fade-in">
       <HomeHeader />
       
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="flex items-center gap-1 glow-effect">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => navigate(-1)} 
+            className="flex items-center gap-1 glow-effect hover:shadow-[0_0_10px_rgba(66,133,244,0.3)]"
+          >
             <ArrowLeft className="w-4 h-4" />
             <span>Back</span>
           </Button>
         </div>
         
         <div className="max-w-3xl mx-auto">
-          <Card className="shadow-md animate-fade-in">
-            <CardHeader>
+          <Card className="shadow-[0_4px_24px_rgba(66,133,244,0.15)] animate-fade-in overflow-hidden border-0">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-white/30 pointer-events-none"></div>
+            <CardHeader className="relative">
               <div className="flex justify-center mb-4">
                 <img 
                   src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
@@ -144,13 +150,13 @@ const InvestorSignup = () => {
                 Complete your investor profile to access real estate opportunities
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="relative">
               {!showStandardForm ? (
-                <div className="space-y-4 p-4 bg-white rounded-lg">
+                <div className="space-y-4 p-4 bg-white rounded-lg shadow-sm border border-gray-100">
                   <h3 className="text-center font-medium mb-4">Sign in with</h3>
                   <button 
                     onClick={handleGoogleSignIn}
-                    className="sign-in-button sign-in-google"
+                    className="w-full flex items-center justify-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-all duration-300 hover:border-primary/30"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                       <path fill="#EA4335" d="M5.26620003,9.76452941 C6.19878754,6.93863203 8.85444915,4.90909091 12,4.90909091 C13.6909091,4.90909091 15.2181818,5.50909091 16.4181818,6.49090909 L19.9090909,3 C17.7818182,1.14545455 15.0545455,0 12,0 C7.27006974,0 3.1977497,2.69829785 1.23999023,6.65002441 L5.26620003,9.76452941 Z" />
@@ -163,7 +169,7 @@ const InvestorSignup = () => {
                   
                   <button 
                     onClick={handleAppleSignIn}
-                    className="sign-in-button sign-in-apple"
+                    className="w-full flex items-center justify-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-all duration-300 hover:border-primary/30"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
                       <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.32 4.5-3.74 4.25z" />
@@ -173,7 +179,7 @@ const InvestorSignup = () => {
                   
                   <button 
                     onClick={handleEmailSignIn}
-                    className="sign-in-button sign-in-email"
+                    className="w-full flex items-center justify-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-all duration-300 hover:border-primary/30"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect width="20" height="16" x="2" y="4" rx="2" />
@@ -190,7 +196,7 @@ const InvestorSignup = () => {
                   <Button 
                     variant="outline" 
                     onClick={handleEmailSignIn}
-                    className="w-full"
+                    className="w-full hover:shadow-[0_0_10px_rgba(66,133,244,0.3)] transition-all duration-300"
                   >
                     Sign up with detailed profile
                   </Button>
@@ -199,12 +205,12 @@ const InvestorSignup = () => {
                 <InvestorForm onSubmit={onSubmit} isSubmitting={isSubmitting} />
               )}
             </CardContent>
-            <CardFooter className="flex flex-col items-start">
+            <CardFooter className="flex flex-col items-start relative">
               <p className="text-sm text-gray-500">
                 By registering, you agree to our Terms of Service and Privacy Policy.
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                Already have an account? <Link to="/login" className="text-primary font-medium hover:underline">Log in</Link>
+                Already have an account? <Link to="/login" className="text-primary font-medium hover:underline hover:text-primary-dark transition-colors duration-300">Log in</Link>
               </p>
             </CardFooter>
           </Card>

@@ -16,17 +16,25 @@ export const DashboardHeader = ({
     <div className="container mx-auto px-4 py-4">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
-          <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-10 mr-4 rounded-lg shadow-[0_0_10px_rgba(66,133,244,0.2)] transition-all duration-300 hover:shadow-[0_0_15px_rgba(66,133,244,0.4)]" />
+          <img 
+            src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+            alt="RealTrade Logo" 
+            className="h-10 mr-4 rounded-lg shadow-[0_0_10px_rgba(66,133,244,0.3)] transition-all duration-300 hover:shadow-[0_0_20px_rgba(66,133,244,0.5)] animate-pulse-slow" 
+          />
           <h1 className="text-xl font-semibold relative">
             {title}
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary-light animate-[grow_2s_ease-in-out_infinite_alternate]"></span>
+            <span className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-primary/20 via-primary to-primary/20 animate-[grow_2.5s_ease-in-out_infinite_alternate]"></span>
           </h1>
         </div>
         <div className="flex items-center gap-4">
           <Link to="/">
-            <Button variant="outline" size="sm" className="flex items-center gap-2 transition-all duration-300 hover:shadow-[0_0_8px_rgba(66,133,244,0.3)]">
-              <Home size={16} />
-              Home
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-2 transition-all duration-300 hover:shadow-[0_0_12px_rgba(66,133,244,0.4)] hover:bg-gradient-to-r hover:from-white hover:to-blue-50 glow-effect"
+            >
+              <Home size={16} className="text-primary" />
+              <span>Home</span>
             </Button>
           </Link>
           
@@ -34,10 +42,10 @@ export const DashboardHeader = ({
             <Button 
               onClick={onAddDeal}
               size="sm" 
-              className="flex items-center gap-2 transition-all duration-300 hover:shadow-[0_0_8px_rgba(66,133,244,0.3)]"
+              className="flex items-center gap-2 transition-all duration-300 hover:shadow-[0_0_12px_rgba(66,133,244,0.4)] bg-gradient-to-r from-primary to-primary-light group"
             >
-              <PlusCircle size={16} />
-              Add Deal
+              <PlusCircle size={16} className="transition-transform group-hover:rotate-90 duration-300" />
+              <span>Add Deal</span>
             </Button>
           )}
         </div>

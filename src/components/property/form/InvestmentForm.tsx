@@ -36,43 +36,51 @@ export const InvestmentForm = ({
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Invest in {propertyName}</DialogTitle>
-        <DialogDescription>
-          Complete your investment details below
-        </DialogDescription>
+      <DialogHeader className="animate-fade-in">
+        <div className="flex flex-col items-center gap-2">
+          <div className="p-2 bg-primary/10 rounded-full inline-flex items-center justify-center mb-2">
+            <CreditCard className="h-6 w-6 text-primary animate-pulse-slow" />
+          </div>
+          <DialogTitle className="text-xl font-bold">Invest in {propertyName}</DialogTitle>
+          <DialogDescription className="text-center">
+            Complete your investment details below
+          </DialogDescription>
+        </div>
       </DialogHeader>
       
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <InvestmentAmountInput form={form} minInvestment={minInvestment} />
-          <FullNameInput form={form} />
-          <EmailInput form={form} />
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 animate-fade-in">
+          <div className="space-y-5 p-2">
+            <InvestmentAmountInput form={form} minInvestment={minInvestment} />
+            <FullNameInput form={form} />
+            <EmailInput form={form} />
+            
+            <PaymentMethodInput form={form} />
+            
+            <InvestmentContract 
+              form={form} 
+              projectAddress={propertyAddress}
+              propertyName={propertyName}
+              visible={contractVisible} 
+              setVisible={setContractVisible} 
+            />
+            
+            <SecureTransactionInfo />
+          </div>
           
-          <PaymentMethodInput form={form} />
-          
-          <InvestmentContract 
-            form={form} 
-            projectAddress={propertyAddress}
-            propertyName={propertyName}
-            visible={contractVisible} 
-            setVisible={setContractVisible} 
-          />
-          
-          <SecureTransactionInfo />
-          
-          <DialogFooter className="sm:justify-between pt-2">
+          <DialogFooter className="sm:justify-between pt-4 mt-6 border-t">
             <Button 
               type="button" 
               variant="outline" 
               onClick={onCancel}
+              className="hover:shadow-[0_0_10px_rgba(66,133,244,0.2)] transition-all duration-300"
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
               disabled={!formValid}
-              className="font-medium"
+              className="font-medium bg-gradient-to-r from-primary to-primary-light hover:shadow-[0_0_15px_rgba(66,133,244,0.3)] transition-all duration-300"
             >
               Make Investment - {propertyName}
             </Button>

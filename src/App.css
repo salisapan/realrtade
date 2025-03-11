@@ -12,6 +12,14 @@
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 217 91% 60%;
+    
+    /* New color variables for enhanced UI */
+    --primary-light: 217 91% 70%;
+    --primary-dark: 217 91% 50%;
+    --secondary: 215 60% 95%;
+    --secondary-dark: 215 60% 85%;
+    --accent: 214 85% 65%;
+    --accent-foreground: 0 0% 100%;
   }
 
   * {
@@ -61,9 +69,41 @@
   .section-padding {
     @apply py-10 md:py-16 lg:py-20;
   }
+  
+  /* Magical glowing effects */
+  .glow-sm {
+    @apply shadow-[0_0_10px_rgba(66,133,244,0.3)];
+  }
+  
+  .glow-md {
+    @apply shadow-[0_0_15px_rgba(66,133,244,0.4)];
+  }
+  
+  .glow-lg {
+    @apply shadow-[0_0_20px_rgba(66,133,244,0.5)];
+  }
+  
+  .hover-glow {
+    @apply transition-all duration-300 hover:shadow-[0_0_15px_rgba(66,133,244,0.4)];
+  }
+  
+  /* Button glow effect */
+  .glow-effect {
+    @apply relative overflow-hidden;
+  }
+  
+  .glow-effect::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/30 opacity-0 transition-opacity duration-300;
+  }
+  
+  .glow-effect:hover::before {
+    @apply opacity-100;
+  }
 }
 
 @layer components {
+  /* Keep existing brand styles */
   .brand-gradient {
     @apply bg-gradient-to-r from-primary to-primary-dark;
   }
@@ -87,8 +127,88 @@
   .outline-button {
     @apply border border-primary text-primary hover:bg-primary/5 transition-colors duration-200 font-medium rounded-md;
   }
+  
+  /* New magic UI components */
+  .magic-card {
+    @apply bg-white rounded-lg shadow-sm hover:shadow-[0_5px_15px_rgba(66,133,244,0.25)] transition-all duration-300 overflow-hidden border border-gray-100;
+  }
+  
+  .magic-input {
+    @apply transition-all duration-300 focus:shadow-[0_0_0_2px_rgba(66,133,244,0.2)];
+  }
+  
+  .magic-button {
+    @apply bg-gradient-to-r from-primary to-primary-light hover:shadow-[0_0_15px_rgba(66,133,244,0.4)] transition-all duration-300;
+  }
+  
+  .magic-card-header {
+    @apply p-4 border-b border-gray-100 bg-gradient-to-r from-white to-blue-50;
+  }
+  
+  .magic-card-body {
+    @apply p-4;
+  }
+  
+  .magic-card-footer {
+    @apply p-4 border-t border-gray-100 bg-gradient-to-r from-blue-50 to-white;
+  }
 }
 
+/* Enhanced animations */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes grow {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Keep the rest of the original styles */
 #root {
   max-width: 1440px;
   margin: 0 auto;
@@ -123,6 +243,357 @@
   filter: drop-shadow(0 0 1em rgba(66, 133, 244, 0.6));
 }
 
+/* Deal card styles with improved mobile responsiveness */
+.deal-card {
+  @apply rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300;
+}
+
+.deal-image {
+  @apply w-full h-36 sm:h-48 object-cover;
+}
+
+@media (min-width: 768px) {
+  .deal-image {
+    height: 180px;
+  }
+}
+
+/* Marketing slogan styles with better mobile sizing */
+.marketing-slogan {
+  @apply text-base sm:text-lg md:text-xl lg:text-2xl font-medium text-gray-700 my-3 sm:my-4;
+}
+
+/* Improved button styles with better touch targets for mobile */
+.action-button {
+  @apply px-3 py-2 sm:px-4 sm:py-2 rounded-md font-medium transition-all duration-200;
+}
+
+/* Loading animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.loading-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Enhanced mobile responsiveness - specifically for iPhone */
+@media screen and (max-width: 420px) {
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+  }
+  
+  h1 {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  
+  h2 {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+  
+  h3 {
+    font-size: 1.125rem !important;
+    line-height: 1.5rem !important;
+  }
+  
+  p {
+    font-size: 0.875rem !important;
+  }
+  
+  .action-button, .btn, button {
+    min-height: 44px; /* Better touch target for iPhone */
+    font-size: 0.875rem !important;
+  }
+  
+  /* Improve Properties page layout specifically */
+  .property-listing-grid {
+    display: grid !important;
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    gap: 1rem !important;
+    padding: 0.75rem !important;
+  }
+  
+  .property-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Fix for property header */
+  .properties-header-container {
+    padding: 0.5rem !important;
+  }
+
+  .properties-header-title {
+    max-width: 70% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Fix for alignment in PropertiesHeader */
+  .header-logo-container {
+    margin-right: 0.5rem !important;
+  }
+  
+  /* Adjust spacing for menu button */
+  .menu-right-aligned {
+    position: absolute;
+    right: 0.5rem;
+    top: 0.5rem;
+  }
+
+  /* Adjust padding for the sidebar */
+  .app-sidebar {
+    width: 60px !important;
+  }
+  
+  .app-sidebar-text {
+    display: none !important;
+  }
+  
+  .main-content-with-sidebar {
+    margin-left: 60px !important;
+    width: calc(100% - 60px) !important;
+  }
+  
+  /* Fix for category filter */
+  .category-filter {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.5rem;
+  }
+  
+  .category-filter::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Additional fixes specifically for iPhone */
+@media screen and (max-width: 390px) {
+  .container {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+  
+  button, a.btn, .btn, .action-button {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+    font-size: 0.8125rem !important;
+  }
+  
+  .text-xl, .text-2xl, .text-3xl {
+    font-size: 1rem !important;
+    line-height: 1.5rem !important;
+  }
+
+  /* Fix for property details content */
+  .property-metrics {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Better spacing for investment charts */
+  .investment-chart {
+    max-height: 200px;
+  }
+}
+
+/* Fix for Index page on mobile */
+@media screen and (max-width: 420px) {
+  .property-listing-grid {
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 1rem !important;
+    padding: 0.5rem !important;
+  }
+  
+  .property-card {
+    max-width: 100% !important;
+    margin-bottom: 1rem;
+  }
+  
+  .app-sidebar {
+    width: 60px !important;
+  }
+  
+  .app-sidebar-text {
+    display: none !important;
+  }
+  
+  .main-content-with-sidebar {
+    margin-left: 60px !important;
+    width: calc(100% - 60px) !important;
+  }
+  
+  .properties-header {
+    padding: 0.5rem !important;
+  }
+  
+  .category-filter {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.5rem;
+  }
+  
+  .category-filter::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Fix for iPhone menu */
+  .mobile-header-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-around;
+    padding: 0.5rem;
+    z-index: 50;
+  }
+
+  /* Property detail page fixes */
+  .property-detail-tabs {
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .property-detail-tabs::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* 3D graph container */
+.graph-3d-container {
+  width: 100%;
+  height: 300px;
+  position: relative;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+@media screen and (max-width: 768px) {
+  .graph-3d-container {
+    height: 220px;
+  }
+  
+  /* Fix chart display on mobile */
+  .recharts-wrapper {
+    overflow-x: visible !important;
+  }
+  
+  /* Ensure the chart axis labels are visible */
+  .recharts-layer.recharts-cartesian-axis-tick {
+    visibility: visible !important;
+  }
+  
+  /* Make chart container more compact on mobile */
+  .investment-chart {
+    margin-bottom: 30px;
+    height: 220px !important;
+  }
+}
+
+@media screen and (max-width: 390px) {
+  .graph-3d-container {
+    height: 180px;
+  }
+  
+  /* Ensure XAxis labels fit on very small screens */
+  .recharts-xAxis .recharts-cartesian-axis-tick-value {
+    font-size: 8px !important;
+  }
+}
+
+/* Investment letter of intent form fixes */
+.loi-form-container {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Fixes for Investment Details section */
+.investment-details-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media screen and (max-width: 768px) {
+  .investment-details-section {
+    flex-direction: column;
+  }
+  
+  /* Fix for property details page on mobile */
+  .recharts-surface {
+    overflow: visible;
+  }
+  
+  /* Fix colors for charts */
+  .recharts-bar-rectangle path {
+    fill: #1EAEDB !important;
+  }
+  
+  .recharts-pie-sector path {
+    fill: #1EAEDB !important;
+  }
+  
+  .recharts-pie-sector:nth-child(2) path {
+    fill: #0088FE !important;
+  }
+  
+  .recharts-pie-sector:nth-child(3) path {
+    fill: #0FA0CE !important;
+  }
+}
+
+/* Additional floating particles background (subtle) */
+.particles-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.particles-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 35%, rgba(66, 133, 244, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 75% 44%, rgba(66, 133, 244, 0.05) 0%, transparent 60%);
+  z-index: -1;
+  opacity: 0.6;
+  animation: pulse-slow 10s ease-in-out infinite alternate;
+}
+
+/* Other existing styles */
 /* Deal card styles with improved mobile responsiveness */
 .deal-card {
   @apply rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all duration-300;
