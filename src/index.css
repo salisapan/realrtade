@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -71,6 +70,66 @@
     font-size: 0.65rem;
     line-height: 1rem;
   }
+  
+  /* Animation utilities */
+  .animate-float {
+    animation: float 5s ease-in-out infinite;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+  
+  .animate-glow-subtle {
+    animation: glow-subtle 3s ease-in-out infinite alternate;
+  }
+  
+  .animate-grow {
+    animation: grow 2s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px rgba(66, 133, 244, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(66, 133, 244, 0.7);
+  }
+}
+
+@keyframes glow-subtle {
+  0% {
+    box-shadow: 0 0 3px rgba(66, 133, 244, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(66, 133, 244, 0.4);
+  }
+}
+
+@keyframes grow {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
 }
 
 @layer components {
@@ -128,6 +187,51 @@
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+  
+  /* Modern button styling */
+  .modern-button {
+    @apply relative overflow-hidden transition-all duration-300 hover:shadow-[0_0_15px_rgba(66,133,244,0.5)];
+  }
+  
+  .modern-button::after {
+    content: '';
+    @apply absolute top-0 -left-[100%] w-full h-full bg-white/20 transform skew-x-[-45deg] transition-all duration-700;
+  }
+  
+  .modern-button:hover::after {
+    @apply left-[100%];
+  }
+  
+  /* Glowing elements */
+  .glow-effect {
+    @apply relative;
+  }
+  
+  .glow-effect::before {
+    content: '';
+    @apply absolute -inset-0.5 bg-gradient-to-r from-primary/40 to-primary-light/40 rounded-lg blur opacity-0 transition duration-300;
+  }
+  
+  .glow-effect:hover::before {
+    @apply opacity-100;
+  }
+  
+  /* Sign-in button styles */
+  .sign-in-button {
+    @apply flex items-center justify-center gap-3 w-full p-3 rounded-lg border border-gray-200 transition-all duration-300 bg-white;
+  }
+  
+  .sign-in-google {
+    @apply hover:shadow-[0_0_10px_rgba(234,67,53,0.3)];
+  }
+  
+  .sign-in-apple {
+    @apply hover:shadow-[0_0_10px_rgba(0,0,0,0.2)];
+  }
+  
+  .sign-in-email {
+    @apply hover:shadow-[0_0_10px_rgba(66,133,244,0.3)];
   }
 }
 

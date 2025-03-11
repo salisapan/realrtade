@@ -16,13 +16,13 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
       <DialogTrigger asChild>
         <Button 
           variant="link" 
-          className="p-0 h-auto flex items-center gap-1 text-gray-800 hover:text-primary"
+          className="p-0 h-auto flex items-center gap-1 text-gray-800 hover:text-primary group"
         >
-          <span>{developer.name}</span>
-          <span className="text-yellow-500 text-sm ml-1">★ {developer.rating}</span>
+          <span className="group-hover:text-primary transition-colors duration-300">{developer.name}</span>
+          <span className="text-yellow-500 text-sm ml-1 group-hover:scale-110 transition-transform duration-300">★ {developer.rating}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 md:p-6">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 md:p-6 shadow-[0_0_15px_rgba(66,133,244,0.15)] animate-fade-in">
         <DeveloperProfileHeader developer={developer} />
         <DeveloperTabs developer={developer} />
       </DialogContent>
