@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -156,10 +157,9 @@ export const CashFlowSimulator = () => {
                 <ReferenceLine x={0} stroke="#888" />
                 <Bar 
                   dataKey="amount"
-                  fill="#3b82f6"
                   radius={[4, 4, 4, 4]}
                   className="hover:opacity-80 transition-opacity duration-300"
-                  fill={(entry) => entry.color}
+                  fill={(entry: any) => entry.color || '#3b82f6'}
                 />
               </BarChart>
             </ResponsiveContainer>
