@@ -23,9 +23,9 @@ export const DeveloperProfileModal = ({ developer }: DeveloperProfileModalProps)
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 md:p-6 shadow-[0_0_15px_rgba(66,133,244,0.25)] animate-fade-in bg-gradient-to-b from-white to-gray-50">
-        <div className="animate-fade-in transition-all duration-300">
+        <div className="animate-fade-in animate-in transition-all duration-300">
           <DeveloperProfileHeader developer={developer} />
-          <div className="mt-2 rounded-lg p-1 bg-gray-100/70 shadow-inner">
+          <div className="mt-2">
             <DeveloperTabs developer={developer} />
           </div>
         </div>
