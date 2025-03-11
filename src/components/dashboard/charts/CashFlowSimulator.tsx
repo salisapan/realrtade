@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
-import { DollarSign, Calculator } from "lucide-react";
+import { Calculator } from "lucide-react";
 
 export const CashFlowSimulator = () => {
   const [propertyValue, setPropertyValue] = useState(300000);
@@ -11,11 +10,10 @@ export const CashFlowSimulator = () => {
   const [rentalIncome, setRentalIncome] = useState(2200);
   const [expenses, setExpenses] = useState(600);
   
-  // Calculate monthly mortgage payment
   const calculateMortgage = () => {
-    const loanAmount = propertyValue * 0.8; // Assuming 20% down payment
+    const loanAmount = propertyValue * 0.8;
     const monthlyRate = mortgageRate / 100 / 12;
-    const termMonths = 30 * 12; // 30-year mortgage
+    const termMonths = 30 * 12;
     
     const monthlyPayment = 
       (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, termMonths)) / 
@@ -27,15 +25,15 @@ export const CashFlowSimulator = () => {
   const mortgagePayment = calculateMortgage();
   const cashFlow = rentalIncome - mortgagePayment - expenses;
   const annualCashFlow = cashFlow * 12;
-  const cashOnCash = (annualCashFlow / (propertyValue * 0.2)) * 100; // Return on down payment
+  const cashOnCash = (annualCashFlow / (propertyValue * 0.2)) * 100;
   
   const data = [
-    { name: 'Rental Income', amount: rentalIncome, fill: '#3b82f6' },
-    { name: 'Mortgage', amount: -mortgagePayment, fill: '#ef4444' },
-    { name: 'Expenses', amount: -expenses, fill: '#f97316' },
-    { name: 'Cash Flow', amount: cashFlow, fill: cashFlow >= 0 ? '#22c55e' : '#ef4444' },
+    { name: 'Rental Income', amount: rentalIncome, color: '#3b82f6' },
+    { name: 'Mortgage', amount: -mortgagePayment, color: '#ef4444' },
+    { name: 'Expenses', amount: -expenses, color: '#f97316' },
+    { name: 'Cash Flow', amount: cashFlow, color: cashFlow >= 0 ? '#22c55e' : '#ef4444' },
   ];
-  
+
   return (
     <Card className="hover:shadow-md transition-all duration-300">
       <CardHeader className="pb-2">
@@ -139,15 +137,15 @@ export const CashFlowSimulator = () => {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
                 <XAxis 
                   type="number"
-                  tickFormatter={(value) => `$${Math.abs(value)}`}
+                  tickFormatter={(value: number) => `$${Math.abs(value)}`}
                   domain={[
-                    (dataMin) => Math.floor(Math.min(dataMin, -500) / 500) * 500,
-                    (dataMax) => Math.ceil(Math.max(dataMax, 500) / 500) * 500
+                    (dataMin: number) => Math.floor(Math.min(dataMin, -500) / 500) * 500,
+                    (dataMax: number) => Math.ceil(Math.max(dataMax, 500) / 500) * 500
                   ]}
                 />
                 <YAxis dataKey="name" type="category" />
                 <Tooltip 
-                  formatter={(value) => [`$${Math.abs(value)}`, value >= 0 ? 'Income' : 'Expense']}
+                  formatter={(value: number) => [`$${Math.abs(value)}`, value >= 0 ? 'Income' : 'Expense']}
                   contentStyle={{ 
                     backgroundColor: 'white', 
                     border: '1px solid #e5e7eb',
@@ -157,12 +155,11 @@ export const CashFlowSimulator = () => {
                 />
                 <ReferenceLine x={0} stroke="#888" />
                 <Bar 
-                  dataKey="amount" 
-                  fill="#3b82f6" 
+                  dataKey="amount"
+                  fill="#3b82f6"
                   radius={[4, 4, 4, 4]}
                   className="hover:opacity-80 transition-opacity duration-300"
-                  // Use fill from data
-                  fill={(entry) => entry.fill}
+                  fill={(entry) => entry.color}
                 />
               </BarChart>
             </ResponsiveContainer>
