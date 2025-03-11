@@ -1,8 +1,7 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from "recharts";
 import { Calculator } from "lucide-react";
 
 export const CashFlowSimulator = () => {
@@ -159,10 +158,10 @@ export const CashFlowSimulator = () => {
                   dataKey="amount"
                   radius={[4, 4, 4, 4]}
                   className="hover:opacity-80 transition-opacity duration-300"
-                  fill="#3b82f6" // Use a default color
+                  fill="#3b82f6"
                 >
                   {data.map((entry, index) => (
-                    <cell key={`cell-${index}`} fill={entry.color} />
+                    <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Bar>
               </BarChart>
