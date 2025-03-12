@@ -1,3 +1,4 @@
+
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
@@ -20,6 +21,7 @@ import { useState } from "react";
 import { MetricDetailsModal } from "@/components/performance/MetricDetailsModal";
 import { BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const performanceData = [
   { month: "Jan", returns: 4.5, benchmark: 3.8, volume: 18500 },
@@ -89,6 +91,19 @@ const performanceMetrics = [
 const Performance = () => {
   const isMobile = useIsMobile();
   const [selectedMetric, setSelectedMetric] = useState<any>(null);
+  
+  const handleMetricClick = (metric: any) => {
+    // Create a complete metric object with historical data and additional details
+    const metricName = metric.name;
+    setSelectedMetric({
+      name: metricName,
+      currentValue: metric.value,
+      change: metric.change,
+      description: metricDetails[metricName as keyof typeof metricDetails]?.description || "",
+      formula: metricDetails[metricName as keyof typeof metricDetails]?.formula || "",
+      historicalData: getHistoricalData(metricName)
+    });
+  };
   
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
