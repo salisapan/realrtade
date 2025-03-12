@@ -1,7 +1,5 @@
-
 import { AppSidebar } from "@/components/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   LineChart, 
   ResponsiveContainer, 
@@ -18,10 +16,11 @@ import {
   Legend
 } from "recharts";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { MetricDetailsModal } from "@/components/performance/MetricDetailsModal";
 import { BarChart3, PieChart as PieChartIcon, LineChart as LineChartIcon, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Extended performance data for more months
 const performanceData = [
   { month: "Jan", returns: 4.5, benchmark: 3.8, volume: 18500 },
   { month: "Feb", returns: 5.2, benchmark: 4.1, volume: 22000 },
@@ -37,7 +36,6 @@ const performanceData = [
   { month: "Dec", returns: 10.2, benchmark: 8.1, volume: 38000 },
 ];
 
-// Asset allocation data
 const assetAllocationData = [
   { name: "Office", value: 35 },
   { name: "Retail", value: 25 },
@@ -46,10 +44,39 @@ const assetAllocationData = [
   { name: "Data Centers", value: 5 },
 ];
 
-// Colors for the pie chart - updated to match app theme
 const COLORS = ['#1A2E5A', '#007BFF', '#4A90E2', '#A9A9A9', '#D3D3D3'];
 
-// Key performance metrics
+const getHistoricalData = (metric: string) => {
+  return [
+    { date: "Jan 2024", value: metric === "Total Return" ? 16.4 : metric === "Annualized ROI" ? 10.9 : 5.5 },
+    { date: "Feb 2024", value: metric === "Total Return" ? 17.2 : metric === "Annualized ROI" ? 11.4 : 5.6 },
+    { date: "Mar 2024", value: metric === "Total Return" ? 18.7 : metric === "Annualized ROI" ? 12.4 : 5.8 },
+  ];
+};
+
+const metricDetails = {
+  "Total Return": {
+    description: "The total return represents the overall gain or loss on an investment over a specific period, including both capital appreciation and income.",
+    formula: "Total Return = (Current Value - Initial Value + Distributions) / Initial Value × 100"
+  },
+  "Annualized ROI": {
+    description: "Annualized ROI shows the yearly rate of return, useful for comparing investments held for different periods.",
+    formula: "Annualized ROI = (1 + Total Return)^(1/n) - 1, where n is the number of years"
+  },
+  "Cap Rate": {
+    description: "The capitalization rate indicates the potential rate of return on a real estate investment based on its income.",
+    formula: "Cap Rate = Net Operating Income / Current Market Value × 100"
+  },
+  "IRR": {
+    description: "Internal Rate of Return (IRR) is the discount rate that makes the net present value of all cash flows equal to zero.",
+    formula: "NPV = Σ (Cash Flow) / (1 + IRR)^t = 0, solve for IRR"
+  },
+  "Cash on Cash": {
+    description: "Cash on Cash return measures the cash income earned relative to the cash invested in a property.",
+    formula: "Cash on Cash Return = Annual Pre-Tax Cash Flow / Total Cash Investment × 100"
+  }
+};
+
 const performanceMetrics = [
   { name: "Total Return", value: "18.7%", change: "+2.3%", positive: true },
   { name: "Annualized ROI", value: "12.4%", change: "+1.5%", positive: true },
@@ -61,6 +88,7 @@ const performanceMetrics = [
 
 const Performance = () => {
   const isMobile = useIsMobile();
+  const [selectedMetric, setSelectedMetric] = useState<any>(null);
   
   return (
     <div className="flex flex-col md:flex-row min-h-screen">
@@ -77,18 +105,27 @@ const Performance = () => {
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-4 md:mb-6">
             {performanceMetrics.map((metric) => (
-              <Card key={metric.name} className="overflow-hidden">
+              <Card 
+                key={metric.name} 
+                className="overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-blue-100/50 group"
+                onClick={() => handleMetricClick(metric)}
+              >
                 <CardContent className="p-3 md:p-4">
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="text-sm text-gray-500">{metric.name}</p>
-                      <p className="text-lg md:text-xl font-bold">{metric.value}</p>
+                      <p className="text-sm text-gray-500 group-hover:text-blue-600 transition-colors">{metric.name}</p>
+                      <p className="text-lg md:text-xl font-bold group-hover:text-blue-700 transition-colors">{metric.value}</p>
                     </div>
                     <div className={`flex items-center ${metric.positive ? 'text-blue-600' : 'text-red-600'}`}>
                       {metric.positive ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
                       <span className="text-sm font-medium">{metric.change}</span>
                     </div>
                   </div>
+                  
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-50/0 via-blue-50/30 to-blue-50/0 
+                                opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                  <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-gradient-to-r from-blue-400 to-blue-200 
+                                group-hover:w-full transition-all duration-700"></div>
                 </CardContent>
               </Card>
             ))}
@@ -299,6 +336,14 @@ const Performance = () => {
           </div>
         </div>
       </div>
+
+      {selectedMetric && (
+        <MetricDetailsModal
+          open={!!selectedMetric}
+          onClose={() => setSelectedMetric(null)}
+          metric={selectedMetric}
+        />
+      )}
     </div>
   );
 };
