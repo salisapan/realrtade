@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -11,15 +10,15 @@ import { InvestorForm } from "@/components/investor/InvestorForm";
 import { RegistrationComplete } from "@/components/investor/RegistrationComplete";
 import { InvestorFormValues } from "@/schemas/investorSchema";
 import { SignInOptions } from "@/components/investor/SignInOptions";
-
 const InvestorSignup = () => {
-  const { toast } = useToast();
+  const {
+    toast
+  } = useToast();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [isAccredited, setIsAccredited] = useState(false);
   const [showStandardForm, setShowStandardForm] = useState(false);
-  
   function onSubmit(values: InvestorFormValues) {
     setIsSubmitting(true);
 
@@ -54,14 +53,13 @@ const InvestorSignup = () => {
       }
     }, 2000);
   }
-  
   const handleGoogleSignIn = () => {
     // For demo purposes, we'll just complete the registration
     toast({
       title: "Google Sign-In Successful",
       description: "Welcome to RealTrade! You now have access to verified deals."
     });
-    
+
     // Create basic profile with Google sign-in
     const basicProfile = {
       fullName: "Google User",
@@ -69,23 +67,21 @@ const InvestorSignup = () => {
       isAccredited: "no",
       signInMethod: "google"
     };
-    
     localStorage.setItem("investorProfile", JSON.stringify(basicProfile));
-    
+
     // Show completion and redirect
     setRegistrationComplete(true);
     setTimeout(() => {
       navigate("/verified-deals");
     }, 2000);
   };
-  
   const handleAppleSignIn = () => {
     // For demo purposes, we'll just complete the registration
     toast({
       title: "Apple Sign-In Successful",
       description: "Welcome to RealTrade! You now have access to verified deals."
     });
-    
+
     // Create basic profile with Apple sign-in
     const basicProfile = {
       fullName: "Apple User",
@@ -93,46 +89,31 @@ const InvestorSignup = () => {
       isAccredited: "no",
       signInMethod: "apple"
     };
-    
     localStorage.setItem("investorProfile", JSON.stringify(basicProfile));
-    
+
     // Show completion and redirect
     setRegistrationComplete(true);
     setTimeout(() => {
       navigate("/verified-deals");
     }, 2000);
   };
-  
   const handleEmailSignIn = () => {
     setShowStandardForm(true);
   };
-
   if (registrationComplete) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
+    return <div className="min-h-screen bg-gray-50 flex flex-col">
         <HomeHeader />
         <div className="flex-1 flex flex-col items-center justify-center p-4">
           <RegistrationComplete isAccredited={isAccredited} />
         </div>
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-blue-50 animate-fade-in">
+  return <div className="min-h-screen bg-gradient-to-br from-white to-blue-50 animate-fade-in">
       <HomeHeader />
       
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => navigate(-1)} 
-            className="flex items-center gap-1 glow-effect hover:shadow-[0_0_10px_rgba(66,133,244,0.3)]"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
-          </Button>
+          
         </div>
         
         <div className="max-w-3xl mx-auto">
@@ -140,11 +121,7 @@ const InvestorSignup = () => {
             <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-white/30 pointer-events-none"></div>
             <CardHeader className="relative">
               <div className="flex justify-center mb-4">
-                <img 
-                  src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
-                  alt="RealTrade Logo" 
-                  className="h-12 rounded-lg animate-float shadow-[0_0_15px_rgba(66,133,244,0.3)]" 
-                />
+                <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-12 rounded-lg animate-float shadow-[0_0_15px_rgba(66,133,244,0.3)]" />
               </div>
               <CardTitle className="text-2xl text-center">Investor Registration</CardTitle>
               <CardDescription className="text-center">
@@ -152,15 +129,7 @@ const InvestorSignup = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="relative">
-              {!showStandardForm ? (
-                <SignInOptions 
-                  onGoogleSignIn={handleGoogleSignIn}
-                  onAppleSignIn={handleAppleSignIn}
-                  onEmailSignIn={handleEmailSignIn}
-                />
-              ) : (
-                <InvestorForm onSubmit={onSubmit} isSubmitting={isSubmitting} />
-              )}
+              {!showStandardForm ? <SignInOptions onGoogleSignIn={handleGoogleSignIn} onAppleSignIn={handleAppleSignIn} onEmailSignIn={handleEmailSignIn} /> : <InvestorForm onSubmit={onSubmit} isSubmitting={isSubmitting} />}
             </CardContent>
             <CardFooter className="flex flex-col items-start relative">
               <p className="text-sm text-gray-500">
@@ -173,8 +142,6 @@ const InvestorSignup = () => {
           </Card>
         </div>
       </main>
-    </div>
-  );
+    </div>;
 };
-
 export default InvestorSignup;
