@@ -67,13 +67,20 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 // התחברות עם ספק חיצוני (גוגל, פייסבוק וכו')
 export const signInWithProvider = async (provider: 'google' | 'facebook' | 'apple'): Promise<AuthResponse> => {
   try {
+    // הקריאה ל-signInWithOAuth מחזירה רק מידע על ה-URL, ולא את פרטי המשתמש או הסשן
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
     });
 
     if (error) throw error;
 
-    return { user: data.user, session: data.session, error: null };
+    // מכיוון שזו התחברות עם OAuth, התהליך הוא בשני שלבים:
+    // 1. ייצור קישור להתחברות
+    // 2. הפניה לקישור (מתבצעת באופן אוטומטי על ידי הדפדפן)
+    
+    // במקרה זה אנחנו מחזירים אובייקט ריק עבור user ו-session
+    // המשתמש והסשן יהיו זמינים רק לאחר שהמשתמש יסיים את תהליך ההתחברות
+    return { user: null, session: null, error: null };
   } catch (error) {
     console.error(`Error signing in with ${provider}:`, error);
     return { user: null, session: null, error };
