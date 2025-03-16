@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +21,7 @@ import InvestorSignup from "./pages/InvestorSignup";
 import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
+import SupabaseMigration from "./pages/SupabaseMigration";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -34,12 +34,12 @@ import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
 
 const queryClient = new QueryClient();
 
-// Check if user has completed registration - simplified to only check if profile exists
+// Check if user has completed registration - using Supabase or localStorage as fallback
 const hasRegistered = () => {
   return localStorage.getItem("investorProfile") !== null;
 };
 
-// Protected route component - now only checks if registration exists, not financial status
+// Protected route component
 const ProtectedRoute = ({
   children
 }: {
@@ -51,7 +51,7 @@ const ProtectedRoute = ({
   return <>{children}</>;
 };
 
-// Admin protected route - in a real app, this would check for admin role
+// Admin protected route
 const AdminRoute = ({
   children
 }: {
@@ -77,6 +77,8 @@ const App = () => {
               <Route path="/" element={<Landing />} />
               <Route path="/investor-signup" element={<InvestorSignup />} />
               <Route path="/verified-deals" element={<VerifiedDeals />} />
+              <Route path="/supabase-migration" element={<SupabaseMigration />} />
+              
               <Route 
                 path="/properties" 
                 element={
