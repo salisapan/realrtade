@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { InvestorForm } from "@/components/investor/InvestorForm";
@@ -12,6 +12,7 @@ import { RegistrationComplete } from "@/components/investor/RegistrationComplete
 import { InvestorFormValues } from "@/schemas/investorSchema";
 import { SignInOptions } from "@/components/investor/SignInOptions";
 import { signUpWithEmail, signInWithProvider } from "@/services/authService";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const InvestorSignup = () => {
   const { toast } = useToast();
@@ -24,10 +25,12 @@ const InvestorSignup = () => {
   const [password, setPassword] = useState("");
   const [isGoogleSignInLoading, setIsGoogleSignInLoading] = useState(false);
   const [isAppleSignInLoading, setIsAppleSignInLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // טיפול בטופס הרשמה מלא
   async function onSubmit(values: InvestorFormValues) {
     setIsSubmitting(true);
+    setAuthError(null);
 
     try {
       // רישום המשתמש ב-Supabase
@@ -67,6 +70,7 @@ const InvestorSignup = () => {
 
     } catch (error) {
       console.error("Registration error:", error);
+      setAuthError(error instanceof Error ? error.message : "An unexpected error occurred");
       toast({
         title: "Registration Failed",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -80,13 +84,16 @@ const InvestorSignup = () => {
   // התחברות באמצעות Google
   const handleGoogleSignIn = async () => {
     setIsGoogleSignInLoading(true);
+    setAuthError(null);
     
     try {
+      console.log("Starting Google sign-in process...");
       const response = await signInWithProvider('google');
       
       if (response.error) {
         // Check for specific provider not enabled error
         if (response.error.message?.includes("provider is not enabled")) {
+          setAuthError("Google authentication is not currently configured in the Supabase project. Please check the provider settings in the Supabase dashboard or use email signup instead.");
           toast({
             title: "Google Sign-In Unavailable",
             description: "Google authentication is not currently configured. Please use email signup or contact support.",
@@ -97,21 +104,17 @@ const InvestorSignup = () => {
         }
       } else {
         toast({
-          title: "Google Sign-In Successful",
-          description: "Welcome to RealTrade! You now have access to verified deals."
+          title: "Google Sign-In Process Started",
+          description: "Please complete the authentication in the Google popup window."
         });
-
-        // הצגת הודעת השלמה והפניה
-        setRegistrationComplete(true);
-        setTimeout(() => {
-          navigate("/verified-deals");
-        }, 2000);
       }
     } catch (error) {
       console.error("Google sign-in error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to sign in with Google";
+      setAuthError(errorMessage);
       toast({
         title: "Sign-In Failed",
-        description: error instanceof Error ? error.message : "Failed to sign in with Google",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -122,6 +125,7 @@ const InvestorSignup = () => {
   // התחברות באמצעות Apple
   const handleAppleSignIn = async () => {
     setIsAppleSignInLoading(true);
+    setAuthError(null);
     
     try {
       const response = await signInWithProvider('apple');
@@ -129,6 +133,7 @@ const InvestorSignup = () => {
       if (response.error) {
         // Check for specific provider not enabled error
         if (response.error.message?.includes("provider is not enabled")) {
+          setAuthError("Apple authentication is not currently configured in the Supabase project. Please check the provider settings in the Supabase dashboard or use email signup instead.");
           toast({
             title: "Apple Sign-In Unavailable",
             description: "Apple authentication is not currently configured. Please use email signup or contact support.",
@@ -139,21 +144,17 @@ const InvestorSignup = () => {
         }
       } else {
         toast({
-          title: "Apple Sign-In Successful",
-          description: "Welcome to RealTrade! You now have access to verified deals."
+          title: "Apple Sign-In Process Started",
+          description: "Please complete the authentication in the Apple popup window."
         });
-
-        // הצגת הודעת השלמה והפניה
-        setRegistrationComplete(true);
-        setTimeout(() => {
-          navigate("/verified-deals");
-        }, 2000);
       }
     } catch (error) {
       console.error("Apple sign-in error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to sign in with Apple";
+      setAuthError(errorMessage);
       toast({
         title: "Sign-In Failed",
-        description: error instanceof Error ? error.message : "Failed to sign in with Apple",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -164,6 +165,7 @@ const InvestorSignup = () => {
   // מעבר לטופס הרשמה מלא
   const handleEmailSignIn = () => {
     setShowStandardForm(true);
+    setAuthError(null);
   };
 
   if (registrationComplete) {
@@ -201,6 +203,16 @@ const InvestorSignup = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="relative">
+              {authError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>שגיאת אימות</AlertTitle>
+                  <AlertDescription className="text-sm">
+                    {authError}
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {!showStandardForm ? (
                 // אפשרויות התחברות
                 <SignInOptions 

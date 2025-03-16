@@ -67,11 +67,16 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 // התחברות עם ספק חיצוני (גוגל, פייסבוק וכו')
 export const signInWithProvider = async (provider: 'google' | 'facebook' | 'apple'): Promise<AuthResponse> => {
   try {
+    console.log(`Attempting to sign in with ${provider}...`);
+    
     // הקריאה ל-signInWithOAuth מחזירה רק מידע על ה-URL, ולא את פרטי המשתמש או הסשן
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin + '/auth/callback'
+        redirectTo: window.location.origin + '/auth/callback',
+        queryParams: {
+          prompt: 'select_account', // To force Google to show the account selection screen
+        }
       }
     });
 
@@ -93,12 +98,21 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
       throw error;
     }
 
+    console.log(`OAuth URL generated for ${provider}:`, data.url);
+    
     // במקרה זה אנחנו מחזירים אובייקט ריק עבור user ו-session
     // המשתמש והסשן יהיו זמינים רק לאחר שהמשתמש יסיים את תהליך ההתחברות
     return { user: null, session: null, error: null };
   } catch (error) {
     console.error(`Error signing in with ${provider}:`, error);
-    return { user: null, session: null, error };
+    return { 
+      user: null, 
+      session: null, 
+      error: {
+        message: `Error connecting to ${provider}. The service may be unavailable or not properly configured.`,
+        originalError: error
+      }
+    };
   }
 };
 
