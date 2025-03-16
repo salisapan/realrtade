@@ -15,10 +15,13 @@ import {
   ZoomOut,
   RefreshCw,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface WorkspaceLayoutProps {
   children: ReactNode;
@@ -85,6 +88,7 @@ const SubItem = ({ label, to, isActive }: { label: string; to: string; isActive:
 export const WorkspaceLayout = ({ children }: WorkspaceLayoutProps) => {
   const location = useLocation();
   const currentPath = location.pathname;
+  const isMobile = useIsMobile();
   
   const [expanded, setExpanded] = useState({
     data: false,
@@ -93,6 +97,7 @@ export const WorkspaceLayout = ({ children }: WorkspaceLayoutProps) => {
   
   const [publishDialogOpen, setPublishDialogOpen] = useState(false);
   const [scale, setScale] = useState(1);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const toggleExpanded = (section: 'data' | 'settings') => {
     setExpanded(prev => ({
@@ -109,119 +114,200 @@ export const WorkspaceLayout = ({ children }: WorkspaceLayoutProps) => {
     }
   };
 
-  return (
-    <div className="flex h-screen w-full bg-white">
-      {/* Sidebar */}
-      <div className="w-64 bg-[#F5F5F5] overflow-y-auto border-r border-gray-200">
-        <div className="p-4 flex items-center justify-center">
-          <img 
-            src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
-            alt="RealTrade Logo" 
-            className="h-8 mr-2" 
-          />
-          <h1 className="text-xl font-semibold text-gray-800">Workspace</h1>
+  const sidebarContent = (
+    <>
+      <div className={`${isMobile ? 'p-4' : 'p-4'} flex items-center justify-center`}>
+        <img 
+          src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+          alt="RealTrade Logo" 
+          className="h-8 mr-2" 
+        />
+        <h1 className="text-xl font-semibold text-gray-800">Workspace</h1>
+      </div>
+      
+      <div className="mt-4 px-3 space-y-1">
+        <SidebarItem 
+          icon={<Clipboard className="w-5 h-5" />} 
+          label="Overview" 
+          to="/admin" 
+          isActive={currentPath === "/admin"} 
+        />
+        
+        <SidebarItem 
+          icon={<BarChart3 className="w-5 h-5" />} 
+          label="Analytics" 
+          to="/admin/analytics" 
+          isActive={currentPath === "/admin/analytics"} 
+        />
+        
+        <SidebarItem 
+          icon={<Globe className="w-5 h-5" />} 
+          label="Domains" 
+          to="/admin/domains" 
+          isActive={currentPath === "/admin/domains"} 
+        />
+        
+        <SidebarItem 
+          icon={<DollarSign className="w-5 h-5" />} 
+          label="Payments" 
+          to="/admin/payments" 
+          isActive={currentPath === "/admin/payments"} 
+        />
+        
+        <SidebarItem 
+          icon={<Users className="w-5 h-5" />} 
+          label="Users" 
+          to="/admin/users" 
+          isActive={currentPath === "/admin/users"} 
+        />
+        
+        <SidebarItem 
+          icon={<Database className="w-5 h-5" />} 
+          label="Data" 
+          to="/admin/data" 
+          isActive={currentPath.startsWith("/admin/data")}
+          hasSubItems={true}
+          isExpanded={expanded.data}
+          onToggle={() => toggleExpanded('data')}
+        />
+        
+        {expanded.data && (
+          <div className="ml-2 border-l border-gray-200 pl-2">
+            <SubItem 
+              label="Property" 
+              to="/admin/data/property" 
+              isActive={currentPath === "/admin/data/property"} 
+            />
+            <SubItem 
+              label="Investment" 
+              to="/admin/data/investment" 
+              isActive={currentPath === "/admin/data/investment"} 
+            />
+          </div>
+        )}
+        
+        <SidebarItem 
+          icon={<Code className="w-5 h-5" />} 
+          label="Code" 
+          to="/admin/code" 
+          isActive={currentPath === "/admin/code"} 
+        />
+        
+        <SidebarItem 
+          icon={<Search className="w-5 h-5" />} 
+          label="Logs" 
+          to="/admin/logs" 
+          isActive={currentPath === "/admin/logs"} 
+        />
+        
+        <SidebarItem 
+          icon={<Settings className="w-5 h-5" />} 
+          label="Settings" 
+          to="/admin/settings" 
+          isActive={currentPath.startsWith("/admin/settings")}
+          hasSubItems={true}
+          isExpanded={expanded.settings}
+          onToggle={() => toggleExpanded('settings')}
+        />
+        
+        {expanded.settings && (
+          <div className="ml-2 border-l border-gray-200 pl-2">
+            <SubItem 
+              label="Logo" 
+              to="/admin/settings/logo" 
+              isActive={currentPath === "/admin/settings/logo"} 
+            />
+            <SubItem 
+              label="App Settings" 
+              to="/admin/settings/app" 
+              isActive={currentPath === "/admin/settings/app"} 
+            />
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  // Mobile Layout
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-screen w-full bg-white overflow-hidden">
+        {/* Mobile Header */}
+        <div className="h-14 bg-[#14151A] text-white flex items-center justify-between px-4 sticky top-0 z-30">
+          <div className="flex items-center">
+            <img 
+              src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
+              alt="RealTrade Logo" 
+              className="h-7 mr-2" 
+            />
+            <span className="font-semibold">Admin Workspace</span>
+          </div>
+          
+          <button 
+            className="p-1 rounded-md hover:bg-gray-700"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
         </div>
         
-        <div className="mt-4 px-3 space-y-1">
-          <SidebarItem 
-            icon={<Clipboard className="w-5 h-5" />} 
-            label="Overview" 
-            to="/admin" 
-            isActive={currentPath === "/admin"} 
-          />
-          
-          <SidebarItem 
-            icon={<BarChart3 className="w-5 h-5" />} 
-            label="Analytics" 
-            to="/admin/analytics" 
-            isActive={currentPath === "/admin/analytics"} 
-          />
-          
-          <SidebarItem 
-            icon={<Globe className="w-5 h-5" />} 
-            label="Domains" 
-            to="/admin/domains" 
-            isActive={currentPath === "/admin/domains"} 
-          />
-          
-          <SidebarItem 
-            icon={<DollarSign className="w-5 h-5" />} 
-            label="Payments" 
-            to="/admin/payments" 
-            isActive={currentPath === "/admin/payments"} 
-          />
-          
-          <SidebarItem 
-            icon={<Users className="w-5 h-5" />} 
-            label="Users" 
-            to="/admin/users" 
-            isActive={currentPath === "/admin/users"} 
-          />
-          
-          <SidebarItem 
-            icon={<Database className="w-5 h-5" />} 
-            label="Data" 
-            to="/admin/data" 
-            isActive={currentPath.startsWith("/admin/data")}
-            hasSubItems={true}
-            isExpanded={expanded.data}
-            onToggle={() => toggleExpanded('data')}
-          />
-          
-          {expanded.data && (
-            <div className="ml-2 border-l border-gray-200 pl-2">
-              <SubItem 
-                label="Property" 
-                to="/admin/data/property" 
-                isActive={currentPath === "/admin/data/property"} 
-              />
-              <SubItem 
-                label="Investment" 
-                to="/admin/data/investment" 
-                isActive={currentPath === "/admin/data/investment"} 
-              />
+        {/* Mobile Sidebar - Slide in from left */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-40 bg-black bg-opacity-50" onClick={() => setMobileMenuOpen(false)}>
+            <div 
+              className="fixed top-0 left-0 h-full w-64 bg-[#F5F5F5] shadow-lg z-50 overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              {sidebarContent}
             </div>
-          )}
+          </div>
+        )}
+        
+        {/* Mobile Quick Actions */}
+        <div className="flex justify-between items-center p-2 border-b bg-white sticky top-14 z-20">
+          <Link to="/">
+            <Button variant="outline" size="sm" className="text-xs px-2">
+              Preview
+            </Button>
+          </Link>
           
-          <SidebarItem 
-            icon={<Code className="w-5 h-5" />} 
-            label="Code" 
-            to="/admin/code" 
-            isActive={currentPath === "/admin/code"} 
-          />
-          
-          <SidebarItem 
-            icon={<Search className="w-5 h-5" />} 
-            label="Logs" 
-            to="/admin/logs" 
-            isActive={currentPath === "/admin/logs"} 
-          />
-          
-          <SidebarItem 
-            icon={<Settings className="w-5 h-5" />} 
-            label="Settings" 
-            to="/admin/settings" 
-            isActive={currentPath.startsWith("/admin/settings")}
-            hasSubItems={true}
-            isExpanded={expanded.settings}
-            onToggle={() => toggleExpanded('settings')}
-          />
-          
-          {expanded.settings && (
-            <div className="ml-2 border-l border-gray-200 pl-2">
-              <SubItem 
-                label="Logo" 
-                to="/admin/settings/logo" 
-                isActive={currentPath === "/admin/settings/logo"} 
-              />
-              <SubItem 
-                label="App Settings" 
-                to="/admin/settings/app" 
-                isActive={currentPath === "/admin/settings/app"} 
-              />
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="icon" className="w-8 h-8" onClick={() => zoom('out')}>
+              <ZoomOut className="w-3 h-3" />
+            </Button>
+            <Button variant="outline" size="icon" className="w-8 h-8" onClick={() => zoom('in')}>
+              <ZoomIn className="w-3 h-3" />
+            </Button>
+            <Button 
+              variant="default" 
+              size="sm"
+              className="bg-[#14151A] hover:bg-[#2A2B30] text-white text-xs"
+              onClick={() => setPublishDialogOpen(true)}
+            >
+              Publish
+            </Button>
+          </div>
         </div>
+        
+        {/* Content Area */}
+        <div className="flex-1 overflow-auto p-3">
+          <div 
+            className="bg-white rounded-lg"
+            style={{ transform: `scale(${scale})`, transformOrigin: 'top left' }}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop Layout
+  return (
+    <div className="flex h-screen w-full bg-white">
+      {/* Desktop Sidebar */}
+      <div className="w-64 bg-[#F5F5F5] overflow-y-auto border-r border-gray-200 hidden md:block">
+        {sidebarContent}
       </div>
       
       {/* Main Content */}
@@ -265,7 +351,7 @@ export const WorkspaceLayout = ({ children }: WorkspaceLayoutProps) => {
       
       {/* Publish Dialog */}
       <Dialog open={publishDialogOpen} onOpenChange={setPublishDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Publish Changes</DialogTitle>
             <DialogDescription>
