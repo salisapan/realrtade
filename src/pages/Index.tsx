@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -54,28 +55,28 @@ const Index = () => {
           onSelectCategory={handleCategoryChange} 
         />
         
-        <div className="container mx-auto px-4 pt-3 md:pt-6 flex flex-col items-center">
+        <div className="container mx-auto px-2 sm:px-4 pt-2 md:pt-4 flex flex-col items-center">
           <div className="mb-2 md:mb-4 flex items-center justify-center"></div>
           <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4 px-2">
             RealTrade - Invest in real estate worldwide from anywhere.
           </p>
         </div>
 
-        <main className="container mx-auto py-4 md:py-8">
-          <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full">
-            <TabsContent value="sector">
+        <main className="w-full max-w-full overflow-hidden py-2 md:py-6">
+          <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full max-w-full">
+            <TabsContent value="sector" className="w-full max-w-full m-0">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="low-risk">
+            <TabsContent value="low-risk" className="w-full max-w-full m-0">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="geography">
+            <TabsContent value="geography" className="w-full max-w-full m-0">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="profitable">
+            <TabsContent value="profitable" className="w-full max-w-full m-0">
               <PropertyListing properties={properties} />
             </TabsContent>
-            <TabsContent value="company">
+            <TabsContent value="company" className="w-full max-w-full m-0">
               <PropertyListing properties={properties} />
             </TabsContent>
           </Tabs>

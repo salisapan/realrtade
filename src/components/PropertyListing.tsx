@@ -16,8 +16,10 @@ export const PropertyListing = ({ properties }: PropertyListingProps) => {
   };
 
   return (
-    <div className={`grid gap-4 w-full pb-20 px-2 sm:px-4 md:px-6
-      ${isMobile ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`}>
+    <div className={`grid w-full pb-6 px-2 sm:px-4 md:px-6
+      ${isMobile 
+        ? 'grid-cols-1 gap-3' 
+        : 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'}`}>
       {properties.map((property) => (
         <div 
           key={property.id} 

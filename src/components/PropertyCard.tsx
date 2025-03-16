@@ -3,6 +3,7 @@ import { Building2, MapPin, DollarSign, LineChart, Users, Calendar } from "lucid
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface PropertyCardProps {
   image: string;
@@ -44,17 +45,18 @@ export const PropertyCard = ({
   minInvestment = 2500,
 }: PropertyCardProps) => {
   const displayImage = image || imageUrl;
+  const isMobile = useIsMobile();
   
   return (
-    <Link to={`/property/${id}`} className="block h-full group">
+    <Link to={`/property/${id}`} className="block h-full w-full group">
       <Card className="h-full overflow-hidden transition-all duration-500 animate-fade-in relative
-                     hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-1 border border-gray-100/80">
+                     hover:shadow-lg hover:shadow-blue-100/50 hover:-translate-y-1 border border-gray-100/80 max-w-full">
         {/* Animated gradient background on hover */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
         <div className="absolute -inset-1 bg-gradient-to-r from-blue-100/10 to-transparent opacity-0 blur-xl group-hover:opacity-20 transition-opacity duration-500 z-0"></div>
         
         {/* Image container with zoom effect */}
-        <div className="relative aspect-[4/3] overflow-hidden rounded-t-lg">
+        <div className="relative aspect-[4/3] overflow-hidden rounded-t-lg w-full">
           <img
             src={displayImage}
             alt={title}
@@ -79,7 +81,7 @@ export const PropertyCard = ({
           )}
         </div>
         
-        <div className="p-4 relative z-10">
+        <div className="p-3 sm:p-4 relative z-10">
           <h3 className="text-lg font-semibold mb-2 break-words line-clamp-2 group-hover:text-blue-700 transition-colors duration-300">{title}</h3>
           
           <div className="flex items-center gap-2 mb-3">
@@ -87,63 +89,78 @@ export const PropertyCard = ({
             <span className="text-gray-600 text-sm break-words group-hover:text-gray-700 transition-colors duration-300">{location}</span>
           </div>
 
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3">
             <Building2 size={16} className="text-secondary flex-shrink-0 group-hover:text-blue-500 transition-colors duration-300" />
             <span className="text-gray-600 text-sm break-words group-hover:text-gray-700 transition-colors duration-300">{company}</span>
-            <span className="text-primary text-sm ml-auto truncate group-hover:text-blue-600 transition-colors duration-300">
-              {website && website.replace(/^https?:\/\//i, '')}
-            </span>
+            {!isMobile && (
+              <span className="text-primary text-sm ml-auto truncate group-hover:text-blue-600 transition-colors duration-300">
+                {website && website.replace(/^https?:\/\//i, '')}
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="flex items-center gap-2 group-hover:bg-blue-50/50 p-1.5 rounded-md transition-colors duration-300">
               <DollarSign size={16} className="text-secondary flex-shrink-0 group-hover:text-blue-500 transition-colors duration-300" />
-              <div className="text-sm">
+              <div className="text-xs sm:text-sm">
                 <span className="font-medium group-hover:text-blue-700 transition-colors duration-300">{cashOnCash}</span> 
-                <span className="text-gray-500 text-xs block">Cash on cash</span>
+                <span className="text-gray-500 text-2xs sm:text-xs block">Cash on cash</span>
               </div>
             </div>
             <div className="flex items-center gap-2 group-hover:bg-blue-50/50 p-1.5 rounded-md transition-colors duration-300">
               <LineChart size={16} className="text-secondary flex-shrink-0 group-hover:text-blue-500 transition-colors duration-300" />
-              <div className="text-sm">
+              <div className="text-xs sm:text-sm">
                 <span className="font-medium group-hover:text-blue-700 transition-colors duration-300">{upside}</span>
-                <span className="text-gray-500 text-xs block">Upside</span>
+                <span className="text-gray-500 text-2xs sm:text-xs block">Upside</span>
               </div>
             </div>
             <div className="flex items-center gap-2 group-hover:bg-blue-50/50 p-1.5 rounded-md transition-colors duration-300">
               <Users size={16} className="text-secondary flex-shrink-0 group-hover:text-blue-500 transition-colors duration-300" />
-              <div className="text-sm">
+              <div className="text-xs sm:text-sm">
                 <span className="font-medium group-hover:text-blue-700 transition-colors duration-300">{funded}</span>
-                <span className="text-gray-500 text-xs block">Funded</span>
+                <span className="text-gray-500 text-2xs sm:text-xs block">Funded</span>
               </div>
             </div>
             <div className="flex items-center gap-2 group-hover:bg-blue-50/50 p-1.5 rounded-md transition-colors duration-300">
               <Building2 size={16} className="text-secondary flex-shrink-0 group-hover:text-blue-500 transition-colors duration-300" />
-              <div className="text-sm">
+              <div className="text-xs sm:text-sm">
                 <span className="font-medium group-hover:text-blue-700 transition-colors duration-300">{rented}</span>
-                <span className="text-gray-500 text-xs block">Rented</span>
+                <span className="text-gray-500 text-2xs sm:text-xs block">Rented</span>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm border-t pt-3">
-            <div className="group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
-              <span className="block text-gray-500 text-xs">Area</span>
-              <span className="font-medium break-words group-hover:text-blue-700 transition-colors duration-300">{sqft}</span>
+          {!isMobile ? (
+            <div className="grid grid-cols-2 gap-3 text-sm border-t pt-3">
+              <div className="group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
+                <span className="block text-gray-500 text-xs">Area</span>
+                <span className="font-medium break-words group-hover:text-blue-700 transition-colors duration-300">{sqft}</span>
+              </div>
+              <div className="group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
+                <span className="block text-gray-500 text-xs">Floors</span>
+                <span className="font-medium break-words group-hover:text-blue-700 transition-colors duration-300">{floors}</span>
+              </div>
+              <div className="group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
+                <span className="block text-gray-500 text-xs">Year</span>
+                <span className="font-medium group-hover:text-blue-700 transition-colors duration-300">{year}</span>
+              </div>
+              <div className="flex items-center gap-1 group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
+                <span className="block text-xs text-gray-500">Built</span>
+                <Calendar size={14} className="text-secondary group-hover:text-blue-500 transition-colors duration-300" />
+              </div>
             </div>
-            <div className="group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
-              <span className="block text-gray-500 text-xs">Floors</span>
-              <span className="font-medium break-words group-hover:text-blue-700 transition-colors duration-300">{floors}</span>
+          ) : (
+            <div className="flex justify-between text-xs border-t pt-2">
+              <div className="flex flex-col">
+                <span className="text-gray-500">Area</span>
+                <span className="font-medium">{sqft}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-gray-500">Year</span>
+                <span className="font-medium">{year}</span>
+              </div>
             </div>
-            <div className="group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
-              <span className="block text-gray-500 text-xs">Year</span>
-              <span className="font-medium group-hover:text-blue-700 transition-colors duration-300">{year}</span>
-            </div>
-            <div className="flex items-center gap-1 group-hover:bg-blue-50/50 p-1 rounded transition-colors duration-300">
-              <span className="block text-xs text-gray-500">Built</span>
-              <Calendar size={14} className="text-secondary group-hover:text-blue-500 transition-colors duration-300" />
-            </div>
-          </div>
+          )}
         </div>
         
         {/* Animated border effect on hover */}
