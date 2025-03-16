@@ -8,11 +8,13 @@ import { categories } from "@/data/propertyData";
 import { affordableDeals } from "@/components/properties/AffordableDealsList";
 import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
 import { useInvestorProfile } from "@/components/properties/useInvestorProfile";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("sector");
   const [properties, setProperties] = useState<any[]>([]);
   const { investorProfile, isLoading } = useInvestorProfile();
+  const isMobile = useIsMobile();
   
   useEffect(() => {
     if (!investorProfile) return;
@@ -44,7 +46,7 @@ const Index = () => {
   }
 
   return (
-    <div className="flex flex-col md:flex-row">
+    <div className="flex flex-col md:flex-row w-full max-w-[100vw] overflow-x-hidden">
       <AppSidebar />
       <div className="flex-1 min-h-screen bg-gray-50 w-full overflow-x-hidden">
         <PropertiesHeader 
@@ -55,7 +57,7 @@ const Index = () => {
           onSelectCategory={handleCategoryChange} 
         />
         
-        <div className="container mx-auto px-2 sm:px-4 pt-2 md:pt-4 flex flex-col items-center">
+        <div className="w-full mx-auto px-2 sm:px-4 pt-2 md:pt-4 flex flex-col items-center">
           <div className="mb-2 md:mb-4 flex items-center justify-center"></div>
           <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4 px-2">
             RealTrade - Invest in real estate worldwide from anywhere.
