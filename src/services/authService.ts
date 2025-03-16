@@ -69,6 +69,10 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
   try {
     console.log(`Attempting to sign in with ${provider}...`);
     
+    // תוספת מידע דיאגנוסטי
+    const currentUrl = window.location.origin;
+    console.log(`Current origin URL: ${currentUrl}`);
+    
     // הקריאה ל-signInWithOAuth מחזירה רק מידע על ה-URL, ולא את פרטי המשתמש או הסשן
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -83,15 +87,26 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
     if (error) {
       console.error(`OAuth error for ${provider}:`, error);
       
-      // Check if this is a provider not enabled error
+      // בדיקה מפורטת יותר של סוגי שגיאות
       if (error.message?.includes("provider is not enabled")) {
         return { 
           user: null, 
           session: null, 
           error: { 
-            message: `Authentication with ${provider} is not currently enabled. Please use email or contact support.`,
+            message: `Authentication with ${provider} is not currently enabled in Supabase. Please enable it in the Auth providers section.`,
             originalError: error
           } 
+        };
+      }
+      
+      if (error.message?.includes("403") || error.status === 403) {
+        return {
+          user: null,
+          session: null,
+          error: {
+            message: `Received a 403 error from ${provider}. This usually means your OAuth credentials are incorrect or the redirect URI is not authorized. Please check your Google Cloud Console configuration.`,
+            originalError: error
+          }
         };
       }
       
@@ -109,7 +124,7 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
       user: null, 
       session: null, 
       error: {
-        message: `Error connecting to ${provider}. The service may be unavailable or not properly configured.`,
+        message: `Error connecting to ${provider}. The service may be unavailable or not properly configured. Details: ${error instanceof Error ? error.message : 'Unknown error'}`,
         originalError: error
       }
     };

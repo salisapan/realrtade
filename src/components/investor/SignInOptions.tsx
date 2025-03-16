@@ -44,8 +44,15 @@ export const SignInOptions = ({
               <AlertCircle className="h-4 w-4 text-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
-            <p>Google Authentication needs to be configured in your Supabase project. If you see a 403 error, please check the OAuth setup.</p>
+          <TooltipContent side="bottom" className="max-w-[320px] p-3 bg-amber-50 border-amber-200 text-amber-800">
+            <p className="font-medium mb-1">Google Authentication Setup Required</p>
+            <p className="text-xs">The 403 error indicates your Google OAuth is not configured correctly. You need to:</p>
+            <ol className="text-xs list-decimal pl-4 mt-1 space-y-1">
+              <li>Set up a Google Cloud project and configure OAuth consent screen</li>
+              <li>Create OAuth credentials with the correct redirect URIs</li>
+              <li>Add the Client ID and Secret to Supabase Auth providers</li>
+              <li>Ensure your Site URL and Redirect URLs are properly set in Supabase Auth settings</li>
+            </ol>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -95,8 +102,8 @@ export const SignInOptions = ({
           <div>
             <p className="font-medium">הגדרת אימות Google</p>
             <p className="mt-1">
-              לפני שתוכל להשתמש בהתחברות באמצעות Google, עליך להפעיל ולהגדיר את ספק האימות של Google ב-Supabase.
-              אם אתה מקבל שגיאת 403, יש לבדוק את הגדרות ה-OAuth ב-Google Cloud והמפתח ב-Supabase.
+              שגיאת 403 מצביעה על בעיית הרשאות בהגדרות OAuth. עליך להגדיר את אימות Google ב-Google Cloud Console ובפרויקט Supabase שלך. 
+              ראה את הפרטים המלאים בהנחיות הקישור למטה.
             </p>
           </div>
         </div>

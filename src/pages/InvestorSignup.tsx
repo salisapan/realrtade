@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, ArrowLeft } from "lucide-react";
+import { AlertCircle, ArrowLeft, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { InvestorForm } from "@/components/investor/InvestorForm";
@@ -91,12 +91,19 @@ const InvestorSignup = () => {
       const response = await signInWithProvider('google');
       
       if (response.error) {
-        // Check for specific provider not enabled error
+        // בדיקת שגיאות ספציפיות
         if (response.error.message?.includes("provider is not enabled")) {
-          setAuthError("Google authentication is not currently configured in the Supabase project. Please check the provider settings in the Supabase dashboard or use email signup instead.");
+          setAuthError("Google authentication is not currently configured in the Supabase project. Please enable the Google provider in the Supabase Auth providers settings.");
           toast({
             title: "Google Sign-In Unavailable",
             description: "Google authentication is not currently configured. Please use email signup or contact support.",
+            variant: "destructive"
+          });
+        } else if (response.error.message?.includes("403") || response.error.originalError?.status === 403) {
+          setAuthError("Received a 403 Forbidden error from Google. This usually means the OAuth credentials are incorrect or the authorized redirect URI is not properly configured in Google Cloud Console.");
+          toast({
+            title: "Google Authentication Error (403)",
+            description: "Google OAuth configuration error. Please check the OAuth credentials and redirect URIs.",
             variant: "destructive"
           });
         } else {
@@ -211,6 +218,29 @@ const InvestorSignup = () => {
                     {authError}
                   </AlertDescription>
                 </Alert>
+              )}
+
+              {/* Google OAuth Error Guide */}
+              {authError && authError.includes("403") && (
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <h3 className="font-bold text-amber-800 mb-2 flex items-center gap-1">
+                    <AlertCircle className="h-4 w-4" /> מדריך פתרון שגיאת 403
+                  </h3>
+                  <div className="text-sm text-amber-800 space-y-2">
+                    <p>שגיאת 403 מתרחשת כאשר הגדרות OAuth של Google אינן מוגדרות כראוי. הנה מה שעליך לעשות:</p>
+                    <ol className="list-decimal pl-5 space-y-1">
+                      <li>היכנס ל-<a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 inline-flex items-center">Google Cloud Console <ExternalLink className="h-3 w-3 ml-1" /></a></li>
+                      <li>צור פרויקט חדש או השתמש בקיים</li>
+                      <li>פתח את מסך OAuth consent screen והגדר אותו</li>
+                      <li>צור OAuth credentials מסוג "Web application"</li>
+                      <li>הוסף את הכתובת של האפליקציה שלך ב-Authorized JavaScript origins</li>
+                      <li>הוסף את כתובת ה-callback של Supabase ב-Authorized redirect URIs</li>
+                      <li>העתק את Client ID וה-Client Secret</li>
+                      <li>הכנס את המידע הזה בהגדרות ספקי האימות ב-<a href="https://supabase.com/dashboard/project/nlvljclvoguvrnntwufu/auth/providers" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 inline-flex items-center">Supabase <ExternalLink className="h-3 w-3 ml-1" /></a></li>
+                      <li>ודא שכתובות ה-URL מוגדרות כראוי ב-<a href="https://supabase.com/dashboard/project/nlvljclvoguvrnntwufu/auth/url-configuration" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800 inline-flex items-center">Supabase Auth URL Configuration <ExternalLink className="h-3 w-3 ml-1" /></a></li>
+                    </ol>
+                  </div>
+                </div>
               )}
 
               {!showStandardForm ? (
