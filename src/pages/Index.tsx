@@ -6,7 +6,7 @@ import { PropertyListing } from "@/components/PropertyListing";
 import { PropertiesHeader } from "@/components/PropertiesHeader";
 import { categories } from "@/data/propertyData";
 import { affordableDeals } from "@/components/properties/AffordableDealsList";
-import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
+import { getCategoryPropertiesLocal } from "@/components/properties/PropertyCategoryHelper";
 import { useInvestorProfile } from "@/components/properties/useInvestorProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -22,7 +22,7 @@ const Index = () => {
     const isAccredited = investorProfile?.isAccredited === "yes";
     
     if (isAccredited) {
-      setProperties(getCategoryProperties(selectedCategory));
+      setProperties(getCategoryPropertiesLocal(selectedCategory));
     } else {
       setProperties(affordableDeals);
     }
@@ -31,7 +31,7 @@ const Index = () => {
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
     if (investorProfile && investorProfile.isAccredited === "yes") {
-      setProperties(getCategoryProperties(category));
+      setProperties(getCategoryPropertiesLocal(category));
     } else {
       setProperties(affordableDeals);
     }

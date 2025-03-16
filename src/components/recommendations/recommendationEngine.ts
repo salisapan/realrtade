@@ -1,7 +1,6 @@
-
 import { UserPreferences, PropertyRecommendation } from "./types";
 import { propertiesBySector, propertiesByLowRisk, propertiesByGeography, propertiesByProfitable } from "@/data/propertyData";
-import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
+import { getCategoryPropertiesLocal } from "@/components/properties/PropertyCategoryHelper";
 
 // Property images for recommendations
 const propertyImages = [
@@ -89,7 +88,7 @@ const getMatchScore = (preferences: UserPreferences, property: any): number => {
 export const generateRecommendations = (preferences: UserPreferences): PropertyRecommendation[] => {
   // Get properties based on risk tolerance
   const category = mapRiskToCategory(preferences.riskTolerance);
-  let propertyPool = getCategoryProperties(category);
+  let propertyPool = getCategoryPropertiesLocal(category);
   
   // Filter for asset types if possible
   const filteredProperties = propertyPool.filter(property => 
