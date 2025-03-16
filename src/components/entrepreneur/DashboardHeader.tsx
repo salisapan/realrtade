@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, PlusCircle } from "lucide-react";
@@ -20,7 +21,14 @@ export const DashboardHeader = ({
         </div>
         <div className="flex items-center gap-4">
           <Link to="/">
-            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex items-center gap-2 transition-all duration-300 hover:shadow-[0_0_12px_rgba(66,133,244,0.4)] hover:bg-gradient-to-r hover:from-white hover:to-blue-50 glow-effect"
+            >
+              <Home size={16} className="text-primary" />
+              <span>Home</span>
+            </Button>
           </Link>
           
           {onAddDeal && <Button onClick={onAddDeal} size="sm" className="flex items-center gap-2 transition-all duration-300 hover:shadow-[0_0_12px_rgba(66,133,244,0.4)] bg-gradient-to-r from-primary to-primary-light group">

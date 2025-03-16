@@ -23,6 +23,15 @@ import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
 
+// Admin Workspace Pages
+import AdminPage from "./pages/admin/AdminPage";
+import UsersPage from "./pages/admin/UsersPage";
+import AnalyticsPage from "./pages/admin/AnalyticsPage";
+import DomainsPage from "./pages/admin/DomainsPage";
+import PaymentsPage from "./pages/admin/PaymentsPage";
+import DataPropertyPage from "./pages/admin/DataPropertyPage";
+import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
+
 const queryClient = new QueryClient();
 
 // Check if user has completed registration - simplified to only check if profile exists
@@ -39,6 +48,20 @@ const ProtectedRoute = ({
   if (!hasRegistered()) {
     return <Navigate to="/investor-signup" replace />;
   }
+  return <>{children}</>;
+};
+
+// Admin protected route - in a real app, this would check for admin role
+const AdminRoute = ({
+  children
+}: {
+  children: React.ReactNode;
+}) => {
+  // For demo purposes, we're allowing access without checks
+  // In a real app, you would check if the user is an admin:
+  // if (!isAdmin()) {
+  //   return <Navigate to="/" replace />;
+  // }
   return <>{children}</>;
 };
 
@@ -158,6 +181,65 @@ const App = () => {
                   </ProtectedRoute>
                 } 
               />
+              
+              {/* Admin Workspace Routes */}
+              <Route 
+                path="/admin" 
+                element={
+                  <AdminRoute>
+                    <AdminPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/users" 
+                element={
+                  <AdminRoute>
+                    <UsersPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/analytics" 
+                element={
+                  <AdminRoute>
+                    <AnalyticsPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/domains" 
+                element={
+                  <AdminRoute>
+                    <DomainsPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/payments" 
+                element={
+                  <AdminRoute>
+                    <PaymentsPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/data/property" 
+                element={
+                  <AdminRoute>
+                    <DataPropertyPage />
+                  </AdminRoute>
+                } 
+              />
+              <Route 
+                path="/admin/settings/logo" 
+                element={
+                  <AdminRoute>
+                    <SettingsLogoPage />
+                  </AdminRoute>
+                } 
+              />
+              
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
