@@ -1,5 +1,6 @@
 
 import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 
 export const PerformanceHeader = () => {
   return (
@@ -8,6 +9,10 @@ export const PerformanceHeader = () => {
       <div className="space-x-2">
         <Button variant="outline" size="sm">Export PDF</Button>
         <Button variant="outline" size="sm">Print Report</Button>
+        <Button variant="outline" size="sm">
+          <FileText className="mr-1 h-4 w-4" />
+          Generate Report
+        </Button>
       </div>
     </div>
   );
