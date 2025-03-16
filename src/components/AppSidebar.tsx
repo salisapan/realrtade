@@ -1,6 +1,7 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X, Brain } from "lucide-react";
+import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X, Brain, Sliders } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -12,6 +13,7 @@ const menuItems = [
   { title: "Performance", url: "/performance", icon: LineChart },
   { title: "Reports", url: "/reports", icon: FileText },
   { title: "Wallet", url: "/wallet", icon: DollarSign },
+  { title: "Admin", url: "/admin", icon: Sliders },
   { title: "Settings", url: "/settings", icon: Settings }
 ];
 
@@ -20,6 +22,7 @@ const entrepreneurMenuItems = [
   { title: "Entrepreneur Portal", url: "/entrepreneur", icon: Building2 },
   { title: "Due Diligence", url: "/entrepreneur/due-diligence", icon: ClipboardCheck },
   { title: "Reports", url: "/entrepreneur/reports", icon: FileText },
+  { title: "Admin", url: "/admin", icon: Sliders },
   { title: "Register", url: "/entrepreneur/register", icon: UserPlus }
 ];
 

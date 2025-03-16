@@ -1,7 +1,7 @@
 
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Home, Menu, User, X, ArrowLeft, Settings, Building2, LineChart } from "lucide-react";
+import { Home, Menu, User, X, ArrowLeft, Settings, Building2, LineChart, Sliders } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -51,7 +51,7 @@ export const HomeHeader = () => {
                   src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
                   alt="RealTrade Logo" 
                   className="h-8 rounded-lg transition-all duration-300 hover:shadow-[0_0_10px_rgba(66,133,244,0.25)]" 
-                />
+                /> 
               </Link>
             )}
             
@@ -62,6 +62,14 @@ export const HomeHeader = () => {
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Admin link */}
+            <Link to="/admin" className="hidden md:flex items-center">
+              <Button variant="outline" size="sm" className="flex items-center gap-1">
+                <Sliders className="w-4 h-4 text-primary" />
+                <span className="text-sm">Admin</span>
+              </Button>
+            </Link>
+            
             {/* Show user name only if logged in */}
             {isLoggedIn && (
               <div className="hidden md:flex items-center gap-1 mr-2">
@@ -111,6 +119,10 @@ export const HomeHeader = () => {
                 <LineChart className="w-5 h-5" />
                 <span>Dashboard</span>
               </Link>
+              <Link to="/admin" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
+                <Sliders className="w-5 h-5" />
+                <span>Admin</span>
+              </Link>
               {!isLoggedIn && (
                 <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
                   <User className="w-5 h-5" />
@@ -139,6 +151,10 @@ export const HomeHeader = () => {
         <Link to="/dashboard" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
           <LineChart className="w-5 h-5 text-gray-600" />
           <span className="text-xs mt-1">Dashboard</span>
+        </Link>
+        <Link to="/admin" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
+          <Sliders className="w-5 h-5 text-gray-600" />
+          <span className="text-xs mt-1">Admin</span>
         </Link>
       </div>
     </header>
