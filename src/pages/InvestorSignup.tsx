@@ -22,6 +22,8 @@ const InvestorSignup = () => {
   const [showStandardForm, setShowStandardForm] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isGoogleSignInLoading, setIsGoogleSignInLoading] = useState(false);
+  const [isAppleSignInLoading, setIsAppleSignInLoading] = useState(false);
 
   // טיפול בטופס הרשמה מלא
   async function onSubmit(values: InvestorFormValues) {
@@ -77,23 +79,34 @@ const InvestorSignup = () => {
 
   // התחברות באמצעות Google
   const handleGoogleSignIn = async () => {
+    setIsGoogleSignInLoading(true);
+    
     try {
       const response = await signInWithProvider('google');
       
       if (response.error) {
-        throw new Error(response.error.message || "Google sign-in failed");
+        // Check for specific provider not enabled error
+        if (response.error.message?.includes("provider is not enabled")) {
+          toast({
+            title: "Google Sign-In Unavailable",
+            description: "Google authentication is not currently configured. Please use email signup or contact support.",
+            variant: "destructive"
+          });
+        } else {
+          throw new Error(response.error.message || "Google sign-in failed");
+        }
+      } else {
+        toast({
+          title: "Google Sign-In Successful",
+          description: "Welcome to RealTrade! You now have access to verified deals."
+        });
+
+        // הצגת הודעת השלמה והפניה
+        setRegistrationComplete(true);
+        setTimeout(() => {
+          navigate("/verified-deals");
+        }, 2000);
       }
-
-      toast({
-        title: "Google Sign-In Successful",
-        description: "Welcome to RealTrade! You now have access to verified deals."
-      });
-
-      // הצגת הודעת השלמה והפניה
-      setRegistrationComplete(true);
-      setTimeout(() => {
-        navigate("/verified-deals");
-      }, 2000);
     } catch (error) {
       console.error("Google sign-in error:", error);
       toast({
@@ -101,28 +114,41 @@ const InvestorSignup = () => {
         description: error instanceof Error ? error.message : "Failed to sign in with Google",
         variant: "destructive"
       });
+    } finally {
+      setIsGoogleSignInLoading(false);
     }
   };
 
   // התחברות באמצעות Apple
   const handleAppleSignIn = async () => {
+    setIsAppleSignInLoading(true);
+    
     try {
       const response = await signInWithProvider('apple');
       
       if (response.error) {
-        throw new Error(response.error.message || "Apple sign-in failed");
+        // Check for specific provider not enabled error
+        if (response.error.message?.includes("provider is not enabled")) {
+          toast({
+            title: "Apple Sign-In Unavailable",
+            description: "Apple authentication is not currently configured. Please use email signup or contact support.",
+            variant: "destructive"
+          });
+        } else {
+          throw new Error(response.error.message || "Apple sign-in failed");
+        }
+      } else {
+        toast({
+          title: "Apple Sign-In Successful",
+          description: "Welcome to RealTrade! You now have access to verified deals."
+        });
+
+        // הצגת הודעת השלמה והפניה
+        setRegistrationComplete(true);
+        setTimeout(() => {
+          navigate("/verified-deals");
+        }, 2000);
       }
-
-      toast({
-        title: "Apple Sign-In Successful",
-        description: "Welcome to RealTrade! You now have access to verified deals."
-      });
-
-      // הצגת הודעת השלמה והפניה
-      setRegistrationComplete(true);
-      setTimeout(() => {
-        navigate("/verified-deals");
-      }, 2000);
     } catch (error) {
       console.error("Apple sign-in error:", error);
       toast({
@@ -130,6 +156,8 @@ const InvestorSignup = () => {
         description: error instanceof Error ? error.message : "Failed to sign in with Apple",
         variant: "destructive"
       });
+    } finally {
+      setIsAppleSignInLoading(false);
     }
   };
 
@@ -178,7 +206,9 @@ const InvestorSignup = () => {
                 <SignInOptions 
                   onGoogleSignIn={handleGoogleSignIn} 
                   onAppleSignIn={handleAppleSignIn} 
-                  onEmailSignIn={handleEmailSignIn} 
+                  onEmailSignIn={handleEmailSignIn}
+                  isGoogleLoading={isGoogleSignInLoading}
+                  isAppleLoading={isAppleSignInLoading}
                 />
               ) : (
                 // טופס הרשמה מלא

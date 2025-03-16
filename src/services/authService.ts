@@ -70,14 +70,29 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
     // הקריאה ל-signInWithOAuth מחזירה רק מידע על ה-URL, ולא את פרטי המשתמש או הסשן
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
+      options: {
+        redirectTo: window.location.origin + '/auth/callback'
+      }
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error(`OAuth error for ${provider}:`, error);
+      
+      // Check if this is a provider not enabled error
+      if (error.message?.includes("provider is not enabled")) {
+        return { 
+          user: null, 
+          session: null, 
+          error: { 
+            message: `Authentication with ${provider} is not currently enabled. Please use email or contact support.`,
+            originalError: error
+          } 
+        };
+      }
+      
+      throw error;
+    }
 
-    // מכיוון שזו התחברות עם OAuth, התהליך הוא בשני שלבים:
-    // 1. ייצור קישור להתחברות
-    // 2. הפניה לקישור (מתבצעת באופן אוטומטי על ידי הדפדפן)
-    
     // במקרה זה אנחנו מחזירים אובייקט ריק עבור user ו-session
     // המשתמש והסשן יהיו זמינים רק לאחר שהמשתמש יסיים את תהליך ההתחברות
     return { user: null, session: null, error: null };
