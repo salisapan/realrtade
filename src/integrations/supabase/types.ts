@@ -9,7 +9,158 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      investments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          payment_method: string
+          property_id: string
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          payment_method: string
+          property_id: string
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          payment_method?: string
+          property_id?: string
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          age: number | null
+          annual_income: number | null
+          created_at: string | null
+          email: string
+          full_name: string
+          id: string
+          investment_experience: string | null
+          is_accredited: boolean | null
+          net_worth: number | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          age?: number | null
+          annual_income?: number | null
+          created_at?: string | null
+          email: string
+          full_name: string
+          id: string
+          investment_experience?: string | null
+          is_accredited?: boolean | null
+          net_worth?: number | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          age?: number | null
+          annual_income?: number | null
+          created_at?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          investment_experience?: string | null
+          is_accredited?: boolean | null
+          net_worth?: number | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      properties: {
+        Row: {
+          cash_on_cash: string
+          category: string
+          company: string
+          created_at: string | null
+          floors: string
+          funded: string
+          id: string
+          image_url: string
+          location: string
+          min_investment: number | null
+          price: string
+          rented: string
+          sqft: string
+          status: string
+          title: string
+          updated_at: string | null
+          upside: string
+          website: string | null
+          year: string
+        }
+        Insert: {
+          cash_on_cash: string
+          category: string
+          company: string
+          created_at?: string | null
+          floors: string
+          funded: string
+          id?: string
+          image_url: string
+          location: string
+          min_investment?: number | null
+          price: string
+          rented: string
+          sqft: string
+          status: string
+          title: string
+          updated_at?: string | null
+          upside: string
+          website?: string | null
+          year: string
+        }
+        Update: {
+          cash_on_cash?: string
+          category?: string
+          company?: string
+          created_at?: string | null
+          floors?: string
+          funded?: string
+          id?: string
+          image_url?: string
+          location?: string
+          min_investment?: number | null
+          price?: string
+          rented?: string
+          sqft?: string
+          status?: string
+          title?: string
+          updated_at?: string | null
+          upside?: string
+          website?: string | null
+          year?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
