@@ -45,12 +45,13 @@ export const SignInOptions = ({
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-[320px] p-3 bg-amber-50 border-amber-200 text-amber-800">
-            <p className="font-medium mb-1">Google Authentication Setup</p>
-            <p className="text-xs">Make sure you've configured Google OAuth correctly:</p>
+            <p className="font-medium mb-1">Google Authentication Setup Required</p>
+            <p className="text-xs">The 403 error indicates your Google OAuth is not configured correctly. You need to:</p>
             <ol className="text-xs list-decimal pl-4 mt-1 space-y-1">
-              <li>בהגדרות OAuth של Google הוספת את הכתובת: <span className="font-mono text-xs">{window.location.origin}</span></li>
-              <li>לכתובת הקולבק של Supabase הגדרת: <span className="font-mono text-xs">https://nlvljclvoguvrnntwufu.supabase.co/auth/v1/callback</span></li>
-              <li>Client ID ו-Secret מוגדרים נכון בהגדרות Supabase Auth</li>
+              <li>Set up a Google Cloud project and configure OAuth consent screen</li>
+              <li>Create OAuth credentials with the correct redirect URIs</li>
+              <li>Add the Client ID and Secret to Supabase Auth providers</li>
+              <li>Ensure your Site URL and Redirect URLs are properly set in Supabase Auth settings</li>
             </ol>
           </TooltipContent>
         </Tooltip>
@@ -101,10 +102,8 @@ export const SignInOptions = ({
           <div>
             <p className="font-medium">הגדרת אימות Google</p>
             <p className="mt-1">
-              במקרה של שגיאת 404 בעת התחברות, וודא שהגדרת את הכתובת הבאה בהגדרות הקולבק של Google OAuth:
-              <span dir="ltr" className="block mt-1 font-mono text-xs bg-white p-1 rounded border border-amber-300">
-                {window.location.origin}/auth/callback
-              </span>
+              שגיאת 403 מצביעה על בעיית הרשאות בהגדרות OAuth. עליך להגדיר את אימות Google ב-Google Cloud Console ובפרויקט Supabase שלך. 
+              ראה את הפרטים המלאים בהנחיות הקישור למטה.
             </p>
           </div>
         </div>
