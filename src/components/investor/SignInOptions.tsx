@@ -17,6 +17,9 @@ export const SignInOptions = ({
   isGoogleLoading = false,
   isAppleLoading = false
 }: SignInOptionsProps) => {
+  const currentOrigin = window.location.origin;
+  const supabaseCallback = "https://nlvljclvoguvrnntwufu.supabase.co/auth/v1/callback";
+
   return (
     <div className="space-y-4 p-5 bg-white rounded-lg shadow-sm border border-gray-100 animate-in fade-in-50 duration-500">
       <h3 className="text-center font-medium mb-4">Sign in with</h3>
@@ -28,6 +31,7 @@ export const SignInOptions = ({
               onClick={onGoogleSignIn}
               disabled={isGoogleLoading}
               className="w-full flex items-center justify-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-all duration-300 hover:border-primary/30 hover:translate-y-[-2px] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none group"
+              aria-label="Sign in with Google"
             >
               {isGoogleLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
@@ -47,8 +51,8 @@ export const SignInOptions = ({
             <p className="font-medium mb-1">הגדרת אימות Google</p>
             <p className="text-xs">לוודא שהוספת את הכתובות הבאות ב-Google OAuth:</p>
             <ol className="text-xs list-decimal pl-4 mt-1 space-y-1">
-              <li><strong>JavaScript Origins:</strong> {window.location.origin}</li>
-              <li><strong>Redirect URI:</strong> https://nlvljclvoguvrnntwufu.supabase.co/auth/v1/callback</li>
+              <li><strong>JavaScript Origins:</strong> <span className="font-mono bg-white/80 px-1 rounded select-all">{currentOrigin}</span></li>
+              <li><strong>Redirect URI:</strong> <span className="font-mono bg-white/80 px-1 rounded select-all">{supabaseCallback}</span></li>
             </ol>
             <p className="text-xs mt-1">וודא גם שהוספת את ה-Client ID וה-Client Secret ב-Supabase</p>
           </TooltipContent>
@@ -98,10 +102,9 @@ export const SignInOptions = ({
         <div className="flex gap-2 items-start">
           <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="font-medium">הגדרת אימות Google</p>
+            <p className="font-medium">בעיות באימות Google?</p>
             <p className="mt-1">
-              שגיאת 403 מצביעה על בעיית הרשאות בהגדרות OAuth. עליך להגדיר את אימות Google ב-Google Cloud Console ובפרויקט Supabase שלך. 
-              ראה את הפרטים המלאים בהנחיות הקישור למטה.
+              לוודא שהגדרות OAuth מוגדרות נכון ב-Google Cloud Console. שגיאת 403 עשויה להצביע על בעיית הרשאות או URL לא נכונים.
             </p>
           </div>
         </div>
