@@ -22,6 +22,7 @@ import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
 import SupabaseMigration from "./pages/SupabaseMigration";
+import AuthCallback from "./components/auth/AuthCallback";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -79,6 +80,9 @@ const App = () => {
               <Route path="/verified-deals" element={<VerifiedDeals />} />
               <Route path="/supabase-migration" element={<SupabaseMigration />} />
               
+              {/* Auth Callback Route - חדש */}
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              
               <Route 
                 path="/properties" 
                 element={
@@ -87,6 +91,7 @@ const App = () => {
                   </ProtectedRoute>
                 } 
               />
+              
               <Route 
                 path="/dashboard" 
                 element={

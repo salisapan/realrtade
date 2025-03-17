@@ -73,11 +73,15 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
     const currentUrl = window.location.origin;
     console.log(`Current origin URL: ${currentUrl}`);
     
+    // הגדיר את כתובת ה-callback בצורה דינמית בהתאם לכתובת האתר הנוכחית
+    const redirectUrl = `${window.location.origin}/auth/callback`;
+    console.log(`Setting redirect URL to: ${redirectUrl}`);
+    
     // הקריאה ל-signInWithOAuth מחזירה רק מידע על ה-URL, ולא את פרטי המשתמש או הסשן
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin + '/auth/callback',
+        redirectTo: redirectUrl,
         queryParams: {
           prompt: 'select_account', // To force Google to show the account selection screen
         }
