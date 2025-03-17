@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { InvestorFormValues } from '@/schemas/investorSchema';
 
@@ -73,11 +72,15 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
     const currentUrl = window.location.origin;
     console.log(`Current origin URL: ${currentUrl}`);
     
+    // הגדרת כתובת ה-redirectTo המדויקת עם /auth/callback
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    console.log(`Setting redirect URL to: ${redirectTo}`);
+    
     // הקריאה ל-signInWithOAuth מחזירה רק מידע על ה-URL, ולא את פרטי המשתמש או הסשן
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: window.location.origin + '/auth/callback',
+        redirectTo,
         queryParams: {
           prompt: 'select_account', // To force Google to show the account selection screen
         }

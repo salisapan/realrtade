@@ -22,6 +22,7 @@ import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
 import SupabaseMigration from "./pages/SupabaseMigration";
+import AuthCallback from "./pages/AuthCallback";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -78,6 +79,7 @@ const App = () => {
               <Route path="/investor-signup" element={<InvestorSignup />} />
               <Route path="/verified-deals" element={<VerifiedDeals />} />
               <Route path="/supabase-migration" element={<SupabaseMigration />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               
               <Route 
                 path="/properties" 

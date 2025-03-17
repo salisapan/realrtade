@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -45,14 +44,13 @@ export const SignInOptions = ({
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-[320px] p-3 bg-amber-50 border-amber-200 text-amber-800">
-            <p className="font-medium mb-1">Google Authentication Setup Required</p>
-            <p className="text-xs">The 403 error indicates your Google OAuth is not configured correctly. You need to:</p>
+            <p className="font-medium mb-1">הגדרת אימות Google</p>
+            <p className="text-xs">לוודא שהוספת את הכתובות הבאות ב-Google OAuth:</p>
             <ol className="text-xs list-decimal pl-4 mt-1 space-y-1">
-              <li>Set up a Google Cloud project and configure OAuth consent screen</li>
-              <li>Create OAuth credentials with the correct redirect URIs</li>
-              <li>Add the Client ID and Secret to Supabase Auth providers</li>
-              <li>Ensure your Site URL and Redirect URLs are properly set in Supabase Auth settings</li>
+              <li><strong>JavaScript Origins:</strong> {window.location.origin}</li>
+              <li><strong>Redirect URI:</strong> https://nlvljclvoguvrnntwufu.supabase.co/auth/v1/callback</li>
             </ol>
+            <p className="text-xs mt-1">וודא גם שהוספת את ה-Client ID וה-Client Secret ב-Supabase</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
