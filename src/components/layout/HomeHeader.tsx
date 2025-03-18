@@ -1,3 +1,4 @@
+
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, Menu, User, X, ArrowLeft, Settings, Building2, LineChart, Sliders } from "lucide-react";
@@ -64,12 +65,21 @@ export const HomeHeader = () => {
                 <span className="text-sm font-medium text-gray-700">{userName}</span>
               </div>}
             
-            {/* Only show Sign Up button if not logged in */}
-            {!isLoggedIn && <Link to="/investor-signup">
-                <Button variant="default" size="sm" className="hidden md:inline-flex shadow-sm hover:shadow-md transition-all duration-300">
-                  Sign Up
-                </Button>
-              </Link>}
+            {/* Show Login/Sign Up buttons if not logged in */}
+            {!isLoggedIn && (
+              <div className="hidden md:flex items-center gap-2">
+                <Link to="/login">
+                  <Button variant="ghost" size="sm" className="hover:bg-gray-100 transition-colors duration-300">
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/investor-signup">
+                  <Button variant="default" size="sm" className="shadow-sm hover:shadow-md transition-all duration-300">
+                    Sign Up
+                  </Button>
+                </Link>
+              </div>
+            )}
             
             <Button variant="ghost" size="icon" className="md:hidden hover:bg-gray-100 transition-colors duration-300" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -99,19 +109,25 @@ export const HomeHeader = () => {
                 <Sliders className="w-5 h-5" />
                 <span>Admin</span>
               </Link>
-              {!isLoggedIn && <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
-                  <User className="w-5 h-5" />
-                  <span>Sign Up</span>
-                </Link>}
-              <Link to="/settings" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
-                <Settings className="w-5 h-5" />
-                <span>Settings</span>
-              </Link>
+              {!isLoggedIn ? (
+                <>
+                  <Link to="/login" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
+                    <User className="w-5 h-5" />
+                    <span>Login</span>
+                  </Link>
+                  <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
+                    <User className="w-5 h-5" />
+                    <span>Sign Up</span>
+                  </Link>
+                </>
+              ) : (
+                <Link to="/settings" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
+                  <Settings className="w-5 h-5" />
+                  <span>Settings</span>
+                </Link>
+              )}
             </nav>
           </div>}
       </div>
-      
-      {/* Mobile fixed bottom navigation - simplified */}
-      
     </header>;
 };

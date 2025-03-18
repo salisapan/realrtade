@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +19,7 @@ import EntrepreneurRegistration from "./pages/EntrepreneurRegistration";
 import DueDiligencePortal from "./pages/DueDiligencePortal";
 import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
+import Login from "./pages/Login";
 import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
@@ -47,7 +49,7 @@ const ProtectedRoute = ({
   children: React.ReactNode;
 }) => {
   if (!hasRegistered()) {
-    return <Navigate to="/investor-signup" replace />;
+    return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
 };
@@ -77,6 +79,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/investor-signup" element={<InvestorSignup />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/verified-deals" element={<VerifiedDeals />} />
               <Route path="/supabase-migration" element={<SupabaseMigration />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
