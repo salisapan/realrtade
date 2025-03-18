@@ -1,4 +1,3 @@
-
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -12,9 +11,10 @@ import { investorFormSchema, InvestorFormValues } from "@/schemas/investorSchema
 interface InvestorFormProps {
   onSubmit: (values: InvestorFormValues) => void;
   isSubmitting: boolean;
+  hideEmailField?: boolean;
 }
 
-export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
+export const InvestorForm = ({ onSubmit, isSubmitting, hideEmailField = false }: InvestorFormProps) => {
   const form = useForm<InvestorFormValues>({
     resolver: zodResolver(investorFormSchema),
     defaultValues: {
@@ -52,24 +52,26 @@ export const InvestorForm = ({ onSubmit, isSubmitting }: InvestorFormProps) => {
             )}
           />
           
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem className="transition-all duration-300 hover:shadow-sm">
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="email" 
-                    placeholder="your.email@example.com" 
-                    {...field} 
-                    className="focus:shadow-[0_0_0_2px_rgba(66,133,244,0.2)]"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          {!hideEmailField && (
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem className="transition-all duration-300 hover:shadow-sm">
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="email" 
+                      placeholder="your.email@example.com" 
+                      {...field} 
+                      className="focus:shadow-[0_0_0_2px_rgba(66,133,244,0.2)]"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
           
           <FormField
             control={form.control}
