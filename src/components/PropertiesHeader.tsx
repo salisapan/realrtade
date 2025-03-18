@@ -56,7 +56,7 @@ export const PropertiesHeader = ({
             {/* Show user name if logged in, otherwise show Sign Up button */}
             {isLoggedIn ? <div className="hidden sm:flex items-center gap-1 mr-2">
                 <User className="w-4 h-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700">{userName}</span>
+                
               </div> : <Link to="/investor-signup" className="hidden sm:block">
                 <Button variant="default" size="sm">
                   Sign Up
