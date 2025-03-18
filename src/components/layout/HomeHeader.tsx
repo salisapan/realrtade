@@ -112,20 +112,6 @@ export const HomeHeader = () => {
       </div>
       
       {/* Mobile fixed bottom navigation - simplified */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-50 flex justify-around py-2 px-1 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-        
-        <Link to="/properties" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
-          <Building2 className="w-5 h-5 text-gray-600" />
-          <span className="text-xs mt-1">Properties</span>
-        </Link>
-        <Link to="/dashboard" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
-          <LineChart className="w-5 h-5 text-gray-600" />
-          <span className="text-xs mt-1">Dashboard</span>
-        </Link>
-        <Link to="/admin" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
-          <Sliders className="w-5 h-5 text-gray-600" />
-          <span className="text-xs mt-1">Admin</span>
-        </Link>
-      </div>
+      
     </header>;
 };
