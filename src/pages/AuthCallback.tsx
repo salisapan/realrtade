@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -8,6 +9,7 @@ const AuthCallback = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
     // Handle OAuth return code
@@ -28,6 +30,7 @@ const AuthCallback = () => {
             description: errorMsg,
             variant: "destructive"
           });
+          setIsProcessing(false);
           return;
         }
 
@@ -75,6 +78,7 @@ const AuthCallback = () => {
             }));
             
             // Redirect to properties
+            setIsProcessing(false);
             navigate("/properties");
           } else if (profileData) {
             console.log("Existing profile found:", profileData);
@@ -85,14 +89,17 @@ const AuthCallback = () => {
               fullName: profileData.full_name || "Investor"
             }));
             
+            setIsProcessing(false);
             navigate(profileData.is_accredited ? "/properties" : "/verified-deals");
           } else {
             // Fallback
+            setIsProcessing(false);
             navigate("/properties");
           }
         } else {
           console.log("No session found, redirecting to sign-up");
           // No session, go back to sign-up
+          setIsProcessing(false);
           navigate("/investor-signup");
         }
       } catch (error) {
@@ -104,6 +111,7 @@ const AuthCallback = () => {
           variant: "destructive"
         });
         // On error, return to sign-up after 3 seconds
+        setIsProcessing(false);
         setTimeout(() => navigate("/investor-signup"), 3000);
       }
     };
@@ -122,8 +130,14 @@ const AuthCallback = () => {
       ) : (
         <div className="p-6 max-w-md bg-white rounded-lg shadow-lg text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-800 mb-2">Completing Authentication</h2>
-          <p className="text-gray-600">Please wait while we finish the authentication process...</p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            {isProcessing ? "Completing Authentication" : "Authentication Complete"}
+          </h2>
+          <p className="text-gray-600">
+            {isProcessing 
+              ? "Please wait while we finish the authentication process..." 
+              : "You'll be redirected to the dashboard momentarily..."}
+          </p>
           <div className="mt-4 text-sm text-blue-500">
             <span className="animate-pulse">Loading your profile...</span>
           </div>

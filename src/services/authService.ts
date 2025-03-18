@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { InvestorFormValues } from '@/schemas/investorSchema';
 
@@ -13,7 +12,70 @@ export const signUpWithEmail = async (email: string, password: string, userData:
   try {
     console.log("Starting signup process for email:", email);
     
-    // Sign up the user through Supabase Auth
+    // First check if the user already exists
+    const { data: existingUser, error: checkError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('email', email)
+      .single();
+      
+    if (!checkError && existingUser) {
+      console.log("User already exists in profiles table:", existingUser);
+      
+      // Try to sign in the user since they already exist
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (signInError) {
+        console.error("Error signing in existing user:", signInError);
+        return { 
+          user: null, 
+          session: null, 
+          error: {
+            code: "user_already_exists",
+            message: "This email is already registered. Please use a different email or try logging in instead."
+          }
+        };
+      }
+      
+      // If sign-in succeeded, return the auth data
+      if (authData.user) {
+        // Update the user profile with the new data
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            full_name: userData.fullName || existingUser.full_name,
+            phone: userData.phone || existingUser.phone,
+            address: userData.address || existingUser.address,
+            age: userData.age || existingUser.age,
+            annual_income: userData.annualIncome || existingUser.annual_income,
+            net_worth: userData.netWorth || existingUser.net_worth,
+            investment_experience: userData.investmentExperience || existingUser.investment_experience,
+            is_accredited: userData.isAccredited === 'yes' || existingUser.is_accredited,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', authData.user.id);
+          
+        if (updateError) {
+          console.error("Error updating existing profile:", updateError);
+        } else {
+          console.log("Updated existing profile successfully");
+        }
+        
+        return { 
+          user: authData.user, 
+          session: authData.session, 
+          error: {
+            code: "user_already_exists",
+            message: "This email is already registered. Please use a different email or try logging in instead."
+          }
+        };
+      }
+    }
+    
+    // If user doesn't exist, sign up
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -29,9 +91,26 @@ export const signUpWithEmail = async (email: string, password: string, userData:
       
       // Check if this is a "User already registered" error
       if (authError.message?.includes("already registered")) {
+        // Try to sign in the user since they already exist
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        
+        if (signInError) {
+          return { 
+            user: null, 
+            session: null, 
+            error: {
+              code: "user_already_exists",
+              message: "This email is already registered. Please use a different email or try logging in instead."
+            }
+          };
+        }
+        
         return { 
-          user: null, 
-          session: null, 
+          user: signInData.user, 
+          session: signInData.session, 
           error: {
             code: "user_already_exists",
             message: "This email is already registered. Please use a different email or try logging in instead."
@@ -81,6 +160,8 @@ export const signUpWithEmail = async (email: string, password: string, userData:
 // Login with email and password
 export const signInWithEmail = async (email: string, password: string): Promise<AuthResponse> => {
   try {
+    console.log("Attempting to sign in with email:", email);
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -91,6 +172,8 @@ export const signInWithEmail = async (email: string, password: string): Promise<
       return { user: null, session: null, error };
     }
 
+    console.log("Sign in successful, checking for profile");
+    
     // Check if the user profile exists after login
     if (data.user) {
       const { data: profile, error: profileError } = await supabase
@@ -111,7 +194,16 @@ export const signInWithEmail = async (email: string, password: string): Promise<
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
+      } else {
+        console.log("Found existing profile:", profile);
       }
+      
+      // Save user profile to localStorage for app-wide access
+      localStorage.setItem("investorProfile", JSON.stringify({
+        id: data.user.id,
+        email: data.user.email,
+        fullName: profile?.full_name || data.user.user_metadata?.full_name || 'Investor'
+      }));
     }
 
     return { user: data.user, session: data.session, error: null };

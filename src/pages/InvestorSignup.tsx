@@ -9,6 +9,8 @@ import { SignInOptions } from "@/components/investor/SignInOptions";
 import { AuthErrorDisplay } from "@/components/investor/AuthErrorDisplay";
 import { CredentialsInput } from "@/components/investor/CredentialsInput";
 import { useInvestorAuth } from "@/hooks/useInvestorAuth";
+import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 
 const InvestorSignup = () => {
   const [showStandardForm, setShowStandardForm] = useState(false);
@@ -34,7 +36,7 @@ const InvestorSignup = () => {
     setAuthError(null);
   };
 
-  // This function logs when the form is submitted
+  // This function logs when the form is submitted and ensures we pass all required data
   const onFormSubmit = (values: any) => {
     console.log("Form submitted with values:", values);
     console.log("Current email state:", email);
@@ -96,7 +98,7 @@ const InvestorSignup = () => {
                 />
               ) : (
                 // Full registration form
-                <>
+                <div className="animate-fade-in">
                   {/* Email and password fields - These will be passed to InvestorForm */}
                   <CredentialsInput 
                     email={email}
@@ -111,7 +113,18 @@ const InvestorSignup = () => {
                     isSubmitting={isSubmitting}
                     hideEmailField={true} // Hide the email field in the form
                   />
-                </>
+                  
+                  {/* Show animation during form submission */}
+                  {isSubmitting && (
+                    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+                      <div className="bg-white p-8 rounded-lg shadow-xl flex flex-col items-center">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                        <h3 className="text-xl font-semibold mb-2">Processing Registration</h3>
+                        <p className="text-gray-600">Please wait while we create your account...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
             <CardFooter className="flex flex-col items-start relative">

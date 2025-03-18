@@ -41,7 +41,35 @@ export function useInvestorAuth() {
         console.error("Registration error:", response.error);
         // Special handling for "user already registered" error
         if (response.error.code === "user_already_exists") {
-          throw new Error("This email is already registered. Please use a different email or try logging in instead.");
+          toast({
+            title: "Account Already Exists",
+            description: "This email is already registered. Redirecting to properties...",
+            variant: "default"
+          });
+          
+          // Save user profile to localStorage for app-wide access even if user exists
+          if (response.user) {
+            localStorage.setItem("investorProfile", JSON.stringify({
+              id: response.user.id,
+              email: email,
+              fullName: values.fullName || "Investor"
+            }));
+          }
+          
+          // If user already exists, we'll redirect them appropriately
+          setIsAccredited(values.isAccredited === "yes");
+          setRegistrationComplete(true);
+          
+          // Redirect based on accreditation status
+          setTimeout(() => {
+            if (values.isAccredited === "yes") {
+              navigate("/properties");
+            } else {
+              navigate("/verified-deals");
+            }
+          }, 1500);
+          
+          return;
         }
         throw new Error(response.error.message || "Registration failed");
       }
@@ -83,7 +111,7 @@ export function useInvestorAuth() {
         } else {
           navigate("/verified-deals");
         }
-      }, 2000);
+      }, 1500);
 
     } catch (error) {
       console.error("Registration error:", error);

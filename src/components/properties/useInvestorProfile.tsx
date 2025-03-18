@@ -14,11 +14,11 @@ export const useInvestorProfile = () => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        // בדיקה אם יש משתמש מחובר כרגע
+        // Check if there's a logged-in user session
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          // למקרה שאין חיבור ל-Supabase, ננסה להשתמש ב-localStorage כגיבוי
+          // Try to use localStorage as a fallback if no Supabase session
           const localProfile = localStorage.getItem("investorProfile");
           
           if (localProfile) {
@@ -27,7 +27,7 @@ export const useInvestorProfile = () => {
             return;
           }
           
-          // אם אין נתונים מקומיים, נציג הודעה למשתמש
+          // If no local data, show a notification to the user
           toast({
             title: "Registration Required",
             description: "Please complete your investor profile to access properties.",
@@ -35,15 +35,17 @@ export const useInvestorProfile = () => {
           });
           
           setIsLoading(false);
+          navigate("/investor-signup");
           return;
         }
 
-        // קבלת פרופיל המשתמש מ-Supabase
+        // Get user profile from Supabase
         const userProfile = await getUserProfile(session.user.id);
         
         if (userProfile) {
-          // המרה מפורמט של Supabase לפורמט הישן של האפליקציה
+          // Convert from Supabase format to app format
           const formattedProfile = {
+            id: userProfile.id,
             fullName: userProfile.full_name,
             email: userProfile.email,
             phone: userProfile.phone,
@@ -55,9 +57,16 @@ export const useInvestorProfile = () => {
             isAccredited: userProfile.is_accredited ? "yes" : "no"
           };
           
+          // Update localStorage with latest profile info
+          localStorage.setItem("investorProfile", JSON.stringify({
+            id: userProfile.id,
+            email: userProfile.email,
+            fullName: userProfile.full_name || "Investor"
+          }));
+          
           setInvestorProfile(formattedProfile);
         } else {
-          // אם אין פרופיל, כנראה צריך ליצור אחד
+          // No profile found, probably need to create one
           toast({
             title: "Profile Information Missing",
             description: "Please complete your investor profile.",
