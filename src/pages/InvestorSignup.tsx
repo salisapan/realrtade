@@ -34,7 +34,23 @@ const InvestorSignup = () => {
     setAuthError(null);
   };
 
+  // This function logs when the form is submitted
+  const onFormSubmit = (values: any) => {
+    console.log("Form submitted with values:", values);
+    console.log("Current email state:", email);
+    
+    // Use the email from our state to avoid duplicate email field
+    const formValues = {
+      ...values,
+      email: email // Override the email from the form with our state value
+    };
+    
+    console.log("Final form values being passed to handler:", formValues);
+    handleFormSubmit(formValues);
+  };
+
   if (registrationComplete) {
+    console.log("Registration complete, showing success screen");
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col">
         <HomeHeader />
@@ -72,7 +88,7 @@ const InvestorSignup = () => {
               <AuthErrorDisplay error={authError} />
 
               {!showStandardForm ? (
-                // Sign-in options - Apple removed
+                // Sign-in options
                 <SignInOptions 
                   onGoogleSignIn={handleGoogleSignIn} 
                   onEmailSignIn={handleEmailSignIn}
@@ -91,16 +107,9 @@ const InvestorSignup = () => {
                   
                   {/* The InvestorForm will now use the email state from above, not asking again */}
                   <InvestorForm 
-                    onSubmit={(values) => {
-                      // Use the email from our state to avoid duplicate email field
-                      const formValues = {
-                        ...values,
-                        email: email // Override the email from the form with our state value
-                      };
-                      handleFormSubmit(formValues);
-                    }} 
+                    onSubmit={onFormSubmit} 
                     isSubmitting={isSubmitting}
-                    hideEmailField={true} // Add this prop to hide the email field in the form
+                    hideEmailField={true} // Hide the email field in the form
                   />
                 </>
               )}

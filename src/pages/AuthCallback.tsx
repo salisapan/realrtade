@@ -2,23 +2,32 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Handle OAuth return code
     const handleAuthCallback = async () => {
       try {
+        console.log("Auth callback started");
         // Check for error parameters in URL
         const hash = window.location.hash;
         const query = new URLSearchParams(window.location.search);
         
         if (query.get("error")) {
           // Display error from URL
-          setError(query.get("error_description") || "An error occurred during the authentication process");
-          console.error("Auth error:", query.get("error"), query.get("error_description"));
+          const errorMsg = query.get("error_description") || "An error occurred during the authentication process";
+          setError(errorMsg);
+          console.error("Auth error:", query.get("error"), errorMsg);
+          toast({
+            title: "Authentication Error",
+            description: errorMsg,
+            variant: "destructive"
+          });
           return;
         }
 
@@ -29,7 +38,14 @@ const AuthCallback = () => {
           throw error;
         }
 
+        console.log("Session data:", data);
+
         if (data?.session) {
+          toast({
+            title: "Authentication Successful", 
+            description: "You've been successfully logged in"
+          });
+          
           // Check if user is registered and redirect accordingly
           const { data: profileData, error: profileError } = await supabase
             .from("profiles")
@@ -61,6 +77,7 @@ const AuthCallback = () => {
             // Redirect to properties
             navigate("/properties");
           } else if (profileData) {
+            console.log("Existing profile found:", profileData);
             // Existing user - redirect to home or verified deals
             localStorage.setItem("investorProfile", JSON.stringify({
               id: profileData.id,
@@ -74,19 +91,25 @@ const AuthCallback = () => {
             navigate("/properties");
           }
         } else {
+          console.log("No session found, redirecting to sign-up");
           // No session, go back to sign-up
           navigate("/investor-signup");
         }
       } catch (error) {
         console.error("Error in auth callback:", error);
         setError(error instanceof Error ? error.message : "An unexpected error occurred");
+        toast({
+          title: "Authentication Error",
+          description: error instanceof Error ? error.message : "An unexpected error occurred",
+          variant: "destructive"
+        });
         // On error, return to sign-up after 3 seconds
         setTimeout(() => navigate("/investor-signup"), 3000);
       }
     };
 
     handleAuthCallback();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-white to-blue-50">

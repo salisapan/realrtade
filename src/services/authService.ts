@@ -11,13 +11,8 @@ export interface AuthResponse {
 // Registration with email and password
 export const signUpWithEmail = async (email: string, password: string, userData: Partial<InvestorFormValues>): Promise<AuthResponse> => {
   try {
-    // First check if the user already exists to provide a better error message
-    const { data: existingUser } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('email', email)
-      .single();
-      
+    console.log("Starting signup process for email:", email);
+    
     // Sign up the user through Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -31,8 +26,23 @@ export const signUpWithEmail = async (email: string, password: string, userData:
 
     if (authError) {
       console.error('Auth error during signup:', authError);
+      
+      // Check if this is a "User already registered" error
+      if (authError.message?.includes("already registered")) {
+        return { 
+          user: null, 
+          session: null, 
+          error: {
+            code: "user_already_exists",
+            message: "This email is already registered. Please use a different email or try logging in instead."
+          }
+        };
+      }
+      
       return { user: null, session: null, error: authError };
     }
+
+    console.log("Auth signup successful, creating profile");
 
     // If we get a user back, create their profile
     if (authData.user) {
@@ -57,6 +67,8 @@ export const signUpWithEmail = async (email: string, password: string, userData:
         console.error('Profile creation error:', profileError);
         return { user: authData.user, session: authData.session, error: profileError };
       }
+      
+      console.log("Profile created successfully");
     }
 
     return { user: authData.user, session: authData.session, error: null };

@@ -18,24 +18,35 @@ export function useInvestorAuth() {
 
   // Handle full registration form submission
   async function handleFormSubmit(values: InvestorFormValues) {
+    console.log("Form submission started with values:", values);
     setIsSubmitting(true);
     setAuthError(null);
 
     try {
-      // Make sure we use the email and password from the form, not the state
-      // This prevents issues with double email entry
-      const emailToUse = values.email;
+      // Make sure we use the email from state
+      if (!email) {
+        throw new Error("Email is required");
+      }
+      
+      if (!password) {
+        throw new Error("Password is required");
+      }
+      
+      console.log("Registering user with email:", email);
       
       // Register user in Supabase
-      const response = await signUpWithEmail(emailToUse, password, values);
+      const response = await signUpWithEmail(email, password, values);
 
       if (response.error) {
+        console.error("Registration error:", response.error);
         // Special handling for "user already registered" error
         if (response.error.code === "user_already_exists") {
           throw new Error("This email is already registered. Please use a different email or try logging in instead.");
         }
         throw new Error(response.error.message || "Registration failed");
       }
+
+      console.log("Registration successful:", response);
 
       // Store accreditation status for success screen
       setIsAccredited(values.isAccredited === "yes");
@@ -57,7 +68,7 @@ export function useInvestorAuth() {
       if (response.user) {
         localStorage.setItem("investorProfile", JSON.stringify({
           id: response.user.id,
-          email: emailToUse,
+          email: email,
           fullName: values.fullName || "Investor"
         }));
       }
