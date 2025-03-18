@@ -1,21 +1,18 @@
+
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SignInOptionsProps {
   onGoogleSignIn: () => void;
-  onAppleSignIn: () => void;
   onEmailSignIn: () => void;
   isGoogleLoading?: boolean;
-  isAppleLoading?: boolean;
 }
 
 export const SignInOptions = ({ 
   onGoogleSignIn, 
-  onAppleSignIn, 
   onEmailSignIn, 
-  isGoogleLoading = false,
-  isAppleLoading = false
+  isGoogleLoading = false
 }: SignInOptionsProps) => {
   const currentOrigin = window.location.origin;
   const supabaseCallback = "https://nlvljclvoguvrnntwufu.supabase.co/auth/v1/callback";
@@ -48,31 +45,16 @@ export const SignInOptions = ({
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-[320px] p-3 bg-amber-50 border-amber-200 text-amber-800">
-            <p className="font-medium mb-1">הגדרת אימות Google</p>
-            <p className="text-xs">לוודא שהוספת את הכתובות הבאות ב-Google OAuth:</p>
+            <p className="font-medium mb-1">Google Auth Configuration</p>
+            <p className="text-xs">Make sure you've added the following URLs in Google OAuth:</p>
             <ol className="text-xs list-decimal pl-4 mt-1 space-y-1">
               <li><strong>JavaScript Origins:</strong> <span className="font-mono bg-white/80 px-1 rounded select-all">{currentOrigin}</span></li>
               <li><strong>Redirect URI:</strong> <span className="font-mono bg-white/80 px-1 rounded select-all">{supabaseCallback}</span></li>
             </ol>
-            <p className="text-xs mt-1">וודא גם שהוספת את ה-Client ID וה-Client Secret ב-Supabase</p>
+            <p className="text-xs mt-1">Also verify that you've added the Client ID and Client Secret in Supabase</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-      
-      <button 
-        onClick={onAppleSignIn}
-        disabled={isAppleLoading}
-        className="w-full flex items-center justify-center gap-3 p-3 rounded-lg border border-gray-200 bg-white hover:shadow-md transition-all duration-300 hover:border-primary/30 hover:translate-y-[-2px] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
-      >
-        {isAppleLoading ? (
-          <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-        ) : (
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-            <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.53 4.08zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.32 4.5-3.74 4.25z" />
-          </svg>
-        )}
-        <span>{isAppleLoading ? "Connecting..." : "Continue with Apple"}</span>
-      </button>
       
       <button 
         onClick={onEmailSignIn}
@@ -102,9 +84,9 @@ export const SignInOptions = ({
         <div className="flex gap-2 items-start">
           <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
           <div>
-            <p className="font-medium">בעיות באימות Google?</p>
+            <p className="font-medium">Google Authentication Setup</p>
             <p className="mt-1">
-              לוודא שהגדרות OAuth מוגדרות נכון ב-Google Cloud Console. שגיאת 403 עשויה להצביע על בעיית הרשאות או URL לא נכונים.
+              Make sure your OAuth settings are correctly configured in Google Cloud Console and Supabase. A 403 error may indicate permission issues or incorrect URLs.
             </p>
           </div>
         </div>

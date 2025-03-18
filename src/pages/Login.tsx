@@ -18,7 +18,6 @@ const Login = () => {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSignInLoading, setIsGoogleSignInLoading] = useState(false);
-  const [isAppleSignInLoading, setIsAppleSignInLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   const handleEmailSignIn = () => {
@@ -41,6 +40,10 @@ const Login = () => {
       const response = await signInWithEmail(email, password);
       
       if (response.error) {
+        // Improved error handling with specific messages
+        if (response.error.message.includes("Invalid login credentials")) {
+          throw new Error("Invalid email or password. Please check your credentials and try again.");
+        }
         throw new Error(response.error.message || "Login failed");
       }
       
@@ -83,7 +86,13 @@ const Login = () => {
       const response = await signInWithProvider('google');
       
       if (response.error) {
-        throw new Error(response.error.message || "Google sign-in failed");
+        if (response.error.message?.includes("provider is not enabled")) {
+          throw new Error("Google authentication is not currently configured in Supabase. Please check the provider settings.");
+        } else if (response.error.message?.includes("403") || response.error.originalError?.status === 403) {
+          throw new Error("Google authentication failed with a 403 error. Please verify your OAuth configuration in Google Cloud Console and Supabase Auth providers.");
+        } else {
+          throw new Error(response.error.message || "Google sign-in failed");
+        }
       }
       
       toast({
@@ -101,36 +110,6 @@ const Login = () => {
       });
     } finally {
       setIsGoogleSignInLoading(false);
-    }
-  };
-
-  // Handler for Apple Sign In
-  const handleAppleSignIn = async () => {
-    setIsAppleSignInLoading(true);
-    setAuthError(null);
-    
-    try {
-      const response = await signInWithProvider('apple');
-      
-      if (response.error) {
-        throw new Error(response.error.message || "Apple sign-in failed");
-      }
-      
-      toast({
-        title: "Apple Sign-In Process Started",
-        description: "Please complete the authentication in the Apple popup window."
-      });
-    } catch (error) {
-      console.error("Apple sign-in error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to sign in with Apple";
-      setAuthError(errorMessage);
-      toast({
-        title: "Sign-In Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setIsAppleSignInLoading(false);
     }
   };
 
@@ -161,13 +140,11 @@ const Login = () => {
               <AuthErrorDisplay error={authError} />
               
               {!showEmailForm ? (
-                // Sign-in options (Google, Apple, Email)
+                // Sign-in options (Google and Email - Apple removed)
                 <SignInOptions 
                   onGoogleSignIn={handleGoogleSignIn} 
-                  onAppleSignIn={handleAppleSignIn}
                   onEmailSignIn={handleEmailSignIn}
                   isGoogleLoading={isGoogleSignInLoading}
-                  isAppleLoading={isAppleSignInLoading}
                 />
               ) : (
                 // Email & password form

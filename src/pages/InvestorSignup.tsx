@@ -22,15 +22,13 @@ const InvestorSignup = () => {
     password,
     setPassword,
     isGoogleSignInLoading,
-    isAppleSignInLoading,
     authError,
     setAuthError,
     handleFormSubmit,
-    handleGoogleSignIn,
-    handleAppleSignIn
+    handleGoogleSignIn
   } = useInvestorAuth();
 
-  // מעבר לטופס הרשמה מלא
+  // Show full registration form
   const handleEmailSignIn = () => {
     setShowStandardForm(true);
     setAuthError(null);
@@ -74,18 +72,16 @@ const InvestorSignup = () => {
               <AuthErrorDisplay error={authError} />
 
               {!showStandardForm ? (
-                // אפשרויות התחברות
+                // Sign-in options - Apple removed
                 <SignInOptions 
                   onGoogleSignIn={handleGoogleSignIn} 
-                  onAppleSignIn={handleAppleSignIn} 
                   onEmailSignIn={handleEmailSignIn}
                   isGoogleLoading={isGoogleSignInLoading}
-                  isAppleLoading={isAppleSignInLoading}
                 />
               ) : (
-                // טופס הרשמה מלא
+                // Full registration form
                 <>
-                  {/* שדות אימייל וסיסמה */}
+                  {/* Email and password fields - These will be passed to InvestorForm */}
                   <CredentialsInput 
                     email={email}
                     setEmail={setEmail}
@@ -93,7 +89,19 @@ const InvestorSignup = () => {
                     setPassword={setPassword}
                   />
                   
-                  <InvestorForm onSubmit={handleFormSubmit} isSubmitting={isSubmitting} />
+                  {/* The InvestorForm will now use the email state from above, not asking again */}
+                  <InvestorForm 
+                    onSubmit={(values) => {
+                      // Use the email from our state to avoid duplicate email field
+                      const formValues = {
+                        ...values,
+                        email: email // Override the email from the form with our state value
+                      };
+                      handleFormSubmit(formValues);
+                    }} 
+                    isSubmitting={isSubmitting}
+                    hideEmailField={true} // Add this prop to hide the email field in the form
+                  />
                 </>
               )}
             </CardContent>

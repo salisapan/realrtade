@@ -14,26 +14,33 @@ export function useInvestorAuth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isGoogleSignInLoading, setIsGoogleSignInLoading] = useState(false);
-  const [isAppleSignInLoading, setIsAppleSignInLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // טיפול בטופס הרשמה מלא
+  // Handle full registration form submission
   async function handleFormSubmit(values: InvestorFormValues) {
     setIsSubmitting(true);
     setAuthError(null);
 
     try {
-      // רישום המשתמש ב-Supabase
-      const response = await signUpWithEmail(values.email, password, values);
+      // Make sure we use the email and password from the form, not the state
+      // This prevents issues with double email entry
+      const emailToUse = values.email;
+      
+      // Register user in Supabase
+      const response = await signUpWithEmail(emailToUse, password, values);
 
       if (response.error) {
+        // Special handling for "user already registered" error
+        if (response.error.code === "user_already_exists") {
+          throw new Error("This email is already registered. Please use a different email or try logging in instead.");
+        }
         throw new Error(response.error.message || "Registration failed");
       }
 
-      // שמירת סטטוס הכרה פיננסית לצורך מסך ההצלחה
+      // Store accreditation status for success screen
       setIsAccredited(values.isAccredited === "yes");
 
-      // הודעה מותאמת בהתאם לסטטוס ההכרה
+      // Custom toast based on accreditation
       if (values.isAccredited === "yes") {
         toast({
           title: "Registration Successful",
@@ -46,10 +53,19 @@ export function useInvestorAuth() {
         });
       }
 
-      // הצגת הודעת השלמה לפני הפניה
+      // Save user profile to localStorage for app-wide access
+      if (response.user) {
+        localStorage.setItem("investorProfile", JSON.stringify({
+          id: response.user.id,
+          email: emailToUse,
+          fullName: values.fullName || "Investor"
+        }));
+      }
+
+      // Show completion message before redirecting
       setRegistrationComplete(true);
 
-      // הפניה בהתאם לסטטוס ההכרה
+      // Redirect based on accreditation status
       setTimeout(() => {
         if (values.isAccredited === "yes") {
           navigate("/properties");
@@ -71,7 +87,7 @@ export function useInvestorAuth() {
     }
   }
 
-  // התחברות באמצעות Google
+  // Google sign-in handler
   const handleGoogleSignIn = async () => {
     setIsGoogleSignInLoading(true);
     setAuthError(null);
@@ -81,21 +97,11 @@ export function useInvestorAuth() {
       const response = await signInWithProvider('google');
       
       if (response.error) {
-        // בדיקת שגיאות ספציפיות
+        // Specific error handling
         if (response.error.message?.includes("provider is not enabled")) {
-          setAuthError("Google authentication is not currently configured in the Supabase project. Please enable the Google provider in the Supabase Auth providers settings.");
-          toast({
-            title: "Google Sign-In Unavailable",
-            description: "Google authentication is not currently configured. Please use email signup or contact support.",
-            variant: "destructive"
-          });
+          throw new Error("Google authentication is not currently configured in Supabase. Please check the provider settings.");
         } else if (response.error.message?.includes("403") || response.error.originalError?.status === 403) {
-          setAuthError("Received a 403 Forbidden error from Google. This usually means the OAuth credentials are incorrect or the authorized redirect URI is not properly configured in Google Cloud Console.");
-          toast({
-            title: "Google Authentication Error (403)",
-            description: "Google OAuth configuration error. Please check the OAuth credentials and redirect URIs.",
-            variant: "destructive"
-          });
+          throw new Error("Google authentication failed with a 403 error. Please verify the OAuth configuration in Google Cloud Console.");
         } else {
           throw new Error(response.error.message || "Google sign-in failed");
         }
@@ -119,46 +125,6 @@ export function useInvestorAuth() {
     }
   };
 
-  // התחברות באמצעות Apple
-  const handleAppleSignIn = async () => {
-    setIsAppleSignInLoading(true);
-    setAuthError(null);
-    
-    try {
-      const response = await signInWithProvider('apple');
-      
-      if (response.error) {
-        // Check for specific provider not enabled error
-        if (response.error.message?.includes("provider is not enabled")) {
-          setAuthError("Apple authentication is not currently configured in the Supabase project. Please check the provider settings in the Supabase dashboard or use email signup instead.");
-          toast({
-            title: "Apple Sign-In Unavailable",
-            description: "Apple authentication is not currently configured. Please use email signup or contact support.",
-            variant: "destructive"
-          });
-        } else {
-          throw new Error(response.error.message || "Apple sign-in failed");
-        }
-      } else {
-        toast({
-          title: "Apple Sign-In Process Started",
-          description: "Please complete the authentication in the Apple popup window."
-        });
-      }
-    } catch (error) {
-      console.error("Apple sign-in error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to sign in with Apple";
-      setAuthError(errorMessage);
-      toast({
-        title: "Sign-In Failed",
-        description: errorMessage,
-        variant: "destructive"
-      });
-    } finally {
-      setIsAppleSignInLoading(false);
-    }
-  };
-
   return {
     isSubmitting,
     registrationComplete,
@@ -168,11 +134,9 @@ export function useInvestorAuth() {
     password,
     setPassword,
     isGoogleSignInLoading,
-    isAppleSignInLoading,
     authError,
     setAuthError,
     handleFormSubmit,
-    handleGoogleSignIn,
-    handleAppleSignIn
+    handleGoogleSignIn
   };
 }

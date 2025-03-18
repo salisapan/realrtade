@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { InvestorFormValues } from '@/schemas/investorSchema';
 
@@ -7,17 +8,33 @@ export interface AuthResponse {
   error: any;
 }
 
-// הרשמה עם אימייל וסיסמה
+// Registration with email and password
 export const signUpWithEmail = async (email: string, password: string, userData: Partial<InvestorFormValues>): Promise<AuthResponse> => {
   try {
+    // First check if the user already exists to provide a better error message
+    const { data: existingUser } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('email', email)
+      .single();
+      
+    // Sign up the user through Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          full_name: userData.fullName || '',
+        }
+      }
     });
 
-    if (authError) throw authError;
+    if (authError) {
+      console.error('Auth error during signup:', authError);
+      return { user: null, session: null, error: authError };
+    }
 
-    // עדכון נתוני המשתמש בטבלת פרופילים
+    // If we get a user back, create their profile
     if (authData.user) {
       const { error: profileError } = await supabase
         .from('profiles')
@@ -36,7 +53,10 @@ export const signUpWithEmail = async (email: string, password: string, userData:
           updated_at: new Date().toISOString(),
         });
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        return { user: authData.user, session: authData.session, error: profileError };
+      }
     }
 
     return { user: authData.user, session: authData.session, error: null };
@@ -46,7 +66,7 @@ export const signUpWithEmail = async (email: string, password: string, userData:
   }
 };
 
-// התחברות עם אימייל וסיסמה
+// Login with email and password
 export const signInWithEmail = async (email: string, password: string): Promise<AuthResponse> => {
   try {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -54,7 +74,33 @@ export const signInWithEmail = async (email: string, password: string): Promise<
       password,
     });
 
-    if (error) throw error;
+    if (error) {
+      console.error('SignIn error:', error);
+      return { user: null, session: null, error };
+    }
+
+    // Check if the user profile exists after login
+    if (data.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', data.user.id)
+        .single();
+      
+      if (profileError) {
+        console.warn('Profile not found for user, creating one now');
+        // Create a profile if missing
+        await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: data.user.email,
+            full_name: data.user.user_metadata?.full_name || 'Investor',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+      }
+    }
 
     return { user: data.user, session: data.session, error: null };
   } catch (error) {
@@ -63,26 +109,26 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   }
 };
 
-// התחברות עם ספק חיצוני (גוגל, פייסבוק וכו')
-export const signInWithProvider = async (provider: 'google' | 'facebook' | 'apple'): Promise<AuthResponse> => {
+// Sign in with provider (Google only, Apple removed)
+export const signInWithProvider = async (provider: 'google'): Promise<AuthResponse> => {
   try {
     console.log(`Attempting to sign in with ${provider}...`);
     
-    // תוספת מידע דיאגנוסטי
+    // Add diagnostic information
     const currentUrl = window.location.origin;
     console.log(`Current origin URL: ${currentUrl}`);
     
-    // הגדרת כתובת ה-redirectTo המדויקת עם /auth/callback
+    // Set correct redirect URL with /auth/callback
     const redirectTo = `${window.location.origin}/auth/callback`;
     console.log(`Setting redirect URL to: ${redirectTo}`);
     
-    // הקריאה ל-signInWithOAuth מחזירה רק מידע על ה-URL, ולא את פרטי המשתמש או הסשן
+    // Call signInWithOAuth which returns URL information
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo,
         queryParams: {
-          prompt: 'select_account', // To force Google to show the account selection screen
+          prompt: 'select_account', // Force Google account selection screen
         }
       }
     });
@@ -90,7 +136,7 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
     if (error) {
       console.error(`OAuth error for ${provider}:`, error);
       
-      // בדיקה מפורטת יותר של סוגי שגיאות
+      // More detailed error checking
       if (error.message?.includes("provider is not enabled")) {
         return { 
           user: null, 
@@ -118,8 +164,6 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
 
     console.log(`OAuth URL generated for ${provider}:`, data.url);
     
-    // במקרה זה אנחנו מחזירים אובייקט ריק עבור user ו-session
-    // המשתמש והסשן יהיו זמינים רק לאחר שהמשתמש יסיים את תהליך ההתחברות
     return { user: null, session: null, error: null };
   } catch (error) {
     console.error(`Error signing in with ${provider}:`, error);
@@ -134,11 +178,14 @@ export const signInWithProvider = async (provider: 'google' | 'facebook' | 'appl
   }
 };
 
-// התנתקות
+// Logout
 export const signOut = async (): Promise<{ error: any }> => {
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    
+    // Clear local storage
+    localStorage.removeItem("investorProfile");
     return { error: null };
   } catch (error) {
     console.error('Error signing out:', error);
@@ -146,18 +193,18 @@ export const signOut = async (): Promise<{ error: any }> => {
   }
 };
 
-// בדיקת מצב ההתחברות הנוכחי
+// Check current session
 export const getCurrentSession = async () => {
   return await supabase.auth.getSession();
 };
 
-// קבלת המשתמש הנוכחי
+// Get current user
 export const getCurrentUser = async () => {
   const { data } = await supabase.auth.getUser();
   return data?.user;
 };
 
-// קבלת נתוני פרופיל המשתמש
+// Get user profile
 export const getUserProfile = async (userId: string) => {
   const { data, error } = await supabase
     .from('profiles')
@@ -173,7 +220,7 @@ export const getUserProfile = async (userId: string) => {
   return data;
 };
 
-// עדכון פרטי משתמש
+// Update user profile
 export const updateUserProfile = async (userId: string, userData: Partial<InvestorFormValues>) => {
   try {
     const { error } = await supabase
