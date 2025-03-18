@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { InvestorForm } from "@/components/investor/InvestorForm";
@@ -11,8 +11,10 @@ import { CredentialsInput } from "@/components/investor/CredentialsInput";
 import { useInvestorAuth } from "@/hooks/useInvestorAuth";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const InvestorSignup = () => {
+  const navigate = useNavigate();
   const [showStandardForm, setShowStandardForm] = useState(false);
   
   const {
@@ -29,6 +31,19 @@ const InvestorSignup = () => {
     handleFormSubmit,
     handleGoogleSignIn
   } = useInvestorAuth();
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        console.log("User already logged in, redirecting to properties");
+        navigate("/properties");
+      }
+    };
+    
+    checkSession();
+  }, [navigate]);
 
   // Show full registration form
   const handleEmailSignIn = () => {
@@ -111,7 +126,7 @@ const InvestorSignup = () => {
                   <InvestorForm 
                     onSubmit={onFormSubmit} 
                     isSubmitting={isSubmitting}
-                    hideEmailField={true} // Hide the email field in the form
+                    hideEmailField={true} 
                   />
                   
                   {/* Show animation during form submission */}

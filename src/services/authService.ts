@@ -17,7 +17,9 @@ export const signUpWithEmail = async (email: string, password: string, userData:
       .from('profiles')
       .select('*')
       .eq('email', email)
-      .single();
+      .maybeSingle();
+      
+    console.log("Existing user check result:", existingUser, checkError);
       
     if (!checkError && existingUser) {
       console.log("User already exists in profiles table:", existingUser);
@@ -27,6 +29,8 @@ export const signUpWithEmail = async (email: string, password: string, userData:
         email,
         password
       });
+      
+      console.log("Sign in attempt for existing user:", authData, signInError);
       
       if (signInError) {
         console.error("Error signing in existing user:", signInError);
@@ -76,6 +80,7 @@ export const signUpWithEmail = async (email: string, password: string, userData:
     }
     
     // If user doesn't exist, sign up
+    console.log("Creating new user in Supabase Auth");
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -86,16 +91,21 @@ export const signUpWithEmail = async (email: string, password: string, userData:
       }
     });
 
+    console.log("Auth signup result:", authData, authError);
+
     if (authError) {
       console.error('Auth error during signup:', authError);
       
       // Check if this is a "User already registered" error
       if (authError.message?.includes("already registered")) {
         // Try to sign in the user since they already exist
+        console.log("User already exists in Auth, attempting sign-in");
         const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password
         });
+        
+        console.log("Sign in attempt result:", signInData, signInError);
         
         if (signInError) {
           return { 
@@ -125,12 +135,13 @@ export const signUpWithEmail = async (email: string, password: string, userData:
 
     // If we get a user back, create their profile
     if (authData.user) {
+      console.log("Creating profile for new user:", authData.user.id);
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: authData.user.id,
           full_name: userData.fullName || '',
-          email: userData.email || '',
+          email: userData.email || email, // Make sure we use email from the function parameter
           phone: userData.phone || '',
           address: userData.address || '',
           age: userData.age || 0,
