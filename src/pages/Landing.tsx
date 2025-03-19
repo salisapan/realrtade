@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Building2, LineChart, Users, DollarSign, ArrowRight, Star, Shield, Clock } from "lucide-react";
@@ -18,14 +17,24 @@ const Landing = () => {
             <img 
               src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" 
               alt="RealTrade Logo" 
-              className="h-16 md:h-20 object-contain rounded-lg"
+              className="h-16 md:h-20 object-contain rounded-lg animate-float"
             />
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 md:mb-6">RealTrade - Invest in real estate worldwide from anywhere.</h1>
-          <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 px-2">Make informed investment with comprehensive market data and analysis on deal from the top US real estate entrepreneurs.</p>
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 relative z-10 overflow-hidden">
+            <span className="bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent animate-pulse-slow">
+              RealTrade
+            </span> - 
+            <span className="relative">
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Invest in real estate</span>
+              <span className="bg-gradient-to-br from-blue-500 to-primary bg-clip-text text-transparent"> worldwide from anywhere.</span>
+              <span className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-blue-400 to-purple-500 transform animate-grow"></span>
+            </span>
+          </h1>
+          <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 px-2 animate-fade-in">Make informed investment with comprehensive market data and analysis on deal from the top US real estate entrepreneurs.</p>
           <Link to="/investor-signup">
-            <Button size="lg" className="text-base md:text-lg px-5 md:px-8 py-2 md:py-2.5 h-auto min-h-[44px]">
-              Get Started <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+            <Button size="lg" className="text-base md:text-lg px-5 md:px-8 py-2 md:py-2.5 h-auto min-h-[44px] relative overflow-hidden group button-hover-effect hover-glow">
+              Get Started 
+              <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5 group-hover:translate-x-1 transition-transform" />
             </Button>
           </Link>
         </div>
