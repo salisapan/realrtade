@@ -1,9 +1,11 @@
 
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X, Brain, Sliders } from "lucide-react";
+import { Home, Building2, LineChart, FileText, Settings, DollarSign, UserPlus, ClipboardCheck, Menu, X, Brain, Sliders, LogOut, LogIn } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const menuItems = [
   { title: "Home", url: "/", icon: Home },
@@ -28,6 +30,7 @@ const entrepreneurMenuItems = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const path = location.pathname;
   const isMobile = useIsMobile();
   const [isCollapsed, setIsCollapsed] = useState(isMobile);
@@ -36,28 +39,120 @@ export function AppSidebar() {
   const displayItems = isEntrepreneurSection ? entrepreneurMenuItems : menuItems;
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState("Investor");
+  const { toast } = useToast();
 
   useEffect(() => {
     setIsCollapsed(isMobile);
   }, [isMobile]);
 
   useEffect(() => {
-    try {
-      const profile = localStorage.getItem("investorProfile");
-      if (profile) {
-        const parsedProfile = JSON.parse(profile);
-        setUserName(parsedProfile.fullName || "Investor");
-        setIsLoggedIn(true);
+    // Check current auth status
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        try {
+          const profile = localStorage.getItem("investorProfile");
+          if (profile) {
+            const parsedProfile = JSON.parse(profile);
+            setUserName(parsedProfile.full_name || "Investor");
+            setIsLoggedIn(true);
+          } else {
+            // Fetch profile if not in localStorage
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+            
+            if (data && !error) {
+              localStorage.setItem("investorProfile", JSON.stringify(data));
+              setUserName(data.full_name || "Investor");
+              setIsLoggedIn(true);
+            } else {
+              console.error("Error fetching profile:", error);
+              setIsLoggedIn(false);
+            }
+          }
+        } catch (error) {
+          console.error("Error getting user profile:", error);
+          setIsLoggedIn(false);
+        }
       } else {
+        setIsLoggedIn(false);
+      }
+    };
+    
+    checkAuth();
+    
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Update login state
+        setIsLoggedIn(true);
+        
+        // Check for profile in localStorage
+        const profile = localStorage.getItem("investorProfile");
+        if (profile) {
+          try {
+            const parsedProfile = JSON.parse(profile);
+            setUserName(parsedProfile.full_name || "Investor");
+          } catch (error) {
+            console.error("Error parsing profile:", error);
+          }
+        } else {
+          // Fetch profile if not in localStorage
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single()
+            .then(({ data, error }) => {
+              if (data && !error) {
+                localStorage.setItem("investorProfile", JSON.stringify(data));
+                setUserName(data.full_name || "Investor");
+              }
+            });
+        }
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem("investorProfile");
         setUserName("Investor");
         setIsLoggedIn(false);
       }
-    } catch (error) {
-      console.error("Error getting user name:", error);
-      setUserName("Investor");
-      setIsLoggedIn(false);
-    }
+    });
+    
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      localStorage.removeItem("investorProfile");
+      setIsLoggedIn(false);
+      setUserName("Investor");
+      
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account"
+      });
+      
+      navigate("/");
+      
+      // Close mobile menu if it's open
+      setIsMenuOpen(false);
+    } catch (error: any) {
+      console.error("Error signing out:", error);
+      toast({
+        title: "Sign out failed",
+        description: error.message || "An error occurred while signing out",
+        variant: "destructive"
+      });
+    }
+  };
 
   const ToggleButton = () => (
     <button 
@@ -102,15 +197,23 @@ export function AppSidebar() {
                   </Link>
                 ))}
                 
-                {!isLoggedIn && (
+                {!isLoggedIn ? (
                   <Link 
-                    to="/investor-signup" 
+                    to="/auth" 
                     className="flex items-center gap-3 p-3 rounded-lg mt-4 border-t pt-4 hover:bg-gray-100" 
                     onClick={() => setIsMenuOpen(false)}
                   >
-                    <UserPlus size={20} />
-                    <span>Sign Up</span>
+                    <LogIn size={20} />
+                    <span>Sign In</span>
                   </Link>
+                ) : (
+                  <button 
+                    onClick={handleSignOut}
+                    className="flex items-center gap-3 p-3 rounded-lg mt-4 border-t pt-4 w-full text-left hover:bg-red-50 text-red-600"
+                  >
+                    <LogOut size={20} />
+                    <span>Sign Out</span>
+                  </button>
                 )}
                 
                 <Link 
@@ -149,13 +252,20 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>)}
               
-              {!isLoggedIn && (
+              {!isLoggedIn ? (
                 <SidebarMenuItem>
                   <SidebarMenuButton asChild>
-                    <Link to="/investor-signup">
-                      <UserPlus />
-                      <span>Sign Up</span>
+                    <Link to="/auth">
+                      <LogIn />
+                      <span>Sign In</span>
                     </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ) : (
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={handleSignOut} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                    <LogOut />
+                    <span>Sign Out</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}

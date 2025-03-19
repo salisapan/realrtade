@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -22,6 +24,7 @@ import InvestorSignup from "./pages/InvestorSignup";
 import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
+import Auth from "./pages/Auth";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -34,7 +37,7 @@ import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
 
 const queryClient = new QueryClient();
 
-// Check if user has completed registration - simplified to only check if profile exists
+// Updated to check for active Supabase session
 const hasRegistered = () => {
   return localStorage.getItem("investorProfile") !== null;
 };
@@ -46,7 +49,7 @@ const ProtectedRoute = ({
   children: React.ReactNode;
 }) => {
   if (!hasRegistered()) {
-    return <Navigate to="/investor-signup" replace />;
+    return <Navigate to="/auth" replace />;
   }
   return <>{children}</>;
 };
@@ -66,6 +69,47 @@ const AdminRoute = ({
 };
 
 const App = () => {
+  const [session, setSession] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for an active session when the app loads
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+
+      // If we have a session, make sure we also have the profile in localStorage
+      if (session?.user?.id) {
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data, error }) => {
+            if (data && !error) {
+              localStorage.setItem("investorProfile", JSON.stringify(data));
+            } else if (error) {
+              console.error("Error fetching profile:", error);
+            }
+          });
+      }
+    });
+
+    // Subscribe to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      
+      // If auth state changes to signed out, clear the profile
+      if (!session) {
+        localStorage.removeItem("investorProfile");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -75,7 +119,8 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Landing />} />
-              <Route path="/investor-signup" element={<InvestorSignup />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/investor-signup" element={<Navigate to="/auth" replace />} />
               <Route path="/verified-deals" element={<VerifiedDeals />} />
               <Route 
                 path="/properties" 
