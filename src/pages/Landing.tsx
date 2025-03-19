@@ -1,26 +1,12 @@
 
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Building2, LineChart, Users, DollarSign, ArrowRight, Star, Shield, Clock } from "lucide-react";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { Testimonials } from "@/components/landing/Testimonials";
 import { HomeFooter } from "@/components/landing/HomeFooter";
 import { HowPropertyOwnershipWorks } from "@/components/HowPropertyOwnershipWorks";
-import { useEffect } from "react";
-
 const Landing = () => {
-  const navigate = useNavigate();
-  
-  // Function to handle direct navigation with logging
-  const handleGetStarted = () => {
-    console.log("Get Started button clicked, navigating to /investor-signup");
-    navigate("/investor-signup");
-  };
-  
-  useEffect(() => {
-    console.log("Landing page loaded");
-  }, []);
-  
   return <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       {/* Hero Section */}
       <div className="container mx-auto px-4 pt-12 md:pt-20 pb-10 md:pb-16">
@@ -36,15 +22,11 @@ const Landing = () => {
             </h1>
           </div>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 px-2 animate-fade-in">Make informed investment with comprehensive market data and analysis on deal from the top real estate entrepreneurs.</p>
-          
-          {/* Updated to use direct navigation function with onClick instead of Link */}
-          <Button 
-            size="lg" 
-            className="text-base md:text-lg px-5 md:px-8 py-2 md:py-2.5 h-auto min-h-[44px] button-hover-effect hover-glow"
-            onClick={handleGetStarted}
-          >
-            Get Started <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
-          </Button>
+          <Link to="/investor-signup">
+            <Button size="lg" className="text-base md:text-lg px-5 md:px-8 py-2 md:py-2.5 h-auto min-h-[44px] button-hover-effect hover-glow">
+              Get Started <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -121,15 +103,11 @@ const Landing = () => {
         <p className="text-base md:text-xl text-gray-600 mb-6 md:mb-8 max-w-2xl mx-auto px-2">
           Join thousands of investors who are already using our platform to make data-driven investment decisions.
         </p>
-        
-        {/* Updated to use direct navigation function with onClick instead of Link */}
-        <Button 
-          size="lg" 
-          className="text-base md:text-lg px-5 md:px-8 py-2 md:py-2.5 h-auto min-h-[44px]"
-          onClick={handleGetStarted}
-        >
-          Get Started Now <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
-        </Button>
+        <Link to="/investor-signup">
+          <Button size="lg" className="text-base md:text-lg px-5 md:px-8 py-2 md:py-2.5 h-auto min-h-[44px]">
+            Get Started Now <ArrowRight className="ml-2 h-4 w-4 md:h-5 md:w-5" />
+          </Button>
+        </Link>
       </div>
 
       {/* How Property Ownership Works Section */}

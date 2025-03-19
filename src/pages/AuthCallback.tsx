@@ -54,14 +54,13 @@ const AuthCallback = () => {
             .from("profiles")
             .select("*")
             .eq("id", data.session.user.id)
-            .maybeSingle();
+            .single();
             
           if (profileError) {
-            console.error("Error fetching profile:", profileError);
-            console.log("Creating new profile for user");
+            console.log("Profile not found, creating new profile");
             
             // Create a basic profile for the user
-            const { error: insertError } = await supabase
+            await supabase
               .from("profiles")
               .insert({
                 id: data.session.user.id,
@@ -70,10 +69,6 @@ const AuthCallback = () => {
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               });
-              
-            if (insertError) {
-              console.error("Error creating profile:", insertError);
-            }
             
             // Save user info to localStorage
             localStorage.setItem("investorProfile", JSON.stringify({
@@ -97,10 +92,9 @@ const AuthCallback = () => {
             setIsProcessing(false);
             navigate(profileData.is_accredited ? "/properties" : "/verified-deals");
           } else {
-            console.log("No profile data returned, redirecting to investor signup");
-            // No profile found, redirect to complete registration
+            // Fallback
             setIsProcessing(false);
-            navigate("/investor-signup");
+            navigate("/properties");
           }
         } else {
           console.log("No session found, redirecting to sign-up");

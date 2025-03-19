@@ -5,9 +5,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle, Loader2 } from "lucide-react";
+import { HelpCircle } from "lucide-react";
 import { investorFormSchema, InvestorFormValues } from "@/schemas/investorSchema";
-import { useEffect } from "react";
 
 interface InvestorFormProps {
   onSubmit: (values: InvestorFormValues) => void;
@@ -31,20 +30,9 @@ export const InvestorForm = ({ onSubmit, isSubmitting, hideEmailField = false }:
     }
   });
 
-  const handleSubmit = (values: InvestorFormValues) => {
-    console.log("Form submitted with values:", values);
-    onSubmit(values);
-  };
-
-  useEffect(() => {
-    if (!isSubmitting && form.formState.isSubmitted) {
-      console.log("Form submission completed, form state:", form.formState);
-    }
-  }, [isSubmitting, form.formState]);
-
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 animate-fade-in">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 animate-fade-in">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FormField
             control={form.control}
@@ -253,14 +241,7 @@ export const InvestorForm = ({ onSubmit, isSubmitting, hideEmailField = false }:
           className="w-full bg-gradient-to-r from-primary to-primary-light hover:shadow-[0_0_15px_rgba(66,133,244,0.5)] transition-all duration-300" 
           disabled={isSubmitting}
         >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating Profile...
-            </>
-          ) : (
-            "Complete Registration"
-          )}
+          {isSubmitting ? "Creating Profile..." : "Complete Registration"}
         </Button>
       </form>
     </Form>

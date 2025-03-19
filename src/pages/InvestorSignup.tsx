@@ -1,6 +1,6 @@
 
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { HomeHeader } from "@/components/layout/HomeHeader";
 import { InvestorForm } from "@/components/investor/InvestorForm";
@@ -11,12 +11,9 @@ import { CredentialsInput } from "@/components/investor/CredentialsInput";
 import { useInvestorAuth } from "@/hooks/useInvestorAuth";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 const InvestorSignup = () => {
-  const navigate = useNavigate();
   const [showStandardForm, setShowStandardForm] = useState(false);
-  const [isCheckingSession, setIsCheckingSession] = useState(true);
   
   const {
     isSubmitting,
@@ -33,36 +30,8 @@ const InvestorSignup = () => {
     handleGoogleSignIn
   } = useInvestorAuth();
 
-  // Check if user is already logged in
-  useEffect(() => {
-    console.log("InvestorSignup page loaded - checking session");
-    const checkSession = async () => {
-      try {
-        setIsCheckingSession(true);
-        const { data, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("Error checking session:", error);
-        }
-        
-        console.log("Session check result:", data.session ? "User logged in" : "No session found");
-        
-        if (data.session) {
-          console.log("User already logged in, redirecting to properties");
-          navigate("/properties");
-        }
-      } catch (err) {
-        console.error("Session check failed:", err);
-      } finally {
-        setIsCheckingSession(false);
-      }
-    };
-    
-    checkSession();
-  }, [navigate]);
-
   // Show full registration form
   const handleEmailSignIn = () => {
-    console.log("Email sign-in option selected");
     setShowStandardForm(true);
     setAuthError(null);
   };
@@ -81,21 +50,6 @@ const InvestorSignup = () => {
     console.log("Final form values being passed to handler:", formValues);
     handleFormSubmit(formValues);
   };
-
-  if (isCheckingSession) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        <HomeHeader />
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-lg shadow-xl flex flex-col items-center">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Checking Session</h3>
-            <p className="text-gray-600">Please wait while we check your login status...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (registrationComplete) {
     console.log("Registration complete, showing success screen");
@@ -157,7 +111,7 @@ const InvestorSignup = () => {
                   <InvestorForm 
                     onSubmit={onFormSubmit} 
                     isSubmitting={isSubmitting}
-                    hideEmailField={true} 
+                    hideEmailField={true} // Hide the email field in the form
                   />
                   
                   {/* Show animation during form submission */}

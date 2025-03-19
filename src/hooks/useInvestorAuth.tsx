@@ -36,7 +36,6 @@ export function useInvestorAuth() {
       
       // Register user in Supabase
       const response = await signUpWithEmail(email, password, values);
-      console.log("Supabase registration response:", response);
 
       if (response.error) {
         console.error("Registration error:", response.error);
@@ -108,10 +107,8 @@ export function useInvestorAuth() {
       // Redirect based on accreditation status
       setTimeout(() => {
         if (values.isAccredited === "yes") {
-          console.log("Redirecting to properties page");
           navigate("/properties");
         } else {
-          console.log("Redirecting to verified deals page");
           navigate("/verified-deals");
         }
       }, 1500);
@@ -137,7 +134,6 @@ export function useInvestorAuth() {
     try {
       console.log("Starting Google sign-in process...");
       const response = await signInWithProvider('google');
-      console.log("Google sign-in response:", response);
       
       if (response.error) {
         // Specific error handling
