@@ -19,12 +19,9 @@ import EntrepreneurRegistration from "./pages/EntrepreneurRegistration";
 import DueDiligencePortal from "./pages/DueDiligencePortal";
 import TransactionReports from "./pages/TransactionReports";
 import InvestorSignup from "./pages/InvestorSignup";
-import Login from "./pages/Login";
 import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
-import SupabaseMigration from "./pages/SupabaseMigration";
-import AuthCallback from "./pages/AuthCallback";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -37,24 +34,24 @@ import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
 
 const queryClient = new QueryClient();
 
-// Check if user has completed registration - using Supabase or localStorage as fallback
+// Check if user has completed registration - simplified to only check if profile exists
 const hasRegistered = () => {
   return localStorage.getItem("investorProfile") !== null;
 };
 
-// Protected route component
+// Protected route component - now only checks if registration exists, not financial status
 const ProtectedRoute = ({
   children
 }: {
   children: React.ReactNode;
 }) => {
   if (!hasRegistered()) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/investor-signup" replace />;
   }
   return <>{children}</>;
 };
 
-// Admin protected route
+// Admin protected route - in a real app, this would check for admin role
 const AdminRoute = ({
   children
 }: {
@@ -79,11 +76,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/investor-signup" element={<InvestorSignup />} />
-              <Route path="/login" element={<Login />} />
               <Route path="/verified-deals" element={<VerifiedDeals />} />
-              <Route path="/supabase-migration" element={<SupabaseMigration />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              
               <Route 
                 path="/properties" 
                 element={

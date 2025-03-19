@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -8,8 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { InvestmentForm } from "./form/InvestmentForm";
 import { InvestmentConfirmation } from "./confirmation/InvestmentConfirmation";
 import { investmentFormSchema, InvestmentFormValues } from "./types/letterOfIntentTypes";
-import { createInvestment } from "@/services/investmentService";
-import { supabase } from "@/integrations/supabase/client";
 
 interface LetterOfIntentFormProps {
   propertyId: string;
@@ -41,72 +40,35 @@ export const LetterOfIntentForm = ({
     },
   });
 
-  const onSubmit = async (data: InvestmentFormValues) => {
+  const onSubmit = (data: InvestmentFormValues) => {
     console.log("Form data:", data);
     setFormData(data);
     
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        toast({
-          title: "Authentication Required",
-          description: "Please sign in or register to make an investment.",
-          variant: "destructive",
-        });
-        
-        sessionStorage.setItem("investmentIntent", JSON.stringify({
-          propertyId,
-          propertyName,
-          propertyAddress,
-          investmentAmount: data.investmentAmount,
-          paymentMethod: data.paymentMethod,
-        }));
-        
-        navigate("/investor-signup");
-        return;
-      }
-      
-      const result = await createInvestment(
-        session.user.id,
-        propertyId,
-        data
-      );
-      
-      if (!result) {
-        throw new Error("Failed to create investment");
-      }
-      
-      toast({
-        title: "Investment Submitted",
-        description: `Your investment of $${data.investmentAmount.toLocaleString()} has been processed.`,
-        variant: "success",
-      });
-      
-      const investments = JSON.parse(localStorage.getItem("investments") || "[]");
-      investments.push({
-        id: result.id,
-        propertyId,
-        propertyName,
-        propertyAddress,
-        investmentAmount: data.investmentAmount,
-        fullName: data.fullName,
-        email: data.email,
-        paymentMethod: data.paymentMethod,
-        status: "completed",
-        date: new Date().toISOString()
-      });
-      localStorage.setItem("investments", JSON.stringify(investments));
-      
-      setShowConfirmation(true);
-    } catch (error) {
-      console.error("Error submitting investment:", error);
-      toast({
-        title: "Investment Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-        variant: "destructive",
-      });
-    }
+    // Show success message
+    toast({
+      title: "Investment Submitted",
+      description: `Your investment of $${data.investmentAmount.toLocaleString()} has been processed.`,
+      variant: "success",
+    });
+    
+    // Store in localStorage for persistence
+    const investments = JSON.parse(localStorage.getItem("investments") || "[]");
+    investments.push({
+      id: Date.now(),
+      propertyId,
+      propertyName,
+      propertyAddress,
+      investmentAmount: data.investmentAmount,
+      fullName: data.fullName,
+      email: data.email,
+      paymentMethod: data.paymentMethod,
+      status: "completed",
+      date: new Date().toISOString()
+    });
+    localStorage.setItem("investments", JSON.stringify(investments));
+    
+    // Show confirmation screen
+    setShowConfirmation(true);
   };
 
   const handleContinue = () => {
@@ -116,6 +78,7 @@ export const LetterOfIntentForm = ({
   
   const handleInvestClick = () => {
     setIsOpen(true);
+    // Reset form if it was previously submitted
     if (showConfirmation) {
       setShowConfirmation(false);
       form.reset({

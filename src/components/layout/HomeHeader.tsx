@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Home, Menu, User, X, ArrowLeft, Settings, Building2, LineChart, Sliders } from "lucide-react";
@@ -65,21 +64,12 @@ export const HomeHeader = () => {
                 <span className="text-sm font-medium text-gray-700">{userName}</span>
               </div>}
             
-            {/* Show Login/Sign Up buttons if not logged in */}
-            {!isLoggedIn && (
-              <div className="hidden md:flex items-center gap-2">
-                <Link to="/login">
-                  <Button variant="ghost" size="sm" className="hover:bg-gray-100 transition-colors duration-300">
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/investor-signup">
-                  <Button variant="default" size="sm" className="shadow-sm hover:shadow-md transition-all duration-300">
-                    Sign Up
-                  </Button>
-                </Link>
-              </div>
-            )}
+            {/* Only show Sign Up button if not logged in */}
+            {!isLoggedIn && <Link to="/investor-signup">
+                <Button variant="default" size="sm" className="hidden md:inline-flex shadow-sm hover:shadow-md transition-all duration-300">
+                  Sign Up
+                </Button>
+              </Link>}
             
             <Button variant="ghost" size="icon" className="md:hidden hover:bg-gray-100 transition-colors duration-300" onClick={() => setIsMenuOpen(!isMenuOpen)}>
               {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -109,25 +99,33 @@ export const HomeHeader = () => {
                 <Sliders className="w-5 h-5" />
                 <span>Admin</span>
               </Link>
-              {!isLoggedIn ? (
-                <>
-                  <Link to="/login" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
-                    <User className="w-5 h-5" />
-                    <span>Login</span>
-                  </Link>
-                  <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
-                    <User className="w-5 h-5" />
-                    <span>Sign Up</span>
-                  </Link>
-                </>
-              ) : (
-                <Link to="/settings" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
-                  <Settings className="w-5 h-5" />
-                  <span>Settings</span>
-                </Link>
-              )}
+              {!isLoggedIn && <Link to="/investor-signup" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
+                  <User className="w-5 h-5" />
+                  <span>Sign Up</span>
+                </Link>}
+              <Link to="/settings" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50 transition-all duration-300">
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </Link>
             </nav>
           </div>}
+      </div>
+      
+      {/* Mobile fixed bottom navigation - simplified */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-50 flex justify-around py-2 px-1 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+        
+        <Link to="/properties" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
+          <Building2 className="w-5 h-5 text-gray-600" />
+          <span className="text-xs mt-1">Properties</span>
+        </Link>
+        <Link to="/dashboard" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
+          <LineChart className="w-5 h-5 text-gray-600" />
+          <span className="text-xs mt-1">Dashboard</span>
+        </Link>
+        <Link to="/admin" className="flex flex-col items-center justify-center p-1 transition-colors duration-300 hover:text-primary">
+          <Sliders className="w-5 h-5 text-gray-600" />
+          <span className="text-xs mt-1">Admin</span>
+        </Link>
       </div>
     </header>;
 };

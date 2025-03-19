@@ -6,75 +6,35 @@ import { PropertyListing } from "@/components/PropertyListing";
 import { PropertiesHeader } from "@/components/PropertiesHeader";
 import { categories } from "@/data/propertyData";
 import { affordableDeals } from "@/components/properties/AffordableDealsList";
-import { getCategoryPropertiesLocal } from "@/components/properties/PropertyCategoryHelper";
+import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
 import { useInvestorProfile } from "@/components/properties/useInvestorProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { PropertyDataLoading } from "@/components/property/PropertyDataLoading";
-import { PropertyDataError } from "@/components/property/PropertyDataError";
-import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("sector");
   const [properties, setProperties] = useState<any[]>([]);
   const { investorProfile, isLoading } = useInvestorProfile();
   const isMobile = useIsMobile();
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
   
   useEffect(() => {
     if (!investorProfile) return;
     
-    try {
-      const isAccredited = investorProfile?.isAccredited === "yes";
-      
-      if (isAccredited) {
-        setProperties(getCategoryPropertiesLocal(selectedCategory));
-      } else {
-        setProperties(affordableDeals);
-      }
-      
-      // Clear any previous errors
-      setError(null);
-    } catch (err) {
-      console.error("Error loading properties:", err);
-      setError("Failed to load properties. Please try again.");
-      toast({
-        title: "Error",
-        description: "Failed to load properties. Please try again.",
-        variant: "destructive"
-      });
-    }
-  }, [investorProfile, selectedCategory, toast]);
-
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    try {
-      if (investorProfile && investorProfile.isAccredited === "yes") {
-        setProperties(getCategoryPropertiesLocal(category));
-      } else {
-        setProperties(affordableDeals);
-      }
-      
-      // Clear any previous errors
-      setError(null);
-    } catch (err) {
-      console.error("Error changing category:", err);
-      setError("Failed to change category. Please try again.");
-      toast({
-        title: "Error",
-        description: "Failed to change category. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleRetry = () => {
-    if (investorProfile && investorProfile.isAccredited === "yes") {
-      setProperties(getCategoryPropertiesLocal(selectedCategory));
+    const isAccredited = investorProfile?.isAccredited === "yes";
+    
+    if (isAccredited) {
+      setProperties(getCategoryProperties(selectedCategory));
     } else {
       setProperties(affordableDeals);
     }
-    setError(null);
+  }, [investorProfile, selectedCategory]);
+
+  const handleCategoryChange = (category: string) => {
+    setSelectedCategory(category);
+    if (investorProfile && investorProfile.isAccredited === "yes") {
+      setProperties(getCategoryProperties(category));
+    } else {
+      setProperties(affordableDeals);
+    }
   };
 
   if (isLoading) {
@@ -105,27 +65,23 @@ const Index = () => {
         </div>
 
         <main className="w-full max-w-full overflow-hidden py-2 md:py-6">
-          {error ? (
-            <PropertyDataError error={error} onRetry={handleRetry} />
-          ) : (
-            <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full max-w-full">
-              <TabsContent value="sector" className="w-full max-w-full m-0">
-                <PropertyListing properties={properties} />
-              </TabsContent>
-              <TabsContent value="low-risk" className="w-full max-w-full m-0">
-                <PropertyListing properties={properties} />
-              </TabsContent>
-              <TabsContent value="geography" className="w-full max-w-full m-0">
-                <PropertyListing properties={properties} />
-              </TabsContent>
-              <TabsContent value="profitable" className="w-full max-w-full m-0">
-                <PropertyListing properties={properties} />
-              </TabsContent>
-              <TabsContent value="company" className="w-full max-w-full m-0">
-                <PropertyListing properties={properties} />
-              </TabsContent>
-            </Tabs>
-          )}
+          <Tabs value={selectedCategory} onValueChange={handleCategoryChange} className="w-full max-w-full">
+            <TabsContent value="sector" className="w-full max-w-full m-0">
+              <PropertyListing properties={properties} />
+            </TabsContent>
+            <TabsContent value="low-risk" className="w-full max-w-full m-0">
+              <PropertyListing properties={properties} />
+            </TabsContent>
+            <TabsContent value="geography" className="w-full max-w-full m-0">
+              <PropertyListing properties={properties} />
+            </TabsContent>
+            <TabsContent value="profitable" className="w-full max-w-full m-0">
+              <PropertyListing properties={properties} />
+            </TabsContent>
+            <TabsContent value="company" className="w-full max-w-full m-0">
+              <PropertyListing properties={properties} />
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
     </div>
