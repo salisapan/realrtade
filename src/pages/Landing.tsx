@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Building2, LineChart, Users, DollarSign, ArrowRight, Star, Shield, Clock } from "lucide-react";
@@ -22,11 +21,9 @@ const Landing = () => {
             />
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 md:mb-6 relative z-10">
-            <span className="bg-gradient-to-r from-primary via-primary-light to-primary bg-clip-text text-transparent animate-pulse-slow">
-              RealTrade
-            </span> - 
-            <span className="bg-gradient-to-r from-primary-dark to-primary bg-clip-text text-transparent">Invest in real estate</span>
-            <span className="bg-gradient-to-br from-primary to-primary-light bg-clip-text text-transparent"> worldwide from anywhere.</span>
+            <span className="bg-gradient-to-r from-primary-dark via-primary to-primary-light bg-clip-text text-transparent animate-pulse-slow">
+              RealTrade: Invest in real estate worldwide from anywhere.
+            </span>
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 px-2 animate-fade-in">Make informed investment with comprehensive market data and analysis on deal from the top US real estate entrepreneurs.</p>
           <Link to="/investor-signup">
