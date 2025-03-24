@@ -41,17 +41,29 @@ const Auth = () => {
           .single();
         
         if (profileData) {
+          // Make sure is_accredited is properly mapped to isAccredited for backward compatibility
+          if (profileData.is_accredited !== undefined) {
+            profileData.isAccredited = profileData.is_accredited ? "yes" : "no";
+          }
           localStorage.setItem("investorProfile", JSON.stringify(profileData));
+          
+          toast({
+            title: "Login successful",
+            description: "Welcome back!",
+          });
+          
+          navigate("/properties");
         } else if (profileError) {
           console.error("Error fetching profile:", profileError);
+          
+          // If profile fetch fails, we should still redirect to properties and handle missing profile there
+          toast({
+            title: "Login successful",
+            description: "Welcome back!",
+          });
+          
+          navigate("/properties");
         }
-        
-        toast({
-          title: "Login successful",
-          description: "Welcome back!",
-        });
-        
-        navigate("/properties");
       }
     } catch (error: any) {
       toast({

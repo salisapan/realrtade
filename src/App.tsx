@@ -50,7 +50,8 @@ const isAccreditedInvestor = () => {
   if (!profile) return false;
   try {
     const parsedProfile = JSON.parse(profile);
-    return parsedProfile.is_accredited === true;
+    // Check both possible fields for backward compatibility
+    return parsedProfile.is_accredited === true || parsedProfile.isAccredited === "yes";
   } catch (error) {
     console.error("Error parsing investor profile:", error);
     return false;
