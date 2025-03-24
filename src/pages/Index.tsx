@@ -9,16 +9,12 @@ import { affordableDeals } from "@/components/properties/AffordableDealsList";
 import { getCategoryProperties } from "@/components/properties/PropertyCategoryHelper";
 import { useInvestorProfile } from "@/components/properties/useInvestorProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Button } from "@/components/ui/button";
-import { Briefcase } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("sector");
   const [properties, setProperties] = useState<any[]>([]);
   const { investorProfile, isLoading } = useInvestorProfile();
   const isMobile = useIsMobile();
-  const navigate = useNavigate();
   
   useEffect(() => {
     if (!investorProfile) return;
@@ -39,10 +35,6 @@ const Index = () => {
     } else {
       setProperties(affordableDeals);
     }
-  };
-  
-  const navigateToDevRegistration = () => {
-    navigate("/developer-registration");
   };
 
   if (isLoading) {
@@ -66,16 +58,7 @@ const Index = () => {
         />
         
         <div className="w-full mx-auto px-2 sm:px-4 pt-2 md:pt-4 flex flex-col items-center">
-          <div className="mb-2 md:mb-4 flex items-center justify-center">
-            <Button 
-              variant="outline" 
-              onClick={navigateToDevRegistration}
-              className="flex items-center justify-center gap-2"
-            >
-              <Briefcase size={16} />
-              Developer Registration
-            </Button>
-          </div>
+          <div className="mb-2 md:mb-4 flex items-center justify-center"></div>
           <p className="text-gray-600 text-xs md:text-sm text-center mb-2 md:mb-4 px-2">
             RealTrade - Invest in real estate worldwide from anywhere.
           </p>
