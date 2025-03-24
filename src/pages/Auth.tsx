@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Briefcase, User } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -115,6 +116,14 @@ const Auth = () => {
     setShowPassword(!showPassword);
   };
 
+  const navigateToInvestorRegistration = () => {
+    navigate("/investor-registration");
+  };
+
+  const navigateToDevRegistration = () => {
+    navigate("/developer-registration");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-blue-50 animate-fade-in">
       <HomeHeader />
@@ -195,6 +204,32 @@ const Auth = () => {
                   {isLoading ? "Processing..." : isSignUp ? "Create Account" : "Sign In"}
                 </Button>
               </form>
+
+              {isSignUp && (
+                <div className="mt-6">
+                  <div className="text-center text-sm text-gray-500 mb-4">
+                    Looking for a more comprehensive registration?
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      variant="outline" 
+                      onClick={navigateToInvestorRegistration}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <User size={16} />
+                      Investor
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={navigateToDevRegistration}
+                      className="flex items-center justify-center gap-2"
+                    >
+                      <Briefcase size={16} />
+                      Developer
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
             
             <CardFooter className="flex flex-col items-center relative">

@@ -25,6 +25,8 @@ import VerifiedDeals from "./pages/VerifiedDeals";
 import CommunityForum from "./pages/CommunityForum";
 import Recommendations from "./pages/Recommendations";
 import Auth from "./pages/Auth";
+import InvestorRegistrationPage from "./pages/InvestorRegistrationPage";
+import DeveloperRegistrationPage from "./pages/DeveloperRegistrationPage";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -37,12 +39,25 @@ import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
 
 const queryClient = new QueryClient();
 
-// Updated to check for active Supabase session
+// Function to check for active Supabase session
 const hasRegistered = () => {
   return localStorage.getItem("investorProfile") !== null;
 };
 
-// Protected route component - now only checks if registration exists, not financial status
+// Check if user is an accredited investor
+const isAccreditedInvestor = () => {
+  const profile = localStorage.getItem("investorProfile");
+  if (!profile) return false;
+  try {
+    const parsedProfile = JSON.parse(profile);
+    return parsedProfile.is_accredited === true;
+  } catch (error) {
+    console.error("Error parsing investor profile:", error);
+    return false;
+  }
+};
+
+// Protected route component
 const ProtectedRoute = ({
   children
 }: {
@@ -54,7 +69,24 @@ const ProtectedRoute = ({
   return <>{children}</>;
 };
 
-// Admin protected route - in a real app, this would check for admin role
+// Accredited investor route
+const AccreditedRoute = ({
+  children
+}: {
+  children: React.ReactNode;
+}) => {
+  if (!hasRegistered()) {
+    return <Navigate to="/auth" replace />;
+  }
+  
+  if (!isAccreditedInvestor()) {
+    return <Navigate to="/verified-deals" replace />;
+  }
+  
+  return <>{children}</>;
+};
+
+// Admin protected route
 const AdminRoute = ({
   children
 }: {
@@ -120,7 +152,9 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
-              <Route path="/investor-signup" element={<Navigate to="/auth" replace />} />
+              <Route path="/investor-registration" element={<InvestorRegistrationPage />} />
+              <Route path="/developer-registration" element={<DeveloperRegistrationPage />} />
+              <Route path="/investor-signup" element={<Navigate to="/investor-registration" replace />} />
               <Route path="/verified-deals" element={<VerifiedDeals />} />
               <Route 
                 path="/properties" 

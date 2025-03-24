@@ -9,6 +9,81 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      developers: {
+        Row: {
+          background_check_consent: boolean
+          company_address: string
+          company_name: string
+          company_registration_number: string
+          country_of_registration: string
+          created_at: string | null
+          deals_completed: number | null
+          email: string
+          full_name: string
+          id: string
+          legal_disputes: boolean | null
+          legal_disputes_explanation: string | null
+          number_of_employees: number
+          past_projects: string | null
+          performance_metrics: string | null
+          phone: string
+          property_specialization: string[] | null
+          role_in_company: string
+          total_value_of_projects: number | null
+          updated_at: string | null
+          website_url: string | null
+          years_in_operation: number
+        }
+        Insert: {
+          background_check_consent: boolean
+          company_address: string
+          company_name: string
+          company_registration_number: string
+          country_of_registration: string
+          created_at?: string | null
+          deals_completed?: number | null
+          email: string
+          full_name: string
+          id: string
+          legal_disputes?: boolean | null
+          legal_disputes_explanation?: string | null
+          number_of_employees: number
+          past_projects?: string | null
+          performance_metrics?: string | null
+          phone: string
+          property_specialization?: string[] | null
+          role_in_company: string
+          total_value_of_projects?: number | null
+          updated_at?: string | null
+          website_url?: string | null
+          years_in_operation: number
+        }
+        Update: {
+          background_check_consent?: boolean
+          company_address?: string
+          company_name?: string
+          company_registration_number?: string
+          country_of_registration?: string
+          created_at?: string | null
+          deals_completed?: number | null
+          email?: string
+          full_name?: string
+          id?: string
+          legal_disputes?: boolean | null
+          legal_disputes_explanation?: string | null
+          number_of_employees?: number
+          past_projects?: string | null
+          performance_metrics?: string | null
+          phone?: string
+          property_specialization?: string[] | null
+          role_in_company?: string
+          total_value_of_projects?: number | null
+          updated_at?: string | null
+          website_url?: string | null
+          years_in_operation?: number
+        }
+        Relationships: []
+      }
       investments: {
         Row: {
           amount: number
@@ -52,44 +127,62 @@ export type Database = {
       }
       profiles: {
         Row: {
+          accredited_reason: string | null
           address: string | null
           age: number | null
           annual_income: number | null
           created_at: string | null
           email: string
           full_name: string
+          household_income_year1: number | null
+          household_income_year2: number | null
           id: string
+          income_year1: number | null
+          income_year2: number | null
           investment_experience: string | null
           is_accredited: boolean | null
           net_worth: number | null
+          occupation: string | null
           phone: string | null
           updated_at: string | null
         }
         Insert: {
+          accredited_reason?: string | null
           address?: string | null
           age?: number | null
           annual_income?: number | null
           created_at?: string | null
           email: string
           full_name: string
+          household_income_year1?: number | null
+          household_income_year2?: number | null
           id: string
+          income_year1?: number | null
+          income_year2?: number | null
           investment_experience?: string | null
           is_accredited?: boolean | null
           net_worth?: number | null
+          occupation?: string | null
           phone?: string | null
           updated_at?: string | null
         }
         Update: {
+          accredited_reason?: string | null
           address?: string | null
           age?: number | null
           annual_income?: number | null
           created_at?: string | null
           email?: string
           full_name?: string
+          household_income_year1?: number | null
+          household_income_year2?: number | null
           id?: string
+          income_year1?: number | null
+          income_year2?: number | null
           investment_experience?: string | null
           is_accredited?: boolean | null
           net_worth?: number | null
+          occupation?: string | null
           phone?: string | null
           updated_at?: string | null
         }
