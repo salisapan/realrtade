@@ -642,7 +642,7 @@ const InvestorRegistrationPage = () => {
                     onClick={() => navigate('/auth')}
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Return to login
+                    Login
                   </Button>
                 )}
                 
@@ -679,3 +679,4 @@ const InvestorRegistrationPage = () => {
 };
 
 export default InvestorRegistrationPage;
+
