@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { Home, ArrowRight, ArrowLeft, Check, Eye, EyeOff } from "lucide-react";
+import { Home, ArrowRight, Check, Eye, EyeOff } from "lucide-react";
 
 const roleOptions = [
   { value: "ceo", label: "CEO" },
@@ -47,6 +48,7 @@ const DeveloperRegistrationPage = () => {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -188,30 +190,28 @@ const DeveloperRegistrationPage = () => {
         
         const { error: developerError } = await supabase
           .from('developers')
-          .insert([
-            { 
-              id: data.user.id,
-              full_name: fullName,
-              email: email,
-              company_name: companyName,
-              role_in_company: roleInCompany,
-              company_address: companyAddress,
-              company_registration_number: companyRegistrationNumber,
-              country_of_registration: countryOfRegistration,
-              number_of_employees: numberOfEmployees,
-              years_in_operation: yearsInOperation,
-              past_projects: pastProjects,
-              performance_metrics: performanceMetrics,
-              website_url: website,
-              phone: phone,
-              deals_completed: dealsCompleted,
-              total_value_of_projects: totalValueOfProjects,
-              legal_disputes: legalDisputes === "yes",
-              legal_disputes_explanation: legalDisputes === "yes" ? legalDisputesExplanation : "",
-              property_specialization: propertySpecialization,
-              background_check_consent: backgroundCheckConsent
-            },
-          ]);
+          .insert({
+            id: data.user.id,
+            full_name: fullName,
+            email: email,
+            company_name: companyName,
+            role_in_company: roleInCompany,
+            company_address: companyAddress,
+            company_registration_number: companyRegistrationNumber,
+            country_of_registration: countryOfRegistration,
+            number_of_employees: numberOfEmployees,
+            years_in_operation: yearsInOperation,
+            past_projects: pastProjects,
+            performance_metrics: performanceMetrics,
+            website_url: website,
+            phone: phone,
+            deals_completed: dealsCompleted,
+            total_value_of_projects: totalValueOfProjects,
+            legal_disputes: legalDisputes === "yes",
+            legal_disputes_explanation: legalDisputes === "yes" ? legalDisputesExplanation : "",
+            property_specialization: propertySpecialization,
+            background_check_consent: backgroundCheckConsent
+          });
         
         if (developerError) {
           console.error("Error creating developer profile:", developerError);
@@ -673,7 +673,6 @@ const DeveloperRegistrationPage = () => {
                     onClick={handlePrevStep}
                     disabled={isLoading}
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
                     Back
                   </Button>
                 ) : (
