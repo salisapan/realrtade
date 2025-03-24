@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Home, ArrowRight, ArrowLeft, Check, Eye, EyeOff } from "lucide-react";
+import { Home, ArrowRight, ArrowLeft, Check, Eye, EyeOff, Briefcase } from "lucide-react";
 
 const InvestorRegistrationPage = () => {
   const navigate = useNavigate();
@@ -23,7 +22,6 @@ const InvestorRegistrationPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Basic information
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,17 +37,14 @@ const InvestorRegistrationPage = () => {
   const [investmentExperience, setInvestmentExperience] = useState<string | undefined>();
   const [phone, setPhone] = useState("");
   
-  // Accredited investor verification
   const [isMillionPlus, setIsMillionPlus] = useState<string | undefined>();
   const [incomeYear1, setIncomeYear1] = useState<number | undefined>();
   const [incomeYear2, setIncomeYear2] = useState<number | undefined>();
   const [householdIncomeYear1, setHouseholdIncomeYear1] = useState<number | undefined>();
   const [householdIncomeYear2, setHouseholdIncomeYear2] = useState<number | undefined>();
   
-  // Terms
   const [agreeTerms, setAgreeTerms] = useState(false);
   
-  // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   const validateStep = (currentStep: number) => {
@@ -105,7 +100,6 @@ const InvestorRegistrationPage = () => {
   };
   
   const checkAccreditedStatus = (): { isAccredited: boolean, reason: string } => {
-    // Check if net worth is $1M+
     if (isMillionPlus === "yes" && netWorth && netWorth >= 1000000) {
       return { 
         isAccredited: true, 
@@ -113,7 +107,6 @@ const InvestorRegistrationPage = () => {
       };
     }
     
-    // Check if individual income is $200k+ for past 2 years
     if (incomeYear1 && incomeYear2 && incomeYear1 >= 200000 && incomeYear2 >= 200000) {
       return { 
         isAccredited: true, 
@@ -121,7 +114,6 @@ const InvestorRegistrationPage = () => {
       };
     }
     
-    // Check if household income is $300k+ for past 2 years
     if (
       householdIncomeYear1 && 
       householdIncomeYear2 && 
@@ -147,13 +139,10 @@ const InvestorRegistrationPage = () => {
     setIsLoading(true);
     
     try {
-      // Check if user is accredited
       const { isAccredited, reason } = checkAccreditedStatus();
       
-      // Combine address components
       const fullAddress = `${address}, ${city}, ${state} ${zip}, ${country}`;
       
-      // Sign up with email and password
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -166,7 +155,6 @@ const InvestorRegistrationPage = () => {
       
       if (error) throw error;
       
-      // Create a profile record for the user
       if (data.user) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -196,7 +184,6 @@ const InvestorRegistrationPage = () => {
           throw profileError;
         }
         
-        // Store accreditation status for redirecting
         localStorage.setItem("investorProfile", JSON.stringify({
           id: data.user.id,
           full_name: fullName,
@@ -211,7 +198,6 @@ const InvestorRegistrationPage = () => {
             : "Welcome! You now have access to our verified deals with lower minimum investments.",
         });
         
-        // Redirect based on accreditation status
         setTimeout(() => {
           navigate(isAccredited ? "/properties" : "/verified-deals");
         }, 1500);
@@ -229,6 +215,10 @@ const InvestorRegistrationPage = () => {
   
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
+  };
+  
+  const navigateToDevRegistration = () => {
+    navigate("/developer-registration");
   };
   
   return (
@@ -253,6 +243,18 @@ const InvestorRegistrationPage = () => {
                 ></div>
               </div>
             </CardHeader>
+            
+            <div className="bg-blue-50 p-4 flex justify-center items-center">
+              <span className="text-sm text-gray-600 mr-2">Are you a property developer?</span>
+              <Button 
+                variant="outline" 
+                onClick={navigateToDevRegistration}
+                className="flex items-center justify-center gap-2"
+              >
+                <Briefcase size={16} />
+                Developer Registration
+              </Button>
+            </div>
             
             <form onSubmit={handleSubmit}>
               <CardContent className="p-6">
@@ -640,7 +642,7 @@ const InvestorRegistrationPage = () => {
                     onClick={() => navigate('/auth')}
                   >
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Return to login
+                    Login
                   </Button>
                 )}
                 
@@ -677,3 +679,4 @@ const InvestorRegistrationPage = () => {
 };
 
 export default InvestorRegistrationPage;
+

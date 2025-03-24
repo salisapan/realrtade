@@ -9,13 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Briefcase, User } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
@@ -26,84 +23,39 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
-        // Sign up with email and password
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-            },
-          },
-        });
+      // Sign in with email and password
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        if (error) throw error;
+      if (error) throw error;
 
-        // Create a profile record for the user
-        if (data.user) {
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert([
-              { 
-                id: data.user.id,
-                full_name: fullName,
-                email: email,
-              },
-            ]);
-          
-          if (profileError) {
-            console.error("Error creating profile:", profileError);
-            toast({
-              title: "Profile creation failed",
-              description: profileError.message,
-              variant: "destructive",
-            });
-          }
+      // Store user session in localStorage for demo purposes
+      if (data.user) {
+        // Fetch user profile
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+        
+        if (profileData) {
+          localStorage.setItem("investorProfile", JSON.stringify(profileData));
+        } else if (profileError) {
+          console.error("Error fetching profile:", profileError);
         }
-
+        
         toast({
-          title: "Account created successfully",
-          description: "You can now log in with your credentials",
+          title: "Login successful",
+          description: "Welcome back!",
         });
         
-        // Switch to login mode after successful signup
-        setIsSignUp(false);
-      } else {
-        // Sign in with email and password
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        // Store user session in localStorage for demo purposes
-        if (data.user) {
-          // Fetch user profile
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-          
-          if (profileData) {
-            localStorage.setItem("investorProfile", JSON.stringify(profileData));
-          } else if (profileError) {
-            console.error("Error fetching profile:", profileError);
-          }
-          
-          toast({
-            title: "Login successful",
-            description: "Welcome back!",
-          });
-          
-          navigate("/properties");
-        }
+        navigate("/properties");
       }
     } catch (error: any) {
       toast({
-        title: isSignUp ? "Sign up failed" : "Login failed",
+        title: "Login failed",
         description: error.message || "An error occurred during authentication",
         variant: "destructive",
       });
@@ -136,31 +88,14 @@ const Auth = () => {
               <div className="flex justify-center mb-4">
                 <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-12 rounded-lg animate-float shadow-[0_0_15px_rgba(66,133,244,0.3)]" />
               </div>
-              <CardTitle className="text-2xl text-center">
-                {isSignUp ? "Create Account" : "Welcome Back"}
-              </CardTitle>
+              <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
               <CardDescription className="text-center">
-                {isSignUp ? "Sign up to access real estate opportunities" : "Log in to your RealTrade account"}
+                Log in to your RealTrade account
               </CardDescription>
             </CardHeader>
             
             <CardContent className="relative">
               <form onSubmit={handleAuth} className="space-y-4">
-                {isSignUp && (
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Full Name</Label>
-                    <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Enter your full name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required={isSignUp}
-                      className="bg-white"
-                    />
-                  </div>
-                )}
-                
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -201,49 +136,36 @@ const Auth = () => {
                   className="w-full mt-6"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Processing..." : isSignUp ? "Create Account" : "Sign In"}
+                  {isLoading ? "Processing..." : "Sign In"}
                 </Button>
               </form>
 
-              {isSignUp && (
-                <div className="mt-6">
-                  <div className="text-center text-sm text-gray-500 mb-4">
-                    Looking for a more comprehensive registration?
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button 
-                      variant="outline" 
-                      onClick={navigateToInvestorRegistration}
-                      className="flex items-center justify-center gap-2"
-                    >
-                      <User size={16} />
-                      Investor
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={navigateToDevRegistration}
-                      className="flex items-center justify-center gap-2"
-                    >
-                      <Briefcase size={16} />
-                      Developer
-                    </Button>
-                  </div>
+              <div className="mt-6">
+                <div className="text-center text-sm text-gray-500 mb-4">
+                  Don't have an account? Register as:
                 </div>
-              )}
+                <div className="grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="outline" 
+                    onClick={navigateToInvestorRegistration}
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <User size={16} />
+                    Investor
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={navigateToDevRegistration}
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <Briefcase size={16} />
+                    Developer
+                  </Button>
+                </div>
+              </div>
             </CardContent>
             
             <CardFooter className="flex flex-col items-center relative">
-              <p className="text-sm text-gray-500 mt-4">
-                {isSignUp ? "Already have an account?" : "Don't have an account?"}
-                <Button
-                  variant="link"
-                  onClick={() => setIsSignUp(!isSignUp)}
-                  className="p-0 ml-1 text-primary font-medium hover:underline hover:text-primary-dark"
-                >
-                  {isSignUp ? "Sign In" : "Sign Up"}
-                </Button>
-              </p>
-              
               <p className="text-sm text-gray-500 mt-4">
                 <Link to="/" className="text-primary font-medium hover:underline hover:text-primary-dark">
                   Return to Home
