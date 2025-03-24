@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -49,13 +48,11 @@ const DeveloperRegistrationPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  // Basic information
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   
-  // Company information
   const [companyName, setCompanyName] = useState("");
   const [roleInCompany, setRoleInCompany] = useState("");
   const [companyAddress, setCompanyAddress] = useState("");
@@ -65,7 +62,6 @@ const DeveloperRegistrationPage = () => {
   const [yearsInOperation, setYearsInOperation] = useState<number | undefined>();
   const [website, setWebsite] = useState("");
   
-  // Experience
   const [pastProjects, setPastProjects] = useState("");
   const [performanceMetrics, setPerformanceMetrics] = useState("");
   const [dealsCompleted, setDealsCompleted] = useState<number | undefined>();
@@ -74,12 +70,8 @@ const DeveloperRegistrationPage = () => {
   const [legalDisputesExplanation, setLegalDisputesExplanation] = useState("");
   const [propertySpecialization, setPropertySpecialization] = useState<string[]>([]);
   
-  // Terms
   const [backgroundCheckConsent, setBackgroundCheckConsent] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
-  
-  // Validation errors
-  const [errors, setErrors] = useState<Record<string, string>>({});
   
   const validateStep = (currentStep: number) => {
     const newErrors: Record<string, string> = {};
@@ -164,7 +156,6 @@ const DeveloperRegistrationPage = () => {
     setIsLoading(true);
     
     try {
-      // Sign up with email and password
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -178,9 +169,7 @@ const DeveloperRegistrationPage = () => {
       
       if (error) throw error;
       
-      // Create a developer record for the user
       if (data.user) {
-        // First create the basic profile
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
@@ -197,7 +186,6 @@ const DeveloperRegistrationPage = () => {
           throw profileError;
         }
         
-        // Then create the developer record
         const { error: developerError } = await supabase
           .from('developers')
           .insert([
@@ -235,7 +223,6 @@ const DeveloperRegistrationPage = () => {
           description: "Your account is now pending approval. We'll review your information and contact you soon.",
         });
         
-        // Redirect to the developer waiting page
         setTimeout(() => {
           navigate("/entrepreneur");
         }, 1500);
@@ -695,8 +682,7 @@ const DeveloperRegistrationPage = () => {
                     variant="outline" 
                     onClick={() => navigate('/auth')}
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Return to login
+                    LOGIN
                   </Button>
                 )}
                 
