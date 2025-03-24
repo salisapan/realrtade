@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,12 +6,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Home, ArrowRight, Check, Eye, EyeOff, Briefcase } from "lucide-react";
+import { Home, ArrowRight, ArrowLeft, Check, Eye, EyeOff, Briefcase } from "lucide-react";
 
 const InvestorRegistrationPage = () => {
   const navigate = useNavigate();
@@ -641,7 +641,8 @@ const InvestorRegistrationPage = () => {
                     variant="outline" 
                     onClick={() => navigate('/auth')}
                   >
-                    LOGIN
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Login
                   </Button>
                 )}
                 
@@ -678,3 +679,4 @@ const InvestorRegistrationPage = () => {
 };
 
 export default InvestorRegistrationPage;
+
