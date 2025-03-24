@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Home, ArrowRight, ArrowLeft, Check, Eye, EyeOff, Briefcase } from "lucide-react";
+import { Home, ArrowRight, Check, Eye, EyeOff, Briefcase } from "lucide-react";
 
 const InvestorRegistrationPage = () => {
   const navigate = useNavigate();
@@ -641,8 +641,7 @@ const InvestorRegistrationPage = () => {
                     variant="outline" 
                     onClick={() => navigate('/auth')}
                   >
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Login
+                    LOGIN
                   </Button>
                 )}
                 
@@ -679,4 +678,3 @@ const InvestorRegistrationPage = () => {
 };
 
 export default InvestorRegistrationPage;
-
