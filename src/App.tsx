@@ -39,6 +39,16 @@ import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
 
 const queryClient = new QueryClient();
 
+// Define an extended profile interface that includes the isAccredited property
+interface ExtendedProfile {
+  id?: string;
+  is_accredited?: boolean;
+  isAccredited?: string;
+  full_name?: string;
+  email?: string;
+  [key: string]: any; // Allow any other properties
+}
+
 // Function to check for active Supabase session
 const hasRegistered = () => {
   return localStorage.getItem("investorProfile") !== null;
@@ -152,7 +162,7 @@ const App = () => {
       
       if (profileData) {
         // Create an extended profile with backward compatibility
-        const extendedProfile = { ...profileData };
+        const extendedProfile: ExtendedProfile = { ...profileData };
         
         // Ensure isAccredited is set based on is_accredited
         if (profileData.is_accredited !== undefined) {
