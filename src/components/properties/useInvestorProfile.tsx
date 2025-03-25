@@ -2,8 +2,16 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
+// Define a type that includes the isAccredited property
+interface ExtendedProfile {
+  id?: string;
+  is_accredited?: boolean;
+  isAccredited?: string;
+  [key: string]: any; // Allow any other properties
+}
+
 export const useInvestorProfile = () => {
-  const [investorProfile, setInvestorProfile] = useState<any>(null);
+  const [investorProfile, setInvestorProfile] = useState<ExtendedProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -21,7 +29,7 @@ export const useInvestorProfile = () => {
 
     try {
       // Create a copy of the parsed profile to avoid modifying the original
-      const parsedProfile = JSON.parse(profile);
+      const parsedProfile: ExtendedProfile = JSON.parse(profile);
       
       // Ensure is_accredited gets properly mapped to isAccredited
       if (parsedProfile.is_accredited !== undefined && parsedProfile.isAccredited === undefined) {

@@ -10,6 +10,16 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Briefcase, User } from "lucide-react";
 
+// Define a type that includes the isAccredited property
+interface ExtendedProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  is_accredited?: boolean;
+  isAccredited?: string;
+  [key: string]: any; // Allow any other properties
+}
+
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,7 +52,8 @@ const Auth = () => {
         
         if (profileData) {
           // Create a copy of the profile data to avoid modifying the original
-          const profileToStore = { ...profileData };
+          // Use type assertion to tell TypeScript this object will have additional properties
+          const profileToStore: ExtendedProfile = { ...profileData };
           
           // Add the isAccredited field for backward compatibility
           if (profileData.is_accredited !== undefined) {
