@@ -7,6 +7,8 @@ interface ExtendedProfile {
   id?: string;
   is_accredited?: boolean;
   isAccredited?: string;
+  full_name?: string;
+  email?: string;
   [key: string]: any; // Allow any other properties
 }
 
@@ -35,6 +37,9 @@ export const useInvestorProfile = () => {
       if (parsedProfile.is_accredited !== undefined && parsedProfile.isAccredited === undefined) {
         parsedProfile.isAccredited = parsedProfile.is_accredited ? "yes" : "no";
       }
+      
+      console.log("Profile loaded from storage:", parsedProfile);
+      console.log("Accreditation status:", parsedProfile.is_accredited, parsedProfile.isAccredited);
       
       setInvestorProfile(parsedProfile);
       setIsLoading(false);

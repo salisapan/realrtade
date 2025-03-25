@@ -21,7 +21,9 @@ const Index = () => {
   useEffect(() => {
     if (!investorProfile) return;
     
-    const isAccredited = investorProfile?.isAccredited === "yes" || investorProfile?.is_accredited === true;
+    // Check both fields for accreditation status
+    const isAccredited = investorProfile.isAccredited === "yes" || investorProfile.is_accredited === true;
+    console.log("Index page checking accreditation:", investorProfile.isAccredited, investorProfile.is_accredited, "Result:", isAccredited);
     
     if (isAccredited) {
       setProperties(getCategoryProperties(selectedCategory));
@@ -32,10 +34,13 @@ const Index = () => {
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
-    if (investorProfile && (investorProfile.isAccredited === "yes" || investorProfile.is_accredited === true)) {
-      setProperties(getCategoryProperties(category));
-    } else {
-      setProperties(affordableDeals);
+    if (investorProfile) {
+      const isAccredited = investorProfile.isAccredited === "yes" || investorProfile.is_accredited === true;
+      if (isAccredited) {
+        setProperties(getCategoryProperties(category));
+      } else {
+        setProperties(affordableDeals);
+      }
     }
   };
 

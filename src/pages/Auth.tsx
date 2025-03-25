@@ -60,6 +60,9 @@ const Auth = () => {
             profileToStore.isAccredited = profileData.is_accredited ? "yes" : "no";
           }
           
+          console.log("Auth - Storing profile with accreditation status:", 
+            profileData.is_accredited, profileToStore.isAccredited);
+          
           localStorage.setItem("investorProfile", JSON.stringify(profileToStore));
           
           toast({
@@ -67,7 +70,13 @@ const Auth = () => {
             description: "Welcome back!",
           });
           
-          navigate("/properties");
+          // Redirect based on accreditation status
+          if (profileData.is_accredited) {
+            navigate("/properties");
+          } else {
+            navigate("/verified-deals");
+          }
+          
         } else if (profileError) {
           console.error("Error fetching profile:", profileError);
           
