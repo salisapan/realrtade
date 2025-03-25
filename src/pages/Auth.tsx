@@ -41,11 +41,15 @@ const Auth = () => {
           .single();
         
         if (profileData) {
-          // Make sure is_accredited is properly mapped to isAccredited for backward compatibility
+          // Create a copy of the profile data to avoid modifying the original
+          const profileToStore = { ...profileData };
+          
+          // Add the isAccredited field for backward compatibility
           if (profileData.is_accredited !== undefined) {
-            profileData.isAccredited = profileData.is_accredited ? "yes" : "no";
+            profileToStore.isAccredited = profileData.is_accredited ? "yes" : "no";
           }
-          localStorage.setItem("investorProfile", JSON.stringify(profileData));
+          
+          localStorage.setItem("investorProfile", JSON.stringify(profileToStore));
           
           toast({
             title: "Login successful",

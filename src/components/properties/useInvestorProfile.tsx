@@ -20,11 +20,14 @@ export const useInvestorProfile = () => {
     }
 
     try {
+      // Create a copy of the parsed profile to avoid modifying the original
       const parsedProfile = JSON.parse(profile);
+      
       // Ensure is_accredited gets properly mapped to isAccredited
       if (parsedProfile.is_accredited !== undefined && parsedProfile.isAccredited === undefined) {
         parsedProfile.isAccredited = parsedProfile.is_accredited ? "yes" : "no";
       }
+      
       setInvestorProfile(parsedProfile);
       setIsLoading(false);
     } catch (error) {
