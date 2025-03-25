@@ -27,6 +27,7 @@ import Recommendations from "./pages/Recommendations";
 import Auth from "./pages/Auth";
 import InvestorRegistrationPage from "./pages/InvestorRegistrationPage";
 import DeveloperRegistrationPage from "./pages/DeveloperRegistrationPage";
+import MVP from "./pages/MVP";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -36,6 +37,16 @@ import DomainsPage from "./pages/admin/DomainsPage";
 import PaymentsPage from "./pages/admin/PaymentsPage";
 import DataPropertyPage from "./pages/admin/DataPropertyPage";
 import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
+
+// Define the ExtendedProfile interface to include both is_accredited and isAccredited
+interface ExtendedProfile {
+  id: string;
+  full_name?: string;
+  email?: string;
+  is_accredited?: boolean;
+  isAccredited?: string;
+  [key: string]: any; // Allow any other properties
+}
 
 const queryClient = new QueryClient();
 
@@ -113,18 +124,7 @@ const App = () => {
 
       // If we have a session, make sure we also have the profile in localStorage
       if (session?.user?.id) {
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data, error }) => {
-            if (data && !error) {
-              localStorage.setItem("investorProfile", JSON.stringify(data));
-            } else if (error) {
-              console.error("Error fetching profile:", error);
-            }
-          });
+        fetchAndStoreUserProfile(session.user.id);
       }
     });
 
@@ -135,6 +135,8 @@ const App = () => {
       // If auth state changes to signed out, clear the profile
       if (!session) {
         localStorage.removeItem("investorProfile");
+      } else if (session?.user?.id) {
+        fetchAndStoreUserProfile(session.user.id);
       }
     });
 
@@ -142,6 +144,32 @@ const App = () => {
       subscription.unsubscribe();
     };
   }, []);
+
+  const fetchAndStoreUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (data && !error) {
+        // Create a copy of the profile data with ExtendedProfile type
+        const profileToStore: ExtendedProfile = { ...data };
+        
+        // Add the isAccredited field for backward compatibility
+        if (profileToStore.is_accredited !== undefined) {
+          profileToStore.isAccredited = profileToStore.is_accredited ? "yes" : "no";
+        }
+        
+        localStorage.setItem("investorProfile", JSON.stringify(profileToStore));
+      } else if (error) {
+        console.error("Error fetching profile:", error);
+      }
+    } catch (err) {
+      console.error("Unexpected error fetching profile:", err);
+    }
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -157,6 +185,7 @@ const App = () => {
               <Route path="/developer-registration" element={<DeveloperRegistrationPage />} />
               <Route path="/investor-signup" element={<Navigate to="/investor-registration" replace />} />
               <Route path="/verified-deals" element={<VerifiedDeals />} />
+              <Route path="/mvp" element={<MVP />} />
               <Route 
                 path="/properties" 
                 element={
