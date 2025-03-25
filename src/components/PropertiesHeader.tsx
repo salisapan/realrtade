@@ -1,4 +1,3 @@
-
 import { Link } from "react-router-dom";
 import { Home, Search, Menu, X, User, Users, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -46,11 +45,6 @@ export const PropertiesHeader = ({
             <Link to="/" className="flex items-center header-logo-container">
               <img src="/lovable-uploads/d4d21b09-7174-49fb-af4f-ee02e8e4966f.png" alt="RealTrade Logo" className="h-8 md:h-10 mr-2 rounded-lg" />
             </Link>
-            
-            {/* מוסיף קישור ל-MVP */}
-            <Link to="/mvp" className="ml-4 text-primary hover:text-primary/80 font-medium text-sm">
-              MVP גרסת
-            </Link>
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto justify-between sm:justify-end">
@@ -93,10 +87,6 @@ export const PropertiesHeader = ({
                   <Link to="/properties" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                     <Home className="w-5 h-5" />
                     <span>Properties</span>
-                  </Link>
-                  <Link to="/mvp" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
-                    <Home className="w-5 h-5" />
-                    <span>MVP גרסת</span>
                   </Link>
                   <Link to="/community" className="flex items-center gap-2 text-gray-600 hover:text-primary p-2 rounded-md hover:bg-gray-50">
                     <MessageCircle className="w-5 h-5" />
