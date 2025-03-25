@@ -39,16 +39,6 @@ import SettingsLogoPage from "./pages/admin/SettingsLogoPage";
 
 const queryClient = new QueryClient();
 
-// Define an extended profile interface that includes the isAccredited property
-interface ExtendedProfile {
-  id?: string;
-  is_accredited?: boolean;
-  isAccredited?: string;
-  full_name?: string;
-  email?: string;
-  [key: string]: any; // Allow any other properties
-}
-
 // Function to check for active Supabase session
 const hasRegistered = () => {
   return localStorage.getItem("investorProfile") !== null;
@@ -123,20 +113,27 @@ const App = () => {
 
       // If we have a session, make sure we also have the profile in localStorage
       if (session?.user?.id) {
-        fetchAndStoreUserProfile(session.user.id);
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data, error }) => {
+            if (data && !error) {
+              localStorage.setItem("investorProfile", JSON.stringify(data));
+            } else if (error) {
+              console.error("Error fetching profile:", error);
+            }
+          });
       }
     });
 
     // Subscribe to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       
-      // If auth state changes to signed in, fetch and store profile
-      if (session?.user?.id) {
-        await fetchAndStoreUserProfile(session.user.id);
-      }
       // If auth state changes to signed out, clear the profile
-      else {
+      if (!session) {
         localStorage.removeItem("investorProfile");
       }
     });
@@ -145,39 +142,6 @@ const App = () => {
       subscription.unsubscribe();
     };
   }, []);
-
-  // Helper function to fetch and store user profile
-  const fetchAndStoreUserProfile = async (userId: string) => {
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      if (profileError) {
-        console.error("Error fetching profile:", profileError);
-        return;
-      }
-      
-      if (profileData) {
-        // Create an extended profile with backward compatibility
-        const extendedProfile: ExtendedProfile = { ...profileData };
-        
-        // Ensure isAccredited is set based on is_accredited
-        if (profileData.is_accredited !== undefined) {
-          extendedProfile.isAccredited = profileData.is_accredited ? "yes" : "no";
-        }
-        
-        console.log("Storing profile with accreditation status:", 
-          profileData.is_accredited, extendedProfile.isAccredited);
-        
-        localStorage.setItem("investorProfile", JSON.stringify(extendedProfile));
-      }
-    } catch (error) {
-      console.error("Error in profile fetch function:", error);
-    }
-  };
 
   return (
     <QueryClientProvider client={queryClient}>
