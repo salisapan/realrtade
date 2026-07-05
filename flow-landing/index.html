@@ -68,16 +68,16 @@
   --nav-bg:rgba(9,12,20,.72);
 }
 :root[data-theme="light"]{
-  --bg:#F8FAFD; --bg2:#F2F6FC; --panel:#FFFFFF; --panel-2:#F5F8FD;
-  --line:rgba(24,44,96,.11); --line-hi:rgba(24,44,96,.22);
-  --txt:#3A425A; --txt-hi:#0B1120; --muted:#5B6684; --chrome:#2A3350;
-  --accent:#2A5CFF; --accent-2:#1B45D6; --accent-deep:#C9D6FF; --glow:rgba(42,92,255,.26); --warm:#CF5220;
-  --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72); --glass-border:rgba(40,70,150,.3); --doit-text:#18328c; --ring:#2f5bd8; --glass-gloss:rgba(255,255,255,.95);
+  --bg:#EEF3FA; --bg2:#E6EDF7; --panel:#FFFFFF; --panel-2:#F4F8FD;
+  --line:rgba(20,40,90,.16); --line-hi:rgba(20,40,90,.30);
+  --txt:#2E3650; --txt-hi:#080D18; --muted:#4E5878; --chrome:#232C48;
+  --accent:#1F52F5; --accent-2:#123CCB; --accent-deep:#C9D6FF; --glow:rgba(31,82,245,.30); --warm:#CF5220;
+  --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72); --glass-border:rgba(40,70,150,.3); --doit-text:#123ccb; --ring:#2f5bd8; --glass-gloss:rgba(255,255,255,.95);
   --net:40,70,150; --net-line:42,92,255; --net-a:.4;
   --logo-shadow:drop-shadow(0 8px 20px rgba(24,44,96,.28)) drop-shadow(0 1px 1px rgba(24,44,96,.25));
-  --card-shadow:0 20px 50px -30px rgba(24,44,96,.3);
-  --hero-glow1:rgba(58,130,255,.11); --hero-glow2:rgba(90,160,255,.07); --blob:rgba(70,142,255,.11); --blob2:rgba(125,182,255,.09);
-  --nav-bg:rgba(248,250,253,.82);
+  --card-shadow:0 26px 60px -28px rgba(20,40,90,.42), 0 2px 8px -2px rgba(20,40,90,.10);
+  --hero-glow1:rgba(58,130,255,.13); --hero-glow2:rgba(90,160,255,.08); --blob:rgba(64,138,255,.14); --blob2:rgba(120,178,255,.10);
+  --nav-bg:rgba(244,248,253,.85);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -92,7 +92,13 @@ body{
     linear-gradient(180deg,var(--bg),var(--bg2) 60%,var(--bg));
   background-attachment:fixed;
 }
+/* light mode: flat clean base — no full-page corner wash; bubbles live only in the hero */
+:root[data-theme="light"] body{
+  background:linear-gradient(180deg,var(--bg),var(--bg2));
+  background-attachment:fixed;
+}
 #bgcanvas{position:fixed; inset:0; width:100%; height:100%; z-index:0; opacity:.55; pointer-events:none}
+:root[data-theme="light"] #bgcanvas{opacity:.4}
 .wrap{max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(20px,5vw,40px); position:relative; z-index:2}
 a{color:inherit; text-decoration:none}
 img{max-width:100%; display:block}
@@ -198,7 +204,11 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .hero-blobs{position:absolute; inset:0; z-index:0; pointer-events:none; filter:blur(60px)}
 .blob{position:absolute; border-radius:50%; mix-blend-mode:screen; will-change:transform}
 :root[data-theme="light"] .blob{mix-blend-mode:normal}
-:root[data-theme="light"] .hero-blobs{filter:blur(72px)}
+:root[data-theme="light"] .hero-blobs{filter:blur(90px)}
+/* light: keep bubbles soft and tucked behind the hero, not bleeding to edges */
+:root[data-theme="light"] .blob.b1{width:36vw; height:36vw; inset-block-start:2%; inset-inline-start:56%}
+:root[data-theme="light"] .blob.b2{width:30vw; height:30vw; inset-block-start:30%; inset-inline-start:14%}
+:root[data-theme="light"] .blob.b3{display:none}
 .blob.b1{width:44vw; height:44vw; background:radial-gradient(circle,var(--blob),transparent 68%); inset-block-start:-6%; inset-inline-start:52%; animation:float1 17s ease-in-out infinite}
 .blob.b2{width:34vw; height:34vw; background:radial-gradient(circle,var(--blob2),transparent 70%); inset-block-start:34%; inset-inline-start:8%; animation:float2 21s ease-in-out infinite}
 .blob.b3{width:26vw; height:26vw; background:radial-gradient(circle,var(--blob),transparent 72%); inset-block-end:-4%; inset-inline-start:60%; animation:float1 24s ease-in-out infinite reverse}
@@ -958,7 +968,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     function rnd(a,b){return a+Math.random()*(b-a);}
     function build(){
       nodes=[]; edges=[];
-      var layers=[{n:10,r:0.06,y:-0.34,li:-1,apex:1},{n:20,r:0.19,y:-0.14,li:0},{n:30,r:0.31,y:0.06,li:1},{n:40,r:0.43,y:0.27,li:2}];
+      var layers=[{n:6,r:0.05,y:-0.36,li:-1,apex:1},{n:12,r:0.19,y:-0.15,li:0},{n:18,r:0.32,y:0.06,li:1},{n:24,r:0.45,y:0.28,li:2}];
       var idx=[];
       layers.forEach(function(L){
         var arr=[];
@@ -970,13 +980,13 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         idx.push(arr);
       });
       expert=idx[0][0]; nodes[expert].expert=true;
-      idx[0].forEach(function(e){ idx[1].forEach(function(t){ if(Math.random()<0.3) edges.push([e,t]); }); });
+      idx[0].forEach(function(e){ idx[1].forEach(function(t){ if(Math.random()<0.42) edges.push([e,t]); }); });
       function link(A,B,pr){ A.forEach(function(a){ B.forEach(function(b){ if(Math.random()<pr) edges.push([a,b]); }); }); }
-      link(idx[1],idx[2],0.15); link(idx[2],idx[3],0.13);
+      link(idx[1],idx[2],0.11); link(idx[2],idx[3],0.09);
       [idx[1],idx[2],idx[3]].forEach(function(R){ for(var i=0;i<R.length;i++) edges.push([R[i],R[(i+1)%R.length]]); });
-      for(var k=0;k<14;k++) edges.push([idx[1][(Math.random()*idx[1].length)|0],idx[3][(Math.random()*idx[3].length)|0]]);
+      for(var k=0;k<5;k++) edges.push([idx[1][(Math.random()*idx[1].length)|0],idx[3][(Math.random()*idx[3].length)|0]]);
       pulseEdges=[];
-      for(var pe=0;pe<edges.length;pe++){ if(Math.random()<0.5) pulseEdges.push({e:pe,o:Math.random(),sp:rnd(0.14,0.4)}); }
+      for(var pe=0;pe<edges.length;pe++){ if(Math.random()<0.4) pulseEdges.push({e:pe,o:Math.random(),sp:rnd(0.14,0.4)}); }
     }
     function size(){ var r=cv.getBoundingClientRect(); W=cv.width=r.width*DPR; H=cv.height=r.height*DPR; S=Math.min(W,H); }
     function prog(){ var r=cv.getBoundingClientRect(); var cy=r.top+r.height/2; var norm=(cy-innerHeight/2)/(innerHeight*0.62); return Math.max(0,Math.min(1,1-Math.abs(norm))); }
@@ -1016,14 +1026,14 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     function proj(x,y,z,a){
       var xr=x*Math.cos(a)-z*Math.sin(a), zr=x*Math.sin(a)+z*Math.cos(a);
       var yr=y*Math.cos(TILT)-zr*Math.sin(TILT), z2=y*Math.sin(TILT)+zr*Math.cos(TILT);
-      var f=1.75, sc=f/(f+z2);
+      var f=1.35, sc=f/(f+z2);
       return {x:W/2+xr*sc*S, y:H/2+yr*sc*S, s:sc, z:z2};
     }
     function frame(ts){
       if(!t0)t0=ts; var el=(ts-t0)/1000, p=rm?1:ease(prog());
       pmx+=(tmx-pmx)*0.06; pmy+=(tmy-pmy)*0.06;
       TILT=TILT_BASE+pmy*0.22;
-      var a=el*0.2+pmx*0.45; curA=a;
+      var a=el*0.32+pmx*0.5; curA=a;
       var breathe=0.5+0.5*Math.sin(el*1.15);
       g.clearRect(0,0,W,H);
       var P=new Array(nodes.length), i;
@@ -1031,7 +1041,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         var cxd=n.cx+Math.sin(el*0.5+i*0.7)*0.06, cyd=n.cy+Math.cos(el*0.45+i)*0.06, czd=n.cz+Math.sin(el*0.4+i*1.3)*0.06;
         P[i]=proj(cxd+(n.mx-cxd)*p, cyd+(n.my-cyd)*p, czd+(n.mz-czd)*p, a); }
       g.lineWidth=1*DPR;
-      for(var e=0;e<edges.length;e++){ var A=P[edges[e][0]], B=P[edges[e][1]], dep=(0.5+0.5*Math.min(A.s,B.s)), al=(0.04+0.16*p)*dep*dep;
+      for(var e=0;e<edges.length;e++){ var A=P[edges[e][0]], B=P[edges[e][1]], dep=Math.max(0,Math.min(1,(Math.min(A.s,B.s)-0.55)/0.85)), al=(0.05+0.2*p)*(0.12+0.88*dep*dep);
         g.strokeStyle='rgba('+PAL.edge+','+al.toFixed(3)+')'; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(B.x,B.y); g.stroke(); }
       /* flowing data pulses along the network — continuous life */
       if(p>0.35){ for(var pu2=0;pu2<pulseEdges.length;pu2++){ var pd=pulseEdges[pu2], ed2=edges[pd.e]; if(!ed2)continue;
@@ -1046,8 +1056,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       var order=[]; for(i=0;i<nodes.length;i++) order.push(i);
       order.sort(function(u,v){ return P[u].z-P[v].z; });
       for(var oi=0;oi<order.length;oi++){ i=order[oi]; var n2=nodes[i], pr=P[i];
-        var rad=(n2.apex?3.4:3.0)*DPR*(0.6+0.7*pr.s), col=n2.apex?PAL.apex:PAL.l[n2.li];
-        var fog=Math.max(0,Math.min(1,(pr.s-0.58)/0.7)), al2=(0.32+0.68*fog)*(0.12+0.88*p);
+        var rad=(n2.apex?4.0:3.5)*DPR*(0.5+0.75*pr.s), col=n2.apex?PAL.apex:PAL.l[n2.li];
+        var fog=Math.max(0,Math.min(1,(pr.s-0.62)/0.85)), al2=(0.18+0.82*fog*fog)*(0.12+0.88*p);
         if(n2.expert){ var pex=0.6+0.4*Math.sin(el*2.4); g.shadowBlur=16*DPR*p; g.shadowColor=PAL.glow; rad*=1.5+0.3*pex; }
         else if(pr.s>1.02){ g.shadowBlur=5*DPR*breathe*p; g.shadowColor=PAL.glow; }
         else { g.shadowBlur=0; }
