@@ -351,7 +351,8 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .cta-sec::before{width:52vw; height:52vw; left:24%; bottom:-30%; animation:orbDrift 30s ease-in-out infinite}
 .agraph-sec > *, .cta-sec > *{position:relative; z-index:1}
 .terrain-zone{position:relative}
-.terrain-zone > canvas.terrain-canvas{position:absolute; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; -webkit-mask-image:linear-gradient(180deg,transparent 2%,#000 16%,#000 97%,transparent), linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent); -webkit-mask-composite:source-in; mask-image:linear-gradient(180deg,transparent 2%,#000 16%,#000 97%,transparent), linear-gradient(90deg,transparent,#000 10%,#000 90%,transparent); mask-composite:intersect}
+canvas.terrain-canvas{position:fixed; inset:0; width:100vw; height:100vh; z-index:0; pointer-events:none; opacity:0; transition:opacity .7s ease; -webkit-mask-image:linear-gradient(180deg,transparent 4%,#000 30%,#000 98%,transparent), linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent); -webkit-mask-composite:source-in; mask-image:linear-gradient(180deg,transparent 4%,#000 30%,#000 98%,transparent), linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent); mask-composite:intersect}
+canvas.terrain-canvas.show{opacity:1}
 .terrain-zone > section, .terrain-zone > footer{position:relative; z-index:1}
 @keyframes orbDrift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5%,-4%) scale(1.14)}}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
@@ -934,31 +935,34 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
   (function(){
     var cv=document.getElementById('ctaTerrain'); if(!cv) return;
     var g=cv.getContext('2d'), sec=document.querySelector('.terrain-zone'), W,H,DPR=Math.min(1.5,devicePixelRatio||1), raf, running=false, t0=null, LINE;
-    var COLS=44, ROWS=40, CELL=0.32, SPEED=0.42;
+    var COLS=38, ROWS=28, CELL=0.34, SPEED=0.4;
     function colors(){ LINE=(getComputedStyle(root).getPropertyValue('--net-line')||'59,116,255').trim(); }
-    function size(){ var r=cv.getBoundingClientRect(); W=cv.width=Math.max(1,r.width*DPR); H=cv.height=Math.max(1,r.height*DPR); }
+    function size(){ W=cv.width=Math.max(1,innerWidth*DPR); H=cv.height=Math.max(1,innerHeight*DPR); }
     function hAt(wx,wz){ var ridge=Math.min(1,Math.pow(Math.abs(wx)/(COLS*CELL*0.5),1.5)); var b=Math.sin(wx*0.9+wz*0.28)*0.5+Math.sin(wx*1.7-wz*0.5)*0.28+Math.sin(wz*0.8)*0.36; return (0.12+1.15*ridge)*b; }
     function frame(ts){ if(!t0)t0=ts; var el=(ts-t0)/1000, scroll=(el*SPEED)%1;
       g.clearRect(0,0,W,H);
-      var vF=H*0.72, hF=W*0.60, horizon=H*0.14, camY=1.2, pts=[], ri, ci;
+      /* scroll progress through the terrain zone: 0 at Performance, 1 at footer — grows the mountains */
+      var rct=sec.getBoundingClientRect(), sp=Math.max(0,Math.min(1, -rct.top/Math.max(1,(rct.height-innerHeight))));
+      var amp=0.16+0.52*sp, bri=0.5+0.7*sp;
+      var FOCAL=H*1.1, horizon=H*(0.38-0.1*sp), camY=0.6, pts=[], ri, ci;
       for(ri=0;ri<ROWS;ri++){ var wz=(ri+1)-scroll; if(wz<0.12){ pts.push(null); continue; }
-        var scv=vF/wz, sch=hF/wz, yBase=horizon+camY*scv, row=[];
-        for(ci=0;ci<=COLS;ci++){ var wx=(ci-COLS/2)*CELL, h=hAt(wx,wz); row.push({x:W/2+wx*sch, y:yBase-h*sch*0.5, wz:wz}); }
+        var scP=FOCAL/wz, yBase=horizon+camY*scP, row=[];
+        for(ci=0;ci<=COLS;ci++){ var wx=(ci-COLS/2)*CELL, h=hAt(wx,wz); row.push({x:W/2+wx*scP*0.42, y:yBase-h*scP*amp, wz:wz}); }
         pts.push(row); }
       g.lineWidth=1*DPR;
       for(ri=0;ri<pts.length;ri++){ var rw=pts[ri]; if(!rw) continue; var fade=Math.max(0,Math.min(1,1-rw[0].wz/ROWS));
-        g.strokeStyle='rgba('+LINE+','+(0.05+0.4*fade*fade).toFixed(3)+')';
+        g.strokeStyle='rgba('+LINE+','+((0.05+0.4*fade*fade)*bri).toFixed(3)+')';
         g.beginPath(); for(ci=0;ci<rw.length;ci++){ if(ci===0)g.moveTo(rw[ci].x,rw[ci].y); else g.lineTo(rw[ci].x,rw[ci].y); } g.stroke(); }
-      g.strokeStyle='rgba('+LINE+',0.14)';
+      g.strokeStyle='rgba('+LINE+','+(0.14*bri).toFixed(3)+')';
       for(ci=0;ci<=COLS;ci++){ g.beginPath(); var started=false;
         for(ri=0;ri<pts.length;ri++){ var r2=pts[ri]; if(!r2){ started=false; continue; } var p=r2[ci]; if(!started){ g.moveTo(p.x,p.y); started=true; } else g.lineTo(p.x,p.y); } g.stroke(); }
       if(running && !rm) raf=requestAnimationFrame(frame); }
     function start(){ if(running||rm)return; running=true; t0=null; raf=requestAnimationFrame(frame); }
     function stop(){ running=false; cancelAnimationFrame(raf); }
     colors(); size();
-    if(rm) requestAnimationFrame(frame); else start();
+    if(rm){ requestAnimationFrame(frame); cv.classList.add('show'); }
     addEventListener('resize', function(){ size(); });
-    new IntersectionObserver(function(es){ es.forEach(function(x){ if(x.isIntersecting) start(); else stop(); }); },{threshold:0}).observe(sec);
+    new IntersectionObserver(function(es){ es.forEach(function(x){ if(x.isIntersecting){ cv.classList.add('show'); start(); } else { cv.classList.remove('show'); stop(); } }); },{threshold:0}).observe(sec);
     window.__ctaTerrainColors=function(){ colors(); };
   })();
 
@@ -1075,7 +1079,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       }
     }
     function pnode(n,i,el,p,a){
-      var wob=0.055;
+      var wob=0.06*(1-p)*(1-p);
       var X=n.cx+(n.mx-n.cx)*p+Math.sin(el*0.5+i*0.7)*wob;
       var Y=n.cy+(n.my-n.cy)*p+Math.cos(el*0.45+i)*wob;
       var Z=n.cz+(n.mz-n.cz)*p+Math.sin(el*0.4+i*1.3)*wob;
@@ -1106,7 +1110,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       if(!t0)t0=ts; var el=(ts-t0)/1000, p=rm?1:ease(prog());
       pmx+=(tmx-pmx)*0.06; pmy+=(tmy-pmy)*0.06;
       TILT=TILT_BASE+pmy*0.2;
-      var a=el*0.3+pmx*0.5; curA=a;
+      var a=el*0.2*(1-0.5*p)+pmx*0.5; curA=a;
       var azw=el*0.17+pmy*0.4, axw=el*0.11+pmx*0.45; curZW=azw; curXW=axw;
       var add=!PAL.light, i;
       g.globalCompositeOperation='source-over'; g.clearRect(0,0,W,H);
@@ -1123,7 +1127,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       for(i=0;i<nodes.length;i++) P[i]=pnode(nodes[i],i,el,p,a);
       /* connections */
       g.lineWidth=1*DPR;
-      for(var e=0;e<edges.length;e++){ var A=P[edges[e][0]], B=P[edges[e][1]], dep=Math.max(0,Math.min(1,(Math.min(A.s,B.s)-0.55)/0.85)), al=(add?0.13:0.12)*(0.12+0.88*dep*dep)*(0.15+0.85*p);
+      for(var e=0;e<edges.length;e++){ var A=P[edges[e][0]], B=P[edges[e][1]], dep=Math.max(0,Math.min(1,(Math.min(A.s,B.s)-0.55)/0.85)), al=(add?0.17:0.15)*(0.14+0.86*dep*dep)*(0.08+0.92*p*p);
         g.strokeStyle='rgba('+PAL.edge+','+al.toFixed(3)+')'; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(B.x,B.y); g.stroke(); }
       /* comet data pulses along the network */
       if(p>0.35){ for(var pu2=0;pu2<pulseEdges.length;pu2++){ var pd=pulseEdges[pu2], ed2=edges[pd.e]; if(!ed2)continue;
