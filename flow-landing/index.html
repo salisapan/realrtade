@@ -573,7 +573,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       <div class="grid-3">
         <div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div><h3 data-i18n="a1.t">Context Awareness</h3><p data-i18n="a1.b">Flow learns your operational context across every application — the relationships between CRM data, email threads, documents, and spreadsheets — building a real-time knowledge graph of your work.</p></div></div>
         <div class="card tilt reveal" data-d="2"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3 data-i18n="a2.t">Smart Data Masking</h3><p data-i18n="a2.b">Sensitive information is identified and protected automatically. PII, financial data, and confidential records are masked before any processing — meeting SOC 2, HIPAA, and GDPR requirements.</p></div></div>
-        <div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3 data-i18n="a3.t">Cross-App Integration</h3><p data-i18n="a3.b">Connects your existing tools — Salesforce, HubSpot, Slack, Gmail, Excel, and 200+ enterprise apps. No API keys, no configuration, no IT overhead. Flow operates within your existing stack.</p></div></div>
+        <div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3 data-i18n="a3.t">Cross-App Integration</h3><p data-i18n="a3.b">Connects 200+ apps — Salesforce, HubSpot, Slack, Gmail, Excel. No API keys. No configuration.</p></div></div>
         <div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h3 data-i18n="a4.t">Workflow Engine</h3><p data-i18n="a4.b">A deterministic execution runtime that guarantees reliable outcomes. Every workflow is auditable, versioned, and rollback-capable, with human-in-the-loop checkpoints on critical decisions.</p></div></div>
         <div class="card tilt reveal" data-d="5"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v2"/></svg></div><h3 data-i18n="a5.t">Local-First Security</h3><p data-i18n="a5.b">All processing happens on-device. Your data never leaves your infrastructure — not for training, not for inference, not for storage. Zero third-party risk. Zero external API dependencies.</p></div></div>
         <div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3 data-i18n="a6.t">Autonomous Execution</h3><p data-i18n="a6.b">Once Flow learns a workflow pattern, it executes autonomously — 24/7, without intervention. Trigger actions, update records, send communications, and generate reports automatically.</p></div></div>
@@ -586,7 +586,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     <div class="wrap">
       <p class="integ-title reveal" data-i18n="integ.title">Works within your existing stack — no API keys, no configuration</p>
       <div class="integ-row reveal" data-d="1">
-        <span>Salesforce</span><span>HubSpot</span><span>Slack</span><span>Gmail</span><span>Excel</span><span>Google&nbsp;Drive</span><span>Notion</span><span>Jira</span>
+        <span>Salesforce</span><span>HubSpot</span><span>Slack</span><span>Gmail</span><span>Excel</span><span>Google&nbsp;Drive</span><span>Notion</span><span>Jira</span><span>Outlook</span><span>Word</span><span>iManage</span>
       </div>
     </div>
   </section>
@@ -907,7 +907,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
   (function(){
     var cv=document.getElementById('agraphCanvas'); if(!cv) return;
     var g=cv.getContext('2d'), sec=document.getElementById('actiongraph'), W,H,S,DPR=Math.min(2,devicePixelRatio||1);
-    var nodes=[], edges=[], expert=0, PAL, running=false, raf, t0=null, TILT=-0.42;
+    var nodes=[], edges=[], expert=0, PAL, running=false, raf, t0=null, TILT=-0.42, particles=[];
     function pal(){
       var light=root.getAttribute('data-theme')==='light';
       PAL = light
@@ -938,6 +938,29 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     function size(){ var r=cv.getBoundingClientRect(); W=cv.width=r.width*DPR; H=cv.height=r.height*DPR; S=Math.min(W,H); }
     function prog(){ var r=cv.getBoundingClientRect(); var cy=r.top+r.height/2; var norm=(cy-innerHeight/2)/(innerHeight*0.62); return Math.max(0,Math.min(1,1-Math.abs(norm))); }
     function ease(p){ return p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2; }
+    function updateParticles(el, p){
+      if(Math.random()<0.15 && p>0.3) particles.push({x:rnd(-0.5,0.5), y:rnd(-0.4,-0.2), z:rnd(-0.5,0.5), life:1, vx:rnd(-0.03,0.03), vy:rnd(0.01,0.04), vz:rnd(-0.03,0.03)});
+      for(var i=particles.length-1;i>=0;i--){
+        var pt=particles[i];
+        pt.x+=pt.vx; pt.y+=pt.vy; pt.z+=pt.vz;
+        pt.life-=0.015;
+        if(pt.life<=0) particles.splice(i,1);
+      }
+    }
+    function drawParticles(P, el){
+      for(var i=0;i<particles.length;i++){
+        var pt=particles[i], proj_pt=proj(pt.x, pt.y, pt.z, el*0.2);
+        var glow_intensity=pt.life*(0.5+0.5*Math.sin(el*3+i));
+        g.shadowColor='rgba(42,92,255,'+glow_intensity+')';
+        g.shadowBlur=8*DPR;
+        g.globalAlpha=pt.life*0.6;
+        g.fillStyle=PAL.spark;
+        g.beginPath();
+        g.arc(proj_pt.x, proj_pt.y, 1.5*DPR, 0, 6.283);
+        g.fill();
+      }
+      g.shadowBlur=0; g.globalAlpha=1;
+    }
     function proj(x,y,z,a){
       var xr=x*Math.cos(a)-z*Math.sin(a), zr=x*Math.sin(a)+z*Math.cos(a);
       var yr=y*Math.cos(TILT)-zr*Math.sin(TILT), z2=y*Math.sin(TILT)+zr*Math.cos(TILT);
@@ -954,6 +977,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       g.lineWidth=1*DPR;
       for(var e=0;e<edges.length;e++){ var A=P[edges[e][0]], B=P[edges[e][1]], al=(0.045+0.15*p)*(0.5+0.5*Math.min(A.s,B.s));
         g.strokeStyle='rgba('+PAL.edge+','+al.toFixed(3)+')'; g.beginPath(); g.moveTo(A.x,A.y); g.lineTo(B.x,B.y); g.stroke(); }
+      updateParticles(el, p);
+      drawParticles(P, el);
       if(p>0.5){ var ep=P[expert], cyc=el*0.5;
         for(var k=0;k<edges.length;k++){ var ed=edges[k]; if(ed[0]===expert||ed[1]===expert){ var o=(ed[0]===expert)?ed[1]:ed[0], q=(cyc+(k%5)/5)%1, B2=P[o]; g.fillStyle=PAL.spark; g.globalAlpha=0.85*(1-Math.abs(q-0.5)*1.5); g.beginPath(); g.arc(ep.x+(B2.x-ep.x)*q, ep.y+(B2.y-ep.y)*q, 2.3*DPR,0,6.283); g.fill(); g.globalAlpha=1; } } }
       var order=[]; for(i=0;i<nodes.length;i++) order.push(i);
