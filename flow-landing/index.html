@@ -68,16 +68,16 @@
   --nav-bg:rgba(9,12,20,.72);
 }
 :root[data-theme="light"]{
-  --bg:#EEF3FA; --bg2:#E6EDF7; --panel:#FFFFFF; --panel-2:#F4F8FD;
-  --line:rgba(20,40,90,.16); --line-hi:rgba(20,40,90,.30);
-  --txt:#2E3650; --txt-hi:#080D18; --muted:#4E5878; --chrome:#232C48;
-  --accent:#1F52F5; --accent-2:#123CCB; --accent-deep:#C9D6FF; --glow:rgba(31,82,245,.30); --warm:#CF5220;
+  --bg:#E4ECF7; --bg2:#D6E1F1; --panel:#FFFFFF; --panel-2:#F3F7FD;
+  --line:rgba(18,38,88,.22); --line-hi:rgba(18,38,88,.36);
+  --txt:#242C44; --txt-hi:#060B16; --muted:#414C6E; --chrome:#1E2742;
+  --accent:#1A4EF5; --accent-2:#0F37C6; --accent-deep:#C9D6FF; --glow:rgba(26,78,245,.34); --warm:#CF5220;
   --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72); --glass-border:rgba(40,70,150,.3); --doit-text:#123ccb; --ring:#2f5bd8; --glass-gloss:rgba(255,255,255,.95);
   --net:40,70,150; --net-line:42,92,255; --net-a:.4;
   --logo-shadow:drop-shadow(0 8px 20px rgba(24,44,96,.28)) drop-shadow(0 1px 1px rgba(24,44,96,.25));
   --card-shadow:0 26px 60px -28px rgba(20,40,90,.42), 0 2px 8px -2px rgba(20,40,90,.10);
-  --hero-glow1:rgba(58,130,255,.13); --hero-glow2:rgba(90,160,255,.08); --blob:rgba(64,138,255,.14); --blob2:rgba(120,178,255,.10);
-  --nav-bg:rgba(244,248,253,.85);
+  --hero-glow1:rgba(48,120,255,.16); --hero-glow2:rgba(80,150,255,.10); --blob:rgba(58,132,255,.17); --blob2:rgba(110,172,255,.12);
+  --nav-bg:rgba(238,243,251,.86);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -147,6 +147,9 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .nav-links a:hover{color:var(--txt-hi)}
 .nav-links a::after{content:""; position:absolute; inset-inline:0; inset-block-end:-6px; height:1px; background:var(--accent); transform:scaleX(0); transform-origin:inline-end; transition:transform .3s}
 .nav-links a:hover::after{transform:scaleX(1); transform-origin:inline-start}
+.nav-links a.active{color:var(--txt-hi)}
+.nav-links a.active::after{transform:scaleX(1); transform-origin:inline-start}
+.cursor-trail{position:fixed; inset:0; width:100vw; height:100vh; z-index:70; pointer-events:none}
 .nav-tools{display:flex; align-items:center; gap:10px}
 .icon-btn{width:38px; height:38px; border-radius:11px; border:1px solid var(--line-hi); background:transparent; color:var(--txt-hi); cursor:pointer; display:grid; place-items:center; transition:border-color .25s, background .25s, transform .25s; font-family:var(--mono); font-size:.74rem; font-weight:600; letter-spacing:.04em}
 .icon-btn:hover{border-color:var(--accent); background:rgba(59,116,255,.08); transform:translateY(-1px)}
@@ -217,7 +220,7 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .hero-in{position:relative; z-index:3; display:flex; flex-direction:column; align-items:flex-start}
 [dir="ltr"] .hero-in{align-items:flex-start}
 .hero-logo{width:min(206px,44vw); height:auto; margin-bottom:20px; filter:var(--logo-shadow)}
-.hero h1{font-size:var(--step-4); letter-spacing:-.02em; margin:4px 0 20px}
+.hero h1{font-size:var(--step-4); letter-spacing:-.02em; margin:4px 0 20px; transform-style:preserve-3d; transition:transform .3s cubic-bezier(.2,.7,.2,1)}
 .hero .lead{margin-bottom:36px}
 .hero-cta{display:flex; align-items:center; gap:20px; flex-wrap:wrap}
 .hero-foot{margin-top:46px; display:flex; align-items:center; gap:13px; color:var(--muted); font-size:.9rem}
@@ -228,7 +231,9 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 @media(max-width:640px){.scroll-cue{display:none}.hero{min-height:auto; padding-block:120px 60px}}
 
 /* generic card grid */
-.grid-3{display:grid; gap:18px; grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.grid-3{display:grid; gap:18px; grid-template-columns:1fr}
+@media(min-width:640px){.grid-3{grid-template-columns:1fr 1fr}}
+@media(min-width:940px){.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .grid-2{display:grid; gap:20px; grid-template-columns:1fr}
 @media(min-width:820px){.grid-2{grid-template-columns:1fr 1fr}}
 .card{position:relative; isolation:isolate; border:1px solid var(--line); border-radius:20px; padding:30px 28px; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 55%, transparent)); box-shadow:var(--card-shadow); overflow:hidden; transition:border-color .35s, transform .2s}
@@ -328,8 +333,7 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .integ-sec{padding-block:clamp(32px,5vw,52px); border-block:1px solid var(--line); background:color-mix(in srgb,var(--panel) 30%, transparent)}
 .integ-title{text-align:center; color:var(--muted); font-size:.95rem; margin-bottom:24px}
 .integ-marquee{position:relative; overflow:hidden; -webkit-mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent); mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent)}
-.integ-track{display:flex; align-items:center; gap:clamp(38px,5.5vw,68px); width:max-content; animation:integ-scroll 48s linear infinite; will-change:transform}
-.integ-marquee:hover .integ-track{animation-play-state:paused}
+.integ-track{display:flex; align-items:center; gap:clamp(38px,5.5vw,68px); width:max-content; animation:integ-scroll 32s linear infinite; will-change:transform}
 @keyframes integ-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 .integ-logo{display:inline-flex; align-items:center; gap:11px; color:var(--txt-hi); opacity:.48; filter:grayscale(1); transition:opacity .3s ease, filter .3s ease, transform .3s cubic-bezier(.34,1.56,.64,1); flex:0 0 auto}
 .integ-logo svg{height:27px; width:auto; flex:0 0 auto; fill:currentColor}
@@ -355,6 +359,21 @@ canvas.terrain-canvas{position:fixed; inset:0; width:100vw; height:100vh; z-inde
 canvas.terrain-canvas.show{opacity:1}
 .terrain-zone > section, .terrain-zone > footer{position:relative; z-index:1}
 @keyframes orbDrift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(5%,-4%) scale(1.14)}}
+/* dual-core: depth + observe→act connector beam + do-it glow ring */
+#dualcore{position:relative; overflow:hidden}
+#dualcore::before{content:""; position:absolute; z-index:0; width:44vw; height:44vw; border-radius:50%; left:28%; top:16%; filter:blur(80px); background:radial-gradient(circle,var(--blob),transparent 66%); opacity:.55; pointer-events:none; animation:orbDrift 28s ease-in-out infinite}
+#dualcore .wrap{position:relative; z-index:1}
+.grid-2{position:relative}
+.core-beam{display:none}
+@media(min-width:820px){
+  .core-beam{display:block; position:absolute; z-index:2; top:31%; left:46.5%; width:7%; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.6; pointer-events:none}
+  .core-beam::after{content:""; position:absolute; top:50%; left:0; width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%; background:var(--accent); box-shadow:0 0 12px 3px var(--glow); animation:beamRun 2.6s cubic-bezier(.5,0,.5,1) infinite}
+}
+@keyframes beamRun{0%{left:0; opacity:0}12%{opacity:1}82%{opacity:1}100%{left:100%; opacity:0}}
+.demo-doit{position:relative}
+.demo-doit::after{content:""; position:absolute; inset:-5px; border-radius:999px; border:1.5px solid var(--accent); opacity:0; animation:doitRing 7s ease-in-out infinite}
+@keyframes doitRing{0%,15%{opacity:0; transform:scale(.85)}22%{opacity:.75; transform:scale(1)}42%{opacity:0; transform:scale(1.3)}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.core-beam::after,.demo-doit::after,#dualcore::before{animation:none}.core-beam::after{opacity:0}.demo-doit::after{opacity:0}}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 
@@ -433,7 +452,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     <nav class="nav-links" aria-label="Primary">
       <a href="#challenge" data-i18n="nav.challenge">Challenge</a>
       <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
-      <a href="#security" data-i18n="nav.security">Security</a>
       <a href="#performance" data-i18n="nav.performance">Performance</a>
       <a href="#waitlist" data-i18n="nav.waitlist">Waitlist</a>
     </nav>
@@ -456,7 +474,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     <a href="#challenge" data-i18n="nav.challenge">Challenge</a>
     <a href="#actiongraph" data-i18n="ag.title">The Action Graph</a>
     <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
-    <a href="#security" data-i18n="nav.security">Security</a>
     <a href="#performance" data-i18n="nav.performance">Performance</a>
     <a href="#waitlist" data-i18n="nav.waitlist">Waitlist</a>
   </nav>
@@ -537,6 +554,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         <p class="lead muted" data-i18n="dual.lead">Two engines working together — one visible, one invisible.</p>
       </div>
       <div class="grid-2">
+        <div class="core-beam" aria-hidden="true"></div>
         <div class="panel shadow reveal" data-d="1">
           <div class="art win-art" aria-hidden="true">
             <div class="win">
@@ -585,29 +603,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     </div>
   </section>
 
-  <!-- SECURITY -->
-  <section id="security" class="sec-secure">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow" data-i18n="sec.eyebrow">SECURITY &amp; COMPLIANCE</span>
-        <h2 data-i18n="sec.title">Built for the Most Regulated Industries</h2>
-        <p class="lead muted" data-i18n="sec.lead">Finance, healthcare, legal, and government require the highest security standards. Flow was designed from the ground up to meet — and exceed — them.</p>
-      </div>
-      <div class="sixgrid">
-        <div class="card reveal" data-d="1"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg></div><h3><span class="en">Local-First</span><span data-i18n="s1.t">100% On-Device Processing</span></h3><p data-i18n="s1.b">All AI processing runs on your device using local SLMs. Your data never leaves your machine.</p></div>
-        <div class="card reveal" data-d="2"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3><span class="en">Masking</span><span data-i18n="s2.t">Smart Data Masking</span></h3><p data-i18n="s2.b">PII and sensitive fields are automatically identified and masked before any AI processing.</p></div>
-        <div class="card reveal" data-d="3"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/><path d="M4 8l4 1M20 8l-4 1"/></svg></div><h3><span class="en">Zero Cloud</span><span data-i18n="s3.t">Zero Cloud Dependencies</span></h3><p data-i18n="s3.b">No API keys. No external services. No network latency. Complete operational independence.</p></div>
-        <div class="card reveal" data-d="4"><div class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg></div><h3><span class="en">Audit</span><span data-i18n="s4.t">Immutable Audit Trail</span></h3><p data-i18n="s4.b">Every action is logged with cryptographic proof. Full compliance visibility for regulators.</p></div>
-        <div class="card reveal" data-d="5"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M6 20a6 6 0 0 1 12 0"/><path d="M12 11v3"/></svg></div><h3><span class="en">Human-in-Loop</span><span data-i18n="s5.t">Human-in-the-Loop</span></h3><p data-i18n="s5.b">Critical decisions require human approval. Flow suggests, humans decide. Always.</p></div>
-        <div class="card reveal" data-d="6"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3><span class="en">Governance</span><span data-i18n="s6.t">Governance Engine</span></h3><p data-i18n="s6.b">Role-based access, approval workflows, and policy enforcement built-in.</p></div>
-      </div>
-      <div class="secure-note reveal">
-        <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-        <span data-i18n="sec.note">Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government — where a data leak to the cloud is never an option.</span>
-      </div>
-    </div>
-  </section>
-
   <!-- ARCHITECTURE -->
   <section id="architecture">
     <div class="wrap">
@@ -617,12 +612,16 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         <p class="lead muted" data-i18n="arch.lead">Six foundational pillars that make Flow the most secure, capable, and autonomous workflow engine for mission-critical operations.</p>
       </div>
       <div class="grid-3">
-        <div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div><h3 data-i18n="a1.t">Context Awareness</h3><p data-i18n="a1.b">Flow builds a real-time knowledge graph of your work — learning relationships between CRM data, emails, documents, and spreadsheets across every application.</p></div></div>
-        <div class="card tilt reveal" data-d="2"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3 data-i18n="a2.t">Smart Data Masking</h3><p data-i18n="a2.b">PII and sensitive fields auto-masked before processing. Meets SOC 2, HIPAA, GDPR requirements.</p></div></div>
-        <div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3 data-i18n="a3.t">Cross-App Integration</h3><p data-i18n="a3.b">Connects 200+ apps — Salesforce, HubSpot, Slack, Gmail, Excel. No API keys. No configuration.</p></div></div>
-        <div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="4"/></svg></div><h3 data-i18n="a4.t">Workflow Engine</h3><p data-i18n="a4.b">Deterministic runtime. Every workflow auditable, versioned, rollback-capable. Human-in-the-loop on critical decisions.</p></div></div>
-        <div class="card tilt reveal" data-d="5"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v2"/></svg></div><h3 data-i18n="a5.t">Local-First Security</h3><p data-i18n="a5.b">All processing on-device. Data never leaves your infrastructure. Zero third-party risk.</p></div></div>
-        <div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3 data-i18n="a6.t">Autonomous Execution</h3><p data-i18n="a6.b">Flow learns patterns and executes 24/7. Trigger actions, update records, send communications — automatically.</p></div></div>
+        <div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg></div><h3><span class="en">LOCAL-FIRST</span><span data-i18n="c1.t">100% On-Device Processing</span></h3><p data-i18n="c1.b">All AI inference runs locally using SLMs. Your data never leaves your infrastructure.</p></div></div>
+        <div class="card tilt reveal" data-d="2"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3><span class="en">MASKING</span><span data-i18n="c2.t">Smart Data Masking</span></h3><p data-i18n="c2.b">PII and confidential fields are automatically identified and protected before any processing.</p></div></div>
+        <div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div><h3><span class="en">ACTION GRAPH</span><span data-i18n="c3.t">Institutional Wisdom Infrastructure</span></h3><p data-i18n="c3.b">Maps OS telemetry and causal habits, turning implicit professional judgment into execution memory.</p></div></div>
+        <div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3><span class="en">INTEGRATION</span><span data-i18n="c4.t">Zero-API Cross-App Linking</span></h3><p data-i18n="c4.b">Connects instantly to Salesforce, Excel, Outlook, and 200+ apps within your existing stack.</p></div></div>
+        <div class="card tilt reveal" data-d="5"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3><span class="en">EXECUTION</span><span data-i18n="c5.t">Autonomous &amp; Deterministic</span></h3><p data-i18n="c5.b">Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.</p></div></div>
+        <div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3><span class="en">GOVERNANCE</span><span data-i18n="c6.t">Control &amp; Cryptographic Audit</span></h3><p data-i18n="c6.b">Requires explicit human approval for high-risk tasks while creating unalterable logs for compliance.</p></div></div>
+      </div>
+      <div class="secure-note reveal">
+        <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <span data-i18n="sec.note">Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government — where a data leak to the cloud is never an option.</span>
       </div>
     </div>
   </section>
@@ -713,7 +712,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       <nav class="foot-links" aria-label="Footer">
         <a href="#architecture" data-i18n="foot.features">Features</a>
         <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
-        <a href="#security" data-i18n="nav.security">Security</a>
         <a href="#waitlist" data-i18n="nav.waitlist">Waitlist</a>
       </nav>
     </div>
@@ -779,6 +777,18 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     'arch.eyebrow':{en:'CORE ARCHITECTURE',he:'CORE ARCHITECTURE'},
     'arch.title':{en:'Engineered for Enterprise Intelligence',he:'מהונדס לאינטליגנציה ארגונית'},
     'arch.lead':{en:'Six foundational pillars that make Flow the most secure, capable, and autonomous workflow engine for mission-critical operations.',he:'שישה עמודי תווך שהופכים את Flow למנוע תהליכי העבודה המאובטח, היכול והאוטונומי ביותר למשימות קריטיות.'},
+    'c1.t':{en:'100% On-Device Processing',he:'עיבוד 100% על המכשיר'},
+    'c1.b':{en:'All AI inference runs locally using SLMs. Your data never leaves your infrastructure.',he:'כל היסק ה-AI רץ מקומית עם מודלי SLM. הנתונים שלכם לא עוזבים את התשתית.'},
+    'c2.t':{en:'Smart Data Masking',he:'מיסוך נתונים חכם'},
+    'c2.b':{en:'PII and confidential fields are automatically identified and protected before any processing.',he:'שדות PII ומידע סודי מזוהים ומוגנים אוטומטית לפני כל עיבוד.'},
+    'c3.t':{en:'Institutional Wisdom Infrastructure',he:'תשתית לחוכמה ארגונית'},
+    'c3.b':{en:'Maps OS telemetry and causal habits, turning implicit professional judgment into execution memory.',he:'ממפה טלמטריית מערכת והרגלים סיבתיים, והופך שיפוט מקצועי סמוי לזיכרון ביצוע.'},
+    'c4.t':{en:'Zero-API Cross-App Linking',he:'חיבור חוצה-אפליקציות ללא API'},
+    'c4.b':{en:'Connects instantly to Salesforce, Excel, Outlook, and 200+ apps within your existing stack.',he:'מתחבר מיידית ל-Salesforce, Excel, Outlook ועוד 200+ אפליקציות בסטאק הקיים שלכם.'},
+    'c5.t':{en:'Autonomous & Deterministic',he:'אוטונומי ודטרמיניסטי'},
+    'c5.b':{en:'Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.',he:'מריץ תהליכים בשקט ברקע עם runtime מחמיר שמבטיח אפס הזיות.'},
+    'c6.t':{en:'Control & Cryptographic Audit',he:'בקרה וביקורת קריפטוגרפית'},
+    'c6.b':{en:'Requires explicit human approval for high-risk tasks while creating unalterable logs for compliance.',he:'דורש אישור אנושי מפורש למשימות בסיכון גבוה, ויוצר לוגים בלתי ניתנים לשינוי לצורכי רגולציה.'},
     'a1.t':{en:'Context Awareness',he:'מודעות להקשר'},
     'a1.b':{en:'Flow learns your operational context across every application — the relationships between CRM data, email threads, documents, and spreadsheets — building a real-time knowledge graph of your work.',he:'Flow לומד את ההקשר התפעולי שלכם על פני כל אפליקציה — את הקשרים בין נתוני CRM, שרשורי מייל, מסמכים וגיליונות — ובונה גרף ידע בזמן אמת של העבודה שלכם.'},
     'a2.t':{en:'Smart Data Masking',he:'מיסוך מידע חכם'},
@@ -929,6 +939,37 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     document.querySelectorAll('.card').forEach(function(c){
       c.addEventListener('pointermove',function(ev){ var r=c.getBoundingClientRect(); c.style.setProperty('--mx',((ev.clientX-r.left)/r.width*100).toFixed(1)+'%'); c.style.setProperty('--my',((ev.clientY-r.top)/r.height*100).toFixed(1)+'%'); });
     });
+  }
+
+  /* ---------- active-section nav highlight ---------- */
+  (function(){
+    var links=Array.prototype.slice.call(document.querySelectorAll('.nav-links a[href^="#"]'));
+    if(!links.length) return;
+    var map={}; links.forEach(function(a){ var id=a.getAttribute('href').slice(1), s=document.getElementById(id); if(s) map[id]=a; });
+    var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(a){a.classList.remove('active');}); var a=map[e.target.id]; if(a)a.classList.add('active'); } }); },{rootMargin:'-45% 0px -50% 0px',threshold:0});
+    Object.keys(map).forEach(function(id){ io.observe(document.getElementById(id)); });
+  })();
+
+  /* ---------- hero title 3D parallax ---------- */
+  if(fine && !rm){
+    var heroEl=document.getElementById('hero'), h1=heroEl&&heroEl.querySelector('h1');
+    if(h1){
+      heroEl.addEventListener('pointermove',function(ev){ var r=heroEl.getBoundingClientRect(); var x=(ev.clientX-r.left)/r.width-0.5, y=(ev.clientY-r.top)/r.height-0.5; h1.style.transform='perspective(900px) rotateY('+(x*6).toFixed(2)+'deg) rotateX('+(-y*5).toFixed(2)+'deg)'; });
+      heroEl.addEventListener('pointerleave',function(){ h1.style.transform=''; });
+    }
+  }
+
+  /* ---------- cursor particle trail (dark mode only) ---------- */
+  if(fine && !rm){
+    var tcanvas=document.createElement('canvas'); tcanvas.className='cursor-trail'; tcanvas.setAttribute('aria-hidden','true'); document.body.appendChild(tcanvas);
+    var tg=tcanvas.getContext('2d'), tw,th, trail=[];
+    function tsize(){ tw=tcanvas.width=innerWidth; th=tcanvas.height=innerHeight; }
+    tsize(); addEventListener('resize',tsize,{passive:true});
+    addEventListener('pointermove',function(e){ if(e.pointerType==='touch')return; if(root.getAttribute('data-theme')==='light')return; if(trail.length<60 && Math.random()<0.7) trail.push({x:e.clientX,y:e.clientY,life:1,r:Math.random()*2+1.2}); },{passive:true});
+    (function tdraw(){ tg.clearRect(0,0,tw,th);
+      for(var i=trail.length-1;i>=0;i--){ var p=trail[i]; p.life-=0.05; if(p.life<=0){trail.splice(i,1);continue;}
+        tg.globalAlpha=p.life*0.45; tg.fillStyle='rgba(130,165,255,1)'; tg.beginPath(); tg.arc(p.x,p.y,p.r*p.life,0,6.283); tg.fill(); }
+      tg.globalAlpha=1; requestAnimationFrame(tdraw); })();
   }
 
   /* ---------- wireframe terrain (long blue valley receding to the horizon) ---------- */
