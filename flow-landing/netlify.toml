@@ -1,0 +1,6 @@
+# Static, self-contained landing page — no build step.
+# In Netlify, the site's "Base directory" is set to flow-landing, so
+# publishing "." deploys this folder exactly as-is.
+[build]
+  command = ""
+  publish = "."
