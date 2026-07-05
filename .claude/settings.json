@@ -1,0 +1,20 @@
+{
+  "extraKnownMarketplaces": {
+    "ui-ux-pro-max-skill": {
+      "source": {
+        "source": "github",
+        "repo": "nextlevelbuilder/ui-ux-pro-max-skill"
+      }
+    },
+    "21st": {
+      "source": {
+        "source": "github",
+        "repo": "21st-dev/claude-code-plugin"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true,
+    "21st@21st": true
+  }
+}
