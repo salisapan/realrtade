@@ -408,15 +408,16 @@ canvas.terrain-canvas.show{opacity:1}
 /* Enterprise — circular kinetic typography */
 #enterprise{position:relative; padding-block:clamp(48px,7vw,96px)}
 .enterprise-orbit{position:relative; width:min(620px,94vw); aspect-ratio:1; margin-inline:auto; display:grid; place-items:center}
-.orbit-ring{position:absolute; inset:0; width:100%; height:100%; overflow:visible}
+.orbit-ring{position:absolute; inset:0; width:100%; height:100%; overflow:visible; direction:ltr; unicode-bidi:isolate; filter:drop-shadow(0 14px 34px rgba(20,40,100,.32))}
 .orbit-line{fill:none; stroke:var(--line-hi); stroke-width:1}
 .orbit-line-2{stroke:var(--line); stroke-dasharray:2 7}
 .orbit-rot{transform-box:view-box; transform-origin:center; animation:spin 25s linear infinite}
-.orbit-ring text{font-family:var(--mono); font-size:19px; font-weight:600; letter-spacing:.2em; fill:var(--accent); filter:drop-shadow(0 0 5px var(--glow))}
+.orbit-ring text{direction:ltr; unicode-bidi:isolate; font-family:var(--mono); font-size:19px; font-weight:600; letter-spacing:.2em; fill:var(--accent); filter:drop-shadow(0 0 5px var(--glow))}
 .orbit-center{position:relative; z-index:1; width:64%; text-align:center; display:flex; flex-direction:column; align-items:center; gap:14px}
 .orbit-center .eyebrow{justify-content:center}
 .orbit-center h2{font-size:clamp(1.5rem,1.1rem + 1.6vw,2.4rem)}
 .orbit-center .lead{font-size:clamp(.9rem,.84rem + .3vw,1.02rem); line-height:1.55}
+.ent-tag{display:inline-flex; align-items:center; font-family:var(--mono); font-size:.72rem; letter-spacing:.05em; color:var(--accent-2); padding:8px 16px; border-radius:999px; border:1px solid var(--line-hi); background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 60%,transparent)); box-shadow:var(--card-shadow)}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:640px){.orbit-ring text{font-size:15px; letter-spacing:.12em} .orbit-center{width:74%}}
 @media (prefers-reduced-motion:reduce){.orbit-rot{animation:none}}
@@ -680,6 +681,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
   </section>
 
   <!-- USE CASES -->
+  <div class="terrain-zone">
+    <canvas id="ctaTerrain" class="terrain-canvas" aria-hidden="true"></canvas>
   <section id="enterprise">
     <div class="wrap">
       <div class="enterprise-orbit reveal">
@@ -687,12 +690,13 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
           <defs><path id="orbitPath" d="M300,300 m-256,0 a256,256 0 1,1 512,0 a256,256 0 1,1 -512,0"/></defs>
           <circle class="orbit-line" cx="300" cy="300" r="256"/>
           <circle class="orbit-line orbit-line-2" cx="300" cy="300" r="232"/>
-          <g class="orbit-rot"><text><textPath href="#orbitPath" startOffset="0">LEGAL&#160;&#160;·&#160;&#160;FINANCE&#160;&#160;·&#160;&#160;HEALTHCARE&#160;&#160;·&#160;&#160;DEFENSE&#160;&#160;·&#160;&#160;GOVERNMENT&#160;&#160;·&#160;&#160;INSURANCE&#160;&#160;·&#160;&#160;ARCHITECTS&#160;&#160;·&#160;&#160;APPRAISERS&#160;&#160;·&#160;&#160;UNDERWRITING&#160;&#160;·&#160;&#160;ACCOUNTANTS&#160;&#160;·&#160;&#160;INVESTMENT&#160;FUNDS&#160;&#160;·&#160;&#160;BANKS&#160;&#160;·&#160;&#160;</textPath></text></g>
+          <g class="orbit-rot"><text dir="ltr"><textPath href="#orbitPath" startOffset="0" textLength="1608.5" lengthAdjust="spacing" dir="ltr">LEGAL&#160;&#160;·&#160;&#160;FINANCE&#160;&#160;·&#160;&#160;HEALTHCARE&#160;&#160;·&#160;&#160;DEFENSE&#160;&#160;·&#160;&#160;GOVERNMENT&#160;&#160;·&#160;&#160;INSURANCE&#160;&#160;·&#160;&#160;ARCHITECTS&#160;&#160;·&#160;&#160;APPRAISERS&#160;&#160;·&#160;&#160;UNDERWRITING&#160;&#160;·&#160;&#160;ACCOUNTANTS&#160;&#160;·&#160;&#160;INVESTMENT&#160;FUNDS&#160;&#160;·&#160;&#160;BANKS&#160;&#160;·&#160;&#160;</textPath></text></g>
         </svg>
         <div class="orbit-center">
           <span class="eyebrow" data-i18n="ent.eyebrow">ENTERPRISE DEPLOYMENT</span>
           <h2 data-i18n="ent.title">Custom Infrastructure for Zero-Margin Environments</h2>
-          <p class="lead muted" data-i18n="ent.body">Flow is not a rigid software application. It is an enterprise-grade execution engine. Through a dedicated on-site blueprinting process, we map your organization's proprietary workflows and codify institutional knowledge into a permanent, local-first execution asset.</p>
+          <p class="lead muted" data-i18n="ent.body">Flow is not a rigid software application. It is an enterprise-grade execution engine. Deployment begins with a dedicated scoping engagement — our team works directly with yours to map proprietary workflows and codify institutional knowledge into a permanent, local-first execution asset.</p>
+          <span class="ent-tag" data-i18n="ent.tag">Includes dedicated workflow discovery &amp; scoping with your team</span>
         </div>
       </div>
     </div>
@@ -746,8 +750,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
   </section>
 
   <!-- PERFORMANCE -->
-  <div class="terrain-zone">
-    <canvas id="ctaTerrain" class="terrain-canvas" aria-hidden="true"></canvas>
   <section id="performance">
     <div class="wrap">
       <div class="sec-head reveal">
@@ -902,7 +904,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     'trust.note':{en:'On-device by default. Audited by design. Your data never leaves your infrastructure.',he:'על המכשיר כברירת מחדל. מבוקר בתכנון. הנתונים שלכם לא עוזבים את התשתית.'},
     'ent.eyebrow':{en:'ENTERPRISE DEPLOYMENT',he:'פריסה ארגונית'},
     'ent.title':{en:'Custom Infrastructure for Zero-Margin Environments',he:'תשתית מותאמת לסביבות ללא מרווח לטעות'},
-    'ent.body':{en:'Flow is not a rigid software application. It is an enterprise-grade execution engine. Through a dedicated on-site blueprinting process, we map your organization\'s proprietary workflows and codify institutional knowledge into a permanent, local-first execution asset.',he:'Flow אינו יישום תוכנה נוקשה. זהו מנוע ביצוע ברמה ארגונית. באמצעות תהליך אפיון ייעודי באתר הלקוח, אנו ממפים את תהליכי העבודה הקנייניים של הארגון ומקודדים ידע מוסדי לנכס ביצוע קבוע, מקומי-תחילה.'},
+    'ent.body':{en:'Flow is not a rigid software application. It is an enterprise-grade execution engine. Deployment begins with a dedicated scoping engagement — our team works directly with yours to map proprietary workflows and codify institutional knowledge into a permanent, local-first execution asset.',he:'Flow אינו יישום תוכנה נוקשה. זהו מנוע ביצוע ברמה ארגונית. ההטמעה מתחילה בתהליך אפיון ייעודי — הצוות שלנו עובד ישירות מול הצוות שלכם כדי למפות את תהליכי העבודה הקנייניים ולקודד ידע מוסדי לנכס ביצוע קבוע, מקומי-תחילה.'},
+    'ent.tag':{en:'Includes dedicated workflow discovery & scoping with your team',he:'כולל אפיון ומיפוי תהליכי עבודה ייעודי מול הצוות שלכם'},
     'a1.t':{en:'Context Awareness',he:'מודעות להקשר'},
     'a1.b':{en:'Flow learns your operational context across every application — the relationships between CRM data, email threads, documents, and spreadsheets — building a real-time knowledge graph of your work.',he:'Flow לומד את ההקשר התפעולי שלכם על פני כל אפליקציה — את הקשרים בין נתוני CRM, שרשורי מייל, מסמכים וגיליונות — ובונה גרף ידע בזמן אמת של העבודה שלכם.'},
     'a2.t':{en:'Smart Data Masking',he:'מיסוך מידע חכם'},
@@ -982,6 +985,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     readNetColors();
     if(window.__agraphColors) window.__agraphColors();
     if(window.__ctaTerrainColors) window.__ctaTerrainColors();
+    if(window.__cursorTrailColors) window.__cursorTrailColors();
   }
   document.getElementById('themeBtn').addEventListener('click',function(){
     applyTheme(root.getAttribute('data-theme')==='light'?'dark':'light');
@@ -1073,17 +1077,19 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     }
   }
 
-  /* ---------- cursor particle trail (dark mode only) ---------- */
+  /* ---------- cursor particle trail (both themes) ---------- */
   if(fine && !rm){
     var tcanvas=document.createElement('canvas'); tcanvas.className='cursor-trail'; tcanvas.setAttribute('aria-hidden','true'); document.body.appendChild(tcanvas);
-    var tg=tcanvas.getContext('2d'), tw,th, trail=[];
+    var tg=tcanvas.getContext('2d'), tw,th, trail=[], tcolor;
     function tsize(){ tw=tcanvas.width=innerWidth; th=tcanvas.height=innerHeight; }
-    tsize(); addEventListener('resize',tsize,{passive:true});
-    addEventListener('pointermove',function(e){ if(e.pointerType==='touch')return; if(root.getAttribute('data-theme')==='light')return; if(trail.length<60 && Math.random()<0.7) trail.push({x:e.clientX,y:e.clientY,life:1,r:Math.random()*2+1.2}); },{passive:true});
+    function tcolors(){ tcolor=(getComputedStyle(root).getPropertyValue('--net-line')||'59,116,255').trim(); }
+    tsize(); tcolors(); addEventListener('resize',tsize,{passive:true});
+    addEventListener('pointermove',function(e){ if(e.pointerType==='touch')return; if(trail.length<60 && Math.random()<0.7) trail.push({x:e.clientX,y:e.clientY,life:1,r:Math.random()*2+1.2}); },{passive:true});
     (function tdraw(){ tg.clearRect(0,0,tw,th);
       for(var i=trail.length-1;i>=0;i--){ var p=trail[i]; p.life-=0.05; if(p.life<=0){trail.splice(i,1);continue;}
-        tg.globalAlpha=p.life*0.45; tg.fillStyle='rgba(130,165,255,1)'; tg.beginPath(); tg.arc(p.x,p.y,p.r*p.life,0,6.283); tg.fill(); }
+        tg.globalAlpha=p.life*0.5; tg.fillStyle='rgb('+tcolor+')'; tg.beginPath(); tg.arc(p.x,p.y,p.r*p.life,0,6.283); tg.fill(); }
       tg.globalAlpha=1; requestAnimationFrame(tdraw); })();
+    window.__cursorTrailColors=tcolors;
   }
 
   /* ---------- wireframe terrain (long blue valley receding to the horizon) ---------- */
