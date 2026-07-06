@@ -423,16 +423,24 @@ canvas.terrain-canvas.show{opacity:1}
 .sector-arc.in .arc-line{stroke-dashoffset:0}
 .arc-line-2{stroke:var(--line); stroke-dasharray:2 7}
 .sector-words{position:absolute; inset:0; direction:ltr; unicode-bidi:isolate; animation:arcSway 19s ease-in-out infinite alternate}
-.sector-word{position:absolute; white-space:nowrap; pointer-events:none; font-family:var(--mono); font-weight:600; font-size:clamp(9.5px,1.25vw,13.5px); letter-spacing:.05em; opacity:0;
+/* glass bubbles — transparent, orderly, reusing the site's established glass-button tokens */
+.sector-bubble{position:absolute; display:inline-flex; align-items:center; justify-content:center; padding:9px 20px; border-radius:999px; white-space:nowrap;
+  background:linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(9px);
+  box-shadow:inset 0 1px 0 var(--glass-gloss), 0 10px 28px -14px rgba(20,40,100,.4);
+  --depth-s:1; --depth-o:1; --depth-b:0px;
+  opacity:0; transform:translate(-50%,-50%) scale(.8);
+  transition:opacity .6s ease, transform .4s cubic-bezier(.2,.7,.2,1), filter .4s ease}
+.sector-arc.in .sector-bubble{opacity:var(--depth-o,1); transform:translate(-50%,-50%) scale(var(--depth-s,1)); filter:blur(var(--depth-b,0px))}
+.sector-arc.in .sector-bubble.far{opacity:calc(var(--depth-o,1)*0.68); transform:translate(-50%,-50%) scale(calc(var(--depth-s,1)*0.72)); filter:blur(calc(1px + var(--depth-b,0px)))}
+.sector-word{white-space:nowrap; pointer-events:none; font-family:var(--mono); font-weight:600; font-size:clamp(10.5px,1.3vw,15px); letter-spacing:.05em;
   background:linear-gradient(100deg,color-mix(in srgb,var(--chrome) 45%,var(--bg)) 0%,var(--chrome) 20%,color-mix(in srgb,var(--chrome) 55%,var(--bg)) 42%,var(--chrome) 64%,color-mix(in srgb,var(--chrome) 45%,var(--bg)) 100%);
   background-size:220% 100%; -webkit-background-clip:text; background-clip:text; color:transparent;
-  filter:drop-shadow(0 1px 3px rgba(10,16,32,.3))}
-.sector-arc.in .sector-word{animation:sectorFade .6s ease forwards, chromeSweep 7s linear infinite; animation-delay:var(--d,0s),0s}
-@keyframes sectorFade{to{opacity:1}}
+  filter:drop-shadow(0 1px 3px rgba(10,16,32,.3));
+  animation:chromeSweep 7s linear infinite}
 @keyframes chromeSweep{to{background-position:-220% 0}}
 @keyframes arcSway{0%,100%{transform:translateX(0)}50%{transform:translateX(12px)}}
-@media(max-width:640px){.sector-arc{width:98vw; margin-inline:calc(50% - 49vw)} .sector-word{font-size:9px; letter-spacing:0}}
-@media (prefers-reduced-motion:reduce){.sector-words{animation:none} .arc-line{transition:none; stroke-dashoffset:0} .sector-arc.in .sector-word{animation:none; opacity:1}}
+@media(max-width:640px){.sector-arc{width:98vw; margin-inline:calc(50% - 49vw)} .sector-bubble{padding:7px 14px} .sector-word{font-size:11px; letter-spacing:.03em}}
+@media (prefers-reduced-motion:reduce){.sector-words{animation:none} .arc-line{transition:none; stroke-dashoffset:0} .sector-word{animation:none} .sector-bubble{transition:opacity .4s ease} .sector-arc.in .sector-bubble{transform:translate(-50%,-50%) scale(1); filter:none}}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 
@@ -1042,41 +1050,72 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
   }
   onScroll(); window.addEventListener('scroll',onScroll,{passive:true});
 
-  /* ---------- sector arc — plot words along the quadratic-bezier arc path ---------- */
+  /* ---------- sector arc — two depth layers of glass bubbles along the horizon ---------- */
   (function(){
     var wrap=document.getElementById('sectorWords'); if(!wrap) return;
-    // ordered longest→shortest outside-in, so long words sit toward the steeply-rotated
-    // edges (where rotation compresses their horizontal footprint) and only the shortest
-    // words land at the flat apex — avoids collisions that plain list order caused there.
-    // On narrow viewports there simply isn't room for all 12 without crowding, so a
-    // shorter, still-representative subset is used instead.
     var narrow=window.matchMedia('(max-width:640px)').matches;
-    var words=narrow
-      ? ['GOVERNMENT','FINANCE','LEGAL','BANKS','INSURANCE','HEALTHCARE']
-      : ['PRIVATE EQUITY','ACCOUNTANTS','GOVERNMENT','APPRAISERS','FINANCE','LEGAL','BANKS','DEFENSE','INSURANCE','ARCHITECTS','HEALTHCARE','UNDERWRITING'];
-    var P0={x:3,y:80.6}, P1={x:50,y:-13.9}, P2={x:97,y:80.6}; // % coords matching the .arc-line path in the 1000x360 viewBox
-    function bez(t){ var mt=1-t; return {x:mt*mt*P0.x+2*mt*t*P1.x+t*t*P2.x, y:mt*mt*P0.y+2*mt*t*P1.y+t*t*P2.y}; }
-    function tangent(t){ var dx=2*(1-t)*(P1.x-P0.x)+2*t*(P2.x-P1.x), dy=2*(1-t)*(P1.y-P0.y)+2*t*(P2.y-P1.y); return Math.atan2(dy,dx)*180/Math.PI; }
-    // weight each word's slice of the arc by its length (monospace font → length ≈ pixel width)
-    // AND by how flat it sits: words near the apex render close to unrotated (full width in x),
-    // while words near the ends are rotated steeply and need much less horizontal room —
-    // without this, long words placed near the flat apex overlap their neighbors.
-    var n=words.length, tMin=0.04, tMax=0.96, pad=3;
-    var estT=words.map(function(w,i){ return tMin+((i+0.5)/n)*(tMax-tMin); });
-    var mult=estT.map(function(t){ return Math.max(Math.abs(Math.cos(tangent(t)*Math.PI/180)),0.22); });
-    var weights=words.map(function(w,i){ return (w.replace(' ','').length+pad)*mult[i]; });
-    var total=weights.reduce(function(a,b){ return a+b; },0), cum=0;
-    words.forEach(function(w,i){
-      var center=cum+weights[i]/2, frac=center/total, t=tMin+frac*(tMax-tMin);
-      cum+=weights[i];
-      var pos=bez(t), ang=tangent(t);
-      var span=document.createElement('span');
-      span.className='sector-word'; span.textContent=w;
-      span.style.left=pos.x+'%'; span.style.top=pos.y+'%';
-      span.style.transform='translate(-50%,-50%) rotate('+ang.toFixed(1)+'deg)';
-      span.style.setProperty('--d',(i*0.1)+'s');
-      wrap.appendChild(span);
-    });
+    // Upright glass bubbles have real padding (unlike flowing rotated text before), so 12
+    // in one row is too tight — split into a near row (larger, lower, common sectors) and
+    // a far row (smaller, higher, the rest) for a genuine sense of depth, each independently
+    // length-weighted so words don't collide with their row-neighbors.
+    function bezFactory(P0,P1,P2){ return function(t){ var mt=1-t; return {x:mt*mt*P0.x+2*mt*t*P1.x+t*t*P2.x, y:mt*mt*P0.y+2*mt*t*P1.y+t*t*P2.y}; }; }
+    function makeRow(words,curve,far,delayBase){
+      var pad=far?3.4:4.5, tMin=0.05, tMax=0.95, cum=0;
+      var weights=words.map(function(w){ return w.replace(' ','').length+pad; });
+      var total=weights.reduce(function(a,b){ return a+b; },0);
+      var bubbles=[];
+      words.forEach(function(w,i){
+        var center=cum+weights[i]/2, frac=center/total, t=tMin+frac*(tMax-tMin);
+        cum+=weights[i];
+        var pos=curve(t);
+        var bubble=document.createElement('span');
+        bubble.className='sector-bubble'+(far?' far':'');
+        bubble.style.left=pos.x+'%'; bubble.style.top=pos.y+'%';
+        bubble.style.transitionDelay=(delayBase+i*0.07)+'s';
+        var word=document.createElement('span');
+        word.className='sector-word'; word.textContent=w;
+        bubble.appendChild(word);
+        wrap.appendChild(bubble);
+        bubbles.push(bubble);
+      });
+      return bubbles;
+    }
+    var bubbles;
+    if(narrow){
+      // narrow bubbles carry the same fixed padding as desktop but with far less width to
+      // spend, so mobile also gets two thinner rows (3+3) rather than one crowded row.
+      var nearCurveM=bezFactory({x:4,y:90},{x:50,y:14},{x:96,y:90});
+      var farCurveM=bezFactory({x:10,y:34},{x:50,y:-40},{x:90,y:34});
+      var nearM=makeRow(['LEGAL','FINANCE','HEALTHCARE'],nearCurveM,false,0);
+      var farM=makeRow(['BANKS','INSURANCE','GOVERNMENT'],farCurveM,true,0.1);
+      bubbles=nearM.concat(farM);
+    } else {
+      var nearCurve=bezFactory({x:4,y:92},{x:50,y:18},{x:96,y:92});
+      var farCurve=bezFactory({x:8,y:38},{x:50,y:-38},{x:92,y:38});
+      var near=makeRow(['LEGAL','FINANCE','HEALTHCARE','BANKS','INSURANCE','GOVERNMENT'],nearCurve,false,0);
+      var far=makeRow(['ACCOUNTANTS','APPRAISERS','ARCHITECTS','UNDERWRITING','PRIVATE EQUITY','DEFENSE'],farCurve,true,0.1);
+      bubbles=near.concat(far);
+    }
+
+    // depth-of-field: bubbles grow toward a peak size as they near the viewport's vertical
+    // center while scrolling, then shrink and soften again as they pass — a sense of horizon,
+    // depth, and quality rather than a flat static row.
+    if(!rm){
+      function updateDepth(){
+        var vh=innerHeight, cy=vh*0.5;
+        bubbles.forEach(function(b){
+          var r=b.getBoundingClientRect();
+          var by=r.top+r.height/2;
+          var d=Math.min(Math.abs(by-cy)/(vh*0.62),1);
+          b.style.setProperty('--depth-s',(1.45-d*0.62).toFixed(3));
+          b.style.setProperty('--depth-o',(1-d*0.5).toFixed(3));
+          b.style.setProperty('--depth-b',(d*1.8).toFixed(2)+'px');
+        });
+      }
+      updateDepth();
+      window.addEventListener('scroll',updateDepth,{passive:true});
+      window.addEventListener('resize',updateDepth);
+    }
   })();
 
   /* ---------- smooth scroll ---------- */
