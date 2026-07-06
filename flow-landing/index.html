@@ -68,16 +68,16 @@
   --nav-bg:rgba(9,12,20,.72);
 }
 :root[data-theme="light"]{
-  --bg:#E4ECF7; --bg2:#D6E1F1; --panel:#FFFFFF; --panel-2:#F3F7FD;
-  --line:rgba(18,38,88,.22); --line-hi:rgba(18,38,88,.36);
-  --txt:#242C44; --txt-hi:#060B16; --muted:#414C6E; --chrome:#1E2742;
-  --accent:#1A4EF5; --accent-2:#0F37C6; --accent-deep:#C9D6FF; --glow:rgba(26,78,245,.34); --warm:#CF5220;
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#FFFFFF; --panel-2:#F4F8FD;
+  --line:rgba(20,44,100,.11); --line-hi:rgba(20,44,100,.20);
+  --txt:#232B44; --txt-hi:#060B16; --muted:#455073; --chrome:#1E2742;
+  --accent:#1A4EF5; --accent-2:#0F37C6; --accent-deep:#C9D6FF; --glow:rgba(26,78,245,.30); --warm:#CF5220;
   --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72); --glass-border:rgba(40,70,150,.3); --doit-text:#123ccb; --ring:#2f5bd8; --glass-gloss:rgba(255,255,255,.95);
-  --net:40,70,150; --net-line:42,92,255; --net-a:.4;
-  --logo-shadow:drop-shadow(0 8px 20px rgba(24,44,96,.28)) drop-shadow(0 1px 1px rgba(24,44,96,.25));
-  --card-shadow:0 26px 60px -28px rgba(20,40,90,.42), 0 2px 8px -2px rgba(20,40,90,.10);
-  --hero-glow1:rgba(48,120,255,.16); --hero-glow2:rgba(80,150,255,.10); --blob:rgba(58,132,255,.17); --blob2:rgba(110,172,255,.12);
-  --nav-bg:rgba(238,243,251,.86);
+  --net:52,104,230; --net-line:40,100,255; --net-a:.6;
+  --logo-shadow:drop-shadow(0 8px 20px rgba(24,44,96,.24)) drop-shadow(0 1px 1px rgba(24,44,96,.22));
+  --card-shadow:0 30px 60px -26px rgba(28,64,150,.30), 0 10px 24px -12px rgba(28,64,150,.16);
+  --hero-glow1:rgba(52,124,255,.18); --hero-glow2:rgba(90,158,255,.13); --blob:rgba(60,134,255,.20); --blob2:rgba(120,178,255,.15);
+  --nav-bg:rgba(255,255,255,.82);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -92,13 +92,17 @@ body{
     linear-gradient(180deg,var(--bg),var(--bg2) 60%,var(--bg));
   background-attachment:fixed;
 }
-/* light mode: flat clean base — no full-page corner wash; bubbles live only in the hero */
+/* light mode: pure white base with soft glowing blue bubbles */
 :root[data-theme="light"] body{
-  background:linear-gradient(180deg,var(--bg),var(--bg2));
+  background:
+    radial-gradient(760px 560px at 84% 2%, rgba(56,122,255,.15), transparent 62%),
+    radial-gradient(640px 520px at 8% 20%, rgba(96,158,255,.11), transparent 62%),
+    radial-gradient(720px 560px at 62% 96%, rgba(60,130,255,.10), transparent 62%),
+    #FFFFFF;
   background-attachment:fixed;
 }
 #bgcanvas{position:fixed; inset:0; width:100%; height:100%; z-index:0; opacity:.55; pointer-events:none}
-:root[data-theme="light"] #bgcanvas{opacity:.4}
+:root[data-theme="light"] #bgcanvas{opacity:.85}
 .wrap{max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(20px,5vw,40px); position:relative; z-index:2}
 a{color:inherit; text-decoration:none}
 img{max-width:100%; display:block}
@@ -270,28 +274,32 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .grid-scan.anim::after{animation:scanY 4s linear infinite}
 @keyframes scanY{0%{inset-block-start:-60px}100%{inset-block-start:100%}}
 
-/* dual-core live demo */
-.art.demo{height:214px; flex-direction:column; align-items:stretch; justify-content:center; gap:0; padding:18px 20px; overflow:hidden}
-.demo-chip{align-self:flex-start; font-family:var(--mono); font-size:.7rem; letter-spacing:.04em; color:var(--accent-2); border:1px solid var(--line-hi); border-radius:999px; padding:6px 12px; background:color-mix(in srgb,var(--panel) 70%,transparent); opacity:0; animation:d-chip 7s ease-in-out infinite}
-.demo-doit{align-self:center; margin:13px 0 15px; font-family:var(--disp); font-weight:700; font-size:.98rem; color:var(--doit-text); padding:9px 24px; border-radius:999px; background:linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); box-shadow:0 0 22px -4px var(--glow); opacity:0; animation:d-doit 7s ease-in-out infinite}
+/* dual-core live demo — one synchronized 8s story with a faux cursor */
+.art.demo{height:214px; flex-direction:column; align-items:stretch; justify-content:center; gap:0; padding:18px 20px; overflow:hidden; position:relative}
+.demo-chip{align-self:flex-start; font-family:var(--mono); font-size:.7rem; letter-spacing:.04em; color:var(--accent-2); border:1px solid var(--line-hi); border-radius:999px; padding:6px 12px; background:color-mix(in srgb,var(--panel) 70%,transparent); opacity:0; animation:d-chip 8s ease-in-out infinite}
+.demo-doit{align-self:center; margin:13px 0 15px; font-family:var(--disp); font-weight:700; font-size:.98rem; color:var(--doit-text); padding:9px 24px; border-radius:999px; background:linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); box-shadow:0 0 22px -4px var(--glow); opacity:0; animation:d-doit 8s ease-in-out infinite}
 .demo-steps{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px}
 .demo-steps li{position:relative; padding-inline-start:26px; font-size:.85rem; color:var(--muted); opacity:0}
 .demo-steps li::before{content:""; position:absolute; inset-inline-start:0; inset-block-start:1px; width:16px; height:16px; border-radius:50%; border:1.5px solid var(--accent)}
 .demo-steps li::after{content:"✓"; position:absolute; inset-inline-start:3.5px; inset-block-start:-1px; font-size:.72rem; font-weight:700; color:var(--accent-2); opacity:0}
-.demo-steps li:nth-child(1){animation:d-s1 7s ease-in-out infinite}
-.demo-steps li:nth-child(2){animation:d-s2 7s ease-in-out infinite}
-.demo-steps li:nth-child(3){animation:d-s3 7s ease-in-out infinite}
-.demo-steps li:nth-child(1)::after{animation:d-c1 7s ease-in-out infinite}
-.demo-steps li:nth-child(2)::after{animation:d-c2 7s ease-in-out infinite}
-.demo-steps li:nth-child(3)::after{animation:d-c3 7s ease-in-out infinite}
-@keyframes d-chip{0%,3%{opacity:0;transform:translateY(-6px)}9%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
-@keyframes d-doit{0%,15%{opacity:0;transform:scale(.9)}22%{opacity:1;transform:scale(1.05)}26%,90%{opacity:1;transform:scale(1)}97%,100%{opacity:0}}
-@keyframes d-s1{0%,29%{opacity:0;transform:translateX(-6px)}36%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
-@keyframes d-s2{0%,42%{opacity:0;transform:translateX(-6px)}49%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
-@keyframes d-s3{0%,55%{opacity:0;transform:translateX(-6px)}62%,90%{opacity:1;transform:none}97%,100%{opacity:0}}
-@keyframes d-c1{0%,38%{opacity:0}44%,100%{opacity:1}}
-@keyframes d-c2{0%,51%{opacity:0}57%,100%{opacity:1}}
-@keyframes d-c3{0%,64%{opacity:0}70%,100%{opacity:1}}
+.demo-steps li:nth-child(1){animation:d-s1 8s ease-in-out infinite}
+.demo-steps li:nth-child(2){animation:d-s2 8s ease-in-out infinite}
+.demo-steps li:nth-child(3){animation:d-s3 8s ease-in-out infinite}
+.demo-steps li:nth-child(1)::after{animation:d-c1 8s ease-in-out infinite}
+.demo-steps li:nth-child(2)::after{animation:d-c2 8s ease-in-out infinite}
+.demo-steps li:nth-child(3)::after{animation:d-c3 8s ease-in-out infinite}
+.demo-cursor{position:absolute; left:24%; top:96%; width:20px; height:20px; z-index:6; opacity:0; pointer-events:none; filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); animation:demoCursor 8s cubic-bezier(.5,0,.25,1) infinite}
+.demo-cursor svg{width:100%; height:100%; display:block; fill:var(--txt-hi); stroke:var(--panel); stroke-width:1}
+@keyframes d-chip{0%,8%{opacity:0;transform:translateY(-6px)}14%,90%{opacity:1;transform:none}96%,100%{opacity:0}}
+@keyframes d-doit{0%,14%{opacity:0;transform:scale(.9)}20%{opacity:1;transform:scale(1.06)}25%,39%{opacity:1;transform:scale(1)}41%{transform:scale(.86)}45%{transform:scale(1.05)}49%,90%{transform:scale(1)}96%,100%{opacity:0;transform:scale(1)}}
+@keyframes d-s1{0%,45%{opacity:0;transform:translateX(-6px)}51%,90%{opacity:1;transform:none}96%,100%{opacity:0}}
+@keyframes d-s2{0%,55%{opacity:0;transform:translateX(-6px)}61%,90%{opacity:1;transform:none}96%,100%{opacity:0}}
+@keyframes d-s3{0%,65%{opacity:0;transform:translateX(-6px)}71%,90%{opacity:1;transform:none}96%,100%{opacity:0}}
+@keyframes d-c1{0%,49%{opacity:0}54%,100%{opacity:1}}
+@keyframes d-c2{0%,59%{opacity:0}64%,100%{opacity:1}}
+@keyframes d-c3{0%,69%{opacity:0}74%,100%{opacity:1}}
+@keyframes demoCursor{0%,18%{opacity:0; left:26%; top:98%}23%{opacity:1; left:26%; top:98%}39%{opacity:1; left:50%; top:32%}41%{left:50%; top:35%}45%{left:50%; top:32%}86%{opacity:1; left:50%; top:32%}93%,100%{opacity:0; left:26%; top:98%}}
+@media (prefers-reduced-motion:reduce){.demo-chip,.demo-doit,.demo-steps li,.demo-steps li::after,.demo-cursor{animation:none!important; opacity:1}.demo-cursor{opacity:0}}
 [dir="rtl"] .demo-steps li{padding-inline-start:26px}
 
 /* shadow: scanned work-window */
@@ -367,13 +375,33 @@ canvas.terrain-canvas.show{opacity:1}
 .core-beam{display:none}
 @media(min-width:820px){
   .core-beam{display:block; position:absolute; z-index:2; top:31%; left:46.5%; width:7%; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.6; pointer-events:none}
-  .core-beam::after{content:""; position:absolute; top:50%; left:0; width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%; background:var(--accent); box-shadow:0 0 12px 3px var(--glow); animation:beamRun 2.6s cubic-bezier(.5,0,.5,1) infinite}
+  .core-beam::after{content:""; position:absolute; top:50%; left:0; width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%; background:var(--accent); box-shadow:0 0 12px 3px var(--glow); animation:beamRun 8s cubic-bezier(.5,0,.5,1) infinite}
 }
-@keyframes beamRun{0%{left:0; opacity:0}12%{opacity:1}82%{opacity:1}100%{left:100%; opacity:0}}
+@keyframes beamRun{0%,7%{left:0; opacity:0}11%{opacity:1}19%{left:100%; opacity:1}23%,100%{left:100%; opacity:0}}
 .demo-doit{position:relative}
-.demo-doit::after{content:""; position:absolute; inset:-5px; border-radius:999px; border:1.5px solid var(--accent); opacity:0; animation:doitRing 7s ease-in-out infinite}
-@keyframes doitRing{0%,15%{opacity:0; transform:scale(.85)}22%{opacity:.75; transform:scale(1)}42%{opacity:0; transform:scale(1.3)}100%{opacity:0}}
+.demo-doit::after{content:""; position:absolute; inset:-5px; border-radius:999px; border:1.5px solid var(--accent); opacity:0; animation:doitRing 8s ease-in-out infinite}
+@keyframes doitRing{0%,40%{opacity:0; transform:scale(.85)}44%{opacity:.8; transform:scale(1)}58%{opacity:0; transform:scale(1.35)}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.core-beam::after,.demo-doit::after,#dualcore::before{animation:none}.core-beam::after{opacity:0}.demo-doit::after{opacity:0}}
+/* How It Works — step cards */
+#how{position:relative}
+.steps .card{padding-block:34px}
+.step-n{font-family:var(--mono); font-weight:700; font-size:2.4rem; line-height:1; color:var(--accent); opacity:.28; margin-bottom:14px; letter-spacing:-.02em}
+.steps .card:hover .step-n{opacity:.5; transition:opacity .35s}
+/* Use cases reuse .sixgrid + .card */
+#usecases{position:relative}
+#usecases .sixgrid{grid-template-columns:1fr}
+@media(min-width:760px){#usecases .sixgrid{grid-template-columns:1fr 1fr}}
+/* Trust band */
+.trust-sec{position:relative; overflow:hidden; border-block:1px solid var(--line); padding-block:clamp(40px,6vw,64px); background:color-mix(in srgb,var(--panel) 22%, transparent); text-align:center}
+.trust-sec::before{content:""; position:absolute; z-index:0; inset:auto; width:60vw; height:60vw; left:20%; top:-30%; border-radius:50%; filter:blur(90px); background:radial-gradient(circle,var(--blob),transparent 66%); opacity:.5; pointer-events:none; animation:orbDrift 30s ease-in-out infinite}
+.trust-sec .wrap{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:22px}
+.trust-sec .eyebrow{justify-content:center}
+.trust-row{display:flex; flex-wrap:wrap; justify-content:center; gap:14px}
+.trust-badge{display:inline-flex; align-items:center; gap:9px; font-family:var(--mono); font-size:.82rem; letter-spacing:.06em; color:var(--txt-hi); padding:11px 18px; border-radius:999px; border:1px solid var(--line-hi); background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 60%,transparent)); box-shadow:var(--card-shadow); transition:transform .3s cubic-bezier(.34,1.56,.64,1), border-color .3s}
+.trust-badge:hover{transform:translateY(-4px); border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.trust-badge svg{width:19px; height:19px; fill:none; stroke:var(--accent-2); stroke-width:1.6; flex:0 0 auto}
+.trust-note{max-width:60ch; color:var(--muted); font-size:1rem}
+@media (prefers-reduced-motion:reduce){.trust-sec::before{animation:none}}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 
@@ -594,11 +622,28 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
               <li data-i18n="demo.s2">Update the CRM record</li>
               <li data-i18n="demo.s3">File &amp; schedule follow-up</li>
             </ul>
+            <span class="demo-cursor" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 2l14 8.2-6.1 1.3-3 6.3L5 2z"/></svg></span>
           </div>
           <span class="tag">Do It — Visible</span>
           <h3 data-i18n="doit.t">The button that appears at the right moment.</h3>
           <p data-i18n="doit.b">The instant intent is detected, a focused execution button surfaces. No hunting for tools, no switching screens — the action is already here.</p>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow" data-i18n="hw.eyebrow">HOW IT WORKS</span>
+        <h2 data-i18n="hw.title">From signal to action — in three steps.</h2>
+        <p class="lead muted" data-i18n="hw.lead">No prompts. No dashboards. Flow turns everyday work into finished tasks — automatically.</p>
+      </div>
+      <div class="grid-3 steps">
+        <div class="card reveal" data-d="1"><div class="step-n">01</div><h3><span class="en" data-i18n="hw1.l">OBSERVE</span><span data-i18n="hw1.t">Watches your work on-device</span></h3><p data-i18n="hw1.b">Flow's shadow layer reads your screen locally with CV &amp; OCR — no permissions, no cloud, nothing sent anywhere.</p></div>
+        <div class="card reveal" data-d="2"><div class="step-n">02</div><h3><span class="en" data-i18n="hw2.l">DETECT</span><span data-i18n="hw2.t">Knows the exact moment</span></h3><p data-i18n="hw2.b">It maps causal patterns into the Action Graph and recognizes precisely when a task needs doing.</p></div>
+        <div class="card reveal" data-d="3"><div class="step-n">03</div><h3><span class="en" data-i18n="hw3.l">EXECUTE</span><span data-i18n="hw3.t">One click, done</span></h3><p data-i18n="hw3.b">A focused [Do It] surfaces. One click runs the workflow deterministically — draft, update, file, schedule.</p></div>
       </div>
     </div>
   </section>
@@ -622,6 +667,23 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       <div class="secure-note reveal">
         <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
         <span data-i18n="sec.note">Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government — where a data leak to the cloud is never an option.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- USE CASES -->
+  <section id="usecases">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow" data-i18n="uc.eyebrow">WHO IT'S FOR</span>
+        <h2 data-i18n="uc.title">Built for teams where mistakes cost the most.</h2>
+        <p class="lead muted" data-i18n="uc.lead">Wherever data is sensitive and precision is non-negotiable, Flow works without ever touching the cloud.</p>
+      </div>
+      <div class="sixgrid">
+        <div class="card reveal" data-d="1"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3v18M6 21h12M12 4l-7 2 3 5a3.5 3.5 0 0 1-6 0l3-5M12 4l7 2-3 5a3.5 3.5 0 0 0 6 0l-3-5"/></svg></div><h3><span class="en">LEGAL</span><span data-i18n="uc1.t">Privileged by default</span></h3><p data-i18n="uc1.b">Draft, redline, and file matters while every privileged document stays on your machine.</p></div>
+        <div class="card reveal" data-d="2"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-4"/></svg></div><h3><span class="en">FINANCE</span><span data-i18n="uc2.t">Zero-leak automation</span></h3><p data-i18n="uc2.b">Reconcile records and update CRMs with PII masked before anything is processed.</p></div>
+        <div class="card reveal" data-d="3"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.3-7-9.5A3.5 3.5 0 0 1 12 8a3.5 3.5 0 0 1 7 3.5C19 16.7 12 21 12 21z"/><path d="M9 12h2v-2h2v2h2" fill="none"/></svg></div><h3><span class="en">HEALTHCARE</span><span data-i18n="uc3.t">HIPAA without the cloud</span></h3><p data-i18n="uc3.b">Summarize charts and automate intake while patient data never leaves your infrastructure.</p></div>
+        <div class="card reveal" data-d="4"><div class="ic"><svg viewBox="0 0 24 24"><path d="M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6"/></svg></div><h3><span class="en">GOVERNMENT</span><span data-i18n="uc4.t">Auditable &amp; independent</span></h3><p data-i18n="uc4.b">Automate casework with cryptographic audit trails and complete operational independence.</p></div>
       </div>
     </div>
   </section>
@@ -656,6 +718,20 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
           <span class="integ-logo" title="iManage" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M18.5 5.2c2.3 2 2.6 6.1.4 9.3-2.2 3.2-6.5 5.1-10 4.4-3-.6-4.6-3-4-6.2.7-3.8 4-7.2 7.8-8.2 2-.5 3.9-.4 5.8.7ZM9.4 7.55a1.15 1.15 0 1 1 0 2.3 1.15 1.15 0 0 1 0-2.3ZM7.6 15.4v-4.2c0-1 .8-1.7 1.8-1.7.7 0 1.3.4 1.6 1 .3-.6.9-1 1.7-1 1.1 0 1.9.8 1.9 1.9v4h-1.5v-3.8c0-.4-.3-.7-.7-.7s-.7.3-.7.7v3.8h-1.5v-3.8c0-.4-.3-.7-.7-.7s-.6.3-.6.7v3.8H7.6Z"/></svg><span>iManage</span></span>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- TRUST -->
+  <section id="trust" class="trust-sec">
+    <div class="wrap">
+      <span class="eyebrow reveal" data-i18n="trust.eyebrow">SECURITY YOU CAN PROVE</span>
+      <div class="trust-row reveal" data-d="1">
+        <span class="trust-badge"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg>SOC 2 Type II</span>
+        <span class="trust-badge"><svg viewBox="0 0 24 24"><path d="M12 21s-7-4.3-7-9.5A3.5 3.5 0 0 1 12 8a3.5 3.5 0 0 1 7 3.5C19 16.7 12 21 12 21z"/></svg>HIPAA</span>
+        <span class="trust-badge"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3.5 9h17M3.5 15h17M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>GDPR</span>
+        <span class="trust-badge"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/><path d="M5 5l14 14"/></svg>Zero-Retention</span>
+      </div>
+      <p class="trust-note reveal" data-d="2" data-i18n="trust.note">On-device by default. Audited by design. Your data never leaves your infrastructure.</p>
     </div>
   </section>
 
@@ -789,6 +865,31 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     'c5.b':{en:'Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.',he:'מריץ תהליכים בשקט ברקע עם runtime מחמיר שמבטיח אפס הזיות.'},
     'c6.t':{en:'Control & Cryptographic Audit',he:'בקרה וביקורת קריפטוגרפית'},
     'c6.b':{en:'Requires explicit human approval for high-risk tasks while creating unalterable logs for compliance.',he:'דורש אישור אנושי מפורש למשימות בסיכון גבוה, ויוצר לוגים בלתי ניתנים לשינוי לצורכי רגולציה.'},
+    'hw.eyebrow':{en:'HOW IT WORKS',he:'איך זה עובד'},
+    'hw.title':{en:'From signal to action — in three steps.',he:'מאות לפעולה — בשלושה שלבים.'},
+    'hw.lead':{en:'No prompts. No dashboards. Flow turns everyday work into finished tasks — automatically.',he:'בלי פרומפטים. בלי דשבורדים. Flow הופך עבודה יומיומית למשימות גמורות — אוטומטית.'},
+    'hw1.l':{en:'OBSERVE',he:'צופה'},
+    'hw1.t':{en:'Watches your work on-device',he:'צופה בעבודה שלכם על המכשיר'},
+    'hw1.b':{en:'Flow\'s shadow layer reads your screen locally with CV & OCR — no permissions, no cloud, nothing sent anywhere.',he:'שכבת הצל של Flow קוראת את המסך מקומית עם CV ו-OCR — בלי הרשאות, בלי ענן, בלי לשלוח דבר.'},
+    'hw2.l':{en:'DETECT',he:'מזהה'},
+    'hw2.t':{en:'Knows the exact moment',he:'יודע את הרגע המדויק'},
+    'hw2.b':{en:'It maps causal patterns into the Action Graph and recognizes precisely when a task needs doing.',he:'ממפה דפוסים סיבתיים לתוך גרף הפעולות ומזהה בדיוק מתי משימה צריכה להתבצע.'},
+    'hw3.l':{en:'EXECUTE',he:'מבצע'},
+    'hw3.t':{en:'One click, done',he:'קליק אחד, בוצע'},
+    'hw3.b':{en:'A focused [Do It] surfaces. One click runs the workflow deterministically — draft, update, file, schedule.',he:'כפתור [Do It] ממוקד עולה. קליק אחד מריץ את התהליך דטרמיניסטית — טיוטה, עדכון, תיוק, תזמון.'},
+    'uc.eyebrow':{en:'WHO IT\'S FOR',he:'למי זה מיועד'},
+    'uc.title':{en:'Built for teams where mistakes cost the most.',he:'נבנה לצוותים שבהם טעויות עולות הכי ביוקר.'},
+    'uc.lead':{en:'Wherever data is sensitive and precision is non-negotiable, Flow works without ever touching the cloud.',he:'בכל מקום שבו המידע רגיש והדיוק הוא חובה, Flow פועל בלי לגעת בענן.'},
+    'uc1.t':{en:'Privileged by default',he:'חסוי כברירת מחדל'},
+    'uc1.b':{en:'Draft, redline, and file matters while every privileged document stays on your machine.',he:'ניסוח, סימון ותיוק תיקים — כשכל מסמך חסוי נשאר על המכשיר שלכם.'},
+    'uc2.t':{en:'Zero-leak automation',he:'אוטומציה ללא דליפות'},
+    'uc2.b':{en:'Reconcile records and update CRMs with PII masked before anything is processed.',he:'התאמת רשומות ועדכון CRM כש-PII ממוסך לפני כל עיבוד.'},
+    'uc3.t':{en:'HIPAA without the cloud',he:'HIPAA בלי הענן'},
+    'uc3.b':{en:'Summarize charts and automate intake while patient data never leaves your infrastructure.',he:'סיכום תיקים ואוטומציה של קליטה — כשנתוני המטופל לא עוזבים את התשתית.'},
+    'uc4.t':{en:'Auditable & independent',he:'ניתן לביקורת ועצמאי'},
+    'uc4.b':{en:'Automate casework with cryptographic audit trails and complete operational independence.',he:'אוטומציה של תיקים עם שרשרת ביקורת קריפטוגרפית ועצמאות תפעולית מלאה.'},
+    'trust.eyebrow':{en:'SECURITY YOU CAN PROVE',he:'אבטחה שאפשר להוכיח'},
+    'trust.note':{en:'On-device by default. Audited by design. Your data never leaves your infrastructure.',he:'על המכשיר כברירת מחדל. מבוקר בתכנון. הנתונים שלכם לא עוזבים את התשתית.'},
     'a1.t':{en:'Context Awareness',he:'מודעות להקשר'},
     'a1.b':{en:'Flow learns your operational context across every application — the relationships between CRM data, email threads, documents, and spreadsheets — building a real-time knowledge graph of your work.',he:'Flow לומד את ההקשר התפעולי שלכם על פני כל אפליקציה — את הקשרים בין נתוני CRM, שרשורי מייל, מסמכים וגיליונות — ובונה גרף ידע בזמן אמת של העבודה שלכם.'},
     'a2.t':{en:'Smart Data Masking',he:'מיסוך מידע חכם'},
@@ -1177,8 +1278,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
           if(add){ var psz=(4-tl*0.7)*DPR*ss*1.7; g.globalAlpha=0.5*p*ss*env*(1-tl/4); g.drawImage(glowNear,tx-psz/2,ty-psz/2,psz,psz); }
           else { g.globalAlpha=0.55*p*ss*env*(1-tl/4); g.fillStyle='rgb('+PAL.sparkRGB.join(',')+')'; g.beginPath(); g.arc(tx,ty,1.3*DPR*ss*(1-tl*0.15),0,6.283); g.fill(); } } }
         g.globalAlpha=1; }
-      /* rising particles */
-      updateParticles(el,p); drawParticles(el,a,azw,axw);
       /* nodes — depth sorted, glow bloom + depth color ramp */
       var order=[]; for(i=0;i<nodes.length;i++) order.push(i);
       order.sort(function(u,v){ return P[u].z-P[v].z; });
