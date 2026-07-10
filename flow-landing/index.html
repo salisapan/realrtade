@@ -394,18 +394,6 @@ canvas.terrain-canvas.show{opacity:1}
 .demo-doit::after{content:""; position:absolute; inset:-5px; border-radius:999px; border:1.5px solid var(--accent); opacity:0; animation:doitRing 6s ease-in-out infinite}
 @keyframes doitRing{0%,40%{opacity:0; transform:scale(.85)}44%{opacity:.8; transform:scale(1)}58%{opacity:0; transform:scale(1.35)}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.core-beam::after,.demo-doit::after,#dualcore::before{animation:none}.core-beam::after{opacity:0}.demo-doit::after{opacity:0}}
-/* How It Works — compact strip folded into #dualcore */
-.how-strip{position:relative; margin-top:clamp(28px,4vw,44px); padding-top:clamp(22px,3vw,32px); border-top:1px solid var(--line)}
-.how-strip-label{justify-content:center; width:100%; margin-bottom:18px}
-/* compact horizontal stepper — numbers + short labels only, no card/paragraph */
-.stepper{display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px 0; max-width:920px; margin-inline:auto}
-.step{display:flex; align-items:center; gap:10px}
-.step-num{font-family:var(--mono); font-weight:700; font-size:1.2rem; color:var(--accent); opacity:.55; letter-spacing:-.02em; flex:0 0 auto}
-.step-txt{display:flex; flex-direction:column; line-height:1.3}
-.step-label{font-family:var(--disp); font-weight:700; font-size:.72rem; letter-spacing:.08em; color:var(--txt-hi)}
-.step-tag{font-size:.82rem; color:var(--muted)}
-.step-line{flex:1 1 44px; min-width:20px; height:1px; background:linear-gradient(90deg,var(--line-hi),var(--line)); margin-inline:16px}
-@media(max-width:760px){.stepper{flex-direction:column; align-items:flex-start; gap:16px} .step-line{display:none}}
 /* Use cases reuse .sixgrid + .card */
 #usecases{position:relative}
 #usecases .sixgrid{grid-template-columns:1fr}
@@ -421,25 +409,6 @@ canvas.terrain-canvas.show{opacity:1}
 .trust-badge svg{width:19px; height:19px; fill:none; stroke:var(--accent-2); stroke-width:1.6; flex:0 0 auto}
 .trust-note{max-width:60ch; color:var(--muted); font-size:1rem}
 @media (prefers-reduced-motion:reduce){.trust-sec::before{animation:none}}
-/* Enterprise — ordered sector grid, silver chrome text */
-#enterprise{position:relative; padding-block:clamp(32px,5vw,72px)}
-.sector-grid{display:grid; grid-template-columns:repeat(3,1fr); grid-auto-rows:60px; gap:16px 12px; max-width:760px; margin:clamp(28px,4vw,44px) auto 0; direction:ltr; unicode-bidi:isolate}
-/* glass bubbles — transparent, orderly, reusing the site's established glass-button tokens */
-.sector-bubble{display:flex; align-items:center; justify-content:center; align-self:center; justify-self:center; width:100%; height:100%;
-  padding:calc(9px*var(--depth-sc,1)) calc(8px*var(--depth-sc,1)); border-radius:999px; white-space:nowrap; text-align:center;
-  background:linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(9px);
-  box-shadow:inset 0 1px 0 var(--glass-gloss), 0 10px 28px -14px rgba(20,40,100,.4);
-  --depth-sc:1; --depth-o:1;
-  opacity:0; transform:translateY(14px);
-  transition:opacity .5s ease, transform .5s cubic-bezier(.2,.7,.2,1), padding .3s ease}
-.sector-grid.in .sector-bubble{opacity:var(--depth-o,1); transform:translateY(0)}
-.sector-word{white-space:nowrap; pointer-events:none; font-family:var(--mono); font-weight:600; letter-spacing:.04em;
-  font-size:calc(clamp(10.5px,1.6vw,13.5px)*var(--depth-sc,1));
-  background:linear-gradient(100deg,color-mix(in srgb,var(--chrome) 45%,var(--bg)) 0%,var(--chrome) 22%,color-mix(in srgb,var(--chrome) 55%,var(--bg)) 46%,var(--chrome) 70%,color-mix(in srgb,var(--chrome) 45%,var(--bg)) 100%);
-  -webkit-background-clip:text; background-clip:text; color:transparent;
-  transition:font-size .3s ease}
-@media(max-width:640px){.sector-grid{max-width:100%; grid-auto-rows:52px; gap:12px 8px} .sector-word{font-size:calc(clamp(9.5px,3.4vw,12px)*var(--depth-sc,1))}}
-@media (prefers-reduced-motion:reduce){.sector-bubble{transition:opacity .4s ease} .sector-grid.in .sector-bubble{--depth-sc:1; opacity:1}}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 
@@ -495,9 +464,6 @@ canvas.terrain-canvas.show{opacity:1}
 .wait-wrap.reveal.in .field input{animation:waitFieldWelcome 1.6s ease-out .3s 1}
 @keyframes waitFieldWelcome{0%{box-shadow:0 0 0 0 var(--glow)}45%{box-shadow:0 0 0 8px var(--glow)}100%{box-shadow:0 0 0 0 transparent}}
 .wait-msg.err{color:#ff7a55}
-.badges{display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:6px}
-.badge{display:inline-flex; align-items:center; gap:8px; padding:9px 16px; border-radius:999px; border:1px solid var(--line-hi); color:var(--muted); font-family:var(--mono); font-size:.74rem; letter-spacing:.05em; direction:ltr}
-.badge svg{width:14px; height:14px; stroke:var(--accent-2); fill:none; stroke-width:1.8}
 .cta-fine{color:var(--muted); font-size:.86rem; display:flex; align-items:center; gap:9px; flex-wrap:wrap; justify-content:center; margin-top:4px}
 .cta-fine svg{width:15px; height:15px; stroke:var(--accent-2); fill:none; stroke-width:1.6}
 .success-mark{display:none; align-items:center; gap:12px; color:var(--accent-2); font-family:var(--disp); font-weight:700; font-size:1.2rem}
@@ -676,25 +642,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
           <p data-i18n="doit.b">The instant intent is detected, a focused execution button surfaces. No hunting for tools, no switching screens — the action is already here.</p>
         </div>
       </div>
-      <div class="how-strip" id="how">
-        <p class="eyebrow how-strip-label reveal" data-i18n="hw.eyebrow">HOW IT WORKS</p>
-        <div class="stepper">
-          <div class="step reveal" data-d="1">
-            <span class="step-num">01</span>
-            <span class="step-txt"><span class="step-label en" data-i18n="hw1.l">OBSERVE</span><span class="step-tag" data-i18n="hw1.t">Watches your work on-device</span></span>
-          </div>
-          <span class="step-line" aria-hidden="true"></span>
-          <div class="step reveal" data-d="2">
-            <span class="step-num">02</span>
-            <span class="step-txt"><span class="step-label en" data-i18n="hw2.l">DETECT</span><span class="step-tag" data-i18n="hw2.t">Knows the exact moment</span></span>
-          </div>
-          <span class="step-line" aria-hidden="true"></span>
-          <div class="step reveal" data-d="3">
-            <span class="step-num">03</span>
-            <span class="step-txt"><span class="step-label en" data-i18n="hw3.l">EXECUTE</span><span class="step-tag" data-i18n="hw3.t">One click, done</span></span>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -721,20 +668,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     </div>
   </section>
 
-  <!-- USE CASES -->
   <div class="terrain-zone">
     <canvas id="ctaTerrain" class="terrain-canvas" aria-hidden="true"></canvas>
-  <section id="enterprise">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow" data-i18n="ent.eyebrow">ENTERPRISE DEPLOYMENT</span>
-        <h2 data-i18n="ent.title">Custom Infrastructure for Zero-Margin Environments</h2>
-        <p class="lead muted" data-i18n="ent.body">Deployment begins with a dedicated scoping engagement — we map your workflows into a permanent, local-first execution asset.</p>
-      </div>
-      <div class="sector-grid reveal" data-d="1" id="sectorWords"></div>
-    </div>
-  </section>
-
   <!-- INTEGRATIONS -->
   <section id="trust" class="integ-sec trust-sec" aria-label="Integrations &amp; Security">
     <div class="wrap">
@@ -823,11 +758,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
           </form>
           <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">You're on the list. We'll be in touch.</span></div>
           <div class="wait-msg" id="waitMsg" role="status" aria-live="polite"></div>
-        </div>
-        <div class="badges reveal" data-d="3">
-          <span class="badge"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg><span data-i18n="wl.b1">SOC 2 Compliant</span></span>
-          <span class="badge"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-5"/></svg><span data-i18n="wl.b2">GDPR Ready</span></span>
-          <span class="badge"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg><span data-i18n="wl.b3">HIPAA Compatible</span></span>
         </div>
         <div class="cta-fine reveal" data-d="3"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span data-i18n="wl.fine">No spam. Your details stay with you — exactly like the product works.</span></div>
       </div>
@@ -919,13 +849,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     'c5.b':{en:'Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.',he:'מריץ תהליכים בשקט ברקע עם runtime מחמיר שמבטיח אפס הזיות.'},
     'c6.t':{en:'Control & Cryptographic Audit',he:'בקרה וביקורת קריפטוגרפית'},
     'c6.b':{en:'Requires explicit human approval for high-risk tasks while creating unalterable logs for compliance.',he:'דורש אישור אנושי מפורש למשימות בסיכון גבוה, ויוצר לוגים בלתי ניתנים לשינוי לצורכי רגולציה.'},
-    'hw.eyebrow':{en:'HOW IT WORKS',he:'איך זה עובד'},
-    'hw1.l':{en:'OBSERVE',he:'צופה'},
-    'hw1.t':{en:'Watches your work on-device',he:'צופה בעבודה שלכם על המכשיר'},
-    'hw2.l':{en:'DETECT',he:'מזהה'},
-    'hw2.t':{en:'Knows the exact moment',he:'יודע את הרגע המדויק'},
-    'hw3.l':{en:'EXECUTE',he:'מבצע'},
-    'hw3.t':{en:'One click, done',he:'קליק אחד, בוצע'},
     'uc.eyebrow':{en:'WHO IT\'S FOR',he:'למי זה מיועד'},
     'uc.title':{en:'Built for teams where mistakes cost the most.',he:'נבנה לצוותים שבהם טעויות עולות הכי ביוקר.'},
     'uc.lead':{en:'Wherever data is sensitive and precision is non-negotiable, Flow works without ever touching the cloud.',he:'בכל מקום שבו המידע רגיש והדיוק הוא חובה, Flow פועל בלי לגעת בענן.'},
@@ -939,9 +862,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     'uc4.b':{en:'Automate casework with cryptographic audit trails and complete operational independence.',he:'אוטומציה של תיקים עם שרשרת ביקורת קריפטוגרפית ועצמאות תפעולית מלאה.'},
     'trust.eyebrow':{en:'SECURITY YOU CAN PROVE',he:'אבטחה שאפשר להוכיח'},
     'trust.note':{en:'On-device by default. Audited by design. Your data never leaves your infrastructure.',he:'על המכשיר כברירת מחדל. מבוקר בתכנון. הנתונים שלכם לא עוזבים את התשתית.'},
-    'ent.eyebrow':{en:'ENTERPRISE DEPLOYMENT',he:'פריסה ארגונית'},
-    'ent.title':{en:'Custom Infrastructure for Zero-Margin Environments',he:'תשתית מותאמת לסביבות ללא מרווח לטעות'},
-    'ent.body':{en:'Deployment begins with a dedicated scoping engagement — we map your workflows into a permanent, local-first execution asset.',he:'ההטמעה מתחילה בתהליך אפיון ייעודי — אנו ממפים את תהליכי העבודה שלכם לנכס ביצוע קבוע, מקומי-תחילה.'},
     'a1.t':{en:'Context Awareness',he:'מודעות להקשר'},
     'a1.b':{en:'Flow learns your operational context across every application — the relationships between CRM data, email threads, documents, and spreadsheets — building a real-time knowledge graph of your work.',he:'Flow לומד את ההקשר התפעולי שלכם על פני כל אפליקציה — את הקשרים בין נתוני CRM, שרשורי מייל, מסמכים וגיליונות — ובונה גרף ידע בזמן אמת של העבודה שלכם.'},
     'a2.t':{en:'Smart Data Masking',he:'מיסוך מידע חכם'},
@@ -984,9 +904,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     'wl.lead':{en:'Join the waitlist for early access to Flow. Experience the future of autonomous, secure, local-first workflow automation.',he:'הצטרפו לרשימת ההמתנה לגישה מוקדמת ל-Flow. חוו את עתיד האוטומציה — אוטונומית, מאובטחת ו-Local-First.'},
     'wl.ph':{en:'Enter your work email',he:'כתובת האימייל הארגוני שלכם'},
     'wl.success':{en:"You're on the list. We'll be in touch.",he:'אתם ברשימה. ניצור קשר.'},
-    'wl.b1':{en:'SOC 2 Compliant',he:'תואם SOC 2'},
-    'wl.b2':{en:'GDPR Ready',he:'מוכן ל-GDPR'},
-    'wl.b3':{en:'HIPAA Compatible',he:'תואם HIPAA'},
     'wl.fine':{en:'No spam. Your details stay with you — exactly like the product works.',he:'ללא ספאם. הפרטים נשמרים אצלכם — בדיוק כמו שהמוצר עובד.'},
     'wl.err':{en:"That email doesn't look right. Please check it.",he:'כתובת האימייל לא נראית תקינה. בדקו שוב.'},
     'foot.features':{en:'Features',he:'יכולות'},
@@ -1048,42 +965,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     if(heroBlobs && !rm){ var d=Math.min(1, window.scrollY/(innerHeight*0.85)); heroBlobs.style.opacity=(1-d*0.9); heroBlobs.style.transform='translateY('+(d*90)+'px) scale('+(1+d*0.18)+')'; }
   }
   onScroll(); window.addEventListener('scroll',onScroll,{passive:true});
-
-  /* ---------- sector grid — ordered glass bubbles, depth via real font-size/padding growth ---------- */
-  (function(){
-    var wrap=document.getElementById('sectorWords'); if(!wrap) return;
-    var words=['LEGAL','FINANCE','HEALTHCARE','DEFENSE','GOVERNMENT','INSURANCE','ARCHITECTS','APPRAISERS','UNDERWRITING','ACCOUNTANTS','PRIVATE EQUITY','BANKS'];
-    var bubbles=words.map(function(w,i){
-      var bubble=document.createElement('span');
-      bubble.className='sector-bubble';
-      bubble.style.transitionDelay=(i*0.05)+'s';
-      var word=document.createElement('span');
-      word.className='sector-word'; word.textContent=w;
-      bubble.appendChild(word);
-      wrap.appendChild(bubble);
-      return bubble;
-    });
-
-    // depth-of-field: bubbles grow toward a peak size as they near the viewport's vertical
-    // center while scrolling, then shrink again as they pass — a sense of horizon and depth.
-    // Driven by real font-size/padding (not transform:scale) so the chrome text stays crisp
-    // and isn't at the mercy of compositor/backdrop-filter interactions on mobile browsers.
-    if(!rm){
-      function updateDepth(){
-        var vh=innerHeight, cy=vh*0.5;
-        bubbles.forEach(function(b){
-          var r=b.getBoundingClientRect();
-          var by=r.top+r.height/2;
-          var d=Math.min(Math.abs(by-cy)/(vh*0.6),1);
-          b.style.setProperty('--depth-sc',(1.3-d*0.5).toFixed(3));
-          b.style.setProperty('--depth-o',(1-d*0.35).toFixed(3));
-        });
-      }
-      updateDepth();
-      window.addEventListener('scroll',updateDepth,{passive:true});
-      window.addEventListener('resize',updateDepth);
-    }
-  })();
 
   /* ---------- smooth scroll ---------- */
   document.querySelectorAll('[data-scroll]').forEach(function(b){
