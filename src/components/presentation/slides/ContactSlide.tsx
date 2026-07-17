@@ -5,12 +5,23 @@ export const ContactSlide = () => {
   return (
     <PresentationContainer>
       <div className="space-y-8">
+        {/* Logo */}
+        <div className="text-center">
+          <img
+            src="/as-is-logo.jpeg"
+            alt="AS IS Group Logo"
+            className="h-20 w-20 mx-auto object-contain drop-shadow-lg mb-4"
+          />
+        </div>
         <div className="text-center">
           <h2 className="text-4xl font-bold text-foreground mb-2">
             בואו נדבר
           </h2>
           <p className="text-foreground/60 mb-4">
             אנחנו כאן כדי לענות על כל שאלה ותהייה שלכם
+          </p>
+          <p className="text-xs text-foreground/40 mb-6">
+            AS IS GROUP - מנהלת התחדשות עירונית
           </p>
         </div>
 

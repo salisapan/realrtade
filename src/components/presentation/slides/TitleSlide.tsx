@@ -4,20 +4,24 @@ export const TitleSlide = () => {
   return (
     <PresentationContainer>
       <div className="space-y-8 text-center">
-        {/* Logo Placeholder */}
-        <div className="h-20 flex items-center justify-center">
-          <div className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-            AS IS
-          </div>
-          <div className="ml-2 text-2xl font-light text-secondary">GROUP</div>
+        {/* Logo */}
+        <div className="h-32 flex items-center justify-center">
+          <img
+            src="/as-is-logo.jpeg"
+            alt="AS IS Group Logo"
+            className="h-32 w-32 object-contain drop-shadow-lg hover:scale-105 transition-transform"
+          />
         </div>
 
         <div className="space-y-4">
           <h1 className="text-5xl md:text-6xl font-bold text-foreground">
-            ניהול מתחם דירורים
+            מנהלת התחדשות עירונית
           </h1>
           <p className="text-xl text-foreground/60">
-            מנהלת הפרויקט מ-2019
+            שותף אמיתי של הדיירים מ-2019
+          </p>
+          <p className="text-sm text-primary/80 font-medium">
+            נגבה - בר כוכבא
           </p>
         </div>
 
