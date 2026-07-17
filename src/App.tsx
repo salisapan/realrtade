@@ -27,6 +27,7 @@ import Recommendations from "./pages/Recommendations";
 import Auth from "./pages/Auth";
 import InvestorRegistrationPage from "./pages/InvestorRegistrationPage";
 import DeveloperRegistrationPage from "./pages/DeveloperRegistrationPage";
+import AsIsPresentation from "./pages/AsIsPresentation";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -151,6 +152,7 @@ const App = () => {
           <Sonner />
           <BrowserRouter>
             <Routes>
+              <Route path="/as-is-presentation" element={<AsIsPresentation />} />
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/investor-registration" element={<InvestorRegistrationPage />} />
