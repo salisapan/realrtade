@@ -192,7 +192,7 @@ export const Scene2Solution: React.FC = () => {
           style={{
             position: "relative",
             width: "100%",
-            height: 420,
+            height: 370,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -209,6 +209,48 @@ export const Scene2Solution: React.FC = () => {
             />
           </div>
         </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 22,
+            paddingBottom: 44,
+          }}
+        >
+          {fadingWindows.map((w, i) => {
+            const resolveIn = spring({
+              frame: frame - (700 + i * 12),
+              fps,
+              config: SPRING_CONFIG,
+            });
+            const idleY = Math.sin(frame * 0.02 + i * 1.8) * 2;
+            return (
+              <div
+                key={`after-${w.title}`}
+                style={{
+                  position: "relative",
+                  width: 150,
+                  height: 92,
+                  translate: `0 ${interpolate(resolveIn, [0, 1], [16, 0]) + idleY}px`,
+                }}
+              >
+                <WindowCard
+                  title={w.title}
+                  meta=""
+                  icon={w.icon}
+                  top={0}
+                  left={0}
+                  width={380}
+                  rotateDeg={0}
+                  scale={Math.min(resolveIn, 1) * 0.4}
+                  opacity={Math.min(resolveIn, 1)}
+                  zIndex={1}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <Interactive.Div
@@ -220,7 +262,7 @@ export const Scene2Solution: React.FC = () => {
           right: 0,
           textAlign: "center",
           fontFamily: spaceGrotesk,
-          fontSize: 30,
+          fontSize: 26,
           fontWeight: 600,
           letterSpacing: 2,
           color: "#6EA0FF",

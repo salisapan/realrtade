@@ -31,7 +31,7 @@ const satellites = [
   { Icon: FormIcon, color: "#f87171", label: "CRM" },
 ];
 
-export const Scene6ActionHub: React.FC = () => {
+export const Scene5ActionHub: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -40,8 +40,8 @@ export const Scene6ActionHub: React.FC = () => {
   const hubPulse = interpolate(frame % 90, [0, 45, 90], [0.5, 0.95, 0.5]);
 
   return (
-    <AbsoluteFill name="Scene 6 - Action Hub" style={{ fontFamily: inter }}>
-      <GlowBackground accent="#4285F4" />
+    <AbsoluteFill name="Scene 5 - Action Hub" style={{ fontFamily: inter }}>
+      <GlowBackground accent="#38bdf8" />
 
       <div
         style={{
@@ -56,7 +56,7 @@ export const Scene6ActionHub: React.FC = () => {
         <KineticText
           tokens={words("One system. Every digital action.", ["Every"])}
           from={12}
-          fontSize={54}
+          fontSize={58}
           fontWeight={700}
         />
       </div>
@@ -204,7 +204,7 @@ export const Scene6ActionHub: React.FC = () => {
               position: "absolute",
               inset: -30,
               borderRadius: "50%",
-              background: "#4285F4",
+              background: "#38bdf8",
               opacity: hubPulse * 0.35,
               filter: "blur(30px)",
             }}
@@ -217,7 +217,7 @@ export const Scene6ActionHub: React.FC = () => {
               background:
                 "radial-gradient(circle at 35% 30%, rgba(147,197,253,0.4), rgba(15,23,42,0.9) 70%)",
               border: `1.5px solid rgba(96,165,250,${(0.6 + hubPulse * 0.3).toFixed(2)})`,
-              boxShadow: `0 0 ${30 + hubPulse * 30}px rgba(66,133,244,0.55)`,
+              boxShadow: `0 0 ${30 + hubPulse * 30}px rgba(56,189,248,0.55)`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

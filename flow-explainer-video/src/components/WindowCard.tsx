@@ -93,14 +93,27 @@ export const WindowCard: React.FC<{
       ) : null}
       <div
         style={{
+          position: "relative",
           borderRadius: 16,
           overflow: "hidden",
           background:
             "linear-gradient(165deg, rgba(21,29,49,0.95), rgba(13,19,34,0.95))",
           border: "1px solid rgba(148,163,184,0.16)",
-          boxShadow: "0 30px 60px -20px rgba(0,0,0,0.65)",
+          boxShadow: "0 36px 70px -22px rgba(0,0,0,0.7)",
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "38%",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.07), transparent)",
+            pointerEvents: "none",
+          }}
+        />
         <div
           style={{
             display: "flex",

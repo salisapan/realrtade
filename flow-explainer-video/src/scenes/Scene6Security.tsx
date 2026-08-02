@@ -132,7 +132,7 @@ const WireframeGlobe: React.FC<{ size: number }> = ({ size }) => {
   );
 };
 
-export const Scene7Security: React.FC = () => {
+export const Scene6Security: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -145,7 +145,7 @@ export const Scene7Security: React.FC = () => {
   });
 
   return (
-    <AbsoluteFill name="Scene 7 - Security" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 6 - Security" style={{ fontFamily: inter }}>
       <GlowBackground accent="#34d399" />
 
       <Interactive.Div
@@ -303,7 +303,7 @@ export const Scene7Security: React.FC = () => {
           tokens={words("Zero data leaves the building.", ["Zero"])}
           from={280}
           to={640}
-          fontSize={44}
+          fontSize={48}
           fontWeight={700}
         />
       </div>

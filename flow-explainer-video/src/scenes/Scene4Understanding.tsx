@@ -8,50 +8,76 @@ import {
   useVideoConfig,
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
+import { DoItButton } from "../components/DoItButton";
 import { KineticText, words } from "../components/KineticText";
 import { CheckIcon } from "../components/Icons";
 import { inter, spaceGrotesk } from "../fonts";
 
 const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
+const SENTENCE = "Send the signed lease + update the tenant file";
 
 const chain = [
-  { label: "SIGNAL", delay: 130 },
-  { label: "PATTERN", delay: 210 },
-  { label: "INTUITION", delay: 290 },
-  { label: "EXECUTION MEMORY", delay: 370 },
+  { label: "SIGNAL", delay: 330 },
+  { label: "PATTERN", delay: 390 },
+  { label: "INTUITION", delay: 450 },
+  { label: "EXECUTION MEMORY", delay: 510 },
 ];
-const CHAIN_Y = 560;
+const CHAIN_Y = 620;
 const NODE_X = [420, 700, 980, 1300];
 
 const teammates = [
-  { x: 1560, y: 400, delay: 470 },
-  { x: 1620, y: 560, delay: 510 },
-  { x: 1560, y: 720, delay: 550 },
+  { x: 1560, y: 460, delay: 590 },
+  { x: 1620, y: 620, delay: 630 },
+  { x: 1560, y: 780, delay: 670 },
 ];
 
-export const Scene5ActionGraph: React.FC = () => {
+export const Scene4Understanding: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const headlineIn = spring({ frame: frame - 8, fps, config: SPRING_CONFIG });
-  const subIn = interpolate(frame, [50, 90], [0, 1], {
+  const subIn = interpolate(frame, [45, 85], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  return (
-    <AbsoluteFill name="Scene 5 - Action Graph" style={{ fontFamily: inter }}>
-      <GlowBackground accent="#8b5cf6" />
+  const typedLength = Math.floor(
+    interpolate(frame, [50, 260], [0, SENTENCE.length], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    }),
+  );
+  const typed = SENTENCE.slice(0, typedLength);
+  const cursorOn = Math.floor(frame / 12) % 2 === 0;
+  const barOpacity = interpolate(frame, [20, 50, 300, 340], [0, 1, 1, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const barScale = interpolate(frame, [300, 340], [1, 0.85], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const barFloat = Math.sin(frame * 0.03) * 4;
 
-      <div style={{ position: "absolute", top: 76, left: 120, right: 120 }}>
+  const buttonAppear = spring({
+    frame: frame - 720,
+    fps,
+    config: SPRING_CONFIG,
+  });
+
+  return (
+    <AbsoluteFill name="Scene 4 - Understanding" style={{ fontFamily: inter }}>
+      <GlowBackground accent="#22d3ee" />
+
+      <div style={{ position: "absolute", top: 66, left: 120, right: 120 }}>
         <Interactive.Div
           name="Kicker"
           style={{
             fontFamily: spaceGrotesk,
-            fontSize: 20,
+            fontSize: 21,
             fontWeight: 600,
             letterSpacing: 3,
-            color: "#a78bfa",
+            color: "#67e8f9",
             opacity: interpolate(headlineIn, [0, 1], [0, 1]),
             marginBottom: 10,
           }}
@@ -64,28 +90,78 @@ export const Scene5ActionGraph: React.FC = () => {
             ["Wisdom", "Infrastructure"],
           )}
           from={8}
-          fontSize={46}
+          fontSize={58}
           fontWeight={700}
           align="left"
-          maxWidth={1500}
+          maxWidth={1600}
         />
         <div
           style={{
             fontFamily: inter,
-            fontSize: 21,
+            fontSize: 24,
             fontWeight: 400,
             color: "#94a3b8",
-            marginTop: 16,
-            maxWidth: 1100,
-            lineHeight: 1.55,
+            marginTop: 14,
+            maxWidth: 1150,
+            lineHeight: 1.5,
             opacity: subIn,
             translate: `0 ${interpolate(subIn, [0, 1], [14, 0])}px`,
           }}
         >
           Flow decodes causal chains and hidden work patterns at the OS
-          level, turning professional intuition into Execution Memory. The
-          judgment of your most senior experts is replicated automatically
-          to every teammate's machine.
+          level, turning professional intuition into Execution Memory —
+          replicated automatically to every teammate's machine.
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          top: 380,
+          left: "50%",
+          translate: `-50% ${barFloat}px`,
+          opacity: barOpacity,
+          scale: barScale,
+          width: 1300,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "24px 32px",
+            borderRadius: 20,
+            background: "rgba(15,20,36,0.75)",
+            border: "1px solid rgba(34,211,238,0.35)",
+            boxShadow: "0 0 50px -10px rgba(34,211,238,0.35)",
+            backdropFilter: "blur(14px)",
+          }}
+        >
+          <div
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: "50%",
+              background: "#67e8f9",
+              boxShadow: "0 0 10px #67e8f9",
+              flexShrink: 0,
+            }}
+          />
+          <div
+            style={{
+              fontFamily: spaceGrotesk,
+              fontSize: 30,
+              color: "#f1f5f9",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+            }}
+          >
+            {typed}
+            <span style={{ opacity: cursorOn ? 1 : 0, color: "#67e8f9" }}>
+              |
+            </span>
+          </div>
         </div>
       </div>
 
@@ -107,7 +183,7 @@ export const Scene5ActionGraph: React.FC = () => {
               y1={CHAIN_Y}
               x2={x + 50 + len}
               y2={CHAIN_Y}
-              stroke="#a78bfa"
+              stroke="#22d3ee"
               strokeWidth={2}
               strokeDasharray={len}
               strokeDashoffset={len * (1 - progress)}
@@ -173,10 +249,10 @@ export const Scene5ActionGraph: React.FC = () => {
                 borderRadius: 22,
                 rotate: "45deg",
                 background: isLast
-                  ? "linear-gradient(135deg, rgba(96,165,250,0.25), rgba(139,92,246,0.15))"
-                  : "linear-gradient(135deg, rgba(139,92,246,0.22), rgba(139,92,246,0.04))",
-                border: `1.5px solid rgba(167,139,250,${(0.5 + pulse * 0.4).toFixed(2)})`,
-                boxShadow: `0 0 ${20 + pulse * 24}px rgba(139,92,246,0.45)`,
+                  ? "linear-gradient(135deg, rgba(96,165,250,0.25), rgba(34,211,238,0.15))"
+                  : "linear-gradient(135deg, rgba(34,211,238,0.22), rgba(34,211,238,0.04))",
+                border: `1.5px solid rgba(103,232,249,${(0.5 + pulse * 0.4).toFixed(2)})`,
+                boxShadow: `0 0 ${20 + pulse * 24}px rgba(34,211,238,0.45)`,
               }}
             />
             <div
@@ -189,7 +265,7 @@ export const Scene5ActionGraph: React.FC = () => {
                 fontSize: isLast ? 13 : 14,
                 fontWeight: 700,
                 letterSpacing: 1,
-                color: "#e0d9ff",
+                color: "#e0fbff",
                 textAlign: "center",
                 width: 90,
               }}
@@ -245,19 +321,14 @@ export const Scene5ActionGraph: React.FC = () => {
       <div
         style={{
           position: "absolute",
-          bottom: 90,
-          left: 0,
-          right: 0,
-          display: "flex",
-          justifyContent: "center",
+          top: CHAIN_Y + 170,
+          left: NODE_X[3] + 50,
+          translate: "-50% -50%",
+          opacity: Math.min(buttonAppear, 1),
+          scale: Math.max(buttonAppear, 0),
         }}
       >
-        <KineticText
-          tokens={words("Zero clicks. Exactly on time.", ["Zero", "Exactly"])}
-          from={600}
-          fontSize={42}
-          fontWeight={700}
-        />
+        <DoItButton fontSize={20} />
       </div>
     </AbsoluteFill>
   );

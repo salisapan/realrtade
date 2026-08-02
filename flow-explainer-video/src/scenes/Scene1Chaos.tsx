@@ -121,6 +121,10 @@ export const Scene1Chaos: React.FC = () => {
             fps,
             config: SPRING_CONFIG,
           });
+          const driftX =
+            Math.sin(frame * 0.012 + i * 2.1) * (frame >= w.start ? 1.5 : 0);
+          const driftY =
+            Math.cos(frame * 0.009 + i * 1.4) * (frame >= w.start ? 1.5 : 0);
 
           return (
             <WindowCard
@@ -136,6 +140,7 @@ export const Scene1Chaos: React.FC = () => {
               opacity={Math.min(appear, 1)}
               zIndex={10 + i}
               badge={frame >= w.start + 22 ? w.badge : undefined}
+              translate={`${driftX}px ${driftY}px`}
             />
           );
         })}
@@ -208,7 +213,7 @@ export const Scene1Chaos: React.FC = () => {
           )}
           from={210}
           to={455}
-          fontSize={52}
+          fontSize={56}
           fontWeight={700}
           maxWidth={1500}
         />

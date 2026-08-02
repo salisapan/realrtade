@@ -15,7 +15,7 @@ import { inter, spaceGrotesk } from "../fonts";
 const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
 const bars = [0.4, 0.65, 0.5, 0.85, 1];
 
-export const Scene8Outro: React.FC = () => {
+export const Scene7Outro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -45,7 +45,7 @@ export const Scene8Outro: React.FC = () => {
   const glow = interpolate(frame % 120, [0, 60, 120], [0.5, 0.9, 0.5]);
 
   return (
-    <AbsoluteFill name="Scene 8 - Outro" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 7 - Outro" style={{ fontFamily: inter }}>
       <GlowBackground accent="#4285F4" />
 
       <div
