@@ -4,15 +4,20 @@ import {
   Easing,
   Interactive,
   interpolate,
+  spring,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
+import { LiquidLogo } from "../components/Logo";
 import { inter, spaceGrotesk } from "../fonts";
 
+const SPRING_CONFIG = { damping: 14, stiffness: 100, mass: 0.8 };
 const bars = [0.4, 0.65, 0.5, 0.85, 1];
 
-export const Scene4Outro: React.FC = () => {
+export const Scene5Outro: React.FC = () => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   const dashboardOpacity = interpolate(
     frame,
@@ -23,12 +28,7 @@ export const Scene4Outro: React.FC = () => {
       extrapolateRight: "clamp",
     },
   );
-  const dashboardScale = interpolate(frame, [10, 40, 255], [0.94, 1, 1.06], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.bezier(0.4, 0, 0.2, 1),
-    output: "perceptual-scale",
-  });
+  const dashboardScale = spring({ frame: frame - 10, fps, config: SPRING_CONFIG });
 
   const hoursCount = interpolate(frame, [40, 190], [0, 14.5], {
     extrapolateLeft: "clamp",
@@ -51,16 +51,11 @@ export const Scene4Outro: React.FC = () => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const logoScale = interpolate(frame, [465, 520], [0.85, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.spring({ damping: 200 }),
-    output: "perceptual-scale",
-  });
+  const logoScale = spring({ frame: frame - 465, fps, config: SPRING_CONFIG });
   const glow = interpolate(frame % 120, [0, 60, 120], [0.5, 0.9, 0.5]);
 
   return (
-    <AbsoluteFill name="Scene 4 - Outro" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 5 - Outro" style={{ fontFamily: inter }}>
       <GlowBackground accent="#4285F4" />
 
       <div
@@ -70,7 +65,7 @@ export const Scene4Outro: React.FC = () => {
           left: "50%",
           translate: "-50% -50%",
           opacity: dashboardOpacity,
-          scale: dashboardScale,
+          scale: 0.85 + Math.min(dashboardScale, 1) * 0.15,
           width: 760,
           borderRadius: 28,
           padding: 48,
@@ -201,8 +196,11 @@ export const Scene4Outro: React.FC = () => {
           left: "50%",
           translate: "-50% -50%",
           opacity: logoOpacity,
-          scale: logoScale,
+          scale: 0.85 + Math.min(logoScale, 1) * 0.15,
           textAlign: "center",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
         }}
       >
         <div
@@ -222,15 +220,10 @@ export const Scene4Outro: React.FC = () => {
         <div
           style={{
             position: "relative",
-            fontFamily: spaceGrotesk,
-            fontSize: 130,
-            fontWeight: 700,
-            letterSpacing: 14,
-            color: "#ffffff",
-            textShadow: `0 0 ${40 + glow * 30}px rgba(66,133,244,0.65)`,
+            filter: `drop-shadow(0 0 ${30 + glow * 26}px rgba(66,133,244,0.6))`,
           }}
         >
-          FLOW
+          <LiquidLogo width={480} />
         </div>
         <div
           style={{

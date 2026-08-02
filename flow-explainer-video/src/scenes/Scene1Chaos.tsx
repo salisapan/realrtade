@@ -1,15 +1,18 @@
 import React from "react";
 import {
   AbsoluteFill,
-  Easing,
   Interactive,
   interpolate,
+  spring,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
 import { WindowCard } from "../components/WindowCard";
 import { Caption } from "../components/Caption";
 import { inter, spaceGrotesk } from "../fonts";
+
+const SPRING_CONFIG = { damping: 14, stiffness: 100, mass: 0.8 };
 
 const windows = [
   {
@@ -82,39 +85,54 @@ const windows = [
 
 export const Scene1Chaos: React.FC = () => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   const openCount = windows.filter((w) => frame >= w.start).length;
 
   return (
-    <AbsoluteFill name="Scene 1 - Chaos" style={{ fontFamily: inter }}>
+    <AbsoluteFill
+      name="Scene 1 - Chaos"
+      style={{
+        fontFamily: inter,
+        perspective: 1800,
+      }}
+    >
       <GlowBackground accent="#4285F4" />
 
-      {windows.map((w, i) => {
-        const appear = interpolate(frame, [w.start, w.start + 20], [0, 1], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-          easing: Easing.spring({ damping: 200 }),
-        });
-        const jitter =
-          Math.sin(frame * 0.04 + i * 12) * (frame >= w.start ? 1.4 : 0);
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          rotate: "1 0.3 0 3deg",
+        }}
+      >
+        {windows.map((w, i) => {
+          const appear = spring({
+            frame: frame - w.start,
+            fps,
+            config: SPRING_CONFIG,
+          });
+          const jitter =
+            Math.sin(frame * 0.04 + i * 12) * (frame >= w.start ? 1.4 : 0);
 
-        return (
-          <WindowCard
-            key={w.title}
-            title={w.title}
-            meta={w.meta}
-            icon={w.icon}
-            top={w.top}
-            left={w.left}
-            width={w.width}
-            rotateDeg={w.rotate + jitter}
-            scale={0.85 + appear * 0.15}
-            opacity={appear}
-            zIndex={10 + i}
-            badge={frame >= w.start + 25 ? w.badge : undefined}
-          />
-        );
-      })}
+          return (
+            <WindowCard
+              key={w.title}
+              title={w.title}
+              meta={w.meta}
+              icon={w.icon}
+              top={w.top}
+              left={w.left}
+              width={w.width}
+              rotateDeg={w.rotate + jitter}
+              scale={0.82 + appear * 0.18}
+              opacity={Math.min(appear, 1)}
+              zIndex={10 + i}
+              badge={frame >= w.start + 25 ? w.badge : undefined}
+            />
+          );
+        })}
+      </div>
 
       <Interactive.Div
         name="Status badge"

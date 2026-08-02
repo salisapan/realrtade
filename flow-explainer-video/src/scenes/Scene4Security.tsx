@@ -1,32 +1,32 @@
 import React from "react";
 import {
   AbsoluteFill,
-  Easing,
   Interactive,
   interpolate,
+  spring,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
 import { Caption } from "../components/Caption";
+import { ShieldIcon, CheckIcon, BracketsIcon } from "../components/Icons";
 import { inter, spaceGrotesk } from "../fonts";
 
+const SPRING_CONFIG = { damping: 14, stiffness: 100, mass: 0.8 };
+
 const features = [
-  { label: "Zero Data Leaks", icon: "🛡", delay: 420 },
-  { label: "Zero Hallucinations", icon: "✅", delay: 480 },
-  { label: "Deterministic Execution", icon: "{ }", delay: 540 },
+  { label: "Zero Data Leaks", Icon: ShieldIcon, delay: 420 },
+  { label: "Zero Hallucinations", Icon: CheckIcon, delay: 480 },
+  { label: "Deterministic Execution", Icon: BracketsIcon, delay: 540 },
 ];
 
 const particles = [0, 1, 2, 3, 4];
 
-export const Scene3Security: React.FC = () => {
+export const Scene4Security: React.FC = () => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
-  const chipAppear = interpolate(frame, [10, 60], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.spring({ damping: 200 }),
-    output: "perceptual-scale",
-  });
+  const chipAppear = spring({ frame: frame - 10, fps, config: SPRING_CONFIG });
 
   const ringPulse = interpolate(frame % 100, [0, 50, 100], [0.25, 0.6, 0.25]);
 
@@ -36,7 +36,7 @@ export const Scene3Security: React.FC = () => {
   });
 
   return (
-    <AbsoluteFill name="Scene 3 - Security" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 4 - Security" style={{ fontFamily: inter }}>
       <GlowBackground accent="#34d399" />
 
       <Interactive.Div
@@ -55,7 +55,14 @@ export const Scene3Security: React.FC = () => {
           color: "#94a3b8",
         }}
       >
-        <span style={{ fontSize: 32 }}>☁️</span>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M7 17a4 4 0 0 1 .3-8 5.5 5.5 0 0 1 10.6 1.6A3.5 3.5 0 0 1 17 17H7z"
+            stroke="#94a3b8"
+            strokeWidth={1.7}
+            strokeLinejoin="round"
+          />
+        </svg>
         <span
           style={{
             position: "relative",
@@ -120,8 +127,8 @@ export const Scene3Security: React.FC = () => {
           top: 260,
           left: "50%",
           translate: "-50% 0",
-          scale: chipAppear,
-          opacity: chipAppear,
+          scale: Math.max(chipAppear, 0),
+          opacity: Math.min(chipAppear, 1),
         }}
       >
         <div
@@ -184,11 +191,10 @@ export const Scene3Security: React.FC = () => {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: 92,
               filter: "drop-shadow(0 0 22px rgba(74,222,128,0.55))",
             }}
           >
-            🛡
+            <ShieldIcon size={92} color="#4ade80" strokeWidth={1.3} />
           </div>
         </div>
         <div
@@ -218,21 +224,17 @@ export const Scene3Security: React.FC = () => {
         }}
       >
         {features.map((f) => {
-          const local = interpolate(
-            frame,
-            [f.delay, f.delay + 24],
-            [0, 1],
-            {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-              easing: Easing.bezier(0.16, 1, 0.3, 1),
-            },
-          );
+          const local = spring({
+            frame: frame - f.delay,
+            fps,
+            config: SPRING_CONFIG,
+          });
+          const Icon = f.Icon;
           return (
             <div
               key={f.label}
               style={{
-                opacity: local,
+                opacity: Math.min(local, 1),
                 translate: `0 ${interpolate(local, [0, 1], [24, 0])}px`,
                 display: "flex",
                 alignItems: "center",
@@ -244,7 +246,7 @@ export const Scene3Security: React.FC = () => {
                 boxShadow: "0 0 30px -8px rgba(74,222,128,0.35)",
               }}
             >
-              <span style={{ fontSize: 26 }}>{f.icon}</span>
+              <Icon size={24} color="#4ade80" />
               <span
                 style={{
                   fontFamily: inter,

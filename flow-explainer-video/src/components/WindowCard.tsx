@@ -1,14 +1,16 @@
 import React from "react";
 import { inter } from "../fonts";
+import { MailIcon, SheetIcon, FormIcon, LegalIcon } from "./Icons";
 
 type IconKind = "mail" | "sheet" | "form" | "legal";
 
-const iconGlyph: Record<IconKind, string> = {
-  mail: "✉",
-  sheet: "▦",
-  form: "☷",
-  legal: "§",
-};
+const iconMap: Record<IconKind, React.FC<{ size?: number; color?: string }>> =
+  {
+    mail: MailIcon,
+    sheet: SheetIcon,
+    form: FormIcon,
+    legal: LegalIcon,
+  };
 
 const iconColor: Record<IconKind, string> = {
   mail: "#60a5fa",
@@ -29,6 +31,7 @@ export const WindowCard: React.FC<{
   opacity: number;
   zIndex: number;
   filter?: string;
+  translate?: string;
   badge?: number;
 }> = ({
   title,
@@ -42,8 +45,11 @@ export const WindowCard: React.FC<{
   opacity,
   zIndex,
   filter,
+  translate,
   badge,
 }) => {
+  const Icon = iconMap[icon];
+
   return (
     <div
       style={{
@@ -55,7 +61,8 @@ export const WindowCard: React.FC<{
         zIndex,
         scale,
         rotate: `${rotateDeg}deg`,
-        borderRadius: 14,
+        translate: translate ?? "0 0",
+        borderRadius: 16,
         overflow: "visible",
         fontFamily: inter,
         filter,
@@ -67,15 +74,15 @@ export const WindowCard: React.FC<{
             position: "absolute",
             top: -10,
             right: -10,
-            width: 30,
-            height: 30,
+            width: 28,
+            height: 28,
             borderRadius: "50%",
             background: "#ef4444",
             color: "white",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 700,
             boxShadow: "0 0 16px rgba(239,68,68,0.7)",
             zIndex: 2,
@@ -86,10 +93,11 @@ export const WindowCard: React.FC<{
       ) : null}
       <div
         style={{
-          borderRadius: 14,
+          borderRadius: 16,
           overflow: "hidden",
-          background: "#131b2e",
-          border: "1px solid rgba(148,163,184,0.18)",
+          background:
+            "linear-gradient(165deg, rgba(21,29,49,0.95), rgba(13,19,34,0.95))",
+          border: "1px solid rgba(148,163,184,0.16)",
           boxShadow: "0 30px 60px -20px rgba(0,0,0,0.65)",
         }}
       >
@@ -99,30 +107,30 @@ export const WindowCard: React.FC<{
             alignItems: "center",
             gap: 8,
             padding: "10px 14px",
-            background: "#1a2338",
-            borderBottom: "1px solid rgba(148,163,184,0.12)",
+            background: "rgba(255,255,255,0.03)",
+            borderBottom: "1px solid rgba(148,163,184,0.1)",
           }}
         >
           <div
             style={{
-              width: 10,
-              height: 10,
+              width: 9,
+              height: 9,
               borderRadius: "50%",
               background: "#f87171",
             }}
           />
           <div
             style={{
-              width: 10,
-              height: 10,
+              width: 9,
+              height: 9,
               borderRadius: "50%",
               background: "#fbbf24",
             }}
           />
           <div
             style={{
-              width: 10,
-              height: 10,
+              width: 9,
+              height: 9,
               borderRadius: "50%",
               background: "#34d399",
             }}
@@ -131,7 +139,7 @@ export const WindowCard: React.FC<{
             style={{
               marginLeft: 8,
               color: "#94a3b8",
-              fontSize: 13,
+              fontSize: 12.5,
               fontWeight: 500,
             }}
           >
@@ -149,20 +157,19 @@ export const WindowCard: React.FC<{
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
               style={{
-                width: 34,
-                height: 34,
+                width: 32,
+                height: 32,
                 borderRadius: 8,
-                background: `${iconColor[icon]}22`,
+                background: `${iconColor[icon]}1f`,
                 color: iconColor[icon],
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 18,
               }}
             >
-              {iconGlyph[icon]}
+              <Icon size={17} color={iconColor[icon]} />
             </div>
-            <div style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600 }}>
+            <div style={{ color: "#e2e8f0", fontSize: 13.5, fontWeight: 600 }}>
               {meta}
             </div>
           </div>
@@ -170,10 +177,10 @@ export const WindowCard: React.FC<{
             <div
               key={i}
               style={{
-                height: 8,
+                height: 7,
                 borderRadius: 4,
                 width: i === 2 ? "55%" : "88%",
-                background: "rgba(148,163,184,0.16)",
+                background: "rgba(148,163,184,0.14)",
               }}
             />
           ))}
