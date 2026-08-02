@@ -1,6 +1,7 @@
 import "./index.css";
 import { Composition, Folder } from "remotion";
 import { FlowExplainer } from "./FlowExplainer";
+import { FlowPromo } from "./FlowPromo";
 import { Scene1Chaos } from "./scenes/Scene1Chaos";
 import { Scene2Solution } from "./scenes/Scene2Solution";
 import { Scene3Architecture } from "./scenes/Scene3Architecture";
@@ -74,6 +75,14 @@ export const RemotionRoot: React.FC = () => {
         id="FlowExplainer"
         component={FlowExplainer}
         durationInFrames={4730}
+        fps={60}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="FlowPromo"
+        component={FlowPromo}
+        durationInFrames={1440}
         fps={60}
         width={1920}
         height={1080}
