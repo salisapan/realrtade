@@ -4,8 +4,10 @@ import { FlowExplainer } from "./FlowExplainer";
 import { Scene1Chaos } from "./scenes/Scene1Chaos";
 import { Scene2Solution } from "./scenes/Scene2Solution";
 import { Scene3Architecture } from "./scenes/Scene3Architecture";
-import { Scene4Security } from "./scenes/Scene4Security";
-import { Scene5Outro } from "./scenes/Scene5Outro";
+import { Scene4IntentCompiler } from "./scenes/Scene4IntentCompiler";
+import { Scene5ActionHub } from "./scenes/Scene5ActionHub";
+import { Scene6Security } from "./scenes/Scene6Security";
+import { Scene7Outro } from "./scenes/Scene7Outro";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -14,7 +16,7 @@ export const RemotionRoot: React.FC = () => {
         <Composition
           id="Scene1Chaos"
           component={Scene1Chaos}
-          durationInFrames={600}
+          durationInFrames={480}
           fps={60}
           width={1920}
           height={1080}
@@ -36,16 +38,32 @@ export const RemotionRoot: React.FC = () => {
           height={1080}
         />
         <Composition
-          id="Scene4Security"
-          component={Scene4Security}
+          id="Scene4IntentCompiler"
+          component={Scene4IntentCompiler}
+          durationInFrames={540}
+          fps={60}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Scene5ActionHub"
+          component={Scene5ActionHub}
+          durationInFrames={540}
+          fps={60}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Scene6Security"
+          component={Scene6Security}
           durationInFrames={780}
           fps={60}
           width={1920}
           height={1080}
         />
         <Composition
-          id="Scene5Outro"
-          component={Scene5Outro}
+          id="Scene7Outro"
+          component={Scene7Outro}
           durationInFrames={600}
           fps={60}
           width={1920}
@@ -55,7 +73,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="FlowExplainer"
         component={FlowExplainer}
-        durationInFrames={3580}
+        durationInFrames={4500}
         fps={60}
         width={1920}
         height={1080}

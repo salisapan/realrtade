@@ -2,7 +2,6 @@ import React from "react";
 import {
   AbsoluteFill,
   Easing,
-  Interactive,
   interpolate,
   spring,
   useCurrentFrame,
@@ -10,12 +9,13 @@ import {
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
 import { LiquidLogo } from "../components/Logo";
+import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 100, mass: 0.8 };
+const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
 const bars = [0.4, 0.65, 0.5, 0.85, 1];
 
-export const Scene5Outro: React.FC = () => {
+export const Scene7Outro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -29,6 +29,7 @@ export const Scene5Outro: React.FC = () => {
     },
   );
   const dashboardScale = spring({ frame: frame - 10, fps, config: SPRING_CONFIG });
+  const barGlow = interpolate(frame % 80, [0, 40, 80], [0.5, 1, 0.5]);
 
   const hoursCount = interpolate(frame, [40, 190], [0, 14.5], {
     extrapolateLeft: "clamp",
@@ -36,26 +37,15 @@ export const Scene5Outro: React.FC = () => {
     easing: Easing.bezier(0.16, 1, 0.3, 1),
   });
 
-  const line1Opacity = interpolate(
-    frame,
-    [250, 280, 370, 405],
-    [0, 1, 1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
-  const line2Opacity = interpolate(frame, [330, 365, 420, 455], [0, 1, 1, 0], {
+  const logoOpacity = interpolate(frame, [455, 500], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-
-  const logoOpacity = interpolate(frame, [465, 510], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const logoScale = spring({ frame: frame - 465, fps, config: SPRING_CONFIG });
+  const logoScale = spring({ frame: frame - 455, fps, config: SPRING_CONFIG });
   const glow = interpolate(frame % 120, [0, 60, 120], [0.5, 0.9, 0.5]);
 
   return (
-    <AbsoluteFill name="Scene 5 - Outro" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 7 - Outro" style={{ fontFamily: inter }}>
       <GlowBackground accent="#4285F4" />
 
       <div
@@ -134,6 +124,7 @@ export const Scene5Outro: React.FC = () => {
                 easing: Easing.bezier(0.16, 1, 0.3, 1),
               },
             );
+            const landed = frame > 130 + i * 12;
             return (
               <div
                 key={i}
@@ -142,7 +133,7 @@ export const Scene5Outro: React.FC = () => {
                   height: `${barLocal * 100}%`,
                   borderRadius: 8,
                   background: "linear-gradient(180deg, #6EA0FF, #4285F4)",
-                  boxShadow: "0 0 18px rgba(66,133,244,0.5)",
+                  boxShadow: `0 0 ${landed ? 14 + barGlow * 16 : 18}px rgba(66,133,244,0.5)`,
                 }}
               />
             );
@@ -150,44 +141,44 @@ export const Scene5Outro: React.FC = () => {
         </div>
       </div>
 
-      <Interactive.Div
-        name="Thesis line 1"
+      <div
         style={{
           position: "absolute",
           top: "42%",
           left: 0,
           right: 0,
-          textAlign: "center",
-          opacity: line1Opacity,
-          translate: `0 ${interpolate(frame, [250, 290], [24, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px`,
-          fontFamily: spaceGrotesk,
-          fontSize: 56,
-          fontWeight: 600,
-          color: "#94a3b8",
+          display: "flex",
+          justifyContent: "center",
         }}
       >
-        Applications are the Backend.
-      </Interactive.Div>
+        <KineticText
+          tokens={words("Applications are the Backend.", [])}
+          from={250}
+          to={400}
+          fontSize={56}
+          fontWeight={600}
+          style={{ color: "#94a3b8" }}
+        />
+      </div>
 
-      <Interactive.Div
-        name="Thesis line 2"
+      <div
         style={{
           position: "absolute",
           top: "52%",
           left: 0,
           right: 0,
-          textAlign: "center",
-          opacity: line2Opacity,
-          translate: `0 ${interpolate(frame, [330, 370], [24, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })}px`,
-          fontFamily: spaceGrotesk,
-          fontSize: 72,
-          fontWeight: 700,
-          color: "#ffffff",
-          textShadow: "0 0 30px rgba(66,133,244,0.4)",
+          display: "flex",
+          justifyContent: "center",
         }}
       >
-        Flow is the Interface.
-      </Interactive.Div>
+        <KineticText
+          tokens={words("Flow is the Interface.", ["Flow", "Interface"])}
+          from={330}
+          to={450}
+          fontSize={72}
+          fontWeight={700}
+        />
+      </div>
 
       <div
         style={{

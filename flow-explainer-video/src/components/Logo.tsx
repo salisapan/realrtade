@@ -2,7 +2,47 @@ import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 import { spaceGrotesk } from "../fonts";
 
-// Chrome/metallic "Flow" wordmark — matches the brand's hero logo treatment.
+const Droplet: React.FC<{
+  leftPct: number;
+  topPct: number;
+  size: number;
+  delay: number;
+  flip?: boolean;
+}> = ({ leftPct, topPct, size, delay, flip }) => {
+  const frame = useCurrentFrame();
+  const bob = Math.sin(frame * 0.05 + delay) * 3;
+
+  return (
+    <svg
+      width={size}
+      height={size * 1.4}
+      viewBox="0 0 20 28"
+      style={{
+        position: "absolute",
+        left: `${leftPct}%`,
+        top: `${topPct}%`,
+        translate: `0 ${bob}px`,
+        scale: flip ? "-1 1" : "1 1",
+        filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.35))",
+      }}
+    >
+      <defs>
+        <linearGradient id={`drop-${leftPct}-${topPct}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#f8fafc" />
+          <stop offset="45%" stopColor="#94a3b8" />
+          <stop offset="100%" stopColor="#e2e8f0" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M10 1 C13 8 18 14 18 19 A8 8 0 1 1 2 19 C2 14 7 8 10 1 Z"
+        fill={`url(#drop-${leftPct}-${topPct})`}
+      />
+    </svg>
+  );
+};
+
+// Chrome/metallic "Flow" wordmark — matches the brand's hero logo treatment,
+// with small liquid-splash droplet accents echoing the reference art.
 export const LiquidLogo: React.FC<{ width?: number }> = ({ width = 480 }) => {
   const frame = useCurrentFrame();
   const sweep = interpolate(frame % 140, [0, 140], [-30, 130]);
@@ -29,6 +69,11 @@ export const LiquidLogo: React.FC<{ width?: number }> = ({ width = 480 }) => {
       >
         Flow
       </div>
+      <Droplet leftPct={4} topPct={-24} size={16} delay={0} />
+      <Droplet leftPct={21} topPct={-30} size={12} delay={1.4} />
+      <Droplet leftPct={46} topPct={-20} size={10} delay={2.6} />
+      <Droplet leftPct={88} topPct={-26} size={14} delay={0.7} flip />
+      <Droplet leftPct={97} topPct={-10} size={8} delay={3.3} flip />
       <div
         style={{
           position: "absolute",

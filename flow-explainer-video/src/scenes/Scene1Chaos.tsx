@@ -9,10 +9,10 @@ import {
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
 import { WindowCard } from "../components/WindowCard";
-import { Caption } from "../components/Caption";
+import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 100, mass: 0.8 };
+const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
 
 const windows = [
   {
@@ -23,7 +23,7 @@ const windows = [
     left: 190,
     width: 380,
     rotate: -7,
-    start: 15,
+    start: 8,
     badge: 12,
   },
   {
@@ -34,7 +34,7 @@ const windows = [
     left: 130,
     width: 420,
     rotate: 5,
-    start: 60,
+    start: 34,
     badge: undefined,
   },
   {
@@ -45,7 +45,7 @@ const windows = [
     left: 1010,
     width: 380,
     rotate: 6,
-    start: 105,
+    start: 60,
     badge: 3,
   },
   {
@@ -56,7 +56,7 @@ const windows = [
     left: 1140,
     width: 400,
     rotate: -5,
-    start: 150,
+    start: 86,
     badge: undefined,
   },
   {
@@ -67,7 +67,7 @@ const windows = [
     left: 660,
     width: 300,
     rotate: -10,
-    start: 220,
+    start: 130,
     badge: 5,
   },
   {
@@ -78,7 +78,7 @@ const windows = [
     left: 800,
     width: 340,
     rotate: 8,
-    start: 290,
+    start: 170,
     badge: undefined,
   },
 ];
@@ -113,7 +113,7 @@ export const Scene1Chaos: React.FC = () => {
             config: SPRING_CONFIG,
           });
           const jitter =
-            Math.sin(frame * 0.04 + i * 12) * (frame >= w.start ? 1.4 : 0);
+            Math.sin(frame * 0.045 + i * 12) * (frame >= w.start ? 1.6 : 0);
 
           return (
             <WindowCard
@@ -128,7 +128,7 @@ export const Scene1Chaos: React.FC = () => {
               scale={0.82 + appear * 0.18}
               opacity={Math.min(appear, 1)}
               zIndex={10 + i}
-              badge={frame >= w.start + 25 ? w.badge : undefined}
+              badge={frame >= w.start + 22 ? w.badge : undefined}
             />
           );
         })}
@@ -166,19 +166,35 @@ export const Scene1Chaos: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          height: 340,
+          height: 400,
           background:
-            "linear-gradient(to top, rgba(10,14,26,0.92), rgba(10,14,26,0))",
+            "linear-gradient(to top, rgba(10,14,26,0.94), rgba(10,14,26,0))",
         }}
       />
 
-      <Caption from={45} to={555} fontSize={44}>
-        Knowledge workers waste up to{" "}
-        <span style={{ color: "#93c5fd", fontWeight: 700 }}>
-          40% of their day
-        </span>{" "}
-        manually jumping between dozens of applications and re-entering data.
-      </Caption>
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 130,
+          display: "flex",
+          justifyContent: "center",
+          padding: "0 140px",
+        }}
+      >
+        <KineticText
+          tokens={words(
+            "40% of the day, lost switching between apps.",
+            ["40%", "lost"],
+          )}
+          from={210}
+          to={455}
+          fontSize={52}
+          fontWeight={700}
+          maxWidth={1500}
+        />
+      </div>
     </AbsoluteFill>
   );
 };

@@ -11,10 +11,10 @@ import { GlowBackground } from "../components/GlowBackground";
 import { WindowCard } from "../components/WindowCard";
 import { DoItButton } from "../components/DoItButton";
 import { Cursor } from "../components/Cursor";
-import { Caption } from "../components/Caption";
+import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 100, mass: 0.8 };
+const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
 
 const CONVERGE_X = 960;
 const CONVERGE_Y = 660;
@@ -198,7 +198,12 @@ export const Scene2Solution: React.FC = () => {
             justifyContent: "center",
           }}
         >
-          <div style={{ scale: Math.max(buttonAppear, 0) }}>
+          <div
+            style={{
+              scale: Math.max(buttonAppear, 0),
+              translate: `0 ${frame > 150 ? Math.sin(frame * 0.04) * 5 : 0}px`,
+            }}
+          >
             <DoItButton
               clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
             />
@@ -235,17 +240,47 @@ export const Scene2Solution: React.FC = () => {
         clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
       />
 
-      <Caption from={90} to={380} fontSize={40}>
-        We eliminated this chaos. Meet{" "}
-        <span style={{ color: "#93c5fd", fontWeight: 700 }}>Flow</span> — a
-        local runtime that silently sits in the background and learns your
-        patterns.
-      </Caption>
-      <Caption from={410} to={790} fontSize={40}>
-        It serves a single execution button that completes the entire
-        workflow in{" "}
-        <span style={{ color: "#93c5fd", fontWeight: 700 }}>one click</span>.
-      </Caption>
+      <div
+        style={{
+          position: "absolute",
+          top: 190,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          padding: "0 200px",
+        }}
+      >
+        <KineticText
+          tokens={words("Meet Flow. It learns in silence.", ["Flow"])}
+          from={90}
+          to={370}
+          fontSize={44}
+          fontWeight={700}
+          maxWidth={1300}
+        />
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          top: 190,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+          padding: "0 200px",
+        }}
+      >
+        <KineticText
+          tokens={words("One click. Every workflow, done.", ["one", "click"])}
+          from={CLICK_FRAME + 20}
+          to={790}
+          fontSize={44}
+          fontWeight={700}
+          maxWidth={1300}
+        />
+      </div>
     </AbsoluteFill>
   );
 };

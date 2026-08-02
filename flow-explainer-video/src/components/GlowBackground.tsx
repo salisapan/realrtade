@@ -1,12 +1,113 @@
 import React from "react";
 import { interpolate, useCurrentFrame } from "remotion";
 
+const NODES: [number, number][] = [
+  [120, 140],
+  [380, 90],
+  [640, 220],
+  [900, 60],
+  [1180, 180],
+  [1450, 100],
+  [1720, 230],
+  [150, 860],
+  [420, 940],
+  [700, 820],
+  [980, 960],
+  [1260, 840],
+  [1540, 920],
+  [1800, 780],
+];
+
+const EDGES: [number, number][] = [
+  [0, 1],
+  [1, 2],
+  [2, 3],
+  [3, 4],
+  [4, 5],
+  [5, 6],
+  [7, 8],
+  [8, 9],
+  [9, 10],
+  [10, 11],
+  [11, 12],
+  [12, 13],
+  [0, 7],
+  [2, 9],
+  [4, 11],
+  [6, 13],
+  [1, 8],
+  [5, 12],
+];
+
+// Reusable animated node-link "neural network" motif. Used as the ambient
+// background layer, and reused denser/clipped inside the Scene 4 core.
+export const NeuralField: React.FC<{
+  accent?: string;
+  opacity?: number;
+  nodeRadius?: number;
+}> = ({ accent = "#6EA0FF", opacity = 1, nodeRadius = 3 }) => {
+  const frame = useCurrentFrame();
+
+  return (
+    <svg
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        opacity,
+      }}
+      viewBox="0 0 1920 1080"
+      preserveAspectRatio="none"
+    >
+      {EDGES.map(([a, b], i) => {
+        const [ax, ay] = NODES[a];
+        const [bx, by] = NODES[b];
+        const pulse = interpolate(
+          Math.sin(frame * 0.05 - i * 0.6),
+          [-1, 1],
+          [0.05, 0.28],
+        );
+        return (
+          <line
+            key={i}
+            x1={ax}
+            y1={ay}
+            x2={bx}
+            y2={by}
+            stroke={accent}
+            strokeWidth={1}
+            opacity={pulse}
+          />
+        );
+      })}
+      {NODES.map(([x, y], i) => {
+        const dx = Math.sin(frame * 0.02 + i) * 8;
+        const dy = Math.cos(frame * 0.017 + i * 2) * 8;
+        return (
+          <circle
+            key={i}
+            cx={x + dx}
+            cy={y + dy}
+            r={nodeRadius}
+            fill={accent}
+            opacity={0.5}
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
 export const GlowBackground: React.FC<{ accent?: string }> = ({
   accent = "#4285F4",
 }) => {
   const frame = useCurrentFrame();
   const cycle = (frame % 300) / 300;
   const sweep = (frame % 480) / 480;
+  const driftX = Math.sin(frame * 0.008) * 40;
+  const driftY = Math.cos(frame * 0.006) * 26;
+  const gridDrift = (frame * 0.35) % 64;
 
   return (
     <div
@@ -27,6 +128,7 @@ export const GlowBackground: React.FC<{ accent?: string }> = ({
           height: 900,
           borderRadius: "50%",
           background: accent,
+          translate: `${driftX}px ${driftY}px`,
           opacity: interpolate(
             Math.sin(cycle * Math.PI * 2),
             [-1, 1],
@@ -44,6 +146,7 @@ export const GlowBackground: React.FC<{ accent?: string }> = ({
           height: 800,
           borderRadius: "50%",
           background: accent,
+          translate: `${-driftX}px ${-driftY}px`,
           opacity: interpolate(
             Math.sin(cycle * Math.PI * 2 + Math.PI),
             [-1, 1],
@@ -52,10 +155,12 @@ export const GlowBackground: React.FC<{ accent?: string }> = ({
           filter: "blur(200px)",
         }}
       />
+      <NeuralField accent="#6EA0FF" opacity={0.55} />
       <div
         style={{
           position: "absolute",
-          inset: 0,
+          inset: -64,
+          translate: `${gridDrift}px ${gridDrift}px`,
           backgroundImage:
             "linear-gradient(rgba(148,163,184,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.05) 1px, transparent 1px)",
           backgroundSize: "64px 64px",

@@ -2,7 +2,8 @@ import React from "react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { spaceGrotesk } from "../fonts";
 
-// Matches the real product's [Do It] pill: dark glass, neon-blue outline glow.
+// Matches the real product's [Do It] pill: double-ring neon-blue glow with a
+// glass highlight arc, dark glass fill.
 export const DoItButton: React.FC<{
   scale?: number;
   clickFrame?: number;
@@ -11,7 +12,7 @@ export const DoItButton: React.FC<{
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const idleGlow = interpolate(frame % 110, [0, 55, 110], [0.4, 0.85, 0.4]);
+  const idleGlow = interpolate(frame % 110, [0, 55, 110], [0.45, 0.9, 0.45]);
 
   const press =
     clickFrame === undefined
@@ -34,6 +35,8 @@ export const DoItButton: React.FC<{
         });
 
   const glow = Math.max(idleGlow, clickGlow);
+  const padY = fontSize * 0.5;
+  const padX = fontSize * 1.3;
 
   return (
     <div
@@ -46,31 +49,60 @@ export const DoItButton: React.FC<{
       <div
         style={{
           position: "absolute",
-          inset: -30,
+          inset: -34,
           borderRadius: 999,
           background: "#3b82f6",
-          opacity: glow * 0.35,
-          filter: "blur(28px)",
+          opacity: glow * 0.4,
+          filter: "blur(30px)",
         }}
       />
       <div
         style={{
           position: "relative",
-          padding: `${fontSize * 0.5}px ${fontSize * 1.3}px`,
+          padding: 3,
           borderRadius: 999,
-          background: "rgba(8,14,28,0.78)",
-          backdropFilter: "blur(6px)",
-          border: `1.5px solid rgba(96,165,250,${0.7 + glow * 0.3})`,
-          boxShadow: `0 0 ${16 + glow * 26}px rgba(59,130,246,${(0.35 + glow * 0.4).toFixed(2)}), inset 0 0 18px rgba(59,130,246,0.18)`,
-          color: "#bfdbfe",
-          fontFamily: spaceGrotesk,
-          fontSize,
-          fontWeight: 600,
-          letterSpacing: 1,
-          whiteSpace: "nowrap",
+          background: `rgba(96,165,250,${(0.35 + glow * 0.35).toFixed(2)})`,
+          boxShadow: `0 0 ${18 + glow * 28}px rgba(59,130,246,${(0.4 + glow * 0.4).toFixed(2)})`,
         }}
       >
-        [Do It]
+        <div
+          style={{
+            position: "relative",
+            borderRadius: 999,
+            padding: `${padY}px ${padX}px`,
+            background:
+              "linear-gradient(180deg, rgba(15,23,42,0.9), rgba(4,8,18,0.92))",
+            border: `1.5px solid rgba(147,197,253,${(0.75 + glow * 0.25).toFixed(2)})`,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "55%",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.24), transparent)",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "relative",
+              color: "#e0edff",
+              fontFamily: spaceGrotesk,
+              fontSize,
+              fontWeight: 700,
+              letterSpacing: 1,
+              whiteSpace: "nowrap",
+              textShadow: "0 0 14px rgba(147,197,253,0.6)",
+            }}
+          >
+            [Do It]
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -212,6 +212,65 @@ export const BoltIcon: React.FC<IconProps> = ({
   </svg>
 );
 
+export const CalendarIcon: React.FC<IconProps> = ({
+  size = 20,
+  color = "currentColor",
+  strokeWidth = 1.8,
+}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <rect
+      x="3.5"
+      y="5"
+      width="17"
+      height="16"
+      rx="2.5"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
+    <path
+      d="M3.5 10h17M8 3v4M16 3v4"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+export const ChatIcon: React.FC<IconProps> = ({
+  size = 20,
+  color = "currentColor",
+  strokeWidth = 1.8,
+}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <path
+      d="M4 5.5h16v10.5H9l-4 4v-4H4z"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+export const DatabaseIcon: React.FC<IconProps> = ({
+  size = 20,
+  color = "currentColor",
+  strokeWidth = 1.8,
+}) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <ellipse cx="12" cy="5.5" rx="8" ry="3" stroke={color} strokeWidth={strokeWidth} />
+    <path
+      d="M4 5.5V18.5C4 20.2 7.6 21.5 12 21.5C16.4 21.5 20 20.2 20 18.5V5.5"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
+    <path
+      d="M4 12C4 13.7 7.6 15 12 15C16.4 15 20 13.7 20 12"
+      stroke={color}
+      strokeWidth={strokeWidth}
+    />
+  </svg>
+);
+
 export const BellIcon: React.FC<IconProps> = ({
   size = 20,
   color = "currentColor",

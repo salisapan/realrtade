@@ -10,11 +10,11 @@ import {
 import { GlowBackground } from "../components/GlowBackground";
 import { GlassCard } from "../components/GlassCard";
 import { DoItButton } from "../components/DoItButton";
-import { Caption } from "../components/Caption";
+import { KineticText, words, node } from "../components/KineticText";
 import { EyeOffIcon, BellIcon, CheckIcon } from "../components/Icons";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 100, mass: 0.8 };
+const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
 
 const BUTTON_POS = { x: 960, y: 430 };
 const LEFT_CARD = { x: 560, y: 600 };
@@ -80,20 +80,16 @@ export const Scene3Architecture: React.FC = () => {
         >
           — DUAL-CORE ARCHITECTURE
         </Interactive.Div>
-        <Interactive.Div
-          name="Headline"
-          style={{
-            fontFamily: spaceGrotesk,
-            fontSize: 62,
-            fontWeight: 700,
-            color: "#f8fafc",
-            lineHeight: 1.15,
-            opacity: interpolate(headlineIn, [0, 1], [0, 1]),
-            translate: `0 ${interpolate(headlineIn, [0, 1], [24, 0])}px`,
-          }}
-        >
-          Watch in silence. Act with power.
-        </Interactive.Div>
+        <KineticText
+          tokens={words("Watch in silence. Act with power.", [
+            "silence",
+            "power",
+          ])}
+          from={8}
+          fontSize={62}
+          fontWeight={700}
+          align="left"
+        />
         <Interactive.Div
           name="Subheadline"
           style={{
@@ -145,6 +141,7 @@ export const Scene3Architecture: React.FC = () => {
           height: 240,
           opacity: diamondIn,
           scale: 0.85 + diamondIn * 0.15,
+          rotate: `${Math.sin(frame * 0.02) * 2.2}deg`,
           filter: "drop-shadow(0 0 40px rgba(66,133,244,0.45))",
         }}
       >
@@ -180,7 +177,7 @@ export const Scene3Architecture: React.FC = () => {
           left: LEFT_CARD.x - 380,
           top: LEFT_CARD.y - 20,
           opacity: interpolate(leftCardIn, [0, 1], [0, 1]),
-          translate: `0 ${interpolate(leftCardIn, [0, 1], [40, 0])}px`,
+          translate: `0 ${interpolate(leftCardIn, [0, 1], [40, 0]) + (leftCardIn > 0.9 ? Math.sin(frame * 0.025) * 4 : 0)}px`,
         }}
       >
         <GlassCard width={760} label="SHADOW — INVISIBLE" accent="#94a3b8">
@@ -272,7 +269,7 @@ export const Scene3Architecture: React.FC = () => {
           left: RIGHT_CARD.x - 380,
           top: RIGHT_CARD.y - 20,
           opacity: interpolate(rightCardIn, [0, 1], [0, 1]),
-          translate: `0 ${interpolate(rightCardIn, [0, 1], [40, 0])}px`,
+          translate: `0 ${interpolate(rightCardIn, [0, 1], [40, 0]) + (rightCardIn > 0.9 ? Math.sin(frame * 0.025 + 1.5) * 4 : 0)}px`,
         }}
       >
         <GlassCard width={760} label="DO IT — VISIBLE" accent="#60a5fa">
@@ -350,15 +347,26 @@ export const Scene3Architecture: React.FC = () => {
         </GlassCard>
       </div>
 
-      <Caption from={280} to={560} fontSize={38}>
-        A local layer watches in silence — learning your patterns on-device,
-        without ever sending data to the cloud.
-      </Caption>
-      <Caption from={590} to={820} fontSize={38}>
-        The moment your intent is detected, the only interface you'll ever
-        need surfaces:{" "}
-        <span style={{ color: "#93c5fd", fontWeight: 700 }}>[Do It]</span>.
-      </Caption>
+      <div
+        style={{
+          position: "absolute",
+          bottom: 90,
+          left: 0,
+          right: 0,
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <KineticText
+          tokens={[
+            ...words("Every action ends at"),
+            node(<DoItButton fontSize={20} />),
+          ]}
+          from={620}
+          fontSize={40}
+          fontWeight={700}
+        />
+      </div>
     </AbsoluteFill>
   );
 };
