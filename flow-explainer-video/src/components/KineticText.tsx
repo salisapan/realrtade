@@ -6,7 +6,7 @@ export type KineticToken =
   | { text: string; emphasis?: boolean }
   | { node: React.ReactNode };
 
-const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+const SPRING_CONFIG = { damping: 12, stiffness: 150, mass: 0.8 };
 
 // Splits a sentence into word tokens, marking any word containing one of the
 // given (case-insensitive) substrings as an emphasis token.
@@ -23,6 +23,56 @@ export const words = (
 
 export const node = (n: React.ReactNode): KineticToken => ({ node: n });
 
+const VARIANTS = ["rise", "drop", "zoom", "slideLeft", "slideRight", "pop"] as const;
+type Variant = (typeof VARIANTS)[number];
+
+const wordMotion = (variant: Variant, enter: number) => {
+  switch (variant) {
+    case "rise":
+      return {
+        x: 0,
+        y: interpolate(enter, [0, 1], [30, 0]),
+        scale: interpolate(enter, [0, 1], [0.82, 1]),
+        rotate: 0,
+      };
+    case "drop":
+      return {
+        x: 0,
+        y: interpolate(enter, [0, 1], [-36, 0]),
+        scale: interpolate(enter, [0, 1], [1.22, 1]),
+        rotate: 0,
+      };
+    case "zoom":
+      return {
+        x: 0,
+        y: 0,
+        scale: interpolate(enter, [0, 1], [2.6, 1]),
+        rotate: 0,
+      };
+    case "slideLeft":
+      return {
+        x: interpolate(enter, [0, 1], [52, 0]),
+        y: 0,
+        scale: interpolate(enter, [0, 1], [0.9, 1]),
+        rotate: 0,
+      };
+    case "slideRight":
+      return {
+        x: interpolate(enter, [0, 1], [-52, 0]),
+        y: 0,
+        scale: interpolate(enter, [0, 1], [0.9, 1]),
+        rotate: 0,
+      };
+    case "pop":
+      return {
+        x: 0,
+        y: 0,
+        scale: interpolate(enter, [0, 1], [0, 1]),
+        rotate: interpolate(enter, [0, 1], [-12, 0]),
+      };
+  }
+};
+
 export const KineticText: React.FC<{
   tokens: KineticToken[];
   from: number;
@@ -38,7 +88,7 @@ export const KineticText: React.FC<{
   tokens,
   from,
   to,
-  stagger = 3,
+  stagger = 4,
   fontSize = 46,
   fontWeight = 600,
   align = "center",
@@ -80,19 +130,27 @@ export const KineticText: React.FC<{
           fps,
           config: SPRING_CONFIG,
         });
+        const clampedEnter = Math.min(Math.max(enter, 0), 1.15);
         const opacity = Math.min(enter, 1) * (1 - exitProgress);
-        const translateY =
-          interpolate(enter, [0, 1], [20, 0]) + exitProgress * -22;
-        const blur = interpolate(enter, [0, 1], [9, 0]) + exitProgress * 7;
+        const idleBob =
+          enter >= 1 ? Math.sin(frame * 0.05 + i * 1.7) * 2.2 : 0;
 
-        if ("node" in token) {
+        const isNode = "node" in token;
+        const variant: Variant = isNode ? "rise" : VARIANTS[i % VARIANTS.length];
+        const motion = wordMotion(variant, clampedEnter);
+        const blur = interpolate(clampedEnter, [0, 1], [10, 0]) + exitProgress * 7;
+        const translateY = motion.y + idleBob + exitProgress * -24;
+        const translateX = motion.x;
+
+        if (isNode) {
           return (
             <span
               key={i}
               style={{
                 display: "inline-flex",
                 opacity,
-                translate: `0 ${translateY}px`,
+                translate: `${translateX}px ${translateY}px`,
+                scale: motion.scale,
                 filter: `blur(${blur}px)`,
               }}
             >
@@ -107,7 +165,9 @@ export const KineticText: React.FC<{
             style={{
               display: "inline-block",
               opacity,
-              translate: `0 ${translateY}px`,
+              translate: `${translateX}px ${translateY}px`,
+              scale: motion.scale,
+              rotate: `${motion.rotate}deg`,
               filter: `blur(${blur}px)`,
               color: token.emphasis ? "#7dc0ff" : "#f8fafc",
               textShadow: token.emphasis

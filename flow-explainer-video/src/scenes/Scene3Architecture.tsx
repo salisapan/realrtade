@@ -10,11 +10,16 @@ import {
 import { GlowBackground } from "../components/GlowBackground";
 import { GlassCard } from "../components/GlassCard";
 import { DoItButton } from "../components/DoItButton";
+import { Cursor, ClickBurst } from "../components/Cursor";
 import { KineticText, words, node } from "../components/KineticText";
 import { EyeOffIcon, BellIcon, CheckIcon } from "../components/Icons";
 import { inter, spaceGrotesk } from "../fonts";
 
 const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+
+const CURSOR_TRAVEL_START = 260;
+const CURSOR_TRAVEL_FRAMES = 55;
+const CLICK_FRAME = CURSOR_TRAVEL_START + CURSOR_TRAVEL_FRAMES + 4;
 
 const BUTTON_POS = { x: 960, y: 430 };
 const LEFT_CARD = { x: 560, y: 600 };
@@ -167,9 +172,29 @@ export const Scene3Architecture: React.FC = () => {
             translate: "-50% 0",
           }}
         >
-          <DoItButton fontSize={22} />
+          <DoItButton
+            fontSize={22}
+            clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+          />
         </div>
       </div>
+
+      <Cursor
+        fromX={1500}
+        fromY={200}
+        toX={1030}
+        toY={385}
+        startFrame={CURSOR_TRAVEL_START}
+        travelFrames={CURSOR_TRAVEL_FRAMES}
+        clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+      />
+
+      <ClickBurst
+        x={1030}
+        y={385}
+        clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+        color="#60a5fa"
+      />
 
       <div
         style={{

@@ -8,14 +8,14 @@ import {
   useVideoConfig,
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
-import { LiquidLogo } from "../components/Logo";
+import { RealLogo } from "../components/Logo";
 import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
 const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
 const bars = [0.4, 0.65, 0.5, 0.85, 1];
 
-export const Scene7Outro: React.FC = () => {
+export const Scene8Outro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -45,7 +45,7 @@ export const Scene7Outro: React.FC = () => {
   const glow = interpolate(frame % 120, [0, 60, 120], [0.5, 0.9, 0.5]);
 
   return (
-    <AbsoluteFill name="Scene 7 - Outro" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 8 - Outro" style={{ fontFamily: inter }}>
       <GlowBackground accent="#4285F4" />
 
       <div
@@ -214,7 +214,7 @@ export const Scene7Outro: React.FC = () => {
             filter: `drop-shadow(0 0 ${30 + glow * 26}px rgba(66,133,244,0.6))`,
           }}
         >
-          <LiquidLogo width={480} />
+          <RealLogo width={480} />
         </div>
         <div
           style={{

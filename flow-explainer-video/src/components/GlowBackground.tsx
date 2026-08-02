@@ -108,12 +108,14 @@ export const GlowBackground: React.FC<{ accent?: string }> = ({
   const driftX = Math.sin(frame * 0.008) * 40;
   const driftY = Math.cos(frame * 0.006) * 26;
   const gridDrift = (frame * 0.35) % 64;
+  const breathe = 1 + Math.sin(frame * 0.011) * 0.012;
 
   return (
     <div
       style={{
         position: "absolute",
         inset: 0,
+        scale: breathe,
         background:
           "linear-gradient(160deg, #0a0e1a 0%, #0f1830 55%, #0a0e1a 100%)",
         overflow: "hidden",

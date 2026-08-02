@@ -5,9 +5,10 @@ import { Scene1Chaos } from "./scenes/Scene1Chaos";
 import { Scene2Solution } from "./scenes/Scene2Solution";
 import { Scene3Architecture } from "./scenes/Scene3Architecture";
 import { Scene4IntentCompiler } from "./scenes/Scene4IntentCompiler";
-import { Scene5ActionHub } from "./scenes/Scene5ActionHub";
-import { Scene6Security } from "./scenes/Scene6Security";
-import { Scene7Outro } from "./scenes/Scene7Outro";
+import { Scene5ActionGraph } from "./scenes/Scene5ActionGraph";
+import { Scene6ActionHub } from "./scenes/Scene6ActionHub";
+import { Scene7Security } from "./scenes/Scene7Security";
+import { Scene8Outro } from "./scenes/Scene8Outro";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -46,24 +47,32 @@ export const RemotionRoot: React.FC = () => {
           height={1080}
         />
         <Composition
-          id="Scene5ActionHub"
-          component={Scene5ActionHub}
+          id="Scene5ActionGraph"
+          component={Scene5ActionGraph}
+          durationInFrames={720}
+          fps={60}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Scene6ActionHub"
+          component={Scene6ActionHub}
           durationInFrames={540}
           fps={60}
           width={1920}
           height={1080}
         />
         <Composition
-          id="Scene6Security"
-          component={Scene6Security}
+          id="Scene7Security"
+          component={Scene7Security}
           durationInFrames={780}
           fps={60}
           width={1920}
           height={1080}
         />
         <Composition
-          id="Scene7Outro"
-          component={Scene7Outro}
+          id="Scene8Outro"
+          component={Scene8Outro}
           durationInFrames={600}
           fps={60}
           width={1920}
@@ -73,7 +82,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="FlowExplainer"
         component={FlowExplainer}
-        durationInFrames={4500}
+        durationInFrames={5200}
         fps={60}
         width={1920}
         height={1080}

@@ -20,16 +20,8 @@ const features = [
   { label: "Deterministic Execution", Icon: BracketsIcon, delay: 560 },
 ];
 
-const particles = [0, 1, 2, 3, 4];
-
-const CIRCUIT_PATHS = [
-  "M46,104 L82,66 L124,66 L156,104",
-  "M44,140 L92,140 L118,168 L164,168",
-  "M64,42 L64,88 L102,118",
-  "M148,44 L148,82 L178,110",
-  "M52,176 L98,176 L138,148",
-  "M156,58 L128,90 L128,130",
-];
+const beams = [0, 1, 2, 3, 4];
+const MERIDIANS = 9;
 
 const Ring: React.FC<{
   size: number;
@@ -69,63 +61,82 @@ const Ring: React.FC<{
   );
 };
 
-const CircuitCore: React.FC<{ size: number }> = ({ size }) => {
+// A genuine 3D CSS wireframe globe: layered meridian + latitude rings inside
+// a perspective container, spinning continuously.
+const WireframeGlobe: React.FC<{ size: number }> = ({ size }) => {
   const frame = useCurrentFrame();
+  const spin = frame * 0.55;
 
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 200 200"
-      style={{ position: "absolute", inset: 0 }}
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        perspective: 1000,
+      }}
     >
-      <defs>
-        <radialGradient id="orbGlass" cx="35%" cy="28%" r="78%">
-          <stop offset="0%" stopColor="rgba(134,239,172,0.32)" />
-          <stop offset="55%" stopColor="rgba(6,20,14,0.55)" />
-          <stop offset="100%" stopColor="rgba(3,10,7,0.9)" />
-        </radialGradient>
-      </defs>
-      <circle
-        cx="100"
-        cy="100"
-        r="96"
-        fill="url(#orbGlass)"
-        stroke="rgba(74,222,128,0.45)"
-        strokeWidth="1.5"
-      />
-      <path
-        d="M100 38 L152 60 V102 C152 138 129 162 100 172 C71 162 48 138 48 102 V60 Z"
-        fill="none"
-        stroke="rgba(134,239,172,0.4)"
-        strokeWidth="2"
-      />
-      {CIRCUIT_PATHS.map((d, i) => {
-        const speed = 1.5 + i * 0.28;
-        const offset = (frame * speed + i * 40) % 240;
-        return (
-          <path
-            key={i}
-            d={d}
-            fill="none"
-            stroke="#4ade80"
-            strokeWidth="1.6"
-            strokeDasharray="40 200"
-            strokeDashoffset={-offset}
-            opacity={0.85}
-            strokeLinecap="round"
+      <div
+        style={{
+          position: "relative",
+          width: size,
+          height: size,
+          transformStyle: "preserve-3d",
+          transform: `rotateX(16deg) rotateY(${spin}deg)`,
+        }}
+      >
+        {[...Array(MERIDIANS)].map((_, i) => (
+          <div
+            key={`m-${i}`}
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "50%",
+              border: "1.4px solid rgba(74,222,128,0.5)",
+              boxShadow: "0 0 10px rgba(74,222,128,0.3)",
+              transform: `rotateY(${(i * 180) / MERIDIANS}deg)`,
+            }}
           />
-        );
-      })}
-    </svg>
+        ))}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            border: "1.3px solid rgba(134,239,172,0.45)",
+            transform: "rotateX(90deg)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            border: "1px solid rgba(134,239,172,0.32)",
+            transform: `rotateX(90deg) translateY(-${size * 0.32}px) scale(0.58)`,
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: "50%",
+            border: "1px solid rgba(134,239,172,0.32)",
+            transform: `rotateX(90deg) translateY(${size * 0.32}px) scale(0.58)`,
+          }}
+        />
+      </div>
+    </div>
   );
 };
 
-export const Scene6Security: React.FC = () => {
+export const Scene7Security: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const chipAppear = spring({ frame: frame - 10, fps, config: SPRING_CONFIG });
+  const coreAppear = spring({ frame: frame - 10, fps, config: SPRING_CONFIG });
   const idleFloat = Math.sin(frame * 0.025) * 6;
 
   const boundaryAppear = interpolate(frame, [90, 140], [0, 1], {
@@ -134,7 +145,7 @@ export const Scene6Security: React.FC = () => {
   });
 
   return (
-    <AbsoluteFill name="Scene 6 - Security" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 7 - Security" style={{ fontFamily: inter }}>
       <GlowBackground accent="#34d399" />
 
       <Interactive.Div
@@ -186,17 +197,14 @@ export const Scene6Security: React.FC = () => {
         }}
       />
 
-      {particles.map((p) => {
-        const period = 70;
-        const local = (frame + p * 14) % period;
-        const rising = local < period * 0.5;
-        const progress = rising
-          ? interpolate(local, [0, period * 0.5], [0, 1])
-          : interpolate(local, [period * 0.5, period], [1, 0]);
-        const y = interpolate(progress, [0, 1], [420, 210]);
-        const x = 960 + (p - 2) * 70;
+      {beams.map((p) => {
+        const period = 80;
+        const local = (frame + p * 16) % period;
+        const progress = interpolate(local, [0, period], [0, 1]);
+        const y = interpolate(progress, [0, 1], [430, 200]);
+        const x = 960 + (p - 2) * 50;
         const opacity =
-          interpolate(local, [0, 6, period - 10, period], [0, 1, 1, 0], {
+          interpolate(local, [0, 12, period - 24, period], [0, 0.85, 0.85, 0], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           }) * boundaryAppear;
@@ -208,12 +216,14 @@ export const Scene6Security: React.FC = () => {
               position: "absolute",
               top: y,
               left: x,
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: "#4ade80",
+              translate: "-50% 0",
+              width: 3,
+              height: 70,
+              borderRadius: 2,
+              background:
+                "linear-gradient(to bottom, transparent, rgba(134,239,172,0.95), transparent)",
               opacity,
-              boxShadow: "0 0 10px #4ade80",
+              filter: "blur(0.6px)",
             }}
           />
         );
@@ -225,8 +235,8 @@ export const Scene6Security: React.FC = () => {
           top: 250 + idleFloat,
           left: "50%",
           translate: "-50% 0",
-          scale: Math.max(chipAppear, 0),
-          opacity: Math.min(chipAppear, 1),
+          scale: Math.max(coreAppear, 0),
+          opacity: Math.min(coreAppear, 1),
         }}
       >
         <div style={{ position: "relative", width: 280, height: 280 }}>
@@ -238,7 +248,7 @@ export const Scene6Security: React.FC = () => {
             color="#4ade80"
           />
           <Ring
-            size={320}
+            size={330}
             rotateSpeed={0.22}
             dasharray="1 16"
             opacity={0.28}
@@ -246,7 +256,7 @@ export const Scene6Security: React.FC = () => {
             reverse
           />
           <Ring
-            size={360}
+            size={378}
             rotateSpeed={0.14}
             dasharray="6 4"
             opacity={0.16}
@@ -255,12 +265,14 @@ export const Scene6Security: React.FC = () => {
           <div
             style={{
               position: "absolute",
-              inset: 40,
-              filter: "drop-shadow(0 0 26px rgba(74,222,128,0.5))",
+              inset: 60,
+              borderRadius: "50%",
+              background:
+                "radial-gradient(circle at 38% 32%, rgba(134,239,172,0.4), rgba(6,20,14,0.2) 70%)",
+              filter: "blur(18px)",
             }}
-          >
-            <CircuitCore size={200} />
-          </div>
+          />
+          <WireframeGlobe size={190} />
         </div>
         <div
           style={{

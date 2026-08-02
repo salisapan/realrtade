@@ -1,6 +1,80 @@
 import React from "react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 
+// A big dramatic shockwave + light flash for "eureka" click moments.
+export const ClickBurst: React.FC<{
+  x: number;
+  y: number;
+  clickFrame?: number;
+  color?: string;
+}> = ({ x, y, clickFrame, color = "#60a5fa" }) => {
+  const frame = useCurrentFrame();
+
+  if (clickFrame === undefined) return null;
+  const t = frame - clickFrame;
+  if (t < 0 || t > 46) return null;
+
+  const progress = interpolate(t, [0, 46], [0, 1]);
+  const ringScale = interpolate(progress, [0, 1], [0.15, 4.2]);
+  const ringOpacity = interpolate(progress, [0, 0.12, 1], [0, 0.9, 0]);
+  const ring2Scale = interpolate(progress, [0.1, 1], [0.15, 3]);
+  const ring2Opacity = interpolate(progress, [0.1, 0.25, 1], [0, 0.7, 0]);
+  const flashOpacity = interpolate(t, [0, 4, 16], [0, 0.85, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <>
+      <div
+        style={{
+          position: "absolute",
+          top: y,
+          left: x,
+          translate: "-50% -50%",
+          width: 420,
+          height: 420,
+          borderRadius: "50%",
+          background: color,
+          opacity: flashOpacity * 0.4,
+          filter: "blur(70px)",
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: y,
+          left: x,
+          translate: "-50% -50%",
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          border: `2px solid ${color}`,
+          scale: ringScale,
+          opacity: ringOpacity,
+          pointerEvents: "none",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: y,
+          left: x,
+          translate: "-50% -50%",
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          border: `1.5px solid ${color}`,
+          scale: ring2Scale,
+          opacity: ring2Opacity,
+          pointerEvents: "none",
+        }}
+      />
+    </>
+  );
+};
+
 export const Cursor: React.FC<{
   fromX: number;
   fromY: number;

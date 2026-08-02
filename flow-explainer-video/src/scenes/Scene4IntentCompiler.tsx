@@ -8,11 +8,15 @@ import {
 } from "remotion";
 import { GlowBackground } from "../components/GlowBackground";
 import { DoItButton } from "../components/DoItButton";
+import { Cursor, ClickBurst } from "../components/Cursor";
 import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
 const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
 const SENTENCE = "Send the signed lease + update the tenant file";
+const CURSOR_TRAVEL_START = 420;
+const CURSOR_TRAVEL_FRAMES = 50;
+const CLICK_FRAME = CURSOR_TRAVEL_START + CURSOR_TRAVEL_FRAMES + 4;
 
 const chips = [
   { label: "EXTRACT", delay: 260, color: "#f472b6" },
@@ -220,8 +224,28 @@ export const Scene4IntentCompiler: React.FC = () => {
           scale: Math.max(buttonAppear, 0),
         }}
       >
-        <DoItButton fontSize={22} />
+        <DoItButton
+          fontSize={22}
+          clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+        />
       </div>
+
+      <Cursor
+        fromX={1450}
+        fromY={950}
+        toX={1030}
+        toY={770}
+        startFrame={CURSOR_TRAVEL_START}
+        travelFrames={CURSOR_TRAVEL_FRAMES}
+        clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+      />
+
+      <ClickBurst
+        x={1030}
+        y={770}
+        clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+        color="#60a5fa"
+      />
     </AbsoluteFill>
   );
 };

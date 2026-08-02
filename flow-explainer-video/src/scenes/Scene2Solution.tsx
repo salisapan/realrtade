@@ -10,7 +10,7 @@ import {
 import { GlowBackground } from "../components/GlowBackground";
 import { WindowCard } from "../components/WindowCard";
 import { DoItButton } from "../components/DoItButton";
-import { Cursor } from "../components/Cursor";
+import { Cursor, ClickBurst } from "../components/Cursor";
 import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
@@ -238,6 +238,28 @@ export const Scene2Solution: React.FC = () => {
         startFrame={CURSOR_TRAVEL_START}
         travelFrames={CURSOR_TRAVEL_FRAMES}
         clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+      />
+
+      <ClickBurst
+        x={CONVERGE_X}
+        y={CONVERGE_Y}
+        clickFrame={frame >= CLICK_FRAME ? CLICK_FRAME : undefined}
+        color="#60a5fa"
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: "#eaf2ff",
+          opacity: interpolate(
+            frame - CLICK_FRAME,
+            [0, 3, 22],
+            [0, 0.5, 0],
+            { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+          ),
+          pointerEvents: "none",
+        }}
       />
 
       <div

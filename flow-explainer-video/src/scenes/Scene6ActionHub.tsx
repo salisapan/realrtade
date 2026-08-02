@@ -31,7 +31,7 @@ const satellites = [
   { Icon: FormIcon, color: "#f87171", label: "CRM" },
 ];
 
-export const Scene5ActionHub: React.FC = () => {
+export const Scene6ActionHub: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -40,7 +40,7 @@ export const Scene5ActionHub: React.FC = () => {
   const hubPulse = interpolate(frame % 90, [0, 45, 90], [0.5, 0.95, 0.5]);
 
   return (
-    <AbsoluteFill name="Scene 5 - Action Hub" style={{ fontFamily: inter }}>
+    <AbsoluteFill name="Scene 6 - Action Hub" style={{ fontFamily: inter }}>
       <GlowBackground accent="#4285F4" />
 
       <div

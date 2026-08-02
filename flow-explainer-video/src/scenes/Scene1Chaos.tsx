@@ -89,6 +89,20 @@ export const Scene1Chaos: React.FC = () => {
 
   const openCount = windows.filter((w) => frame >= w.start).length;
 
+  const tension = interpolate(frame, [0, 460], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const shakeAmp = 1 + tension * 3.5;
+  const shakeX =
+    Math.sin(frame * 0.9) * shakeAmp * 0.6 + Math.sin(frame * 2.3) * shakeAmp * 0.4;
+  const shakeY =
+    Math.cos(frame * 1.1) * shakeAmp * 0.5 + Math.cos(frame * 2.7) * shakeAmp * 0.3;
+  const heartbeat = Math.max(
+    Math.sin(frame * (0.12 + tension * 0.08)) * 0.5 + 0.5,
+    0,
+  );
+
   return (
     <AbsoluteFill
       name="Scene 1 - Chaos"
@@ -104,6 +118,7 @@ export const Scene1Chaos: React.FC = () => {
           position: "absolute",
           inset: 0,
           rotate: "1 0.3 0 3deg",
+          translate: `${shakeX}px ${shakeY}px`,
         }}
       >
         {windows.map((w, i) => {
@@ -146,11 +161,13 @@ export const Scene1Chaos: React.FC = () => {
           padding: "10px 18px",
           borderRadius: 999,
           background: "rgba(15,23,42,0.65)",
-          border: "1px solid rgba(248,113,113,0.4)",
+          border: `1px solid rgba(248,113,113,${(0.4 + heartbeat * 0.35).toFixed(2)})`,
+          boxShadow: `0 0 ${10 + heartbeat * 18}px rgba(248,113,113,${(0.15 + heartbeat * 0.25).toFixed(2)})`,
           fontFamily: spaceGrotesk,
           fontSize: 20,
           fontWeight: 600,
           color: "#fca5a5",
+          scale: 1 + heartbeat * 0.035,
           opacity: interpolate(frame, [0, 20], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
@@ -159,6 +176,15 @@ export const Scene1Chaos: React.FC = () => {
       >
         {`${openCount} apps open · switching every 40s`}
       </Interactive.Div>
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          boxShadow: `inset 0 0 ${140 + tension * 160}px rgba(220,38,38,${(tension * 0.28).toFixed(2)})`,
+          pointerEvents: "none",
+        }}
+      />
 
       <div
         style={{

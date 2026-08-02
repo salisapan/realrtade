@@ -5,9 +5,10 @@ import { Scene1Chaos } from "./scenes/Scene1Chaos";
 import { Scene2Solution } from "./scenes/Scene2Solution";
 import { Scene3Architecture } from "./scenes/Scene3Architecture";
 import { Scene4IntentCompiler } from "./scenes/Scene4IntentCompiler";
-import { Scene5ActionHub } from "./scenes/Scene5ActionHub";
-import { Scene6Security } from "./scenes/Scene6Security";
-import { Scene7Outro } from "./scenes/Scene7Outro";
+import { Scene5ActionGraph } from "./scenes/Scene5ActionGraph";
+import { Scene6ActionHub } from "./scenes/Scene6ActionHub";
+import { Scene7Security } from "./scenes/Scene7Security";
+import { Scene8Outro } from "./scenes/Scene8Outro";
 
 export const FlowExplainer: React.FC = () => {
   return (
@@ -46,22 +47,29 @@ export const FlowExplainer: React.FC = () => {
         presentation={fade()}
         timing={linearTiming({ durationInFrames: 20 })}
       />
+      <TransitionSeries.Sequence durationInFrames={720} name="Action Graph">
+        <Scene5ActionGraph />
+      </TransitionSeries.Sequence>
+      <TransitionSeries.Transition
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: 20 })}
+      />
       <TransitionSeries.Sequence durationInFrames={540} name="Action Hub">
-        <Scene5ActionHub />
+        <Scene6ActionHub />
       </TransitionSeries.Sequence>
       <TransitionSeries.Transition
         presentation={fade()}
         timing={linearTiming({ durationInFrames: 20 })}
       />
       <TransitionSeries.Sequence durationInFrames={780} name="Security">
-        <Scene6Security />
+        <Scene7Security />
       </TransitionSeries.Sequence>
       <TransitionSeries.Transition
         presentation={fade()}
         timing={linearTiming({ durationInFrames: 20 })}
       />
       <TransitionSeries.Sequence durationInFrames={600} name="Outro">
-        <Scene7Outro />
+        <Scene8Outro />
       </TransitionSeries.Sequence>
     </TransitionSeries>
   );
