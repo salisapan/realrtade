@@ -14,7 +14,7 @@ import { Cursor, ClickBurst } from "../components/Cursor";
 import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
 
 const CONVERGE_X = 960;
 const CONVERGE_Y = 660;

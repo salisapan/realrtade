@@ -18,7 +18,7 @@ import {
 } from "../components/Icons";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
 const HUB = { x: 960, y: 610 };
 const RADIUS = 300;
 

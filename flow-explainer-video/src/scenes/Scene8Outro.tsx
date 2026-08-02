@@ -12,7 +12,7 @@ import { RealLogo } from "../components/Logo";
 import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
 const bars = [0.4, 0.65, 0.5, 0.85, 1];
 
 export const Scene8Outro: React.FC = () => {

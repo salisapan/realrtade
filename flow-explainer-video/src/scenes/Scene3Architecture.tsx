@@ -15,7 +15,7 @@ import { KineticText, words, node } from "../components/KineticText";
 import { EyeOffIcon, BellIcon, CheckIcon } from "../components/Icons";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
 
 const CURSOR_TRAVEL_START = 260;
 const CURSOR_TRAVEL_FRAMES = 55;

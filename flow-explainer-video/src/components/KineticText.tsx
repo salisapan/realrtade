@@ -132,14 +132,12 @@ export const KineticText: React.FC<{
         });
         const clampedEnter = Math.min(Math.max(enter, 0), 1.15);
         const opacity = Math.min(enter, 1) * (1 - exitProgress);
-        const idleBob =
-          enter >= 1 ? Math.sin(frame * 0.05 + i * 1.7) * 2.2 : 0;
 
         const isNode = "node" in token;
         const variant: Variant = isNode ? "rise" : VARIANTS[i % VARIANTS.length];
         const motion = wordMotion(variant, clampedEnter);
         const blur = interpolate(clampedEnter, [0, 1], [10, 0]) + exitProgress * 7;
-        const translateY = motion.y + idleBob + exitProgress * -24;
+        const translateY = motion.y + exitProgress * -24;
         const translateX = motion.x;
 
         if (isNode) {

@@ -12,7 +12,7 @@ import { WindowCard } from "../components/WindowCard";
 import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
 
 const windows = [
   {
@@ -93,11 +93,6 @@ export const Scene1Chaos: React.FC = () => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const shakeAmp = 1 + tension * 3.5;
-  const shakeX =
-    Math.sin(frame * 0.9) * shakeAmp * 0.6 + Math.sin(frame * 2.3) * shakeAmp * 0.4;
-  const shakeY =
-    Math.cos(frame * 1.1) * shakeAmp * 0.5 + Math.cos(frame * 2.7) * shakeAmp * 0.3;
   const heartbeat = Math.max(
     Math.sin(frame * (0.12 + tension * 0.08)) * 0.5 + 0.5,
     0,
@@ -118,7 +113,6 @@ export const Scene1Chaos: React.FC = () => {
           position: "absolute",
           inset: 0,
           rotate: "1 0.3 0 3deg",
-          translate: `${shakeX}px ${shakeY}px`,
         }}
       >
         {windows.map((w, i) => {
@@ -127,8 +121,6 @@ export const Scene1Chaos: React.FC = () => {
             fps,
             config: SPRING_CONFIG,
           });
-          const jitter =
-            Math.sin(frame * 0.045 + i * 12) * (frame >= w.start ? 1.6 : 0);
 
           return (
             <WindowCard
@@ -139,7 +131,7 @@ export const Scene1Chaos: React.FC = () => {
               top={w.top}
               left={w.left}
               width={w.width}
-              rotateDeg={w.rotate + jitter}
+              rotateDeg={w.rotate}
               scale={0.82 + appear * 0.18}
               opacity={Math.min(appear, 1)}
               zIndex={10 + i}
@@ -181,7 +173,7 @@ export const Scene1Chaos: React.FC = () => {
         style={{
           position: "absolute",
           inset: 0,
-          boxShadow: `inset 0 0 ${140 + tension * 160}px rgba(220,38,38,${(tension * 0.28).toFixed(2)})`,
+          boxShadow: `inset 0 0 ${160 + tension * 120}px rgba(220,38,38,${(tension * 0.16).toFixed(2)})`,
           pointerEvents: "none",
         }}
       />

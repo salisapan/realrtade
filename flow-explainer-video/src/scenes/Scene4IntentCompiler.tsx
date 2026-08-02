@@ -12,7 +12,7 @@ import { Cursor, ClickBurst } from "../components/Cursor";
 import { KineticText, words } from "../components/KineticText";
 import { inter, spaceGrotesk } from "../fonts";
 
-const SPRING_CONFIG = { damping: 14, stiffness: 130, mass: 0.8 };
+const SPRING_CONFIG = { damping: 20, stiffness: 120, mass: 0.8 };
 const SENTENCE = "Send the signed lease + update the tenant file";
 const CURSOR_TRAVEL_START = 420;
 const CURSOR_TRAVEL_FRAMES = 50;
