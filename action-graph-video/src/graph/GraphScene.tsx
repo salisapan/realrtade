@@ -9,6 +9,10 @@ const ACCENT2 = new THREE.Color("#8FB4FF");
 const EXPERT = new THREE.Color("#F3F7FF");
 const FAR = new THREE.Color("#1B2C56");
 
+// The build() cone lives in a tiny [-0.45, 0.45] unit box — blow it up so it
+// actually fills the frame instead of reading as a speck in the middle.
+const GRAPH_SCALE = 3.4;
+
 function lerpColor(a: THREE.Color, b: THREE.Color, t: number) {
   return a.clone().lerp(b, Math.max(0, Math.min(1, t)));
 }
@@ -38,8 +42,8 @@ export const GraphScene: React.FC<{
     : 1;
 
   const camAngle = t * 0.12;
-  const camRadius = 4.6 - fold * 0.5;
-  const camY = 0.55 + Math.sin(t * 0.1) * 0.22;
+  const camRadius = 8.4 - fold * 0.9;
+  const camY = 1.1 + Math.sin(t * 0.1) * 0.5;
   const camX = Math.sin(camAngle) * camRadius;
   const camZ = Math.cos(camAngle) * camRadius;
 
@@ -64,9 +68,9 @@ export const GraphScene: React.FC<{
       const az = n.mz * localAssemble;
 
       return {
-        x: assemble ? p.x * localAssemble + ax * (1 - localAssemble) : p.x,
-        y: assemble ? p.y * localAssemble + ay * (1 - localAssemble) : p.y,
-        z: assemble ? p.z * localAssemble + az * (1 - localAssemble) : p.z,
+        x: (assemble ? p.x * localAssemble + ax * (1 - localAssemble) : p.x) * GRAPH_SCALE,
+        y: (assemble ? p.y * localAssemble + ay * (1 - localAssemble) : p.y) * GRAPH_SCALE,
+        z: (assemble ? p.z * localAssemble + az * (1 - localAssemble) : p.z) * GRAPH_SCALE,
         scale: 0.3 + localAssemble * 0.7,
         opacity: localAssemble,
         depth: rotated.w,
@@ -101,7 +105,7 @@ export const GraphScene: React.FC<{
   return (
     <>
       <color attach="background" args={["#04060c"]} />
-      <fog attach="fog" args={["#04060c", 4, 9]} />
+      <fog attach="fog" args={["#04060c", 6, 15]} />
       <PerspectiveCamera makeDefault position={[camX, camY, camZ]} fov={36} near={0.1} far={20} />
       <ambientLight intensity={0.4} />
       <pointLight position={[0, 2, 0]} intensity={2} color="#6E9BFF" />
@@ -120,7 +124,7 @@ export const GraphScene: React.FC<{
         const n = graph.nodes[i];
         const depth = Math.max(0, Math.min(1, (p.z + 1.4) / 2.8));
         const color = n.expert ? EXPERT : n.apex ? lerpColor(FAR, ACCENT2, 0.8) : lerpColor(FAR, ACCENT2, depth);
-        const baseSize = n.expert ? 0.075 : n.apex ? 0.045 : 0.03;
+        const baseSize = (n.expert ? 0.075 : n.apex ? 0.045 : 0.03) * (GRAPH_SCALE * 0.72);
         const pulse = n.expert ? 1 + Math.sin(t * 2.6) * 0.18 : 1;
         return (
           <mesh key={i} position={[p.x, p.y, p.z]} scale={p.scale * pulse}>

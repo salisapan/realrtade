@@ -95,7 +95,15 @@ export const ActionGraphNarrative: React.FC = () => {
         <Beat
           start={17.4}
           end={22}
-          style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "28px 56px",
+            borderRadius: 24,
+            backgroundColor: "rgba(4,6,12,0.55)",
+            backdropFilter: "blur(18px)",
+          }}
         >
           <div style={wordmark}>Flow</div>
           <div style={tagline}>Cognitive Workflow Engine</div>

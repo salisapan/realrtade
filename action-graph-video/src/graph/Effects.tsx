@@ -12,8 +12,8 @@ export const GraphEffects: React.FC<{ readonly loop?: boolean }> = ({ loop = fal
   const durSec = durationInFrames / fps;
   const fold = foldEnvelope(t, durSec, loop, interpolate, Easing);
 
-  const aberrationOffset = 0.0006 + fold * 0.0032;
-  const bloomIntensity = 0.75 + fold * 0.55;
+  const aberrationOffset = 0.00006 + fold * 0.0026;
+  const bloomIntensity = 0.65 + fold * 0.55;
 
   return (
     <EffectComposer multisampling={0}>
