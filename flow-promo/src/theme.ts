@@ -1,9 +1,13 @@
-export const BG = '#07090F';
-export const GREEN = '#22C55E';
-export const BLUE = '#6E9BFF';
-export const ORANGE = '#E5642A';
-export const TEXT = '#FFFFFF';
-export const MUTED = '#8f9bb4';
+export const BG = '#FFFFFF';
+export const TEXT = '#111111';
+export const MUTED = '#6B7280';
+export const ACCENT = '#2563EB';
+export const ACCENT_DARK = '#1E3A8A';
+
+export const GLASS_BG = 'rgba(255,255,255,0.6)';
+export const GLASS_BORDER = 'rgba(17,17,17,0.08)';
+export const SHADOW = '0 20px 40px rgba(17,17,17,0.08)';
+export const SHADOW_LG = '0 30px 70px rgba(17,17,17,0.14)';
 
 export const FONT_STACK =
-  '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif';
+  '"Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif';
