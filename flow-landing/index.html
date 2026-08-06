@@ -452,24 +452,36 @@ canvas.terrain-canvas.show{opacity:1}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 
-/* performance stats — dark gradient card, pill tag, layered hover shadow (circular-carousel card style) */
-.stats{display:grid; gap:18px; grid-template-columns:1fr}
-@media(min-width:760px){.stats{grid-template-columns:repeat(3,1fr)}}
-.stat{
-  border:1px solid color-mix(in srgb,var(--line-hi) 75%, transparent); border-radius:20px; padding:32px 30px 34px;
+/* performance stats — circular carousel (arc-positioned cards, counter, nav) */
+.ccarousel{outline:none; display:flex; flex-direction:column; align-items:center; gap:28px}
+.cc-stage{position:relative; width:100%; max-width:840px; height:clamp(300px,36vw,380px); margin-inline:auto}
+.cc-counter{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; z-index:0}
+.cc-num{font-family:var(--disp); font-weight:700; font-size:clamp(3.4rem,3rem + 3vw,5rem); line-height:1; letter-spacing:-.03em; color:color-mix(in srgb,var(--txt-hi) 20%, transparent); font-variant-numeric:tabular-nums}
+.cc-of{font-family:var(--mono); font-size:.76rem; letter-spacing:.16em; text-transform:uppercase; direction:ltr; color:color-mix(in srgb,var(--muted) 65%, transparent); margin-top:2px}
+.cc-track{position:absolute; inset:0}
+.cc-card{
+  position:absolute; top:50%; left:50%; z-index:1; appearance:none; font-family:inherit; color:inherit; text-align:start; cursor:pointer;
+  width:min(300px,74vw); border:1px solid color-mix(in srgb,var(--line-hi) 75%, transparent); border-radius:20px; padding:26px 26px 28px;
   background:linear-gradient(180deg, color-mix(in srgb,var(--panel) 95%, transparent), color-mix(in srgb,var(--panel-2) 88%, transparent));
   backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  box-shadow:0 8px 24px -6px rgba(0,0,0,.28);
-  position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:flex-start;
-  transition:box-shadow .4s cubic-bezier(.2,.7,.2,1), transform .4s cubic-bezier(.2,.7,.2,1), border-color .4s ease;
+  box-shadow:0 12px 34px -14px rgba(0,0,0,.36);
+  transition:transform .55s cubic-bezier(.22,1,.36,1), opacity .55s cubic-bezier(.22,1,.36,1), box-shadow .35s ease, border-color .35s ease;
 }
-.stat:hover{transform:translateY(-5px); border-color:color-mix(in srgb,var(--accent) 38%,transparent); box-shadow:0 22px 56px -14px rgba(0,0,0,.4), 0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent), 0 12px 34px -10px var(--glow)}
-.stat-tag{display:inline-flex; align-items:center; border-radius:999px; padding:5px 12px; font-family:var(--mono); font-size:.62rem; font-weight:500; text-transform:uppercase; letter-spacing:.14em; direction:ltr; color:var(--accent-2); background:color-mix(in srgb,var(--accent) 13%, transparent); border:1px solid color-mix(in srgb,var(--accent) 24%,transparent); margin-bottom:20px}
-.stat .big{font-family:var(--disp); font-weight:700; font-size:clamp(3rem,2rem + 4vw,4.6rem); line-height:1; letter-spacing:-.03em; color:var(--txt-hi); font-variant-numeric:tabular-nums; display:flex; align-items:baseline; gap:2px}
-.stat .big .u{color:var(--accent-2)}
-.stat .st{margin-top:14px; font-family:var(--disp); font-weight:600; color:var(--txt-hi); font-size:1.1rem}
-.stat .sp{margin-top:8px; color:var(--muted); font-size:.95rem}
-.stat::before{content:""; position:absolute; inset-block-start:0; inset-inline:0; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.6}
+.cc-card:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+.cc-card.is-active{box-shadow:0 26px 64px -16px rgba(0,0,0,.46), 0 0 0 1px color-mix(in srgb,var(--accent) 22%,transparent), 0 14px 36px -10px var(--glow); border-color:color-mix(in srgb,var(--accent) 34%,transparent)}
+.cc-tag{display:inline-flex; align-items:center; border-radius:999px; padding:5px 12px; font-family:var(--mono); font-size:.6rem; font-weight:500; text-transform:uppercase; letter-spacing:.14em; direction:ltr; color:var(--accent-2); background:color-mix(in srgb,var(--accent) 13%, transparent); border:1px solid color-mix(in srgb,var(--accent) 24%,transparent); margin-bottom:16px}
+.cc-big{font-family:var(--disp); font-weight:700; font-size:clamp(2.1rem,1.6rem + 2vw,2.8rem); line-height:1; letter-spacing:-.03em; color:var(--txt-hi); font-variant-numeric:tabular-nums; display:flex; align-items:baseline; gap:2px}
+.cc-big .cc-u{color:var(--accent-2)}
+.cc-title{margin:12px 0 0; font-family:var(--disp); font-weight:600; color:var(--txt-hi); font-size:1.05rem}
+.cc-desc{margin:8px 0 0; color:var(--muted); font-size:.9rem; line-height:1.5}
+.cc-controls{display:flex; align-items:center; gap:18px}
+.cc-arrow{width:42px; height:42px; border-radius:999px; border:1px solid var(--line-hi); background:color-mix(in srgb,var(--panel) 70%, transparent); color:var(--txt-hi); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:border-color .3s, transform .2s, background .3s}
+.cc-arrow:hover{border-color:var(--accent); background:rgba(59,116,255,.1); transform:scale(1.06)}
+.cc-arrow svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.cc-dots{display:flex; align-items:center; gap:7px}
+.cc-dots button{width:7px; height:7px; border-radius:999px; border:none; background:var(--line-hi); padding:0; cursor:pointer; transition:width .3s, background .3s}
+.cc-dots button.active{width:26px; background:var(--accent)}
+@media (prefers-reduced-motion:reduce){.cc-card{transition:opacity .3s ease}}
 
 /* action graph — full-bleed cinematic */
 .agraph-sec{position:relative; border-block:1px solid var(--line); overflow:hidden; padding-block:clamp(60px,8vw,108px); background:radial-gradient(1200px 720px at 50% 52%, var(--hero-glow2), transparent 60%)}
@@ -785,10 +797,35 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         <h2 data-i18n="perf.title">Quantifiable Acceleration</h2>
         <p class="lead muted" data-i18n="perf.lead">Enterprise teams using Flow report dramatic improvements in operational velocity while maintaining the highest security standards.</p>
       </div>
-      <div class="stats">
-        <div class="stat reveal" data-d="1"><span class="stat-tag">Speed</span><div class="big"><span data-count="10" data-i18n-num>0</span><span class="u">x</span></div><div class="st" data-i18n="p1.t">Faster Execution</div><div class="sp" data-i18n="p1.b">Workflow execution speed vs. manual processing or traditional RPA tools.</div></div>
-        <div class="stat reveal" data-d="2"><span class="stat-tag">Privacy</span><div class="big"><span data-count="100" data-i18n-num>0</span><span class="u">%</span></div><div class="st" data-i18n="p2.t">Data On-Device</div><div class="sp" data-i18n="p2.b">Of all data processing occurs locally — zero data ever leaves your infrastructure.</div></div>
-        <div class="stat reveal" data-d="3"><span class="stat-tag">Autonomy</span><div class="big"><span class="u">0</span></div><div class="st" data-i18n="p3.t">External Dependencies</div><div class="sp" data-i18n="p3.b">Zero external API calls. Zero cloud processing. Complete operational independence.</div></div>
+      <div class="ccarousel reveal" id="statsCarousel" tabindex="0" role="region" aria-roledescription="carousel" aria-label="Performance metrics">
+        <div class="cc-stage">
+          <div class="cc-counter" aria-hidden="true"><span class="cc-num" id="ccNum">01</span><span class="cc-of">of 03</span></div>
+          <div class="cc-track" id="ccTrack">
+            <button type="button" class="cc-card" data-i="0" role="option" aria-selected="true">
+              <span class="cc-tag">Speed</span>
+              <div class="cc-big"><span data-count="10" data-i18n-num>0</span><span class="cc-u">x</span></div>
+              <h3 class="cc-title" data-i18n="p1.t">Faster Execution</h3>
+              <p class="cc-desc" data-i18n="p1.b">Workflow execution speed vs. manual processing or traditional RPA tools.</p>
+            </button>
+            <button type="button" class="cc-card" data-i="1" role="option" aria-selected="false">
+              <span class="cc-tag">Privacy</span>
+              <div class="cc-big"><span data-count="100" data-i18n-num>0</span><span class="cc-u">%</span></div>
+              <h3 class="cc-title" data-i18n="p2.t">Data On-Device</h3>
+              <p class="cc-desc" data-i18n="p2.b">Of all data processing occurs locally — zero data ever leaves your infrastructure.</p>
+            </button>
+            <button type="button" class="cc-card" data-i="2" role="option" aria-selected="false">
+              <span class="cc-tag">Autonomy</span>
+              <div class="cc-big"><span class="cc-u">0</span></div>
+              <h3 class="cc-title" data-i18n="p3.t">External Dependencies</h3>
+              <p class="cc-desc" data-i18n="p3.b">Zero external API calls. Zero cloud processing. Complete operational independence.</p>
+            </button>
+          </div>
+        </div>
+        <div class="cc-controls">
+          <button type="button" class="cc-arrow" id="ccPrev" aria-label="Previous metric"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <div class="cc-dots" id="ccDots" role="tablist"></div>
+          <button type="button" class="cc-arrow" id="ccNext" aria-label="Next metric"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+        </div>
       </div>
     </div>
   </section>
@@ -1433,6 +1470,56 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       requestAnimationFrame(frame);
     }
     requestAnimationFrame(frame);
+  })();
+
+  /* ---------- performance stats: circular carousel (arc layout, counter, nav, autoplay) ---------- */
+  (function(){
+    var stage=document.getElementById('statsCarousel'); if(!stage) return;
+    var track=document.getElementById('ccTrack'), numEl=document.getElementById('ccNum'), dotsWrap=document.getElementById('ccDots');
+    var cards=Array.prototype.slice.call(track.querySelectorAll('.cc-card'));
+    var total=cards.length, active=0, hovered=false, focused=false, timer=null;
+    cards.forEach(function(c,i){
+      var dot=document.createElement('button');
+      dot.type='button'; dot.setAttribute('role','tab'); dot.setAttribute('aria-label','Go to metric '+(i+1));
+      dot.addEventListener('click', function(){ goTo(i); });
+      dotsWrap.appendChild(dot);
+      c.addEventListener('click', function(){ goTo(i); });
+    });
+    var dots=Array.prototype.slice.call(dotsWrap.children);
+    function layout(){
+      var rect=stage.querySelector('.cc-stage').getBoundingClientRect();
+      var RX=Math.min(230, rect.width*0.3), RY=Math.min(78, rect.width*0.11);
+      cards.forEach(function(c,i){
+        var offset=i-active;
+        if(offset>total/2) offset-=total;
+        if(offset<-total/2) offset+=total;
+        var angle=(offset/total)*Math.PI;
+        var x=Math.sin(angle)*RX, y=-Math.cos(angle)*RY;
+        var d=Math.abs(offset);
+        var scale=Math.max(.72,1-d*.22), opacity=Math.max(.35,1-d*.6), z=10-d;
+        c.style.transform='translate(-50%,-50%) translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px) scale('+scale.toFixed(3)+')';
+        c.style.opacity=opacity;
+        c.style.zIndex=z;
+        c.classList.toggle('is-active', i===active);
+        c.setAttribute('aria-selected', i===active ? 'true' : 'false');
+      });
+      dots.forEach(function(d,i){ d.classList.toggle('active', i===active); });
+      numEl.textContent=String(active+1).padStart(2,'0');
+    }
+    function goTo(i){ active=((i%total)+total)%total; layout(); }
+    document.getElementById('ccPrev').addEventListener('click', function(){ goTo(active-1); });
+    document.getElementById('ccNext').addEventListener('click', function(){ goTo(active+1); });
+    stage.addEventListener('keydown', function(e){
+      if(e.key==='ArrowLeft'){ goTo(active+(document.dir==='rtl'?1:-1)); }
+      if(e.key==='ArrowRight'){ goTo(active+(document.dir==='rtl'?-1:1)); }
+    });
+    stage.addEventListener('pointerenter', function(){ hovered=true; });
+    stage.addEventListener('pointerleave', function(){ hovered=false; });
+    stage.addEventListener('focusin', function(){ focused=true; });
+    stage.addEventListener('focusout', function(){ focused=false; });
+    layout();
+    addEventListener('resize', layout);
+    if(!rm){ timer=setInterval(function(){ if(!hovered && !focused) goTo(active+1); }, 4200); }
   })();
 
   /* init */
