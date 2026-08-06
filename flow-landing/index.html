@@ -92,12 +92,12 @@ body{
     linear-gradient(180deg,var(--bg),var(--bg2) 60%,var(--bg));
   background-attachment:fixed;
 }
-/* light mode: pure white base with soft glowing blue bubbles */
+/* light mode: pure white base with elegant blue accents */
 :root[data-theme="light"] body{
   background:
-    radial-gradient(760px 560px at 84% 2%, rgba(56,122,255,.15), transparent 62%),
-    radial-gradient(640px 520px at 8% 20%, rgba(96,158,255,.11), transparent 62%),
-    radial-gradient(720px 560px at 62% 96%, rgba(60,130,255,.10), transparent 62%),
+    radial-gradient(760px 560px at 84% 2%, rgba(79,124,255,.07), transparent 70%),
+    radial-gradient(640px 520px at 8% 20%, rgba(96,158,255,.05), transparent 75%),
+    radial-gradient(720px 560px at 62% 96%, rgba(79,124,255,.03), transparent 80%),
     #FFFFFF;
   background-attachment:fixed;
 }
@@ -224,9 +224,9 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 :root[data-theme="light"] .blob.b1{width:36vw; height:36vw; inset-block-start:2%; inset-inline-start:56%}
 :root[data-theme="light"] .blob.b2{width:30vw; height:30vw; inset-block-start:30%; inset-inline-start:14%}
 :root[data-theme="light"] .blob.b3{display:none}
-.blob.b1{width:44vw; height:44vw; background:radial-gradient(circle,var(--blob),transparent 68%); inset-block-start:-6%; inset-inline-start:52%; animation:float1 17s ease-in-out infinite}
-.blob.b2{width:34vw; height:34vw; background:radial-gradient(circle,var(--blob2),transparent 70%); inset-block-start:34%; inset-inline-start:8%; animation:float2 21s ease-in-out infinite}
-.blob.b3{width:26vw; height:26vw; background:radial-gradient(circle,var(--blob),transparent 72%); inset-block-end:-4%; inset-inline-start:60%; animation:float1 24s ease-in-out infinite reverse}
+.blob.b1{width:44vw; height:44vw; background:radial-gradient(circle,var(--blob),transparent 68%); inset-block-start:-6%; inset-inline-start:52%; animation:float1 17s ease-in-out infinite; will-change:transform}
+.blob.b2{width:34vw; height:34vw; background:radial-gradient(circle,var(--blob2),transparent 70%); inset-block-start:34%; inset-inline-start:8%; animation:float2 21s ease-in-out infinite; will-change:transform}
+.blob.b3{width:26vw; height:26vw; background:radial-gradient(circle,var(--blob),transparent 72%); inset-block-end:-4%; inset-inline-start:60%; animation:float1 24s ease-in-out infinite reverse; will-change:transform}
 @keyframes float1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-4%,5%) scale(1.12)}}
 @keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6%,-4%) scale(1.08)}}
 .hero-in{position:relative; z-index:3; display:flex; flex-direction:column; align-items:flex-start}
@@ -365,7 +365,13 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .reveal{opacity:0; animation:fadeInUp 0.7s ease-out forwards}
 .reveal.in{animation-play-state:running}
 .card{transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.35s ease, border-color .35s}
-.card:hover{transform:translateY(-6px); border-color:color-mix(in srgb,var(--accent) 40%,transparent); box-shadow:var(--card-shadow), 0 16px 44px -14px var(--glow), inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent)}
+.card:hover{transform:translateY(-6px); border-color:color-mix(in srgb,var(--accent) 40%,transparent); box-shadow:var(--card-shadow), 0 16px 44px -14px var(--glow), inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent); animation:shimmerCard 2s ease-in-out infinite}
+.card.reveal{animation:slideInLeft 0.6s cubic-bezier(0.2,0.7,0.2,1) forwards; opacity:0}
+.card[data-d="2"].reveal{animation-delay:0.1s}
+.card[data-d="3"].reveal{animation-delay:0.2s}
+.card[data-d="4"].reveal{animation-delay:0.3s}
+.card[data-d="5"].reveal{animation-delay:0.4s}
+.card[data-d="6"].reveal{animation-delay:0.5s}
 
 /* R4: ambient glow orbs — depth behind key sections */
 .agraph-sec, .cta-sec{position:relative; overflow:hidden}
@@ -463,6 +469,12 @@ canvas.terrain-canvas.show{opacity:1}
 .wait-wrap.reveal.in{transform:none}
 .wait-wrap.reveal.in .field input{animation:waitFieldWelcome 1.6s ease-out .3s 1}
 @keyframes waitFieldWelcome{0%{box-shadow:0 0 0 0 var(--glow)}45%{box-shadow:0 0 0 8px var(--glow)}100%{box-shadow:0 0 0 0 transparent}}
+/* cutting-edge animations */
+@keyframes morphShape{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes shimmerCard{0%{opacity:.8; filter:brightness(1)}50%{opacity:1; filter:brightness(1.05)}100%{opacity:.8; filter:brightness(1)}}
+@keyframes glowPulse{0%{box-shadow:0 0 12px rgba(59,116,255,.3)}50%{box-shadow:0 0 24px rgba(59,116,255,.6)}100%{box-shadow:0 0 12px rgba(59,116,255,.3)}}
+@keyframes slideInLeft{from{opacity:0; transform:translateX(-30px)}to{opacity:1; transform:translateX(0)}}
+@keyframes slideInRight{from{opacity:0; transform:translateX(30px)}to{opacity:1; transform:translateX(0)}}
 .wait-msg.err{color:#ff7a55}
 .cta-fine{color:var(--muted); font-size:.86rem; display:flex; align-items:center; gap:9px; flex-wrap:wrap; justify-content:center; margin-top:4px}
 .cta-fine svg{width:15px; height:15px; stroke:var(--accent-2); fill:none; stroke-width:1.6}
@@ -706,6 +718,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
           <span class="integ-logo" title="Dropbox" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 1.807L0 5.629l6 3.822 6.001-3.822L6 1.807zM18 1.807l-6 3.822 6 3.822 6-3.822-6-3.822zM0 13.274l6 3.822 6.001-3.822L6 9.452l-6 3.822zM18 9.452l-6 3.822 6 3.822 6-3.822-6-3.822zM6 18.371l6.001 3.822 6-3.822-6-3.822L6 18.371z"/></svg><span>Dropbox</span></span>
           <span class="integ-logo" title="Asana" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18.78 12.653c-2.882 0-5.22 2.336-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.34 5.22-5.22-2.336-5.22-5.22-5.22zm-13.56 0c-2.88 0-5.22 2.337-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.338 5.22-5.22-2.336-5.22-5.22-5.22zm12-6.525c0 2.883-2.337 5.22-5.22 5.22-2.882 0-5.22-2.337-5.22-5.22 0-2.88 2.338-5.22 5.22-5.22 2.883 0 5.22 2.34 5.22 5.22z"/></svg><span>Asana</span></span>
           <span class="integ-logo" title="QuickBooks" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm.642 4.1335c.9554 0 1.7296.776 1.7296 1.7332v9.0667h1.6c1.614 0 2.9275-1.3156 2.9275-2.933 0-1.6173-1.3136-2.9333-2.9276-2.9333h-.6654V7.3334h.6654c2.5722 0 4.6577 2.0897 4.6577 4.667 0 2.5774-2.0855 4.6666-4.6577 4.6666H12.642zM7.9837 7.333h3.3291v12.533c-.9555 0-1.73-.7759-1.73-1.7332V9.0662H7.9837c-1.6146 0-2.9277 1.316-2.9277 2.9334 0 1.6175 1.3131 2.9333 2.9277 2.9333h.6654v1.7332h-.6654c-2.5725 0-4.6577-2.0892-4.6577-4.6665 0-2.5771 2.0852-4.6666 4.6577-4.6666Z"/></svg><span>QuickBooks</span></span>
+          <span class="integ-logo" title="WhatsApp"><svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.868-2.031-.967-.273-.099-.472-.149-.671.149-.2.297-.771.967-.945 1.166-.174.199-.347.223-.644.075-.297-.149-1.255-.462-2.39-1.475-.884-.788-1.48-1.761-1.653-2.059-.174-.297-.019-.458.131-.606.134-.133.297-.347.446-.52.149-.174.199-.297.298-.496.099-.198.05-.371-.025-.52-.075-.149-.671-1.612-.92-2.207-.242-.579-.487-.501-.671-.51-.174-.009-.371-.009-.57-.009-.198 0-.52.075-.792.371-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.174-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.006c-1.735 0-3.415.566-4.759 1.617-1.344 1.051-2.057 2.439-2.057 3.927 0 .964.258 1.897.748 2.744l-1.191 3.553 3.639-1.198c.849.463 1.809.707 2.82.707 4.002 0 7.26-3.277 7.26-7.303 0-1.952-.759-3.782-2.14-5.163-1.38-1.381-3.212-2.14-5.164-2.14" fill="currentColor"/></svg><span>WhatsApp</span></span>
+          <span class="integ-logo" title="WhatsApp" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.868-2.031-.967-.273-.099-.472-.149-.671.149-.2.297-.771.967-.945 1.166-.174.199-.347.223-.644.075-.297-.149-1.255-.462-2.39-1.475-.884-.788-1.48-1.761-1.653-2.059-.174-.297-.019-.458.131-.606.134-.133.297-.347.446-.52.149-.174.199-.297.298-.496.099-.198.05-.371-.025-.52-.075-.149-.671-1.612-.92-2.207-.242-.579-.487-.501-.671-.51-.174-.009-.371-.009-.57-.009-.198 0-.52.075-.792.371-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.174-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.006c-1.735 0-3.415.566-4.759 1.617-1.344 1.051-2.057 2.439-2.057 3.927 0 .964.258 1.897.748 2.744l-1.191 3.553 3.639-1.198c.849.463 1.809.707 2.82.707 4.002 0 7.26-3.277 7.26-7.303 0-1.952-.759-3.782-2.14-5.163-1.38-1.381-3.212-2.14-5.164-2.14" fill="currentColor"/></svg><span>WhatsApp</span></span>
         </div>
       </div>
       <div class="trust-divider" aria-hidden="true"></div>
@@ -1235,8 +1249,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     function ease(p){ return p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2; }
     function updateParticles(el, p){
       if(rm) return;
-      if(particles.length<70 && p>0.25 && Math.random()<0.4)
-        particles.push({x:rnd(-0.42,0.42), y:rnd(0.12,0.34), z:rnd(-0.42,0.42), w:rnd(-0.4,0.4), life:1, vx:rnd(-0.01,0.01), vy:rnd(-0.044,-0.02), vz:rnd(-0.01,0.01), trail:[]});
+      if(particles.length<120 && p>0.2 && Math.random()<0.62)
+        particles.push({x:rnd(-0.42,0.42), y:rnd(0.12,0.34), z:rnd(-0.42,0.42), w:rnd(-0.4,0.4), life:1, vx:rnd(-0.015,0.015), vy:rnd(-0.052,-0.018), vz:rnd(-0.015,0.015), trail:[]});
       for(var i=particles.length-1;i>=0;i--){
         var pt=particles[i];
         pt.trail.unshift({x:pt.x,y:pt.y,z:pt.z});
@@ -1279,6 +1293,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
       TILT=TILT_BASE+pmy*0.2;
       var a=el*0.2*(1-0.5*p)+pmx*0.5; curA=a;
       var azw=el*0.17+pmy*0.4, axw=el*0.11+pmx*0.45; curZW=azw; curXW=axw;
+      var pulse=1+0.08*Math.sin(el*1.1);  /* global pulsing scale for 4D feel */
       var add=!PAL.light, i;
       g.globalCompositeOperation='source-over'; g.clearRect(0,0,W,H);
       if(add) g.globalCompositeOperation='lighter';
@@ -1311,8 +1326,8 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         var ramp=n2.apex?PAL.apex.join(','):mix(PAL.far,PAL.near,depth);
         if(add){
           var spr=depth>0.55?glowNear:glowFar, gsz=size*(n2.apex?7:5)*(0.6+0.8*depth);
-          if(n2.expert){ spr=glowHot; gsz=size*(9+2*Math.sin(el*2.4)); }
-          g.globalAlpha=(0.07+0.5*depth*depth)*(0.2+0.8*p)*(n2.apex?1.4:1); g.drawImage(spr,pr.x-gsz/2,pr.y-gsz/2,gsz,gsz);
+          if(n2.expert){ spr=glowHot; gsz=size*(11+3.5*Math.sin(el*2.8)); }
+          g.globalAlpha=(0.09+0.6*depth*depth)*(0.2+0.8*p)*(n2.apex?1.5:1); g.drawImage(spr,pr.x-gsz/2,pr.y-gsz/2,gsz,gsz);
           g.globalAlpha=(0.32+0.68*depth)*(0.2+0.8*p); g.fillStyle='rgb('+ramp+')'; g.beginPath(); g.arc(pr.x,pr.y,size*(0.42+0.5*depth),0,6.283); g.fill();
         } else {
           var fog=Math.max(0,Math.min(1,(pr.s-0.62)/0.85)), al2=(0.2+0.8*fog*fog)*(0.12+0.88*p);
