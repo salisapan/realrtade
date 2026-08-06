@@ -1,5 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { Trail } from '@remotion/motion-blur';
 import { ACCENT, ACCENT_DARK, SHADOW_LG, FONT_STACK } from '../theme';
 
 const CURSOR_START = { x: 0.94, y: 0.94 };
@@ -8,7 +9,7 @@ const CURSOR_ENTER = 20;
 const CURSOR_ARRIVE = 115;
 const CLICK_FRAME = 120;
 
-const Cursor: React.FC = () => {
+const CursorArrow: React.FC = () => {
   const frame = useCurrentFrame();
   const local = frame - CURSOR_ENTER;
   if (local < 0) return null;
@@ -54,6 +55,12 @@ const Cursor: React.FC = () => {
   );
 };
 
+const Cursor: React.FC = () => (
+  <Trail layers={5} lagInFrames={1} trailOpacity={0.45}>
+    <CursorArrow />
+  </Trail>
+);
+
 const Ripple: React.FC = () => {
   const frame = useCurrentFrame();
   const local = frame - CLICK_FRAME;
@@ -80,6 +87,74 @@ const Ripple: React.FC = () => {
   );
 };
 
+const PARTICLE_COUNT = 10;
+
+const ParticleBurst: React.FC = () => {
+  const frame = useCurrentFrame();
+  const local = frame - CLICK_FRAME;
+  if (local < 0 || local > 35) return null;
+
+  const progress = local / 35;
+
+  return (
+    <>
+      {Array.from({ length: PARTICLE_COUNT }).map((_, i) => {
+        const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + 0.3;
+        const distance = interpolate(progress, [0, 1], [0, 240], {
+          easing: Easing.out(Easing.cubic),
+        });
+        const px = Math.cos(angle) * distance;
+        const py = Math.sin(angle) * distance;
+        const opacity = interpolate(progress, [0, 0.2, 1], [0, 1, 0]);
+        const size = interpolate(progress, [0, 1], [10, 2]);
+
+        return (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: '50%',
+              top: '50%',
+              width: size,
+              height: size,
+              borderRadius: '50%',
+              backgroundColor: i % 2 === 0 ? ACCENT : ACCENT_DARK,
+              opacity,
+              transform: `translate(${px - size / 2}px, ${py - size / 2}px)`,
+            }}
+          />
+        );
+      })}
+    </>
+  );
+};
+
+const AnticipationRing: React.FC = () => {
+  const frame = useCurrentFrame();
+  if (frame >= CLICK_FRAME) return null;
+
+  const period = 26;
+  const t = (frame % period) / period;
+  const scale = interpolate(t, [0, 1], [1, 1.18]);
+  const opacity = interpolate(t, [0, 1], [0.4, 0]);
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        width: 340,
+        height: 118,
+        borderRadius: 100,
+        border: `1.5px solid ${ACCENT}`,
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        opacity,
+      }}
+    />
+  );
+};
+
 export const DoItButton: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 180 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -97,6 +172,8 @@ export const DoItButton: React.FC<{ durationInFrames?: number }> = ({ durationIn
 
   const clickLocal = frame - CLICK_FRAME;
   const pressScale = clickLocal >= 0 && clickLocal < 12 ? interpolate(clickLocal, [0, 6, 12], [1, 0.9, 1]) : 1;
+
+  const idlePulse = frame < CLICK_FRAME ? 1 + Math.sin((frame / fps) * 3.2) * 0.012 : 1;
 
   const exitOpacity = interpolate(frame, [exitStart, durationInFrames], [1, 0], {
     extrapolateLeft: 'clamp',
@@ -116,10 +193,12 @@ export const DoItButton: React.FC<{ durationInFrames?: number }> = ({ durationIn
           alignItems: 'center',
           justifyContent: 'center',
           opacity: entranceOpacity * exitOpacity,
-          transform: `scale(${burst * pressScale * exitScale})`,
+          transform: `scale(${burst * pressScale * idlePulse * exitScale})`,
         }}
       >
+        <AnticipationRing />
         <Ripple />
+        <ParticleBurst />
         <div
           style={{
             padding: '38px 110px',

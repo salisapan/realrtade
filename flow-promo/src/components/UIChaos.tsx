@@ -1,5 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { Trail } from '@remotion/motion-blur';
 import { ACCENT, GLASS_BG, GLASS_BORDER, MUTED, SHADOW_LG, TEXT, FONT_STACK } from '../theme';
 
 type CardKind = 'email' | 'crm' | 'window' | 'calendar' | 'chat';
@@ -107,13 +108,12 @@ const CARD_WIDTH: Record<CardKind, number> = {
   chat: 380,
 };
 
-export const UIChaos: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 200 }) => {
+const CardsLayer: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const collapseStart = 120;
 
   return (
-    <AbsoluteFill style={{ perspective: 1400 }}>
+    <>
       {CARDS.map((card) => {
         const enter = spring({
           frame: frame - card.delay,
@@ -122,10 +122,13 @@ export const UIChaos: React.FC<{ durationInFrames?: number }> = ({ durationInFra
         });
 
         const floatT = frame / fps;
-        const jitterX = Math.sin(floatT * 0.9 + card.seed) * 14;
-        const jitterY = Math.cos(floatT * 0.7 + card.seed * 1.4) * 14;
+        const jitterX =
+          Math.sin(floatT * 0.9 + card.seed) * 14 + Math.sin(floatT * 2.3 + card.seed * 1.7) * 5;
+        const jitterY =
+          Math.cos(floatT * 0.7 + card.seed * 1.4) * 14 + Math.cos(floatT * 1.9 + card.seed * 2.1) * 5;
         const rotateY = Math.sin(floatT * 0.5 + card.seed) * 10;
         const rotateX = Math.cos(floatT * 0.6 + card.seed) * 6;
+        const breathe = 1 + Math.sin(floatT * 1.3 + card.seed * 2) * 0.025;
 
         const collapseLocal = frame - collapseStart - card.delay * 0.4;
         const collapse =
@@ -140,7 +143,7 @@ export const UIChaos: React.FC<{ durationInFrames?: number }> = ({ durationInFra
 
         const posXPct = interpolate(collapseClamped, [0, 1], [card.x * 100, 50]);
         const posYPct = interpolate(collapseClamped, [0, 1], [card.y * 100, 50]);
-        const scale = enter * interpolate(collapseClamped, [0, 1], [1, 0.05]);
+        const scale = enter * breathe * interpolate(collapseClamped, [0, 1], [1, 0.05]);
         const opacity =
           enter *
           interpolate(collapseClamped, [0, 0.75, 1], [1, 1, 0], {
@@ -178,6 +181,18 @@ export const UIChaos: React.FC<{ durationInFrames?: number }> = ({ durationInFra
           </div>
         );
       })}
+    </>
+  );
+};
+
+export const UIChaos: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 200 }) => {
+  const collapseStart = 120;
+
+  return (
+    <AbsoluteFill style={{ perspective: 1400 }}>
+      <Trail layers={4} lagInFrames={2} trailOpacity={0.3}>
+        <CardsLayer collapseStart={collapseStart} />
+      </Trail>
 
       <CompilerPulse collapseStart={collapseStart} />
     </AbsoluteFill>

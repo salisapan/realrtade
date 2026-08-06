@@ -16,14 +16,8 @@ export const KineticText: React.FC = () => {
         const local = frame - start;
         if (local < -2 || local > SLOT + 2) return null;
 
-        const enter = spring({
-          frame: local,
-          fps,
-          config: { stiffness: 200, damping: 14, mass: 0.6 },
-        });
-
         const exitLocal = local - (SLOT - 9);
-        const exit =
+        const groupExit =
           exitLocal > 0
             ? spring({
                 frame: exitLocal,
@@ -31,32 +25,51 @@ export const KineticText: React.FC = () => {
                 config: { stiffness: 220, damping: 17, mass: 0.5 },
               })
             : 0;
+        const groupScale = 1 + groupExit * 0.35;
+        const groupOpacity = Math.max(0, 1 - groupExit);
 
-        const scale = 0.4 + enter * 0.6 + exit * 0.35;
-        const rotate = (1 - enter) * -9 + exit * 6;
-        const opacity = Math.max(0, Math.min(enter, 1 - exit));
+        const chars = phrase.split('');
 
         return (
           <div
             key={phrase}
             style={{
               position: 'absolute',
-              opacity,
-              transform: `scale(${scale}) rotate(${rotate}deg)`,
+              display: 'flex',
+              opacity: groupOpacity,
+              transform: `scale(${groupScale})`,
             }}
           >
-            <span
-              style={{
-                fontFamily: FONT_STACK,
-                fontSize: 132,
-                fontWeight: 800,
-                color: TEXT,
-                letterSpacing: -4,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {phrase}
-            </span>
+            {chars.map((ch, ci) => {
+              const charDelay = ci * 1.4;
+              const enter = spring({
+                frame: local - charDelay,
+                fps,
+                config: { stiffness: 220, damping: 15, mass: 0.5 },
+              });
+              const scale = 0.3 + enter * 0.7;
+              const rotate = (1 - enter) * (ci % 2 === 0 ? -14 : 14);
+              const y = (1 - enter) * 40;
+
+              return (
+                <span
+                  key={ci}
+                  style={{
+                    display: 'inline-block',
+                    fontFamily: FONT_STACK,
+                    fontSize: 132,
+                    fontWeight: 800,
+                    color: TEXT,
+                    letterSpacing: -4,
+                    whiteSpace: 'pre',
+                    opacity: enter,
+                    transform: `translateY(${y}px) scale(${scale}) rotate(${rotate}deg)`,
+                  }}
+                >
+                  {ch}
+                </span>
+              );
+            })}
           </div>
         );
       })}
