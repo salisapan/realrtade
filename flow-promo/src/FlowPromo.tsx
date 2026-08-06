@@ -1,23 +1,10 @@
 import React from 'react';
-import {
-  AbsoluteFill,
-  Sequence,
-  interpolate,
-  spring,
-  useCurrentFrame,
-  useVideoConfig,
-  Easing,
-} from 'remotion';
-
-const BG = '#07090F';
-const GREEN = '#22C55E';
-const BLUE = '#6E9BFF';
-const ORANGE = '#E5642A';
-const TEXT = '#FFFFFF';
-const MUTED = '#8f9bb4';
-
-const FONT_STACK =
-  '"SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif';
+import { AbsoluteFill, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig, Easing } from 'remotion';
+import { BG, GREEN, BLUE, ORANGE, TEXT, MUTED, FONT_STACK } from './theme';
+import { FlowMark } from './components/FlowMark';
+import { UIChaos } from './components/UIChaos';
+import { DoItButton } from './components/DoItButton';
+import { Outro } from './components/Outro';
 
 const Background: React.FC = () => {
   const frame = useCurrentFrame();
@@ -57,92 +44,22 @@ const Background: React.FC = () => {
   );
 };
 
-const FlowMark: React.FC<{ size: number }> = ({ size }) => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const nodes = [
-    { x: 0.5, y: 0.08, delay: 0 },
-    { x: 0.15, y: 0.42, delay: 6 },
-    { x: 0.85, y: 0.42, delay: 12 },
-    { x: 0.5, y: 0.92, delay: 18 },
-  ];
-
-  const lineOpacity = (delay: number) =>
-    interpolate(frame - delay, [10, 26], [0, 1], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
-
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100">
-      <line
-        x1={50}
-        y1={8}
-        x2={15}
-        y2={42}
-        stroke={BLUE}
-        strokeWidth={2}
-        opacity={lineOpacity(4)}
-      />
-      <line
-        x1={15}
-        y1={42}
-        x2={85}
-        y2={42}
-        stroke={GREEN}
-        strokeWidth={2}
-        opacity={lineOpacity(10)}
-      />
-      <line
-        x1={85}
-        y1={42}
-        x2={50}
-        y2={92}
-        stroke={ORANGE}
-        strokeWidth={2}
-        opacity={lineOpacity(16)}
-      />
-      <line
-        x1={15}
-        y1={42}
-        x2={50}
-        y2={92}
-        stroke={BLUE}
-        strokeWidth={2}
-        opacity={lineOpacity(20)}
-      />
-      {nodes.map((node, i) => {
-        const scale = spring({
-          frame: frame - node.delay,
-          fps,
-          config: { damping: 12, stiffness: 140, mass: 0.6 },
-        });
-        return (
-          <circle
-            key={i}
-            cx={node.x * 100}
-            cy={node.y * 100}
-            r={5 * scale}
-            fill={TEXT}
-          />
-        );
-      })}
-    </svg>
-  );
-};
-
-const Logo: React.FC<{ from: number }> = ({ from }) => {
+const Logo: React.FC<{ from: number; durationInFrames: number }> = ({ from, durationInFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const local = frame - from;
+  const exitStart = durationInFrames - 25;
 
   const scale = spring({
     frame: local,
     fps,
     config: { damping: 14, stiffness: 120, mass: 0.8 },
   });
-  const opacity = interpolate(local, [0, 20], [0, 1], {
+  const entranceOpacity = interpolate(local, [0, 20], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const exitOpacity = interpolate(frame, [exitStart, durationInFrames], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -152,7 +69,7 @@ const Logo: React.FC<{ from: number }> = ({ from }) => {
       style={{
         alignItems: 'center',
         justifyContent: 'center',
-        opacity,
+        opacity: entranceOpacity * exitOpacity,
         transform: `scale(${scale})`,
       }}
     >
@@ -174,9 +91,10 @@ const Logo: React.FC<{ from: number }> = ({ from }) => {
   );
 };
 
-const Tagline: React.FC = () => {
+const Tagline: React.FC<{ durationInFrames: number }> = ({ durationInFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const exitStart = durationInFrames - 30;
 
   const words = ['Cognitive', 'Workflow', 'Engine'];
 
@@ -191,8 +109,13 @@ const Tagline: React.FC = () => {
     extrapolateRight: 'clamp',
   });
 
+  const exitOpacity = interpolate(frame, [exitStart, durationInFrames], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
   return (
-    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', opacity: exitOpacity }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 36 }}>
         <div style={{ display: 'flex', gap: 28, opacity: titleOpacity }}>
           {words.map((word, i) => {
@@ -254,12 +177,17 @@ const FEATURES = [
   { label: 'Runs on-device', color: ORANGE },
 ];
 
-const Features: React.FC = () => {
+const Features: React.FC<{ durationInFrames: number }> = ({ durationInFrames }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const exitStart = durationInFrames - 25;
+  const exitOpacity = interpolate(frame, [exitStart, durationInFrames], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
   return (
-    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center', opacity: exitOpacity }}>
       <div style={{ display: 'flex', gap: 64 }}>
         {FEATURES.map((feature, i) => {
           const delay = i * 12;
@@ -314,103 +242,34 @@ const Features: React.FC = () => {
   );
 };
 
-const ClosingLockup: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const scale = spring({
-    frame,
-    fps,
-    config: { damping: 15, stiffness: 110, mass: 0.8 },
-  });
-  const opacity = interpolate(frame, [0, 20], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const ctaOpacity = interpolate(frame, [30, 55], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  return (
-    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 40,
-          opacity,
-          transform: `scale(${scale})`,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 36 }}>
-          <FlowMark size={90} />
-          <span
-            style={{
-              fontFamily: FONT_STACK,
-              fontSize: 92,
-              fontWeight: 700,
-              color: TEXT,
-              letterSpacing: -3,
-            }}
-          >
-            Flow
-          </span>
-        </div>
-        <span
-          style={{
-            fontFamily: FONT_STACK,
-            fontSize: 32,
-            fontWeight: 400,
-            color: MUTED,
-            opacity: ctaOpacity,
-            letterSpacing: 1,
-          }}
-        >
-          Cognitive Workflow Engine — coming to your device
-        </span>
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-const FadeToBlack: React.FC<{ from: number; duration: number }> = ({
-  from,
-  duration,
-}) => {
-  const frame = useCurrentFrame();
-  const opacity = interpolate(frame, [from, from + duration], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  return (
-    <AbsoluteFill style={{ backgroundColor: BG, opacity, pointerEvents: 'none' }} />
-  );
-};
-
 export const FlowPromo: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: BG }}>
       <Background />
 
-      <Sequence from={0} durationInFrames={150}>
-        <Logo from={10} />
+      <Sequence from={0} durationInFrames={130}>
+        <UIChaos durationInFrames={130} />
       </Sequence>
 
-      <Sequence from={130} durationInFrames={170}>
-        <Tagline />
+      <Sequence from={100} durationInFrames={150}>
+        <DoItButton durationInFrames={150} />
       </Sequence>
 
-      <Sequence from={300} durationInFrames={180}>
-        <Features />
+      <Sequence from={220} durationInFrames={140}>
+        <Logo from={10} durationInFrames={140} />
       </Sequence>
 
-      <Sequence from={470} durationInFrames={130}>
-        <ClosingLockup />
+      <Sequence from={340} durationInFrames={140}>
+        <Tagline durationInFrames={140} />
       </Sequence>
 
-      <FadeToBlack from={585} duration={15} />
+      <Sequence from={450} durationInFrames={110}>
+        <Features durationInFrames={110} />
+      </Sequence>
+
+      <Sequence from={520} durationInFrames={80}>
+        <Outro durationInFrames={80} />
+      </Sequence>
     </AbsoluteFill>
   );
 };
