@@ -373,12 +373,14 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .card[data-d="5"].reveal{animation-delay:0.4s}
 .card[data-d="6"].reveal{animation-delay:0.5s}
 
-/* ---------- border beam: twin comets orbiting a thin ring, Flow blue → glowing white ---------- */
-.beam-wrap{position:relative; border-radius:20px; isolation:isolate}
+/* ---------- border beam: a light that travels the card's own border on a conic gradient ----------
+   The gradient's *angle* is animated via the --beam-a custom property (driven by rAF in JS below) —
+   the box itself never rotates, so the ring stays glued to the card's rounded rect at any aspect ratio. */
+.beam-wrap{position:relative; border-radius:20px; isolation:isolate; --beam-a:40deg}
 .beam-wrap > .card{position:relative; z-index:1; height:100%}
 .beam-wrap::before, .beam-wrap::after{
-  content:""; position:absolute; inset:-2px; z-index:0; border-radius:inherit; pointer-events:none;
-  background:conic-gradient(from 0deg,
+  content:""; position:absolute; inset:-1px; z-index:0; border-radius:inherit; pointer-events:none;
+  background:conic-gradient(from var(--beam-a),
     transparent 0deg,
     color-mix(in srgb,var(--accent) 12%,transparent) 26deg,
     color-mix(in srgb,var(--accent) 75%,transparent) 52deg,
@@ -392,22 +394,18 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
     color-mix(in srgb,#ffffff 45%,var(--accent-2)) 236deg,
     transparent 258deg,
     transparent 360deg);
-  animation:beamSpin 8s linear infinite;
 }
 .beam-wrap::before{
-  padding:1.5px;
+  padding:1.4px;
   -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite:xor;
   mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   mask-composite:exclude;
-  opacity:.9;
+  opacity:.85; transition:opacity .35s ease;
 }
-.beam-wrap::after{inset:-18px; filter:blur(22px); opacity:.22; z-index:-1}
-.beam-wrap:hover::before, .beam-wrap:hover::after{animation-duration:2.6s}
+.beam-wrap::after{filter:blur(13px); opacity:.28; z-index:-1; transition:opacity .35s ease}
 .beam-wrap:hover::before{opacity:1}
-.beam-wrap:hover::after{opacity:.4}
-@keyframes beamSpin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.beam-wrap::before,.beam-wrap::after{animation:none}}
+.beam-wrap:hover::after{opacity:.45}
 
 /* R4: ambient glow orbs — depth behind key sections */
 .agraph-sec, .cta-sec{position:relative; overflow:hidden}
@@ -1401,6 +1399,38 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     if(rm || !chip) return;
     /* advance at each 6s loop boundary (content is faded out there → seamless swap) */
     chip.addEventListener('animationiteration', function(){ i=(i+1)%scenes.length; apply(scenes[i]); });
+  })();
+
+  /* ---------- border beam: rAF-driven --beam-a angle per card (see .beam-wrap CSS) ---------- */
+  (function(){
+    var wraps=document.querySelectorAll('.beam-wrap'); if(!wraps.length) return;
+    if(rm) return; /* CSS default --beam-a:40deg already gives a static lit border */
+    var IDLE=40, HOVER=230;
+    var items=Array.prototype.map.call(wraps,function(w,i){ return {el:w, angle:(i*137.508)%360, speed:IDLE, target:IDLE}; });
+    var io=new IntersectionObserver(function(es){ es.forEach(function(e){
+      var it=items.filter(function(x){return x.el===e.target;})[0];
+      if(it) it.onScreen=e.isIntersecting;
+    }); },{threshold:0});
+    items.forEach(function(it){
+      it.onScreen=true; io.observe(it.el);
+      it.el.addEventListener('pointerenter', function(){ it.target=HOVER; });
+      it.el.addEventListener('pointerleave', function(){ it.target=IDLE; });
+      it.el.addEventListener('focusin', function(){ it.target=HOVER; });
+      it.el.addEventListener('focusout', function(){ it.target=IDLE; });
+    });
+    var last=null;
+    function frame(ts){
+      if(last==null) last=ts;
+      var dt=Math.min(0.05,(ts-last)/1000); last=ts;
+      for(var i=0;i<items.length;i++){
+        var it=items[i]; if(!it.onScreen) continue;
+        it.speed+=(it.target-it.speed)*Math.min(1,dt*3.2);
+        it.angle=(it.angle+it.speed*dt)%360;
+        it.el.style.setProperty('--beam-a', it.angle.toFixed(2)+'deg');
+      }
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
   })();
 
   /* init */
