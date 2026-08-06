@@ -452,10 +452,19 @@ canvas.terrain-canvas.show{opacity:1}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 
-/* performance stats */
+/* performance stats — dark gradient card, pill tag, layered hover shadow (circular-carousel card style) */
 .stats{display:grid; gap:18px; grid-template-columns:1fr}
 @media(min-width:760px){.stats{grid-template-columns:repeat(3,1fr)}}
-.stat{border:1px solid var(--line); border-radius:20px; padding:38px 30px; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 55%, transparent)); box-shadow:var(--card-shadow); position:relative; overflow:hidden}
+.stat{
+  border:1px solid color-mix(in srgb,var(--line-hi) 75%, transparent); border-radius:20px; padding:32px 30px 34px;
+  background:linear-gradient(180deg, color-mix(in srgb,var(--panel) 95%, transparent), color-mix(in srgb,var(--panel-2) 88%, transparent));
+  backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  box-shadow:0 8px 24px -6px rgba(0,0,0,.28);
+  position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:flex-start;
+  transition:box-shadow .4s cubic-bezier(.2,.7,.2,1), transform .4s cubic-bezier(.2,.7,.2,1), border-color .4s ease;
+}
+.stat:hover{transform:translateY(-5px); border-color:color-mix(in srgb,var(--accent) 38%,transparent); box-shadow:0 22px 56px -14px rgba(0,0,0,.4), 0 0 0 1px color-mix(in srgb,var(--accent) 20%,transparent), 0 12px 34px -10px var(--glow)}
+.stat-tag{display:inline-flex; align-items:center; border-radius:999px; padding:5px 12px; font-family:var(--mono); font-size:.62rem; font-weight:500; text-transform:uppercase; letter-spacing:.14em; direction:ltr; color:var(--accent-2); background:color-mix(in srgb,var(--accent) 13%, transparent); border:1px solid color-mix(in srgb,var(--accent) 24%,transparent); margin-bottom:20px}
 .stat .big{font-family:var(--disp); font-weight:700; font-size:clamp(3rem,2rem + 4vw,4.6rem); line-height:1; letter-spacing:-.03em; color:var(--txt-hi); font-variant-numeric:tabular-nums; display:flex; align-items:baseline; gap:2px}
 .stat .big .u{color:var(--accent-2)}
 .stat .st{margin-top:14px; font-family:var(--disp); font-weight:600; color:var(--txt-hi); font-size:1.1rem}
@@ -777,9 +786,9 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         <p class="lead muted" data-i18n="perf.lead">Enterprise teams using Flow report dramatic improvements in operational velocity while maintaining the highest security standards.</p>
       </div>
       <div class="stats">
-        <div class="stat reveal" data-d="1"><div class="big"><span data-count="10" data-i18n-num>0</span><span class="u">x</span></div><div class="st" data-i18n="p1.t">Faster Execution</div><div class="sp" data-i18n="p1.b">Workflow execution speed vs. manual processing or traditional RPA tools.</div></div>
-        <div class="stat reveal" data-d="2"><div class="big"><span data-count="100" data-i18n-num>0</span><span class="u">%</span></div><div class="st" data-i18n="p2.t">Data On-Device</div><div class="sp" data-i18n="p2.b">Of all data processing occurs locally — zero data ever leaves your infrastructure.</div></div>
-        <div class="stat reveal" data-d="3"><div class="big"><span class="u">0</span></div><div class="st" data-i18n="p3.t">External Dependencies</div><div class="sp" data-i18n="p3.b">Zero external API calls. Zero cloud processing. Complete operational independence.</div></div>
+        <div class="stat reveal" data-d="1"><span class="stat-tag">Speed</span><div class="big"><span data-count="10" data-i18n-num>0</span><span class="u">x</span></div><div class="st" data-i18n="p1.t">Faster Execution</div><div class="sp" data-i18n="p1.b">Workflow execution speed vs. manual processing or traditional RPA tools.</div></div>
+        <div class="stat reveal" data-d="2"><span class="stat-tag">Privacy</span><div class="big"><span data-count="100" data-i18n-num>0</span><span class="u">%</span></div><div class="st" data-i18n="p2.t">Data On-Device</div><div class="sp" data-i18n="p2.b">Of all data processing occurs locally — zero data ever leaves your infrastructure.</div></div>
+        <div class="stat reveal" data-d="3"><span class="stat-tag">Autonomy</span><div class="big"><span class="u">0</span></div><div class="st" data-i18n="p3.t">External Dependencies</div><div class="sp" data-i18n="p3.b">Zero external API calls. Zero cloud processing. Complete operational independence.</div></div>
       </div>
     </div>
   </section>
@@ -1405,27 +1414,20 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
   (function(){
     var wraps=document.querySelectorAll('.beam-wrap'); if(!wraps.length) return;
     if(rm) return; /* CSS default --beam-a:40deg already gives a static lit border */
-    var IDLE=40, HOVER=230;
-    var items=Array.prototype.map.call(wraps,function(w,i){ return {el:w, angle:(i*137.508)%360, speed:IDLE, target:IDLE}; });
+    var SPEED=26; /* deg/s — constant, no hover acceleration */
+    var items=Array.prototype.map.call(wraps,function(w,i){ return {el:w, angle:(i*137.508)%360}; });
     var io=new IntersectionObserver(function(es){ es.forEach(function(e){
       var it=items.filter(function(x){return x.el===e.target;})[0];
       if(it) it.onScreen=e.isIntersecting;
     }); },{threshold:0});
-    items.forEach(function(it){
-      it.onScreen=true; io.observe(it.el);
-      it.el.addEventListener('pointerenter', function(){ it.target=HOVER; });
-      it.el.addEventListener('pointerleave', function(){ it.target=IDLE; });
-      it.el.addEventListener('focusin', function(){ it.target=HOVER; });
-      it.el.addEventListener('focusout', function(){ it.target=IDLE; });
-    });
+    items.forEach(function(it){ it.onScreen=true; io.observe(it.el); });
     var last=null;
     function frame(ts){
       if(last==null) last=ts;
       var dt=Math.min(0.05,(ts-last)/1000); last=ts;
       for(var i=0;i<items.length;i++){
         var it=items[i]; if(!it.onScreen) continue;
-        it.speed+=(it.target-it.speed)*Math.min(1,dt*3.2);
-        it.angle=(it.angle+it.speed*dt)%360;
+        it.angle=(it.angle+SPEED*dt)%360;
         it.el.style.setProperty('--beam-a', it.angle.toFixed(2)+'deg');
       }
       requestAnimationFrame(frame);
