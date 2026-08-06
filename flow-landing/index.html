@@ -373,6 +373,42 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .card[data-d="5"].reveal{animation-delay:0.4s}
 .card[data-d="6"].reveal{animation-delay:0.5s}
 
+/* ---------- border beam: twin comets orbiting a thin ring, Flow blue → glowing white ---------- */
+.beam-wrap{position:relative; border-radius:20px; isolation:isolate}
+.beam-wrap > .card{position:relative; z-index:1; height:100%}
+.beam-wrap::before, .beam-wrap::after{
+  content:""; position:absolute; inset:-2px; z-index:0; border-radius:inherit; pointer-events:none;
+  background:conic-gradient(from 0deg,
+    transparent 0deg,
+    color-mix(in srgb,var(--accent) 12%,transparent) 26deg,
+    color-mix(in srgb,var(--accent) 75%,transparent) 52deg,
+    color-mix(in srgb,#ffffff 55%,var(--accent-2)) 60deg,
+    #ffffff 64deg,
+    color-mix(in srgb,#ffffff 55%,var(--accent-2)) 68deg,
+    transparent 94deg,
+    transparent 180deg,
+    color-mix(in srgb,var(--accent-2) 10%,transparent) 206deg,
+    color-mix(in srgb,var(--accent-2) 60%,transparent) 230deg,
+    color-mix(in srgb,#ffffff 45%,var(--accent-2)) 236deg,
+    transparent 258deg,
+    transparent 360deg);
+  animation:beamSpin 8s linear infinite;
+}
+.beam-wrap::before{
+  padding:1.5px;
+  -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite:xor;
+  mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite:exclude;
+  opacity:.9;
+}
+.beam-wrap::after{inset:-18px; filter:blur(22px); opacity:.22; z-index:-1}
+.beam-wrap:hover::before, .beam-wrap:hover::after{animation-duration:2.6s}
+.beam-wrap:hover::before{opacity:1}
+.beam-wrap:hover::after{opacity:.4}
+@keyframes beamSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.beam-wrap::before,.beam-wrap::after{animation:none}}
+
 /* R4: ambient glow orbs — depth behind key sections */
 .agraph-sec, .cta-sec{position:relative; overflow:hidden}
 .agraph-sec::before, .agraph-sec::after, .cta-sec::before{content:""; position:absolute; border-radius:50%; pointer-events:none; z-index:0; filter:blur(70px); background:radial-gradient(circle, var(--blob), transparent 66%); opacity:.7}
@@ -666,12 +702,12 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
         <p class="lead muted" data-i18n="arch.lead">Six foundational pillars that make Flow the most secure, capable, and autonomous workflow engine for mission-critical operations.</p>
       </div>
       <div class="grid-3">
-        <div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg></div><h3><span class="en">LOCAL-FIRST</span><span data-i18n="c1.t">100% On-Device Processing</span></h3><p data-i18n="c1.b">All AI inference runs locally using SLMs. Your data never leaves your infrastructure.</p></div></div>
-        <div class="card tilt reveal" data-d="2"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3><span class="en">MASKING</span><span data-i18n="c2.t">Smart Data Masking</span></h3><p data-i18n="c2.b">PII and confidential fields are automatically identified and protected before any processing.</p></div></div>
-        <div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div><h3><span class="en">ACTION GRAPH</span><span data-i18n="c3.t">Institutional Wisdom Infrastructure</span></h3><p data-i18n="c3.b">Maps OS telemetry and causal habits, turning implicit professional judgment into execution memory.</p></div></div>
-        <div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3><span class="en">INTEGRATION</span><span data-i18n="c4.t">Zero-API Cross-App Linking</span></h3><p data-i18n="c4.b">Connects instantly to Salesforce, Excel, Outlook, and 200+ apps within your existing stack.</p></div></div>
-        <div class="card tilt reveal" data-d="5"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3><span class="en">EXECUTION</span><span data-i18n="c5.t">Autonomous &amp; Deterministic</span></h3><p data-i18n="c5.b">Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.</p></div></div>
-        <div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3><span class="en">GOVERNANCE</span><span data-i18n="c6.t">Control &amp; Cryptographic Audit</span></h3><p data-i18n="c6.b">Requires explicit human approval for high-risk tasks while creating unalterable logs for compliance.</p></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg></div><h3><span class="en">LOCAL-FIRST</span><span data-i18n="c1.t">100% On-Device Processing</span></h3><p data-i18n="c1.b">All AI inference runs locally using SLMs. Your data never leaves your infrastructure.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="2"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3><span class="en">MASKING</span><span data-i18n="c2.t">Smart Data Masking</span></h3><p data-i18n="c2.b">PII and confidential fields are automatically identified and protected before any processing.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div><h3><span class="en">ACTION GRAPH</span><span data-i18n="c3.t">Institutional Wisdom Infrastructure</span></h3><p data-i18n="c3.b">Maps OS telemetry and causal habits, turning implicit professional judgment into execution memory.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3><span class="en">INTEGRATION</span><span data-i18n="c4.t">Zero-API Cross-App Linking</span></h3><p data-i18n="c4.b">Connects instantly to Salesforce, Excel, Outlook, and 200+ apps within your existing stack.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="5"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3><span class="en">EXECUTION</span><span data-i18n="c5.t">Autonomous &amp; Deterministic</span></h3><p data-i18n="c5.b">Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3><span class="en">GOVERNANCE</span><span data-i18n="c6.t">Control &amp; Cryptographic Audit</span></h3><p data-i18n="c6.b">Requires explicit human approval for high-risk tasks while creating unalterable logs for compliance.</p></div></div></div>
       </div>
       <div class="secure-note reveal">
         <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
