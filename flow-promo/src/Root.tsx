@@ -1,3 +1,4 @@
+import "./index.css";
 import { Composition } from 'remotion';
 import { FlowPromo } from './FlowPromo';
 
