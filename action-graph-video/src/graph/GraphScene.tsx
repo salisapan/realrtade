@@ -3,6 +3,7 @@ import React, { useMemo } from "react";
 import * as THREE from "three";
 import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { buildGraph, foldEnvelope, project4to3, rotate4 } from "./build";
+import { LIGHT, LIGHT_3D } from "../promo/theme";
 
 const ACCENT = new THREE.Color("#3B74FF");
 const ACCENT2 = new THREE.Color("#8FB4FF");
@@ -20,11 +21,27 @@ function lerpColor(a: THREE.Color, b: THREE.Color, t: number) {
 export const GraphScene: React.FC<{
   readonly loop?: boolean;
   readonly assemble?: boolean;
-}> = ({ loop = false, assemble = false }) => {
+  /**
+   * Light-mode rendering for the promo composition. Note this isn't just a
+   * color swap: the dark scenes render nodes/edges with AdditiveBlending,
+   * which is how the "glow" look works — but additive blending against a
+   * white background pushes everything toward white and makes the graph
+   * nearly invisible, so light mode also switches to NormalBlending.
+   */
+  readonly light?: boolean;
+  /**
+   * Absolute composition frame this scene should treat as its own t=0.
+   * GraphScene's internal clock (fold envelope, assembleT, camera orbit) is
+   * relative-time based — mounting it partway through a longer composition
+   * without this would make `t` start already large, skipping straight past
+   * the assemble/fold animation instead of playing it.
+   */
+  readonly startFrame?: number;
+}> = ({ loop = false, assemble = false, light = false, startFrame = 0 }) => {
   const frame = useCurrentFrame();
   const { durationInFrames, fps } = useVideoConfig();
   const graph = useMemo(() => buildGraph(), []);
-  const t = frame / fps;
+  const t = Math.max(0, frame - startFrame) / fps;
   const durSec = durationInFrames / fps;
 
   const azw = t * 0.22;
@@ -100,22 +117,26 @@ export const GraphScene: React.FC<{
     edgeGeometry.attributes.position.needsUpdate = true;
   }, [edgeGeometry, positions, graph.edges]);
 
-  const edgeOpacity = 0.22 + fold * 0.25;
+  const edgeOpacity = light ? 0.32 + fold * 0.3 : 0.22 + fold * 0.25;
+  const blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
+  const bgColor = light ? LIGHT.bg : "#04060c";
+  const edgeColor = light ? LIGHT_3D.accent : ACCENT;
+  const pointLightColor = light ? LIGHT.accent2 : "#6E9BFF";
 
   return (
     <>
-      <color attach="background" args={["#04060c"]} />
-      <fog attach="fog" args={["#04060c", 6, 15]} />
+      <color attach="background" args={[bgColor]} />
+      <fog attach="fog" args={[bgColor, 6, 15]} />
       <PerspectiveCamera makeDefault position={[camX, camY, camZ]} fov={36} near={0.1} far={20} />
       <ambientLight intensity={0.4} />
-      <pointLight position={[0, 2, 0]} intensity={2} color="#6E9BFF" />
+      <pointLight position={[0, 2, 0]} intensity={2} color={pointLightColor} />
 
       <lineSegments geometry={edgeGeometry}>
         <lineBasicMaterial
-          color={ACCENT}
+          color={edgeColor}
           transparent
           opacity={edgeOpacity}
-          blending={THREE.AdditiveBlending}
+          blending={blending}
           depthWrite={false}
         />
       </lineSegments>
@@ -123,7 +144,17 @@ export const GraphScene: React.FC<{
       {positions.map((p, i) => {
         const n = graph.nodes[i];
         const depth = Math.max(0, Math.min(1, (p.z + 1.4) / 2.8));
-        const color = n.expert ? EXPERT : n.apex ? lerpColor(FAR, ACCENT2, 0.8) : lerpColor(FAR, ACCENT2, depth);
+        const color = light
+          ? n.expert
+            ? LIGHT_3D.expert
+            : n.apex
+              ? lerpColor(LIGHT_3D.far, LIGHT_3D.accent2, 0.8)
+              : lerpColor(LIGHT_3D.far, LIGHT_3D.accent2, depth)
+          : n.expert
+            ? EXPERT
+            : n.apex
+              ? lerpColor(FAR, ACCENT2, 0.8)
+              : lerpColor(FAR, ACCENT2, depth);
         const baseSize = (n.expert ? 0.075 : n.apex ? 0.045 : 0.03) * (GRAPH_SCALE * 0.72);
         const pulse = n.expert ? 1 + Math.sin(t * 2.6) * 0.18 : 1;
         return (
@@ -133,7 +164,7 @@ export const GraphScene: React.FC<{
               color={color}
               transparent
               opacity={p.opacity}
-              blending={THREE.AdditiveBlending}
+              blending={blending}
               depthWrite={false}
             />
           </mesh>

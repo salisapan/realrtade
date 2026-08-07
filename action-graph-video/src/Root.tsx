@@ -1,6 +1,7 @@
 import { Composition } from "remotion";
 import { ActionGraphLoop } from "./ActionGraphLoop";
 import { ActionGraphNarrative } from "./ActionGraphNarrative";
+import { PromoScene } from "./PromoScene";
 
 // Flow's Action Graph, reimagined as a real 3D scene (Remotion + React Three Fiber)
 // instead of the live site's flat 2D canvas projection — same 4D layered-cone math,
@@ -27,6 +28,17 @@ export const RemotionRoot: React.FC = () => {
         durationInFrames={660}
         width={1920}
         height={1080}
+      />
+
+      {/* ~55s light-mode SaaS promo — chaos to one-click execution across Legal/Finance/
+          Healthcare, fast spring physics. Native 1440p30, upscaled to 4K for delivery. */}
+      <Composition
+        id="FlowPromo"
+        component={PromoScene}
+        fps={30}
+        durationInFrames={1650}
+        width={2560}
+        height={1440}
       />
     </>
   );
