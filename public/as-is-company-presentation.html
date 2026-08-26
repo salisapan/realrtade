@@ -639,19 +639,18 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .cfx-meta .v{font-family:var(--mono);font-size:19px;font-weight:600;color:var(--accent-2);font-variant-numeric:tabular-nums}
 @media (max-width:640px){.cfx{--cfx-card:clamp(120px,32vw,170px)}.cfx-meta{gap:18px}}
 
-.pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
-.pgrid-card{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:12px;padding:8px 12px;
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
+.pgrid-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;border:1px solid var(--line);border-radius:14px;padding:11px 10px;
   background:linear-gradient(180deg,var(--panel),var(--panel-2))}
-.pgrid-card:last-child:nth-child(odd){grid-column:1/-1}
-.pgrid-ic{width:42px;height:42px;flex-shrink:0;color:var(--accent-2)}
+.pgrid-ic{width:50px;height:50px;flex-shrink:0;color:var(--accent-2)}
 .pgrid-ic svg{width:100%;height:100%;display:block}
-.pgrid-info{min-width:0}
-.pgrid-name{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--txt-hi);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pgrid-city{font-family:var(--mono);font-size:10px;color:var(--accent-2);margin-top:1px}
-.pgrid-stats{display:flex;gap:9px;margin-top:4px;flex-wrap:wrap}
-.pgrid-stats span{font-size:10px;color:var(--muted);white-space:nowrap}
-.pgrid-stats b{font-family:var(--mono);color:var(--accent-2);font-weight:600;font-size:11px}
-@media (max-width:640px){.pgrid{grid-template-columns:1fr}.pgrid-card:last-child:nth-child(odd){grid-column:auto}}
+.pgrid-info{min-width:0;width:100%}
+.pgrid-name{font-family:var(--disp);font-weight:700;font-size:14.5px;color:var(--txt-hi);line-height:1.3}
+.pgrid-city{font-family:var(--mono);font-size:11px;color:var(--accent-2);margin-top:2px}
+.pgrid-stats{display:flex;flex-direction:column;gap:2px;margin-top:5px;align-items:center}
+.pgrid-stats span{font-size:11px;color:var(--muted);white-space:nowrap}
+.pgrid-stats b{font-family:var(--mono);color:var(--accent-2);font-weight:600;font-size:13px}
+@media (max-width:640px){.pgrid{grid-template-columns:repeat(2,1fr)}}
 
 .dstat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px;margin-bottom:16px}
 .dstat-card{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line-hi);
@@ -685,9 +684,9 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
         <p class="subline">אנחנו מארגנים ומלווים בעלי דירות בתהליכי התחדשות עירונית מקצה לקצה — מהצעד הראשון ועד קבלת המפתח.</p>
         <div class="stat-row">
           <div class="stat-tile"><div class="num cu">2018</div><div class="lbl">שנת הקמה</div></div>
-          <div class="stat-tile"><div class="num cu">83</div><div class="lbl">בניינים בליווי</div></div>
-          <div class="stat-tile"><div class="num cu">657</div><div class="lbl">דירות קיימות</div></div>
-          <div class="stat-tile"><div class="num cu">3095</div><div class="lbl">יח״ד בתכנון</div></div>
+          <div class="stat-tile"><div class="num cu">82</div><div class="lbl">בניינים בליווי</div></div>
+          <div class="stat-tile"><div class="num cu">648</div><div class="lbl">דירות קיימות</div></div>
+          <div class="stat-tile"><div class="num cu">3072</div><div class="lbl">יח״ד בתכנון</div></div>
         </div>
       </div>
     </section>
@@ -740,12 +739,12 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     <section class="slide" data-slide data-title="הפרויקטים שלנו">
       <div class="eyebrow"><span class="dot"></span>הרקורד שלנו</div>
       <h2 class="slide-title">הפרויקטים שלנו — ההיקף מדבר בעד עצמו</h2>
-      <p class="slide-sub">83 בניינים · 657 דירות קיימות · 3,095 יח״ד בתכנון</p>
+      <p class="slide-sub">82 בניינים · 648 דירות קיימות · 3,072 יח״ד בתכנון</p>
       <div class="slide-body">
         <div class="stat-banner">
-          <div class="sb-item reveal"><div class="num cu">83</div><div class="lbl">בניינים בליווי</div></div>
-          <div class="sb-item reveal" style="--i:1"><div class="num cu">657</div><div class="lbl">דירות קיימות</div></div>
-          <div class="sb-item reveal" style="--i:2"><div class="num cu">3095</div><div class="lbl">יח״ד בתכנון</div></div>
+          <div class="sb-item reveal"><div class="num cu">82</div><div class="lbl">בניינים בליווי</div></div>
+          <div class="sb-item reveal" style="--i:1"><div class="num cu">648</div><div class="lbl">דירות קיימות</div></div>
+          <div class="sb-item reveal" style="--i:2"><div class="num cu">3072</div><div class="lbl">יח״ד בתכנון</div></div>
         </div>
         <div class="pgrid" id="pgrid"></div>
       </div>
@@ -873,7 +872,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   var PROJECTS=[
     {name:"מתחם נגבה – בר כוכבא",city:"רמת גן",b:17,e:124,p:360,sketch:"cluster",tag:"נגבה-ב\"כ"},
     {name:"השר משה ועוזיאל",city:"רמת גן",b:2,e:12,p:35,sketch:"lowrise",tag:"השר משה"},
-    {name:"רחוב אילת",city:"גבעתיים",b:1,e:9,p:23,sketch:"tower",tag:"גבעתיים"},
     {name:"רחוב וולפסון",city:"ראשון לציון",b:2,e:12,p:38,sketch:"lowrise",tag:"ראשל\"צ"},
     {name:"רחובות נווה ואדמון",city:"קצרין",b:44,e:240,p:1440,sketch:"campus",tag:"קצרין"},
     {name:"רחובות הגאולה וישורון",city:"הוד השרון",b:5,e:120,p:350,sketch:"cluster",tag:"הוד השרון"},
@@ -1014,19 +1012,24 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   // projects grid (static, all 9 at once)
   var pg=document.getElementById("pgrid");
   PROJECTS.forEach(function(p,idx){
-    var card=el('<div class="pgrid-card reveal"><div class="pgrid-ic">'+CFX_SKETCHES[p.sketch]+'</div><div class="pgrid-info"><div class="pgrid-name">'+p.name+'</div><div class="pgrid-city">'+p.city+'</div><div class="pgrid-stats"><span><b class="cu">'+p.b+'</b> בניינים</span><span><b class="cu">'+p.e+'</b> קיימות</span><span><b class="cu">'+p.p+'</b> בתכנון</span></div></div></div>');
+    var card=el('<div class="pgrid-card reveal"><div class="pgrid-ic">'+CFX_SKETCHES[p.sketch]+'</div><div class="pgrid-info"><div class="pgrid-name">'+p.name+'</div><div class="pgrid-city">'+p.city+'</div><div class="pgrid-stats"><span><b class="cu">'+p.b+'</b> בניינים</span><span><b class="cu">'+p.e+'</b> דירות קיימות</span><span><b class="cu">'+p.p+'</b> בתכנון</span></div></div></div>');
     card.style.setProperty('--i', idx);
     pg.appendChild(card);
   });
 
   // portfolio data slide — two donuts + ranked bar list
+  var totalB=PROJECTS.reduce(function(s,p){return s+p.b;},0);
+  var totalE=PROJECTS.reduce(function(s,p){return s+p.e;},0);
+  var totalP=PROJECTS.reduce(function(s,p){return s+p.p;},0);
+  var LARGE=PROJECTS.filter(function(p){return p.b>=10;});
+  var largeP=LARGE.reduce(function(s,p){return s+p.p;},0);
   var DSTATS=[
-    {name:"מתחם נגבה – בר כוכבא",chip:PROJECTS[0].b+" בניינים",desc:'מתוך '+PROJECTS[0].p+' יח"ד מתוכננות',pct:Math.round(PROJECTS[0].e/PROJECTS[0].p*100)},
-    {name:"נווה ואדמון, קצרין",chip:PROJECTS[4].b+" בניינים",desc:'מתוך '+PROJECTS[4].p+' יח"ד מתוכננות',pct:Math.round(PROJECTS[4].e/PROJECTS[4].p*100)}
+    {name:"התקדמות כוללת",chip:PROJECTS.length+" פרויקטים",desc:totalE+' מתוך '+totalP+' יח"ד מתוכננות',dl:"מהיעד הכולל כבר קיים",pct:Math.round(totalE/totalP*100)},
+    {name:"ריכוז בפרויקטים הגדולים",chip:LARGE.length+" מתוך "+PROJECTS.length+" פרויקטים",desc:largeP+' מתוך '+totalP+' יח"ד בתכנון',dl:"מהתכנון מגיע מהגדולים",pct:Math.round(largeP/totalP*100)}
   ];
   var dg=document.getElementById("dstatGrid");
   DSTATS.forEach(function(d,idx){
-    var card=el('<div class="dstat-card reveal"><div class="dstat-info"><div class="dstat-name">'+d.name+'</div><span class="dstat-chip">'+d.chip+'</span><p class="dstat-desc">'+d.desc+'</p></div><div class="donut"><div class="donut-c"><div class="dn cu">'+d.pct+'%</div><div class="dl">כבר קיים היום</div></div></div></div>');
+    var card=el('<div class="dstat-card reveal"><div class="dstat-info"><div class="dstat-name">'+d.name+'</div><span class="dstat-chip">'+d.chip+'</span><p class="dstat-desc">'+d.desc+'</p></div><div class="donut"><div class="donut-c"><div class="dn cu">'+d.pct+'%</div><div class="dl">'+d.dl+'</div></div></div></div>');
     card.style.setProperty('--i', idx);
     card.querySelector(".donut").style.background="conic-gradient(var(--accent) 0% "+d.pct+"%, var(--panel-2) "+d.pct+"% 100%)";
     dg.appendChild(card);
