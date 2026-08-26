@@ -310,6 +310,105 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 @media (prefers-reduced-motion:reduce){.demo-chip,.demo-doit,.demo-steps li,.demo-steps li::after,.demo-cursor{animation:none!important; opacity:1}.demo-cursor{opacity:0}}
 [dir="rtl"] .demo-steps li{padding-inline-start:26px}
 
+/* legal demo — static preview + play button, under the hero */
+.legal-demo-preview{position:relative; border:1px solid var(--line); border-radius:22px; background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 60%, transparent)); box-shadow:var(--card-shadow); padding:8px; max-width:720px}
+.ld-mock{border-radius:16px; overflow:hidden; opacity:.92; pointer-events:none; user-select:none}
+.ld-caption-row{display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 14px 8px; flex-wrap:wrap}
+.ld-caption-row .ld-tag{font-family:var(--mono); font-size:.76rem; letter-spacing:.08em; color:var(--muted); text-transform:uppercase}
+.ld-caption-row .ld-runtime{font-family:var(--mono); font-size:.76rem; color:var(--accent-2); font-weight:600}
+.ld-play{position:absolute; top:50%; left:50%; transform:translate(-50%,-64%); width:84px; height:84px; border-radius:50%; border:1px solid var(--glass-border); background:linear-gradient(180deg,var(--glass-top),var(--glass-bot)); box-shadow:0 18px 40px -14px var(--glow), inset 0 1px 0 var(--glass-gloss); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s}
+.ld-play:hover{transform:translate(-50%,-64%) scale(1.06); box-shadow:0 22px 48px -12px var(--glow), inset 0 1px 0 var(--glass-gloss)}
+.ld-play .tri{width:0; height:0; border-style:solid; border-width:12px 0 12px 20px; border-color:transparent transparent transparent var(--accent); margin-inline-start:5px}
+
+/* legal demo — modal */
+.ld-modal{position:fixed; inset:0; z-index:95; display:flex; align-items:center; justify-content:center; padding:20px; opacity:0; transition:opacity .3s ease}
+.ld-modal.open{opacity:1}
+.ld-modal[hidden]{display:none}
+.ld-backdrop{position:absolute; inset:0; background:var(--nav-bg); backdrop-filter:blur(22px) saturate(1.2)}
+.ld-panel{position:relative; width:100%; max-width:640px; max-height:88svh; overflow-y:auto; border-radius:22px; border:1px solid var(--line); background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 60%, transparent)); box-shadow:var(--card-shadow); padding:28px 28px 30px; transform:translateY(10px) scale(.98); transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.ld-modal.open .ld-panel{transform:translateY(0) scale(1)}
+.ld-close{position:absolute; top:16px; inset-inline-end:16px}
+.ld-progress{display:flex; align-items:center; gap:8px; margin-bottom:22px}
+.ld-dot{width:7px; height:7px; border-radius:50%; background:var(--line-hi); transition:background .3s, width .3s, border-radius .3s}
+.ld-dot.active{background:var(--accent); width:20px; border-radius:4px}
+.ld-dot.done{background:var(--accent-2)}
+.ld-step{display:none}
+.ld-step.active{display:block; animation:ldStepIn .4s cubic-bezier(.2,.7,.2,1)}
+@keyframes ldStepIn{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:translateY(0)}}
+.ld-step-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; flex-wrap:wrap}
+.ld-step-tag{font-family:var(--mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted)}
+.ld-pill{font-family:var(--mono); font-size:.68rem; letter-spacing:.06em; text-transform:uppercase; padding:4px 10px; border-radius:999px; font-weight:600}
+.ld-pill.zero{background:var(--panel-2); color:var(--muted); border:1px solid var(--line)}
+.ld-pill.turn{background:color-mix(in srgb,var(--accent) 9%, transparent); color:var(--accent-2); border:1px solid color-mix(in srgb,var(--accent) 22%, transparent)}
+.ld-body{color:var(--txt); font-size:.98rem; margin:16px 0}
+.ld-body b{color:var(--txt-hi)}
+.ld-amt{font-family:var(--mono); color:var(--accent-2); font-weight:600}
+.ld-rail{height:3px; border-radius:2px; background:var(--line); overflow:hidden; margin-top:20px}
+.ld-rail i{display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-2)); width:0%; animation-timing-function:linear; animation-fill-mode:forwards}
+.ld-rail-label{font-family:var(--mono); font-size:.7rem; color:var(--muted); margin-top:8px; letter-spacing:.04em}
+
+.ld-approve{border:1px solid var(--line); border-inline-start:3px solid var(--accent); border-radius:14px; background:var(--panel-2); padding:16px 18px}
+.ld-glyph{display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:.72rem; color:var(--accent-2); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px}
+.ld-checklist{list-style:none; margin:0 0 14px; padding:0; display:flex; flex-direction:column; gap:8px}
+.ld-checklist li{display:flex; align-items:flex-start; gap:8px; font-size:.92rem; opacity:0; transform:translateX(-6px); animation:ldCheckIn .4s ease forwards}
+[dir="rtl"] .ld-checklist li{transform:translateX(6px)}
+.ld-checklist li:nth-child(1){animation-delay:.15s}
+.ld-checklist li:nth-child(2){animation-delay:.45s}
+@keyframes ldCheckIn{to{opacity:1; transform:translateX(0)}}
+.ld-ck{width:18px; height:18px; border-radius:50%; background:color-mix(in srgb,var(--accent-2) 12%, transparent); color:var(--accent-2); flex:0 0 auto; display:flex; align-items:center; justify-content:center; font-size:.7rem; margin-top:1px}
+
+.ld-doc-split{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0}
+@media(max-width:520px){.ld-doc-split{grid-template-columns:1fr}}
+.ld-doc-row{display:flex; align-items:center; justify-content:space-between; font-size:.78rem; padding:5px 0; border-bottom:1px dashed var(--line)}
+.ld-doc-row:last-child{border-bottom:none}
+.ld-doc-row .k{color:var(--muted)}
+.ld-doc-row .v{font-family:var(--mono); color:var(--txt-hi); font-weight:600}
+.ld-doc-row .v.new{color:var(--accent-2)}
+.ld-doc-row .v.old{color:var(--muted); text-decoration:line-through; font-weight:400; margin-inline-end:6px}
+.ld-fadeup{opacity:0; animation:ldFadeUp .5s ease forwards}
+@keyframes ldFadeUp{from{opacity:0; transform:translateY(4px)} to{opacity:1; transform:translateY(0)}}
+
+.ld-mail-field{display:flex; gap:8px; font-size:.8rem; padding:6px 0; border-bottom:1px solid var(--line)}
+.ld-mail-field .k{color:var(--muted); min-width:52px; flex:0 0 auto}
+.ld-mail-field .v{color:var(--txt-hi); font-family:var(--mono); font-size:.78rem}
+.ld-mail-body{font-size:.86rem; color:var(--txt); margin-top:12px; white-space:pre-line}
+.ld-mail-attach{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap}
+.ld-attach-chip{display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:8px; background:var(--panel-2); border:1px solid var(--line); font-family:var(--mono); font-size:.72rem; color:var(--muted)}
+
+.ld-tooltip{position:relative; margin-top:14px; padding:10px 14px; border-radius:12px; background:var(--txt-hi); color:var(--bg); font-size:.82rem; display:inline-flex; align-items:center; gap:8px; box-shadow:var(--card-shadow)}
+
+.ld-end-check{width:56px; height:56px; border-radius:50%; background:color-mix(in srgb,var(--accent-2) 10%, transparent); color:var(--accent-2); display:flex; align-items:center; justify-content:center; font-size:1.5rem; margin-bottom:18px; box-shadow:0 0 0 8px color-mix(in srgb,var(--accent-2) 6%, transparent)}
+.ld-end-lines{display:flex; flex-direction:column; gap:8px; margin-bottom:22px}
+.ld-end-lines p{margin:0; color:var(--txt)}
+.ld-end-lines .headline{font-family:var(--disp); font-weight:700; font-size:1.1rem; color:var(--txt-hi)}
+.ld-end-lines .final{color:var(--accent-2); font-weight:600}
+
+/* legal demo — shared fake-document window (scoped, does not touch .win used by dual-core) */
+.ld-win{border-radius:14px; overflow:hidden; border:1px solid var(--line); background:var(--panel)}
+.ld-win-bar{display:flex; align-items:center; gap:6px; padding:9px 12px; background:var(--panel-2); border-bottom:1px solid var(--line)}
+.ld-win-bar .wd{width:8px; height:8px; border-radius:50%; background:var(--line-hi)}
+.ld-win-title{font-family:var(--mono); font-size:.72rem; color:var(--muted); margin-inline-start:8px}
+.ld-win-body{padding:14px}
+.ld-inbox-row{display:flex; align-items:center; gap:10px; padding:10px 8px; border-radius:10px; margin-bottom:4px}
+.ld-inbox-row .av{width:26px; height:26px; border-radius:50%; background:var(--line-hi); flex:0 0 auto}
+.ld-inbox-row .lines{flex:1; min-width:0}
+.ld-inbox-row .l1{height:8px; width:60%; background:var(--line-hi); border-radius:4px; margin-bottom:6px}
+.ld-inbox-row .l2{height:6px; width:40%; background:var(--line); border-radius:4px}
+.ld-inbox-row.hi{background:linear-gradient(90deg,color-mix(in srgb,var(--accent) 7%, transparent),transparent); border:1px solid color-mix(in srgb,var(--accent) 18%, transparent)}
+.ld-sender{font-weight:600; color:var(--txt-hi); font-size:.86rem}
+.ld-subject{font-size:.82rem; color:var(--txt); margin-top:2px}
+.ld-scan-badge{position:relative; margin-top:8px; height:16px; overflow:hidden; font-family:var(--mono); font-size:.72rem}
+.ld-scan-badge span{position:absolute; inset-inline-start:0; top:0; transition:opacity .4s}
+.ld-scan-badge .a{color:var(--muted); opacity:1; animation:ldFadeOut .5s ease 1.6s forwards}
+.ld-scan-badge .b{color:var(--accent-2); opacity:0; animation:ldFadeIn .5s ease 1.9s forwards}
+@keyframes ldFadeOut{to{opacity:0}}
+@keyframes ldFadeIn{to{opacity:1}}
+
+@media(max-width:640px){.legal-demo-preview{max-width:none}}
+@media (prefers-reduced-motion:reduce){
+  .ld-step.active, .ld-checklist li, .ld-fadeup, .ld-scan-badge .a, .ld-scan-badge .b{animation:none!important; opacity:1!important; transform:none!important}
+}
+
 /* shadow: scanned work-window */
 .art.win-art{height:230px; padding:12px; align-items:stretch; justify-content:stretch; background:none; border-color:var(--line)}
 .win{width:100%; height:100%; border:1px solid var(--line-hi); border-radius:11px; background:color-mix(in srgb,var(--panel) 84%,transparent); overflow:hidden; display:flex; flex-direction:column; position:relative}
@@ -615,6 +714,177 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     </div>
     <div class="scroll-cue" aria-hidden="true"><span>SCROLL</span><span class="bar"></span></div>
   </section>
+
+  <!-- LEGAL DEMO -->
+  <section id="legal-demo">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow" data-i18n="legal.eyebrow">SEE IT WORK</span>
+        <h2 data-i18n="legal.title">A real closing, end to end.</h2>
+        <p class="lead muted" data-i18n="legal.lead">Watch Flow handle a live legal / real-estate workflow — locally, on your device.</p>
+      </div>
+      <div class="legal-demo-preview reveal" data-d="2">
+        <div class="ld-mock" aria-hidden="true">
+          <div class="ld-win">
+            <div class="ld-win-bar"><span class="wd"></span><span class="wd"></span><span class="wd"></span><span class="ld-win-title" data-i18n="legal.inbox.title">Inbox — Project Ironwood</span></div>
+            <div class="ld-win-body">
+              <div class="ld-inbox-row hi">
+                <span class="av"></span>
+                <div class="lines">
+                  <div class="ld-sender ltr" data-i18n="legal.sender">Escrow-Agent@title-co.com</div>
+                  <div class="ld-subject" data-i18n="legal.subject1">Project Ironwood – Tax Clearance Certificate &amp; Verified Ledger</div>
+                </div>
+              </div>
+              <div class="ld-inbox-row"><span class="av"></span><div class="lines"><div class="l1"></div><div class="l2"></div></div></div>
+              <div class="ld-inbox-row"><span class="av"></span><div class="lines"><div class="l1"></div><div class="l2"></div></div></div>
+            </div>
+          </div>
+        </div>
+        <button class="ld-play" id="ldPlay" type="button" aria-label="Play the demo" data-i18n-aria="legal.play"><span class="tri" aria-hidden="true"></span></button>
+        <div class="ld-caption-row">
+          <span class="ld-tag" data-i18n="legal.tag">Real-Estate Post-Tax Verification</span>
+          <span class="ld-runtime" data-i18n="legal.runtime">~1 min · 6 steps</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ld-modal" id="legalDemoModal" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="ldStepTag" data-scenario="legal">
+    <div class="ld-backdrop" data-ld-close></div>
+    <div class="ld-panel" role="document">
+      <button class="icon-btn ld-close" id="ldClose" type="button" aria-label="Close demo" data-i18n-aria="legal.close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div class="ld-progress" id="ldProgress"></div>
+      <div class="ld-stage" id="ldStage">
+
+        <div class="ld-step" data-step="1" data-scenario="legal">
+          <div class="ld-step-head"><span class="ld-step-tag" id="ldStepTag" data-i18n="legal.step1.tag">Step 1 of 6 · Autonomous Trigger</span><span class="ld-pill zero" data-i18n="legal.pill.zero">0 clicks</span></div>
+          <div class="ld-win" aria-hidden="true">
+            <div class="ld-win-bar"><span class="wd"></span><span class="wd"></span><span class="wd"></span><span class="ld-win-title" data-i18n="legal.inbox.title">Inbox — Project Ironwood</span></div>
+            <div class="ld-win-body">
+              <div class="ld-inbox-row hi">
+                <span class="av"></span>
+                <div class="lines">
+                  <div class="ld-sender ltr" data-i18n="legal.sender">Escrow-Agent@title-co.com</div>
+                  <div class="ld-subject" data-i18n="legal.subject1">Project Ironwood – Tax Clearance Certificate &amp; Verified Ledger</div>
+                  <div class="ld-attach-chip ltr" data-i18n="legal.attach1">📎 Tax_Clearance_Receipt_3049.pdf</div>
+                  <div class="ld-scan-badge">
+                    <span class="a" data-i18n="legal.scan.a">⟳ Reading via on-device OCR…</span>
+                    <span class="b" data-i18n="legal.scan.b">✓ Matched to Project Ironwood by parcel ID</span>
+                  </div>
+                </div>
+              </div>
+              <div class="ld-inbox-row"><span class="av"></span><div class="lines"><div class="l1"></div><div class="l2"></div></div></div>
+              <div class="ld-inbox-row"><span class="av"></span><div class="lines"><div class="l1"></div><div class="l2"></div></div></div>
+            </div>
+          </div>
+          <p class="ld-body" data-i18n="legal.step1.body">Flow runs locally in the background. It automatically detects the incoming PDF, reads its contents via secure local OCR, and matches it to the active transaction file — no upload, no cloud round-trip.</p>
+          <div class="ld-rail"><i id="ldRail1"></i></div>
+          <div class="ld-rail-label" data-i18n="legal.autoadvance">Auto-advancing…</div>
+        </div>
+
+        <div class="ld-step" data-step="2" data-scenario="legal">
+          <div class="ld-step-head"><span class="ld-step-tag" data-i18n="legal.step2.tag">Step 2 of 6 · Human-in-the-Loop · Milestone 1</span><span class="ld-pill turn" data-i18n="legal.pill.turn">Your turn</span></div>
+          <div class="ld-approve">
+            <div class="ld-glyph"><span aria-hidden="true">⬢</span> Flow</div>
+            <p class="ld-body" style="margin-top:0" data-i18n="legal.step2.body">Flow detected a new Tax Clearance PDF for active matter: <b>Project Ironwood</b>. Amount extracted: <span class="ld-amt">$42,500</span>. This matches the pending escrow estimate perfectly.<br>Do you want to verify and file this document?</p>
+            <button class="doit sm" id="ldApprove1" type="button"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.step2.btn">Approve &amp; File</span></button>
+          </div>
+        </div>
+
+        <div class="ld-step" data-step="3" data-scenario="legal">
+          <div class="ld-step-head"><span class="ld-step-tag" data-i18n="legal.step3.tag">Step 3 of 6 · Substantive Professional Analysis</span><span class="ld-pill zero" data-i18n="legal.pill.zero">0 clicks</span></div>
+          <div class="ld-doc-split">
+            <div class="ld-win" aria-hidden="true">
+              <div class="ld-win-bar"><span class="wd"></span><span class="wd"></span><span class="wd"></span><span class="ld-win-title ltr" data-i18n="legal.doc1.title">Transfer_Deed_Form.docx</span></div>
+              <div class="ld-win-body">
+                <div class="ld-doc-row"><span class="k" data-i18n="legal.doc1.k1">Grantor</span><span class="v ltr" data-i18n="legal.doc1.v1">Ironwood Holdings LLC</span></div>
+                <div class="ld-doc-row"><span class="k" data-i18n="legal.doc1.k2">Parcel ID</span><span class="v ltr" data-i18n="legal.doc1.v2">04-2291-017</span></div>
+                <div class="ld-doc-row ld-fadeup" style="animation-delay:.4s"><span class="k" data-i18n="legal.doc1.k3">Tax Receipt</span><span class="v new ltr" data-i18n="legal.doc1.v3">#3049</span></div>
+                <div class="ld-doc-row ld-fadeup" style="animation-delay:.7s"><span class="k" data-i18n="legal.doc1.k4">Execution Date</span><span class="v new ltr" id="ldExecDate"></span></div>
+              </div>
+            </div>
+            <div class="ld-win" aria-hidden="true">
+              <div class="ld-win-bar"><span class="wd"></span><span class="wd"></span><span class="wd"></span><span class="ld-win-title ltr" data-i18n="legal.doc2.title">Closing_Statement.xlsx</span></div>
+              <div class="ld-win-body">
+                <div class="ld-doc-row"><span class="k" data-i18n="legal.doc2.k1">Title Fees</span><span class="v ltr" data-i18n="legal.doc2.v1">$3,200</span></div>
+                <div class="ld-doc-row ld-fadeup" style="animation-delay:.5s"><span class="k" data-i18n="legal.doc2.k2">Tax</span><span class="v"><span class="v old ltr" data-i18n="legal.doc2.v2old">Estimated</span><span class="v new ltr" data-i18n="legal.doc2.v2new">Paid</span></span></div>
+                <div class="ld-doc-row ld-fadeup" style="animation-delay:1s"><span class="k" data-i18n="legal.doc2.k3">Cash to Close</span><span class="v new ltr" id="ldCashTick">$—</span></div>
+              </div>
+            </div>
+          </div>
+          <p class="ld-body" data-i18n="legal.step3.body">Flow updates the local draft Deed and recalculates the Closing Statement automatically — same engine, zero manual entry.</p>
+          <div class="ld-rail"><i id="ldRail3"></i></div>
+          <div class="ld-rail-label" data-i18n="legal.autoadvance">Auto-advancing…</div>
+        </div>
+
+        <div class="ld-step" data-step="4" data-scenario="legal">
+          <div class="ld-step-head"><span class="ld-step-tag" data-i18n="legal.step4.tag">Step 4 of 6 · Human-in-the-Loop · Milestone 2</span><span class="ld-pill turn" data-i18n="legal.pill.turn">Your turn</span></div>
+          <div class="ld-approve">
+            <div class="ld-glyph"><span aria-hidden="true">⬢</span> Flow</div>
+            <p class="ld-body" style="margin-top:0" data-i18n="legal.step4.intro">Flow has finalized the closing updates. Review professional output:</p>
+            <ul class="ld-checklist">
+              <li><span class="ld-ck">✓</span><span data-i18n="legal.step4.item1">Legal Transfer Deed updated with Tax Receipt <b>#3049</b></span></li>
+              <li><span class="ld-ck">✓</span><span data-i18n="legal.step4.item2">Closing Statement recalculated — new <b>Cash to Close</b> is <span class="ld-amt">$1,240,500</span></span></li>
+            </ul>
+            <p class="ld-body" style="margin-top:0" data-i18n="legal.step4.question">Do you approve these updates and wish to prepare the client notification?</p>
+            <button class="doit sm" id="ldApprove2" type="button"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.step4.btn">Approve Updates</span></button>
+          </div>
+        </div>
+
+        <div class="ld-step" data-step="5" data-scenario="legal">
+          <div class="ld-step-head"><span class="ld-step-tag" data-i18n="legal.step5.tag">Step 5 of 6 · Final Closure · Communication Readiness</span><span class="ld-pill zero" data-i18n="legal.pill.zero">0 clicks</span></div>
+          <div class="ld-win" aria-hidden="true">
+            <div class="ld-win-bar"><span class="wd"></span><span class="wd"></span><span class="wd"></span><span class="ld-win-title" data-i18n="legal.mail.title">New Message</span></div>
+            <div class="ld-win-body">
+              <div class="ld-mail-field"><span class="k" data-i18n="legal.mail.to">To</span><span class="v ltr" data-i18n="legal.mail.toaddr">client-counsel@global-equity.com</span></div>
+              <div class="ld-mail-field"><span class="k" data-i18n="legal.mail.subjectk">Subject</span><span class="v" data-i18n="legal.mail.subject">Project Ironwood — Closing Package Ready</span></div>
+              <p class="ld-mail-body" data-i18n="legal.mail.body">Dear Sarah, please find attached the verified Tax Clearance Certificate and updated Closing Statement for Project Ironwood. All pre-closing financial conditions on our end have now been met. Final Cash to Close is confirmed at $1,240,500. We are ready to schedule the closing call.
+
+Best,
+[Partner Name]</p>
+              <div class="ld-mail-attach">
+                <span class="ld-attach-chip ltr" data-i18n="legal.attach1">📎 Tax_Clearance_Receipt_3049.pdf</span>
+                <span class="ld-attach-chip ltr" data-i18n="legal.attach2">📎 Closing_Statement_Ironwood.xlsx</span>
+              </div>
+            </div>
+          </div>
+          <p class="ld-body" data-i18n="legal.step5.body">Flow drafts the closing email automatically — subject, body, and attachments assembled from the matter file.</p>
+          <div class="ld-rail"><i id="ldRail5"></i></div>
+          <div class="ld-rail-label" data-i18n="legal.autoadvance">Auto-advancing…</div>
+        </div>
+
+        <div class="ld-step" data-step="6" data-scenario="legal">
+          <div class="ld-step-head"><span class="ld-step-tag" data-i18n="legal.step6.tag">Step 6 of 6 · Human-in-the-Loop · The Dispatch</span><span class="ld-pill turn" data-i18n="legal.pill.turn">Your turn</span></div>
+          <div class="ld-win" aria-hidden="true">
+            <div class="ld-win-bar"><span class="wd"></span><span class="wd"></span><span class="wd"></span><span class="ld-win-title" data-i18n="legal.mail.title">New Message</span></div>
+            <div class="ld-win-body">
+              <div class="ld-mail-field"><span class="k" data-i18n="legal.mail.to">To</span><span class="v ltr" data-i18n="legal.mail.toaddr">client-counsel@global-equity.com</span></div>
+              <div class="ld-mail-field"><span class="k" data-i18n="legal.mail.subjectk">Subject</span><span class="v" data-i18n="legal.mail.subject">Project Ironwood — Closing Package Ready</span></div>
+              <p class="ld-mail-body" data-i18n="legal.mail.body">Dear Sarah, please find attached the verified Tax Clearance Certificate and updated Closing Statement for Project Ironwood. All pre-closing financial conditions on our end have now been met. Final Cash to Close is confirmed at $1,240,500. We are ready to schedule the closing call.
+
+Best,
+[Partner Name]</p>
+            </div>
+          </div>
+          <div class="ld-tooltip"><span aria-hidden="true">💬</span> <span data-i18n="legal.step6.tooltip">Closing package generated. Ready for final dispatch.</span></div><br>
+          <button class="doit sm" id="ldSend" type="button" style="margin-top:14px"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.step6.btn">Send Email</span></button>
+        </div>
+
+        <div class="ld-step" data-step="end" data-scenario="legal">
+          <div class="ld-end-check">✓</div>
+          <div class="ld-end-lines">
+            <p class="headline" data-i18n="legal.end.line1">3 clicks for full compliance. 0 clicks for manual data entry.</p>
+            <p data-i18n="legal.end.line2">Deed updated. Ledger recalculated. Client package dispatched.</p>
+            <p class="final" data-i18n="legal.end.line3">And your firm's multi-million dollar transaction data? It never left your local machine.</p>
+          </div>
+          <span class="magnetic"><button class="doit" id="ldCta" type="button" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.end.cta">Get the Automation Guide &amp; Join Waitlist</span></button></span>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- CHALLENGE -->
   <section id="challenge">
@@ -1003,7 +1273,67 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     'foot.features':{en:'Features',he:'יכולות'},
     'foot.copy':{en:'© %Y% Flow — Cognitive Workflow Engine. All rights reserved.',he:'© %Y% Flow — מנוע תהליכי עבודה קוגניטיבי. כל הזכויות שמורות.'},
     'a11y.skip':{en:'Skip to content',he:'דלג לתוכן'},
-    'integ.title':{en:'Works within your existing stack — no API keys, no configuration',he:'עובד בתוך הסטאק הקיים שלכם — בלי מפתחות API, בלי הגדרות'}
+    'integ.title':{en:'Works within your existing stack — no API keys, no configuration',he:'עובד בתוך הסטאק הקיים שלכם — בלי מפתחות API, בלי הגדרות'},
+    'legal.eyebrow':{en:'SEE IT WORK',he:'SEE IT WORK'},
+    'legal.title':{en:'A real closing, end to end.',he:'סגירת עסקה אמיתית, מקצה לקצה.'},
+    'legal.lead':{en:'Watch Flow handle a live legal / real-estate workflow — locally, on your device.',he:'צפו כיצד Flow מנהל תהליך עבודה משפטי-נדל״ני אמיתי — מקומית, על המכשיר שלכם.'},
+    'legal.tag':{en:'Real-Estate Post-Tax Verification',he:'אימות מס לאחר עסקה — נדל״ן'},
+    'legal.runtime':{en:'~1 min · 6 steps',he:'כ-1 דקה · 6 שלבים'},
+    'legal.play':{en:'Play the demo',he:'הפעל את הדמו'},
+    'legal.close':{en:'Close demo',he:'סגור את הדמו'},
+    'legal.inbox.title':{en:'Inbox — Project Ironwood',he:'תיבת דואר — פרויקט Ironwood'},
+    'legal.sender':{en:'Escrow-Agent@title-co.com',he:'Escrow-Agent@title-co.com'},
+    'legal.subject1':{en:'Project Ironwood – Tax Clearance Certificate &amp; Verified Ledger',he:'פרויקט Ironwood – תעודת פטור ממס וספר חשבונות מאומת'},
+    'legal.attach1':{en:'📎 Tax_Clearance_Receipt_3049.pdf',he:'📎 Tax_Clearance_Receipt_3049.pdf'},
+    'legal.attach2':{en:'📎 Closing_Statement_Ironwood.xlsx',he:'📎 Closing_Statement_Ironwood.xlsx'},
+    'legal.scan.a':{en:'⟳ Reading via on-device OCR…',he:'⟳ קורא באמצעות OCR מקומי…'},
+    'legal.scan.b':{en:'✓ Matched to Project Ironwood by parcel ID',he:'✓ הותאם לפרויקט Ironwood לפי מספר חלקה'},
+    'legal.autoadvance':{en:'Auto-advancing…',he:'ממשיך אוטומטית…'},
+    'legal.pill.zero':{en:'0 clicks',he:'0 קליקים'},
+    'legal.pill.turn':{en:'Your turn',he:'תורכם'},
+    'legal.step1.tag':{en:'Step 1 of 6 · Autonomous Trigger',he:'שלב 1 מתוך 6 · הפעלה אוטונומית'},
+    'legal.step1.body':{en:'Flow runs locally in the background. It automatically detects the incoming PDF, reads its contents via secure local OCR, and matches it to the active transaction file — no upload, no cloud round-trip.',he:'Flow רץ ברקע, מקומית. הוא מזהה אוטומטית את קובץ ה-PDF הנכנס, קורא את תוכנו באמצעות OCR מקומי ומאובטח, ומתאים אותו לתיק העסקה הפעיל — בלי העלאה, בלי מעבר דרך הענן.'},
+    'legal.step2.tag':{en:'Step 2 of 6 · Human-in-the-Loop · Milestone 1',he:'שלב 2 מתוך 6 · אדם בלולאה · אבן דרך 1'},
+    'legal.step2.body':{en:'Flow detected a new Tax Clearance PDF for active matter: <b>Project Ironwood</b>. Amount extracted: <span class="ld-amt">$42,500</span>. This matches the pending escrow estimate perfectly.<br>Do you want to verify and file this document?',he:'Flow זיהה קובץ PDF חדש של אישור פטור ממס עבור התיק הפעיל: <b>Project Ironwood</b>. הסכום שחולץ: <span class="ld-amt">$42,500</span>. הסכום תואם במדויק להערכת הנאמנות (escrow) הממתינה.<br>האם ברצונכם לאמת ולתייק את המסמך?'},
+    'legal.step2.btn':{en:'Approve &amp; File',he:'אשר ותייק'},
+    'legal.step3.tag':{en:'Step 3 of 6 · Substantive Professional Analysis',he:'שלב 3 מתוך 6 · ניתוח מקצועי מהותי'},
+    'legal.step3.body':{en:'Flow updates the local draft Deed and recalculates the Closing Statement automatically — same engine, zero manual entry.',he:'Flow מעדכן אוטומטית את טיוטת שטר ההעברה המקומית ומחשב מחדש את דוח הסגירה — אותו מנוע, אפס הזנה ידנית.'},
+    'legal.doc1.title':{en:'Transfer_Deed_Form.docx',he:'Transfer_Deed_Form.docx'},
+    'legal.doc1.k1':{en:'Grantor',he:'מעביר הזכות'},
+    'legal.doc1.v1':{en:'Ironwood Holdings LLC',he:'Ironwood Holdings LLC'},
+    'legal.doc1.k2':{en:'Parcel ID',he:'מספר חלקה'},
+    'legal.doc1.v2':{en:'04-2291-017',he:'04-2291-017'},
+    'legal.doc1.k3':{en:'Tax Receipt',he:'קבלת מס'},
+    'legal.doc1.v3':{en:'#3049',he:'#3049'},
+    'legal.doc1.k4':{en:'Execution Date',he:'תאריך חתימה'},
+    'legal.doc2.title':{en:'Closing_Statement.xlsx',he:'Closing_Statement.xlsx'},
+    'legal.doc2.k1':{en:'Title Fees',he:'עמלות רישום'},
+    'legal.doc2.v1':{en:'$3,200',he:'$3,200'},
+    'legal.doc2.k2':{en:'Tax',he:'מס'},
+    'legal.doc2.v2old':{en:'Estimated',he:'הערכה'},
+    'legal.doc2.v2new':{en:'Paid',he:'שולם'},
+    'legal.doc2.k3':{en:'Cash to Close',he:'מזומן לסגירה'},
+    'legal.step4.tag':{en:'Step 4 of 6 · Human-in-the-Loop · Milestone 2',he:'שלב 4 מתוך 6 · אדם בלולאה · אבן דרך 2'},
+    'legal.step4.intro':{en:'Flow has finalized the closing updates. Review professional output:',he:'Flow סיים לעדכן את מסמכי הסגירה. סקרו את הפלט המקצועי:'},
+    'legal.step4.item1':{en:'Legal Transfer Deed updated with Tax Receipt <b>#3049</b>',he:'שטר ההעברה המשפטי עודכן עם קבלת מס <b>#3049</b>'},
+    'legal.step4.item2':{en:'Closing Statement recalculated — new <b>Cash to Close</b> is <span class="ld-amt">$1,240,500</span>',he:'דוח הסגירה חושב מחדש — <b>המזומן לסגירה</b> החדש הוא <span class="ld-amt">$1,240,500</span>'},
+    'legal.step4.question':{en:'Do you approve these updates and wish to prepare the client notification?',he:'האם אתם מאשרים את העדכונים ומעוניינים להכין את הודעת הלקוח?'},
+    'legal.step4.btn':{en:'Approve Updates',he:'אשר עדכונים'},
+    'legal.step5.tag':{en:'Step 5 of 6 · Final Closure · Communication Readiness',he:'שלב 5 מתוך 6 · סגירה סופית · מוכנות לתקשורת'},
+    'legal.mail.title':{en:'New Message',he:'הודעה חדשה'},
+    'legal.mail.to':{en:'To',he:'אל'},
+    'legal.mail.toaddr':{en:'client-counsel@global-equity.com',he:'client-counsel@global-equity.com'},
+    'legal.mail.subjectk':{en:'Subject',he:'נושא'},
+    'legal.mail.subject':{en:'Project Ironwood — Closing Package Ready',he:'פרויקט Ironwood — חבילת הסגירה מוכנה'},
+    'legal.mail.body':{en:'Dear Sarah, please find attached the verified Tax Clearance Certificate and updated Closing Statement for Project Ironwood. All pre-closing financial conditions on our end have now been met. Final Cash to Close is confirmed at $1,240,500. We are ready to schedule the closing call.\n\nBest,\n[Partner Name]',he:'שרה יקרה, מצורפים אישור הפטור ממס המאומת ודוח הסגירה המעודכן עבור פרויקט Ironwood. כל התנאים הפיננסיים מצדנו לקראת הסגירה מולאו כעת. המזומן הסופי לסגירה אושר על סך $1,240,500. אנו מוכנים לתאם את שיחת הסגירה.\n\nבברכה,\n[שם השותף]'},
+    'legal.step5.body':{en:'Flow drafts the closing email automatically — subject, body, and attachments assembled from the matter file.',he:'Flow מנסח את מייל הסגירה אוטומטית — נושא, גוף ההודעה וקבצים מצורפים, הכל מורכב מתיק העסקה.'},
+    'legal.step6.tag':{en:'Step 6 of 6 · Human-in-the-Loop · The Dispatch',he:'שלב 6 מתוך 6 · אדם בלולאה · המשלוח'},
+    'legal.step6.tooltip':{en:'Closing package generated. Ready for final dispatch.',he:'חבילת הסגירה הופקה. מוכנה למשלוח סופי.'},
+    'legal.step6.btn':{en:'Send Email',he:'שלח מייל'},
+    'legal.end.line1':{en:'3 clicks for full compliance. 0 clicks for manual data entry.',he:'3 קליקים לעמידה מלאה ברגולציה. 0 קליקים להזנת נתונים ידנית.'},
+    'legal.end.line2':{en:'Deed updated. Ledger recalculated. Client package dispatched.',he:'שטר ההעברה עודכן. הספר חושב מחדש. חבילת הלקוח נשלחה.'},
+    'legal.end.line3':{en:"And your firm's multi-million dollar transaction data? It never left your local machine.",he:'ונתוני העסקה רבת מיליוני הדולרים של המשרד שלכם? הם מעולם לא עזבו את המכשיר המקומי שלכם.'},
+    'legal.end.cta':{en:'Get the Automation Guide &amp; Join Waitlist',he:'קבלו את מדריך האוטומציה והצטרפו לרשימת ההמתנה'}
   };
   var YEAR=new Date().getFullYear();
   var curLang=root.getAttribute('lang')||'en';
@@ -1017,6 +1347,9 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     });
     document.querySelectorAll('[data-i18n-ph]').forEach(function(el){
       var k=el.getAttribute('data-i18n-ph'); if(I18N[k]) el.setAttribute('placeholder',I18N[k][lang]);
+    });
+    document.querySelectorAll('[data-i18n-aria]').forEach(function(el){
+      var k=el.getAttribute('data-i18n-aria'); if(I18N[k]) el.setAttribute('aria-label',I18N[k][lang]);
     });
     document.getElementById('langLabel').textContent = lang==='he' ? 'EN' : 'עב';
     var lb=document.getElementById('langBtn'); lb.setAttribute('aria-pressed', lang==='he'?'true':'false'); lb.setAttribute('aria-label', lang==='he'?'עבור לאנגלית':'Switch to Hebrew');
@@ -1520,6 +1853,107 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
     layout();
     addEventListener('resize', layout);
     if(!rm){ timer=setInterval(function(){ if(!hovered && !focused) goTo(active+1); }, 4200); }
+  })();
+
+  /* ---------- legal demo modal: 6-step state machine ---------- */
+  (function(){
+    var modal=document.getElementById('legalDemoModal'), stage=document.getElementById('ldStage'), progress=document.getElementById('ldProgress');
+    var playBtn=document.getElementById('ldPlay'), closeBtn=document.getElementById('ldClose'), backdrop=modal ? modal.querySelector('[data-ld-close]') : null;
+    if(!modal || !playBtn) return;
+    var steps=Array.prototype.slice.call(stage.querySelectorAll('.ld-step'));
+    var order=['1','2','3','4','5','6','end'];
+    var AUTO={'1':2600,'3':3400,'5':2600};
+    var cur=0, timer=null, lastFocus=null;
+
+    for(var i=0;i<6;i++){
+      var d=document.createElement('span'); d.className='ld-dot';
+      progress.appendChild(d);
+    }
+    var dots=Array.prototype.slice.call(progress.querySelectorAll('.ld-dot'));
+
+    function updateDots(idx){
+      dots.forEach(function(d,k){ d.classList.toggle('active', k===idx); d.classList.toggle('done', k<idx); });
+      progress.style.display = order[idx]==='end' ? 'none' : 'flex';
+    }
+
+    function tickCash(el, target){
+      if(!el) return;
+      if(rm){ el.textContent='$'+target.toLocaleString(); return; }
+      var dur=900, t0=null;
+      function frame(ts){
+        if(!t0) t0=ts;
+        var p=Math.min(1,(ts-t0)/dur);
+        var val=Math.round(target*(1-Math.pow(1-p,3)));
+        el.textContent='$'+val.toLocaleString();
+        if(p<1) requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    }
+
+    function show(idx){
+      clearTimeout(timer);
+      var key=order[idx];
+      steps.forEach(function(s){ s.classList.toggle('active', s.getAttribute('data-step')===key); });
+      updateDots(idx);
+
+      if(key==='3'){
+        var execEl=document.getElementById('ldExecDate');
+        if(execEl){ execEl.textContent=new Date().toLocaleDateString(curLang==='he' ? 'he-IL' : 'en-US',{year:'numeric',month:'short',day:'numeric'}); }
+        tickCash(document.getElementById('ldCashTick'), 1240500);
+      }
+
+      var ms=AUTO[key];
+      if(ms){
+        var rail=document.getElementById('ldRail'+key);
+        if(rail){ rail.style.animation='none'; void rail.offsetWidth; rail.style.animation='ldRailFill '+ms+'ms linear forwards'; }
+        timer=setTimeout(advance, rm ? Math.min(ms,600) : ms);
+      }
+    }
+
+    function advance(){ if(cur<order.length-1){ cur++; show(cur); } }
+
+    function open(){
+      lastFocus=document.activeElement;
+      cur=0; modal.hidden=false; modal.setAttribute('aria-hidden','false');
+      requestAnimationFrame(function(){ modal.classList.add('open'); show(0); });
+      document.body.style.overflow='hidden';
+      closeBtn.focus();
+    }
+    function close(){
+      clearTimeout(timer);
+      modal.classList.remove('open');
+      modal.setAttribute('aria-hidden','true');
+      document.body.style.overflow='';
+      setTimeout(function(){ modal.hidden=true; },300);
+      if(lastFocus) lastFocus.focus();
+    }
+
+    playBtn.addEventListener('click', open);
+    closeBtn.addEventListener('click', close);
+    if(backdrop) backdrop.addEventListener('click', close);
+    document.addEventListener('keydown', function(e){
+      if(e.key==='Escape' && !modal.hidden) close();
+      if(e.key==='Tab' && !modal.hidden){
+        var f=modal.querySelectorAll('button, [href], input, [tabindex]:not([tabindex="-1"])');
+        if(!f.length) return;
+        var first=f[0], last=f[f.length-1];
+        if(e.shiftKey && document.activeElement===first){ e.preventDefault(); last.focus(); }
+        else if(!e.shiftKey && document.activeElement===last){ e.preventDefault(); first.focus(); }
+      }
+    });
+
+    var b1=document.getElementById('ldApprove1'), b2=document.getElementById('ldApprove2'), b3=document.getElementById('ldSend'), cta=document.getElementById('ldCta');
+    if(b1) b1.addEventListener('click', advance);
+    if(b2) b2.addEventListener('click', advance);
+    if(b3) b3.addEventListener('click', advance);
+    if(cta) cta.addEventListener('click', function(){
+      close();
+      if(!rm){ setTimeout(function(){ var em=document.getElementById('waitEmail'); if(em) em.focus({preventScroll:true}); }, 500); }
+    });
+
+    var railStyle=document.createElement('style');
+    railStyle.textContent='@keyframes ldRailFill{from{width:0%}to{width:100%}}';
+    document.head.appendChild(railStyle);
   })();
 
   /* init */
