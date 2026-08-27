@@ -1,8 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FROM = 'Flow <hello@the-flow-ai.com>';
+const LOG_PREFIX = '[send-playbook]';
 
 const SUBJECT = {
   en: 'Your Hybrid Automation Playbook',
@@ -31,7 +33,18 @@ function htmlBody(lang) {
 }
 
 exports.handler = async function (event) {
+  var reqId = crypto.randomBytes(4).toString('hex');
+  var log = function (msg, extra) {
+    console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : '');
+  };
+  var logErr = function (msg, extra) {
+    console.error(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : '');
+  };
+
+  log('invoked', { method: event.httpMethod });
+
   if (event.httpMethod !== 'POST') {
+    logErr('rejected: wrong method');
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
@@ -39,6 +52,7 @@ exports.handler = async function (event) {
   try {
     payload = JSON.parse(event.body || '{}');
   } catch (err) {
+    logErr('rejected: invalid JSON body', String(err));
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) };
   }
 
@@ -47,29 +61,35 @@ exports.handler = async function (event) {
   var honey = String(payload.company || '').trim();
 
   if (honey) {
-    // honeypot tripped — respond as if successful, but do nothing
+    log('honeypot tripped — silently accepting, not sending');
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   }
   if (!EMAIL_RE.test(email)) {
+    logErr('rejected: invalid email', email);
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid email' }) };
   }
 
+  log('validated request', { email: email, lang: lang, from: FROM });
+
   var apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.error('RESEND_API_KEY is not set');
+    logErr('RESEND_API_KEY is not set in this environment — add it in Netlify > Site configuration > Environment variables');
     return { statusCode: 500, body: JSON.stringify({ error: 'Email service not configured' }) };
   }
+  log('RESEND_API_KEY present', { length: apiKey.length });
 
   var pdfBase64;
   try {
     var pdfPath = path.join(__dirname, 'hybrid-automation-playbook.pdf');
     pdfBase64 = fs.readFileSync(pdfPath).toString('base64');
+    log('PDF attachment loaded', { bytes: Math.round((pdfBase64.length * 3) / 4) });
   } catch (err) {
-    console.error('Failed to read Playbook PDF', err);
+    logErr('failed to read Playbook PDF from function bundle', String(err));
     return { statusCode: 500, body: JSON.stringify({ error: 'Attachment unavailable' }) };
   }
 
   try {
+    log('calling Resend API', { to: email, from: FROM, subject: SUBJECT[lang] });
     var res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -90,15 +110,22 @@ exports.handler = async function (event) {
       }),
     });
 
+    var resText = await res.text();
+
     if (!res.ok) {
-      var errText = await res.text();
-      console.error('Resend API error', res.status, errText);
-      return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send email' }) };
+      // Common causes surfaced here: unverified sending domain, invalid/revoked
+      // API key, or a "from" address on a domain not verified in Resend.
+      logErr('Resend API rejected the send — check the "from" domain is verified in Resend', {
+        status: res.status,
+        response: resText,
+      });
+      return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send email', detail: resText }) };
     }
 
+    log('Resend accepted the send', { status: res.status, response: resText });
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (err) {
-    console.error('Resend request failed', err);
+    logErr('network/request error calling Resend', String(err));
     return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send email' }) };
   }
 };
