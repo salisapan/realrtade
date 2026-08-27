@@ -1586,6 +1586,8 @@ Best,
     fetch(SB_URL+'/rest/v1/waitlist',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({email:v,lang:curLang,source:'flow-landing',created_at:new Date().toISOString()})})
       .then(function(r){ done(); })      // table live → stored server-side
       .catch(function(){ done(); });     // offline / CSP / no table → localStorage keeps the signup
+    // fire-and-forget: emails the Playbook PDF via the Netlify function; never blocks or affects the signup UI above
+    fetch('/.netlify/functions/send-playbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v,lang:curLang})}).catch(function(){});
   });
 
   /* ---------- ambient particle network (theme-aware) ---------- */
