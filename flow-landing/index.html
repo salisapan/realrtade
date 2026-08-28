@@ -1138,6 +1138,7 @@ Best,
             <form class="wait-enrich-form" id="waitEnrichForm" novalidate>
               <input type="text" id="waitOrg" name="org" autocomplete="organization" data-i18n-ph="wl.enrich.company" placeholder="Company">
               <input type="text" id="waitRole" name="role" autocomplete="organization-title" data-i18n-ph="wl.enrich.role" placeholder="Role">
+              <input type="url" id="waitWebsite" name="website" autocomplete="url" inputmode="url" class="ltr" data-i18n-ph="wl.enrich.website" placeholder="Company website">
               <span class="magnetic"><button class="doit sm" type="submit" id="waitEnrichBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="wl.enrich.btn">Send</span></button></span>
             </form>
             <div class="wait-enrich-done" id="waitEnrichDone" data-i18n="wl.enrich.thanks">Thanks, that helps us tailor your demo.</div>
@@ -1293,6 +1294,7 @@ Best,
     'wl.enrich.note':{en:'Optional — helps us tailor your demo.',he:'אופציונלי — עוזר לנו להתאים לכם את הדמו.'},
     'wl.enrich.company':{en:'Company',he:'שם החברה'},
     'wl.enrich.role':{en:'Role',he:'תפקיד'},
+    'wl.enrich.website':{en:'Company website',he:'אתר החברה'},
     'wl.enrich.btn':{en:'Send',he:'שלח'},
     'wl.enrich.thanks':{en:'Thanks, that helps us tailor your demo.',he:'תודה, זה עוזר לנו להתאים לכם את הדמו.'},
     'foot.features':{en:'Features',he:'יכולות'},
@@ -1616,16 +1618,16 @@ Best,
   });
 
   /* ---------- optional post-signup enrichment: company + role ---------- */
-  var enrichForm=document.getElementById('waitEnrichForm'), enrichWrap=document.getElementById('waitEnrich'), orgInput=document.getElementById('waitOrg'), roleInput=document.getElementById('waitRole'), enrichBtn=document.getElementById('waitEnrichBtn');
+  var enrichForm=document.getElementById('waitEnrichForm'), enrichWrap=document.getElementById('waitEnrich'), orgInput=document.getElementById('waitOrg'), roleInput=document.getElementById('waitRole'), websiteInput=document.getElementById('waitWebsite'), enrichBtn=document.getElementById('waitEnrichBtn');
   if(enrichForm){
     enrichForm.addEventListener('submit',function(ev){
       ev.preventDefault();
-      var org=(orgInput.value||'').trim(), role=(roleInput.value||'').trim();
-      if(!org && !role){ return; }
+      var org=(orgInput.value||'').trim(), role=(roleInput.value||'').trim(), website=(websiteInput.value||'').trim();
+      if(!org && !role && !website){ return; }
       var v=(email.value||'').trim();
       if(!v || !EMAIL_RE.test(v)){ enrichWrap.classList.add('sent'); return; }
       enrichBtn.disabled=true;
-      fetch(SB_URL+'/rest/v1/waitlist?email=eq.'+encodeURIComponent(v),{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({company:org,role:role})})
+      fetch(SB_URL+'/rest/v1/waitlist?email=eq.'+encodeURIComponent(v),{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({company:org,role:role,website:website})})
         .then(function(){ enrichWrap.classList.add('sent'); })
         .catch(function(){ enrichWrap.classList.add('sent'); });
     });
