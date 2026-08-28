@@ -636,6 +636,17 @@ canvas.terrain-canvas.show{opacity:1}
 .wait-wrap.done .wait-form{display:none}
 .wait-wrap.done .success-mark{display:inline-flex}
 
+.wait-enrich{display:none; flex-direction:column; align-items:center; gap:10px; margin-top:2px; width:100%; max-width:460px}
+.wait-wrap.done .wait-enrich{display:flex}
+.wait-enrich-note{font-size:.86rem; color:var(--muted); margin:0; text-align:center}
+.wait-enrich-form{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center; width:100%}
+.wait-enrich-form input{flex:1 1 150px; padding:12px 16px; border-radius:999px; border:1px solid var(--line-hi); background:color-mix(in srgb,var(--panel) 70%, transparent); color:var(--txt-hi); font-family:var(--body); font-size:.92rem; transition:border-color .3s, box-shadow .3s}
+.wait-enrich-form input::placeholder{color:var(--muted)}
+.wait-enrich-form input:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--glow)}
+.wait-enrich.sent .wait-enrich-form{display:none}
+.wait-enrich-done{display:none; font-size:.88rem; color:var(--accent-2)}
+.wait-enrich.sent .wait-enrich-done{display:block}
+
 /* footer */
 footer{border-block-start:1px solid var(--line); padding-block:52px; position:relative; z-index:2}
 .foot-in{display:flex; flex-wrap:wrap; gap:24px; align-items:center; justify-content:space-between}
@@ -1122,6 +1133,15 @@ Best,
           </form>
           <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">You're on the list. We'll be in touch.</span></div>
           <div class="wait-msg" id="waitMsg" role="status" aria-live="polite"></div>
+          <div class="wait-enrich" id="waitEnrich">
+            <p class="wait-enrich-note" data-i18n="wl.enrich.note">Optional — 30 seconds, so we can tailor your demo.</p>
+            <form class="wait-enrich-form" id="waitEnrichForm" novalidate>
+              <input type="text" id="waitOrg" name="org" autocomplete="organization" data-i18n-ph="wl.enrich.company" placeholder="Company">
+              <input type="text" id="waitRole" name="role" autocomplete="organization-title" data-i18n-ph="wl.enrich.role" placeholder="Role">
+              <span class="magnetic"><button class="doit sm" type="submit" id="waitEnrichBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="wl.enrich.btn">Send</span></button></span>
+            </form>
+            <div class="wait-enrich-done" id="waitEnrichDone" data-i18n="wl.enrich.thanks">Thanks, that helps us tailor your demo.</div>
+          </div>
         </div>
         <div class="cta-fine reveal" data-d="3"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span data-i18n="wl.fine">No spam. Your details stay with you — exactly like the product works.</span></div>
       </div>
@@ -1270,6 +1290,11 @@ Best,
     'wl.success':{en:"You're on the list. We'll be in touch.",he:'אתם ברשימה. ניצור קשר.'},
     'wl.fine':{en:'No spam. Your details stay with you — exactly like the product works.',he:'ללא ספאם. הפרטים נשמרים אצלכם — בדיוק כמו שהמוצר עובד.'},
     'wl.err':{en:"That email doesn't look right. Please check it.",he:'כתובת האימייל לא נראית תקינה. בדקו שוב.'},
+    'wl.enrich.note':{en:'Optional — 30 seconds, so we can tailor your demo.',he:'אופציונלי — 30 שניות, כדי שנתאים את הדמו עבורכם.'},
+    'wl.enrich.company':{en:'Company',he:'שם החברה'},
+    'wl.enrich.role':{en:'Role',he:'תפקיד'},
+    'wl.enrich.btn':{en:'Send',he:'שלח'},
+    'wl.enrich.thanks':{en:'Thanks, that helps us tailor your demo.',he:'תודה, זה עוזר לנו להתאים לכם את הדמו.'},
     'foot.features':{en:'Features',he:'יכולות'},
     'foot.copy':{en:'© %Y% Flow — Cognitive Workflow Engine. All rights reserved.',he:'© %Y% Flow — מנוע תהליכי עבודה קוגניטיבי. כל הזכויות שמורות.'},
     'a11y.skip':{en:'Skip to content',he:'דלג לתוכן'},
@@ -1589,6 +1614,22 @@ Best,
     // fire-and-forget: emails the Playbook PDF via the Netlify function; never blocks or affects the signup UI above
     fetch('/.netlify/functions/send-playbook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v,lang:curLang})}).catch(function(){});
   });
+
+  /* ---------- optional post-signup enrichment: company + role ---------- */
+  var enrichForm=document.getElementById('waitEnrichForm'), enrichWrap=document.getElementById('waitEnrich'), orgInput=document.getElementById('waitOrg'), roleInput=document.getElementById('waitRole'), enrichBtn=document.getElementById('waitEnrichBtn');
+  if(enrichForm){
+    enrichForm.addEventListener('submit',function(ev){
+      ev.preventDefault();
+      var org=(orgInput.value||'').trim(), role=(roleInput.value||'').trim();
+      if(!org && !role){ return; }
+      var v=(email.value||'').trim();
+      if(!v || !EMAIL_RE.test(v)){ enrichWrap.classList.add('sent'); return; }
+      enrichBtn.disabled=true;
+      fetch(SB_URL+'/rest/v1/waitlist?email=eq.'+encodeURIComponent(v),{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({company:org,role:role})})
+        .then(function(){ enrichWrap.classList.add('sent'); })
+        .catch(function(){ enrichWrap.classList.add('sent'); });
+    });
+  }
 
   /* ---------- ambient particle network (theme-aware) ---------- */
   var c=document.getElementById('bgcanvas'), x=c.getContext('2d'), W,H,pts,raf,NET='150,170,220',NL='59,116,255',NA=.5;
