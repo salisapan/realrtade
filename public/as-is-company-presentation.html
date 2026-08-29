@@ -211,6 +211,14 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .fact .fl{font-size:10px;color:var(--muted);margin-top:2px}
 .plan-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
 .plan-chip{font-family:var(--mono);font-size:13.5px;padding:7px 13px;border:1px solid var(--line-hi);border-radius:9px;color:var(--muted)}
+.why-body{display:grid;grid-template-columns:.95fr 1.15fr;gap:22px;align-items:start}
+.why-reasons{display:flex;flex-direction:column;gap:9px}
+.why-reason{display:flex;gap:12px;align-items:flex-start;padding:11px 14px;border:1px solid var(--line);border-radius:13px;background:var(--panel-2)}
+.why-reason .pillar-icon{margin:0;flex-shrink:0}
+.why-reason h4{margin:0 0 3px;font-family:var(--disp);font-weight:700;font-size:15px;color:var(--txt-hi)}
+.why-reason p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
+.why-final{margin-top:2px;padding:12px 16px;border-radius:12px;border:1px solid var(--line-hi);background:color-mix(in srgb,var(--accent) 8%,transparent);font-size:14px;color:var(--txt-hi);text-align:center}
+@media (max-width:900px){.why-body{grid-template-columns:1fr}}
 .plan-chip b{color:var(--txt-hi)}
 /* dramatic hero */
 .hero-shot{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line-hi);box-shadow:var(--card-shadow);margin-bottom:14px;transition:transform .25s ease-out;transform-style:preserve-3d}
@@ -615,13 +623,19 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   animation:beamSpin 4s linear infinite}
 @keyframes beamSpin{from{--rev:0deg}to{--rev:360deg}}
 
-.cfx{--cfx-card:clamp(150px,16.5vw,215px);position:relative;margin-top:14px}
-.cfx-frame{overflow:hidden;padding:10px 0;cursor:grab;outline:none;touch-action:pan-y;perspective:calc(var(--cfx-card) * 2.6)}
+.cfx{--cfx-card:clamp(196px,21vw,268px);--cfx-card-h:clamp(240px,27vw,330px);position:relative;margin-top:18px}
+.cfx-frame{overflow:hidden;padding:14px 0;cursor:grab;outline:none;touch-action:pan-y;perspective:calc(var(--cfx-card) * 2.6)}
 .cfx-frame:active{cursor:grabbing}
-.cfx-track{position:relative;height:var(--cfx-card);width:1px;margin:0 auto;transform-style:preserve-3d}
-.cfx-card{position:absolute;left:50%;top:0;width:var(--cfx-card);aspect-ratio:1/1;border-radius:16px;overflow:hidden;
+.cfx-track{position:relative;height:var(--cfx-card-h);width:1px;margin:0 auto;transform-style:preserve-3d}
+.cfx-card{position:absolute;left:50%;top:0;width:var(--cfx-card);height:var(--cfx-card-h);border-radius:18px;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;text-align:center;justify-content:center;gap:8px;padding:22px 18px;
   background:var(--panel-2);border:1px solid var(--line-hi);box-shadow:0 22px 40px -20px rgba(20,44,100,.35);
   will-change:transform;user-select:none;color:var(--accent-2)}
+.cfx-num{position:absolute;top:14px;inset-inline-start:16px;font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.04em}
+.cfx-card .pillar-icon{width:44px;height:44px;margin:0}
+.cfx-card .pillar-icon svg{width:21px;height:21px}
+.cfx-card h4{margin:2px 0 0;font-family:var(--disp);font-weight:700;font-size:16.5px;color:var(--txt-hi)}
+.cfx-card p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.55}
 :root[data-theme="dark"] .cfx-card{box-shadow:0 22px 40px -20px rgba(0,0,0,.55)}
 .cfx-card.is-center{border-color:color-mix(in srgb,var(--accent) 45%,var(--line-hi))}
 .cfx-card svg{width:100%;height:100%;display:block}
@@ -631,42 +645,40 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .cfx-nav.prev{inset-inline-start:2px}
 .cfx-nav.next{inset-inline-end:2px}
 .cfx-nav:hover{border-color:var(--accent);color:var(--accent-2)}
-.cfx-cap{margin-top:14px;text-align:center}
-.cfx-cap-name{font-family:var(--disp);font-weight:700;font-size:23px;color:var(--txt-hi)}
-.cfx-cap-city{font-family:var(--mono);font-size:12px;color:var(--accent-2);letter-spacing:.05em;margin-top:3px}
 .cfx-meta{display:flex;justify-content:center;gap:30px;margin-top:12px}
 .cfx-meta div{display:flex;flex-direction:column;align-items:center}
 .cfx-meta .l{font-size:11px;color:var(--muted);margin-top:2px}
 .cfx-meta .v{font-family:var(--mono);font-size:19px;font-weight:600;color:var(--accent-2);font-variant-numeric:tabular-nums}
-@media (max-width:640px){.cfx{--cfx-card:clamp(120px,32vw,170px)}.cfx-meta{gap:18px}}
+@media (max-width:640px){.cfx{--cfx-card:clamp(150px,42vw,190px);--cfx-card-h:clamp(210px,58vw,250px)}.cfx-meta{gap:18px}}
 
-.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}
-.pgrid-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;border:1px solid var(--line);border-radius:14px;padding:11px 10px;
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}
+.pgrid-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;border:1px solid var(--line);border-radius:14px;padding:10px 8px;
   background:linear-gradient(180deg,var(--panel),var(--panel-2))}
-.pgrid-ic{width:50px;height:50px;flex-shrink:0;color:var(--accent-2)}
+.pgrid-ic{width:46px;height:46px;flex-shrink:0;color:var(--accent-2)}
 .pgrid-ic svg{width:100%;height:100%;display:block}
 .pgrid-info{min-width:0;width:100%}
-.pgrid-name{font-family:var(--disp);font-weight:700;font-size:14.5px;color:var(--txt-hi);line-height:1.3}
-.pgrid-city{font-family:var(--mono);font-size:11px;color:var(--accent-2);margin-top:2px}
-.pgrid-stats{display:flex;flex-direction:column;gap:2px;margin-top:5px;align-items:center}
-.pgrid-stats span{font-size:11px;color:var(--muted);white-space:nowrap}
-.pgrid-stats b{font-family:var(--mono);color:var(--accent-2);font-weight:600;font-size:13px}
+.pgrid-name{font-family:var(--disp);font-weight:700;font-size:15.5px;color:var(--txt-hi);line-height:1.25}
+.pgrid-city{font-family:var(--mono);font-size:11.5px;color:var(--accent-2);margin-top:1px}
+.pgrid-stats{display:flex;flex-direction:column;gap:2px;margin-top:4px;align-items:center}
+.pgrid-stats span{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.pgrid-stats b{font-family:var(--mono);color:var(--accent-2);font-weight:600;font-size:14px}
+@media (max-width:1180px){.pgrid{gap:7px}.pgrid-card{padding:9px 7px;gap:4px}.pgrid-ic{width:40px;height:40px}
+.pgrid-name{font-size:13.5px}.pgrid-city{font-size:10.5px}.pgrid-stats span{font-size:10.5px}.pgrid-stats b{font-size:12.5px}}
 @media (max-width:640px){.pgrid{grid-template-columns:repeat(2,1fr)}}
 
-.dstat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:12px;margin-bottom:16px}
-.dstat-card{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line-hi);
-  border-radius:16px;padding:14px 16px;background:linear-gradient(180deg,var(--panel),var(--panel-2))}
+.dstat-grid{display:flex;justify-content:center;margin-top:10px;margin-bottom:18px}
+.dstat-card{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid var(--line-hi);
+  border-radius:18px;padding:20px 28px;background:linear-gradient(180deg,var(--panel),var(--panel-2));max-width:560px;width:100%}
 .dstat-info{flex:1;min-width:0}
-.dstat-name{font-family:var(--disp);font-weight:700;font-size:15.5px;color:var(--txt-hi);line-height:1.25}
-.dstat-chip{display:inline-block;margin:6px 0 7px;font-family:var(--mono);font-size:10.5px;color:var(--muted);
-  border:1px solid var(--line-hi);border-radius:999px;padding:3px 10px}
-.dstat-desc{font-size:11.5px;color:var(--muted);line-height:1.45}
-.dstat-card .donut{width:126px;height:126px;flex-shrink:0}
-.dstat-card .donut-c .dn{font-size:21px}
-.dstat-card .donut-c .dl{font-size:8.5px}
-@media (max-width:640px){.dstat-grid{grid-template-columns:1fr}}
+.dstat-name{font-family:var(--disp);font-weight:700;font-size:19px;color:var(--txt-hi);line-height:1.3}
+.dstat-chip{display:inline-block;margin:8px 0 9px;font-family:var(--mono);font-size:12px;color:var(--muted);
+  border:1px solid var(--line-hi);border-radius:999px;padding:4px 12px}
+.dstat-desc{font-size:13.5px;color:var(--muted);line-height:1.5}
+.dstat-card .donut{width:160px;height:160px;flex-shrink:0}
+.dstat-card .donut-c .dn{font-size:27px}
+.dstat-card .donut-c .dl{font-size:10px}
+@media (max-width:640px){.dstat-card{flex-direction:column;text-align:center;padding:18px}}
 
-.cfx-cap-desc{margin:8px auto 0;max-width:46ch;font-size:14px;color:var(--muted);line-height:1.55;text-align:center}
 </style>
 
 <div class="bg"><canvas id="mesh" class="mesh"></canvas><div class="blob b1"></div><div class="blob b2"></div></div>
@@ -715,15 +727,14 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       <div class="eyebrow"><span class="dot"></span>האמונה שלנו</div>
       <h2 class="slide-title">למה התחדשות עירונית</h2>
       <p class="slide-sub">תהליך שמחולל צמיחה והתפתחות — ועונה על צורך לאומי אמיתי</p>
-      <div class="slide-body">
-        <div class="card"><p style="margin:0;font-size:18px;line-height:1.72;color:var(--txt)">עולם הנדל״ן הוא תחום מורכב הדורש הקפדה על פרטים רבים. כשאתם בוחרים בנו לנהל עבורכם את תהליכי ההתחדשות העירונית, אתם ממקסמים את סיכויי ההצלחה — בזכות המוניטין שלנו המבוסס על ניסיון מקצועי, ידע עשיר וסטנדרטים גבוהים.</p></div>
-        <div class="takeaway"><span class="ic">◆</span><p>מערכות מידע מתקדמות, אמינות ושקיפות מלאה — לצד צוות מקצועי ואיכותי המהווה חלק אינטגרלי מביצוע הפרויקט.</p></div>
-        <div class="takeaway"><span class="ic">◆</span><p>כל שנותר לכם לעשות הוא פשוט לסמוך עלינו — <b>ולצאת לדרך.</b></p></div>
-        <div class="plan-list">
-          <span class="plan-chip"><b>ניסיון מקצועי</b> · וידע עשיר</span>
-          <span class="plan-chip"><b>סטנדרטים גבוהים</b> · לכל אורך הדרך</span>
-          <span class="plan-chip"><b>מערכות מידע מתקדמות</b> · מעקב ובקרה</span>
-          <span class="plan-chip"><b>אמינות ושקיפות</b> · תמיד</span>
+      <div class="slide-body why-body">
+        <div class="card why-intro reveal"><p style="margin:0;font-size:18px;line-height:1.72;color:var(--txt)">עולם הנדל״ן הוא תחום מורכב הדורש הקפדה על פרטים רבים. כשאתם בוחרים בנו לנהל עבורכם את תהליכי ההתחדשות העירונית, אתם ממקסמים את סיכויי ההצלחה — בזכות המוניטין שלנו המבוסס על ניסיון מקצועי, ידע עשיר וסטנדרטים גבוהים.</p></div>
+        <div class="why-reasons">
+          <div class="why-reason reveal" style="--i:1"><div class="pillar-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5.2" stroke-width="2"/><path d="M9 13.5 7.5 21l4.5-2.4 4.5 2.4L15 13.5" stroke-width="2" stroke-linejoin="round"/></svg></div><div><h4>ניסיון מקצועי ועשיר</h4><p>מוניטין בנוי על ניסיון מוכח וידע מעמיק בתחום ההתחדשות העירונית.</p></div></div>
+          <div class="why-reason reveal" style="--i:2"><div class="pillar-icon"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7h6v6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><h4>סטנדרטים גבוהים</h4><p>הקפדה על כל פרט לאורך כל התהליך — מהמשא ומתן ועד המסירה.</p></div></div>
+          <div class="why-reason reveal" style="--i:3"><div class="pillar-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2" stroke-width="2"/><path d="M8 21h8M12 17v4" stroke-width="2" stroke-linecap="round"/></svg></div><div><h4>מערכות מידע מתקדמות</h4><p>מעקב סטטוס, שקיפות מלאה ובקרה צמודה על כל שלב בפרויקט.</p></div></div>
+          <div class="why-reason reveal" style="--i:4"><div class="pillar-icon"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.8-3 8-7 9-4-1-7-4.2-7-9V6l7-3Z" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><h4>אמינות ושקיפות</h4><p>תקשורת ישירה וצוות מקצועי שמהווה חלק אינטגרלי מהפרויקט.</p></div></div>
+          <div class="why-final reveal" style="--i:5">כל שנותר לכם לעשות הוא פשוט לסמוך עלינו — <b>ולצאת לדרך.</b></div>
         </div>
       </div>
     </section>
@@ -779,10 +790,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
           <button type="button" class="cfx-nav prev" id="cfxPrev" aria-label="הקודם">‹</button>
           <button type="button" class="cfx-nav next" id="cfxNext" aria-label="הבא">›</button>
         </div>
-        <div class="cfx-cap reveal" style="--i:1">
-          <div class="cfx-cap-name" id="cfxName"></div>
-          <p class="cfx-cap-desc" id="cfxDesc"></p>
-        </div>
       </div>
     </section>
 
@@ -814,8 +821,8 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
           <div class="bio-card">
             <div class="avatar-ring"><span>ח</span></div>
             <div class="bio-name">חן כהן</div>
-            <div class="bio-role">שותף, עו״ד התחדשות עירונית</div>
-            <p class="bio-txt">בעל תואר כפול במשפטים ובפסיכולוגיה, התמחה במשרד פירון בתחומי הנדל״ן, ההתחדשות העירונית והמשפט המסחרי, עם ניסיון בליווי עסקאות ופרויקטים מורכבים.</p>
+            <div class="bio-role">עו״ד — ליווי משפטי חיצוני</div>
+            <p class="bio-txt">בעל תואר כפול במשפטים ובפסיכולוגיה, התמחה במשרד פירון בתחומי הנדל״ן, ההתחדשות העירונית והמשפט המסחרי. שותף במשרד עורכי דין העוסק בהתחדשות עירונית, ומלווה את פרויקטי AS-IS מהצד המשפטי.</p>
           </div>
         </div>
       </div>
@@ -897,9 +904,9 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   var PILLAR_ICONS={
     star:'<path d="M12 3l2.2 4.5 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.2l5-.7L12 3Z" stroke-width="2" stroke-linejoin="round"/>',
     layers:'<path d="M12 3 3 8l9 5 9-5-9-5Z" stroke-width="2" stroke-linejoin="round"/><path d="M3 12l9 5 9-5" stroke-width="2" stroke-linejoin="round"/><path d="M3 16l9 5 9-5" stroke-width="2" stroke-linejoin="round"/>',
-    people:'<circle cx="8" cy="8" r="3" stroke-width="2"/><circle cx="16" cy="8" r="3" stroke-width="2"/><path d="M2 20c0-3.3 2.7-6 6-6M22 20c0-3.3-2.7-6-6-6" stroke-width="2" stroke-linecap="round"/>',
+    people:'<circle cx="12" cy="8" r="4" stroke-width="2"/><path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" stroke-width="2" stroke-linecap="round"/>',
     building:'<path d="M4 21V9l8-5 8 5v12" stroke-width="2" stroke-linejoin="round"/><path d="M9 21v-6h6v6M4 21h16" stroke-width="2" stroke-linecap="round"/>',
-    team:'<circle cx="6" cy="6" r="2.4" stroke-width="2"/><circle cx="18" cy="6" r="2.4" stroke-width="2"/><circle cx="6" cy="18" r="2.4" stroke-width="2"/><circle cx="18" cy="18" r="2.4" stroke-width="2"/><path d="M8.2 7.5 15.8 16.5M15.8 7.5 8.2 16.5" stroke-width="1.5"/>',
+    team:'<circle cx="12" cy="5.3" r="2.3" stroke-width="2"/><circle cx="5" cy="18" r="2.3" stroke-width="2"/><circle cx="19" cy="18" r="2.3" stroke-width="2"/><path d="M12 7.6 6.4 16M12 7.6l5.6 8.4M7.3 18h9.4" stroke-width="1.6" stroke-linecap="round"/>',
     shield:'<path d="M12 3l7 3v6c0 4.8-3 8-7 9-4-1-7-4.2-7-9V6l7-3Z" stroke-width="2" stroke-linejoin="round"/><path d="M9 12l2 2 4-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
   };
 
@@ -920,12 +927,12 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     if(!frame||!track)return;
     var count=PILLARS.length,pos=0,target=0,width=0,raf=null,drag=null;
     var ROTATE=42,DEPTH=.55,FALLOFF=.56,FADE=.12,GAP=.08;
-    var cards=PILLARS.map(function(p){
-      var card=el('<div class="cfx-card"><div class="pillar-icon" style="margin:auto"><svg viewBox="0 0 24 24">'+PILLAR_ICONS[p.icon]+'</svg></div></div>');
+    var cards=PILLARS.map(function(p,i){
+      var num=String(i+1).padStart(2,"0");
+      var card=el('<div class="cfx-card"><span class="cfx-num">'+num+'</span><div class="pillar-icon"><svg viewBox="0 0 24 24">'+PILLAR_ICONS[p.icon]+'</svg></div><h4>'+p.t+'</h4><p>'+p.d+'</p></div>');
       track.appendChild(card);
       return card;
     });
-    function indexAt(p){return ((Math.round(p)%count)+count)%count;}
     function paint(){
       if(!width)return;
       var pitch=width*(1+GAP);
@@ -943,15 +950,9 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
         card.classList.toggle("is-center",distance<0.02);
       });
     }
-    function renderCaption(idx){
-      var p=PILLARS[idx];
-      document.getElementById("cfxName").textContent=p.t;
-      document.getElementById("cfxDesc").textContent=p.d;
-    }
     function settle(t){
       if(raf!==null)cancelAnimationFrame(raf);
       target=t;
-      renderCaption(indexAt(t));
       function step(){
         var remaining=target-pos;
         if(Math.abs(remaining)<0.0004){pos=target;paint();raf=null;return;}
@@ -980,7 +981,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       pos=drag.pos-(e.clientX-drag.x)/pitch;
       drag.v=(pos-prev)/Math.max(now-drag.t,1)*1000;
       drag.t=now;
-      renderCaption(indexAt(pos));
       paint();
     });
     function endDrag(e){
@@ -1025,7 +1025,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   var LARGE=PROJECTS.filter(function(p){return p.b>=10;});
   var largeP=LARGE.reduce(function(s,p){return s+p.p;},0);
   var DSTATS=[
-    {name:"התקדמות כוללת",chip:PROJECTS.length+" פרויקטים",desc:totalE+' מתוך '+totalP+' יח"ד מתוכננות',dl:"מהיעד הכולל כבר קיים",pct:Math.round(totalE/totalP*100)},
     {name:"ריכוז בפרויקטים הגדולים",chip:LARGE.length+" מתוך "+PROJECTS.length+" פרויקטים",desc:largeP+' מתוך '+totalP+' יח"ד בתכנון',dl:"מהתכנון מגיע מהגדולים",pct:Math.round(largeP/totalP*100)}
   ];
   var dg=document.getElementById("dstatGrid");
@@ -1035,11 +1034,16 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     card.querySelector(".donut").style.background="conic-gradient(var(--accent) 0% "+d.pct+"%, var(--panel-2) "+d.pct+"% 100%)";
     dg.appendChild(card);
   });
-  var BARS=PROJECTS.slice().sort(function(a,b){return b.p-a.p;});
+  var CITY_MAP={};
+  PROJECTS.forEach(function(p){
+    if(!CITY_MAP[p.city])CITY_MAP[p.city]={city:p.city,b:0,e:0,p:0,n:0};
+    var c=CITY_MAP[p.city];c.b+=p.b;c.e+=p.e;c.p+=p.p;c.n+=1;
+  });
+  var BARS=Object.keys(CITY_MAP).map(function(k){return CITY_MAP[k];}).sort(function(a,b){return b.p-a.p;});
   var sb=document.getElementById("sbarList");
   BARS.forEach(function(p,idx){
     var sp=Math.round(p.e/p.p*100);
-    var row=el('<div class="sbar-row reveal"><span class="addr">'+p.tag+'</span><div class="sbar-track"><div class="sbar-signed" style="width:'+sp+'%"></div><div class="sbar-proc" style="width:'+(100-sp)+'%"></div></div><span class="n"><b class="cu">'+p.e+'</b>/<span class="cu">'+p.p+'</span></span></div>');
+    var row=el('<div class="sbar-row reveal"><span class="addr">'+p.city+'</span><div class="sbar-track"><div class="sbar-signed" style="width:'+sp+'%"></div><div class="sbar-proc" style="width:'+(100-sp)+'%"></div></div><span class="n"><b class="cu">'+p.e+'</b>/<span class="cu">'+p.p+'</span></span></div>');
     row.style.setProperty('--i', idx);
     sb.appendChild(row);
   });
