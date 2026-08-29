@@ -560,9 +560,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .slide-slider::-moz-range-track{height:4px;border-radius:4px;background:var(--line)}
 .slide-slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);border:2px solid var(--panel);box-shadow:0 0 10px var(--glow)}
 .slider-fill{position:absolute;inset-inline-start:0;top:50%;height:4px;border-radius:4px;background:var(--accent);box-shadow:0 0 8px var(--glow);transform:translateY(-50%);pointer-events:none;transition:width .2s}
-.kbd-hint{position:fixed;bottom:8px;inset-inline-end:16px;font-family:var(--mono);font-size:9.5px;color:var(--muted);z-index:2;letter-spacing:.03em}
-.kbd-hint kbd{border:1px solid var(--line-hi);border-radius:4px;padding:1px 5px;font-family:inherit}
-.app.is-fullscreen .kbd-hint{display:none}
 
 @media (max-width:640px){
   .stat-row,.adv-grid,.contact-grid,.proof-stats,.chg-grid,.step-flow,.metric-flip,.fact-row,.proj-grid,.bio-grid,.stat-banner,.pillar-grid,.proj-grid.trio{grid-template-columns:repeat(2,1fr)}
@@ -651,19 +648,19 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .cfx-meta .v{font-family:var(--mono);font-size:19px;font-weight:600;color:var(--accent-2);font-variant-numeric:tabular-nums}
 @media (max-width:640px){.cfx{--cfx-card:clamp(150px,42vw,190px);--cfx-card-h:clamp(210px,58vw,250px)}.cfx-meta{gap:18px}}
 
-.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}
-.pgrid-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;border:1px solid var(--line);border-radius:14px;padding:10px 8px;
+.pgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:9px}
+.pgrid-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;border:1px solid var(--line);border-radius:14px;padding:12px 9px;
   background:linear-gradient(180deg,var(--panel),var(--panel-2))}
-.pgrid-ic{width:46px;height:46px;flex-shrink:0;color:var(--accent-2)}
+.pgrid-ic{width:52px;height:52px;flex-shrink:0;color:var(--accent-2)}
 .pgrid-ic svg{width:100%;height:100%;display:block}
 .pgrid-info{min-width:0;width:100%}
-.pgrid-name{font-family:var(--disp);font-weight:700;font-size:15.5px;color:var(--txt-hi);line-height:1.25}
-.pgrid-city{font-family:var(--mono);font-size:11.5px;color:var(--accent-2);margin-top:1px}
-.pgrid-stats{display:flex;flex-direction:column;gap:2px;margin-top:4px;align-items:center}
-.pgrid-stats span{font-size:11.5px;color:var(--muted);white-space:nowrap}
-.pgrid-stats b{font-family:var(--mono);color:var(--accent-2);font-weight:600;font-size:14px}
-@media (max-width:1180px){.pgrid{gap:7px}.pgrid-card{padding:9px 7px;gap:4px}.pgrid-ic{width:40px;height:40px}
-.pgrid-name{font-size:13.5px}.pgrid-city{font-size:10.5px}.pgrid-stats span{font-size:10.5px}.pgrid-stats b{font-size:12.5px}}
+.pgrid-name{font-family:var(--disp);font-weight:700;font-size:19px;color:var(--txt-hi);line-height:1.25}
+.pgrid-city{font-family:var(--mono);font-size:14px;color:var(--accent-2);margin-top:2px}
+.pgrid-stats{display:flex;flex-direction:column;gap:3px;margin-top:5px;align-items:center}
+.pgrid-stats span{font-size:14px;color:var(--muted);white-space:nowrap}
+.pgrid-stats b{font-family:var(--mono);color:var(--accent-2);font-weight:600;font-size:17px}
+@media (max-width:1320px){.pgrid{gap:7px}.pgrid-card{padding:9px 7px;gap:4px}.pgrid-ic{width:40px;height:40px}
+.pgrid-name{font-size:14.5px}.pgrid-city{font-size:11.5px}.pgrid-stats span{font-size:11.5px}.pgrid-stats b{font-size:14px}}
 @media (max-width:640px){.pgrid{grid-template-columns:repeat(2,1fr)}}
 
 .dstat-grid{display:flex;justify-content:center;margin-top:10px;margin-bottom:18px}
@@ -863,7 +860,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   </div>
 </div>
 
-<div class="kbd-hint">←‎ ‎→ ניווט · F מסך מלא · Esc יציאה</div>
 <div class="lightbox" id="lightbox"><button class="lightbox-close" id="lightbox-close"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button><img id="lightbox-img" src="" alt="" /></div>
 
 <script>
