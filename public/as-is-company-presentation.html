@@ -161,7 +161,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 
 .tag{font-family:var(--mono);font-size:.66rem;letter-spacing:.14em;text-transform:uppercase;padding:5px 12px;border-radius:999px;border:1px solid var(--line-hi);color:var(--muted);display:inline-block}
 .section-label{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
-.card{border:1px solid var(--line);border-radius:16px;padding:16px 18px;background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 55%, transparent))}
+.card{border:1px solid var(--line);border-radius:16px;padding:20px 22px;background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 55%, transparent))}
 .proj-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .proj-card{border:1px solid var(--line);border-radius:14px;padding:13px 15px;background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 55%, transparent))}
 .proj-city{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2)}
@@ -171,9 +171,9 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .proj-stats b{font-family:var(--mono);color:var(--accent-2);font-size:13px}
 .proj-more{display:flex;align-items:center;justify-content:center;border-style:dashed;border-color:var(--line-hi);color:var(--muted);font-size:12px;text-align:center}
 .card:hover{border-color:var(--line-hi)}
-.takeaway{display:flex;gap:9px;align-items:flex-start;margin-top:14px;padding:12px 14px;border-radius:12px;border:1px solid var(--line-hi);background:color-mix(in srgb,var(--accent) 7%, transparent)}
+.takeaway{display:flex;gap:11px;align-items:flex-start;margin-top:18px;padding:16px 18px;border-radius:12px;border:1px solid var(--line-hi);background:color-mix(in srgb,var(--accent) 7%, transparent)}
 .takeaway .ic{color:var(--accent-2);flex-shrink:0;font-size:15px;margin-top:1px}
-.takeaway p{margin:0;font-size:17px;color:var(--txt-hi);line-height:1.62}
+.takeaway p{margin:0;font-size:20.5px;color:var(--txt-hi);line-height:1.62}
 .takeaway b{color:var(--accent-2)}
 
 /* watermark */
@@ -202,13 +202,14 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .fact{padding:11px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);text-align:center}
 .fact .fn{font-family:var(--mono);font-size:17px;font-weight:600;color:var(--accent-2);font-variant-numeric:tabular-nums}
 .fact .fl{font-size:10px;color:var(--muted);margin-top:2px}
-.why-body{display:grid;grid-template-columns:.95fr 1.15fr;gap:22px;align-items:start}
+.why-body{display:grid;grid-template-columns:.95fr 1.15fr;gap:22px;align-items:stretch}
+.why-intro{display:flex;align-items:center}
 .why-reasons{display:flex;flex-direction:column;gap:9px}
-.why-reason{display:flex;gap:12px;align-items:flex-start;padding:11px 14px;border:1px solid var(--line);border-radius:13px;background:var(--panel-2)}
+.why-reason{display:flex;gap:13px;align-items:center;padding:13px 16px;border:1px solid var(--line);border-radius:13px;background:var(--panel-2)}
 .why-reason .pillar-icon{margin:0;flex-shrink:0}
-.why-reason h4{margin:0 0 3px;font-family:var(--disp);font-weight:700;font-size:15px;color:var(--txt-hi)}
-.why-reason p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
-.why-final{margin-top:2px;padding:12px 16px;border-radius:12px;border:1px solid var(--line-hi);background:color-mix(in srgb,var(--accent) 8%,transparent);font-size:14px;color:var(--txt-hi);text-align:center}
+.why-reason h4{margin:0 0 4px;font-family:var(--disp);font-weight:700;font-size:16.5px;color:var(--txt-hi)}
+.why-reason p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.5}
+.why-final{margin-top:2px;padding:14px 18px;border-radius:12px;border:1px solid var(--line-hi);background:color-mix(in srgb,var(--accent) 8%,transparent);font-size:15.5px;color:var(--txt-hi);text-align:center}
 @media (max-width:900px){.why-body{grid-template-columns:1fr}}
 /* dramatic hero */
 .hero-shot{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line-hi);box-shadow:var(--card-shadow);margin-bottom:14px;transition:transform .25s ease-out;transform-style:preserve-3d}
@@ -370,7 +371,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .rmap-card li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--accent-2);margin-top:5px;flex-shrink:0}
 /* contact bios */
 .bio-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}
-.bio-card{border:1px solid var(--glass-border);border-radius:16px;background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 6%,var(--panel-2)),var(--panel-2));padding:16px;box-shadow:inset 0 1px 0 var(--glass-gloss)}
+.bio-card{border:1px solid var(--glass-border);border-radius:16px;background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 6%,var(--panel-2)),var(--panel-2));padding:16px;box-shadow:inset 0 1px 0 var(--glass-gloss);display:flex;flex-direction:column;justify-content:center}
 .bio-name{font-family:var(--disp);font-weight:700;font-size:21px;color:var(--txt-hi);margin-bottom:6px}
 .bio-txt{font-size:15.5px;color:var(--muted);line-height:1.6;margin:0 0 9px;text-align:start}
 .bio-phone{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:15px;font-weight:600;color:var(--accent-2)}
@@ -526,12 +527,12 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .contact-icon svg{width:15px;height:15px;stroke:var(--accent-2)}
 .contact-card .l{font-weight:700;font-size:11.5px;color:var(--txt-hi)}
 .contact-card .v{font-size:10.5px;color:var(--muted);margin-top:2px}
-.steps{border-radius:16px;border:1px solid var(--line-hi);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 8%, transparent),transparent);padding:16px;display:flex;flex-direction:column;gap:12px}
-.step{display:flex;gap:11px;align-items:flex-start}
-.step-num{width:20px;height:20px;border-radius:50%;background:color-mix(in srgb, var(--accent) 16%, transparent);color:var(--accent-2);font-family:var(--mono);font-weight:500;font-size:10.5px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.step .t{font-weight:700;font-size:12.5px;margin:0 0 2px;font-family:var(--disp);color:var(--txt-hi)}
-.step .d{font-size:11px;color:var(--muted);margin:0}
-.final-line{text-align:center;padding-top:12px;margin-top:4px;border-top:1px solid var(--line);color:var(--accent-2);font-weight:700;font-size:12.5px;font-family:var(--disp);text-shadow:0 0 16px var(--glow)}
+.steps{border-radius:16px;border:1px solid var(--line-hi);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 8%, transparent),transparent);padding:22px;display:flex;flex-direction:column;gap:18px}
+.step{display:flex;gap:15px;align-items:flex-start}
+.step-num{width:30px;height:30px;border-radius:50%;background:color-mix(in srgb, var(--accent) 16%, transparent);color:var(--accent-2);font-family:var(--mono);font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step .t{font-weight:700;font-size:17px;margin:0 0 3px;font-family:var(--disp);color:var(--txt-hi)}
+.step .d{font-size:13.5px;color:var(--muted);margin:0;line-height:1.45}
+.final-line{text-align:center;margin-top:6px;color:#fff;font-weight:700;font-size:18px;font-family:var(--disp);padding:14px 28px;border-radius:999px;background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 14px 30px -12px var(--glow),inset 0 1px 0 rgba(255,255,255,.25);display:inline-block;align-self:center;cursor:default}
 
 /* floating theme toggle — draggable, no fixed control bar */
 .theme-float{position:fixed;right:18px;bottom:18px;z-index:80;width:46px;height:46px;border-radius:50%;border:1px solid var(--line-hi);
@@ -633,7 +634,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   animation:beamSpin 8.5s linear infinite}
 @media (prefers-reduced-motion:reduce){.beam-card::before{animation:none}}
 
-.cfx{--cfx-card:clamp(196px,21vw,268px);--cfx-card-h:clamp(240px,27vw,330px);position:relative;margin-top:18px}
+.cfx{--cfx-card:clamp(220px,23vw,300px);--cfx-card-h:clamp(270px,29vw,360px);position:relative;margin-top:20px}
 .cfx-frame{overflow:hidden;padding:14px 0;cursor:grab;outline:none;touch-action:pan-y;perspective:calc(var(--cfx-card) * 2.6)}
 .cfx-frame:active{cursor:grabbing}
 .cfx-track{position:relative;height:var(--cfx-card-h);width:1px;margin:0 auto;transform-style:preserve-3d}
@@ -642,10 +643,10 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   background:var(--panel-2);border:1px solid var(--line-hi);box-shadow:0 22px 40px -20px rgba(20,44,100,.35);
   will-change:transform;user-select:none;color:var(--accent-2)}
 .cfx-num{position:absolute;top:14px;inset-inline-start:16px;font-family:var(--mono);font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.04em}
-.cfx-card .pillar-icon{width:44px;height:44px;margin:0}
-.cfx-card .pillar-icon svg{width:21px;height:21px}
-.cfx-card h4{margin:2px 0 0;font-family:var(--disp);font-weight:700;font-size:16.5px;color:var(--txt-hi)}
-.cfx-card p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.55}
+.cfx-card .pillar-icon{width:50px;height:50px;margin:0}
+.cfx-card .pillar-icon svg{width:23px;height:23px}
+.cfx-card h4{margin:3px 0 0;font-family:var(--disp);font-weight:700;font-size:18px;color:var(--txt-hi)}
+.cfx-card p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.55}
 :root[data-theme="dark"] .cfx-card{box-shadow:0 22px 40px -20px rgba(0,0,0,.55)}
 .cfx-card.is-center{border-color:color-mix(in srgb,var(--accent) 45%,var(--line-hi))}
 .cfx-card svg{width:100%;height:100%;display:block}
@@ -690,13 +691,13 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 }
 
 .dstat-grid{display:flex;justify-content:center;margin-top:10px;margin-bottom:18px}
-.dstat-card{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid var(--line-hi);
-  border-radius:18px;padding:20px 28px;background:linear-gradient(180deg,var(--panel),var(--panel-2));max-width:560px;width:100%}
-.dstat-info{flex:1;min-width:0}
-.dstat-name{font-family:var(--disp);font-weight:700;font-size:19px;color:var(--txt-hi);line-height:1.3}
-.dstat-chip{display:inline-block;margin:8px 0 9px;font-family:var(--mono);font-size:12px;color:var(--muted);
+.dstat-card{display:flex;align-items:center;justify-content:center;gap:24px;border:1px solid var(--line-hi);
+  border-radius:18px;padding:22px 30px;background:linear-gradient(180deg,var(--panel),var(--panel-2));width:fit-content;max-width:100%}
+.dstat-info{flex:0 1 auto;min-width:0;max-width:280px}
+.dstat-name{font-family:var(--disp);font-weight:700;font-size:21px;color:var(--txt-hi);line-height:1.3}
+.dstat-chip{display:inline-block;margin:9px 0 10px;font-family:var(--mono);font-size:12.5px;color:var(--muted);
   border:1px solid var(--line-hi);border-radius:999px;padding:4px 12px}
-.dstat-desc{font-size:13.5px;color:var(--muted);line-height:1.5}
+.dstat-desc{font-size:15px;color:var(--muted);line-height:1.5}
 .dstat-card .donut{width:160px;height:160px;flex-shrink:0}
 .dstat-card .donut-c .dn{font-size:27px}
 .dstat-card .donut-c .dl{font-size:10px}
@@ -733,7 +734,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       <h2 class="slide-title">מלווים דיירים בהתחדשות עירונית</h2>
       <p class="slide-sub">מייצגים ומנהלים עבורכם את כל התהליך — מול היזם, הרשויות ועורכי הדין</p>
       <div class="slide-body">
-        <div class="card beam-card"><p style="margin:0;font-size:18px;line-height:1.72;color:var(--txt)">אנחנו מלווים דיירים בתהליכי התחדשות עירונית מהיום הראשון ועד מסירת המפתח — מארגנים את הבניין, מנהלים את המשא ומתן מול היזם והרשויות, ודואגים שתקבלו את המקסימום מהזכויות שלכם.</p></div>
+        <div class="card beam-card"><p style="margin:0;font-size:22px;line-height:1.75;color:var(--txt)">אנחנו מלווים דיירים בתהליכי התחדשות עירונית מהיום הראשון ועד מסירת המפתח — מארגנים את הבניין, מנהלים את המשא ומתן מול היזם והרשויות, ודואגים שתקבלו את המקסימום מהזכויות שלכם.</p></div>
         <div class="takeaway"><span class="ic">◆</span><p>הפלטפורמה הייחודית שלנו הופכת את התהליך לפשוט ושקוף — מעקב סטטוס, ריכוז מסמכים ותקשורת ישירה לאורך כל הדרך.</p></div>
         <div class="takeaway"><span class="ic">◆</span><p>אנו מלווים אתכם מהצעד הראשון ועד קבלת המפתח, עם יחס אישי, ליווי מקצועי צמוד ומיצוי מלוא זכויותיכם — <b>עם הרווח הגדול ביותר עבורכם.</b></p></div>
       </div>
@@ -745,7 +746,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       <h2 class="slide-title">למה התחדשות עירונית</h2>
       <p class="slide-sub">תהליך שמחולל צמיחה והתפתחות — ועונה על צורך לאומי אמיתי</p>
       <div class="slide-body why-body">
-        <div class="card why-intro reveal"><p style="margin:0;font-size:18px;line-height:1.72;color:var(--txt)">עולם הנדל״ן הוא תחום מורכב הדורש הקפדה על פרטים רבים. כשאתם בוחרים בנו לנהל עבורכם את תהליכי ההתחדשות העירונית, אתם ממקסמים את סיכויי ההצלחה — בזכות המוניטין שלנו המבוסס על ניסיון מקצועי, ידע עשיר וסטנדרטים גבוהים.</p></div>
+        <div class="card why-intro reveal"><p style="margin:0;font-size:22px;line-height:1.75;color:var(--txt)">עולם הנדל״ן הוא תחום מורכב הדורש הקפדה על פרטים רבים. כשאתם בוחרים בנו לנהל עבורכם את תהליכי ההתחדשות העירונית, אתם ממקסמים את סיכויי ההצלחה — בזכות המוניטין שלנו המבוסס על ניסיון מקצועי, ידע עשיר וסטנדרטים גבוהים.</p></div>
         <div class="why-reasons">
           <div class="why-reason reveal" style="--i:1"><div class="pillar-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="9" r="5.2" stroke-width="2"/><path d="M9 13.5 7.5 21l4.5-2.4 4.5 2.4L15 13.5" stroke-width="2" stroke-linejoin="round"/></svg></div><div><h4>ניסיון מקצועי ועשיר</h4><p>מוניטין בנוי על ניסיון מוכח וידע מעמיק בתחום ההתחדשות העירונית.</p></div></div>
           <div class="why-reason reveal" style="--i:2"><div class="pillar-icon"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7h6v6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><h4>סטנדרטים גבוהים</h4><p>הקפדה על כל פרט לאורך כל התהליך — מהמשא ומתן ועד המסירה.</p></div></div>
@@ -853,7 +854,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       <h2 class="slide-title">מזהים הזדמנות בבניין שלכם?</h2>
       <p class="slide-sub">אנו רוצים לפגוש אתכם, בעלי הדירות, ולבחון יחד את ההתכנות למיצוי מלוא זכויותיכם — ללא התחייבות</p>
       <div class="slide-body">
-        <div class="steps">
+        <div class="steps beam-card">
           <div class="step"><div class="step-num">1</div><div><p class="t">קבעו איתנו פגישת היכרות</p><p class="d">נפגוש אתכם, בעלי הדירות, ונציג את המודל שלנו מקרוב</p></div></div>
           <div class="step"><div class="step-num">2</div><div><p class="t">בדיקת התכנות ראשונית</p><p class="d">נבחן יחד את פוטנציאל הבניין שלכם וההיתכנות הכלכלית</p></div></div>
           <div class="step"><div class="step-num">3</div><div><p class="t">מתחילים לדרך יחד</p><p class="d">ליווי מקצועי צמוד עם שקיפות מלאה, מההתארגנות ועד המפתח</p></div></div>
@@ -1024,9 +1025,9 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     roadmap.appendChild(item);
   });
 
-  // projects grid (static, all 9 at once)
+  // projects grid (static, all at once) — biggest scale leads
   var pg=document.getElementById("pgrid");
-  PROJECTS.forEach(function(p,idx){
+  PROJECTS.slice().sort(function(a,b){return b.p-a.p;}).forEach(function(p,idx){
     var card=el('<div class="pgrid-card reveal"><div class="pgrid-ic">'+CFX_SKETCHES[p.sketch]+'</div><div class="pgrid-info"><div class="pgrid-name">'+p.name+'</div><div class="pgrid-city">'+p.city+'</div><div class="pgrid-stats"><span><b class="cu">'+p.b+'</b> בניינים</span><span><b class="cu">'+p.e+'</b> דירות קיימות</span><span><b class="cu">'+p.p+'</b> בתכנון</span></div></div></div>');
     card.style.setProperty('--i', idx);
     pg.appendChild(card);
@@ -1043,7 +1044,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   ];
   var dg=document.getElementById("dstatGrid");
   DSTATS.forEach(function(d,idx){
-    var card=el('<div class="dstat-card reveal"><div class="dstat-info"><div class="dstat-name">'+d.name+'</div><span class="dstat-chip">'+d.chip+'</span><p class="dstat-desc">'+d.desc+'</p></div><div class="donut"><div class="donut-c"><div class="dn cu">'+d.pct+'%</div><div class="dl">'+d.dl+'</div></div></div></div>');
+    var card=el('<div class="dstat-card beam-card reveal"><div class="dstat-info"><div class="dstat-name">'+d.name+'</div><span class="dstat-chip">'+d.chip+'</span><p class="dstat-desc">'+d.desc+'</p></div><div class="donut"><div class="donut-c"><div class="dn cu">'+d.pct+'%</div><div class="dl">'+d.dl+'</div></div></div></div>');
     card.style.setProperty('--i', idx);
     card.querySelector(".donut").style.background="conic-gradient(var(--accent) 0% "+d.pct+"%, var(--panel-2) "+d.pct+"% 100%)";
     dg.appendChild(card);
