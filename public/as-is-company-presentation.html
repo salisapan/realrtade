@@ -108,8 +108,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 6%,transparent),transparent 32%)}
 .slide-fit{position:relative;z-index:1;width:100%;display:flex;flex-direction:column;transform-origin:center center;will-change:transform}
 .slide.is-active{opacity:1;transform:none;pointer-events:auto}
-.slide.is-scroll{overflow-y:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch}
-.slide.is-scroll .slide-fit{transform-origin:top center}
 .stage[data-dir="fwd"] .slide.is-active{animation:enterFwd .66s cubic-bezier(.2,.75,.2,1) both}
 .stage[data-dir="back"] .slide.is-active{animation:enterBack .66s cubic-bezier(.2,.75,.2,1) both}
 @keyframes enterFwd{0%{opacity:0;transform:translateX(80px) translateZ(-220px) rotateY(-16deg);filter:blur(9px)}60%{filter:blur(0)}100%{opacity:1;transform:none;filter:blur(0)}}
@@ -204,8 +202,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .fact{padding:11px 8px;border-radius:12px;border:1px solid var(--line);background:var(--panel-2);text-align:center}
 .fact .fn{font-family:var(--mono);font-size:17px;font-weight:600;color:var(--accent-2);font-variant-numeric:tabular-nums}
 .fact .fl{font-size:10px;color:var(--muted);margin-top:2px}
-.plan-list{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
-.plan-chip{font-family:var(--mono);font-size:13.5px;padding:7px 13px;border:1px solid var(--line-hi);border-radius:9px;color:var(--muted)}
 .why-body{display:grid;grid-template-columns:.95fr 1.15fr;gap:22px;align-items:start}
 .why-reasons{display:flex;flex-direction:column;gap:9px}
 .why-reason{display:flex;gap:12px;align-items:flex-start;padding:11px 14px;border:1px solid var(--line);border-radius:13px;background:var(--panel-2)}
@@ -214,7 +210,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .why-reason p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.5}
 .why-final{margin-top:2px;padding:12px 16px;border-radius:12px;border:1px solid var(--line-hi);background:color-mix(in srgb,var(--accent) 8%,transparent);font-size:14px;color:var(--txt-hi);text-align:center}
 @media (max-width:900px){.why-body{grid-template-columns:1fr}}
-.plan-chip b{color:var(--txt-hi)}
 /* dramatic hero */
 .hero-shot{position:relative;border-radius:18px;overflow:hidden;border:1px solid var(--line-hi);box-shadow:var(--card-shadow);margin-bottom:14px;transition:transform .25s ease-out;transform-style:preserve-3d}
 .hero-shot>img{width:100%;height:min(40vh,336px);object-fit:cover;display:block}
@@ -560,8 +555,8 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .nav-float:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px)}
 .nav-float:disabled{opacity:.3;cursor:not-allowed}
 .nav-float svg{width:15px;height:15px;stroke:currentColor;fill:none;pointer-events:none}
-.nav-float.next{right:74px}
-.nav-float.prev{right:120px}
+.nav-float.prev{left:18px}
+.nav-float.next{left:64px}
 
 @media (max-width:640px){
   .stat-row,.adv-grid,.contact-grid,.proof-stats,.chg-grid,.step-flow,.metric-flip,.fact-row,.proj-grid,.bio-grid,.stat-banner,.pillar-grid,.proj-grid.trio{grid-template-columns:repeat(2,1fr)}
@@ -731,12 +726,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
         <div class="card beam-card"><p style="margin:0;font-size:18px;line-height:1.72;color:var(--txt)">אנחנו מלווים דיירים בתהליכי התחדשות עירונית מהיום הראשון ועד מסירת המפתח — מארגנים את הבניין, מנהלים את המשא ומתן מול היזם והרשויות, ודואגים שתקבלו את המקסימום מהזכויות שלכם.</p></div>
         <div class="takeaway"><span class="ic">◆</span><p>הפלטפורמה הייחודית שלנו הופכת את התהליך לפשוט ושקוף — מעקב סטטוס, ריכוז מסמכים ותקשורת ישירה לאורך כל הדרך.</p></div>
         <div class="takeaway"><span class="ic">◆</span><p>אנו מלווים אתכם מהצעד הראשון ועד קבלת המפתח, עם יחס אישי, ליווי מקצועי צמוד ומיצוי מלוא זכויותיכם — <b>עם הרווח הגדול ביותר עבורכם.</b></p></div>
-        <div class="plan-list">
-          <span class="plan-chip"><b>ליווי אישי</b> · צמוד לכל בעל דירה</span>
-          <span class="plan-chip"><b>שקיפות מלאה</b> · לאורך כל התהליך</span>
-          <span class="plan-chip"><b>פלטפורמה ייחודית</b> · מעקב וניהול</span>
-          <span class="plan-chip"><b>מעטפת מקיפה</b> · תחת קורת גג אחת</span>
-        </div>
       </div>
     </section>
 
@@ -1141,26 +1130,15 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   document.querySelectorAll(".cu").forEach(function(elm){if(/^[≈~]?\d+%?$/.test(elm.textContent.trim()))prepCount(elm);});
   function countUp(elm){var target=parseFloat(elm.getAttribute("data-count")),suffix=elm.getAttribute("data-suffix")||"",prefix=elm.getAttribute("data-prefix")||"";var dur=950,start=null;function tick(now){if(!start)start=now;var p=Math.min((now-start)/dur,1);var e=1-Math.pow(1-p,3);elm.textContent=prefix+Math.round(target*e)+suffix;if(p<1)requestAnimationFrame(tick);}requestAnimationFrame(tick);}
 
-  // auto-fit-to-scale: guarantee every slide fits with no clipping on any viewport.
-  // Below MIN_SCALE, stop shrinking text further (it becomes illegible on short
-  // phone screens) and let the slide scroll internally instead.
-  var FIT_MIN_SCALE=0.78;
+  // auto-fit-to-scale: guarantee every slide fits with no clipping and no
+  // scrolling on any viewport, however short — always scale down to fit.
   function fitSlide(s){
     var fit=s.querySelector(".slide-fit");if(!fit)return;
     fit.style.transform="";
-    s.classList.remove("is-scroll");
     var cs=getComputedStyle(s);
     var avail=s.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
     var need=fit.offsetHeight;
-    if(need>avail&&avail>0){
-      var scale=avail/need;
-      if(scale<FIT_MIN_SCALE){
-        fit.style.transform="scale("+FIT_MIN_SCALE+")";
-        s.classList.add("is-scroll");
-      } else {
-        fit.style.transform="scale("+scale.toFixed(4)+")";
-      }
-    }
+    if(need>avail&&avail>0){fit.style.transform="scale("+(avail/need).toFixed(4)+")";}
   }
   function fitAll(){slides.forEach(fitSlide);}
 
@@ -1169,7 +1147,6 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     stageEl.classList.toggle("on-title",current===0);
     btnPrevF.disabled=current===0;btnNextF.disabled=current===total-1;
     var b=slides[current].querySelector(".slide-body");if(b&&b.scrollTo)b.scrollTo(0,0);
-    slides[current].scrollTop=0;
     fitSlide(slides[current]);
     slides[current].querySelectorAll("[data-count]").forEach(function(elm){elm.textContent=(elm.getAttribute("data-prefix")||"")+"0"+(elm.getAttribute("data-suffix")||"");setTimeout(function(){countUp(elm);},180);});
   }
