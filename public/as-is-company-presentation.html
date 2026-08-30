@@ -677,7 +677,17 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 .pgrid-stats b{font-family:var(--mono);color:var(--accent-2);font-weight:600;font-size:19px}
 @media (max-width:1320px){.pgrid{gap:7px}.pgrid-card{padding:9px 6px;gap:4px}.pgrid-ic{width:38px;height:38px}
 .pgrid-name{font-size:16px}.pgrid-city{font-size:12.5px}.pgrid-stats span{font-size:12.5px}.pgrid-stats b{font-size:15px}}
-@media (max-width:640px){.pgrid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:700px){
+  .pgrid{grid-template-columns:1fr;gap:6px;margin-top:8px}
+  .pgrid-card{flex-direction:row;align-items:center;text-align:start;padding:8px 10px;gap:10px}
+  .pgrid-ic{width:34px;height:34px}
+  .pgrid-info{flex:1;min-width:0;width:auto}
+  .pgrid-name{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
+  .pgrid-city{font-size:10.5px;margin-top:1px;display:inline-block}
+  .pgrid-stats{flex-direction:row;flex-wrap:wrap;gap:7px;margin-top:2px;justify-content:flex-start}
+  .pgrid-stats span{font-size:10.5px}
+  .pgrid-stats b{font-size:12px}
+}
 
 .dstat-grid{display:flex;justify-content:center;margin-top:10px;margin-bottom:18px}
 .dstat-card{display:flex;align-items:center;justify-content:space-between;gap:20px;border:1px solid var(--line-hi);
@@ -1047,8 +1057,9 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   var sb=document.getElementById("sbarList");
   BARS.forEach(function(c,idx){
     var share=Math.round(c.p/totalP*100);
+    var visual=Math.max(share,5); // keep a visible sliver even for very small shares
     var label=c.city+(c.n>1?' ('+c.n+')':'');
-    var row=el('<div class="sbar-row reveal"><span class="addr">'+label+'</span><div class="sbar-track"><div class="sbar-signed" style="width:'+share+'%"></div><div class="sbar-proc" style="width:'+(100-share)+'%"></div></div><span class="n"><b class="cu">'+share+'</b>%</span></div>');
+    var row=el('<div class="sbar-row reveal"><span class="addr">'+label+'</span><div class="sbar-track"><div class="sbar-signed" style="width:'+visual+'%"></div><div class="sbar-proc" style="width:'+(100-visual)+'%"></div></div><span class="n"><b class="cu">'+share+'</b>%</span></div>');
     row.style.setProperty('--i', idx);
     sb.appendChild(row);
   });
