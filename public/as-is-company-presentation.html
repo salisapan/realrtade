@@ -597,6 +597,18 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   .step .d{font-size:12px}
   .final-line{font-size:15.5px;padding:11px 22px}
   .company-contact{font-size:11px;padding:7px 14px;margin-top:9px}
+  .testi-stack{margin-top:24px}
+  .testi-card{padding:14px 15px}
+  .testi-avatar{width:38px;height:38px}
+  .testi-avatar span{font-size:14px}
+  .testi-name{font-size:14.5px}
+  .testi-role{font-size:10.5px}
+  .testi-quote{font-size:13.5px;line-height:1.5;margin-bottom:10px}
+  .testi-tags{gap:5px;margin-bottom:9px}
+  .testi-tag{font-size:9px;padding:3px 8px}
+  .testi-meta{gap:11px;padding-top:8px;font-size:10px}
+  .testi-nav{width:28px;height:28px;font-size:15px}
+  .testi-dots{gap:14px;margin-top:12px}
 }
 
 /* --- round 2: vertical stepper, stat banner, flagship, pillars, avatars --- */
@@ -639,6 +651,35 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 
 .company-contact{align-self:center;text-align:center;font-family:var(--mono);font-size:12.5px;color:var(--accent-2);letter-spacing:.02em;padding:9px 18px;border:1px solid var(--line-hi);border-radius:999px;margin:14px 0 0;background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .company-contact .cc-item{white-space:nowrap}
+
+/* --- resident testimonials: draggable glass card stack --- */
+.testi-stack{position:relative;margin-top:34px;touch-action:pan-y}
+.testi-card{position:absolute;inset-inline:0;top:0;transform-origin:top center;border-radius:18px;border:1px solid var(--glass-border);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--accent) 7%,var(--panel-2)),var(--panel-2));
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  box-shadow:0 22px 40px -20px rgba(20,44,100,.35),inset 0 1px 0 var(--glass-gloss);
+  padding:20px 22px;cursor:grab;user-select:none;transition:transform .38s cubic-bezier(.2,.75,.2,1),opacity .38s}
+:root[data-theme="dark"] .testi-card{box-shadow:0 22px 40px -20px rgba(0,0,0,.55),inset 0 1px 0 var(--glass-gloss)}
+.testi-card.is-dragging{transition:none;cursor:grabbing}
+.testi-card:not(.is-active-card){pointer-events:none}
+.testi-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.testi-avatar{flex-shrink:0;width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 14%,transparent)}
+.testi-avatar span{font-family:var(--disp);font-weight:700;font-size:16.5px;color:#fff}
+.testi-name{font-family:var(--disp);font-weight:700;font-size:16.5px;color:var(--txt-hi)}
+.testi-role{font-size:12px;color:var(--muted);margin-top:2px}
+.testi-quote{margin:0 0 14px;font-size:15.5px;line-height:1.62;color:var(--txt)}
+.testi-tags{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.testi-tag{font-family:var(--mono);font-size:10px;letter-spacing:.05em;padding:4px 10px;border-radius:999px;border:1px solid var(--line-hi);color:var(--muted)}
+.testi-tag.hl{color:var(--accent-2);border-color:color-mix(in srgb,var(--accent) 45%,var(--line-hi));background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.testi-meta{display:flex;flex-wrap:wrap;gap:16px;border-top:1px solid var(--line);padding-top:11px;font-size:11.5px;color:var(--muted)}
+.testi-meta span{display:inline-flex;align-items:center;gap:5px}
+.testi-meta svg{width:13px;height:13px;stroke:var(--accent-2);fill:none;flex-shrink:0}
+.testi-dots{display:flex;justify-content:center;align-items:center;gap:22px;margin-top:16px}
+.testi-dotrow{display:flex;justify-content:center;align-items:center;gap:7px}
+.testi-dot{width:7px;height:7px;padding:0;border-radius:999px;border:none;background:var(--line-hi);cursor:pointer;transition:width .25s,background .25s}
+.testi-dot.active{width:20px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+.testi-nav{position:static;translate:none;width:32px;height:32px;font-size:18px}
 
 .beam-ring{position:relative}
 .beam-ring::before{content:"";position:absolute;inset:-5px;border-radius:50%;z-index:-1;
@@ -878,6 +919,21 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       </div>
     </section>
 
+    <!-- 8.5 Resident testimonials -->
+    <section class="slide" data-slide data-title="דיירים ממליצים">
+      <div class="eyebrow"><span class="dot"></span>מה אומרים עלינו</div>
+      <h2 class="slide-title">דיירים ממליצים</h2>
+      <p class="slide-sub">בעלי דירות שמלווים אותנו כבר היום — בקולם שלהם</p>
+      <div class="slide-body">
+        <div class="testi-stack" id="testiStack"></div>
+        <div class="testi-dots">
+          <button type="button" class="cfx-nav testi-nav prev" id="testiPrev" aria-label="הקודם">‹</button>
+          <div class="testi-dotrow" id="testiDotRow"></div>
+          <button type="button" class="cfx-nav testi-nav next" id="testiNext" aria-label="הבא">›</button>
+        </div>
+      </div>
+    </section>
+
     <!-- 9 Contact -->
     <section class="slide" data-slide data-title="הצעד הבא">
       <div class="eyebrow"><span class="dot"></span>הצעד הבא</div>
@@ -1094,6 +1150,100 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     row.style.setProperty('--i', idx);
     sb.appendChild(row);
   });
+
+  // resident testimonials — draggable glass card stack (ported from a React reference, vanilla JS)
+  // NOTE: quotes below are illustrative placeholders tied to real project names/cities —
+  // swap in genuine resident quotes (with their consent) before this slide goes out publicly.
+  var TESTI_ICONS={
+    cal:'<path d="M8 3v3M16 3v3M4 9h16M5 6h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1Z" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+    trend:'<path d="M4 16l5-5 4 4 7-8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 7h5v5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'
+  };
+  var RESIDENTS=[
+    {initials:"א",name:"אורית לוי",role:"דיירת בפרויקט מתחם נגבה – בר כוכבא, רמת גן",
+      quote:"בכל שלב ידענו בדיוק איפה אנחנו עומדים. קיבלנו תשובות אמיתיות במקום הבטחות כלליות — הרגשתי שותפה בתהליך ולא רק חתימה על מסמך.",
+      tags:[{t:"ליווי אישי",hl:true},{t:"שקיפות מלאה"}],meta:[{i:"cal",t:"מלווים מאז 2022"},{i:"trend",t:"בתהליך פעיל"}]},
+    {initials:"מ",name:"משה גבאי",role:"דייר בפרויקט השר משה ועוזיאל, רמת גן",
+      quote:"נכנסתי לתהליך עם הרבה חשדנות אחרי מה ששמעתי מבניינים אחרים. הליווי הצמוד וההסברים לאורך הדרך הפכו את זה לתהליך שאני סומך עליו.",
+      tags:[{t:"מענה מקצועי",hl:true},{t:"אמון מלא"}],meta:[{i:"cal",t:"מלווים מאז 2023"},{i:"trend",t:"בתהליך פעיל"}]},
+    {initials:"ר",name:"רונית ברק",role:"דיירת בפרויקט וולפסון, ראשון לציון",
+      quote:"קיבלנו את כל הנתונים הכלכליים בצורה ברורה, ואת הליווי המשפטי הרגשנו לצידנו לאורך כל המשא ומתן. אף פעם לא הרגשנו שאנחנו לבד מול היזם.",
+      tags:[{t:"שקיפות בנתונים",hl:true},{t:"ליווי משפטי"}],meta:[{i:"cal",t:"מלווים מאז 2022"},{i:"trend",t:"בתהליך פעיל"}]},
+    {initials:"י",name:"יעקב שרעבי",role:"דייר בפרויקט מתחם הגאולה וישורון, הוד השרון",
+      quote:"פרויקט עם הרבה דיירים ואינטרסים שונים — AS-IS ניהלו את זה בסבלנות ובמקצועיות, וידעו לייצג אותנו נכון מול כל הגורמים המעורבים.",
+      tags:[{t:"ניהול משא ומתן",hl:true},{t:"תקשורת שוטפת"}],meta:[{i:"cal",t:"מלווים מאז 2021"},{i:"trend",t:"בתהליך פעיל"}]},
+    {initials:"ש",name:"שרה מזרחי",role:"דיירת בפרויקט ארתור רופין, פתח תקווה",
+      quote:"מהפגישה הראשונה ועד היום התהליך התנהל בצורה חלקה ומסודרת. היום אני זו שממליצה לשכנים בבניינים סמוכים לפנות אליהם.",
+      tags:[{t:"תהליך חלק",hl:true},{t:"המלצה חמה"}],meta:[{i:"cal",t:"מלווים מאז 2023"},{i:"trend",t:"בתהליך פעיל"}]}
+  ];
+  (function initTestimonials(){
+    var stack=document.getElementById("testiStack");if(!stack)return;
+    var dotRow=document.getElementById("testiDotRow");
+    var total=RESIDENTS.length,activeIndex=0,visibleBehind=2;
+    var isDragging=false,dragStartX=0,dragOffset=0;
+    var cardEls=[],dotEls=[];
+
+    RESIDENTS.forEach(function(t){
+      var tagsHtml=t.tags.map(function(g){return '<span class="testi-tag'+(g.hl?' hl':'')+'">'+g.t+'</span>';}).join("");
+      var metaHtml=t.meta.map(function(m){return '<span><svg viewBox="0 0 24 24">'+TESTI_ICONS[m.i]+'</svg>'+m.t+'</span>';}).join("");
+      var card=el('<div class="testi-card"><div class="testi-top"><div class="testi-avatar"><span>'+t.initials+'</span></div><div><div class="testi-name">'+t.name+'</div><div class="testi-role">'+t.role+'</div></div></div><p class="testi-quote">"'+t.quote+'"</p><div class="testi-tags">'+tagsHtml+'</div><div class="testi-meta">'+metaHtml+'</div></div>');
+      cardEls.push(card);
+      stack.appendChild(card);
+      card.addEventListener("mousedown",function(e){onDragStart(e,card);});
+      card.addEventListener("touchstart",function(e){onDragStart(e,card);},{passive:true});
+    });
+    RESIDENTS.forEach(function(t,idx){
+      var d=document.createElement("button");
+      d.type="button";d.className="testi-dot";d.setAttribute("aria-label","עדות "+(idx+1)+" מתוך "+total);
+      d.addEventListener("click",function(){navigate(idx);});
+      dotRow.appendChild(d);dotEls.push(d);
+    });
+
+    function layout(){
+      var active=cardEls[activeIndex];
+      if(active)stack.style.minHeight=active.scrollHeight+"px";
+    }
+    function paint(){
+      cardEls.forEach(function(c,i){
+        var order=(i-activeIndex+total)%total;
+        c.classList.toggle("is-active-card",order===0);
+        if(order===0){
+          c.style.transform="translateX("+dragOffset+"px)";c.style.opacity=1;c.style.zIndex=total;
+        }else if(order<=visibleBehind){
+          var scale=1-0.045*order,ty=-14*order;
+          c.style.transform="scale("+scale+") translateY("+ty+"px)";c.style.opacity=1-0.22*order;c.style.zIndex=total-order;
+        }else{
+          c.style.transform="scale(0)";c.style.opacity=0;c.style.zIndex=0;
+        }
+      });
+      dotEls.forEach(function(d,i){d.classList.toggle("active",i===activeIndex);});
+      layout();
+    }
+    function navigate(i){activeIndex=((i%total)+total)%total;paint();}
+    function onDragStart(e,card){
+      if(!card.classList.contains("is-active-card"))return;
+      isDragging=true;dragStartX=("touches" in e)?e.touches[0].clientX:e.clientX;
+      card.classList.add("is-dragging");
+    }
+    function onDragMove(e){
+      if(!isDragging)return;
+      var x=("touches" in e)?e.touches[0].clientX:e.clientX;
+      dragOffset=x-dragStartX;paint();
+    }
+    function onDragEnd(){
+      if(!isDragging)return;
+      cardEls[activeIndex].classList.remove("is-dragging");
+      if(Math.abs(dragOffset)>50)navigate(activeIndex+(dragOffset<0?1:-1));
+      isDragging=false;dragOffset=0;paint();
+    }
+    window.addEventListener("mousemove",onDragMove);
+    window.addEventListener("touchmove",onDragMove,{passive:true});
+    window.addEventListener("mouseup",onDragEnd);
+    window.addEventListener("touchend",onDragEnd);
+    document.getElementById("testiPrev").addEventListener("click",function(){navigate(activeIndex-1);});
+    document.getElementById("testiNext").addEventListener("click",function(){navigate(activeIndex+1);});
+    new ResizeObserver(layout).observe(stack);
+    paint();
+  })();
 
   // lightbox
   var lightbox=document.getElementById("lightbox"),lightboxImg=document.getElementById("lightbox-img");
