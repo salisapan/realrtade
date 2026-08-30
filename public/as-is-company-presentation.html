@@ -568,9 +568,35 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
   .team-row{grid-template-columns:1fr}
   .shot-grid{grid-template-columns:repeat(3,1fr)}
   .sbar-row{grid-template-columns:80px 1fr 64px}
-  .slide-badge{width:50px;height:50px;top:8px}
-  .eyebrow{padding-inline-start:60px;font-size:10.5px;letter-spacing:.14em}
-  .slide-title{padding-inline-start:60px}
+  .slide-badge{width:40px;height:40px;top:6px}
+  .eyebrow{padding-inline-start:46px;font-size:10.5px;letter-spacing:.14em;margin-bottom:5px}
+  .slide-title{padding-inline-start:46px;margin:0 0 5px;font-size:clamp(28px,7.5vw,36px)}
+  .slide-sub{margin:0 0 10px;font-size:15px}
+  .slide-body{gap:0}
+  .card{padding:14px 16px}
+  .card p{font-size:18.5px!important;line-height:1.5!important}
+  .takeaway{margin-top:9px;padding:11px 13px;gap:8px}
+  .takeaway p{font-size:16.5px}
+  .why-body{gap:10px}
+  .why-intro{padding:14px 16px}
+  .why-reasons{gap:6px}
+  .why-reason{padding:10px 12px;gap:10px}
+  .why-reason h4{font-size:15px}
+  .why-reason p{font-size:12.5px}
+  .why-final{padding:11px 14px;font-size:13.5px}
+  .bio-grid{gap:8px;margin-top:8px}
+  .bio-card{padding:12px}
+  .avatar-ring{width:44px;height:44px;margin-bottom:6px}
+  .bio-name{font-size:17px;margin-bottom:2px}
+  .bio-role{font-size:9px;margin-bottom:6px}
+  .bio-txt{font-size:13px;line-height:1.45}
+  .steps{padding:14px;gap:10px}
+  .step{gap:10px}
+  .step-num{width:24px;height:24px;font-size:11.5px}
+  .step .t{font-size:15px}
+  .step .d{font-size:12px}
+  .final-line{font-size:15.5px;padding:11px 22px}
+  .company-contact{font-size:11px;padding:7px 14px;margin-top:9px}
 }
 
 /* --- round 2: vertical stepper, stat banner, flagship, pillars, avatars --- */
@@ -679,15 +705,19 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 @media (max-width:1320px){.pgrid{gap:7px}.pgrid-card{padding:9px 6px;gap:4px}.pgrid-ic{width:38px;height:38px}
 .pgrid-name{font-size:16px}.pgrid-city{font-size:12.5px}.pgrid-stats span{font-size:12.5px}.pgrid-stats b{font-size:15px}}
 @media (max-width:700px){
-  .pgrid{grid-template-columns:1fr;gap:6px;margin-top:8px}
-  .pgrid-card{flex-direction:row;align-items:center;text-align:start;padding:8px 10px;gap:10px}
-  .pgrid-ic{width:34px;height:34px}
+  .pgrid{grid-template-columns:1fr;gap:5px;margin-top:6px}
+  .pgrid-card{flex-direction:row;align-items:center;text-align:start;padding:6px 9px;gap:9px}
+  .pgrid-ic{width:28px;height:28px}
   .pgrid-info{flex:1;min-width:0;width:auto}
-  .pgrid-name{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25}
-  .pgrid-city{font-size:10.5px;margin-top:1px;display:inline-block}
-  .pgrid-stats{flex-direction:row;flex-wrap:wrap;gap:7px;margin-top:2px;justify-content:flex-start}
+  .pgrid-name{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+  .pgrid-city{font-size:10.5px;margin-top:0;display:inline-block}
+  .pgrid-stats{flex-direction:row;flex-wrap:wrap;gap:6px;margin-top:1px;justify-content:flex-start}
   .pgrid-stats span{font-size:10.5px}
   .pgrid-stats b{font-size:12px}
+  .stat-banner{gap:6px;margin-bottom:8px}
+  .stat-banner .sb-item{padding:10px 6px}
+  .stat-banner .sb-item .num{font-size:26px}
+  .stat-banner .sb-item .lbl{font-size:10px;margin-top:2px}
 }
 
 .dstat-grid{display:flex;justify-content:center;margin-top:10px;margin-bottom:18px}
