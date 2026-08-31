@@ -6,29 +6,28 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
+const DOIT_BUTTON_URL = 'https://theflow-ai.com/email-doit-button.png';
 const LOG_PREFIX = '[send-playbook]';
 
-// Temporary CTA until a real scheduling link (e.g. Calendly) is wired up —
-// opens a pre-filled draft in the recipient's own email client. Swap this
-// one constant for the real booking URL once it exists; nothing else needs
-// to change.
-const CTA_URL =
-  'mailto:hello@theflow-ai.com?subject=' +
-  encodeURIComponent('Discovery Call Request') +
-  '&body=' +
-  encodeURIComponent("Hi Flow team,\n\nI'd like to schedule a discovery call to see which deployment model fits us.\n\nA few times that could work for me:\n- \n\nThanks!");
+// Temporary CTA until a real scheduling link (e.g. Calendly) is wired up.
+// Uses a plain https:// URL rather than mailto: — mailto links are not
+// reliably clickable inside sandboxed/embedded viewers (e.g. a PDF opened
+// inline in Gmail or a browser), while https:// links work everywhere.
+// Swap this one constant for the real booking URL once it exists; nothing
+// else needs to change.
+const CTA_URL = 'https://theflow-ai.com/#waitlist';
 
 const SUBJECT = {
   en: 'Your Hybrid Automation Playbook',
   he: 'The Hybrid Automation Playbook — המדריך שלכם',
 };
 
-function ctaButton(label) {
+function ctaButton(altLabel) {
   return (
     '<tr><td align="center" style="padding:28px 0 10px">' +
-    '<a href="' + CTA_URL + '" style="display:inline-block; background:#1A4EF5; color:#ffffff; text-decoration:none; ' +
-    'font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:15px; padding:14px 32px; border-radius:999px;">' +
-    label + '</a></td></tr>'
+    '<a href="' + CTA_URL + '" style="display:inline-block;">' +
+    '<img src="' + DOIT_BUTTON_URL + '" alt="' + altLabel + '" width="220" style="display:block; width:220px; height:auto;">' +
+    '</a></td></tr>'
   );
 }
 
@@ -48,7 +47,7 @@ function htmlBody(lang) {
   var ctaFine = isHe
     ? 'לחצו למטה ונתאם זמן שנוח לכם.'
     : "Click below and we'll find a time that works for you.";
-  var sigTeam = isHe ? 'צוות Flow' : 'The Flow Team';
+  var sigTeam = isHe ? 'FLOW TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
 
   return (
@@ -61,11 +60,9 @@ function htmlBody(lang) {
     '</td></tr>' +
     ctaButton(ctaLabel) +
     '<tr><td dir="' + dir + '" align="center" style="color:#455073; font-size:13px; padding-bottom:26px;">' + ctaFine + '</td></tr>' +
-    '<tr><td style="border-top:1px solid #e3e8f3; padding-top:18px;">' +
-    '<table role="presentation" cellpadding="0" cellspacing="0"><tr>' +
-    '<td style="padding-inline-end:10px;"><img src="' + LOGO_URL + '" alt="Flow" width="26" style="display:block; width:26px; height:auto; border-radius:6px;"></td>' +
-    '<td dir="' + dir + '" style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.4;"><b>' + sigTeam + '</b><br><span style="color:#455073;">' + sigTagline + '</span></td>' +
-    '</tr></table>' +
+    '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px;">' +
+    '<img src="' + LOGO_URL + '" alt="Flow" width="28" style="display:block; width:28px; height:auto; margin-bottom:8px;">' +
+    '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
     '</td></tr>' +
     '</table>'
   );
