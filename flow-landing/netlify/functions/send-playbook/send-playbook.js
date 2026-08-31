@@ -50,21 +50,33 @@ function htmlBody(lang) {
   var sigTeam = isHe ? 'FLOW TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
 
-  return (
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif;">' +
+  var content = (
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; background:#ffffff;">' +
     '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="color:#232B44; font-size:15px; line-height:1.65;">' +
     '<p style="margin:0 0 14px">' + greeting + '</p>' +
     '<p style="margin:0 0 14px">' + intro + '</p>' +
     '<p style="margin:0 0 14px">' + pitch + '</p>' +
     '</td></tr>' +
+    '<tr><td dir="' + dir + '" align="center" style="color:#455073; font-size:13px; padding-top:8px;">' + ctaFine + '</td></tr>' +
     ctaButton(ctaLabel) +
-    '<tr><td dir="' + dir + '" align="center" style="color:#455073; font-size:13px; padding-bottom:26px;">' + ctaFine + '</td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px;">' +
     '<img src="' + LOGO_URL + '" alt="Flow" width="28" style="display:block; width:28px; height:auto; margin-bottom:8px;">' +
     '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
     '</td></tr>' +
     '</table>'
+  );
+
+  return (
+    '<!DOCTYPE html><html dir="' + dir + '"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+    '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">' +
+    '<title>Flow</title></head>' +
+    '<body style="margin:0; padding:0; background:#ffffff;">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="background:#ffffff;"><tr><td align="center" style="padding:32px 20px;">' +
+    content +
+    '</td></tr></table>' +
+    '</body></html>'
   );
 }
 
