@@ -40,12 +40,13 @@
 html{scroll-behavior:smooth}
 body{margin:0; background:var(--bg); color:var(--txt); font-family:Georgia,'Times New Roman',serif; line-height:1.7; font-size:1.08rem}
 .wrap{max-width:740px; margin:0 auto; padding:0 24px}
-header.site{background:var(--navy); padding:18px 0}
+header.site{background:var(--navy); padding:14px 0}
 header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
-.brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:#EEF2F9; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-weight:700; font-size:1.15rem; letter-spacing:.02em}
-.brand .dot{width:8px; height:8px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 12px var(--accent-2)}
-header.site nav a{color:#AEB9D6; text-decoration:none; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.92rem; margin-inline-start:22px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.92rem; font-weight:600; margin-inline-start:24px}
 header.site nav a:hover{color:#fff}
+header.site nav a.hi{color:#EEF2F9}
 main{padding:52px 0 20px}
 .eyebrow{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
 h1.title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:2.1rem; line-height:1.25; color:var(--txt-hi); margin:12px 0 10px}
@@ -57,9 +58,15 @@ article blockquote{margin:28px 0; padding:4px 20px; border-inline-start:3px soli
 .refs h2{font-size:1.05rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 16px}
 .refs ol{margin:0; padding-inline-start:22px; color:var(--muted); font-size:.92rem; line-height:1.65}
 .refs li{margin-bottom:8px}
-.cta{margin:56px 0 10px; padding:30px 28px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-.cta p{margin:0 0 16px; color:var(--txt-hi); font-size:1.02rem}
-.cta a{display:inline-block; background:var(--accent-2); color:#fff; text-decoration:none; font-weight:700; padding:12px 26px; border-radius:999px}
+.cta{margin:56px 0 10px; padding:36px 28px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.cta p{margin:0 0 22px; color:var(--txt-hi); font-size:1.02rem}
+.doit{--pad-y:15px; --pad-x:32px; position:relative; display:inline-flex; align-items:center; justify-content:center; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-weight:700; font-size:1.02rem; color:#123ccb; text-decoration:none; transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.doit .shell{position:absolute; inset:0; border-radius:inherit; z-index:-2; background:linear-gradient(180deg,rgba(255,255,255,.97) 0%,transparent 24%),linear-gradient(180deg,rgba(255,255,255,.97),rgba(219,230,250,.75)); border:1px solid rgba(40,70,150,.3); box-shadow:inset 0 1.5px 0 rgba(255,255,255,.97), inset 0 -12px 26px rgba(14,32,80,.10), 0 16px 46px -10px rgba(26,78,245,.32)}
+.doit .ring{position:absolute; inset:6px; border-radius:999px; z-index:-1; border:2px solid #2f5bd8; box-shadow:0 0 12px rgba(26,78,245,.3), inset 0 0 0 1px rgba(255,255,255,.5), inset 0 0 11px rgba(47,91,216,.3)}
+.doit:hover{transform:translateY(-2px) scale(1.035)}
+.doit:hover .shell{box-shadow:inset 0 1px 0 rgba(255,255,255,.8), inset 0 -10px 22px rgba(14,32,80,.16), 0 20px 60px -8px rgba(26,78,245,.34)}
+.doit:hover .ring{border-color:#1A4EF5; box-shadow:0 0 22px rgba(26,78,245,.32), inset 0 0 16px rgba(26,78,245,.3)}
+.doit:active{transform:translateY(0) scale(.99)}
 footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--muted); font-size:.86rem}
 footer.site a{color:var(--muted)}
 </style>
@@ -67,8 +74,8 @@ footer.site a{color:var(--muted)}
 <body>
 <header class="site">
   <div class="wrap">
-    <a class="brand" href="/"><span class="dot"></span>Flow</a>
-    <nav><a href="/#waitlist">Join Waitlist</a><a href="/blog/">Insights</a></nav>
+    <a class="brand" href="/"><img src="/email-logo.png" alt="Flow"></a>
+    <nav><a href="/">Home</a><a href="/blog/" class="hi">Insights</a><a href="/#waitlist">Join Waitlist</a></nav>
   </div>
 </header>
 <main>
@@ -110,7 +117,7 @@ footer.site a{color:var(--muted)}
     </div>
     <div class="cta">
       <p>See how Flow applies this in practice — masked in our secure cloud, or fully on your own infrastructure with Flow-Edge.</p>
-      <a href="/#waitlist">Join the Waitlist</a>
+      <a class="doit" href="/#waitlist"><span class="shell"></span><span class="ring"></span>[Do It]</a>
     </div>
   </div>
 </main>
