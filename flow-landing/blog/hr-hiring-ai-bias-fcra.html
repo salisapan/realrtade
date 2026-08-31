@@ -30,48 +30,60 @@
   "datePublished": "2026-08-31"
 }
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
-  --txt:#1B2436; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
-  --navy:#07090F;
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --navy:#07090F; --cat:#0891B2;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Fraunces',Georgia,serif;
+  --serif:'Source Serif 4',Georgia,serif;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0; background:var(--bg); color:var(--txt); font-family:Georgia,'Times New Roman',serif; line-height:1.7; font-size:1.08rem}
-.wrap{max-width:740px; margin:0 auto; padding:0 24px}
-header.site{background:var(--navy); padding:14px 0}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.13rem; -webkit-font-smoothing:antialiased}
+.wrap{max-width:700px; margin:0 auto; padding:0 24px}
+#progress{position:fixed; top:0; left:0; height:3px; width:0%; background:var(--cat); z-index:50; transition:width .1s linear}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
 header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
 .brand{display:flex; align-items:center}
 .brand img{height:26px; width:auto; display:block}
-header.site nav a{color:#AEB9D6; text-decoration:none; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
 header.site nav a:hover{color:#fff}
 header.site nav a.hi{color:#EEF2F9}
-main{padding:52px 0 20px}
-.eyebrow{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
-h1.title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:2.1rem; line-height:1.25; color:var(--txt-hi); margin:12px 0 10px}
-.meta{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--muted); font-size:.88rem; margin-bottom:34px; padding-bottom:24px; border-bottom:1px solid var(--line)}
-article h2{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:1.34rem; color:var(--txt-hi); margin:42px 0 14px}
-article p{margin:0 0 20px}
-article blockquote{margin:28px 0; padding:4px 20px; border-inline-start:3px solid var(--accent-2); color:var(--muted); font-style:italic}
-.refs{margin-top:52px; padding-top:26px; border-top:1px solid var(--line); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-.refs h2{font-size:1.05rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 16px}
-.refs ol{margin:0; padding-inline-start:22px; color:var(--muted); font-size:.92rem; line-height:1.65}
-.refs li{margin-bottom:8px}
-.cta{margin:56px 0 10px; padding:36px 28px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+h1.title{font-family:var(--disp); font-weight:560; font-size:2.5rem; line-height:1.18; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 18px}
+.meta{font-family:var(--sans); display:flex; align-items:center; gap:9px; color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+.meta .dot{width:7px; height:7px; border-radius:50%; background:var(--cat); flex:none}
+article p{margin:0 0 22px}
+article>p:first-of-type{font-family:var(--serif); font-size:1.24rem; line-height:1.6; color:var(--txt-hi)}
+article>p:first-of-type::first-letter{font-family:var(--disp); font-weight:680; font-size:3.6em; float:inline-start; line-height:.82; padding:.03em .07em 0 0; color:var(--cat)}
+article h2{font-family:var(--disp); font-weight:560; font-size:1.5rem; line-height:1.3; color:var(--txt-hi); margin:48px 0 16px; padding-inline-start:16px; border-inline-start:3px solid var(--cat)}
+article blockquote{margin:32px 0; padding:2px 22px; border-inline-start:3px solid var(--cat); color:var(--muted); font-style:italic; font-size:1.08rem}
+.refs{margin-top:56px; padding-top:28px; border-top:1px solid var(--line); font-family:var(--sans)}
+.refs h2{font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.14em; color:var(--cat); margin:0 0 18px}
+.refs ol{margin:0; padding-inline-start:0; list-style:none; counter-reset:refs; color:var(--muted); font-size:.9rem; line-height:1.6}
+.refs li{counter-increment:refs; margin-bottom:12px; padding-inline-start:26px; position:relative}
+.refs li::before{content:counter(refs); position:absolute; inset-inline-start:0; top:.1em; font-weight:700; color:var(--cat); font-size:.8rem}
+.cta{margin:60px 0 10px; padding:38px 28px; background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--cat); border-radius:16px; text-align:center; font-family:var(--sans)}
 .cta p{margin:0 0 22px; color:var(--txt-hi); font-size:1.02rem}
-.doit{--pad-y:15px; --pad-x:32px; position:relative; display:inline-flex; align-items:center; justify-content:center; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-weight:700; font-size:1.02rem; color:#123ccb; text-decoration:none; transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.doit{--pad-y:15px; --pad-x:32px; position:relative; display:inline-flex; align-items:center; justify-content:center; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; font-family:var(--sans); font-weight:700; font-size:1.02rem; color:#123ccb; text-decoration:none; transition:transform .28s cubic-bezier(.2,.8,.2,1)}
 .doit .shell{position:absolute; inset:0; border-radius:inherit; z-index:-2; background:linear-gradient(180deg,rgba(255,255,255,.97) 0%,transparent 24%),linear-gradient(180deg,rgba(255,255,255,.97),rgba(219,230,250,.75)); border:1px solid rgba(40,70,150,.3); box-shadow:inset 0 1.5px 0 rgba(255,255,255,.97), inset 0 -12px 26px rgba(14,32,80,.10), 0 16px 46px -10px rgba(26,78,245,.32)}
 .doit .ring{position:absolute; inset:6px; border-radius:999px; z-index:-1; border:2px solid #2f5bd8; box-shadow:0 0 12px rgba(26,78,245,.3), inset 0 0 0 1px rgba(255,255,255,.5), inset 0 0 11px rgba(47,91,216,.3)}
 .doit:hover{transform:translateY(-2px) scale(1.035)}
 .doit:hover .shell{box-shadow:inset 0 1px 0 rgba(255,255,255,.8), inset 0 -10px 22px rgba(14,32,80,.16), 0 20px 60px -8px rgba(26,78,245,.34)}
 .doit:hover .ring{border-color:#1A4EF5; box-shadow:0 0 22px rgba(26,78,245,.32), inset 0 0 16px rgba(26,78,245,.3)}
 .doit:active{transform:translateY(0) scale(.99)}
-footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--muted); font-size:.86rem}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
 footer.site a{color:var(--muted)}
 </style>
 </head>
 <body>
+<div id="progress"></div>
 <header class="site">
   <div class="wrap">
     <a class="brand" href="/"><img src="/email-logo.png" alt="Flow"></a>
@@ -82,7 +94,7 @@ footer.site a{color:var(--muted)}
   <div class="wrap">
     <span class="eyebrow">HR & People Operations</span>
     <h1 class="title">AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook</h1>
-    <div class="meta">Flow Research · 7 min read</div>
+    <div class="meta"><span class="dot"></span>Flow Research · 7 min read</div>
     <article>
 
 <p>Resume screening, interview scheduling, and background-check coordination are among the most automation-ready workflows in any HR function — and among the most heavily scrutinized by regulators over the last several years, precisely because the outcome of a hiring decision is exactly the kind of consequence employment and civil-rights law was built to police.</p>
@@ -123,5 +135,20 @@ footer.site a{color:var(--muted)}
 <footer class="site">
   <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a></div>
 </footer>
+<script>
+(function(){
+  var bar = document.getElementById('progress');
+  var art = document.querySelector('article');
+  function update(){
+    var rect = art.getBoundingClientRect();
+    var total = rect.height - innerHeight * 0.5;
+    var seen = Math.min(Math.max(-rect.top, 0), total);
+    bar.style.width = (total > 0 ? (seen / total) * 100 : 0) + '%';
+  }
+  addEventListener('scroll', update, {passive:true});
+  addEventListener('resize', update);
+  update();
+})();
+</script>
 </body>
 </html>

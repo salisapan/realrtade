@@ -13,14 +13,19 @@
 <meta property="og:url" content="https://theflow-ai.com/blog/">
 <meta property="og:image" content="https://theflow-ai.com/og.png">
 <title>Flow Insights — Research on Regulated AI Deployment</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#FFFFFF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
-  --txt:#1B2436; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF; --navy:#07090F;
+  --bg:#FFFFFF; --panel:#F9FAFC; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF; --navy:#07090F;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Fraunces',Georgia,serif; --serif:'Source Serif 4',Georgia,serif;
 }
 *{box-sizing:border-box}
-body{margin:0; background:var(--bg); color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-.wrap{max-width:900px; margin:0 auto; padding:0 24px}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--sans)}
+.wrap{max-width:980px; margin:0 auto; padding:0 24px}
 header.site{background:var(--navy); padding:14px 0}
 header.site .wrap{display:flex; align-items:center; justify-content:space-between}
 .brand{display:flex; align-items:center}
@@ -28,15 +33,26 @@ header.site .wrap{display:flex; align-items:center; justify-content:space-betwee
 header.site nav a{color:#AEB9D6; text-decoration:none; font-size:.92rem; font-weight:600; margin-inline-start:24px}
 header.site nav a:hover{color:#fff}
 header.site nav a.hi{color:#EEF2F9}
-main{padding:56px 0}
-h1{font-size:2.2rem; color:var(--txt-hi); margin:0 0 10px}
-.lead{color:var(--muted); font-size:1.08rem; max-width:600px; margin:0 0 40px}
-.post{display:block; text-decoration:none; color:inherit; padding:26px 0; border-top:1px solid var(--line)}
-.post:last-child{border-bottom:1px solid var(--line)}
-.post .cat{font-size:.76rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--accent)}
-.post h2{font-size:1.28rem; color:var(--txt-hi); margin:8px 0 8px}
-.post p{color:var(--muted); margin:0; font-size:.96rem; line-height:1.6}
-footer.site{padding:30px 0 60px; text-align:center; color:var(--muted); font-size:.86rem}
+main{padding:64px 0 40px}
+.masthead{margin-bottom:52px}
+.masthead .eyebrow{font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
+h1{font-family:var(--disp); font-weight:560; letter-spacing:-.01em; font-size:2.6rem; color:var(--txt-hi); margin:10px 0 12px}
+.lead{font-family:var(--serif); color:var(--muted); font-size:1.14rem; line-height:1.6; max-width:640px; margin:0}
+
+.featured{display:block; margin-bottom:44px; padding:40px; border:1px solid var(--line); border-top:4px solid var(--fcat, var(--accent)); border-radius:20px; text-decoration:none; color:inherit; background:var(--panel)}
+.featured .cat{font-size:.76rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--fcat, var(--accent))}
+.featured h2{font-family:var(--disp); font-weight:560; font-size:1.9rem; line-height:1.25; color:var(--txt-hi); margin:14px 0 12px; max-width:26ch}
+.featured p{font-family:var(--serif); color:var(--muted); margin:0; font-size:1.06rem; line-height:1.6; max-width:60ch}
+.featured .read{display:inline-block; margin-top:18px; font-weight:700; color:var(--fcat, var(--accent)); font-size:.92rem}
+.featured:hover .read{text-decoration:underline}
+
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:16px; overflow:hidden}
+.post{display:block; text-decoration:none; color:inherit; padding:26px 24px; background:var(--bg); border-top:3px solid var(--pcat, var(--accent)); transition:background .2s}
+.post:hover{background:var(--panel)}
+.post .cat{font-size:.72rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--pcat, var(--accent))}
+.post h3{font-family:var(--disp); font-weight:560; font-size:1.14rem; line-height:1.32; color:var(--txt-hi); margin:9px 0 8px}
+.post p{color:var(--muted); margin:0; font-size:.9rem; line-height:1.55}
+footer.site{padding:30px 0 60px; text-align:center; color:var(--muted); font-size:.86rem; border-top:1px solid var(--line); margin-top:20px}
 footer.site a{color:var(--muted)}
 </style>
 </head>
@@ -49,59 +65,65 @@ footer.site a{color:var(--muted)}
 </header>
 <main>
   <div class="wrap">
-    <h1>Flow Insights</h1>
-    <p class="lead">Research and analysis on deploying AI workflow automation in regulated industries — where compliance, architecture, and efficiency meet.</p>
-    <a class="post" href="/blog/legal-ai-workflow-automation.html">
+    <div class="masthead">
+      <span class="eyebrow">FLOW INSIGHTS</span>
+      <h1>Research on Regulated AI Deployment</h1>
+      <p class="lead">Where compliance, architecture, and efficiency meet — across law, healthcare, finance, insurance, government, and beyond.</p>
+    </div>
+    <a class="featured" style="--fcat:#1A4EF5" href="/blog/legal-ai-workflow-automation.html">
       <span class="cat">Legal</span>
       <h2>Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility</h2>
       <p>A framework for deploying AI workflow automation in legal practice without compromising confidentiality, privilege, or the duty of competence.</p>
+      <span class="read">Start here — 7 min read →</span>
     </a>
-    <a class="post" href="/blog/hipaa-compliant-ai-automation.html">
-      <span class="cat">Healthcare</span>
-      <h2>Compliance by Design: Architecting AI Workflow Automation Under HIPAA</h2>
-      <p>How chart summarization, intake, and clinical workflow automation can be deployed without creating new HIPAA exposure — a technical and regulatory framework.</p>
-    </a>
-    <a class="post" href="/blog/financial-services-data-masking-ai.html">
-      <span class="cat">Financial Services</span>
-      <h2>Automated Data Masking and AI Governance in Regulated Financial Institutions</h2>
-      <p>A governance framework for deploying AI automation on customer financial data under GLBA, model-risk-management guidance, and DORA.</p>
-    </a>
-    <a class="post" href="/blog/insurance-claims-ai-automation.html">
-      <span class="cat">Insurance</span>
-      <h2>AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</h2>
-      <p>How insurers can automate claims triage and underwriting workflows while satisfying emerging AI-specific fairness and disclosure regulation.</p>
-    </a>
-    <a class="post" href="/blog/edge-vs-cloud-ai-architecture.html">
-      <span class="cat">Architecture & Security</span>
-      <h2>Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data</h2>
-      <p>A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.</p>
-    </a>
-    <a class="post" href="/blog/government-ai-automation-fedramp-cmmc.html">
-      <span class="cat">Government & Public Sector</span>
-      <h2>Deploying AI Automation in Government: Meeting the Federal Procurement Security Bar</h2>
-      <p>Why unauthorized commercial AI tools cannot lawfully process federal data, and how FedRAMP, CMMC, and CUI rules should shape deployment architecture.</p>
-    </a>
-    <a class="post" href="/blog/manufacturing-ai-export-controls.html">
-      <span class="cat">Manufacturing & Supply Chain</span>
-      <h2>AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing</h2>
-      <p>Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.</p>
-    </a>
-    <a class="post" href="/blog/title-escrow-ai-wire-fraud.html">
-      <span class="cat">Real Estate & Title</span>
-      <h2>AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard</h2>
-      <p>Automating closing-file review and escrow correspondence sits directly on top of wire instructions — a framework for doing it without widening the fraud surface.</p>
-    </a>
-    <a class="post" href="/blog/hr-hiring-ai-bias-fcra.html">
-      <span class="cat">HR & People Operations</span>
-      <h2>AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook</h2>
-      <p>Resume screening and background-check-adjacent automation now sit under a fast-expanding set of federal and state obligations — a framework for deploying it defensibly.</p>
-    </a>
-    <a class="post" href="/blog/auditability-by-design-ai-systems.html">
-      <span class="cat">Architecture & Security</span>
-      <h2>Auditability by Design: Logging, Provenance, and Human Oversight in Regulated AI Systems</h2>
-      <p>A concrete engineering framework for building the record-keeping and human-oversight controls that every regulatory regime discussed above ultimately requires.</p>
-    </a>
+    <div class="grid">
+      <a class="post" style="--pcat:#0E9488" href="/blog/hipaa-compliant-ai-automation.html">
+        <span class="cat">Healthcare</span>
+        <h3>Compliance by Design: Architecting AI Workflow Automation Under HIPAA</h3>
+        <p>How chart summarization, intake, and clinical workflow automation can be deployed without creating new HIPAA exposure — a technical and regulatory framework.</p>
+      </a>
+      <a class="post" style="--pcat:#0F9D58" href="/blog/financial-services-data-masking-ai.html">
+        <span class="cat">Financial Services</span>
+        <h3>Automated Data Masking and AI Governance in Regulated Financial Institutions</h3>
+        <p>A governance framework for deploying AI automation on customer financial data under GLBA, model-risk-management guidance, and DORA.</p>
+      </a>
+      <a class="post" style="--pcat:#CF5220" href="/blog/insurance-claims-ai-automation.html">
+        <span class="cat">Insurance</span>
+        <h3>AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</h3>
+        <p>How insurers can automate claims triage and underwriting workflows while satisfying emerging AI-specific fairness and disclosure regulation.</p>
+      </a>
+      <a class="post" style="--pcat:#7C3AED" href="/blog/edge-vs-cloud-ai-architecture.html">
+        <span class="cat">Architecture & Security</span>
+        <h3>Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data</h3>
+        <p>A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.</p>
+      </a>
+      <a class="post" style="--pcat:#33506E" href="/blog/government-ai-automation-fedramp-cmmc.html">
+        <span class="cat">Government & Public Sector</span>
+        <h3>Deploying AI Automation in Government: Meeting the Federal Procurement Security Bar</h3>
+        <p>Why unauthorized commercial AI tools cannot lawfully process federal data, and how FedRAMP, CMMC, and CUI rules should shape deployment architecture.</p>
+      </a>
+      <a class="post" style="--pcat:#B45309" href="/blog/manufacturing-ai-export-controls.html">
+        <span class="cat">Manufacturing & Supply Chain</span>
+        <h3>AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing</h3>
+        <p>Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.</p>
+      </a>
+      <a class="post" style="--pcat:#BE123C" href="/blog/title-escrow-ai-wire-fraud.html">
+        <span class="cat">Real Estate & Title</span>
+        <h3>AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard</h3>
+        <p>Automating closing-file review and escrow correspondence sits directly on top of wire instructions — a framework for doing it without widening the fraud surface.</p>
+      </a>
+      <a class="post" style="--pcat:#0891B2" href="/blog/hr-hiring-ai-bias-fcra.html">
+        <span class="cat">HR & People Operations</span>
+        <h3>AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook</h3>
+        <p>Resume screening and background-check-adjacent automation now sit under a fast-expanding set of federal and state obligations — a framework for deploying it defensibly.</p>
+      </a>
+      <a class="post" style="--pcat:#7C3AED" href="/blog/auditability-by-design-ai-systems.html">
+        <span class="cat">Architecture & Security</span>
+        <h3>Auditability by Design: Logging, Provenance, and Human Oversight in Regulated AI Systems</h3>
+        <p>A concrete engineering framework for building the record-keeping and human-oversight controls that every regulatory regime discussed above ultimately requires.</p>
+      </a>
 
+    </div>
   </div>
 </main>
 <footer class="site">
