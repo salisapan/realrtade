@@ -1042,7 +1042,11 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     <button type="button" class="modal-close" id="leadModalClose" aria-label="סגירה"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke-width="2" stroke-linecap="round"/></svg></button>
     <h3 class="modal-title" id="leadModalTitle">בואו נדבר על הפרויקט שלכם</h3>
     <p class="modal-sub">מלאו כמה פרטים ונחזור אליכם בהקדם לתיאום פגישת היכרות — ללא התחייבות</p>
-    <form id="leadForm" novalidate>
+    <form id="leadForm" name="lead-inquiry" method="POST" data-netlify="true" data-netlify-honeypot="bot-field" novalidate>
+      <input type="hidden" name="form-name" value="lead-inquiry">
+      <p style="position:absolute;left:-9999px" aria-hidden="true"><label>אל תמלאו שדה זה: <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
+      <input type="hidden" name="project-type" id="hProjectType" value="">
+      <input type="hidden" name="process-status" id="hProcessStatus" value="">
       <div class="f-row">
         <div class="f-field" data-field="name">
           <label>שם מלא <span class="req">*</span></label>
@@ -1093,12 +1097,12 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
         </div>
       </div>
       <button type="submit" class="f-submit" id="lwSubmitBtn">שליחת הפנייה</button>
-      <p class="f-note">בשליחה ייפתח מייל מוכן עם כל הפרטים ל-info@as-isgroup.com</p>
+      <p class="f-note">הפרטים יישלחו ישירות אלינו — נחזור אליכם בהקדם</p>
     </form>
     <div class="f-thanks" id="lwThanks">
       <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <h4>הפנייה מוכנה לשליחה</h4>
-      <p>נפתח עבורכם מייל עם כל הפרטים — פשוט לחצו "שלח" בתוכנת המייל</p>
+      <h4>הפנייה נשלחה בהצלחה</h4>
+      <p>תודה! קיבלנו את הפרטים ונחזור אליכם בהקדם</p>
     </div>
   </div>
 </div>
@@ -1381,7 +1385,8 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     paint();
   })();
 
-  // final CTA — opens a lead-capture form, submits via a structured mailto
+  // final CTA — opens a lead-capture form, submits to Netlify Forms
+  // (falls back to a structured mailto if the network request fails, e.g. offline)
   (function initLeadForm(){
     var openBtn=document.getElementById("lwOpenForm");
     var modal=document.getElementById("leadModal");
@@ -1391,6 +1396,12 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     var thanks=document.getElementById("lwThanks");
     var typeRow=document.getElementById("lwProjectType");
     var chipsRow=document.getElementById("lwStatusChips");
+    var hProjectType=document.getElementById("hProjectType");
+    var hProcessStatus=document.getElementById("hProcessStatus");
+    var submitBtn=document.getElementById("lwSubmitBtn");
+    // use form.elements (not form.<name>) — the <form> itself has name="lead-inquiry",
+    // which would otherwise shadow a same-named field via the form's own .name property
+    var els=form.elements;
 
     function resetForm(){
       thanks.classList.remove("show");
@@ -1399,6 +1410,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       typeRow.querySelectorAll(".f-pill").forEach(function(x){x.classList.remove("sel");});
       chipsRow.querySelectorAll(".f-pill").forEach(function(x){x.classList.remove("sel");});
       form.querySelectorAll(".f-field").forEach(function(f){f.classList.remove("invalid");});
+      submitBtn.disabled=false;submitBtn.textContent="שליחת הפנייה";
     }
     function openModal(){if(thanks.classList.contains("show"))resetForm();modal.classList.add("open");document.body.style.overflow="hidden";}
     function closeModal(){modal.classList.remove("open");document.body.style.overflow="";}
@@ -1411,42 +1423,57 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
       p.addEventListener("click",function(){
         typeRow.querySelectorAll(".f-pill").forEach(function(x){x.classList.remove("sel");});
         p.classList.add("sel");
+        hProjectType.value=p.getAttribute("data-val");
       });
     });
     chipsRow.querySelectorAll(".f-pill").forEach(function(p){
-      p.addEventListener("click",function(){p.classList.toggle("sel");});
+      p.addEventListener("click",function(){
+        p.classList.toggle("sel");
+        var chips=Array.prototype.map.call(chipsRow.querySelectorAll(".f-pill.sel"),function(c){return c.getAttribute("data-val");});
+        hProcessStatus.value=chips.join(", ");
+      });
     });
 
     function fieldError(name,show){var f=form.querySelector('[data-field="'+name+'"]');if(f)f.classList.toggle("invalid",show);}
-    ["name","phone","address"].forEach(function(n){form[n].addEventListener("input",function(){fieldError(n,false);});});
+    ["name","phone","address"].forEach(function(n){els[n].addEventListener("input",function(){fieldError(n,false);});});
+
+    function mailtoFallback(name,phone,email,address,typeVal,chipsVal,background){
+      var body=[
+        "שם מלא: "+name,
+        "טלפון: "+phone,
+        "אימייל: "+(email||"-"),
+        "כתובת הבניין / מתחם: "+address,
+        "סוג הפרויקט: "+(typeVal||"לא צוין"),
+        "מה כבר קיים בתהליך: "+(chipsVal||"לא נבחר"),
+        "רקע וסטטוס: "+(background||"-")
+      ].join("\n");
+      window.location.href="mailto:sali@as-isgroup.com?subject="+encodeURIComponent("פנייה חדשה מהמצגת — "+name)+"&body="+encodeURIComponent(body);
+    }
 
     form.addEventListener("submit",function(e){
       e.preventDefault();
-      var name=form.name.value.trim(),phone=form.phone.value.trim(),email=form.email.value.trim(),address=form.address.value.trim(),background=form.background.value.trim();
+      var name=els.name.value.trim(),phone=els.phone.value.trim(),email=els.email.value.trim(),address=els.address.value.trim(),background=els.background.value.trim();
       var ok=true;
       fieldError("name",!name);if(!name)ok=false;
       fieldError("phone",!phone);if(!phone)ok=false;
       fieldError("address",!address);if(!address)ok=false;
       if(!ok)return;
 
-      var typeSel=typeRow.querySelector(".f-pill.sel");
-      var typeVal=typeSel?typeSel.getAttribute("data-val"):"לא צוין";
-      var chips=Array.prototype.map.call(chipsRow.querySelectorAll(".f-pill.sel"),function(c){return c.getAttribute("data-val");});
-      var chipsVal=chips.length?chips.join(", "):"לא נבחר";
-
-      var body=[
-        "שם מלא: "+name,
-        "טלפון: "+phone,
-        "אימייל: "+(email||"-"),
-        "כתובת הבניין / מתחם: "+address,
-        "סוג הפרויקט: "+typeVal,
-        "מה כבר קיים בתהליך: "+chipsVal,
-        "רקע וסטטוס: "+(background||"-")
-      ].join("\n");
-      var mailto="mailto:info@as-isgroup.com?subject="+encodeURIComponent("פנייה חדשה מהמצגת — "+name)+"&body="+encodeURIComponent(body);
-      window.location.href=mailto;
-      form.style.display="none";
-      thanks.classList.add("show");
+      submitBtn.disabled=true;submitBtn.textContent="שולח...";
+      var fd=new FormData(form);
+      var params=new URLSearchParams();
+      fd.forEach(function(v,k){params.append(k,v);});
+      fetch("/",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString()})
+        .then(function(res){
+          if(!res.ok)throw new Error("netlify forms responded "+res.status);
+          form.style.display="none";
+          thanks.classList.add("show");
+        })
+        .catch(function(){
+          mailtoFallback(name,phone,email,address,hProjectType.value,hProcessStatus.value,background);
+          form.style.display="none";
+          thanks.classList.add("show");
+        });
     });
   })();
 
