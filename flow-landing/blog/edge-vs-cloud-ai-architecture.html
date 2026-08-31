@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/blog/edge-vs-cloud-ai-architecture.html">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data — Flow">
+<meta property="og:description" content="A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.">
+<meta property="og:url" content="https://theflow-ai.com/blog/edge-vs-cloud-ai-architecture.html">
+<meta property="og:image" content="https://theflow-ai.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data — Flow">
+<meta name="twitter:description" content="A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.png">
+<title>Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data — Flow</title>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data",
+  "description": "A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.",
+  "author": { "@type": "Organization", "name": "Flow" },
+  "publisher": { "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/" },
+  "mainEntityOfPage": "https://theflow-ai.com/blog/edge-vs-cloud-ai-architecture.html",
+  "image": "https://theflow-ai.com/og.png",
+  "datePublished": "2026-08-31"
+}
+</script>
+<style>
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#1B2436; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --navy:#07090F;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:Georgia,'Times New Roman',serif; line-height:1.7; font-size:1.08rem}
+.wrap{max-width:740px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:18px 0}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:#EEF2F9; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-weight:700; font-size:1.15rem; letter-spacing:.02em}
+.brand .dot{width:8px; height:8px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 12px var(--accent-2)}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.92rem; margin-inline-start:22px}
+header.site nav a:hover{color:#fff}
+main{padding:52px 0 20px}
+.eyebrow{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--accent)}
+h1.title{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:2.1rem; line-height:1.25; color:var(--txt-hi); margin:12px 0 10px}
+.meta{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--muted); font-size:.88rem; margin-bottom:34px; padding-bottom:24px; border-bottom:1px solid var(--line)}
+article h2{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:1.34rem; color:var(--txt-hi); margin:42px 0 14px}
+article p{margin:0 0 20px}
+article blockquote{margin:28px 0; padding:4px 20px; border-inline-start:3px solid var(--accent-2); color:var(--muted); font-style:italic}
+.refs{margin-top:52px; padding-top:26px; border-top:1px solid var(--line); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.refs h2{font-size:1.05rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 16px}
+.refs ol{margin:0; padding-inline-start:22px; color:var(--muted); font-size:.92rem; line-height:1.65}
+.refs li{margin-bottom:8px}
+.cta{margin:56px 0 10px; padding:30px 28px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.cta p{margin:0 0 16px; color:var(--txt-hi); font-size:1.02rem}
+.cta a{display:inline-block; background:var(--accent-2); color:#fff; text-decoration:none; font-weight:700; padding:12px 26px; border-radius:999px}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="dot"></span>Flow</a>
+    <nav><a href="/#waitlist">Join Waitlist</a><a href="/blog/">Insights</a></nav>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <span class="eyebrow">Architecture & Security</span>
+    <h1 class="title">Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data</h1>
+    <div class="meta">Flow Research · 8 min read</div>
+    <article>
+
+<p>Discussions of AI deployment often collapse into a false binary — cloud is fast but risky, on-premises is safe but slow — that obscures the actual engineering question. The deployment model is not a single lever; it is the first and most consequential security control applied to a workload, and it should be selected the same way any other control is selected: against an explicit threat model, not a default preference.</p>
+
+<h2>1. What Actually Differs Between the Two Models</h2>
+<p>In a cloud deployment, data leaves the organization's network boundary, traverses infrastructure the organization does not fully control, and is processed by systems whose internal state — including any residual logging or caching — is not directly auditable by the data owner. In a fully local (edge or on-premises) deployment, the same processing occurs entirely inside the organization's own network, under its own access controls and its own audit logging, at the cost of the organization owning the operational burden of running that infrastructure.</p>
+
+<h2>2. Masking as a Compensating Control</h2>
+<p>The risk calculus for a cloud deployment changes substantially if personally identifying and sensitive fields are automatically masked or tokenized before the data leaves the boundary. This does not eliminate the trust placed in the cloud provider, but it changes what is being trusted with: a de-identified payload carries materially lower breach and re-identification consequence than the raw record, which is why masked-cloud architectures are treated distinctly from unmasked cloud architectures in every regulatory framework discussed above, from HIPAA's Safe Harbor to the EU AI Act's risk tiering.</p>
+
+<h2>3. Standards-Based Evaluation, Not Vendor Marketing</h2>
+<p>Rather than evaluate deployment claims rhetorically, organizations can map them against existing standards. ISO/IEC 42001:2023, the first international standard for AI management systems, requires a documented risk-assessment process for each AI use case, of which deployment location is a direct input. NIST SP 800-53 Rev. 5 provides the underlying control catalogue — access control, audit and accountability, system and communications protection — against which either deployment model can be assessed concretely rather than qualitatively. The OWASP Top 10 for LLM Applications separately catalogues risks such as sensitive information disclosure and insecure output handling that apply with different severity depending on where inference actually occurs.</p>
+
+<h2>4. A Decision Framework</h2>
+<p>In practice, three questions determine the appropriate model for a given workload: What is the regulatory classification of the data (e.g., PHI, privileged legal content, non-public financial information)? What is the consequence of a worst-case exposure, independent of probability? And does the organization have — or wish to build — the operational capacity to run inference infrastructure itself? High-volume, lower-sensitivity workloads generally favor a masked-cloud model for speed and scale. Workloads involving privileged, classified, or otherwise irreducibly sensitive data generally favor a fully local model, regardless of scale, because the consequence of exposure dominates the calculus. Many organizations, correctly, run both models simultaneously, matched per workflow rather than chosen once for the entire organization.</p>
+
+<h2>5. Conclusion</h2>
+<p>Treating "cloud versus on-premises" as a single organization-wide decision is itself a category error. The correct unit of analysis is the individual workflow, evaluated against an explicit threat model and an explicit standard. An architecture that supports both a masked-cloud and a fully local deployment path — and lets that choice be made per workload — is not a compromise between security and convenience; it is the only model that treats deployment as the security decision it actually is.</p>
+
+    </article>
+    <div class="refs">
+      <h2>References</h2>
+      <ol>
+
+<li>International Organization for Standardization, ISO/IEC 42001:2023 — Artificial Intelligence Management System.</li>
+<li>National Institute of Standards and Technology, SP 800-53 Rev. 5, Security and Privacy Controls for Information Systems and Organizations.</li>
+<li>National Institute of Standards and Technology, AI Risk Management Framework (AI RMF 1.0), 2023.</li>
+<li>OWASP Foundation, OWASP Top 10 for Large Language Model Applications.</li>
+
+      </ol>
+    </div>
+    <div class="cta">
+      <p>See how Flow applies this in practice — masked in our secure cloud, or fully on your own infrastructure with Flow-Edge.</p>
+      <a href="/#waitlist">Join the Waitlist</a>
+    </div>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a></div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Flow Insights — research and analysis on deploying AI workflow automation in regulated industries: legal, healthcare, finance, insurance, and security architecture.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/blog/">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Flow Insights">
+<meta property="og:description" content="Research and analysis on deploying AI workflow automation in regulated industries.">
+<meta property="og:url" content="https://theflow-ai.com/blog/">
+<meta property="og:image" content="https://theflow-ai.com/og.png">
+<title>Flow Insights — Research on Regulated AI Deployment</title>
+<style>
+:root{
+  --bg:#FFFFFF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#1B2436; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF; --navy:#07090F;
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.wrap{max-width:900px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:18px 0}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between}
+.brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:#EEF2F9; font-weight:700; font-size:1.15rem; letter-spacing:.02em}
+.brand .dot{width:8px; height:8px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 12px var(--accent-2)}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-size:.92rem; margin-inline-start:22px}
+header.site nav a:hover{color:#fff}
+main{padding:56px 0}
+h1{font-size:2.2rem; color:var(--txt-hi); margin:0 0 10px}
+.lead{color:var(--muted); font-size:1.08rem; max-width:600px; margin:0 0 40px}
+.post{display:block; text-decoration:none; color:inherit; padding:26px 0; border-top:1px solid var(--line)}
+.post:last-child{border-bottom:1px solid var(--line)}
+.post .cat{font-size:.76rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--accent)}
+.post h2{font-size:1.28rem; color:var(--txt-hi); margin:8px 0 8px}
+.post p{color:var(--muted); margin:0; font-size:.96rem; line-height:1.6}
+footer.site{padding:30px 0 60px; text-align:center; color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="dot"></span>Flow</a>
+    <nav><a href="/#waitlist">Join Waitlist</a><a href="/blog/">Insights</a></nav>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <h1>Flow Insights</h1>
+    <p class="lead">Research and analysis on deploying AI workflow automation in regulated industries — where compliance, architecture, and efficiency meet.</p>
+    <a class="post" href="/blog/legal-ai-workflow-automation.html">
+      <span class="cat">Legal</span>
+      <h2>Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility</h2>
+      <p>A framework for deploying AI workflow automation in legal practice without compromising confidentiality, privilege, or the duty of competence.</p>
+    </a>
+    <a class="post" href="/blog/hipaa-compliant-ai-automation.html">
+      <span class="cat">Healthcare</span>
+      <h2>Compliance by Design: Architecting AI Workflow Automation Under HIPAA</h2>
+      <p>How chart summarization, intake, and clinical workflow automation can be deployed without creating new HIPAA exposure — a technical and regulatory framework.</p>
+    </a>
+    <a class="post" href="/blog/financial-services-data-masking-ai.html">
+      <span class="cat">Financial Services</span>
+      <h2>Automated Data Masking and AI Governance in Regulated Financial Institutions</h2>
+      <p>A governance framework for deploying AI automation on customer financial data under GLBA, model-risk-management guidance, and DORA.</p>
+    </a>
+    <a class="post" href="/blog/insurance-claims-ai-automation.html">
+      <span class="cat">Insurance</span>
+      <h2>AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</h2>
+      <p>How insurers can automate claims triage and underwriting workflows while satisfying emerging AI-specific fairness and disclosure regulation.</p>
+    </a>
+    <a class="post" href="/blog/edge-vs-cloud-ai-architecture.html">
+      <span class="cat">Architecture & Security</span>
+      <h2>Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data</h2>
+      <p>A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.</p>
+    </a>
+
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a></div>
+</footer>
+</body>
+</html>
