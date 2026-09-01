@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Flow's Privacy Policy — what data we collect through the waitlist and site, how it's used, and your rights.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/privacy.html">
+<title>Privacy Policy — Flow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --navy:#07090F; --cat:#1A4EF5;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Fraunces',Georgia,serif;
+  --serif:'Source Serif 4',Georgia,serif;
+}
+:root[data-theme="dark"]{
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+h1.title{font-family:var(--disp); font-weight:560; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:560; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+</style>
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'light');}catch(e){}})();
+</script>
+<!-- Analytics: replace G-XXXXXXXXXX with the real GA4 Measurement ID from analytics.google.com -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX', { anonymize_ip: true });
+</script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/email-logo.png" alt="Flow"></a>
+    <nav>
+      <a href="/">Home</a><a href="/blog/">Insights</a><a href="/#waitlist">Join Waitlist</a>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <span class="eyebrow">Legal</span>
+    <h1 class="title">Privacy Policy</h1>
+    <div class="updated">Last updated: September 1, 2026</div>
+    <article>
+
+<p>This Privacy Policy explains what information Flow ("Flow", "we", "us") collects when you visit theflow-ai.com or join our early-access waitlist, how we use it, and the choices you have. Flow is currently in pre-release, early-access status — this policy will be expanded as the product moves toward general availability.</p>
+
+<h2>1. Information We Collect</h2>
+<p>We collect information you provide directly, and a small amount of information automatically.</p>
+<ul>
+<li><b>Waitlist information.</b> When you join the waitlist we collect your work email address, and — once you complete signup — your company name, role, and company website.</li>
+<li><b>Communications.</b> If you email us, we keep that correspondence to respond to you and keep a record of the interaction.</li>
+<li><b>Automatic / analytics information.</b> Like most sites, we use an analytics tool (Google Analytics) to understand aggregate traffic — pages viewed, general location by country/region, device and browser type, and referral source. This is not tied to your name unless you've also given us your email separately.</li>
+<li><b>Local preferences.</b> We store a light/dark theme preference in your browser's local storage. This never leaves your device and is not sent to us.</li>
+</ul>
+
+<h2>2. How We Use Your Information</h2>
+<ul>
+<li>To manage the waitlist and grant early access when it opens.</li>
+<li>To send you the Hybrid Automation Playbook and related onboarding material you requested, and to follow up about a discovery call.</li>
+<li>To understand how the site and product content are used, so we can improve them.</li>
+<li>To detect and prevent abuse (for example, automated/bot signups).</li>
+</ul>
+<p>We do not sell your personal information, and we do not use your waitlist submission to train third-party AI models.</p>
+
+<h2>3. Email Confirmation</h2>
+<p>To keep our mailing list accurate and to prevent someone from signing up an email address that isn't theirs, we use a confirmation step: after you submit the waitlist form, we send a confirmation link to the email address provided. The Playbook and further communications are sent only after that link is clicked.</p>
+
+<h2>4. Who We Share Information With</h2>
+<p>We share information only with the service providers that operate the waitlist and site on our behalf, under their own data-processing terms:</p>
+<ul>
+<li><b>Supabase</b> — stores waitlist submissions (email, company, role, website).</li>
+<li><b>Resend</b> — delivers transactional email (confirmation link, Playbook, discovery-call follow-up).</li>
+<li><b>Netlify</b> — hosts the site and runs the serverless functions that process signups.</li>
+<li><b>Google Analytics</b> — aggregate site-traffic analytics.</li>
+</ul>
+<p>We do not share your information with any other third party for their own marketing purposes. We may disclose information if required to by law, or to protect the rights, property, or safety of Flow, our users, or the public.</p>
+
+<h2>5. Cookies</h2>
+<p>Google Analytics sets standard analytics cookies to distinguish returning visitors and measure site usage in aggregate. You can block or clear these at any time through your browser settings without affecting your ability to use the site or join the waitlist.</p>
+
+<h2>6. Data Retention</h2>
+<p>We keep waitlist submissions for as long as your signup is active, and for a reasonable period afterward for our own records, unless you ask us to delete it sooner (see Section 8).</p>
+
+<h2>7. International Transfers</h2>
+<p>Our service providers may process data in the United States and other countries. Where required, we rely on those providers' own standard contractual safeguards for cross-border transfers.</p>
+
+<h2>8. Your Rights</h2>
+<p>Depending on where you live, you may have the right to access, correct, export, or delete the personal information we hold about you, and to withdraw consent to future emails at any time (every email we send includes a way to opt out). To exercise any of these rights, email us at <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a> and we'll act on your request promptly.</p>
+
+<h2>9. Children's Privacy</h2>
+<p>Flow is a business-to-business product. It is not directed at, and we do not knowingly collect information from, anyone under 16 years old.</p>
+
+<h2>10. Changes to This Policy</h2>
+<p>We may update this policy as the product evolves. We'll update the "Last updated" date above when we do; material changes will be reflected here before they take effect.</p>
+
+<h2>11. Contact</h2>
+<p>Questions about this policy or your data? Email <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
+
+    </article>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a> · <a href="/terms.html">Terms of Service</a></div>
+</footer>
+<script>
+(function(){
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
