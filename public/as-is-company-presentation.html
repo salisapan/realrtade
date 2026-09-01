@@ -1667,11 +1667,17 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
 
   // auto-fit-to-scale: guarantee every slide fits with no clipping and no
   // scrolling on any viewport, however short — always scale down to fit.
-  function fitSlide(s){
+  // On every slide but the last, the floating "let's talk" button sits fixed
+  // near the bottom of the viewport — reserve clearance so content never
+  // renders underneath it.
+  var CTA_RESERVE=68;
+  function fitSlide(s,idx){
     var fit=s.querySelector(".slide-fit");if(!fit)return;
     fit.style.transform="";
     var cs=getComputedStyle(s);
     var avail=s.clientHeight-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+    var isLast=(typeof idx==="number")?(idx===total-1):(s===slides[total-1]);
+    if(!isLast)avail-=CTA_RESERVE;
     var need=fit.offsetHeight;
     if(need>avail&&avail>0){fit.style.transform="scale("+(avail/need).toFixed(4)+")";}
   }
@@ -1683,7 +1689,7 @@ h1,h2,h3{font-family:var(--disp);color:var(--txt-hi);margin:0}
     btnPrevF.disabled=current===0;btnNextF.disabled=current===total-1;
     if(ctaFloatBtn)ctaFloatBtn.classList.toggle("hide",current===total-1);
     var b=slides[current].querySelector(".slide-body");if(b&&b.scrollTo)b.scrollTo(0,0);
-    fitSlide(slides[current]);
+    fitSlide(slides[current],current);
     slides[current].querySelectorAll("[data-count]").forEach(function(elm){elm.textContent=(elm.getAttribute("data-prefix")||"")+"0"+(elm.getAttribute("data-suffix")||"");setTimeout(function(){countUp(elm);},180);});
   }
   function goTo(i){var t=Math.max(0,Math.min(total-1,i));if(t===current)return;stageEl.dataset.dir=(t>current)?"fwd":"back";current=t;render();}
