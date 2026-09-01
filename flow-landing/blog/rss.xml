@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Flow Insights</title>
+    <link>https://theflow-ai.com/blog/</link>
+    <description>Research on regulated AI deployment — compliance, architecture, and efficiency across law, healthcare, finance, insurance, government, and technical AI infrastructure.</description>
+    <language>en-us</language>
+    <lastBuildDate>Mon, 31 Aug 2026 00:00:00 +0000</lastBuildDate>
+    <atom:link href="https://theflow-ai.com/blog/rss.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>The Action Graph: How Institutional Knowledge Gets Captured Without Centralizing Raw Data</title>
+      <link>https://theflow-ai.com/blog/action-graph-institutional-knowledge.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/action-graph-institutional-knowledge.html</guid>
+      <category>Product Architecture</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>What a workflow knowledge graph actually is, how it differs from a training dataset, and why capturing patterns rather than content is the architectural choice that makes this safe.</description>
+    </item>
+    <item>
+      <title>Model Drift: Why a Validated AI System Doesn&apos;t Stay Validated on Its Own</title>
+      <link>https://theflow-ai.com/blog/ai-model-drift-monitoring.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/ai-model-drift-monitoring.html</guid>
+      <category>AI Infrastructure</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>A workflow AI system that was accurate at launch can degrade silently as the underlying data changes — the monitoring architecture that catches drift before an outcome does.</description>
+    </item>
+    <item>
+      <title>AI Observability: Tracing a Workflow Decision Back to Its Source</title>
+      <link>https://theflow-ai.com/blog/ai-observability-tracing-debugging.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/ai-observability-tracing-debugging.html</guid>
+      <category>AI Architecture</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>When an automated output needs to be explained, the organization needs more than a log line — a technical look at how AI workflow tracing actually reconstructs a decision after the fact.</description>
+    </item>
+    <item>
+      <title>How AI Workflow Systems Actually Store and Encrypt Your Data</title>
+      <link>https://theflow-ai.com/blog/ai-workflow-encryption-storage-architecture.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/ai-workflow-encryption-storage-architecture.html</guid>
+      <category>Data Security</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Encryption at rest, encryption in transit, key management, and the specific architectural choices that determine what a breach of the infrastructure could actually expose.</description>
+    </item>
+    <item>
+      <title>Automating AML and KYC: AI Workflow Design Under the Bank Secrecy Act</title>
+      <link>https://theflow-ai.com/blog/aml-kyc-ai-automation.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/aml-kyc-ai-automation.html</guid>
+      <category>Financial Services</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Customer due diligence and suspicious activity monitoring are exactly the workflows AI is best suited to accelerate — and exactly where a regulator&apos;s tolerance for error is lowest.</description>
+    </item>
+    <item>
+      <title>Auditability by Design: Logging, Provenance, and Human Oversight in Regulated AI Systems</title>
+      <link>https://theflow-ai.com/blog/auditability-by-design-ai-systems.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/auditability-by-design-ai-systems.html</guid>
+      <category>Architecture &amp; Security</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>A concrete engineering framework for building the record-keeping and human-oversight controls that every regulatory regime discussed above ultimately requires.</description>
+    </item>
+    <item>
+      <title>AI in Customs and Trade Compliance: C-TPAT, CBP Data Rules, and Denied-Party Screening</title>
+      <link>https://theflow-ai.com/blog/customs-trade-compliance-ai.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/customs-trade-compliance-ai.html</guid>
+      <category>Trade &amp; Customs Compliance</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Automating customs documentation and denied-party screening touches supply-chain security programs with their own audit expectations — a framework for doing it defensibly.</description>
+    </item>
+    <item>
+      <title>Inside a Fully Local AI Deployment: The Technical Architecture Behind On-Premises Inference</title>
+      <link>https://theflow-ai.com/blog/edge-ai-inference-architecture-technical.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/edge-ai-inference-architecture-technical.html</guid>
+      <category>AI Infrastructure</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>What actually changes under the hood when an AI workflow runs entirely on an organization&apos;s own infrastructure — model deployment, network isolation, and the operational tradeoffs involved.</description>
+    </item>
+    <item>
+      <title>Edge Versus Cloud: A Comparative Architecture for Deploying AI on Sensitive Data</title>
+      <link>https://theflow-ai.com/blog/edge-vs-cloud-ai-architecture.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/edge-vs-cloud-ai-architecture.html</guid>
+      <category>Architecture &amp; Security</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.</description>
+    </item>
+    <item>
+      <title>Technology-Assisted Review Meets Generative AI: Defensibility in e-Discovery Automation</title>
+      <link>https://theflow-ai.com/blog/ediscovery-tar-generative-ai.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/ediscovery-tar-generative-ai.html</guid>
+      <category>Legal</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Predictive coding earned judicial acceptance a decade ago on a defensibility record generative AI has not yet built — a framework for using new tools without losing that ground.</description>
+    </item>
+    <item>
+      <title>AI Automation in Education Administration: FERPA and Student Data Governance</title>
+      <link>https://theflow-ai.com/blog/education-ai-ferpa.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/education-ai-ferpa.html</guid>
+      <category>Education</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>School and university back-office automation touches some of the most protected records in U.S. privacy law — a framework for deploying it without creating new FERPA exposure.</description>
+    </item>
+    <item>
+      <title>AI Workflow Automation in Critical Infrastructure: NERC CIP and the Limits of Cloud Processing</title>
+      <link>https://theflow-ai.com/blog/energy-utilities-ai-nerc-cip.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/energy-utilities-ai-nerc-cip.html</guid>
+      <category>Energy &amp; Utilities</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Why the bulk electric system&apos;s own cybersecurity standards constrain where AI workflow tools can be deployed, and how to automate operations documentation without crossing the line.</description>
+    </item>
+    <item>
+      <title>Automated Data Masking and AI Governance in Regulated Financial Institutions</title>
+      <link>https://theflow-ai.com/blog/financial-services-data-masking-ai.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/financial-services-data-masking-ai.html</guid>
+      <category>Financial Services</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>A governance framework for deploying AI automation on customer financial data under GLBA, model-risk-management guidance, and DORA.</description>
+    </item>
+    <item>
+      <title>Deploying AI Automation in Government: Meeting the Federal Procurement Security Bar</title>
+      <link>https://theflow-ai.com/blog/government-ai-automation-fedramp-cmmc.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/government-ai-automation-fedramp-cmmc.html</guid>
+      <category>Government &amp; Public Sector</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Why unauthorized commercial AI tools cannot lawfully process federal data, and how FedRAMP, CMMC, and CUI rules should shape deployment architecture.</description>
+    </item>
+    <item>
+      <title>Compliance by Design: Architecting AI Workflow Automation Under HIPAA</title>
+      <link>https://theflow-ai.com/blog/hipaa-compliant-ai-automation.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/hipaa-compliant-ai-automation.html</guid>
+      <category>Healthcare</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>How chart summarization, intake, and clinical workflow automation can be deployed without creating new HIPAA exposure — a technical and regulatory framework.</description>
+    </item>
+    <item>
+      <title>AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook</title>
+      <link>https://theflow-ai.com/blog/hr-hiring-ai-bias-fcra.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/hr-hiring-ai-bias-fcra.html</guid>
+      <category>HR &amp; People Operations</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Resume screening and background-check-adjacent automation now sit under a fast-expanding set of federal and state obligations — a framework for deploying it defensibly.</description>
+    </item>
+    <item>
+      <title>Designing Human-in-the-Loop Systems People Actually Use</title>
+      <link>https://theflow-ai.com/blog/human-in-the-loop-ai-system-design.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/human-in-the-loop-ai-system-design.html</guid>
+      <category>AI Architecture</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Most &apos;human oversight&apos; features are technically present and practically ignored — the interaction-design principles that determine whether a review step gets exercised or rubber-stamped.</description>
+    </item>
+    <item>
+      <title>AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</title>
+      <link>https://theflow-ai.com/blog/insurance-claims-ai-automation.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/insurance-claims-ai-automation.html</guid>
+      <category>Insurance</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>How insurers can automate claims triage and underwriting workflows while satisfying emerging AI-specific fairness and disclosure regulation.</description>
+    </item>
+    <item>
+      <title>AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard</title>
+      <link>https://theflow-ai.com/blog/insurance-underwriting-ai-rate-filing.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/insurance-underwriting-ai-rate-filing.html</guid>
+      <category>Insurance</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Underwriting automation faces a different regulatory test than claims automation — every input has to be actuarially justified, not merely fairly applied.</description>
+    </item>
+    <item>
+      <title>Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility</title>
+      <link>https://theflow-ai.com/blog/legal-ai-workflow-automation.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/legal-ai-workflow-automation.html</guid>
+      <category>Legal</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>A framework for deploying AI workflow automation in legal practice without compromising confidentiality, privilege, or the duty of competence.</description>
+    </item>
+    <item>
+      <title>AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing</title>
+      <link>https://theflow-ai.com/blog/manufacturing-ai-export-controls.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/manufacturing-ai-export-controls.html</guid>
+      <category>Manufacturing &amp; Supply Chain</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.</description>
+    </item>
+    <item>
+      <title>AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records</title>
+      <link>https://theflow-ai.com/blog/pharma-life-sciences-ai-21-cfr-part-11.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/pharma-life-sciences-ai-21-cfr-part-11.html</guid>
+      <category>Pharma &amp; Life Sciences</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Deploying AI workflow automation across regulated drug and device documentation without breaking the validation and electronic-records standard the industry runs on.</description>
+    </item>
+    <item>
+      <title>Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation</title>
+      <link>https://theflow-ai.com/blog/prompt-injection-ai-threat-modeling.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/prompt-injection-ai-threat-modeling.html</guid>
+      <category>Architecture &amp; Security</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>A practical threat-modeling framework for the attack class specific to AI workflow tools — where it differs from conventional application security, and what actually mitigates it.</description>
+    </item>
+    <item>
+      <title>AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook</title>
+      <link>https://theflow-ai.com/blog/retail-ecommerce-ai-ccpa-cpra.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/retail-ecommerce-ai-ccpa-cpra.html</guid>
+      <category>Retail &amp; E-Commerce</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Customer service, personalization, and returns automation now sit under an expanding set of state consumer-privacy statutes — a framework for deploying it without creating new exposure.</description>
+    </item>
+    <item>
+      <title>AI in State and Local Government: Public Records Law and the Transparency Paradox</title>
+      <link>https://theflow-ai.com/blog/state-local-government-ai-public-records.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/state-local-government-ai-public-records.html</guid>
+      <category>State &amp; Local Government</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Government automation faces a distinct constraint federal and private-sector deployments do not: the same records public-records law makes disclosable are often what the system needs protected.</description>
+    </item>
+    <item>
+      <title>AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement</title>
+      <link>https://theflow-ai.com/blog/telecom-ai-cpni-fcc.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/telecom-ai-cpni-fcc.html</guid>
+      <category>Telecommunications</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Automating customer service and network operations for carriers means working inside one of the oldest, strictest customer-data statutes in U.S. law — a framework for doing it correctly.</description>
+    </item>
+    <item>
+      <title>AI Automation in Telehealth: Cross-State Licensure, HIPAA, and the Post-Emergency Landscape</title>
+      <link>https://theflow-ai.com/blog/telehealth-ai-licensure-hipaa.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/telehealth-ai-licensure-hipaa.html</guid>
+      <category>Healthcare</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Telehealth&apos;s regulatory flexibility expanded and then partially contracted after the public health emergency ended — a framework for automating virtual-care workflows amid that shifting ground.</description>
+    </item>
+    <item>
+      <title>AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard</title>
+      <link>https://theflow-ai.com/blog/title-escrow-ai-wire-fraud.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/title-escrow-ai-wire-fraud.html</guid>
+      <category>Real Estate &amp; Title</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Automating closing-file review and escrow correspondence sits directly on top of wire instructions — a framework for doing it without widening the fraud surface.</description>
+    </item>
+    <item>
+      <title>What Is Data Masking? A Technical Guide to De-Identifying Data Before It Reaches an AI Model</title>
+      <link>https://theflow-ai.com/blog/what-is-data-masking-technical-guide.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/what-is-data-masking-technical-guide.html</guid>
+      <category>Data Security</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Static masking, tokenization, format-preserving encryption, k-anonymity, differential privacy — the actual mechanics behind &apos;masked before it reaches a model,&apos; explained precisely.</description>
+    </item>
+    <item>
+      <title>Zero-Retention AI: What It Actually Means and How to Verify a Vendor&apos;s Claim</title>
+      <link>https://theflow-ai.com/blog/zero-retention-ai-architecture.html</link>
+      <guid isPermaLink="true">https://theflow-ai.com/blog/zero-retention-ai-architecture.html</guid>
+      <category>Data Security</category>
+      <pubDate>Mon, 31 Aug 2026 00:00:00 +0000</pubDate>
+      <description>Zero-retention is a specific, checkable architectural property, not a marketing adjective — how it works, what it doesn&apos;t cover, and the questions that separate a real implementation from a claim.</description>
+    </item>
+  </channel>
+</rss>

@@ -98,6 +98,13 @@ article blockquote{margin:32px 0; padding:2px 22px; border-inline-start:3px soli
 .doit:active{transform:translateY(0) scale(.99)}
 footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
 footer.site a{color:var(--muted)}
+.related{margin-top:56px; padding-top:28px; border-top:1px solid var(--line); font-family:var(--sans)}
+.related h2{font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.14em; color:var(--cat); margin:0 0 18px}
+.related-list{display:grid; gap:14px}
+.related-list a{display:block; padding:16px 18px; background:var(--panel); border:1px solid var(--line); border-radius:12px; text-decoration:none; transition:border-color .2s,transform .2s}
+.related-list a:hover{border-color:var(--cat); transform:translateY(-2px)}
+.related-list .rcat{font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--cat)}
+.related-list .rtitle{display:block; margin-top:4px; font-family:var(--disp); font-weight:560; font-size:1.02rem; color:var(--txt-hi); line-height:1.35}
 </style>
 <script>
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'light');}catch(e){}})();
@@ -110,6 +117,7 @@ footer.site a{color:var(--muted)}
   gtag('js', new Date());
   gtag('config', 'G-XXXXXXXXXX', { anonymize_ip: true });
 </script>
+<link rel="alternate" type="application/rss+xml" title="Flow Insights" href="/blog/rss.xml">
 </head>
 <body>
 <div id="progress"></div>
@@ -171,6 +179,14 @@ footer.site a{color:var(--muted)}
 
       </ol>
     </div>
+    <div class="related">
+      <h2>Related Reading</h2>
+      <div class="related-list">
+        <a href="/blog/retail-ecommerce-ai-ccpa-cpra.html"><span class="rcat">Retail &amp; E-Commerce</span><span class="rtitle">AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook</span></a>
+        <a href="/blog/state-local-government-ai-public-records.html"><span class="rcat">State &amp; Local Government</span><span class="rtitle">AI in State and Local Government: Public Records Law and the Transparency Paradox</span></a>
+        <a href="/blog/telecom-ai-cpni-fcc.html"><span class="rcat">Telecommunications</span><span class="rtitle">AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement</span></a>
+      </div>
+    </div>
     <div class="cta">
       <p>See how Flow applies this in practice — masked in our secure cloud, or fully on your own infrastructure with Flow-Edge.</p>
       <a class="doit" href="/#waitlist"><span class="shell"></span><span class="ring"></span>[Do It]</a>
@@ -178,7 +194,7 @@ footer.site a{color:var(--muted)}
   </div>
 </main>
 <footer class="site">
-  <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a></div>
+  <div class="wrap">&copy; 2026 Flow. <a href="/">theflow-ai.com</a> · <a href="/privacy.html">Privacy</a> · <a href="/terms.html">Terms</a> · <a href="/blog/rss.xml">RSS</a></div>
 </footer>
 <script>
 (function(){
