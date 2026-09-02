@@ -628,9 +628,11 @@ canvas.terrain-canvas.show{opacity:1}
 .ins-cards.ins-intro .ins-card{transition:transform 1s cubic-bezier(.2,.8,.2,1), opacity .8s}
 .ins-card-inner{position:relative; display:block; width:100%; height:100%; border-radius:14px; transition:transform .5s cubic-bezier(.2,.8,.2,1); transform-style:preserve-3d}
 .ins-card:hover .ins-card-inner{transform:rotateY(180deg)}
-.ins-card-face{position:absolute; inset:0; border-radius:14px; overflow:hidden; backface-visibility:hidden; box-shadow:0 10px 28px -8px rgba(0,0,0,.45), inset 0 0 0 1px var(--line-hi)}
+.ins-card-face{position:absolute; inset:0; border-radius:14px; overflow:hidden; backface-visibility:hidden; box-shadow:0 16px 34px -14px rgba(0,0,0,.55), inset 0 0 0 1px var(--line-hi), 0 0 0 1px hsl(calc(var(--i) * 47deg) 70% 55% / .22), 0 0 22px -4px hsl(calc(var(--i) * 47deg) 75% 58% / .38)}
 .ins-card-face.front img{width:100%; height:100%; object-fit:cover; display:block}
-.ins-card-face.back{transform:rotateY(180deg); background:var(--panel); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:8px; gap:4px}
+.ins-card-face.back{transform:rotateY(180deg); background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 26%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); border:1px solid var(--glass-border); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:8px; gap:4px}
+.ins-card-cat{display:flex; align-items:center; justify-content:center; gap:5px}
+.ins-card-cat::before{content:''; width:6px; height:6px; border-radius:50%; background:hsl(calc(var(--i) * 47deg) 75% 58%); flex:none}
 @media (hover:none){
   .ins-card:hover .ins-card-inner{transform:none}
   .ins-card-face.front::after{content:attr(data-cat); position:absolute; inset-inline:0; bottom:0; padding:5px 4px 4px; background:linear-gradient(0deg,rgba(0,0,0,.72),transparent); color:#fff; font-family:var(--sans); font-size:.5rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; text-align:center; line-height:1.15}
