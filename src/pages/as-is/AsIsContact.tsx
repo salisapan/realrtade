@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import AsIsLayout from "@/components/as-is/AsIsLayout";
 import { BeamCard, PageHero, Section } from "@/components/as-is/AsIsUI";
 import { useAsIsSeo } from "@/components/as-is/useAsIsSeo";
+import { trackAsIsEvent } from "@/components/as-is/useAsIsAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { company, contactSteps } from "@/data/as-is-content";
 
@@ -37,8 +38,10 @@ export default function AsIsContact() {
     setSubmitting(false);
     if (insertError) {
       setError("קרתה תקלה בשליחה, נסו שוב או צרו קשר ישירות באימייל.");
+      trackAsIsEvent("contact_form_error");
       return;
     }
+    trackAsIsEvent("contact_form_submit");
     setSubmitted(true);
   }
 
@@ -128,15 +131,26 @@ export default function AsIsContact() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div className="asis-card">
               <h4 style={{ fontSize: 15, margin: "0 0 6px" }}>אימייל</h4>
-              <p className="asis-mono" style={{ margin: 0, fontSize: 14, color: "var(--accent-2)" }}>
+              <a
+                href={`mailto:${company.email}`}
+                onClick={() => trackAsIsEvent("email_click")}
+                className="asis-mono"
+                style={{ fontSize: 14, color: "var(--accent-2)", textDecoration: "none" }}
+              >
                 {company.email}
-              </p>
+              </a>
             </div>
             <div className="asis-card">
               <h4 style={{ fontSize: 15, margin: "0 0 6px" }}>אתר</h4>
-              <p className="asis-mono" style={{ margin: 0, fontSize: 14, color: "var(--accent-2)" }}>
+              <a
+                href={`https://${company.website}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="asis-mono"
+                style={{ fontSize: 14, color: "var(--accent-2)", textDecoration: "none" }}
+              >
                 {company.website}
-              </p>
+              </a>
             </div>
             <div className="asis-card">
               <h4 style={{ fontSize: 15, margin: "0 0 6px" }}>זמינות</h4>

@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import Landing from "./pages/Landing";
 import Index from "./pages/Index";
@@ -28,16 +28,25 @@ import Auth from "./pages/Auth";
 import InvestorRegistrationPage from "./pages/InvestorRegistrationPage";
 import DeveloperRegistrationPage from "./pages/DeveloperRegistrationPage";
 import AsIsPresentation from "./pages/AsIsPresentation";
-import AsIsHome from "./pages/as-is/AsIsHome";
-import AsIsAbout from "./pages/as-is/AsIsAbout";
-import AsIsServices from "./pages/as-is/AsIsServices";
-import AsIsProjects from "./pages/as-is/AsIsProjects";
-import AsIsProjectDetail from "./pages/as-is/AsIsProjectDetail";
-import AsIsTeam from "./pages/as-is/AsIsTeam";
-import AsIsInvestors from "./pages/as-is/AsIsInvestors";
-import AsIsArticles from "./pages/as-is/AsIsArticles";
-import AsIsArticlePage from "./pages/as-is/AsIsArticlePage";
-import AsIsContact from "./pages/as-is/AsIsContact";
+
+// AS-IS GROUP marketing site (/as-is/*) — lazy-loaded so its ~1MB of
+// self-hosted fonts, illustrations and interactive components never load
+// for visitors of the rest of the app, and its own first load only pulls
+// the one page requested.
+const AsIsHome = lazy(() => import("./pages/as-is/AsIsHome"));
+const AsIsAbout = lazy(() => import("./pages/as-is/AsIsAbout"));
+const AsIsServices = lazy(() => import("./pages/as-is/AsIsServices"));
+const AsIsProjects = lazy(() => import("./pages/as-is/AsIsProjects"));
+const AsIsProjectDetail = lazy(() => import("./pages/as-is/AsIsProjectDetail"));
+const AsIsTeam = lazy(() => import("./pages/as-is/AsIsTeam"));
+const AsIsInvestors = lazy(() => import("./pages/as-is/AsIsInvestors"));
+const AsIsArticles = lazy(() => import("./pages/as-is/AsIsArticles"));
+const AsIsArticlePage = lazy(() => import("./pages/as-is/AsIsArticlePage"));
+const AsIsContact = lazy(() => import("./pages/as-is/AsIsContact"));
+
+function AsIsLazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<div style={{ minHeight: "100vh", background: "#07090f" }} />}>{children}</Suspense>;
+}
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -163,16 +172,16 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               <Route path="/as-is-presentation" element={<AsIsPresentation />} />
-              <Route path="/as-is" element={<AsIsHome />} />
-              <Route path="/as-is/about" element={<AsIsAbout />} />
-              <Route path="/as-is/services" element={<AsIsServices />} />
-              <Route path="/as-is/projects" element={<AsIsProjects />} />
-              <Route path="/as-is/projects/:slug" element={<AsIsProjectDetail />} />
-              <Route path="/as-is/team" element={<AsIsTeam />} />
-              <Route path="/as-is/investors" element={<AsIsInvestors />} />
-              <Route path="/as-is/articles" element={<AsIsArticles />} />
-              <Route path="/as-is/articles/:slug" element={<AsIsArticlePage />} />
-              <Route path="/as-is/contact" element={<AsIsContact />} />
+              <Route path="/as-is" element={<AsIsLazyPage><AsIsHome /></AsIsLazyPage>} />
+              <Route path="/as-is/about" element={<AsIsLazyPage><AsIsAbout /></AsIsLazyPage>} />
+              <Route path="/as-is/services" element={<AsIsLazyPage><AsIsServices /></AsIsLazyPage>} />
+              <Route path="/as-is/projects" element={<AsIsLazyPage><AsIsProjects /></AsIsLazyPage>} />
+              <Route path="/as-is/projects/:slug" element={<AsIsLazyPage><AsIsProjectDetail /></AsIsLazyPage>} />
+              <Route path="/as-is/team" element={<AsIsLazyPage><AsIsTeam /></AsIsLazyPage>} />
+              <Route path="/as-is/investors" element={<AsIsLazyPage><AsIsInvestors /></AsIsLazyPage>} />
+              <Route path="/as-is/articles" element={<AsIsLazyPage><AsIsArticles /></AsIsLazyPage>} />
+              <Route path="/as-is/articles/:slug" element={<AsIsLazyPage><AsIsArticlePage /></AsIsLazyPage>} />
+              <Route path="/as-is/contact" element={<AsIsLazyPage><AsIsContact /></AsIsLazyPage>} />
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/investor-registration" element={<InvestorRegistrationPage />} />

@@ -4,7 +4,22 @@ import "@/styles/as-is-theme.css";
 import { AsIsThemeToggle, useAsIsTheme } from "./AsIsThemeToggle";
 import AsIsWhatsAppButton from "./AsIsWhatsAppButton";
 import { useAsIsAnalytics } from "./useAsIsAnalytics";
+import { useAsIsJsonLd } from "./useAsIsSeo";
 import { company } from "@/data/as-is-content";
+
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: company.name,
+  alternateName: "AS-IS GROUP - מנהלת התחדשות עירונית",
+  url: "https://www.as-isgroup.co.il/as-is",
+  logo: "https://www.as-isgroup.co.il/as-is-logo.jpeg",
+  foundingDate: String(company.founded),
+  email: company.email,
+  areaServed: "IL",
+  knowsAbout: ["התחדשות עירונית", "פינוי-בינוי", 'תמ"א 38'],
+  sameAs: [] as string[],
+};
 
 const NAV_LINKS = [
   { to: "/as-is", label: "בית" },
@@ -22,6 +37,7 @@ export default function AsIsLayout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   useAsIsAnalytics();
+  useAsIsJsonLd("as-is-organization-jsonld", ORGANIZATION_JSON_LD);
 
   // The rest of the app is lang="en"; these pages are Hebrew/RTL, so set the
   // document language while an /as-is page is mounted and restore it after.
@@ -160,7 +176,18 @@ export default function AsIsLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
           <div style={{ fontFamily: "var(--mono)", fontSize: 12.5, color: "var(--accent-2)" }}>
-            {company.email} · {company.website}
+            <a href={`mailto:${company.email}`} style={{ color: "inherit", textDecoration: "none" }}>
+              {company.email}
+            </a>{" "}
+            ·{" "}
+            <a
+              href={`https://${company.website}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "inherit", textDecoration: "none" }}
+            >
+              {company.website}
+            </a>
           </div>
           <div style={{ fontSize: 12, color: "var(--muted)" }}>
             © {new Date().getFullYear()} AS-IS GROUP. כל הזכויות שמורות.

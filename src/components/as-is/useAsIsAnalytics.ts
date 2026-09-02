@@ -44,3 +44,13 @@ export function useAsIsAnalytics() {
     });
   }, [gaId, location.pathname]);
 }
+
+/**
+ * Fires a GA4 event for the moments that actually matter on a lead-gen
+ * site — form submits, WhatsApp/phone/email taps. A no-op whenever GA
+ * hasn't loaded (no VITE_GA_ID set), so it's always safe to call.
+ */
+export function trackAsIsEvent(name: string, params?: Record<string, unknown>) {
+  if (typeof window === "undefined" || !window.gtag) return;
+  window.gtag("event", name, params);
+}
