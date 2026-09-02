@@ -1,0 +1,163 @@
+import { FormEvent, useState } from "react";
+import AsIsLayout from "@/components/as-is/AsIsLayout";
+import { BeamCard, PageHero, Section } from "@/components/as-is/AsIsUI";
+import { company, contactSteps } from "@/data/as-is-content";
+
+export default function AsIsContact() {
+  const [submitted, setSubmitted] = useState(false);
+  const [form, setForm] = useState({ name: "", phone: "", email: "", city: "", message: "" });
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSubmitted(true);
+  }
+
+  return (
+    <AsIsLayout>
+      <PageHero
+        eyebrow="הצעד הבא"
+        title="מזהים הזדמנות בבניין שלכם?"
+        subtitle="אנו רוצים לפגוש אתכם, בעלי הדירות, ולבחון יחד את ההתכנות למיצוי מלוא זכויותיכם — ללא התחייבות"
+      />
+
+      <Section>
+        <BeamCard style={{ marginBottom: 24 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 16 }}>
+            {contactSteps.map((s, i) => (
+              <div key={s.t} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                <div
+                  className="asis-mono"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: "linear-gradient(135deg,var(--accent),var(--accent-2))",
+                    color: "#fff",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {i + 1}
+                </div>
+                <div>
+                  <p style={{ margin: "0 0 3px", fontSize: 14.5, fontWeight: 700, color: "var(--txt-hi)" }}>{s.t}</p>
+                  <p style={{ margin: 0, fontSize: 12.5, color: "var(--muted)", lineHeight: 1.5 }}>{s.d}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </BeamCard>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }} className="asis-contact-grid">
+          <div className="asis-glass" style={{ padding: "28px 26px" }}>
+            {submitted ? (
+              <div style={{ textAlign: "center", padding: "30px 10px" }}>
+                <svg viewBox="0 0 24 24" width="44" height="44" stroke="var(--accent-2)" fill="none" style={{ margin: "0 auto 14px" }}>
+                  <path d="M5 13l4 4L19 7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <h3 style={{ fontSize: 19, margin: "0 0 6px" }}>תודה!</h3>
+                <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>קיבלנו את הפרטים ונחזור אליכם בהקדם</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }}>
+                <Field label="שם מלא" name="name" value={form.name} onChange={handleChange} required />
+                <Field label="טלפון" name="phone" value={form.phone} onChange={handleChange} required type="tel" />
+                <Field label="אימייל" name="email" value={form.email} onChange={handleChange} type="email" />
+                <Field label="עיר / כתובת הבניין" name="city" value={form.city} onChange={handleChange} />
+                <div>
+                  <label style={labelStyle}>הודעה</label>
+                  <textarea
+                    name="message"
+                    value={form.message}
+                    onChange={handleChange}
+                    rows={4}
+                    style={{ ...inputStyle, resize: "vertical" as const }}
+                  />
+                </div>
+                <button type="submit" className="asis-btn" style={{ justifyContent: "center", marginTop: 6 }}>
+                  שליחת הפנייה
+                </button>
+              </form>
+            )}
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="asis-card">
+              <h4 style={{ fontSize: 15, margin: "0 0 6px" }}>אימייל</h4>
+              <p className="asis-mono" style={{ margin: 0, fontSize: 14, color: "var(--accent-2)" }}>
+                {company.email}
+              </p>
+            </div>
+            <div className="asis-card">
+              <h4 style={{ fontSize: 15, margin: "0 0 6px" }}>אתר</h4>
+              <p className="asis-mono" style={{ margin: 0, fontSize: 14, color: "var(--accent-2)" }}>
+                {company.website}
+              </p>
+            </div>
+            <div className="asis-card">
+              <h4 style={{ fontSize: 15, margin: "0 0 6px" }}>זמינות</h4>
+              <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)" }}>פנויים לפרויקטים חדשים</p>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <style>{`
+        @media (max-width: 760px) {
+          .asis-contact-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+    </AsIsLayout>
+  );
+}
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: 12.5,
+  color: "var(--muted)",
+  marginBottom: 6,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "11px 14px",
+  borderRadius: 10,
+  border: "1px solid var(--line-hi)",
+  background: "var(--panel)",
+  color: "var(--txt)",
+  fontSize: 14,
+  fontFamily: "var(--body)",
+};
+
+function Field({
+  label,
+  name,
+  value,
+  onChange,
+  required,
+  type = "text",
+}: {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  required?: boolean;
+  type?: string;
+}) {
+  return (
+    <div>
+      <label style={labelStyle}>
+        {label} {required && <span style={{ color: "var(--warm)" }}>*</span>}
+      </label>
+      <input type={type} name={name} value={value} onChange={onChange} required={required} style={inputStyle} />
+    </div>
+  );
+}

@@ -1,0 +1,414 @@
+/* AS-IS GROUP marketing site theme — scoped entirely under .asis so it never
+   leaks into (or is affected by) the rest of the app's design tokens.
+   Palette / component language ported from public/as-is-company-presentation.html */
+
+@import url("https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Rubik:wght@500;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap");
+
+.asis {
+  --disp: "Rubik", "Assistant", system-ui, sans-serif;
+  --body: "Assistant", "Inter", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --bg: #ffffff;
+  --bg2: #f5f9ff;
+  --panel: #ffffff;
+  --panel-2: #f4f8fd;
+  --line: rgba(20, 44, 100, 0.11);
+  --line-hi: rgba(20, 44, 100, 0.2);
+  --txt: #232b44;
+  --txt-hi: #060b16;
+  --muted: #455073;
+  --chrome: #1e2742;
+  --accent: #1a4ef5;
+  --accent-2: #0f37c6;
+  --glow: rgba(26, 78, 245, 0.3);
+  --warm: #cf5220;
+  --glass-top: rgba(255, 255, 255, 0.97);
+  --glass-bot: rgba(219, 230, 250, 0.72);
+  --glass-border: rgba(40, 70, 150, 0.3);
+  --glass-gloss: rgba(255, 255, 255, 0.95);
+  --card-shadow: 0 30px 60px -26px rgba(28, 64, 150, 0.3), 0 10px 24px -12px rgba(28, 64, 150, 0.16);
+  --blob: rgba(60, 134, 255, 0.2);
+  --blob2: rgba(120, 178, 255, 0.15);
+  --ok: #15926b;
+
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--body);
+  line-height: 1.7;
+  direction: rtl;
+  transition: background 0.3s, color 0.3s;
+}
+
+.asis[data-theme="dark"] {
+  --bg: #07090f;
+  --bg2: #0a0e18;
+  --panel: #0e1322;
+  --panel-2: #121a2c;
+  --line: rgba(150, 166, 204, 0.13);
+  --line-hi: rgba(150, 166, 204, 0.26);
+  --txt: #c9d0de;
+  --txt-hi: #eef2f9;
+  --muted: #828ba0;
+  --chrome: #e2e8f3;
+  --accent: #3b74ff;
+  --accent-2: #6e9bff;
+  --glow: rgba(59, 116, 255, 0.5);
+  --warm: #e5642a;
+  --glass-top: rgba(228, 236, 250, 0.2);
+  --glass-bot: rgba(9, 13, 24, 0.34);
+  --glass-border: rgba(228, 236, 250, 0.3);
+  --glass-gloss: rgba(255, 255, 255, 0.55);
+  --card-shadow: 0 24px 60px -34px rgba(0, 0, 0, 0.7);
+  --blob: rgba(59, 116, 255, 0.28);
+  --blob2: rgba(150, 180, 255, 0.16);
+  --ok: #37c491;
+}
+
+.asis h1,
+.asis h2,
+.asis h3,
+.asis h4 {
+  font-family: var(--disp);
+  color: var(--txt-hi);
+  margin: 0;
+}
+
+.asis ::selection {
+  background: var(--glow);
+}
+
+/* ambient background blobs */
+.asis-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: radial-gradient(1100px 700px at 15% -6%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    radial-gradient(900px 600px at 85% 106%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%);
+}
+.asis-blob {
+  position: absolute;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  filter: blur(80px);
+  animation: asisFloat 18s ease-in-out infinite;
+}
+.asis-blob.b1 {
+  width: 38vw;
+  height: 38vw;
+  top: -8vw;
+  inset-inline-end: -6vw;
+  background: var(--blob);
+}
+.asis-blob.b2 {
+  width: 30vw;
+  height: 30vw;
+  bottom: -10vw;
+  inset-inline-start: -6vw;
+  background: var(--blob2);
+  animation-duration: 22s;
+}
+@keyframes asisFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-4%, 5%) scale(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .asis-blob { animation: none; }
+}
+
+/* eyebrow / section labels */
+.asis-eyebrow {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.asis-eyebrow .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-2);
+  box-shadow: 0 0 8px var(--glow);
+}
+
+.asis-chrome-text {
+  background: linear-gradient(176deg, #59647f 8%, #28324c 42%, #111a30 78%, #3a4560 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.asis[data-theme="dark"] .asis-chrome-text {
+  background: linear-gradient(176deg, #fff 4%, #c4ccdb 34%, #8f9bb4 50%, #eef2f9 66%, #aab4c9 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+.asis-tag {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-hi);
+  color: var(--muted);
+  display: inline-block;
+}
+
+/* cards */
+.asis-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px 24px;
+  background: linear-gradient(180deg, var(--panel), color-mix(in srgb, var(--panel) 55%, transparent));
+  box-shadow: inset 0 1px 0 var(--glass-gloss), 0 12px 26px -20px rgba(20, 44, 100, 0.28);
+  transition: border-color 0.3s, transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s;
+}
+.asis[data-theme="dark"] .asis-card {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 16px 30px -22px rgba(0, 0, 0, 0.6);
+}
+.asis-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--line-hi);
+  box-shadow: 0 16px 30px -18px var(--glow), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.asis-glass {
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 7%, var(--panel-2)), var(--panel-2));
+  box-shadow: var(--card-shadow), inset 0 1px 0 var(--glass-gloss);
+}
+
+/* beam-card — a slim comet of light gliding along a card's border */
+@property --asis-rev {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.asis-beam {
+  position: relative;
+}
+.asis-beam::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 5;
+  pointer-events: none;
+  padding: 1.4px;
+  background: conic-gradient(
+    from var(--asis-rev),
+    transparent 0deg,
+    transparent 274deg,
+    var(--accent) 274deg,
+    #fff 298deg,
+    var(--accent-2) 300deg,
+    transparent 344deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  animation: asisBeamSpin 8.5s linear infinite;
+}
+@keyframes asisBeamSpin {
+  from { --asis-rev: 0deg; }
+  to { --asis-rev: 360deg; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .asis-beam::before { animation: none; }
+}
+
+/* stat tiles */
+.asis-stat-tile {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 8px;
+  text-align: center;
+}
+.asis-stat-tile .num {
+  font-family: var(--mono);
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 600;
+  color: var(--accent-2);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 20px var(--glow);
+}
+.asis-stat-tile .lbl {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* pillar / icon cards */
+.asis-pillar-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid var(--line-hi);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.asis-pillar-icon svg {
+  width: 19px;
+  height: 19px;
+  stroke: var(--accent-2);
+  fill: none;
+}
+
+/* buttons */
+.asis-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 30px;
+  border-radius: 999px;
+  border: none;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 16px;
+  font-family: var(--disp);
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: 0 14px 30px -12px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: box-shadow 0.25s, transform 0.25s;
+}
+.asis-btn:hover {
+  box-shadow: 0 18px 36px -14px var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+.asis-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  border: 1px solid var(--line-hi);
+  color: var(--txt-hi);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: var(--disp);
+  cursor: pointer;
+  background: transparent;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.asis-btn-outline:hover {
+  border-color: var(--accent);
+  color: var(--accent-2);
+  transform: translateY(-2px);
+}
+
+/* takeaway callout */
+.asis-takeaway {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid var(--line-hi);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+.asis-takeaway .ic {
+  color: var(--accent-2);
+  flex-shrink: 0;
+  font-size: 16px;
+  margin-top: 2px;
+}
+.asis-takeaway p {
+  margin: 0;
+  font-size: 18px;
+  color: var(--txt-hi);
+  line-height: 1.6;
+}
+.asis-takeaway b {
+  color: var(--accent-2);
+}
+
+/* header / nav */
+.asis-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+.asis-nav-link {
+  font-size: 14.5px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+  white-space: nowrap;
+}
+.asis-nav-link:hover,
+.asis-nav-link.active {
+  color: var(--accent-2);
+}
+
+/* floating theme toggle */
+.asis-theme-toggle {
+  position: fixed;
+  inset-inline-end: 18px;
+  bottom: 18px;
+  z-index: 80;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--line-hi);
+  background: linear-gradient(180deg, var(--glass-top), var(--glass-bot));
+  backdrop-filter: blur(10px);
+  color: var(--txt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: inset 0 1.5px 0 var(--glass-gloss), var(--card-shadow);
+  transition: border-color 0.2s, transform 0.15s;
+}
+.asis-theme-toggle:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+.asis-theme-toggle svg {
+  width: 19px;
+  height: 19px;
+  stroke: currentColor;
+  fill: none;
+}
+
+.asis-footer {
+  border-top: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+/* project grid tag */
+.asis-proj-city {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+
+/* mono numerals */
+.asis-mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}

@@ -28,6 +28,15 @@ import Auth from "./pages/Auth";
 import InvestorRegistrationPage from "./pages/InvestorRegistrationPage";
 import DeveloperRegistrationPage from "./pages/DeveloperRegistrationPage";
 import AsIsPresentation from "./pages/AsIsPresentation";
+import AsIsHome from "./pages/as-is/AsIsHome";
+import AsIsAbout from "./pages/as-is/AsIsAbout";
+import AsIsServices from "./pages/as-is/AsIsServices";
+import AsIsProjects from "./pages/as-is/AsIsProjects";
+import AsIsTeam from "./pages/as-is/AsIsTeam";
+import AsIsInvestors from "./pages/as-is/AsIsInvestors";
+import AsIsArticles from "./pages/as-is/AsIsArticles";
+import AsIsArticlePage from "./pages/as-is/AsIsArticlePage";
+import AsIsContact from "./pages/as-is/AsIsContact";
 
 // Admin Workspace Pages
 import AdminPage from "./pages/admin/AdminPage";
@@ -153,6 +162,15 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               <Route path="/as-is-presentation" element={<AsIsPresentation />} />
+              <Route path="/as-is" element={<AsIsHome />} />
+              <Route path="/as-is/about" element={<AsIsAbout />} />
+              <Route path="/as-is/services" element={<AsIsServices />} />
+              <Route path="/as-is/projects" element={<AsIsProjects />} />
+              <Route path="/as-is/team" element={<AsIsTeam />} />
+              <Route path="/as-is/investors" element={<AsIsInvestors />} />
+              <Route path="/as-is/articles" element={<AsIsArticles />} />
+              <Route path="/as-is/articles/:slug" element={<AsIsArticlePage />} />
+              <Route path="/as-is/contact" element={<AsIsContact />} />
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/investor-registration" element={<InvestorRegistrationPage />} />
