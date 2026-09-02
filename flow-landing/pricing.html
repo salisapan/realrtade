@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How Flow is priced: deployment models, what drives cost, and how to get a quote during pre-release.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/pricing.html">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>Pricing — Flow</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Pricing — Flow">
+<meta property="og:description" content="How Flow is priced: deployment models, what drives cost, and how to get a quote during pre-release.">
+<meta property="og:url" content="https://theflow-ai.com/pricing.html">
+<meta property="og:image" content="https://theflow-ai.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Pricing — Flow">
+<meta name="twitter:description" content="How Flow is priced: deployment models, what drives cost, and how to get a quote during pre-release.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --navy:#07090F; --cat:#1A4EF5;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Fraunces',Georgia,serif;
+  --serif:'Source Serif 4',Georgia,serif;
+}
+:root[data-theme="dark"]{
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+h1.title{font-family:var(--disp); font-weight:560; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:560; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
+.btn:hover{filter:brightness(1.1)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+</style>
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'light');}catch(e){}})();
+</script>
+<!-- Analytics: replace G-XXXXXXXXXX with the real GA4 Measurement ID from analytics.google.com -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX', { anonymize_ip: true });
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.png" width="660" height="291" alt="Flow"></a>
+    <nav>
+      <a href="/">Home</a><a href="/security.html">Security</a><a href="/blog/">Insights</a><a href="/#waitlist">Join Waitlist</a>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap">
+    <span class="eyebrow">Pricing</span>
+    <h1 class="title">How Flow is priced.</h1>
+    
+    <article>
+<p class="lead">Flow is in pre-release, and pricing is set per deployment. This page explains what actually drives the number, so you can size a budget before you talk to us.</p>
+
+<h2>What determines cost</h2>
+<div class="cards two">
+  <div class="card">
+    <h3>Deployment Model</h3>
+    <p>The masked secure cloud and a fully local Flow-Edge installation have materially different cost structures. Flow-Edge runs on your infrastructure, so you carry the compute and we license the engine.</p>
+  </div>
+  <div class="card">
+    <h3>Scope of Workflows</h3>
+    <p>How many workflows are automated, and how deeply they reach into your systems &mdash; a single document pipeline is not the same as an engine acting across a department.</p>
+  </div>
+  <div class="card">
+    <h3>Seats</h3>
+    <p>How many people have Flow observing and acting alongside their work.</p>
+  </div>
+  <div class="card">
+    <h3>Compliance Requirements</h3>
+    <p>Environments requiring specific controls, evidence, or deployment isolation carry additional implementation work. We would rather scope that honestly up front than discover it at contract stage.</p>
+  </div>
+</div>
+
+<h2>Why there is no price list yet</h2>
+<p>Publishing a per-seat number would be misleading for this product. A fully local deployment inside a hospital network and a masked cloud deployment for a twelve-person firm are different engagements, and the difference is not a discount tier. During pre-release we scope each deployment directly.</p>
+
+<div class="note">If you need a budgetary figure for a planning cycle, say so in your first email &mdash; we will give you a range with the assumptions written out, rather than asking you to sit through a call for it.</div>
+
+<h2>Early access</h2>
+<p>Flow is working with a limited number of design partners ahead of general availability. Early partners get direct input into the deployment model and roadmap. <a href="/#waitlist">Join the waitlist</a> to be considered.</p>
+
+<!-- TODO (owner): once pricing is set, replace this page with real tiers/figures.
+     Buyers filter out vendors with no pricing signal; this page is the honest
+     pre-release version, not the final one. -->
+
+<div class="cta">
+  <h2>Need a quote?</h2>
+  <p>Tell us your deployment model and rough scope, and we will come back with a range.</p>
+  <a class="btn" href="/contact.html">Request Pricing</a>
+</div>
+    </article>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <div class="pagenav">
+      <a href="/about.html">About</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a><a href="/blog/">Insights</a>
+    </div>
+    &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
+  </div>
+</footer>
+<script>
+
+(function(){
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Deploy AI automation under HIPAA: masked processing or fully local Flow-Edge, audit logging, and human approval gates for clinical and administrative workflows.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/solutions/healthcare.html">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>AI Workflow Automation for Healthcare — Flow</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="AI Workflow Automation for Healthcare — Flow">
+<meta property="og:description" content="Deploy AI automation under HIPAA: masked processing or fully local Flow-Edge, audit logging, and human approval gates for clinical and administrative workflows.">
+<meta property="og:url" content="https://theflow-ai.com/solutions/healthcare.html">
+<meta property="og:image" content="https://theflow-ai.com/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Workflow Automation for Healthcare — Flow">
+<meta name="twitter:description" content="Deploy AI automation under HIPAA: masked processing or fully local Flow-Edge, audit logging, and human approval gates for clinical and administrative workflows.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --navy:#07090F; --cat:#1A4EF5;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Fraunces',Georgia,serif;
+  --serif:'Source Serif 4',Georgia,serif;
+}
+:root[data-theme="dark"]{
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+h1.title{font-family:var(--disp); font-weight:560; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:560; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
+.btn:hover{filter:brightness(1.1)}
+.readlist{list-style:none; padding:0; margin:0}
+.readlist li{margin-bottom:12px}
+.readlist a{font-family:var(--sans); font-weight:600}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+</style>
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'light');}catch(e){}})();
+</script>
+<!-- Analytics: replace G-XXXXXXXXXX with the real GA4 Measurement ID from analytics.google.com -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX', { anonymize_ip: true });
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.png" width="660" height="291" alt="Flow"></a>
+    <nav>
+      <a href="/">Home</a><a href="/security.html">Security</a><a href="/blog/">Insights</a><a href="/#waitlist">Join Waitlist</a>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap">
+    <span class="eyebrow">Solutions</span>
+    <h1 class="title">AI automation for healthcare.</h1>
+    
+    <article>
+<p class="lead">PHI does not get to leave the boundary because a vendor's roadmap says so. Flow deploys in a masked secure cloud &mdash; or entirely inside your own infrastructure &mdash; so automation is possible without renegotiating your HIPAA posture.</p>
+
+<h2>The constraint</h2>
+<p>Healthcare organizations are not short of automatable work: prior authorization packets, referral intake, claims correspondence, chart summarization for administrative review, cross-state licensure checks in telehealth. What they are short of is a way to automate any of it without routing protected health information through a system whose retention and subprocessor behavior cannot be fully accounted for in a BAA.</p>
+
+<h2>How Flow addresses it</h2>
+<ul>
+<li><b>Fully local deployment.</b> With Flow-Edge, PHI never crosses your network boundary. This is the deployment model for organizations whose policy simply prohibits external processing.</li>
+<li><b>Masking before processing.</b> In the cloud model, identifiers are detected and masked before any data is processed.</li>
+<li><b>Append-only audit trail.</b> Every observation, proposal, approval, and execution is recorded &mdash; the evidence base for an OCR inquiry or an internal investigation.</li>
+<li><b>Human approval on high-risk actions.</b> Clinical and billing consequences do not get automated away silently.</li>
+</ul>
+
+<h2>Research on healthcare deployment</h2>
+<ul class="readlist">
+<li><a href="/blog/hipaa-compliant-ai-automation.html">Compliance by Design: Architecting AI Workflow Automation Under HIPAA</a></li>
+<li><a href="/blog/telehealth-ai-licensure-hipaa.html">AI Automation in Telehealth: Cross-State Licensure, HIPAA, and the Post-Emergency Landscape</a></li>
+<li><a href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html">AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records</a></li>
+<li><a href="/blog/what-is-data-masking-technical-guide.html">What Is Data Masking? De-Identifying Data Before It Reaches an AI Model</a></li>
+<li><a href="/blog/human-in-the-loop-ai-system-design.html">Designing Human-in-the-Loop Systems People Actually Use</a></li>
+</ul>
+
+<div class="cta">
+  <h2>Evaluating AI automation under HIPAA?</h2>
+  <p>Start with the architecture, not the demo.</p>
+  <a class="btn" href="/security.html">Read the Security Page</a>
+</div>
+    </article>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <div class="pagenav">
+      <a href="/about.html">About</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a><a href="/blog/">Insights</a>
+    </div>
+    &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
+  </div>
+</footer>
+<script>
+
+(function(){
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+
+</script>
+</body>
+</html>
