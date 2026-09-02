@@ -1,8 +1,14 @@
 import AsIsLayout from "@/components/as-is/AsIsLayout";
 import { BeamCard, PageHero, PillarIcon, Section } from "@/components/as-is/AsIsUI";
+import { useAsIsSeo } from "@/components/as-is/useAsIsSeo";
 import { heroStats, whyReasons } from "@/data/as-is-content";
 
 export default function AsIsAbout() {
+  useAsIsSeo({
+    title: "אודות AS-IS GROUP",
+    description: "מי אנחנו, למה כדאי לבחור ב-AS-IS GROUP כחברה המארגנת של הבניין שלכם, והמספרים שמאחורי הניסיון שלנו בהתחדשות עירונית.",
+    path: "/as-is/about",
+  });
   return (
     <AsIsLayout>
       <PageHero

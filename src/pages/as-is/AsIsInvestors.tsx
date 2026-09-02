@@ -1,11 +1,18 @@
 import { Link } from "react-router-dom";
 import AsIsLayout from "@/components/as-is/AsIsLayout";
+import ProjectSketch from "@/components/as-is/ProjectSketch";
 import { BeamCard, PageHero, Section, StatTile } from "@/components/as-is/AsIsUI";
+import { useAsIsSeo } from "@/components/as-is/useAsIsSeo";
 import { heroStats, projects, totals } from "@/data/as-is-content";
 
 const largeProjects = projects.filter((p) => p.buildings >= 10);
 
 export default function AsIsInvestors() {
+  useAsIsSeo({
+    title: "ליזמים ומשקיעים",
+    description: "פורטפוליו פרויקטי התחדשות עירונית בשלים ומאורגנים לשיתופי פעולה עם יזמים ומשקיעים — נציגות דיירים מוכנה וליווי מקצועי מלא.",
+    path: "/as-is/investors",
+  });
   return (
     <AsIsLayout>
       <PageHero
@@ -34,9 +41,12 @@ export default function AsIsInvestors() {
         <h3 style={{ fontSize: 20, margin: "0 0 14px" }}>הפרויקטים המובילים בפורטפוליו</h3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 14 }}>
           {largeProjects.map((p) => (
-            <div key={p.name} className="asis-card">
+            <Link key={p.slug} to={`/as-is/projects/${p.slug}`} className="asis-card" style={{ textDecoration: "none", display: "block" }}>
+              <div style={{ height: 56, marginBottom: 10 }}>
+                <ProjectSketch sketch={p.sketch} />
+              </div>
               <div className="asis-proj-city">{p.city}</div>
-              <h4 style={{ fontSize: 16, margin: "6px 0 12px" }}>{p.name}</h4>
+              <h4 style={{ fontSize: 16, margin: "6px 0 12px", color: "var(--txt-hi)" }}>{p.name}</h4>
               <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--muted)" }}>
                 <span>
                   <b className="asis-mono" style={{ color: "var(--accent-2)", fontSize: 14 }}>
@@ -51,7 +61,7 @@ export default function AsIsInvestors() {
                   בתכנון
                 </span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
         <p style={{ marginTop: 16, fontSize: 13.5, color: "var(--muted)" }}>

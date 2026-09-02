@@ -32,6 +32,7 @@ import AsIsHome from "./pages/as-is/AsIsHome";
 import AsIsAbout from "./pages/as-is/AsIsAbout";
 import AsIsServices from "./pages/as-is/AsIsServices";
 import AsIsProjects from "./pages/as-is/AsIsProjects";
+import AsIsProjectDetail from "./pages/as-is/AsIsProjectDetail";
 import AsIsTeam from "./pages/as-is/AsIsTeam";
 import AsIsInvestors from "./pages/as-is/AsIsInvestors";
 import AsIsArticles from "./pages/as-is/AsIsArticles";
@@ -166,6 +167,7 @@ const App = () => {
               <Route path="/as-is/about" element={<AsIsAbout />} />
               <Route path="/as-is/services" element={<AsIsServices />} />
               <Route path="/as-is/projects" element={<AsIsProjects />} />
+              <Route path="/as-is/projects/:slug" element={<AsIsProjectDetail />} />
               <Route path="/as-is/team" element={<AsIsTeam />} />
               <Route path="/as-is/investors" element={<AsIsInvestors />} />
               <Route path="/as-is/articles" element={<AsIsArticles />} />

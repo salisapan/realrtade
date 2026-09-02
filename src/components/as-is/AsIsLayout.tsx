@@ -1,7 +1,9 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import "@/styles/as-is-theme.css";
 import { AsIsThemeToggle, useAsIsTheme } from "./AsIsThemeToggle";
+import AsIsWhatsAppButton from "./AsIsWhatsAppButton";
+import { useAsIsAnalytics } from "./useAsIsAnalytics";
 import { company } from "@/data/as-is-content";
 
 const NAV_LINKS = [
@@ -19,6 +21,21 @@ export default function AsIsLayout({ children }: { children: ReactNode }) {
   const { theme, setTheme } = useAsIsTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  useAsIsAnalytics();
+
+  // The rest of the app is lang="en"; these pages are Hebrew/RTL, so set the
+  // document language while an /as-is page is mounted and restore it after.
+  useEffect(() => {
+    const html = document.documentElement;
+    const prevLang = html.lang;
+    const prevDir = html.dir;
+    html.lang = "he";
+    html.dir = "rtl";
+    return () => {
+      html.lang = prevLang;
+      html.dir = prevDir;
+    };
+  }, []);
 
   return (
     <div className="asis" data-theme={theme} style={{ minHeight: "100vh", position: "relative" }}>
@@ -151,6 +168,7 @@ export default function AsIsLayout({ children }: { children: ReactNode }) {
         </div>
       </footer>
 
+      <AsIsWhatsAppButton />
       <AsIsThemeToggle theme={theme} onToggle={() => setTheme(theme === "dark" ? "light" : "dark")} />
 
       <style>{`

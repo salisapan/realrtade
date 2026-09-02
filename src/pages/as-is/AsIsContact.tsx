@@ -1,18 +1,44 @@
 import { FormEvent, useState } from "react";
 import AsIsLayout from "@/components/as-is/AsIsLayout";
 import { BeamCard, PageHero, Section } from "@/components/as-is/AsIsUI";
+import { useAsIsSeo } from "@/components/as-is/useAsIsSeo";
+import { supabase } from "@/integrations/supabase/client";
 import { company, contactSteps } from "@/data/as-is-content";
 
 export default function AsIsContact() {
+  useAsIsSeo({
+    title: "צור קשר",
+    description: "מזהים הזדמנות בבניין שלכם? קבעו פגישת היכרות עם AS-IS GROUP לבדיקת התכנות ראשונית ללא עלות וללא התחייבות.",
+    path: "/as-is/contact",
+  });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", email: "", city: "", message: "" });
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    // "as_is_leads" isn't in the generated Database type yet — it needs
+    // `supabase gen types` re-run against the project after the migration in
+    // supabase/migrations/20260901000000_create_as_is_leads.sql is applied.
+    const { error: insertError } = await supabase.from("as_is_leads" as never).insert({
+      name: form.name,
+      phone: form.phone,
+      email: form.email || null,
+      city: form.city || null,
+      message: form.message || null,
+    } as never);
+    setSubmitting(false);
+    if (insertError) {
+      setError("קרתה תקלה בשליחה, נסו שוב או צרו קשר ישירות באימייל.");
+      return;
+    }
     setSubmitted(true);
   }
 
@@ -82,8 +108,18 @@ export default function AsIsContact() {
                     style={{ ...inputStyle, resize: "vertical" as const }}
                   />
                 </div>
-                <button type="submit" className="asis-btn" style={{ justifyContent: "center", marginTop: 6 }}>
-                  שליחת הפנייה
+                {error && (
+                  <p role="alert" style={{ margin: 0, fontSize: 13, color: "var(--warm)" }}>
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  className="asis-btn"
+                  disabled={submitting}
+                  style={{ justifyContent: "center", marginTop: 6, opacity: submitting ? 0.7 : 1 }}
+                >
+                  {submitting ? "שולח..." : "שליחת הפנייה"}
                 </button>
               </form>
             )}

@@ -1,8 +1,14 @@
 import AsIsLayout from "@/components/as-is/AsIsLayout";
 import { PageHero, Section } from "@/components/as-is/AsIsUI";
+import { useAsIsSeo } from "@/components/as-is/useAsIsSeo";
 import { team, testimonials } from "@/data/as-is-content";
 
 export default function AsIsTeam() {
+  useAsIsSeo({
+    title: "הצוות שלנו",
+    description: "הכירו את הצוות שמלווה אתכם ב-AS-IS GROUP — מומחי תכנון, עורכי דין ואנשי מקצוע בתחום ההתחדשות העירונית.",
+    path: "/as-is/team",
+  });
   return (
     <AsIsLayout>
       <PageHero

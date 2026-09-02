@@ -1,9 +1,15 @@
 import { Link } from "react-router-dom";
 import AsIsLayout from "@/components/as-is/AsIsLayout";
 import { PageHero, Section } from "@/components/as-is/AsIsUI";
+import { useAsIsSeo } from "@/components/as-is/useAsIsSeo";
 import { phases } from "@/data/as-is-content";
 
 export default function AsIsServices() {
+  useAsIsSeo({
+    title: "תהליך העבודה שלנו",
+    description: "מפת הדרכים המלאה של AS-IS GROUP — 7 שלבים מפנייה ראשונית ובדיקת התכנות ועד תכנון, בנייה ומסירת הדירות.",
+    path: "/as-is/services",
+  });
   return (
     <AsIsLayout>
       <PageHero

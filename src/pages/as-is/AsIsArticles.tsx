@@ -1,13 +1,27 @@
-import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import AsIsLayout from "@/components/as-is/AsIsLayout";
 import { PageHero, Section } from "@/components/as-is/AsIsUI";
-import { articles } from "@/data/as-is-content";
+import { useAsIsJsonLd, useAsIsSeo } from "@/components/as-is/useAsIsSeo";
+import { articles, company } from "@/data/as-is-content";
 
 export default function AsIsArticles() {
-  useEffect(() => {
-    document.title = "כתבות ומדריכים בהתחדשות עירונית | AS-IS GROUP";
-  }, []);
+  useAsIsSeo({
+    title: "כתבות ומדריכים בהתחדשות עירונית",
+    description: 'מדריכים מקצועיים על התחדשות עירונית, פינוי-בינוי ותמ"א 38 מבית AS-IS GROUP — לבעלי דירות שרוצים להבין את התהליך לעומק.',
+    path: "/as-is/articles",
+  });
+
+  useAsIsJsonLd("as-is-articles-jsonld", {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: articles.map((a, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `https://www.as-isgroup.co.il/as-is/articles/${a.slug}`,
+      name: a.title,
+    })),
+    publisher: { "@type": "Organization", name: company.name },
+  });
 
   return (
     <AsIsLayout>

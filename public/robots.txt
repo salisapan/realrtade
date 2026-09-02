@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /as-is
+Allow: /as-is/
+
+Sitemap: https://www.as-isgroup.co.il/sitemap.xml

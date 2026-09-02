@@ -1,9 +1,20 @@
 import { Link } from "react-router-dom";
 import AsIsLayout from "@/components/as-is/AsIsLayout";
-import { BeamCard, Eyebrow, PillarIcon, Section, StatTile } from "@/components/as-is/AsIsUI";
-import { company, heroStats, phases, pillars, projects, testimonials, totals } from "@/data/as-is-content";
+import AsIsFaq from "@/components/as-is/AsIsFaq";
+import AsIsPillarCarousel from "@/components/as-is/AsIsPillarCarousel";
+import AsIsTestimonialStack from "@/components/as-is/AsIsTestimonialStack";
+import ProjectSketch from "@/components/as-is/ProjectSketch";
+import { BeamCard, Eyebrow, Section, StatTile } from "@/components/as-is/AsIsUI";
+import { useAsIsSeo } from "@/components/as-is/useAsIsSeo";
+import { company, heroStats, phases, projects, totals } from "@/data/as-is-content";
 
 export default function AsIsHome() {
+  useAsIsSeo({
+    title: "AS-IS GROUP — מנהלת התחדשות עירונית",
+    description:
+      "AS-IS GROUP מלווה בעלי דירות בתהליכי התחדשות עירונית, פינוי-בינוי ותמ\"א 38 מקצה לקצה — מהצעד הראשון ועד קבלת המפתח.",
+    path: "/as-is",
+  });
   const topProjects = [...projects].sort((a, b) => b.plannedUnits - a.plannedUnits).slice(0, 4);
 
   return (
@@ -70,15 +81,7 @@ export default function AsIsHome() {
       <Section>
         <Eyebrow>מה מייחד אותנו</Eyebrow>
         <h2 style={{ fontSize: "clamp(26px,3.4vw,36px)", margin: "0 0 22px" }}>היתרונות שמייחדים אותנו</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 14 }}>
-          {pillars.map((p) => (
-            <div key={p.t} className="asis-card">
-              <PillarIcon icon={p.icon} />
-              <h4 style={{ fontSize: 16, margin: "0 0 6px" }}>{p.t}</h4>
-              <p style={{ margin: 0, fontSize: 13.5, color: "var(--muted)", lineHeight: 1.55 }}>{p.d}</p>
-            </div>
-          ))}
-        </div>
+        <AsIsPillarCarousel />
       </Section>
 
       {/* Process teaser */}
@@ -147,9 +150,12 @@ export default function AsIsHome() {
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 14 }}>
           {topProjects.map((p) => (
-            <div key={p.name} className="asis-card">
+            <Link key={p.slug} to={`/as-is/projects/${p.slug}`} className="asis-card" style={{ textDecoration: "none", display: "block" }}>
+              <div style={{ height: 56, marginBottom: 10 }}>
+                <ProjectSketch sketch={p.sketch} />
+              </div>
               <div className="asis-proj-city">{p.city}</div>
-              <h4 style={{ fontSize: 16, margin: "6px 0 12px" }}>{p.name}</h4>
+              <h4 style={{ fontSize: 16, margin: "6px 0 12px", color: "var(--txt-hi)" }}>{p.name}</h4>
               <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--muted)" }}>
                 <span>
                   <b className="asis-mono" style={{ color: "var(--accent-2)", fontSize: 14 }}>
@@ -164,7 +170,7 @@ export default function AsIsHome() {
                   בתכנון
                 </span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
         <div style={{ marginTop: 20 }}>
@@ -175,16 +181,17 @@ export default function AsIsHome() {
       </Section>
 
       {/* Testimonial teaser */}
-      <Section>
+      <Section style={{ maxWidth: 620 }}>
         <Eyebrow>מה אומרים עלינו</Eyebrow>
         <h2 style={{ fontSize: "clamp(26px,3.4vw,36px)", margin: "0 0 22px" }}>דיירים ממליצים</h2>
-        <div className="asis-glass" style={{ padding: "24px 26px" }}>
-          <p style={{ fontSize: 17, lineHeight: 1.65, margin: "0 0 14px", color: "var(--txt)" }}>
-            "{testimonials[0].quote}"
-          </p>
-          <div style={{ fontWeight: 700, color: "var(--txt-hi)" }}>{testimonials[0].name}</div>
-          <div style={{ fontSize: 12.5, color: "var(--muted)" }}>{testimonials[0].role}</div>
-        </div>
+        <AsIsTestimonialStack />
+      </Section>
+
+      {/* FAQ */}
+      <Section style={{ maxWidth: 820 }}>
+        <Eyebrow>שאלות נפוצות</Eyebrow>
+        <h2 style={{ fontSize: "clamp(26px,3.4vw,36px)", margin: "0 0 22px" }}>שאלות שבעלי דירות שואלים אותנו</h2>
+        <AsIsFaq />
       </Section>
 
       {/* CTA */}

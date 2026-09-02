@@ -1,48 +1,33 @@
-import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import AsIsLayout from "@/components/as-is/AsIsLayout";
 import { Section } from "@/components/as-is/AsIsUI";
+import { useAsIsJsonLd, useAsIsSeo } from "@/components/as-is/useAsIsSeo";
 import { articles, company } from "@/data/as-is-content";
 
 export default function AsIsArticlePage() {
   const { slug } = useParams();
   const article = articles.find((a) => a.slug === slug);
 
-  useEffect(() => {
-    if (!article) return;
-    document.title = `${article.title} | AS-IS GROUP`;
+  useAsIsSeo({
+    title: article?.title ?? "כתבה לא נמצאה",
+    description: article?.excerpt ?? "",
+    path: `/as-is/articles/${slug ?? ""}`,
+  });
 
-    const setMeta = (name: string, content: string) => {
-      let tag = document.querySelector(`meta[name="${name}"]`);
-      if (!tag) {
-        tag = document.createElement("meta");
-        tag.setAttribute("name", name);
-        document.head.appendChild(tag);
-      }
-      tag.setAttribute("content", content);
-    };
-    setMeta("description", article.excerpt);
-
-    const ldId = "as-is-article-jsonld";
-    document.getElementById(ldId)?.remove();
-    const script = document.createElement("script");
-    script.type = "application/ld+json";
-    script.id = ldId;
-    script.text = JSON.stringify({
-      "@context": "https://schema.org",
-      "@type": "Article",
-      headline: article.title,
-      description: article.excerpt,
-      datePublished: article.date,
-      author: { "@type": "Organization", name: company.name },
-      publisher: { "@type": "Organization", name: company.name },
-    });
-    document.head.appendChild(script);
-
-    return () => {
-      document.getElementById(ldId)?.remove();
-    };
-  }, [article]);
+  useAsIsJsonLd(
+    "as-is-article-jsonld",
+    article
+      ? {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          headline: article.title,
+          description: article.excerpt,
+          datePublished: article.date,
+          author: { "@type": "Organization", name: company.name },
+          publisher: { "@type": "Organization", name: company.name },
+        }
+      : null
+  );
 
   if (!article) {
     return (
