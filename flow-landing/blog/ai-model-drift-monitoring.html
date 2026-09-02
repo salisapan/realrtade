@@ -114,7 +114,8 @@ footer.site a{color:var(--muted)}
 .ish-card img{width:100%; height:100%; object-fit:cover; display:block}
 .ish-card.ish-r{animation-name:ish-right}
 .ish-card.ish-l{animation-name:ish-left}
-@media (prefers-reduced-motion:reduce){ .ish-card{animation-play-state:paused} }
+.ish-tab-hidden .ish-card{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){ .ish-space{position:static; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px; height:100%; padding:24px; overflow:auto} .ish-card{position:static; margin:0; width:96px; height:132px; animation:none; transform:none!important} }
 .ish-scrim{position:absolute; inset:0; background:radial-gradient(ellipse 60% 55% at 50% 55%,transparent 0%,var(--navy) 78%); pointer-events:none; z-index:1}
 .ish-overlay{position:relative; z-index:2; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 24px; pointer-events:none}
 .ish-title{font-family:var(--disp); font-weight:560; font-size:clamp(1.9rem,4.6vw,3.1rem); line-height:1.14; letter-spacing:-.01em; color:#EEF2F9; margin:14px 0 16px; max-width:22ch}
@@ -235,5 +236,6 @@ footer.site a{color:var(--muted)}
   });
 })();
 </script>
+<script>document.addEventListener("visibilitychange",function(){document.documentElement.classList.toggle("ish-tab-hidden",document.hidden);});document.addEventListener("click",function(ev){var a=ev.target.closest(".ish-card"); if(a && typeof gtag==="function") gtag("event","ish_card_click",{article_path:a.getAttribute("href")});});</script>
 </body>
 </html>
