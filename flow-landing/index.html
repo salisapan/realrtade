@@ -622,17 +622,16 @@ canvas.terrain-canvas.show{opacity:1}
 .ins-head h2{font-family:var(--disp); font-weight:700; font-size:clamp(1.5rem,3.2vw,2.2rem); color:var(--txt-hi); margin:12px 0 0; letter-spacing:-.01em}
 .ins-morph{position:relative; height:280vh}
 .ins-stage{position:sticky; top:0; height:100vh; overflow:hidden}
+:root[data-theme="dark"] .ins-stage{background:radial-gradient(120% 90% at 50% 42%, #14161d 0%, #0a0b10 55%, #06070a 100%)}
 .ins-cards{position:absolute; inset:0}
 .ins-card{position:absolute; top:50%; left:50%; width:64px; height:90px; margin:-45px 0 0 -32px; display:block; text-decoration:none; opacity:0; will-change:transform,opacity}
 @media (min-width:640px){ .ins-card{width:80px; height:112px; margin:-56px 0 0 -40px} }
 .ins-cards.ins-intro .ins-card{transition:transform 1s cubic-bezier(.2,.8,.2,1), opacity .8s}
-.ins-card-inner{position:relative; display:block; width:100%; height:100%; border-radius:14px; transition:transform .5s cubic-bezier(.2,.8,.2,1); transform-style:preserve-3d}
+.ins-card-inner{position:relative; display:block; width:100%; height:100%; border-radius:20px; transition:transform .5s cubic-bezier(.2,.8,.2,1); transform-style:preserve-3d}
 .ins-card:hover .ins-card-inner{transform:rotateY(180deg)}
-.ins-card-face{position:absolute; inset:0; border-radius:14px; overflow:hidden; backface-visibility:hidden; box-shadow:0 16px 34px -14px rgba(0,0,0,.55), inset 0 0 0 1px var(--line-hi), 0 0 0 1px hsl(calc(var(--i) * 47deg) 70% 55% / .22), 0 0 22px -4px hsl(calc(var(--i) * 47deg) 75% 58% / .38)}
+.ins-card-face{position:absolute; inset:0; border-radius:20px; overflow:hidden; backface-visibility:hidden; box-shadow:0 24px 50px -20px rgba(0,0,0,.6), inset 0 0 0 1px var(--line-hi), inset 0 1px 0 rgba(255,255,255,.14)}
 .ins-card-face.front img{width:100%; height:100%; object-fit:cover; display:block}
 .ins-card-face.back{transform:rotateY(180deg); background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 26%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); border:1px solid var(--glass-border); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:8px; gap:4px}
-.ins-card-cat{display:flex; align-items:center; justify-content:center; gap:5px}
-.ins-card-cat::before{content:''; width:6px; height:6px; border-radius:50%; background:hsl(calc(var(--i) * 47deg) 75% 58%); flex:none}
 @media (hover:none){
   .ins-card:hover .ins-card-inner{transform:none}
   .ins-card-face.front::after{content:attr(data-cat); position:absolute; inset-inline:0; bottom:0; padding:5px 4px 4px; background:linear-gradient(0deg,rgba(0,0,0,.72),transparent); color:#fff; font-family:var(--sans); font-size:.5rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; text-align:center; line-height:1.15}
@@ -1208,7 +1207,7 @@ Best,
             <a class="ins-card" href="/blog/zero-retention-ai-architecture.html" style="--i:29" aria-label="Zero-Retention AI: What It Actually Means and How to Verify a Vendor&#x27;s Claim" data-cat="Data Security"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Data Security"><img src="/blog/img/zero-retention-ai-architecture.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Data Security</span><span class="ins-card-title">Zero-Retention AI: What It Actually Means and How to Verify a Vendor&#x27;s Claim</span></span></span></a>
         </div>
         <div class="ins-center" id="insCenter">
-          <p class="ins-center-title" data-i18n="ins.center">30 articles. One research library.</p>
+          <p class="ins-center-title" data-i18n="ins.center">Our research library.</p>
           <span class="ins-center-hint" data-i18n="ins.hint">SCROLL TO EXPLORE</span>
         </div>
         <div class="ins-reveal" id="insReveal">
@@ -1298,7 +1297,7 @@ Best,
     'nav.blog':{en:'Insights',he:'תובנות'},
     'ins.eyebrow':{en:'INSIGHTS',he:'תובנות'},
     'ins.title':{en:'Research on Regulated AI Deployment',he:'מחקר על פריסת AI בתעשיות מוסדרות'},
-    'ins.center':{en:'30 articles. One research library.',he:'30 מאמרים. ספריית מחקר אחת.'},
+    'ins.center':{en:'Our research library.',he:'ספריית המחקר שלנו.'},
     'ins.hint':{en:'SCROLL TO EXPLORE',he:'גללו כדי לחקור'},
     'ins.title2':{en:'Explore the Research',he:'חקרו את המחקר'},
     'ins.lead':{en:'Compliance, architecture, and efficiency — across law, healthcare, finance, insurance, government, and technical AI infrastructure.',he:'ציות רגולטורי, ארכיטקטורה, ויעילות — בתחומי המשפט, הבריאות, הפיננסים, הביטוח, הממשל, ותשתיות AI טכניות.'},
