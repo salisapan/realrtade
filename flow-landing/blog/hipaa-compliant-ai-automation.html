@@ -16,11 +16,11 @@
 <meta property="og:title" content="Compliance by Design: Architecting AI Workflow Automation Under HIPAA — Flow">
 <meta property="og:description" content="How chart summarization, intake, and clinical workflow automation can be deployed without creating new HIPAA exposure — a technical and regulatory framework.">
 <meta property="og:url" content="https://theflow-ai.com/blog/hipaa-compliant-ai-automation.html">
-<meta property="og:image" content="https://theflow-ai.com/og.png">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Compliance by Design: Architecting AI Workflow Automation Under HIPAA — Flow">
 <meta name="twitter:description" content="How chart summarization, intake, and clinical workflow automation can be deployed without creating new HIPAA exposure — a technical and regulatory framework.">
-<meta name="twitter:image" content="https://theflow-ai.com/og.png">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <title>Compliance by Design: Architecting AI Workflow Automation Under HIPAA — Flow</title>
 <script type="application/ld+json">
 {
@@ -31,7 +31,7 @@
   "author": { "@type": "Organization", "name": "Flow" },
   "publisher": { "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/" },
   "mainEntityOfPage": "https://theflow-ai.com/blog/hipaa-compliant-ai-automation.html",
-  "image": "https://theflow-ai.com/og.png",
+  "image": "https://theflow-ai.com/og.jpg",
   "datePublished": "2026-08-31"
 }
 </script>
@@ -93,6 +93,9 @@ article blockquote{margin:32px 0; padding:2px 22px; border-inline-start:3px soli
 .refs li{counter-increment:refs; margin-bottom:12px; padding-inline-start:26px; position:relative}
 .refs li::before{content:counter(refs); position:absolute; inset-inline-start:0; top:.1em; font-weight:700; color:var(--cat); font-size:.8rem}
 .cta{margin:60px 0 10px; padding:38px 28px; background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--cat); border-radius:16px; text-align:center; font-family:var(--sans)}
+.cta .sol-link{display:block; margin-top:16px; font-size:.92rem; color:var(--muted)}
+.cta .sol-link a{color:var(--accent-2); font-weight:700; text-decoration:none}
+.cta .sol-link a:hover{text-decoration:underline}
 .cta p{margin:0 0 22px; color:var(--txt-hi); font-size:1.02rem}
 .doit{--pad-y:15px; --pad-x:32px; position:relative; display:inline-flex; align-items:center; justify-content:center; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; font-family:var(--sans); font-weight:700; font-size:1.02rem; color:var(--doit-text); text-decoration:none; transition:transform .28s cubic-bezier(.2,.8,.2,1)}
 .doit .shell{position:absolute; inset:0; border-radius:inherit; z-index:-2; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); box-shadow:inset 0 1.5px 0 var(--glass-gloss), inset 0 -12px 26px rgba(14,32,80,.10), 0 16px 46px -10px rgba(26,78,245,.32)}
@@ -213,6 +216,7 @@ footer.site a{color:var(--muted)}
     <div class="cta">
       <p>See how Flow applies this in practice — masked in our secure cloud, or fully on your own infrastructure with Flow-Edge.</p>
       <a class="doit" href="/#waitlist"><span class="shell"></span><span class="ring"></span>[Do It]</a>
+      <p class="sol-link"><a href="/solutions/healthcare.html">See Flow's healthcare deployment guide &rarr;</a></p>
     </div>
   </div>
 </main>
