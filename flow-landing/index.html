@@ -999,7 +999,7 @@ Best,
         <p class="lead muted" data-i18n="ag.body">Flow decodes causal chains and hidden work patterns at the OS level, turning professional intuition into Execution Memory. The judgment of your most senior experts is replicated automatically to every teammate's machine — in zero clicks, at exactly the right second.</p>
       </div>
     </div>
-    <div class="agraph-stage" aria-hidden="true"><video id="agraphVideo" muted playsinline preload="auto" src="https://d8j0ntlcm91z4.cloudfront.net/user_3IXIoov5CmuBCm6ETp865KISVuz/hf_20260902_110536_d3653e2c-2f6f-4a61-ad0d-d3476f4cda4b.mp4"></video></div>
+    <div class="agraph-stage" aria-hidden="true"><video id="agraphVideo" muted playsinline preload="auto" src="/media/agraph.mp4"></video></div>
     <div class="wrap">
       <div class="agraph-legend reveal">
         <span><i class="exp"></i><span data-i18n="ag.l1">Senior expertise</span></span>
@@ -1918,7 +1918,7 @@ Best,
   /* ---------- Action Graph: scroll-scrubbed hero video (chaos → order knowledge graph) ---------- */
   (function(){
     var v=document.getElementById('agraphVideo'); if(!v) return;
-    var duration=0, raf=null, visible=false;
+    var duration=v.duration||0, raf=null, visible=false;
     function prog(){
       var r=v.getBoundingClientRect();
       var total=Math.max(1, r.height+innerHeight);
@@ -1929,7 +1929,8 @@ Best,
       if(duration>0) v.currentTime=prog()*duration*0.999;
     }
     function schedule(){ if(!raf) raf=requestAnimationFrame(update); }
-    v.addEventListener('loadedmetadata',function(){ duration=v.duration||0; update(); });
+    function onMeta(){ duration=v.duration||0; update(); }
+    if(v.readyState>=1) onMeta(); else v.addEventListener('loadedmetadata',onMeta);
     new IntersectionObserver(function(es){ es.forEach(function(e){ visible=e.isIntersecting; if(visible) schedule(); }); },{threshold:0}).observe(v);
     addEventListener('scroll',function(){ if(visible) schedule(); },{passive:true});
     addEventListener('resize',function(){ if(visible) schedule(); });
