@@ -1,17 +1,17 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { GLASS_BG, GLASS_BORDER, MUTED, SHADOW_LG, SUCCESS, TEXT, FONT_STACK } from '../theme';
 import { BrandIcon, BrandKey } from './BrandIcon';
 
-type Result = { brand: BrandKey; done: string };
+type Result = { brand: BrandKey; count?: number; label: string };
 
 const RESULTS: Result[] = [
-  { brand: 'gmail', done: '24 emails answered' },
-  { brand: 'hubspot', done: 'CRM updated' },
-  { brand: 'jira', done: '8 tickets closed' },
-  { brand: 'calendar', done: 'Day cleared' },
-  { brand: 'notion', done: 'Docs summarized' },
-  { brand: 'zoom', done: '3 calls booked' },
+  { brand: 'gmail', count: 24, label: 'emails answered' },
+  { brand: 'hubspot', label: 'CRM updated' },
+  { brand: 'jira', count: 8, label: 'tickets closed' },
+  { brand: 'calendar', label: 'Day cleared' },
+  { brand: 'notion', count: 6, label: 'docs summarized' },
+  { brand: 'zoom', count: 3, label: 'calls booked' },
 ];
 
 const Check: React.FC<{ delay: number }> = ({ delay }) => {
@@ -82,7 +82,15 @@ const ResultCard: React.FC<{ result: Result; index: number }> = ({ result, index
           whiteSpace: 'nowrap',
         }}
       >
-        {result.done}
+        {result.count === undefined
+          ? result.label
+          : `${Math.round(
+              interpolate(frame - delay, [6, 30], [0, result.count], {
+                extrapolateLeft: 'clamp',
+                extrapolateRight: 'clamp',
+                easing: Easing.out(Easing.cubic),
+              }),
+            )} ${result.label}`}
       </span>
       <Check delay={delay + 10} />
     </div>
@@ -148,7 +156,16 @@ export const ResultDeck: React.FC<{ durationInFrames?: number }> = ({ durationIn
               letterSpacing: -3,
             }}
           >
-            3h 40m saved.
+            {(() => {
+              const mins = Math.round(
+                interpolate(frame - headlineDelay, [0, 46], [0, 220], {
+                  extrapolateLeft: 'clamp',
+                  extrapolateRight: 'clamp',
+                  easing: Easing.out(Easing.cubic),
+                }),
+              );
+              return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m saved.`;
+            })()}
           </span>
           <span
             style={{

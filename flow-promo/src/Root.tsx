@@ -1,6 +1,7 @@
 import "./index.css";
 import { Composition } from 'remotion';
 import { FlowPromo } from './FlowPromo';
+import { TOTAL, FPS } from './timeline';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -8,8 +9,8 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="FlowCognitiveOS"
         component={FlowPromo}
-        durationInFrames={1200} // 20 seconds @ 60fps
-        fps={60}
+        durationInFrames={TOTAL} // 26 seconds
+        fps={FPS}
         width={3840} // 4K Resolution
         height={2160}
       />

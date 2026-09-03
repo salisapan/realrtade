@@ -11,7 +11,7 @@ const Wordmark: React.FC = () => {
   /* Uses the real logo once it is added to public/; falls back to the drawn
      mark so the composition renders before the asset lands. */
   if (hasAsset(LOGO_FILE)) {
-    return <Img src={staticFile(LOGO_FILE)} style={{ height: 190, objectFit: 'contain' }} />;
+    return <Img src={staticFile(LOGO_FILE)} style={{ height: 380, objectFit: 'contain' }} />;
   }
 
   return <FlowLogo height={300} />;
