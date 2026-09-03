@@ -43,6 +43,7 @@ const AsIsInvestors = lazy(() => import("./pages/as-is/AsIsInvestors"));
 const AsIsArticles = lazy(() => import("./pages/as-is/AsIsArticles"));
 const AsIsArticlePage = lazy(() => import("./pages/as-is/AsIsArticlePage"));
 const AsIsContact = lazy(() => import("./pages/as-is/AsIsContact"));
+const AsIsNotFound = lazy(() => import("./pages/as-is/AsIsNotFound"));
 
 function AsIsLazyPage({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<div style={{ minHeight: "100vh", background: "#07090f" }} />}>{children}</Suspense>;
@@ -182,6 +183,7 @@ const App = () => {
               <Route path="/as-is/articles" element={<AsIsLazyPage><AsIsArticles /></AsIsLazyPage>} />
               <Route path="/as-is/articles/:slug" element={<AsIsLazyPage><AsIsArticlePage /></AsIsLazyPage>} />
               <Route path="/as-is/contact" element={<AsIsLazyPage><AsIsContact /></AsIsLazyPage>} />
+              <Route path="/as-is/*" element={<AsIsLazyPage><AsIsNotFound /></AsIsLazyPage>} />
               <Route path="/" element={<Landing />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/investor-registration" element={<InvestorRegistrationPage />} />

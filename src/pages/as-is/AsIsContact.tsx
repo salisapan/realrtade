@@ -124,6 +124,9 @@ export default function AsIsContact() {
                 >
                   {submitting ? "שולח..." : "שליחת הפנייה"}
                 </button>
+                <p style={{ margin: 0, fontSize: 11, color: "var(--muted)", lineHeight: 1.5, textAlign: "center" }}>
+                  הפרטים נשמרים אצלנו ומשמשים אך ורק ליצירת קשר בנוגע לפנייתכם, ולא יועברו לצד שלישי.
+                </p>
               </form>
             )}
           </div>
