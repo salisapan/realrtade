@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { TEXT, FONT_STACK } from '../theme';
+import { FONT_STACK, GRADIENT_AI, VIOLET, BLUE } from '../theme';
 
 const PHRASES = ['Meet your new...', 'Execution layer', 'Cognitive OS'];
 const SLOT = 70;
@@ -38,6 +38,7 @@ export const KineticText: React.FC = () => {
               display: 'flex',
               opacity: groupOpacity,
               transform: `scale(${groupScale})`,
+              filter: `drop-shadow(0 0 90px ${VIOLET}55) drop-shadow(0 0 200px ${BLUE}33)`,
             }}
           >
             {chars.map((ch, ci) => {
@@ -57,10 +58,15 @@ export const KineticText: React.FC = () => {
                   style={{
                     display: 'inline-block',
                     fontFamily: FONT_STACK,
-                    fontSize: 132,
-                    fontWeight: 800,
-                    color: TEXT,
-                    letterSpacing: -4,
+                    fontSize: 340,
+                    fontWeight: 900,
+                    letterSpacing: -14,
+                    backgroundImage: GRADIENT_AI,
+                    backgroundSize: '200% 100%',
+                    backgroundPosition: `${(ci / Math.max(1, chars.length - 1)) * 100}% 50%`,
+                    WebkitBackgroundClip: 'text',
+                    backgroundClip: 'text',
+                    color: 'transparent',
                     whiteSpace: 'pre',
                     opacity: enter,
                     transform: `translateY(${y}px) scale(${scale}) rotate(${rotate}deg)`,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import { MUTED, FONT_STACK } from '../theme';
+import { MUTED, FONT_STACK, VIOLET, BLUE } from '../theme';
 import { FlowLogo } from './FlowLogo';
 import { hasAsset } from './Plate';
 
@@ -11,7 +11,16 @@ const Wordmark: React.FC = () => {
   /* Uses the real logo once it is added to public/; falls back to the drawn
      mark so the composition renders before the asset lands. */
   if (hasAsset(LOGO_FILE)) {
-    return <Img src={staticFile(LOGO_FILE)} style={{ height: 380, objectFit: 'contain' }} />;
+    return (
+      <Img
+        src={staticFile(LOGO_FILE)}
+        style={{
+          height: 620,
+          objectFit: 'contain',
+          filter: `drop-shadow(0 0 120px ${VIOLET}66) drop-shadow(0 0 240px ${BLUE}44) drop-shadow(0 30px 60px rgba(0,0,0,0.6))`,
+        }}
+      />
+    );
   }
 
   return <FlowLogo height={300} />;
@@ -64,7 +73,7 @@ export const Outro: React.FC<{ durationInFrames?: number }> = ({ durationInFrame
                 key={i}
                 style={{
                   fontFamily: FONT_STACK,
-                  fontSize: 34,
+                  fontSize: 52,
                   fontWeight: 500,
                   color: MUTED,
                   opacity: wOpacity,

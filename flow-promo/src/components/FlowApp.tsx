@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { GLASS_BORDER, MUTED, SUCCESS, TEXT, ACCENT, FONT_STACK } from '../theme';
+import { WINDOW_BORDER, INK, INK_MUTED, SUCCESS, ACCENT, FONT_STACK, SHADOW_XL } from '../theme';
 import { AppLogo } from './AppLogo';
 import { STEP_DONE_LOCAL } from '../timeline';
 
@@ -89,7 +89,7 @@ const StepRow: React.FC<{ step: (typeof STEPS)[number]; index: number }> = ({ st
           fontFamily: FONT_STACK,
           fontSize: 30,
           fontWeight: 600,
-          color: done ? TEXT : running ? TEXT : MUTED,
+          color: done || running ? INK : INK_MUTED,
           flex: 1,
           whiteSpace: 'nowrap',
         }}
@@ -137,15 +137,15 @@ export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFra
           borderRadius: 28,
           overflow: 'hidden',
           backgroundColor: '#FFFFFF',
-          border: `1px solid ${GLASS_BORDER}`,
-          boxShadow: '0 60px 140px rgba(17,17,17,0.18)',
+          border: `1px solid ${WINDOW_BORDER}`,
+          boxShadow: SHADOW_XL,
           display: 'flex',
           opacity: openOpacity * exitOpacity,
           transform: `scale(${0.9 + open * 0.1})`,
         }}
       >
         {/* sidebar */}
-        <div style={{ width: 300, backgroundColor: '#F7F8FB', borderRight: `1px solid ${GLASS_BORDER}`, padding: '26px 20px' }}>
+        <div style={{ width: 300, backgroundColor: '#F7F8FB', borderRight: `1px solid ${WINDOW_BORDER}`, padding: '26px 20px' }}>
           <div style={{ display: 'flex', gap: 9, marginBottom: 34, paddingLeft: 6 }}>
             <div style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: '#FF5F57' }} />
             <div style={{ width: 14, height: 14, borderRadius: '50%', backgroundColor: '#FEBC2E' }} />
@@ -162,7 +162,7 @@ export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFra
                 fontFamily: FONT_STACK,
                 fontSize: 24,
                 fontWeight: item === 'Runs' ? 700 : 500,
-                color: item === 'Runs' ? ACCENT : MUTED,
+                color: item === 'Runs' ? ACCENT : INK_MUTED,
               }}
             >
               {item}
@@ -172,7 +172,7 @@ export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFra
 
         {/* main */}
         <div style={{ flex: 1, padding: '34px 40px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
-          <span style={{ fontFamily: FONT_STACK, fontSize: 22, fontWeight: 600, color: MUTED, letterSpacing: 1.5 }}>
+          <span style={{ fontFamily: FONT_STACK, fontSize: 22, fontWeight: 600, color: INK_MUTED, letterSpacing: 1.5 }}>
             WHAT DO YOU WANT DONE?
           </span>
 
@@ -188,7 +188,7 @@ export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFra
               boxShadow: `0 0 0 8px ${ACCENT}12`,
             }}
           >
-            <span style={{ fontFamily: FONT_STACK, fontSize: 38, fontWeight: 700, color: TEXT, whiteSpace: 'pre' }}>
+            <span style={{ fontFamily: FONT_STACK, fontSize: 38, fontWeight: 700, color: INK, whiteSpace: 'pre' }}>
               {INTENT.slice(0, typed)}
             </span>
             {caretOn ? <div style={{ width: 3, height: 42, backgroundColor: ACCENT }} /> : null}
@@ -204,7 +204,7 @@ export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFra
             <div style={{ flex: 1, height: 12, borderRadius: 6, backgroundColor: 'rgba(17,17,17,0.08)', overflow: 'hidden' }}>
               <div style={{ width: `${progress * 100}%`, height: '100%', borderRadius: 6, backgroundColor: SUCCESS }} />
             </div>
-            <span style={{ fontFamily: FONT_STACK, fontSize: 26, fontWeight: 700, color: completed === STEPS.length ? SUCCESS : MUTED }}>
+            <span style={{ fontFamily: FONT_STACK, fontSize: 26, fontWeight: 700, color: completed === STEPS.length ? SUCCESS : INK_MUTED }}>
               {completed}/{STEPS.length} done
             </span>
           </div>

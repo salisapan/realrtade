@@ -2,12 +2,13 @@ import React from 'react';
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { Trail } from '@remotion/motion-blur';
 import { ACCENT, ACCENT_DARK, FONT_STACK } from '../theme';
+import { CLICK_LOCAL } from '../timeline';
 
 const CURSOR_START = { x: 0.94, y: 0.94 };
 const CURSOR_END = { x: 0.5, y: 0.5 };
-const CURSOR_ENTER = 25;
-const CURSOR_ARRIVE = 150;
-const CLICK_FRAME = 155;
+const CURSOR_ENTER = 30;
+const CURSOR_ARRIVE = CLICK_LOCAL - 5;
+const CLICK_FRAME = CLICK_LOCAL;
 
 const CursorArrow: React.FC = () => {
   const frame = useCurrentFrame();
@@ -165,7 +166,7 @@ export const DoItButton: React.FC<{ durationInFrames?: number }> = ({ durationIn
     fps,
     config: { stiffness: 190, damping: 13, mass: 0.7 },
   });
-  const entranceOpacity = interpolate(frame, [0, 10], [0, 1], {
+  const entranceOpacity = interpolate(frame, [0, 5], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });

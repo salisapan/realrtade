@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Audio, Sequence, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
-import { BG } from './theme';
+import { Backdrop } from './components/Backdrop';
 import { ACT } from './timeline';
 import { KineticText } from './components/KineticText';
 import { UIChaos } from './components/UIChaos';
@@ -22,7 +22,8 @@ const Camera: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 export const FlowPromo: React.FC = () => {
   return (
-    <AbsoluteFill style={{ backgroundColor: BG }}>
+    <AbsoluteFill>
+      <Backdrop />
       {hasAsset('soundtrack.wav') ? <Audio src={staticFile('soundtrack.wav')} /> : null}
 
       <Camera>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { GLASS_BG, GLASS_BORDER, MUTED, SHADOW_LG, SUCCESS, TEXT, FONT_STACK } from '../theme';
+import { GLASS_BG, GLASS_BORDER, GLASS_HIGHLIGHT, MUTED, SHADOW_LG, SUCCESS, TEXT, FONT_STACK, GRADIENT_AI } from '../theme';
 import { BrandIcon, BrandKey } from './BrandIcon';
 
 type Result = { brand: BrandKey; count?: number; label: string };
@@ -61,8 +61,8 @@ const ResultCard: React.FC<{ result: Result; index: number }> = ({ result, index
         borderRadius: 28,
         backgroundColor: GLASS_BG,
         border: `1px solid ${GLASS_BORDER}`,
-        boxShadow: SHADOW_LG,
-        backdropFilter: 'blur(20px)',
+        boxShadow: `${SHADOW_LG}, ${GLASS_HIGHLIGHT}`,
+        backdropFilter: 'blur(24px)',
         padding: '32px 38px',
         display: 'flex',
         alignItems: 'center',
@@ -75,7 +75,7 @@ const ResultCard: React.FC<{ result: Result; index: number }> = ({ result, index
       <span
         style={{
           fontFamily: FONT_STACK,
-          fontSize: 30,
+          fontSize: 36,
           fontWeight: 600,
           color: TEXT,
           flex: 1,
@@ -150,10 +150,13 @@ export const ResultDeck: React.FC<{ durationInFrames?: number }> = ({ durationIn
           <span
             style={{
               fontFamily: FONT_STACK,
-              fontSize: 104,
-              fontWeight: 800,
-              color: TEXT,
-              letterSpacing: -3,
+              fontSize: 148,
+              fontWeight: 900,
+              letterSpacing: -6,
+              backgroundImage: GRADIENT_AI,
+              WebkitBackgroundClip: 'text',
+              backgroundClip: 'text',
+              color: 'transparent',
             }}
           >
             {(() => {
@@ -170,10 +173,10 @@ export const ResultDeck: React.FC<{ durationInFrames?: number }> = ({ durationIn
           <span
             style={{
               fontFamily: FONT_STACK,
-              fontSize: 104,
-              fontWeight: 800,
+              fontSize: 148,
+              fontWeight: 900,
               color: MUTED,
-              letterSpacing: -3,
+              letterSpacing: -6,
             }}
           >
             Today.

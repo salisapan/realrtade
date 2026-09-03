@@ -58,7 +58,7 @@ export const Plate: React.FC<PlateProps> = ({
   const isVideo = src.endsWith('.mp4') || src.endsWith('.webm');
 
   return (
-    <AbsoluteFill style={{ mixBlendMode: 'multiply', opacity: fade }}>
+    <AbsoluteFill style={{ mixBlendMode: 'screen', opacity: fade }}>
       <AbsoluteFill style={{ transform: `scale(${scale}) translateX(${x}px)` }}>
         {isVideo ? (
           <OffthreadVideo

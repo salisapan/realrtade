@@ -1,5 +1,5 @@
 import React from 'react';
-import { GLASS_BORDER, SHADOW_LG, FONT_STACK } from '../theme';
+import { WINDOW_BORDER, SHADOW_XL, FONT_STACK } from '../theme';
 import { AppLogo } from './AppLogo';
 
 export type DocKind =
@@ -44,8 +44,8 @@ const Shell: React.FC<{
       borderRadius: 18,
       overflow: 'hidden',
       backgroundColor: '#FFFFFF',
-      border: `1px solid ${GLASS_BORDER}`,
-      boxShadow: SHADOW_LG,
+      border: `1px solid ${WINDOW_BORDER}`,
+      boxShadow: SHADOW_XL,
       display: 'flex',
       flexDirection: 'column',
     }}

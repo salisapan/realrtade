@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { Trail } from '@remotion/motion-blur';
-import { MUTED, FONT_STACK } from '../theme';
+import { MUTED, FONT_STACK, VIOLET, BLUE } from '../theme';
 import { DocKind, DocumentPage } from './DocumentPage';
 
 type Doc = {
@@ -116,16 +116,49 @@ const OverloadCounter: React.FC<{ collapseStart: number }> = ({ collapseStart })
       <span
         style={{
           fontFamily: FONT_STACK,
-          fontSize: 46,
+          fontSize: 64,
           fontWeight: 700,
           color: MUTED,
           opacity,
           letterSpacing: 2,
-          textShadow: '0 4px 24px rgba(255,255,255,0.95)',
+          textShadow: '0 4px 30px rgba(0,0,0,0.8)',
         }}
       >
         {tabs} tabs · 12 tools · 0 done
       </span>
+    </AbsoluteFill>
+  );
+};
+
+const CompilerCore: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
+  const frame = useCurrentFrame();
+  const local = frame - collapseStart;
+  if (local < 0) return null;
+
+  /* Grows as the documents converge, then holds so the cut into the button
+     never lands on an empty frame. */
+  const grow = interpolate(local, [0, 34], [0.1, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const opacity = interpolate(local, [0, 26, 60, 110], [0, 1, 0.85, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+  return (
+    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <div
+        style={{
+          width: 900,
+          height: 900,
+          borderRadius: '50%',
+          background: `radial-gradient(circle, #FFFFFF 0%, ${BLUE}CC 18%, ${VIOLET}66 42%, transparent 68%)`,
+          transform: `scale(${grow})`,
+          opacity,
+          filter: 'blur(20px)',
+        }}
+      />
     </AbsoluteFill>
   );
 };
@@ -135,6 +168,7 @@ export const UIChaos: React.FC<{ collapseStart?: number }> = ({ collapseStart = 
     <Trail layers={2} lagInFrames={2} trailOpacity={0.28}>
       <DocsLayer collapseStart={collapseStart} />
     </Trail>
+    <CompilerCore collapseStart={collapseStart} />
     <OverloadCounter collapseStart={collapseStart} />
   </AbsoluteFill>
 );
