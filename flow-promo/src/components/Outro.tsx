@@ -1,27 +1,35 @@
 import React from 'react';
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
-import { TEXT, MUTED, FONT_STACK } from '../theme';
-import { FlowMark } from './FlowMark';
+import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { MUTED, FONT_STACK } from '../theme';
+import { FlowLogo } from './FlowLogo';
+import { hasAsset } from './Plate';
 
 const TAGLINE = 'The first cognitive operating system for the AI era.';
+const LOGO_FILE = 'flow-logo.png';
 
-export const Outro: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 200 }) => {
+const Wordmark: React.FC = () => {
+  /* Uses the real logo once it is added to public/; falls back to the drawn
+     mark so the composition renders before the asset lands. */
+  if (hasAsset(LOGO_FILE)) {
+    return <Img src={staticFile(LOGO_FILE)} style={{ height: 190, objectFit: 'contain' }} />;
+  }
+
+  return <FlowLogo height={300} />;
+};
+
+export const Outro: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 100 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const scale = spring({
-    frame,
-    fps,
-    config: { stiffness: 170, damping: 15, mass: 0.7 },
-  });
+  const scale = spring({ frame, fps, config: { stiffness: 170, damping: 15, mass: 0.7 } });
   const entranceOpacity = interpolate(frame, [0, 22], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const breathe = frame > 60 ? 1 + Math.sin((frame / fps) * 1.6) * 0.012 : 1;
+  const breathe = frame > 50 ? 1 + Math.sin((frame / fps) * 1.6) * 0.012 : 1;
 
-  const fadeOutStart = durationInFrames - 40;
+  const fadeOutStart = durationInFrames - 30;
   const fadeOutOpacity = interpolate(frame, [fadeOutStart, durationInFrames], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
@@ -41,24 +49,11 @@ export const Outro: React.FC<{ durationInFrames?: number }> = ({ durationInFrame
           transform: `scale(${(0.6 + scale * 0.4) * breathe})`,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 38 }}>
-          <FlowMark size={110} />
-          <span
-            style={{
-              fontFamily: FONT_STACK,
-              fontSize: 118,
-              fontWeight: 800,
-              color: TEXT,
-              letterSpacing: -4,
-            }}
-          >
-            Flow
-          </span>
-        </div>
+        <Wordmark />
         <div style={{ display: 'flex', gap: 12 }}>
           {words.map((word, i) => {
-            const wordDelay = 40 + i * 3;
-            const wOpacity = interpolate(frame, [wordDelay, wordDelay + 18], [0, 1], {
+            const wordDelay = 26 + i * 2.5;
+            const wOpacity = interpolate(frame, [wordDelay, wordDelay + 16], [0, 1], {
               extrapolateLeft: 'clamp',
               extrapolateRight: 'clamp',
             });

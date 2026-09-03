@@ -11,3 +11,5 @@ export const SHADOW_LG = '0 30px 70px rgba(17,17,17,0.14)';
 
 export const FONT_STACK =
   '"Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif';
+
+export const SUCCESS = '#16A34A';

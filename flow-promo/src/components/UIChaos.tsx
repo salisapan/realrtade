@@ -1,183 +1,102 @@
 import React from 'react';
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { Trail } from '@remotion/motion-blur';
-import { ACCENT, GLASS_BG, GLASS_BORDER, MUTED, SHADOW_LG, TEXT, FONT_STACK } from '../theme';
+import { MUTED, FONT_STACK } from '../theme';
+import { DocKind, DocumentPage } from './DocumentPage';
 
-type CardKind = 'email' | 'crm' | 'window' | 'calendar' | 'chat';
-
-type CardSpec = {
-  kind: CardKind;
+type Doc = {
+  kind: DocKind;
   x: number;
   y: number;
-  rotateBase: number;
+  depth: number;
+  rotate: number;
   seed: number;
   delay: number;
 };
 
-const CARDS: CardSpec[] = [
-  { kind: 'email', x: 0.2, y: 0.26, rotateBase: -6, seed: 1, delay: 0 },
-  { kind: 'crm', x: 0.76, y: 0.2, rotateBase: 5, seed: 2, delay: 5 },
-  { kind: 'window', x: 0.28, y: 0.68, rotateBase: 4, seed: 3, delay: 10 },
-  { kind: 'calendar', x: 0.8, y: 0.62, rotateBase: -4, seed: 4, delay: 15 },
-  { kind: 'chat', x: 0.5, y: 0.16, rotateBase: -2, seed: 5, delay: 20 },
+/* Deliberately overlapping and crowding the frame — the density is the point.
+   `depth` drives scale, blur and opacity so the storm reads three-dimensional. */
+const DOCS: Doc[] = [
+  { kind: 'outlook', x: 0.27, y: 0.3, depth: 1.12, rotate: -5, seed: 1, delay: 0 },
+  { kind: 'word', x: 0.72, y: 0.27, depth: 1.05, rotate: 4, seed: 2, delay: 3 },
+  { kind: 'pdf', x: 0.5, y: 0.52, depth: 1.18, rotate: -2, seed: 3, delay: 6 },
+  { kind: 'excel', x: 0.79, y: 0.63, depth: 0.98, rotate: 6, seed: 4, delay: 9 },
+  { kind: 'imanage', x: 0.22, y: 0.66, depth: 1.02, rotate: 5, seed: 5, delay: 12 },
+  { kind: 'crm', x: 0.62, y: 0.78, depth: 0.92, rotate: -6, seed: 6, delay: 15 },
+  { kind: 'gmail', x: 0.42, y: 0.16, depth: 0.88, rotate: 3, seed: 7, delay: 18 },
+  { kind: 'powerpoint', x: 0.87, y: 0.4, depth: 0.84, rotate: -4, seed: 8, delay: 21 },
+  { kind: 'jira', x: 0.13, y: 0.44, depth: 0.86, rotate: 6, seed: 9, delay: 24 },
+  { kind: 'adobe', x: 0.36, y: 0.83, depth: 0.8, rotate: 4, seed: 10, delay: 27 },
+  { kind: 'notion', x: 0.66, y: 0.44, depth: 0.76, rotate: -7, seed: 11, delay: 30 },
+  { kind: 'browser', x: 0.9, y: 0.16, depth: 0.72, rotate: 5, seed: 12, delay: 33 },
+  { kind: 'calendar', x: 0.09, y: 0.16, depth: 0.7, rotate: -5, seed: 13, delay: 36 },
+  { kind: 'word', x: 0.53, y: 0.34, depth: 0.66, rotate: 8, seed: 14, delay: 39 },
+  { kind: 'pdf', x: 0.83, y: 0.85, depth: 0.62, rotate: -8, seed: 15, delay: 42 },
+  { kind: 'outlook', x: 0.16, y: 0.87, depth: 0.6, rotate: 7, seed: 16, delay: 45 },
+  { kind: 'excel', x: 0.34, y: 0.5, depth: 0.56, rotate: -9, seed: 17, delay: 48 },
+  { kind: 'imanage', x: 0.94, y: 0.55, depth: 0.54, rotate: 6, seed: 18, delay: 51 },
+  { kind: 'crm', x: 0.05, y: 0.6, depth: 0.52, rotate: -6, seed: 19, delay: 54 },
+  { kind: 'powerpoint', x: 0.75, y: 0.06, depth: 0.5, rotate: 9, seed: 20, delay: 57 },
 ];
 
-const CardBody: React.FC<{ kind: CardKind }> = ({ kind }) => {
-  if (kind === 'email') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{ width: 44, height: 44, borderRadius: '50%', backgroundColor: '#DBEAFE' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <span style={{ fontFamily: FONT_STACK, fontSize: 24, fontWeight: 700, color: TEXT }}>Sarah Chen</span>
-            <span style={{ fontFamily: FONT_STACK, fontSize: 20, color: MUTED }}>Re: Q3 Budget Approval</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  if (kind === 'crm') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <span style={{ fontFamily: FONT_STACK, fontSize: 26, fontWeight: 700, color: TEXT }}>Acme Corp</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <span
-            style={{
-              fontFamily: FONT_STACK,
-              fontSize: 18,
-              fontWeight: 600,
-              color: ACCENT,
-              backgroundColor: '#DBEAFE',
-              padding: '6px 16px',
-              borderRadius: 100,
-            }}
-          >
-            In Progress
-          </span>
-          <span style={{ fontFamily: FONT_STACK, fontSize: 22, fontWeight: 600, color: MUTED }}>$42,000</span>
-        </div>
-      </div>
-    );
-  }
-  if (kind === 'calendar') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <span style={{ fontFamily: FONT_STACK, fontSize: 20, fontWeight: 600, color: ACCENT }}>TODAY 9:00 AM</span>
-        <span style={{ fontFamily: FONT_STACK, fontSize: 26, fontWeight: 700, color: TEXT }}>Standup</span>
-      </div>
-    );
-  }
-  if (kind === 'chat') {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: '50%',
-            backgroundColor: ACCENT,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <span style={{ fontFamily: FONT_STACK, fontSize: 18, fontWeight: 700, color: '#FFFFFF' }}>12</span>
-        </div>
-        <span style={{ fontFamily: FONT_STACK, fontSize: 22, fontWeight: 600, color: TEXT }}>Unread messages</span>
-      </div>
-    );
-  }
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#F87171' }} />
-        <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#FBBF24' }} />
-        <div style={{ width: 12, height: 12, borderRadius: '50%', backgroundColor: '#34D399' }} />
-      </div>
-      <div style={{ height: 10, borderRadius: 6, backgroundColor: 'rgba(17,17,17,0.08)', width: '90%' }} />
-      <div style={{ height: 10, borderRadius: 6, backgroundColor: 'rgba(17,17,17,0.08)', width: '65%' }} />
-    </div>
-  );
-};
+/* Far documents render behind near ones. */
+const ORDERED = [...DOCS].sort((a, b) => a.depth - b.depth);
 
-const CARD_WIDTH: Record<CardKind, number> = {
-  email: 420,
-  crm: 380,
-  window: 340,
-  calendar: 320,
-  chat: 380,
-};
-
-const CardsLayer: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
+const DocsLayer: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   return (
     <>
-      {CARDS.map((card) => {
+      {ORDERED.map((doc, i) => {
         const enter = spring({
-          frame: frame - card.delay,
+          frame: frame - doc.delay,
           fps,
-          config: { stiffness: 160, damping: 15, mass: 0.7 },
+          config: { stiffness: 150, damping: 15, mass: 0.7 },
         });
 
-        const floatT = frame / fps;
-        const jitterX =
-          Math.sin(floatT * 0.9 + card.seed) * 14 + Math.sin(floatT * 2.3 + card.seed * 1.7) * 5;
-        const jitterY =
-          Math.cos(floatT * 0.7 + card.seed * 1.4) * 14 + Math.cos(floatT * 1.9 + card.seed * 2.1) * 5;
-        const rotateY = Math.sin(floatT * 0.5 + card.seed) * 10;
-        const rotateX = Math.cos(floatT * 0.6 + card.seed) * 6;
-        const breathe = 1 + Math.sin(floatT * 1.3 + card.seed * 2) * 0.025;
+        const t = frame / fps;
+        const jitterX = Math.sin(t * 0.9 + doc.seed) * 18 + Math.sin(t * 2.3 + doc.seed * 1.7) * 7;
+        const jitterY = Math.cos(t * 0.7 + doc.seed * 1.4) * 18 + Math.cos(t * 1.9 + doc.seed * 2.1) * 7;
+        const rotateY = Math.sin(t * 0.5 + doc.seed) * 9;
+        const rotateX = Math.cos(t * 0.6 + doc.seed) * 5;
+        const breathe = 1 + Math.sin(t * 1.3 + doc.seed * 2) * 0.02;
 
-        const collapseLocal = frame - collapseStart - card.delay * 0.4;
+        const collapseLocal = frame - collapseStart - doc.delay * 0.18;
         const collapse =
           collapseLocal > 0
-            ? spring({
-                frame: collapseLocal,
-                fps,
-                config: { stiffness: 210, damping: 13, mass: 0.4 },
-              })
+            ? spring({ frame: collapseLocal, fps, config: { stiffness: 210, damping: 13, mass: 0.4 } })
             : 0;
-        const collapseClamped = Math.min(1, collapse);
+        const c = Math.min(1, collapse);
 
-        const posXPct = interpolate(collapseClamped, [0, 1], [card.x * 100, 50]);
-        const posYPct = interpolate(collapseClamped, [0, 1], [card.y * 100, 50]);
-        const scale = enter * breathe * interpolate(collapseClamped, [0, 1], [1, 0.05]);
+        const posX = interpolate(c, [0, 1], [doc.x * 100, 50]);
+        const posY = interpolate(c, [0, 1], [doc.y * 100, 50]);
+        const scale = enter * breathe * doc.depth * interpolate(c, [0, 1], [1, 0.04]);
         const opacity =
           enter *
-          interpolate(collapseClamped, [0, 0.75, 1], [1, 1, 0], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          });
+          interpolate(doc.depth, [0.5, 1.2], [0.55, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) *
+          interpolate(c, [0, 0.75, 1], [1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
+        const blur = interpolate(doc.depth, [0.5, 1.0], [3.2, 0], {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+        });
 
         return (
           <div
-            key={card.kind}
+            key={`${doc.kind}-${i}`}
             style={{
               position: 'absolute',
-              left: `${posXPct}%`,
-              top: `${posYPct}%`,
+              left: `${posX}%`,
+              top: `${posY}%`,
               opacity,
+              filter: blur > 0.05 ? `blur(${blur}px)` : undefined,
               transform:
-                `translate(-50%, -50%) translate(${jitterX * (1 - collapseClamped)}px, ${jitterY * (1 - collapseClamped)}px) ` +
-                `rotateX(${rotateX * (1 - collapseClamped)}deg) rotateY(${rotateY * (1 - collapseClamped)}deg) ` +
-                `rotate(${card.rotateBase * (1 - collapseClamped)}deg) scale(${scale})`,
+                `translate(-50%, -50%) translate(${jitterX * (1 - c)}px, ${jitterY * (1 - c)}px) ` +
+                `rotateX(${rotateX * (1 - c)}deg) rotateY(${rotateY * (1 - c)}deg) ` +
+                `rotate(${doc.rotate * (1 - c)}deg) scale(${scale})`,
             }}
           >
-            <div
-              style={{
-                width: CARD_WIDTH[card.kind],
-                borderRadius: 24,
-                backgroundColor: GLASS_BG,
-                border: `1px solid ${GLASS_BORDER}`,
-                boxShadow: SHADOW_LG,
-                backdropFilter: 'blur(20px)',
-                padding: 30,
-              }}
-            >
-              <CardBody kind={card.kind} />
-            </div>
+            <DocumentPage kind={doc.kind} />
           </div>
         );
       })}
@@ -185,41 +104,43 @@ const CardsLayer: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
   );
 };
 
-export const UIChaos: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 200 }) => {
-  const collapseStart = 120;
-
-  return (
-    <AbsoluteFill style={{ perspective: 1400 }}>
-      <Trail layers={4} lagInFrames={2} trailOpacity={0.3}>
-        <CardsLayer collapseStart={collapseStart} />
-      </Trail>
-
-      <CompilerPulse collapseStart={collapseStart} />
-    </AbsoluteFill>
-  );
-};
-
-const CompilerPulse: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
+const OverloadCounter: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
   const frame = useCurrentFrame();
-  const local = frame - (collapseStart + 30);
-  if (local < 0) return null;
 
-  const progress = Math.min(1, local / 40);
-  const scale = interpolate(progress, [0, 1], [0.2, 3]);
-  const opacity = interpolate(progress, [0, 0.3, 1], [0, 0.5, 0]);
+  const opacity = interpolate(
+    frame,
+    [60, 90, collapseStart - 10, collapseStart + 10],
+    [0, 1, 1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+  const tabs = Math.round(
+    interpolate(frame, [60, collapseStart], [6, 47], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }),
+  );
 
   return (
-    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'center' }}>
-      <div
+    <AbsoluteFill style={{ alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 96 }}>
+      <span
         style={{
-          width: 200,
-          height: 200,
-          borderRadius: '50%',
-          background: `radial-gradient(circle, ${ACCENT}55, transparent 70%)`,
-          transform: `scale(${scale})`,
+          fontFamily: FONT_STACK,
+          fontSize: 46,
+          fontWeight: 700,
+          color: MUTED,
           opacity,
+          letterSpacing: 2,
+          textShadow: '0 4px 24px rgba(255,255,255,0.95)',
         }}
-      />
+      >
+        {tabs} tabs · 12 tools · 0 done
+      </span>
     </AbsoluteFill>
   );
 };
+
+export const UIChaos: React.FC<{ collapseStart?: number }> = ({ collapseStart = 200 }) => (
+  <AbsoluteFill style={{ perspective: 1800 }}>
+    <Trail layers={2} lagInFrames={2} trailOpacity={0.28}>
+      <DocsLayer collapseStart={collapseStart} />
+    </Trail>
+    <OverloadCounter collapseStart={collapseStart} />
+  </AbsoluteFill>
+);

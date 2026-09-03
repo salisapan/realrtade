@@ -1,7 +1,7 @@
 import React from 'react';
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
 import { Trail } from '@remotion/motion-blur';
-import { ACCENT, ACCENT_DARK, SHADOW_LG, FONT_STACK } from '../theme';
+import { ACCENT, ACCENT_DARK, FONT_STACK } from '../theme';
 
 const CURSOR_START = { x: 0.94, y: 0.94 };
 const CURSOR_END = { x: 0.5, y: 0.5 };
@@ -76,8 +76,8 @@ const Ripple: React.FC = () => {
         position: 'absolute',
         left: '50%',
         top: '50%',
-        width: 360,
-        height: 130,
+        width: 500,
+        height: 184,
         borderRadius: 100,
         border: `2px solid ${ACCENT}`,
         transform: `translate(-50%, -50%) scale(${scale})`,
@@ -100,7 +100,7 @@ const ParticleBurst: React.FC = () => {
     <>
       {Array.from({ length: PARTICLE_COUNT }).map((_, i) => {
         const angle = (i / PARTICLE_COUNT) * Math.PI * 2 + 0.3;
-        const distance = interpolate(progress, [0, 1], [0, 240], {
+        const distance = interpolate(progress, [0, 1], [0, 330], {
           easing: Easing.out(Easing.cubic),
         });
         const px = Math.cos(angle) * distance;
@@ -144,8 +144,8 @@ const AnticipationRing: React.FC = () => {
         position: 'absolute',
         left: '50%',
         top: '50%',
-        width: 340,
-        height: 118,
+        width: 470,
+        height: 168,
         borderRadius: 100,
         border: `1.5px solid ${ACCENT}`,
         transform: `translate(-50%, -50%) scale(${scale})`,
@@ -199,19 +199,36 @@ export const DoItButton: React.FC<{ durationInFrames?: number }> = ({ durationIn
         <AnticipationRing />
         <Ripple />
         <ParticleBurst />
+        {/* Outer halo ring, matching the reference lockup */}
         <div
           style={{
-            padding: '38px 110px',
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: 'calc(100% + 128px)',
+            height: 'calc(100% + 76px)',
+            transform: 'translate(-50%, -50%)',
+            borderRadius: 200,
+            border: `3px solid ${ACCENT}55`,
+            background: 'linear-gradient(180deg, #FFFFFF 0%, #EEF2F8 100%)',
+            boxShadow: '0 30px 70px rgba(17,17,17,0.13)',
+          }}
+        />
+        <div
+          style={{
+            position: 'relative',
+            padding: '52px 148px',
             borderRadius: 100,
-            background: 'linear-gradient(180deg, #FFFFFF 0%, #F1F3F6 100%)',
-            border: `2.5px solid ${ACCENT}`,
-            boxShadow: `${SHADOW_LG}, inset 0 1px 0 rgba(255,255,255,0.8)`,
+            background: 'linear-gradient(180deg, #FFFFFF 0%, #F4F6FA 52%, #E4E9F1 100%)',
+            border: `3px solid ${ACCENT}`,
+            boxShadow:
+              'inset 0 2px 0 rgba(255,255,255,0.95), inset 0 -3px 8px rgba(17,17,17,0.06), 0 18px 40px rgba(17,17,17,0.12)',
           }}
         >
           <span
             style={{
               fontFamily: FONT_STACK,
-              fontSize: 62,
+              fontSize: 88,
               fontWeight: 800,
               color: ACCENT_DARK,
               letterSpacing: 0.5,
