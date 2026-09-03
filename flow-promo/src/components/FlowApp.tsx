@@ -3,19 +3,38 @@ import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } fr
 import { WINDOW_BORDER, INK, INK_MUTED, SUCCESS, ACCENT, FONT_STACK, SHADOW_XL } from '../theme';
 import { AppLogo } from './AppLogo';
 import { STEP_DONE_LOCAL } from '../timeline';
+import {
+  ExtractPanel,
+  UpdateFieldPanel,
+  ComposeEmailPanel,
+  SchedulePanel,
+  PostMessagePanel,
+  StepPanelProps,
+} from './StepPanels';
 
 const INTENT = 'Close out Q3 for Acme Corp';
 
-const STEPS: { logo: string; label: string }[] = [
-  { logo: 'adobe-icon', label: 'Pull the signed MSA from iManage' },
-  { logo: 'salesforce', label: 'Update the Acme opportunity to Closed Won' },
-  { logo: 'microsoft-icon', label: "Reply to Sarah's budget thread in Outlook" },
-  { logo: 'google-calendar', label: 'Book the Q3 review with the account team' },
-  { logo: 'slack-icon', label: 'Post the close summary to #deal-desk' },
+type StepKind = 'extract' | 'update' | 'compose' | 'schedule' | 'post';
+
+const PANELS: Record<StepKind, React.FC<StepPanelProps>> = {
+  extract: ExtractPanel,
+  update: UpdateFieldPanel,
+  compose: ComposeEmailPanel,
+  schedule: SchedulePanel,
+  post: PostMessagePanel,
+};
+
+const STEPS: { logo: string; label: string; kind: StepKind }[] = [
+  { logo: 'adobe-icon', label: 'Pull the signed MSA from iManage', kind: 'extract' },
+  { logo: 'salesforce', label: 'Update the Acme opportunity to Closed Won', kind: 'update' },
+  { logo: 'microsoft-icon', label: "Reply to Sarah's budget thread in Outlook", kind: 'compose' },
+  { logo: 'google-calendar', label: 'Book the Q3 review with the account team', kind: 'schedule' },
+  { logo: 'slack-icon', label: 'Post the close summary to #deal-desk', kind: 'post' },
 ];
 
 const TYPE_START = 14;
 const TYPE_END = 74;
+const PANEL_HEIGHT = 212;
 
 const Spinner: React.FC<{ size: number }> = ({ size }) => {
   const frame = useCurrentFrame();
@@ -58,10 +77,10 @@ const StepRow: React.FC<{ step: (typeof STEPS)[number]; index: number }> = ({ st
   const { fps } = useVideoConfig();
 
   const doneAt = STEP_DONE_LOCAL[index];
-  const startAt = index === 0 ? TYPE_END + 8 : STEP_DONE_LOCAL[index - 1];
+  const startAt = index === 0 ? TYPE_END + 8 : STEP_DONE_LOCAL[index - 1] + 10;
 
   const appear = spring({
-    frame: frame - (TYPE_END + index * 6),
+    frame: frame - (startAt - 10),
     fps,
     config: { stiffness: 170, damping: 16, mass: 0.6 },
   });
@@ -69,41 +88,58 @@ const StepRow: React.FC<{ step: (typeof STEPS)[number]; index: number }> = ({ st
   const running = frame >= startAt && frame < doneAt;
   const done = frame >= doneAt;
 
+  const panelHeight = interpolate(
+    frame,
+    [startAt, startAt + 18, doneAt + 16, doneAt + 36],
+    [0, PANEL_HEIGHT, PANEL_HEIGHT, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+
+  const Panel = PANELS[step.kind];
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 24,
-        padding: '22px 28px',
-        borderRadius: 16,
-        backgroundColor: running ? `${ACCENT}0D` : 'transparent',
-        border: `1px solid ${running ? `${ACCENT}33` : 'transparent'}`,
-        opacity: appear * (done ? 1 : running ? 1 : 0.5),
-        transform: `translateX(${(1 - appear) * 30}px)`,
-      }}
-    >
-      <AppLogo logo={step.logo} size={40} />
-      <span
+    <div style={{ display: 'flex', flexDirection: 'column', opacity: appear, transform: `translateX(${(1 - appear) * 30}px)` }}>
+      <div
         style={{
-          fontFamily: FONT_STACK,
-          fontSize: 30,
-          fontWeight: 600,
-          color: done || running ? INK : INK_MUTED,
-          flex: 1,
-          whiteSpace: 'nowrap',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 24,
+          padding: '20px 28px',
+          borderRadius: 16,
+          backgroundColor: running ? `${ACCENT}0D` : 'transparent',
+          border: `1px solid ${running ? `${ACCENT}33` : 'transparent'}`,
         }}
       >
-        {step.label}
-      </span>
-      {done ? <DoneCheck doneAt={doneAt} size={40} /> : running ? <Spinner size={40} /> : (
-        <div style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid rgba(17,17,17,0.12)` }} />
-      )}
+        <AppLogo logo={step.logo} size={40} />
+        <span
+          style={{
+            fontFamily: FONT_STACK,
+            fontSize: 30,
+            fontWeight: 600,
+            color: done || running ? INK : INK_MUTED,
+            flex: 1,
+            whiteSpace: 'nowrap',
+            opacity: done || running ? 1 : 0.5,
+          }}
+        >
+          {step.label}
+        </span>
+        {done ? (
+          <DoneCheck doneAt={doneAt} size={40} />
+        ) : running ? (
+          <Spinner size={40} />
+        ) : (
+          <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid rgba(17,17,17,0.12)', opacity: 0.5 }} />
+        )}
+      </div>
+      <div style={{ height: panelHeight, overflow: 'hidden', padding: panelHeight > 4 ? '4px 8px 10px' : 0 }}>
+        <Panel startAt={startAt} doneAt={doneAt} />
+      </div>
     </div>
   );
 };
 
-export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 390 }) => {
+export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFrames = 860 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -171,7 +207,7 @@ export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFra
         </div>
 
         {/* main */}
-        <div style={{ flex: 1, padding: '34px 40px 40px', display: 'flex', flexDirection: 'column', gap: 22 }}>
+        <div style={{ flex: 1, padding: '34px 40px 40px', display: 'flex', flexDirection: 'column', gap: 18 }}>
           <span style={{ fontFamily: FONT_STACK, fontSize: 22, fontWeight: 600, color: INK_MUTED, letterSpacing: 1.5 }}>
             WHAT DO YOU WANT DONE?
           </span>
@@ -194,13 +230,13 @@ export const FlowApp: React.FC<{ durationInFrames?: number }> = ({ durationInFra
             {caretOn ? <div style={{ width: 3, height: 42, backgroundColor: ACCENT }} /> : null}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {STEPS.map((step, i) => (
               <StepRow key={step.label} step={step} index={i} />
             ))}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 'auto', paddingTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 'auto', paddingTop: 10 }}>
             <div style={{ flex: 1, height: 12, borderRadius: 6, backgroundColor: 'rgba(17,17,17,0.08)', overflow: 'hidden' }}>
               <div style={{ width: `${progress * 100}%`, height: '100%', borderRadius: 6, backgroundColor: SUCCESS }} />
             </div>

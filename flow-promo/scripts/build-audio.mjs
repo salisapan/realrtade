@@ -10,19 +10,19 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 
 const SR = 48000;
 const FPS = 60;
-const TOTAL_FRAMES = 1560;
+const TOTAL_FRAMES = 2030;
 
 // Mirrors src/timeline.ts. Kept as literals so the script has no TS build step.
 const ACT = {
   chaos: { from: 200, duration: 360 },
-  doIt: { from: 530 },
-  app: { from: 760, duration: 390 },
-  results: { from: 1120 },
-  outro: { from: 1420 },
+  doIt: { from: 495 },
+  app: { from: 760, duration: 860 },
+  results: { from: 1590 },
+  outro: { from: 1890 },
 };
 const COLLAPSE_FRAME = 470;
 const CLICK_FRAME = 685;
-const STEP_DONE_FRAMES = [96, 148, 200, 252, 304].map((f) => ACT.app.from + f);
+const STEP_DONE_FRAMES = [230, 372, 524, 646, 778].map((f) => ACT.app.from + f);
 const RESULT_CHECK_FRAMES = [20, 30, 40, 50, 60, 70].map((f) => ACT.results.from + f);
 const HEADLINE_FRAME = ACT.results.from + 150;
 
@@ -153,6 +153,13 @@ noise(t(CLICK_FRAME) + 0.02, 1.5, 0.09, 2.4, 0.16);       // wash
     tone(t(f), notes[i] * 2, 0.22, 0.05, 14);
     noise(t(f), 0.06, 0.03, 34, 0.7);
   });
+
+  // soft typing texture under the compose-email vignette (step index 2)
+  const typeFrom = t(ACT.app.from + 392);
+  const typeTo = t(ACT.app.from + 500);
+  for (let s = typeFrom; s < typeTo; s += 0.045 + Math.random() * 0.05) {
+    noise(s, 0.02, 0.012, 60, 0.85);
+  }
 }
 
 // ---- results: one note per check, resolving under the headline ------------
