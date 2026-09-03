@@ -3,7 +3,7 @@ import { AbsoluteFill, spring, useCurrentFrame, useVideoConfig } from 'remotion'
 import { TEXT, FONT_STACK } from '../theme';
 
 const PHRASES = ['Meet your new...', 'Execution layer', 'Cognitive OS'];
-const SLOT = 30;
+const SLOT = 70;
 
 export const KineticText: React.FC = () => {
   const frame = useCurrentFrame();
@@ -16,7 +16,7 @@ export const KineticText: React.FC = () => {
         const local = frame - start;
         if (local < -2 || local > SLOT + 2) return null;
 
-        const exitLocal = local - (SLOT - 9);
+        const exitLocal = local - (SLOT - 14);
         const groupExit =
           exitLocal > 0
             ? spring({

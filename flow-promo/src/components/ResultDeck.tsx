@@ -42,7 +42,7 @@ const Check: React.FC<{ delay: number }> = ({ delay }) => {
 const ResultCard: React.FC<{ result: Result; index: number }> = ({ result, index }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const delay = index * 7;
+  const delay = index * 10;
 
   const enter = spring({
     frame: frame - delay,
@@ -93,7 +93,7 @@ export const ResultDeck: React.FC<{ durationInFrames?: number }> = ({ durationIn
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const headlineDelay = 105;
+  const headlineDelay = 150;
   const headline = spring({
     frame: frame - headlineDelay,
     fps,

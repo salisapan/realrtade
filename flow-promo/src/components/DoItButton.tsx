@@ -5,9 +5,9 @@ import { ACCENT, ACCENT_DARK, FONT_STACK } from '../theme';
 
 const CURSOR_START = { x: 0.94, y: 0.94 };
 const CURSOR_END = { x: 0.5, y: 0.5 };
-const CURSOR_ENTER = 20;
-const CURSOR_ARRIVE = 115;
-const CLICK_FRAME = 120;
+const CURSOR_ENTER = 25;
+const CURSOR_ARRIVE = 150;
+const CLICK_FRAME = 155;
 
 const CursorArrow: React.FC = () => {
   const frame = useCurrentFrame();

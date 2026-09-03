@@ -8,7 +8,7 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="FlowCognitiveOS"
         component={FlowPromo}
-        durationInFrames={900} // 15 seconds @ 60fps
+        durationInFrames={1200} // 20 seconds @ 60fps
         fps={60}
         width={3840} // 4K Resolution
         height={2160}

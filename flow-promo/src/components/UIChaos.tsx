@@ -17,26 +17,20 @@ type Doc = {
 /* Deliberately overlapping and crowding the frame — the density is the point.
    `depth` drives scale, blur and opacity so the storm reads three-dimensional. */
 const DOCS: Doc[] = [
-  { kind: 'outlook', x: 0.27, y: 0.3, depth: 1.12, rotate: -5, seed: 1, delay: 0 },
-  { kind: 'word', x: 0.72, y: 0.27, depth: 1.05, rotate: 4, seed: 2, delay: 3 },
-  { kind: 'pdf', x: 0.5, y: 0.52, depth: 1.18, rotate: -2, seed: 3, delay: 6 },
-  { kind: 'excel', x: 0.79, y: 0.63, depth: 0.98, rotate: 6, seed: 4, delay: 9 },
-  { kind: 'imanage', x: 0.22, y: 0.66, depth: 1.02, rotate: 5, seed: 5, delay: 12 },
-  { kind: 'crm', x: 0.62, y: 0.78, depth: 0.92, rotate: -6, seed: 6, delay: 15 },
-  { kind: 'gmail', x: 0.42, y: 0.16, depth: 0.88, rotate: 3, seed: 7, delay: 18 },
-  { kind: 'powerpoint', x: 0.87, y: 0.4, depth: 0.84, rotate: -4, seed: 8, delay: 21 },
-  { kind: 'jira', x: 0.13, y: 0.44, depth: 0.86, rotate: 6, seed: 9, delay: 24 },
-  { kind: 'adobe', x: 0.36, y: 0.83, depth: 0.8, rotate: 4, seed: 10, delay: 27 },
-  { kind: 'notion', x: 0.66, y: 0.44, depth: 0.76, rotate: -7, seed: 11, delay: 30 },
-  { kind: 'browser', x: 0.9, y: 0.16, depth: 0.72, rotate: 5, seed: 12, delay: 33 },
-  { kind: 'calendar', x: 0.09, y: 0.16, depth: 0.7, rotate: -5, seed: 13, delay: 36 },
-  { kind: 'word', x: 0.53, y: 0.34, depth: 0.66, rotate: 8, seed: 14, delay: 39 },
-  { kind: 'pdf', x: 0.83, y: 0.85, depth: 0.62, rotate: -8, seed: 15, delay: 42 },
-  { kind: 'outlook', x: 0.16, y: 0.87, depth: 0.6, rotate: 7, seed: 16, delay: 45 },
-  { kind: 'excel', x: 0.34, y: 0.5, depth: 0.56, rotate: -9, seed: 17, delay: 48 },
-  { kind: 'imanage', x: 0.94, y: 0.55, depth: 0.54, rotate: 6, seed: 18, delay: 51 },
-  { kind: 'crm', x: 0.05, y: 0.6, depth: 0.52, rotate: -6, seed: 19, delay: 54 },
-  { kind: 'powerpoint', x: 0.75, y: 0.06, depth: 0.5, rotate: 9, seed: 20, delay: 57 },
+  { kind: 'outlook', x: 0.28, y: 0.29, depth: 1.14, rotate: -5, seed: 1, delay: 0 },
+  { kind: 'word', x: 0.73, y: 0.26, depth: 1.06, rotate: 4, seed: 2, delay: 5 },
+  { kind: 'pdf', x: 0.5, y: 0.53, depth: 1.2, rotate: -2, seed: 3, delay: 10 },
+  { kind: 'excel', x: 0.79, y: 0.65, depth: 1.0, rotate: 6, seed: 4, delay: 15 },
+  { kind: 'salesforce', x: 0.21, y: 0.67, depth: 1.04, rotate: 5, seed: 5, delay: 20 },
+  { kind: 'slack', x: 0.63, y: 0.8, depth: 0.94, rotate: -6, seed: 6, delay: 25 },
+  { kind: 'gmail', x: 0.43, y: 0.14, depth: 0.9, rotate: 3, seed: 7, delay: 30 },
+  { kind: 'imanage', x: 0.88, y: 0.4, depth: 0.86, rotate: -4, seed: 8, delay: 35 },
+  { kind: 'jira', x: 0.12, y: 0.42, depth: 0.88, rotate: 6, seed: 9, delay: 40 },
+  { kind: 'illustrator', x: 0.34, y: 0.85, depth: 0.82, rotate: 4, seed: 10, delay: 45 },
+  { kind: 'notion', x: 0.67, y: 0.44, depth: 0.78, rotate: -7, seed: 11, delay: 50 },
+  { kind: 'powerpoint', x: 0.9, y: 0.14, depth: 0.72, rotate: 5, seed: 12, delay: 55 },
+  { kind: 'calendar', x: 0.08, y: 0.15, depth: 0.7, rotate: -5, seed: 13, delay: 60 },
+  { kind: 'hubspot', x: 0.14, y: 0.88, depth: 0.66, rotate: 7, seed: 14, delay: 65 },
 ];
 
 /* Far documents render behind near ones. */
@@ -74,9 +68,9 @@ const DocsLayer: React.FC<{ collapseStart: number }> = ({ collapseStart }) => {
         const scale = enter * breathe * doc.depth * interpolate(c, [0, 1], [1, 0.04]);
         const opacity =
           enter *
-          interpolate(doc.depth, [0.5, 1.2], [0.55, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) *
+          interpolate(doc.depth, [0.62, 1.2], [0.72, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }) *
           interpolate(c, [0, 0.75, 1], [1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' });
-        const blur = interpolate(doc.depth, [0.5, 1.0], [3.2, 0], {
+        const blur = interpolate(doc.depth, [0.62, 1.0], [2.2, 0], {
           extrapolateLeft: 'clamp',
           extrapolateRight: 'clamp',
         });

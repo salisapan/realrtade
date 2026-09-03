@@ -34,6 +34,11 @@ export const FlowLogo: React.FC<{ height?: number }> = ({ height = 300 }) => {
           <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
         </linearGradient>
 
+        <filter id={`${uid}-molten`} x="-15%" y="-25%" width="130%" height="150%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves={3} seed={7} result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={7} xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+
         <linearGradient id={`${uid}-edge`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#FFFFFF" />
           <stop offset="55%" stopColor="#7C8CA3" />
@@ -44,7 +49,7 @@ export const FlowLogo: React.FC<{ height?: number }> = ({ height = 300 }) => {
       {/* soft contact shadow under the type */}
       <ellipse cx="310" cy="168" rx="250" ry="12" fill="rgba(17,17,17,0.10)" />
 
-      <g>
+      <g filter={`url(#${uid}-molten)`}>
         {/* depth pass */}
         <text
           x="310"

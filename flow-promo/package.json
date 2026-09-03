@@ -6,6 +6,7 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@iconify-json/logos": "^1.2.13",
     "@remotion/cli": "4.0.506",
     "@remotion/motion-blur": "^4.0.506",
     "@remotion/tailwind-v4": "4.0.506",
