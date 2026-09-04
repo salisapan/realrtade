@@ -33,135 +33,187 @@
 ]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 
 :root{
-  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --panel-2:#EEF3FF; --line:rgba(20,44,100,.12);
-  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
-  --navy:#07090F; --cat:#1A4EF5; --ok:#166B44; --ok-wash:#E3F3EA; --warn:#8A5A00; --warn-wash:#FAF0DC;
-  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  --disp:'Fraunces',Georgia,serif;
-  --serif:'Source Serif 4',Georgia,serif;
+  --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F3F6FC; --surface-3:#EAEFFA;
+  --ink:#0B0F1A; --ink-2:#454E63; --ink-3:#7B8398;
+  --line:#E4E8F1; --line-2:#D2D9E8;
+  --accent:#1A4EF5; --accent-ink:#0F37C6; --accent-wash:#EAF0FF;
+  --ok:#166B44; --ok-wash:#E3F3EA;
+  --warn:#8A5A00; --warn-wash:#FBF1DD;
+  --navy:#07090F;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(11,15,26,.04), 0 16px 32px -20px rgba(11,15,26,.16);
+  --shadow-lg:0 2px 4px rgba(11,15,26,.05), 0 28px 56px -24px rgba(11,15,26,.28);
 }
 :root[data-theme="dark"]{
-  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --panel-2:#131A2C; --line:rgba(150,166,204,.16);
-  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
-  --ok:#5FD39B; --ok-wash:#0F2019; --warn:#F0B65B; --warn-wash:#221A0C;
+  --bg:#07090F; --surface:#10141D; --surface-2:#141924; --surface-3:#1A2130;
+  --ink:#EEF2F9; --ink-2:#AEB9D6; --ink-3:#7A879F;
+  --line:#212A3B; --line-2:#2C3852;
+  --accent:#3B74FF; --accent-ink:#93B3FF; --accent-wash:#111C3A;
+  --ok:#5FD39B; --ok-wash:#0F2019;
+  --warn:#F0B65B; --warn-wash:#221A0C;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 32px -20px rgba(0,0,0,.7);
+  --shadow-lg:0 2px 4px rgba(0,0,0,.5), 0 28px 56px -24px rgba(0,0,0,.85);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
-.wrap{max-width:760px; margin:0 auto; padding:0 24px}
-header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
-header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+body{margin:0; background:var(--bg); color:var(--ink-2); font-family:var(--sans); line-height:1.6; font-size:1rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:1040px; margin:0 auto; padding:0 24px}
+.narrow{max-width:760px}
+
+/* header (shared brand identity across the site) */
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--accent)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1120px}
 .brand{display:flex; align-items:center}
 .brand img{height:26px; width:auto; display:block}
-header.site nav{display:flex; align-items:center}
-header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav{display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:2px 0}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.9rem; font-weight:600; margin-inline-start:20px; white-space:nowrap}
 header.site nav a:hover{color:#fff}
-.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn{margin-inline-start:16px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s; flex:none}
 .theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
 .theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
 .theme-btn .sun{display:none}
 :root[data-theme="light"] .theme-btn .sun{display:block}
 :root[data-theme="light"] .theme-btn .moon{display:none}
-main{padding:56px 0 20px}
-.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
-h1.title{font-family:var(--disp); font-weight:560; font-size:2.5rem; line-height:1.15; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
-.status-row{display:flex; flex-wrap:wrap; gap:8px; font-family:var(--sans); font-size:.8rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
-.status-row span{background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:4px 9px; color:var(--muted)}
-article p{margin:0 0 18px}
-article h2{font-family:var(--disp); font-weight:560; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:46px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat); scroll-margin-top:90px}
-article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
-article li{margin-bottom:8px}
-article a{color:var(--accent-2)}
-footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
-footer.site a{color:var(--muted)}
-.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--accent); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
-.lead{font-size:1.16rem; color:var(--txt); margin:0 0 20px}
-.jumpnav{display:flex; flex-wrap:wrap; gap:8px 10px; margin:0 0 40px; font-family:var(--sans)}
-.jumpnav a{font-size:.84rem; font-weight:600; color:var(--accent-2); text-decoration:none; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 13px}
-.jumpnav a:hover{border-color:var(--accent-2)}
-code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:.12em .4em; color:var(--txt-hi)}
 
-/* not/is cards */
-.cards{display:grid; gap:16px; margin:26px 0 32px}
-@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
-.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
-.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 8px}
-.card p{margin:0; font-size:1rem}
-.card ul{margin:0; padding-inline-start:20px}
-.card li{margin-bottom:6px; font-size:.97rem}
+code{font-family:var(--mono); font-size:.86em; background:var(--surface-2); border:1px solid var(--line); border-radius:4px; padding:.12em .45em; color:var(--ink)}
+a{color:var(--accent-ink)}
+b,strong{color:var(--ink)}
 
-/* steps */
-.steps{list-style:none; margin:24px 0; padding:0; border-inline-start:2px solid var(--line); display:flex; flex-direction:column; gap:22px}
-.steps li{padding-inline-start:20px; position:relative}
-.steps li::before{content:attr(data-n); position:absolute; inset-inline-start:-11px; top:2px; width:20px; height:20px; border-radius:50%; background:var(--bg); border:2px solid var(--cat); color:var(--cat); font-family:var(--sans); font-size:.68rem; font-weight:700; display:flex; align-items:center; justify-content:center}
-.steps h4{margin:0 0 4px; font-family:var(--sans); font-size:.98rem; font-weight:700; color:var(--txt-hi)}
-.steps p{margin:0; font-size:.96rem; color:var(--muted)}
+/* ---------------- hero ---------------- */
+.hero{padding:64px 0 8px}
+.eyebrow{font-family:var(--mono); font-size:.76rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:8px}
+.eyebrow::before{content:'';width:7px; height:7px; border-radius:50%; background:var(--accent)}
+h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.4rem,5.4vw,3.4rem); line-height:1.05; letter-spacing:-.02em; color:var(--ink); margin:16px 0 16px; max-width:14ch}
+.lead{font-size:1.2rem; line-height:1.6; color:var(--ink-2); margin:0 0 26px; max-width:52ch}
+.hero-cta{display:flex; flex-wrap:wrap; gap:12px; margin-bottom:28px}
+.status-row{display:flex; flex-wrap:wrap; gap:8px; font-family:var(--mono); font-size:.74rem}
+.status-row span{background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:5px 10px; color:var(--ink-3)}
 
-/* chip specimen */
-.specimen{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin:24px 0}
-.specimen .tag{font-family:var(--sans); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0 0 14px}
-.mail{border-inline-start:2px solid var(--line); padding-inline-start:12px; margin-bottom:16px}
-.mail b{display:block; font-family:var(--sans); font-size:.95rem; color:var(--txt-hi); margin-bottom:2px}
-.mail span{font-family:var(--sans); font-size:.86rem; color:var(--muted)}
-.chip{display:inline-flex; align-items:center; gap:8px; background:var(--cat); color:#fff; border-radius:8px; padding:10px 15px; font-family:var(--sans); font-weight:700; font-size:.9rem; box-shadow:0 8px 20px -10px rgba(26,78,245,.6)}
-.chip .target{font-family:var(--mono); font-weight:400; opacity:.72; font-size:.8rem}
-.specimen .note{font-size:.85rem; color:var(--muted); margin:14px 0 0}
+.btn{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:14px 26px; border-radius:11px; border:0; cursor:pointer; box-shadow:0 10px 24px -12px rgba(26,78,245,.55); transition:transform .12s,box-shadow .12s,filter .12s}
+.btn:hover{filter:brightness(1.07); transform:translateY(-1px)}
+.btn.ghost{background:var(--surface); color:var(--ink) !important; border:1px solid var(--line-2); box-shadow:none}
+.btn.ghost:hover{border-color:var(--accent); color:var(--accent-ink) !important}
+.btn.block{width:100%; justify-content:center}
 
-/* chip grids for connectors / domains */
-.chipgrid{display:flex; flex-wrap:wrap; gap:9px; margin:18px 0 8px}
-.opt{display:inline-flex; align-items:center; gap:7px; font-family:var(--sans); font-size:.86rem; font-weight:600; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:7px 14px; color:var(--txt-hi)}
+/* ---------------- specimen (moved up, primary proof) ---------------- */
+.specimen{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:26px 28px; margin:8px 0 64px; box-shadow:var(--shadow-lg); max-width:640px}
+.specimen .tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 16px}
+.mail{border-inline-start:3px solid var(--line-2); padding-inline-start:14px; margin-bottom:18px}
+.mail b{display:block; font-size:1rem; color:var(--ink); margin-bottom:3px; font-weight:700}
+.mail span{font-size:.88rem; color:var(--ink-3)}
+.chip{display:inline-flex; align-items:center; gap:9px; background:var(--accent); color:#fff; border-radius:9px; padding:11px 16px; font-weight:700; font-size:.92rem; box-shadow:0 10px 22px -10px rgba(26,78,245,.65)}
+.chip .target{font-family:var(--mono); font-weight:400; opacity:.75; font-size:.8rem}
+.specimen .note{font-size:.86rem; color:var(--ink-3); margin:16px 0 0; line-height:1.55}
+
+/* ---------------- section rhythm ---------------- */
+section{padding:0 0 68px}
+.sec-head{margin:0 0 32px; max-width:640px}
+.sec-head .eyebrow{margin-bottom:10px}
+h2{font-family:var(--sans); font-weight:800; font-size:1.9rem; line-height:1.2; color:var(--ink); margin:0 0 10px; letter-spacing:-.01em; scroll-margin-top:88px}
+.sec-head p{margin:0; font-size:1.03rem; color:var(--ink-2)}
+p{margin:0 0 15px}
+
+/* jump nav */
+.jumpnav{display:flex; flex-wrap:wrap; gap:8px 10px; margin:0 0 8px}
+.jumpnav a{font-family:var(--sans); font-size:.84rem; font-weight:600; color:var(--ink-2); text-decoration:none; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:7px 14px; transition:border-color .15s,color .15s}
+.jumpnav a:hover{border-color:var(--accent); color:var(--accent-ink)}
+
+/* is / isn't */
+.cards{display:grid; gap:18px}
+@media (min-width:720px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:24px 26px; box-shadow:var(--shadow)}
+.card h3{font-family:var(--mono); font-size:.74rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:0 0 14px; display:flex; align-items:center; gap:8px}
+.card.is h3{color:var(--ok)}
+.card.isnt h3{color:var(--ink-3)}
+.card ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:11px}
+.card li{font-size:.98rem; color:var(--ink-2); line-height:1.55; padding-inline-start:22px; position:relative}
+.card.is li::before{content:'✓'; position:absolute; inset-inline-start:0; color:var(--ok); font-weight:700}
+.card.isnt li::before{content:'✕'; position:absolute; inset-inline-start:0; color:var(--ink-3); font-weight:700}
+
+/* how it works — 2x2 modern grid, not a text timeline */
+.stepgrid{display:grid; gap:16px; grid-template-columns:1fr}
+@media (min-width:640px){ .stepgrid{grid-template-columns:1fr 1fr} }
+.stepcard{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow); position:relative}
+.stepcard .num{width:34px; height:34px; border-radius:10px; background:var(--accent-wash); color:var(--accent-ink); font-family:var(--mono); font-weight:700; font-size:.95rem; display:flex; align-items:center; justify-content:center; margin-bottom:14px}
+.stepcard h4{margin:0 0 6px; font-size:1.04rem; font-weight:700; color:var(--ink)}
+.stepcard p{margin:0; font-size:.94rem; color:var(--ink-3); line-height:1.55}
+
+/* flexibility: two-column choice panel */
+.choicegrid{display:grid; gap:18px}
+@media (min-width:720px){ .choicegrid{grid-template-columns:1fr 1fr} }
+.choicepanel{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow)}
+.choicepanel h4{margin:0 0 4px; font-size:1rem; font-weight:700; color:var(--ink)}
+.choicepanel .sub{font-size:.87rem; color:var(--ink-3); margin:0 0 16px}
+.chipgrid{display:flex; flex-wrap:wrap; gap:9px}
+.opt{display:inline-flex; align-items:center; gap:7px; font-family:var(--sans); font-size:.87rem; font-weight:600; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:8px 14px; color:var(--ink)}
 .opt.dim{opacity:.55}
-.opt .st{font-family:var(--mono); font-weight:400; font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+.opt .st{font-family:var(--mono); font-weight:500; font-size:.66rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.04em}
+.flex-note{font-size:.95rem; color:var(--ink-2); margin:22px 0 0}
+.flex-note i{color:var(--ink)}
 
 /* callout */
-.note-box{border-inline-start:3px solid var(--warn); background:var(--warn-wash); border-radius:0 10px 10px 0; padding:16px 18px; margin:26px 0; font-size:.96rem}
-.note-box b{color:var(--txt-hi)}
+.note-box{border:1px solid color-mix(in srgb, var(--warn) 35%, transparent); background:var(--warn-wash); border-radius:14px; padding:20px 22px; margin:26px 0 0; font-size:.97rem; display:flex; gap:14px; align-items:flex-start}
+.note-box .ic{flex:none; width:20px; height:20px; margin-top:2px; color:var(--warn)}
+.note-box b{color:var(--ink)}
 
-/* signup form */
-.formcard{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:28px; margin:26px 0}
-.formcard .row{display:flex; gap:10px; flex-wrap:wrap}
-.formcard input[type=email]{flex:1; min-width:220px; font-family:var(--sans); font-size:1rem; padding:13px 16px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--txt-hi)}
-.formcard input[type=email]:focus{outline:2px solid var(--accent-2); outline-offset:1px}
-.formcard .hp{position:absolute; left:-9999px}
-.formcard button{font-family:var(--sans); font-weight:700; font-size:.98rem; background:var(--cat); color:#fff; border:0; border-radius:10px; padding:13px 26px; cursor:pointer}
-.formcard button:hover{filter:brightness(1.08)}
-.formcard button:disabled{opacity:.6; cursor:default}
-.formcard .fine{font-family:var(--sans); font-size:.82rem; color:var(--muted); margin:12px 0 0}
-.formcard .status{font-family:var(--sans); font-size:.9rem; margin-top:12px; display:none}
-.formcard .status.ok{display:block; color:var(--ok)}
-.formcard .status.err{display:block; color:#C0392B}
-
-/* install */
-.installbox{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:28px; margin:26px 0}
-.installbox ol{margin:0 0 20px; padding-inline-start:22px}
-.installbox li{margin-bottom:12px; font-size:.98rem}
-
-.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
+/* data cards reuse .card two */
 
 /* faq */
-.faq{display:flex; flex-direction:column; gap:10px; margin:20px 0 32px}
-.faq details{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:4px 20px}
-.faq summary{font-family:var(--sans); font-weight:700; font-size:.98rem; color:var(--txt-hi); padding:16px 0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:12px}
+.faq{display:flex; flex-direction:column; gap:10px}
+.faq details{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:2px 22px; box-shadow:var(--shadow)}
+.faq summary{font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); padding:18px 0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:14px}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary::after{content:'+'; font-size:1.3rem; color:var(--cat); flex:none; font-weight:400}
+.faq summary::after{content:'+'; font-size:1.4rem; color:var(--accent); flex:none; font-weight:400; line-height:1}
 .faq details[open] summary::after{content:'\2212'}
 .faq details[open] summary{border-bottom:1px solid var(--line)}
-.faq p{margin:14px 0 16px; font-size:.96rem; color:var(--muted)}
-.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
-.btn:hover{filter:brightness(1.1)}
-.btn.ghost{background:transparent; color:var(--cat) !important; border:1px solid var(--cat)}
+.faq p{margin:16px 0 18px; font-size:.96rem; color:var(--ink-3); line-height:1.6}
 
-.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
-.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
-.cta p{margin:0 0 18px; color:var(--muted)}
-.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
-.pagenav a{color:var(--muted); margin-inline-end:16px}
+/* signup */
+.formcard{background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:34px; box-shadow:var(--shadow-lg); max-width:600px}
+.formcard .row{display:flex; gap:10px; flex-wrap:wrap}
+.formcard input[type=email]{flex:1; min-width:220px; font-family:var(--sans); font-size:1.02rem; padding:14px 16px; border-radius:11px; border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink)}
+.formcard input[type=email]:focus{outline:2px solid var(--accent); outline-offset:1px; background:var(--surface)}
+.formcard .hp{position:absolute; left:-9999px}
+.formcard button{font-family:var(--sans); font-weight:700; font-size:1rem; background:var(--accent); color:#fff; border:0; border-radius:11px; padding:14px 26px; cursor:pointer; box-shadow:0 10px 24px -12px rgba(26,78,245,.55)}
+.formcard button:hover{filter:brightness(1.08)}
+.formcard button:disabled{opacity:.6; cursor:default}
+.formcard .fine{font-family:var(--sans); font-size:.83rem; color:var(--ink-3); margin:14px 0 0}
+.formcard .status{font-family:var(--sans); font-size:.92rem; margin-top:12px; display:none}
+.formcard .status.ok{display:block; color:var(--ok)}
+.formcard .status.err{display:block; color:#C0392B}
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
+
+/* install — horizontal wizard */
+.installbox{background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:30px 32px; box-shadow:var(--shadow-lg)}
+.wizard{display:grid; gap:18px; margin:0 0 26px; grid-template-columns:1fr}
+@media (min-width:820px){ .wizard{grid-template-columns:repeat(5,1fr)} }
+.wstep{display:flex; flex-direction:column; gap:8px}
+.wstep .num{width:28px; height:28px; border-radius:8px; background:var(--accent-wash); color:var(--accent-ink); font-family:var(--mono); font-weight:700; font-size:.84rem; display:flex; align-items:center; justify-content:center}
+.wstep p{margin:0; font-size:.9rem; color:var(--ink-2); line-height:1.5}
+
+/* final cta */
+.cta-box{padding:36px 32px; background:linear-gradient(135deg, var(--accent-wash), var(--surface) 60%); border:1px solid var(--line); border-radius:20px; text-align:center; box-shadow:var(--shadow)}
+.cta-box h2{margin:0 0 10px; font-size:1.5rem}
+.cta-box p{margin:0 0 22px; color:var(--ink-2); max-width:48ch; margin-inline:auto}
+
+footer.site{padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--ink-3); font-size:.86rem; border-top:1px solid var(--line)}
+footer.site a{color:var(--ink-3)}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--ink-3)}
+.pagenav a{color:var(--ink-3); margin-inline-end:16px}
+
+@media (max-width:640px){
+  .hero{padding:44px 0 4px}
+  section{padding-bottom:52px}
+  .specimen{margin-bottom:48px}
+  .installbox,.formcard{padding:24px}
+}
 </style>
 <script>
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'light');}catch(e){}})();
@@ -191,160 +243,213 @@ code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1
 </header>
 <main id="main">
   <div class="wrap">
-    <span class="eyebrow">Free &middot; Zero-Prompt</span>
-    <h1 class="title">Flow Trial</h1>
-    <div class="status-row">
-      <span>Pre-release developer preview</span>
-      <span>Not yet on the Chrome Web Store</span>
-      <span>No credit card</span>
+
+    <div class="hero narrow">
+      <span class="eyebrow">Free &middot; Zero-Prompt</span>
+      <h1 class="title">The lean, free version of Flow</h1>
+      <p class="lead">A browser extension that watches Gmail quietly, and&nbsp;&mdash; once in a while, when something actually changed &mdash;&nbsp;surfaces one <code>Do It</code> button. No chat window. No prompts. No if-this-then-that rules to build.</p>
+      <div class="hero-cta">
+        <a class="btn" href="#signup">Request Early Access</a>
+        <a class="btn ghost" href="#how">See how it works</a>
+      </div>
+      <div class="status-row">
+        <span>Pre-release developer preview</span>
+        <span>Not yet on the Chrome Web Store</span>
+        <span>No credit card</span>
+      </div>
     </div>
-    <article>
 
-<p class="lead">A free, lean version of Flow. A browser extension that watches Gmail quietly, and&nbsp;&mdash;&nbsp;once in a while, when something actually changed&nbsp;&mdash;&nbsp;surfaces one <code>Do It</code> button. No chat window. No prompts to write. No if-this-then-that rules to configure.</p>
-
-<nav class="jumpnav" aria-label="On this page">
-  <a href="#how">How it works</a><a href="#flexible">Flexibility</a><a href="#data-use">Data &amp; privacy</a><a href="#faq">FAQ</a><a href="#signup">Get access</a>
-</nav>
-
-<h2 id="what">What it is, and deliberately isn't</h2>
-<div class="cards two">
-  <div class="card">
-    <h3>It is</h3>
-    <ul>
-      <li>Passive &mdash; silent until there's a real reason to speak</li>
-      <li>Zero-prompt &mdash; you never type anything, at setup or at runtime</li>
-      <li>Cross-platform &mdash; correlates what's in your inbox against a system outside Google's own ecosystem</li>
-      <li>Judgment-based &mdash; the model decides what's actionable, live, each time</li>
-    </ul>
-  </div>
-  <div class="card">
-    <h3>It isn't</h3>
-    <ul>
-      <li>A chat assistant</li>
-      <li>A rule builder &mdash; there is no "when X happens, do Y" screen. That's Zapier, and it's exactly the configuration burden Flow exists to remove</li>
-      <li>A nagging notifier &mdash; if nothing happens for two days, that's the product working correctly</li>
-    </ul>
-  </div>
-</div>
-
-<h2 id="how">How it works</h2>
-<ol class="steps">
-  <li data-n="1"><h4>Install &amp; connect (~60 seconds)</h4><p>Install the extension, connect Gmail, connect one work system, answer one question about what kind of work you do. That's it &mdash; no field mapping, no rules.</p></li>
-  <li data-n="2"><h4>It stays quiet</h4><p>Most days, nothing happens. That's by design &mdash; a tool that talks when it has nothing to say gets uninstalled by day two.</p></li>
-  <li data-n="3"><h4>The moment</h4><p>An email arrives that actually changes something &mdash; a client confirms a price, a deadline moves. A small chip appears next to that message. Not a popup. Not a notification.</p></li>
-  <li data-n="4"><h4>Click, or ignore</h4><p>Click and it's done, with an undo link. Ignore it and it disappears and never asks about that email again. Both responses quietly retune the threshold.</p></li>
-</ol>
-
-<div class="specimen">
-  <p class="tag">What it looks like</p>
-  <div class="mail">
-    <b>Re: Office Lease — Meridian Tower, 14th Floor</b>
-    <span>Dana Cole &middot; 9:41 AM &middot; "We're good at $3,900/mo, signing Monday"</span>
-  </div>
-  <span class="chip">Do It: update deal value to $3,900/mo <span class="target">&middot; HubSpot</span></span>
-  <p class="note">The label on the chip is generated live from the specific situation &mdash; it isn't picked from a list you configured in advance.</p>
-</div>
-
-<h2 id="flexible">Choose your systems, choose your work</h2>
-<p>Two dimensions of choice, and neither one is a rule you author:</p>
-<p><b>Which systems Flow may touch</b> &mdash; a permission, not a configuration. Check the ones you actually use:</p>
-<div class="chipgrid">
-  <span class="opt">HubSpot <span class="st">building</span></span>
-  <span class="opt dim">Monday.com <span class="st">planned</span></span>
-  <span class="opt dim">Notion <span class="st">planned</span></span>
-  <span class="opt dim">Salesforce <span class="st">planned</span></span>
-  <span class="opt dim">Pipedrive <span class="st">planned</span></span>
-</div>
-<p><b>What kind of work you do</b> &mdash; biases the model's judgment toward what matters in your field, it doesn't hard-code a trigger:</p>
-<div class="chipgrid">
-  <span class="opt">Sales &amp; deals</span>
-  <span class="opt">Legal &amp; deal coordination</span>
-  <span class="opt">Finance &amp; billing</span>
-  <span class="opt">Operations &amp; admin</span>
-</div>
-<p>The destination is deliberately never Google Sheets. If both ends of the sync sit inside Google, Google already solves that better than we can &mdash; the value here is specifically in reaching <i>outside</i> one ecosystem into another.</p>
-
-<div class="note-box"><b>One honest tension worth naming:</b> Flow's enterprise architecture is Local-First &mdash; no customer data ever leaves the device. Flow Trial is not that. To judge whether an email is actionable, its text is sent to a cloud endpoint for a moment, and not stored afterward. The enterprise deployment runs fully on your own infrastructure with nothing leaving your network. Read the full model on the <a href="/security.html">Security &amp; Architecture</a> page.</div>
-
-<h2 id="data-use">What Flow Trial does with your data</h2>
-<p>Because this reads Gmail content, it deserves a precise answer rather than a generic privacy paragraph:</p>
-<div class="cards two">
-  <div class="card">
-    <h3>What it touches</h3>
-    <ul>
-      <li>The single message open in Gmail's reading pane &mdash; not your inbox, not older messages, not attachments</li>
-      <li>A compact snapshot of the relevant record in your connected work system, so the model can compare the two</li>
-    </ul>
-  </div>
-  <div class="card">
-    <h3>What it never does</h3>
-    <ul>
-      <li>No ad targeting, no reselling of data, no use for training a model</li>
-      <li>No write happens without a click; there is no autonomous send, delete, or bulk edit</li>
-      <li>No crawling your mailbox in the background &mdash; only the message you have open</li>
-    </ul>
-  </div>
-</div>
-<p>Message text is sent to a cloud endpoint for the moment it takes to judge it, then discarded &mdash; it is not written to any database. Your connector choice, domain choice, and activity log (shown/clicked/dismissed) live only in your browser's local storage; uninstalling the extension deletes them. To have your early-access email removed from the waitlist, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
-
-<h2 id="faq">Questions worth asking before you install</h2>
-<div class="faq">
-  <details>
-    <summary>Does Flow Trial read all of my email?</summary>
-    <p>It reads the message you have open in Gmail's reading pane, one at a time, only to decide whether it matches something in your connected work system. It does not crawl your inbox or read messages you haven't opened.</p>
-  </details>
-  <details>
-    <summary>Is my email content stored anywhere?</summary>
-    <p>Message text is sent to a cloud endpoint for a moment to judge whether an action is warranted, and is not retained afterward. The connector, domain choice, and activity log stay on your device in local browser storage.</p>
-  </details>
-  <details>
-    <summary>Why isn't Flow Trial on the Chrome Web Store yet?</summary>
-    <p>It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the first connector is live.</p>
-  </details>
-  <details>
-    <summary>What happens if I ignore a suggestion?</summary>
-    <p>The chip disappears and Flow will not ask about that same email again. Both a click and a dismissal quietly retune how confident the system needs to be before it speaks up next time.</p>
-  </details>
-  <details>
-    <summary>Can I remove my data?</summary>
-    <p>Uninstalling the extension deletes everything stored locally. To remove your waitlist email, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
-  </details>
-</div>
-
-<h2 id="signup">Request early access</h2>
-<p>Confirmed by email (double opt-in) before anything is sent &mdash; the same signup infrastructure the rest of the site uses.</p>
-<div class="formcard">
-  <form id="trialForm">
-    <div class="row">
-      <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-      <label class="sr-only" for="trialEmail">Email address</label>
-      <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
-      <button type="submit" id="trialBtn">Request Access</button>
+    <div class="specimen">
+      <p class="tag">What it looks like</p>
+      <div class="mail">
+        <b>Re: Office Lease — Meridian Tower, 14th Floor</b>
+        <span>Dana Cole &middot; 9:41 AM &middot; "We're good at $3,900/mo, signing Monday"</span>
+      </div>
+      <span class="chip">Do It: update deal value to $3,900/mo <span class="target">&middot; HubSpot</span></span>
+      <p class="note">The label on the chip is generated live from the specific situation &mdash; it isn't picked from a list configured in advance.</p>
     </div>
-    <p class="fine">We'll email you a confirmation link, then the install instructions.</p>
-    <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
-  </form>
-</div>
 
-<h2 id="install">Install it now (developer preview)</h2>
-<p>Already got the confirmation email, or just want to try it immediately? It's not on the Chrome Web Store yet, so installing it takes a few manual steps &mdash; same as any extension in active development.</p>
-<div class="installbox">
-  <ol>
-    <li>Download the ZIP file below and unzip it to a folder on your computer.</li>
-    <li>In Chrome, open <code>chrome://extensions</code>.</li>
-    <li>Turn on <b>Developer mode</b> (top-right toggle).</li>
-    <li>Click <b>Load unpacked</b> and select the unzipped folder.</li>
-    <li>Click the Flow icon in your toolbar, pick a connector and a work domain, and save.</li>
-  </ol>
-  <a class="btn" id="zipBtn" href="/downloads/flow-trial-extension.zip">Download flow-trial-extension.zip</a>
-</div>
+    <nav class="jumpnav narrow" aria-label="On this page">
+      <a href="#how">How it works</a><a href="#flexible">Flexibility</a><a href="#data-use">Data &amp; privacy</a><a href="#faq">FAQ</a><a href="#signup">Get access</a>
+    </nav>
 
-<div class="cta">
-  <h2>Building toward the full platform</h2>
-  <p>Flow Trial is Phase 1 of the architecture described in Flow's product vision &mdash; see where it's headed.</p>
-  <a class="btn" href="/security.html">Read the Security Model</a>
-</div>
-    </article>
+    <section id="what">
+      <div class="sec-head narrow">
+        <span class="eyebrow">01</span>
+        <h2>What it is, and deliberately isn't</h2>
+      </div>
+      <div class="cards two">
+        <div class="card is">
+          <h3>It is</h3>
+          <ul>
+            <li>Passive &mdash; silent until there's a real reason to speak</li>
+            <li>Zero-prompt &mdash; you never type anything, at setup or at runtime</li>
+            <li>Cross-platform &mdash; correlates your inbox against a system outside Google's own ecosystem</li>
+            <li>Judgment-based &mdash; the model decides what's actionable, live, each time</li>
+          </ul>
+        </div>
+        <div class="card isnt">
+          <h3>It isn't</h3>
+          <ul>
+            <li>A chat assistant</li>
+            <li>A rule builder &mdash; there is no "when X happens, do Y" screen. That's Zapier, and it's exactly the configuration burden Flow exists to remove</li>
+            <li>A nagging notifier &mdash; if nothing happens for two days, that's the product working correctly</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="sec-head narrow">
+        <span class="eyebrow">02</span>
+        <h2>How it works</h2>
+        <p>Four moments. Three of them are silence.</p>
+      </div>
+      <div class="stepgrid">
+        <div class="stepcard"><span class="num">1</span><h4>Install &amp; connect</h4><p>~60 seconds: connect Gmail, connect one work system, answer one question about what kind of work you do. No field mapping, no rules.</p></div>
+        <div class="stepcard"><span class="num">2</span><h4>It stays quiet</h4><p>Most days, nothing happens. That's by design &mdash; a tool that talks when it has nothing to say gets uninstalled by day two.</p></div>
+        <div class="stepcard"><span class="num">3</span><h4>The moment</h4><p>An email arrives that actually changes something. A small chip appears next to that message &mdash; not a popup, not a notification.</p></div>
+        <div class="stepcard"><span class="num">4</span><h4>Click, or ignore</h4><p>Click and it's done, with an undo link. Ignore it and it disappears for good. Both responses quietly retune the threshold.</p></div>
+      </div>
+    </section>
+
+    <section id="flexible">
+      <div class="sec-head narrow">
+        <span class="eyebrow">03</span>
+        <h2>Choose your systems, choose your work</h2>
+        <p>Two dimensions of choice &mdash; and neither one is a rule you author.</p>
+      </div>
+      <div class="choicegrid">
+        <div class="choicepanel">
+          <h4>Which systems Flow may touch</h4>
+          <p class="sub">A permission, not a configuration. Check the ones you actually use.</p>
+          <div class="chipgrid">
+            <span class="opt">HubSpot <span class="st">building</span></span>
+            <span class="opt dim">Monday.com <span class="st">planned</span></span>
+            <span class="opt dim">Notion <span class="st">planned</span></span>
+            <span class="opt dim">Salesforce <span class="st">planned</span></span>
+            <span class="opt dim">Pipedrive <span class="st">planned</span></span>
+          </div>
+        </div>
+        <div class="choicepanel">
+          <h4>What kind of work you do</h4>
+          <p class="sub">Biases the model's judgment toward what matters in your field &mdash; it doesn't hard-code a trigger.</p>
+          <div class="chipgrid">
+            <span class="opt">Sales &amp; deals</span>
+            <span class="opt">Legal &amp; deal coordination</span>
+            <span class="opt">Finance &amp; billing</span>
+            <span class="opt">Operations &amp; admin</span>
+          </div>
+        </div>
+      </div>
+      <p class="flex-note narrow">The destination is deliberately never Google Sheets. If both ends of the sync sit inside Google, Google already solves that better than we can &mdash; the value here is specifically in reaching <i>outside</i> one ecosystem into another.</p>
+      <div class="note-box narrow">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+        <div><b>One honest tension worth naming:</b> Flow's enterprise architecture is Local-First &mdash; no customer data ever leaves the device. Flow Trial is not that. To judge whether an email is actionable, its text is sent to a cloud endpoint for a moment, and not stored afterward. The enterprise deployment runs fully on your own infrastructure. Read the full model on the <a href="/security.html">Security &amp; Architecture</a> page.</div>
+      </div>
+    </section>
+
+    <section id="data-use">
+      <div class="sec-head narrow">
+        <span class="eyebrow">04</span>
+        <h2>What it does with your data</h2>
+        <p>Because this reads Gmail content, it deserves a precise answer rather than a generic privacy paragraph.</p>
+      </div>
+      <div class="cards two">
+        <div class="card is">
+          <h3>What it touches</h3>
+          <ul>
+            <li>The single message open in Gmail's reading pane &mdash; not your inbox, not older messages, not attachments</li>
+            <li>A compact snapshot of the matching record in your connected work system</li>
+          </ul>
+        </div>
+        <div class="card isnt">
+          <h3>What it never does</h3>
+          <ul>
+            <li>No ad targeting, no reselling of data, no use for training a model</li>
+            <li>No write happens without a click &mdash; no autonomous send, delete, or bulk edit</li>
+            <li>No crawling your mailbox in the background</li>
+          </ul>
+        </div>
+      </div>
+      <p class="flex-note narrow">Message text is sent to a cloud endpoint for the moment it takes to judge it, then discarded &mdash; never written to a database. Your connector choice, domain choice, and activity log live only in local browser storage; uninstalling the extension deletes them. To remove your early-access email, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
+    </section>
+
+    <section id="faq">
+      <div class="sec-head narrow">
+        <span class="eyebrow">05</span>
+        <h2>Questions worth asking first</h2>
+      </div>
+      <div class="faq narrow">
+        <details>
+          <summary>Does Flow Trial read all of my email?</summary>
+          <p>It reads the message you have open in Gmail's reading pane, one at a time, only to decide whether it matches something in your connected work system. It does not crawl your inbox or read messages you haven't opened.</p>
+        </details>
+        <details>
+          <summary>Is my email content stored anywhere?</summary>
+          <p>Message text is sent to a cloud endpoint for a moment to judge whether an action is warranted, and is not retained afterward. The connector, domain choice, and activity log stay on your device in local browser storage.</p>
+        </details>
+        <details>
+          <summary>Why isn't Flow Trial on the Chrome Web Store yet?</summary>
+          <p>It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the first connector is live.</p>
+        </details>
+        <details>
+          <summary>What happens if I ignore a suggestion?</summary>
+          <p>The chip disappears and Flow will not ask about that same email again. Both a click and a dismissal quietly retune how confident the system needs to be before it speaks up next time.</p>
+        </details>
+        <details>
+          <summary>Can I remove my data?</summary>
+          <p>Uninstalling the extension deletes everything stored locally. To remove your waitlist email, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
+        </details>
+      </div>
+    </section>
+
+    <section id="signup">
+      <div class="sec-head narrow">
+        <span class="eyebrow">06</span>
+        <h2>Request early access</h2>
+        <p>Confirmed by email (double opt-in) before anything is sent &mdash; the same signup infrastructure the rest of the site uses.</p>
+      </div>
+      <div class="formcard">
+        <form id="trialForm">
+          <div class="row">
+            <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <label class="sr-only" for="trialEmail">Email address</label>
+            <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
+            <button type="submit" id="trialBtn">Request Access</button>
+          </div>
+          <p class="fine">We'll email you a confirmation link, then the install instructions.</p>
+          <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="sec-head narrow">
+        <span class="eyebrow">07</span>
+        <h2>Install it now</h2>
+        <p>Already confirmed, or just want to try it immediately? It's not on the Chrome Web Store yet, so installing it takes a few manual steps &mdash; same as any extension in active development.</p>
+      </div>
+      <div class="installbox">
+        <div class="wizard">
+          <div class="wstep"><span class="num">1</span><p>Download the ZIP and unzip it to a folder.</p></div>
+          <div class="wstep"><span class="num">2</span><p>In Chrome, open <code>chrome://extensions</code>.</p></div>
+          <div class="wstep"><span class="num">3</span><p>Turn on <b>Developer mode</b> (top-right).</p></div>
+          <div class="wstep"><span class="num">4</span><p>Click <b>Load unpacked</b>, select the folder.</p></div>
+          <div class="wstep"><span class="num">5</span><p>Pick a connector + work domain, save.</p></div>
+        </div>
+        <a class="btn" id="zipBtn" href="/downloads/flow-trial-extension.zip">Download flow-trial-extension.zip</a>
+      </div>
+    </section>
+
+    <section style="padding-bottom:8px">
+      <div class="cta-box">
+        <h2>Building toward the full platform</h2>
+        <p>Flow Trial is Phase 1 of the architecture described in Flow's product vision &mdash; see where it's headed.</p>
+        <a class="btn ghost" href="/security.html">Read the Security Model</a>
+      </div>
+    </section>
+
   </div>
 </main>
 <footer class="site">
