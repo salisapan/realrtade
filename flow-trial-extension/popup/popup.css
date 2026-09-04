@@ -1,0 +1,81 @@
+@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root{
+  --paper:#F4F5F8; --surface:#FFFFFF; --surface-2:#EDEFF4;
+  --ink:#0D1017; --ink-2:#3F4757; --ink-3:#6B7488;
+  --line:#DCE0E9; --line-2:#C3CAD8;
+  --accent:#1A4EF5; --accent-wash:#E9EEFF;
+  --ok:#166B44; --ok-wash:#E3F3EA;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:#07090F; --surface:#10141D; --surface-2:#161C27;
+    --ink:#E7EAF1; --ink-2:#AFB7C6; --ink-3:#828B9C;
+    --line:#1E2533; --line-2:#2C3446;
+    --accent:#3B74FF; --accent-wash:#111C3A;
+    --ok:#5FD39B; --ok-wash:#0F2019;
+  }
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; width:340px; background:var(--paper); color:var(--ink);
+  font-family:'Assistant',system-ui,sans-serif; direction:rtl;
+}
+.hdr{display:flex;align-items:center;gap:9px;padding:16px 16px 12px}
+.hdr .mark{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none}
+.hdr h1{font-size:1.02rem;margin:0;font-weight:700}
+
+.tabs{display:flex;gap:2px;padding:0 16px;border-bottom:1px solid var(--line)}
+.tab{
+  all:unset;cursor:pointer;font-family:inherit;font-size:.86rem;font-weight:600;
+  color:var(--ink-3);padding:9px 4px 11px;border-bottom:2px solid transparent;
+}
+.tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+
+main{padding:16px}
+.panel{display:none}
+.panel.active{display:block}
+
+.block{margin-bottom:20px}
+.label{font-size:.9rem;font-weight:700;margin:0 0 3px;color:var(--ink)}
+.hint{font-size:.78rem;color:var(--ink-3);margin:0 0 10px;line-height:1.5}
+
+.check-list,.radio-list{display:flex;flex-direction:column;gap:6px}
+.opt{
+  display:flex;align-items:center;gap:10px;background:var(--surface);
+  border:1px solid var(--line);border-radius:7px;padding:9px 11px;cursor:pointer;
+}
+.opt.disabled{opacity:.5;cursor:default}
+.opt input{accent-color:var(--accent);width:15px;height:15px;flex:none}
+.opt .txt{flex:1;min-width:0}
+.opt .name{font-size:.87rem;font-weight:600;color:var(--ink)}
+.opt .kind{font-size:.72rem;color:var(--ink-3);display:block}
+.opt .badge{
+  font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.05em;
+  color:var(--ink-3);background:var(--surface-2);border-radius:4px;padding:2px 6px;flex:none;
+}
+
+.primary{
+  all:unset;display:block;text-align:center;width:100%;background:var(--accent);
+  color:#fff;font-family:inherit;font-weight:700;font-size:.9rem;border-radius:7px;
+  padding:11px;cursor:pointer;
+}
+.primary:hover{opacity:.92}
+.saved-note{font-size:.8rem;color:var(--ok);margin-top:9px;text-align:center}
+
+.log-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto}
+.log-item{
+  background:var(--surface);border:1px solid var(--line);border-radius:7px;
+  padding:9px 11px;font-size:.82rem;line-height:1.5;
+}
+.log-item .kind{
+  font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.05em;
+  text-transform:uppercase;border-radius:4px;padding:1px 6px;margin-left:6px;
+}
+.log-item .kind.shown{background:var(--accent-wash);color:var(--accent)}
+.log-item .kind.clicked{background:var(--ok-wash);color:var(--ok)}
+.log-item .kind.dismissed{background:var(--surface-2);color:var(--ink-3)}
+.log-item .when{color:var(--ink-3);font-size:.72rem;display:block;margin-top:3px}
+
+.ftr{padding:10px 16px;border-top:1px solid var(--line);font-size:.7rem;color:var(--ink-3);text-align:center}

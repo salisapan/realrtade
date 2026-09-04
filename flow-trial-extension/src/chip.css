@@ -1,0 +1,57 @@
+/* Injected into Gmail. Namespaced under .flow-* to avoid any collision with
+   Gmail's own classes, which are obfuscated and change without notice. */
+
+.flow-chip-host {
+  all: initial;
+  font-family: 'Assistant', system-ui, -apple-system, sans-serif;
+  direction: rtl;
+}
+
+.flow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #1A4EF5;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 16px -8px rgba(26, 78, 245, 0.7);
+  margin: 6px 0;
+  animation: flow-chip-in 180ms ease-out;
+}
+
+.flow-chip:hover { background: #1541D8; }
+.flow-chip:focus-visible { outline: 2px solid #93B3FF; outline-offset: 2px; }
+
+.flow-chip .flow-chip-label { white-space: nowrap; }
+.flow-chip .flow-chip-target {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-weight: 400;
+  opacity: .7;
+  font-size: 12px;
+}
+
+.flow-chip-dismiss {
+  all: initial;
+  font-family: inherit;
+  cursor: pointer;
+  color: rgba(255,255,255,.8);
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.flow-chip-dismiss:hover { color: #fff; }
+
+@keyframes flow-chip-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-chip { animation: none; }
+}
