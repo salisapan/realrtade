@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Flow Trial: a free, lean version of Flow. A browser extension that watches Gmail quietly and surfaces one Do It action when it recognizes something worth syncing to your CRM. No prompts, no rules to configure.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/trial.html">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>Flow Trial — Free Zero-Prompt Automation</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Flow Trial — Free Zero-Prompt Automation">
+<meta property="og:description" content="A free, lean version of Flow. Watches Gmail quietly, surfaces one Do It action when it recognizes something worth syncing — no prompts, no rules to configure.">
+<meta property="og:url" content="https://theflow-ai.com/trial.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flow Trial — Free Zero-Prompt Automation">
+<meta name="twitter:description" content="A free, lean version of Flow. Watches Gmail quietly, surfaces one Do It action when it recognizes something worth syncing — no prompts, no rules to configure.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Flow Trial","item":"https://theflow-ai.com/trial.html"}]}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --panel-2:#EEF3FF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --navy:#07090F; --cat:#1A4EF5; --ok:#166B44; --ok-wash:#E3F3EA; --warn:#8A5A00; --warn-wash:#FAF0DC;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Fraunces',Georgia,serif;
+  --serif:'Source Serif 4',Georgia,serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --panel-2:#131A2C; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
+  --ok:#5FD39B; --ok-wash:#0F2019; --warn:#F0B65B; --warn-wash:#221A0C;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+h1.title{font-family:var(--disp); font-weight:560; font-size:2.5rem; line-height:1.15; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+.status-row{display:flex; flex-wrap:wrap; gap:8px; font-family:var(--sans); font-size:.8rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
+.status-row span{background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:4px 9px; color:var(--muted)}
+article p{margin:0 0 18px}
+article h2{font-family:var(--disp); font-weight:560; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:46px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat); scroll-margin-top:90px}
+article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
+article li{margin-bottom:8px}
+article a{color:var(--accent-2)}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:.12em .4em; color:var(--txt-hi)}
+
+/* not/is cards */
+.cards{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
+.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 8px}
+.card p{margin:0; font-size:1rem}
+.card ul{margin:0; padding-inline-start:20px}
+.card li{margin-bottom:6px; font-size:.97rem}
+
+/* steps */
+.steps{list-style:none; margin:24px 0; padding:0; border-inline-start:2px solid var(--line); display:flex; flex-direction:column; gap:22px}
+.steps li{padding-inline-start:20px; position:relative}
+.steps li::before{content:attr(data-n); position:absolute; inset-inline-start:-11px; top:2px; width:20px; height:20px; border-radius:50%; background:var(--bg); border:2px solid var(--cat); color:var(--cat); font-family:var(--sans); font-size:.68rem; font-weight:700; display:flex; align-items:center; justify-content:center}
+.steps h4{margin:0 0 4px; font-family:var(--sans); font-size:.98rem; font-weight:700; color:var(--txt-hi)}
+.steps p{margin:0; font-size:.96rem; color:var(--muted)}
+
+/* chip specimen */
+.specimen{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px; margin:24px 0}
+.specimen .tag{font-family:var(--sans); font-size:.7rem; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0 0 14px}
+.mail{border-inline-start:2px solid var(--line); padding-inline-start:12px; margin-bottom:16px}
+.mail b{display:block; font-family:var(--sans); font-size:.95rem; color:var(--txt-hi); margin-bottom:2px}
+.mail span{font-family:var(--sans); font-size:.86rem; color:var(--muted)}
+.chip{display:inline-flex; align-items:center; gap:8px; background:var(--cat); color:#fff; border-radius:8px; padding:10px 15px; font-family:var(--sans); font-weight:700; font-size:.9rem; box-shadow:0 8px 20px -10px rgba(26,78,245,.6)}
+.chip .target{font-family:var(--mono); font-weight:400; opacity:.72; font-size:.8rem}
+.specimen .note{font-size:.85rem; color:var(--muted); margin:14px 0 0}
+
+/* chip grids for connectors / domains */
+.chipgrid{display:flex; flex-wrap:wrap; gap:9px; margin:18px 0 8px}
+.opt{display:inline-flex; align-items:center; gap:7px; font-family:var(--sans); font-size:.86rem; font-weight:600; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:7px 14px; color:var(--txt-hi)}
+.opt.dim{opacity:.55}
+.opt .st{font-family:var(--mono); font-weight:400; font-size:.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.04em}
+
+/* callout */
+.note-box{border-inline-start:3px solid var(--warn); background:var(--warn-wash); border-radius:0 10px 10px 0; padding:16px 18px; margin:26px 0; font-size:.96rem}
+.note-box b{color:var(--txt-hi)}
+
+/* signup form */
+.formcard{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:28px; margin:26px 0}
+.formcard .row{display:flex; gap:10px; flex-wrap:wrap}
+.formcard input[type=email]{flex:1; min-width:220px; font-family:var(--sans); font-size:1rem; padding:13px 16px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--txt-hi)}
+.formcard input[type=email]:focus{outline:2px solid var(--accent-2); outline-offset:1px}
+.formcard .hp{position:absolute; left:-9999px}
+.formcard button{font-family:var(--sans); font-weight:700; font-size:.98rem; background:var(--cat); color:#fff; border:0; border-radius:10px; padding:13px 26px; cursor:pointer}
+.formcard button:hover{filter:brightness(1.08)}
+.formcard button:disabled{opacity:.6; cursor:default}
+.formcard .fine{font-family:var(--sans); font-size:.82rem; color:var(--muted); margin:12px 0 0}
+.formcard .status{font-family:var(--sans); font-size:.9rem; margin-top:12px; display:none}
+.formcard .status.ok{display:block; color:var(--ok)}
+.formcard .status.err{display:block; color:#C0392B}
+
+/* install */
+.installbox{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:28px; margin:26px 0}
+.installbox ol{margin:0 0 20px; padding-inline-start:22px}
+.installbox li{margin-bottom:12px; font-size:.98rem}
+.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
+.btn:hover{filter:brightness(1.1)}
+.btn.ghost{background:transparent; color:var(--cat) !important; border:1px solid var(--cat)}
+
+.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
+.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
+.cta p{margin:0 0 18px; color:var(--muted)}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+</style>
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'light');}catch(e){}})();
+</script>
+<!-- Analytics: replace G-XXXXXXXXXX with the real GA4 Measurement ID from analytics.google.com -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-XXXXXXXXXX', { anonymize_ip: true });
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.png" width="660" height="291" alt="Flow"></a>
+    <nav>
+      <a href="/">Home</a><a href="/security.html">Security</a><a href="/trial.html">Flow Trial</a><a href="/blog/">Insights</a><a href="/#waitlist">Join Waitlist</a>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap">
+    <span class="eyebrow">Free &middot; Zero-Prompt</span>
+    <h1 class="title">Flow Trial</h1>
+    <div class="status-row">
+      <span>Pre-release developer preview</span>
+      <span>Not yet on the Chrome Web Store</span>
+      <span>No credit card</span>
+    </div>
+    <article>
+
+<p class="lead">A free, lean version of Flow. A browser extension that watches Gmail quietly, and&nbsp;&mdash;&nbsp;once in a while, when something actually changed&nbsp;&mdash;&nbsp;surfaces one <code>Do It</code> button. No chat window. No prompts to write. No if-this-then-that rules to configure.</p>
+
+<h2 id="what">What it is, and deliberately isn't</h2>
+<div class="cards two">
+  <div class="card">
+    <h3>It is</h3>
+    <ul>
+      <li>Passive &mdash; silent until there's a real reason to speak</li>
+      <li>Zero-prompt &mdash; you never type anything, at setup or at runtime</li>
+      <li>Cross-platform &mdash; correlates what's in your inbox against a system outside Google's own ecosystem</li>
+      <li>Judgment-based &mdash; the model decides what's actionable, live, each time</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>It isn't</h3>
+    <ul>
+      <li>A chat assistant</li>
+      <li>A rule builder &mdash; there is no "when X happens, do Y" screen. That's Zapier, and it's exactly the configuration burden Flow exists to remove</li>
+      <li>A nagging notifier &mdash; if nothing happens for two days, that's the product working correctly</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="how">How it works</h2>
+<ol class="steps">
+  <li data-n="1"><h4>Install &amp; connect (~60 seconds)</h4><p>Install the extension, connect Gmail, connect one work system, answer one question about what kind of work you do. That's it &mdash; no field mapping, no rules.</p></li>
+  <li data-n="2"><h4>It stays quiet</h4><p>Most days, nothing happens. That's by design &mdash; a tool that talks when it has nothing to say gets uninstalled by day two.</p></li>
+  <li data-n="3"><h4>The moment</h4><p>An email arrives that actually changes something &mdash; a client confirms a price, a deadline moves. A small chip appears next to that message. Not a popup. Not a notification.</p></li>
+  <li data-n="4"><h4>Click, or ignore</h4><p>Click and it's done, with an undo link. Ignore it and it disappears and never asks about that email again. Both responses quietly retune the threshold.</p></li>
+</ol>
+
+<div class="specimen">
+  <p class="tag">What it looks like</p>
+  <div class="mail">
+    <b>Re: Office Lease — Meridian Tower, 14th Floor</b>
+    <span>Dana Cole &middot; 9:41 AM &middot; "We're good at $3,900/mo, signing Monday"</span>
+  </div>
+  <span class="chip">Do It: update deal value to $3,900/mo <span class="target">&middot; HubSpot</span></span>
+  <p class="note">The label on the chip is generated live from the specific situation &mdash; it isn't picked from a list you configured in advance.</p>
+</div>
+
+<h2 id="flexible">Choose your systems, choose your work</h2>
+<p>Two dimensions of choice, and neither one is a rule you author:</p>
+<p><b>Which systems Flow may touch</b> &mdash; a permission, not a configuration. Check the ones you actually use:</p>
+<div class="chipgrid">
+  <span class="opt">HubSpot <span class="st">building</span></span>
+  <span class="opt dim">Monday.com <span class="st">planned</span></span>
+  <span class="opt dim">Notion <span class="st">planned</span></span>
+  <span class="opt dim">Salesforce <span class="st">planned</span></span>
+  <span class="opt dim">Pipedrive <span class="st">planned</span></span>
+</div>
+<p><b>What kind of work you do</b> &mdash; biases the model's judgment toward what matters in your field, it doesn't hard-code a trigger:</p>
+<div class="chipgrid">
+  <span class="opt">Sales &amp; deals</span>
+  <span class="opt">Legal &amp; deal coordination</span>
+  <span class="opt">Finance &amp; billing</span>
+  <span class="opt">Operations &amp; admin</span>
+</div>
+<p>The destination is deliberately never Google Sheets. If both ends of the sync sit inside Google, Google already solves that better than we can &mdash; the value here is specifically in reaching <i>outside</i> one ecosystem into another.</p>
+
+<div class="note-box"><b>One honest tension worth naming:</b> Flow's enterprise architecture is Local-First &mdash; no customer data ever leaves the device. Flow Trial is not that. To judge whether an email is actionable, its text is sent to a cloud endpoint for a moment, and not stored afterward. The enterprise deployment runs fully on your own infrastructure with nothing leaving your network. Read the full model on the <a href="/security.html">Security &amp; Architecture</a> page.</div>
+
+<h2 id="signup">Request early access</h2>
+<p>Confirmed by email (double opt-in) before anything is sent &mdash; the same signup infrastructure the rest of the site uses.</p>
+<div class="formcard">
+  <form id="trialForm">
+    <div class="row">
+      <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
+      <button type="submit" id="trialBtn">Request Access</button>
+    </div>
+    <p class="fine">We'll email you a confirmation link, then the install instructions.</p>
+    <p class="status" id="trialStatus"></p>
+  </form>
+</div>
+
+<h2 id="install">Install it now (developer preview)</h2>
+<p>Already got the confirmation email, or just want to try it immediately? It's not on the Chrome Web Store yet, so installing it takes a few manual steps &mdash; same as any extension in active development.</p>
+<div class="installbox">
+  <ol>
+    <li>Download the ZIP file below and unzip it to a folder on your computer.</li>
+    <li>In Chrome, open <code>chrome://extensions</code>.</li>
+    <li>Turn on <b>Developer mode</b> (top-right toggle).</li>
+    <li>Click <b>Load unpacked</b> and select the unzipped folder.</li>
+    <li>Click the Flow icon in your toolbar, pick a connector and a work domain, and save.</li>
+  </ol>
+  <a class="btn" href="/downloads/flow-trial-extension.zip">Download flow-trial-extension.zip</a>
+</div>
+
+<div class="cta">
+  <h2>Building toward the full platform</h2>
+  <p>Flow Trial is Phase 1 of the architecture described in Flow's product vision &mdash; see where it's headed.</p>
+  <a class="btn" href="/security.html">Read the Security Model</a>
+</div>
+    </article>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <div class="pagenav">
+      <a href="/about.html">About</a><a href="/security.html">Security</a><a href="/trial.html">Flow Trial</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a><a href="/blog/">Insights</a>
+    </div>
+    &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
+  </div>
+</footer>
+<script>
+(function(){
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+
+(function(){
+  var SB_URL='https://nlvljclvoguvrnntwufu.supabase.co';
+  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5sdmxqY2x2b2d1dnJubnR3dWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIxMjQxMTcsImV4cCI6MjA1NzcwMDExN30.G-Kap81tXWNWkggTEH9d47fNU2-RNKzyokgVivy201M';
+  var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var form=document.getElementById('trialForm');
+  if(!form) return;
+  var email=document.getElementById('trialEmail'), btn=document.getElementById('trialBtn'), status=document.getElementById('trialStatus'), honey=form.querySelector('.hp');
+
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    if(honey && honey.value){ status.className='status ok'; status.textContent='Thanks!'; return; }
+    var v=(email.value||'').trim();
+    if(!EMAIL_RE.test(v)){
+      status.className='status err'; status.textContent='Enter a valid email address.'; email.focus(); return;
+    }
+    btn.disabled=true; btn.textContent='Sending…';
+    status.className=''; status.textContent='';
+
+    function done(ok){
+      btn.disabled=false; btn.textContent='Request Access';
+      status.className='status ' + (ok?'ok':'err');
+      status.textContent = ok
+        ? 'Check your inbox for a confirmation link.'
+        : 'Something went wrong. Please try again in a moment.';
+    }
+
+    fetch(SB_URL+'/rest/v1/waitlist',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({email:v,lang:'en',source:'trial-extension',created_at:new Date().toISOString()})})
+      .catch(function(){}); // best-effort; never blocks the confirmation email
+
+    fetch('/.netlify/functions/send-confirmation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v,lang:'en',kind:'trial'})})
+      .then(function(r){ done(r.ok); })
+      .catch(function(){ done(false); });
+
+    if(typeof gtag==='function') gtag('event','trial_signup_submit');
+  });
+})();
+</script>
+</body>
+</html>

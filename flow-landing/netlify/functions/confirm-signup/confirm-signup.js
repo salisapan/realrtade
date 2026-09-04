@@ -7,26 +7,44 @@ const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const LOG_PREFIX = '[confirm-signup]';
 
 const COPY = {
-  en: {
-    title: 'You’re confirmed',
-    body: 'Thanks for confirming your email. The Hybrid Automation Playbook is on its way to your inbox.',
-    home: 'Back to theflow-ai.com',
-    errTitle: 'This link isn’t valid',
-    errBody: 'This confirmation link is expired or invalid. Please rejoin the waitlist to get a fresh one.',
+  playbook: {
+    en: {
+      title: 'You’re confirmed',
+      body: 'Thanks for confirming your email. The Hybrid Automation Playbook is on its way to your inbox.',
+      home: 'Back to theflow-ai.com',
+      errTitle: 'This link isn’t valid',
+      errBody: 'This confirmation link is expired or invalid. Please rejoin the waitlist to get a fresh one.',
+    },
+    he: {
+      title: 'האימייל אושר',
+      body: 'תודה שאישרתם את כתובת המייל. ה-Hybrid Automation Playbook בדרך אליכם.',
+      home: 'חזרה ל-theflow-ai.com',
+      errTitle: 'הקישור אינו תקין',
+      errBody: 'קישור האישור פג תוקף או שאינו תקין. הצטרפו שוב לרשימת ההמתנה כדי לקבל קישור חדש.',
+    },
   },
-  he: {
-    title: 'האימייל אושר',
-    body: 'תודה שאישרתם את כתובת המייל. ה-Hybrid Automation Playbook בדרך אליכם.',
-    home: 'חזרה ל-theflow-ai.com',
-    errTitle: 'הקישור אינו תקין',
-    errBody: 'קישור האישור פג תוקף או שאינו תקין. הצטרפו שוב לרשימת ההמתנה כדי לקבל קישור חדש.',
+  trial: {
+    en: {
+      title: 'You’re confirmed',
+      body: 'Thanks for confirming your email. Install instructions for Flow Trial are on their way to your inbox.',
+      home: 'Back to theflow-ai.com',
+      errTitle: 'This link isn’t valid',
+      errBody: 'This confirmation link is expired or invalid. Please request access again on the Flow Trial page.',
+    },
+    he: {
+      title: 'האימייל אושר',
+      body: 'תודה שאישרתם את כתובת המייל. הוראות ההתקנה של Flow Trial בדרך אליכם.',
+      home: 'חזרה ל-theflow-ai.com',
+      errTitle: 'הקישור אינו תקין',
+      errBody: 'קישור האישור פג תוקף או שאינו תקין. בקשו גישה מחדש בעמוד Flow Trial.',
+    },
   },
 };
 
-function page(lang, ok) {
+function page(lang, ok, kind) {
   var isHe = lang === 'he';
   var dir = isHe ? 'rtl' : 'ltr';
-  var c = COPY[lang] || COPY.en;
+  var c = (COPY[kind] || COPY.playbook)[lang] || (COPY[kind] || COPY.playbook).en;
   var title = ok ? c.title : c.errTitle;
   var body = ok ? c.body : c.errBody;
   var iconColor = ok ? '#1A4EF5' : '#C0392B';
@@ -69,25 +87,27 @@ exports.handler = async function (event) {
   var exp = String(q.exp || '').trim();
   var sig = String(q.sig || '').trim();
   var lang = q.lang === 'he' ? 'he' : 'en';
+  var kind = q.kind === 'trial' ? 'trial' : 'playbook';
 
   var secret = process.env.EMAIL_VERIFY_SECRET;
   var invalid = !secret || !email || !exp || !sig || !EMAIL_RE.test(email) || Date.now() > Number(exp) || !verify(email, exp, sig, secret);
 
   if (invalid) {
     logErr('rejected: invalid or expired token', { email: email, hasSecret: !!secret });
-    return { statusCode: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, false) };
+    return { statusCode: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, false, kind) };
   }
 
-  log('token verified, triggering playbook send', { email: email });
+  var followUpFn = kind === 'trial' ? 'send-trial-access' : 'send-playbook';
+  log('token verified, triggering follow-up send', { email: email, kind: kind, followUpFn: followUpFn });
 
   try {
-    await fetch(SITE_URL + '/.netlify/functions/send-playbook', {
+    await fetch(SITE_URL + '/.netlify/functions/' + followUpFn, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email, lang: lang }),
     });
   } catch (err) {
-    logErr('failed to trigger send-playbook (customer will still see success page)', String(err));
+    logErr('failed to trigger ' + followUpFn + ' (customer will still see success page)', String(err));
   }
 
   try {
@@ -100,5 +120,5 @@ exports.handler = async function (event) {
     // best-effort only — column may not exist yet, never blocks the confirmation UX
   }
 
-  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true) };
+  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true, kind) };
 };

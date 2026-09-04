@@ -4,41 +4,46 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
-const SITE_URL = 'https://theflow-ai.com';
-const TOKEN_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
-const LOG_PREFIX = '[send-confirmation]';
+const ZIP_URL = 'https://theflow-ai.com/downloads/flow-trial-extension.zip';
+const INSTALL_PAGE_URL = 'https://theflow-ai.com/trial.html#install';
+const LOG_PREFIX = '[send-trial-access]';
 
 const SUBJECT = {
-  playbook: {
-    en: 'Confirm your email to get the Flow Playbook',
-    he: 'אשרו את כתובת המייל כדי לקבל את ה-Playbook של Flow',
-  },
-  trial: {
-    en: 'Confirm your email for Flow Trial early access',
-    he: 'אשרו את כתובת המייל לגישה מוקדמת ל-Flow Trial',
-  },
+  en: 'Your Flow Trial install instructions',
+  he: 'הוראות ההתקנה של Flow Trial',
 };
 
-function sign(email, exp, secret) {
-  return crypto.createHmac('sha256', secret).update(email + '|' + exp).digest('base64url');
-}
-
-function htmlBody(lang, confirmUrl, kind) {
+function htmlBody(lang) {
   var isHe = lang === 'he';
   var dir = isHe ? 'rtl' : 'ltr';
   var align = isHe ? 'right' : 'left';
 
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
-    ? (kind === 'trial'
-        ? 'תודה שביקשתם גישה מוקדמת ל-Flow Trial. כדי לוודא שזו הכתובת שלכם ולשלוח לכם את הוראות ההתקנה, לחצו על הכפתור למטה לאישור.'
-        : 'תודה שהצטרפתם לרשימת ההמתנה של Flow. כדי לוודא שזו הכתובת שלכם ולשלוח לכם את The Hybrid Automation Playbook, לחצו על הכפתור למטה לאישור.')
-    : (kind === 'trial'
-        ? "Thanks for requesting early access to Flow Trial. To confirm this is really your inbox and send you install instructions, please click the button below."
-        : "Thanks for joining the Flow waitlist. To confirm this is really your inbox and send you The Hybrid Automation Playbook, please click the button below.");
-  var ctaLabel = isHe ? 'אישור כתובת המייל' : 'Confirm My Email';
-  var ctaFine = isHe ? 'לחצו למטה לאישור.' : 'Click below to confirm.';
-  var expiry = isHe ? 'הקישור בתוקף ל-72 שעות.' : 'This link is valid for 72 hours.';
+    ? 'תודה שביקשתם גישה מוקדמת ל-Flow Trial. זו עדיין גרסת בדיקה מוקדמת — לא בחנות Chrome עדיין — כך שההתקנה דורשת כמה צעדים ידניים.'
+    : "Thanks for requesting early access to Flow Trial. This is still a pre-release build — not yet on the Chrome Web Store — so installing it takes a few manual steps.";
+  var steps = isHe
+    ? [
+        'הורידו את קובץ ה-ZIP וחלצו אותו לתיקייה.',
+        'ב-Chrome, פתחו chrome://extensions.',
+        'הפעילו את מצב המפתחים (Developer mode) בפינה הימנית העליונה.',
+        'לחצו Load unpacked ובחרו את התיקייה שחילצתם.',
+        'פתחו את התוסף, סמנו מערכת עבודה ותחום עבודה, ושמרו.',
+      ]
+    : [
+        'Download the ZIP file and unzip it to a folder.',
+        'In Chrome, open chrome://extensions.',
+        'Turn on Developer mode (top-right corner).',
+        'Click Load unpacked and select the unzipped folder.',
+        'Open the extension, pick a connector and a work domain, and save.',
+      ];
+  var stepsHtml = steps
+    .map(function (s, i) {
+      return '<tr><td style="padding:4px 0; color:#232B44; font-size:14px;"><b>' + (i + 1) + '.</b> ' + s + '</td></tr>';
+    })
+    .join('');
+  var moreLabel = isHe ? 'הוראות מלאות בעמוד' : 'Full instructions on the page';
+  var ctaLabel = isHe ? 'הורדת קובץ ההתקנה' : 'Download the install file';
   var sigTeam = 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
 
@@ -47,13 +52,15 @@ function htmlBody(lang, confirmUrl, kind) {
     '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="color:#232B44; font-size:15px; line-height:1.65;">' +
     '<p style="margin:0 0 14px">' + greeting + '</p>' +
-    '<p style="margin:0 0 14px">' + intro + '</p>' +
+    '<p style="margin:0 0 18px">' + intro + '</p>' +
     '</td></tr>' +
-    '<tr><td dir="' + dir + '" align="center" style="color:#455073; font-size:13px; padding-top:8px;">' + ctaFine + '</td></tr>' +
-    '<tr><td align="center" style="padding:20px 0 6px">' +
-    '<a href="' + confirmUrl + '" style="display:inline-block; background:#1A4EF5; color:#ffffff; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:15px; text-decoration:none; padding:14px 30px; border-radius:999px;">' + ctaLabel + '</a>' +
+    '<tr><td dir="' + dir + '" align="' + align + '">' +
+    '<table role="presentation" cellpadding="0" cellspacing="0">' + stepsHtml + '</table>' +
     '</td></tr>' +
-    '<tr><td align="center" style="color:#8891A4; font-size:12px; padding-top:14px;">' + expiry + '</td></tr>' +
+    '<tr><td align="center" style="padding:24px 0 6px">' +
+    '<a href="' + ZIP_URL + '" style="display:inline-block; background:#1A4EF5; color:#ffffff; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:15px; text-decoration:none; padding:14px 30px; border-radius:999px;">' + ctaLabel + '</a>' +
+    '</td></tr>' +
+    '<tr><td align="center" style="padding-top:10px; font-size:13px;"><a href="' + INSTALL_PAGE_URL + '" style="color:#455073;">' + moreLabel + '</a></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px; margin-top:18px;">' +
     '<img src="' + LOGO_URL + '" alt="Flow" width="28" style="display:block; width:28px; height:auto; margin-bottom:8px;">' +
     '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
@@ -74,13 +81,11 @@ function htmlBody(lang, confirmUrl, kind) {
   );
 }
 
-function ownerNotificationHtml(email, lang, kind) {
+function ownerNotificationHtml(email, lang) {
   var rows = [
     ['Email', email],
-    ['Kind', kind || 'playbook'],
     ['Language', lang],
     ['Time', new Date().toISOString()],
-    ['Status', 'Awaiting email confirmation'],
   ];
   var rowsHtml = rows
     .map(function (r) {
@@ -89,7 +94,7 @@ function ownerNotificationHtml(email, lang, kind) {
     .join('');
   return (
     '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
-    '<p>New Flow ' + (kind === 'trial' ? 'Trial' : 'waitlist') + ' signup (pending confirmation):</p>' +
+    '<p>Flow Trial install instructions sent:</p>' +
     '<table role="presentation" cellpadding="0" cellspacing="0">' + rowsHtml + '</table>' +
     '</div>'
   );
@@ -123,54 +128,38 @@ exports.handler = async function (event) {
 
   var email = String(payload.email || '').trim();
   var lang = payload.lang === 'he' ? 'he' : 'en';
-  var kind = payload.kind === 'trial' ? 'trial' : 'playbook';
-  var honey = String(payload.company || '').trim();
 
-  if (honey) {
-    log('honeypot tripped — silently accepting, not sending');
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
-  }
   if (!EMAIL_RE.test(email)) {
     logErr('rejected: invalid email', email);
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid email' }) };
   }
 
   var apiKey = process.env.RESEND_API_KEY;
-  var secret = process.env.EMAIL_VERIFY_SECRET;
   if (!apiKey) {
     logErr('RESEND_API_KEY is not set');
     return { statusCode: 500, body: JSON.stringify({ error: 'Email service not configured' }) };
   }
-  if (!secret) {
-    logErr('EMAIL_VERIFY_SECRET is not set');
-    return { statusCode: 500, body: JSON.stringify({ error: 'Confirmation service not configured' }) };
-  }
-
-  var exp = Date.now() + TOKEN_TTL_MS;
-  var sig = sign(email, exp, secret);
-  var confirmUrl = SITE_URL + '/.netlify/functions/confirm-signup?email=' + encodeURIComponent(email) + '&exp=' + exp + '&sig=' + encodeURIComponent(sig) + '&lang=' + lang + '&kind=' + kind;
 
   try {
     var result = await sendEmail(apiKey, {
       from: FROM,
       to: [email],
-      subject: SUBJECT[kind][lang],
-      html: htmlBody(lang, confirmUrl, kind),
+      subject: SUBJECT[lang],
+      html: htmlBody(lang),
     });
 
     if (!result.ok) {
-      logErr('Resend API rejected the confirmation send', { status: result.status, response: result.text });
-      return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send confirmation email' }) };
+      logErr('Resend API rejected the trial-access send', { status: result.status, response: result.text });
+      return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send install instructions' }) };
     }
-    log('confirmation email sent', { to: email, kind: kind });
+    log('trial access email sent', { to: email });
 
     try {
-      var ownerSubjectPrefix = kind === 'trial' ? 'New Flow Trial signup (pending confirmation): ' : 'New Flow waitlist signup (pending confirmation): ';
       var ownerResult = await sendEmail(apiKey, {
         from: FROM,
         to: [OWNER_EMAIL],
-        subject: ownerSubjectPrefix + email,
-        html: ownerNotificationHtml(email, lang, kind),
+        subject: 'Flow Trial install instructions sent: ' + email,
+        html: ownerNotificationHtml(email, lang),
       });
       if (!ownerResult.ok) {
         logErr('owner notification failed', { status: ownerResult.status, response: ownerResult.text });
@@ -182,6 +171,6 @@ exports.handler = async function (event) {
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   } catch (err) {
     logErr('network/request error calling Resend', String(err));
-    return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send confirmation email' }) };
+    return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send install instructions' }) };
   }
 };
