@@ -23,6 +23,14 @@
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Flow Trial","item":"https://theflow-ai.com/trial.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Flow Trial","url":"https://theflow-ai.com/trial.html","description":"A free browser extension that watches Gmail quietly and surfaces a single Do It action when it recognizes something worth syncing to a connected work system.","applicationCategory":"BusinessApplication","operatingSystem":"Chrome","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","url":"https://theflow-ai.com/trial.html"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
+{"@type":"Question","name":"Does Flow Trial read all of my email?","acceptedAnswer":{"@type":"Answer","text":"It reads the message you have open in Gmail's reading pane, one at a time, only to decide whether it matches something in your connected work system. It does not crawl your inbox or read messages you haven't opened."}},
+{"@type":"Question","name":"Is my email content stored anywhere?","acceptedAnswer":{"@type":"Answer","text":"Message text is sent to a cloud endpoint for a moment to judge whether an action is warranted, and is not retained afterward. The connector, domain choice, and activity log stay on your device in local browser storage."}},
+{"@type":"Question","name":"Why isn't Flow Trial on the Chrome Web Store yet?","acceptedAnswer":{"@type":"Answer","text":"It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the first connector is live."}},
+{"@type":"Question","name":"What happens if I ignore a suggestion?","acceptedAnswer":{"@type":"Answer","text":"The chip disappears and Flow will not ask about that same email again. Both a click and a dismissal quietly retune how confident the system needs to be before it speaks up next time."}},
+{"@type":"Question","name":"Can I remove my data?","acceptedAnswer":{"@type":"Answer","text":"Uninstalling the extension deletes everything stored locally. To remove your waitlist email, contact hello@theflow-ai.com."}}
+]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -73,7 +81,10 @@ footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family
 footer.site a{color:var(--muted)}
 .skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
-.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 20px}
+.jumpnav{display:flex; flex-wrap:wrap; gap:8px 10px; margin:0 0 40px; font-family:var(--sans)}
+.jumpnav a{font-size:.84rem; font-weight:600; color:var(--accent-2); text-decoration:none; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:6px 13px}
+.jumpnav a:hover{border-color:var(--accent-2)}
 code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1px solid var(--line); border-radius:3px; padding:.12em .4em; color:var(--txt-hi)}
 
 /* not/is cards */
@@ -130,6 +141,18 @@ code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1
 .installbox{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:28px; margin:26px 0}
 .installbox ol{margin:0 0 20px; padding-inline-start:22px}
 .installbox li{margin-bottom:12px; font-size:.98rem}
+
+.sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
+
+/* faq */
+.faq{display:flex; flex-direction:column; gap:10px; margin:20px 0 32px}
+.faq details{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:4px 20px}
+.faq summary{font-family:var(--sans); font-weight:700; font-size:.98rem; color:var(--txt-hi); padding:16px 0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+'; font-size:1.3rem; color:var(--cat); flex:none; font-weight:400}
+.faq details[open] summary::after{content:'\2212'}
+.faq details[open] summary{border-bottom:1px solid var(--line)}
+.faq p{margin:14px 0 16px; font-size:.96rem; color:var(--muted)}
 .btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
 .btn:hover{filter:brightness(1.1)}
 .btn.ghost{background:transparent; color:var(--cat) !important; border:1px solid var(--cat)}
@@ -178,6 +201,10 @@ code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1
     <article>
 
 <p class="lead">A free, lean version of Flow. A browser extension that watches Gmail quietly, and&nbsp;&mdash;&nbsp;once in a while, when something actually changed&nbsp;&mdash;&nbsp;surfaces one <code>Do It</code> button. No chat window. No prompts to write. No if-this-then-that rules to configure.</p>
+
+<nav class="jumpnav" aria-label="On this page">
+  <a href="#how">How it works</a><a href="#flexible">Flexibility</a><a href="#data-use">Data &amp; privacy</a><a href="#faq">FAQ</a><a href="#signup">Get access</a>
+</nav>
 
 <h2 id="what">What it is, and deliberately isn't</h2>
 <div class="cards two">
@@ -239,17 +266,63 @@ code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1
 
 <div class="note-box"><b>One honest tension worth naming:</b> Flow's enterprise architecture is Local-First &mdash; no customer data ever leaves the device. Flow Trial is not that. To judge whether an email is actionable, its text is sent to a cloud endpoint for a moment, and not stored afterward. The enterprise deployment runs fully on your own infrastructure with nothing leaving your network. Read the full model on the <a href="/security.html">Security &amp; Architecture</a> page.</div>
 
+<h2 id="data-use">What Flow Trial does with your data</h2>
+<p>Because this reads Gmail content, it deserves a precise answer rather than a generic privacy paragraph:</p>
+<div class="cards two">
+  <div class="card">
+    <h3>What it touches</h3>
+    <ul>
+      <li>The single message open in Gmail's reading pane &mdash; not your inbox, not older messages, not attachments</li>
+      <li>A compact snapshot of the relevant record in your connected work system, so the model can compare the two</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>What it never does</h3>
+    <ul>
+      <li>No ad targeting, no reselling of data, no use for training a model</li>
+      <li>No write happens without a click; there is no autonomous send, delete, or bulk edit</li>
+      <li>No crawling your mailbox in the background &mdash; only the message you have open</li>
+    </ul>
+  </div>
+</div>
+<p>Message text is sent to a cloud endpoint for the moment it takes to judge it, then discarded &mdash; it is not written to any database. Your connector choice, domain choice, and activity log (shown/clicked/dismissed) live only in your browser's local storage; uninstalling the extension deletes them. To have your early-access email removed from the waitlist, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
+
+<h2 id="faq">Questions worth asking before you install</h2>
+<div class="faq">
+  <details>
+    <summary>Does Flow Trial read all of my email?</summary>
+    <p>It reads the message you have open in Gmail's reading pane, one at a time, only to decide whether it matches something in your connected work system. It does not crawl your inbox or read messages you haven't opened.</p>
+  </details>
+  <details>
+    <summary>Is my email content stored anywhere?</summary>
+    <p>Message text is sent to a cloud endpoint for a moment to judge whether an action is warranted, and is not retained afterward. The connector, domain choice, and activity log stay on your device in local browser storage.</p>
+  </details>
+  <details>
+    <summary>Why isn't Flow Trial on the Chrome Web Store yet?</summary>
+    <p>It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the first connector is live.</p>
+  </details>
+  <details>
+    <summary>What happens if I ignore a suggestion?</summary>
+    <p>The chip disappears and Flow will not ask about that same email again. Both a click and a dismissal quietly retune how confident the system needs to be before it speaks up next time.</p>
+  </details>
+  <details>
+    <summary>Can I remove my data?</summary>
+    <p>Uninstalling the extension deletes everything stored locally. To remove your waitlist email, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
+  </details>
+</div>
+
 <h2 id="signup">Request early access</h2>
 <p>Confirmed by email (double opt-in) before anything is sent &mdash; the same signup infrastructure the rest of the site uses.</p>
 <div class="formcard">
   <form id="trialForm">
     <div class="row">
       <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label class="sr-only" for="trialEmail">Email address</label>
       <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
       <button type="submit" id="trialBtn">Request Access</button>
     </div>
     <p class="fine">We'll email you a confirmation link, then the install instructions.</p>
-    <p class="status" id="trialStatus"></p>
+    <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
   </form>
 </div>
 
@@ -263,7 +336,7 @@ code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1
     <li>Click <b>Load unpacked</b> and select the unzipped folder.</li>
     <li>Click the Flow icon in your toolbar, pick a connector and a work domain, and save.</li>
   </ol>
-  <a class="btn" href="/downloads/flow-trial-extension.zip">Download flow-trial-extension.zip</a>
+  <a class="btn" id="zipBtn" href="/downloads/flow-trial-extension.zip">Download flow-trial-extension.zip</a>
 </div>
 
 <div class="cta">
@@ -327,6 +400,14 @@ code{font-family:var(--mono); font-size:.86em; background:var(--panel); border:1
       .catch(function(){ done(false); });
 
     if(typeof gtag==='function') gtag('event','trial_signup_submit');
+  });
+})();
+
+(function(){
+  var zipBtn = document.getElementById('zipBtn');
+  if(!zipBtn) return;
+  zipBtn.addEventListener('click', function(){
+    if(typeof gtag==='function') gtag('event','trial_zip_download');
   });
 })();
 </script>
