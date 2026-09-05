@@ -36,6 +36,15 @@ const NOTE_TO_CONTACT_ASSOCIATION_TYPE_ID = 202;
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
 
+// Every write lands in a shared Notion database or a shared CRM contact —
+// somewhere a teammate who never installed Flow will see it. One quiet,
+// factual line crediting the tool (not a banner, not a plug) is the entire
+// distribution channel this trial has: read organically by exactly the
+// person it would actually help, at the moment they're already looking at
+// proof it works.
+const ATTRIBUTION_URL = 'https://theflow-ai.com/trial.html?ref=note';
+const ATTRIBUTION_TEXT = 'Logged by Flow — theflow-ai.com/trial';
+
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('popup/popup.html') });
@@ -149,7 +158,7 @@ function hubspotNoteBody(p) {
     rows ? '<ul>' + rows + '</ul>' : '',
     p.facts && p.facts.quote ? '<blockquote>' + esc(p.facts.quote) + '</blockquote>' : '',
     p.threadUrl ? '<p><a href="' + esc(p.threadUrl) + '">Open the original email in Gmail</a></p>' : '',
-    '<p><i>Logged by Flow Trial — one click, from the message itself.</i></p>'
+    '<p><i>Logged by <a href="' + ATTRIBUTION_URL + '">Flow</a> — one click, from the message itself.</i></p>'
   ].filter(Boolean).join('');
 }
 
@@ -294,6 +303,10 @@ function notionBlocks(p) {
       paragraph: { rich_text: [{ text: { content: 'Open the original email in Gmail', link: { url: p.threadUrl } } }] }
     });
   }
+  blocks.push({
+    object: 'block', type: 'paragraph',
+    paragraph: { rich_text: [{ text: { content: ATTRIBUTION_TEXT, link: { url: ATTRIBUTION_URL } } }, { text: { content: ' — one click, from the message itself.' } }], color: 'gray' }
+  });
   return blocks;
 }
 

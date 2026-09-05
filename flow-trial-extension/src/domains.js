@@ -16,7 +16,7 @@ const FLOW_DOMAINS = [
     label: 'Sales & business development',
     entity: 'Deal / client',
     // Nouns that mean "this message is about the object of my work".
-    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr)\b/i,
+    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr|msa|sow|statement of work)\b/i,
     title(facts) {
       if (facts.lost) return 'Log lost deal';
       if (facts.moneyText && facts.date) return 'Log ' + facts.moneyText + ' confirmed, ' + facts.dateText;
@@ -29,7 +29,7 @@ const FLOW_DOMAINS = [
     id: 'legal',
     label: 'Legal & deal coordination',
     entity: 'Matter / agreement',
-    entityWords: /\b(agreement|contract|matter|clause|amendment|addendum|nda|counterparty|execution|filing|redline|counsel|term sheet)\b/i,
+    entityWords: /\b(agreement|contract|matter|clause|amendment|addendum|nda|counterparty|execution|filing|redline|counsel|term sheet|msa|sow|statement of work)\b/i,
     title(facts) {
       if (facts.executed) return 'Log agreement executed';
       if (facts.date) return 'Log deadline ' + facts.dateText;

@@ -115,6 +115,15 @@ main{padding:16px}
 .ghost:hover{border-color:var(--accent); color:var(--accent)}
 .saved-note{font-size:.8rem; color:var(--ok); margin-top:10px; text-align:center; line-height:1.5}
 
+/* ---- weekly value read-out ---- */
+.week-stat{
+  display:flex; align-items:baseline; gap:5px; margin-bottom:14px;
+  background:var(--accent-wash); border-radius:9px; padding:9px 12px;
+}
+.week-stat b{font-size:1.05rem; font-weight:800; color:var(--accent)}
+.week-stat span{font-size:.78rem; color:var(--ink-2)}
+.week-stat .week-total{margin-inline-start:auto; color:var(--ink-3); font-size:.72rem}
+
 /* ---- sensitivity read-out ---- */
 .sense{display:flex; align-items:center; gap:9px; margin-bottom:14px}
 .sense-label{font-family:'JetBrains Mono',monospace; font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3)}

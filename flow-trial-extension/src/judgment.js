@@ -61,7 +61,10 @@ const FlowJudgment = (() => {
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
     if (commit) add('commitment', 30, 'Someone committed to something');
-    if (lost) add('lost', 40, 'States the work is not going ahead');
+    // Weighted to clear threshold alongside a domain match on its own — a lost
+    // deal is exactly the kind of news worth logging without needing a second,
+    // unrelated signal (a date or a dollar figure) to happen to also be present.
+    if (lost) add('lost', 46, 'States the work is not going ahead');
     if (executed) add('executed', 26, 'Says an agreement was executed');
     if (dispute) add('dispute', 28, 'Raises a discrepancy');
     if (facts.date && obligation) add('deadline', 26, 'Sets a dated obligation: ' + facts.date.raw);

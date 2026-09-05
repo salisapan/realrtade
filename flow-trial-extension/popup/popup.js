@@ -207,8 +207,24 @@
     wrap.hidden = false;
   }
 
+  // The product is deliberately silent between chips, and a silent tool is
+  // easy to forget you installed. This is the one place that answers "is it
+  // actually doing anything" without turning into a notification.
+  function renderWeekStat(s) {
+    const wrap = document.getElementById('weekStat');
+    const written = (s.log || []).filter((e) => e.kind === 'written');
+    if (!written.length) { wrap.hidden = true; return; }
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const thisWeek = written.filter((e) => e.ts >= weekAgo).length;
+    document.getElementById('weekCount').textContent = thisWeek;
+    document.getElementById('weekLabel').textContent = ' logged this week';
+    document.getElementById('weekTotal').textContent = written.length + ' all-time';
+    wrap.hidden = false;
+  }
+
   async function renderLog() {
     const s = await FlowStorage.get();
+    renderWeekStat(s);
     renderSensitivity(s);
     const host = document.getElementById('log-list');
     const empty = document.getElementById('log-empty');
