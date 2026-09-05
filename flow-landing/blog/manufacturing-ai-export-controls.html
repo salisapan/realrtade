@@ -59,6 +59,11 @@
   --hero-a:rgba(59,116,255,.35); --hero-b:rgba(59,116,255,.12); --hero-bg:#0A0E18;
 }
 *{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
 html{scroll-behavior:smooth}
 body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.13rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
 .wrap{max-width:700px; margin:0 auto; padding:0 24px}
