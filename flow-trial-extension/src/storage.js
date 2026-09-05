@@ -1,26 +1,26 @@
 // Thin wrapper around chrome.storage.local. Everything Flow Trial persists —
-// onboarding choices, the activity log, dismissed message ids — lives here,
-// on the device, never sent anywhere by this file.
+// what you connected, what it noticed, and how loud it should be — lives here,
+// on the device. Nothing in this file sends anything anywhere.
 
 const FlowStorage = (() => {
   const DEFAULTS = {
     onboarded: false,
     domainId: null,
     connectorId: null,
-    log: [],        // { ts, kind: 'shown'|'clicked'|'dismissed', label, messageId }
-    seenMessageIds: [] // messages already judged, so we never re-evaluate one
+    // { ts, kind: 'shown'|'clicked'|'written'|'undone'|'dismissed', label, messageId, score, signals, where, url, ref }
+    log: [],
+    seenMessageIds: [],
+    // The only thing that learns. Clicks make Flow slightly more willing to
+    // speak; dismissals make it quieter. The user never sees or sets a number.
+    calibration: { clicks: 0, dismissals: 0 }
   };
 
   function get() {
-    return new Promise((resolve) => {
-      chrome.storage.local.get(DEFAULTS, resolve);
-    });
+    return new Promise((resolve) => chrome.storage.local.get(DEFAULTS, resolve));
   }
 
   function set(patch) {
-    return new Promise((resolve) => {
-      chrome.storage.local.set(patch, resolve);
-    });
+    return new Promise((resolve) => chrome.storage.local.set(patch, resolve));
   }
 
   async function appendLog(entry) {
@@ -33,8 +33,7 @@ const FlowStorage = (() => {
   async function markSeen(messageId) {
     const state = await get();
     if (state.seenMessageIds.includes(messageId)) return;
-    const seenMessageIds = [messageId, ...state.seenMessageIds].slice(0, 500);
-    await set({ seenMessageIds });
+    await set({ seenMessageIds: [messageId, ...state.seenMessageIds].slice(0, 500) });
   }
 
   async function wasSeen(messageId) {
@@ -42,7 +41,20 @@ const FlowStorage = (() => {
     return state.seenMessageIds.includes(messageId);
   }
 
-  return { get, set, appendLog, markSeen, wasSeen, DEFAULTS };
+  // Recent behaviour should count for more than something from three months ago,
+  // so both counters decay rather than accumulating forever.
+  async function calibrate(kind) {
+    const state = await get();
+    const c = state.calibration || { clicks: 0, dismissals: 0 };
+    const next = {
+      clicks: Math.min(6, kind === 'click' ? c.clicks + 1 : c.clicks * 0.9),
+      dismissals: Math.min(6, kind === 'dismiss' ? c.dismissals + 1 : c.dismissals * 0.9)
+    };
+    await set({ calibration: next });
+    return next;
+  }
+
+  return { get, set, appendLog, markSeen, wasSeen, calibrate, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

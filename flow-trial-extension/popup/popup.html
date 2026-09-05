@@ -7,47 +7,53 @@
 </head>
 <body>
   <header class="hdr">
-    <span class="mark"></span>
-    <h1>Flow Trial</h1>
+    <span class="mark" aria-hidden="true"></span>
+    <h1>Flow</h1>
+    <span class="ver" id="statusPill">Not connected</span>
   </header>
 
   <nav class="tabs" role="tablist">
     <button class="tab" data-tab="setup" role="tab" aria-selected="true">Setup</button>
-    <button class="tab" data-tab="log" role="tab" aria-selected="false">Log</button>
+    <button class="tab" data-tab="log" role="tab" aria-selected="false">Activity</button>
   </nav>
 
   <main>
     <section data-panel="setup" class="panel active">
-
-      <div class="block" id="step-connectors">
-        <p class="label">Which systems may Flow touch?</p>
-        <p class="hint">A permission, not a rule. You can check more than one.</p>
-        <div id="connector-list" class="check-list"></div>
+      <div class="block">
+        <p class="label">Where should Flow write?</p>
+        <p class="hint">A permission, not a rule. Flow only ever adds a record — and every write can be undone.</p>
+        <div id="connector-list" class="conn-list"></div>
       </div>
 
-      <div class="block" id="step-domain">
+      <div class="block">
         <p class="label">What kind of work do you do?</p>
-        <p class="hint">Steers Flow's judgment — it doesn't set a rule.</p>
+        <p class="hint">Steers what counts as a real event in your field. It does not set a trigger.</p>
         <div id="domain-list" class="radio-list"></div>
       </div>
 
-      <button id="save" class="primary">Save &amp; Start</button>
-      <p id="saved-note" class="saved-note" hidden>Saved. Go back to Gmail and open an email.</p>
+      <button id="save" class="primary">Save &amp; start</button>
+      <p id="saved-note" class="saved-note" hidden>Saved. Open an email in Gmail — Flow will stay quiet until one matters.</p>
     </section>
 
     <section data-panel="log" class="panel">
-      <p class="label">What Flow has seen</p>
+      <div class="sense" id="sense" hidden>
+        <span class="sense-label">Sensitivity</span>
+        <span class="sense-bar"><i id="senseFill"></i></span>
+        <span class="sense-note" id="senseNote"></span>
+      </div>
       <div id="log-list" class="log-list"></div>
-      <p id="log-empty" class="hint" hidden>Nothing yet — that's fine, Flow only speaks up when there's a reason to.</p>
+      <p id="log-empty" class="hint" hidden>Nothing yet. Flow only speaks up when an email actually decides something — silence is the normal state.</p>
     </section>
   </main>
 
   <footer class="ftr">
-    <span>Trial build · your data stays on this device</span>
+    <span>Judgment runs on this device. No email text is sent anywhere to decide.</span>
   </footer>
 
   <script src="../src/domains.js"></script>
   <script src="../src/connectors.js"></script>
+  <script src="../src/extract.js"></script>
+  <script src="../src/judgment.js"></script>
   <script src="../src/storage.js"></script>
   <script src="popup.js"></script>
 </body>

@@ -1,70 +1,66 @@
-// Domain profiles — the "what kind of work" dimension of flexibility.
+// Domain profiles — the "what kind of work do you do" dimension.
 //
-// A domain profile does NOT define trigger->action rules. It only biases the
-// judgment engine's attention: which entities matter, which verbs count as a
-// real event, and what language to use when it proposes an action. Adding a
-// new line of work means adding a profile here — never asking the end user
-// to author logic.
+// A profile never encodes a rule. It supplies vocabulary: which nouns count as a
+// real object of work in this field, and how to phrase the action once the
+// judgment engine has decided there is one. Every profile runs through the same
+// scorer with the same weights; the profile only adds its own entity vocabulary
+// and writes the sentence at the end.
 //
-// judged() in judgment.js reads whichever profile the user picked at
-// onboarding and uses it purely as context for the (future) model call.
-// Everything under `demoTriggers` exists only so Phase 1 can render a
-// realistic end-to-end chip without a live model call — it is replaced
-// wholesale once judgment.js talks to a real model, and until then it's the
-// only thing standing in for "is this worth flagging."
+// Adding a line of work means adding a profile here. It never means asking
+// someone to author "when X, do Y" — that is the configuration burden this
+// product exists to remove.
 
 const FLOW_DOMAINS = [
   {
     id: 'sales',
     label: 'Sales & business development',
     entity: 'Deal / client',
-    verbs: ['price confirmed', 'scope changed', 'signing date', 'deal lost'],
-    actionVerb: (ctx) => `update deal value to ${ctx.amount || '…'}`,
-    demoTriggers: [
-      { pattern: /(we're good at|agreed on|confirmed)[^.]{0,40}(\$[\d,]+(?:\.\d+)?|\d[\d,]*\s?(usd|dollars))/i,
-        buildAction: (m) => `update deal value to ${m[2]}` },
-      { pattern: /(not moving forward|we're pulling out|decided to go with someone else)/i,
-        buildAction: () => `mark deal as lost` }
-    ]
+    // Nouns that mean "this message is about the object of my work".
+    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr)\b/i,
+    title(facts) {
+      if (facts.lost) return 'Log lost deal';
+      if (facts.moneyText && facts.date) return 'Log ' + facts.moneyText + ' confirmed, ' + facts.dateText;
+      if (facts.moneyText) return 'Log confirmed value ' + facts.moneyText;
+      if (facts.date) return 'Log agreed date ' + facts.dateText;
+      return 'Log deal update';
+    }
   },
   {
     id: 'legal',
     label: 'Legal & deal coordination',
     entity: 'Matter / agreement',
-    verbs: ['draft agreement', 'filing deadline', 'signed', 'clause revised'],
-    actionVerb: (ctx) => `update matter deadline to ${ctx.date || '…'}`,
-    demoTriggers: [
-      { pattern: /(deadline|due date|must be filed by)[^.]{0,30}(\d{1,2}\/\d{1,2})/i,
-        buildAction: (m) => `update matter deadline to ${m[2]}` },
-      { pattern: /(fully executed|signed the agreement|countersigned)/i,
-        buildAction: () => `mark matter as signed` }
-    ]
+    entityWords: /\b(agreement|contract|matter|clause|amendment|addendum|nda|counterparty|execution|filing|redline|counsel|term sheet)\b/i,
+    title(facts) {
+      if (facts.executed) return 'Log agreement executed';
+      if (facts.date) return 'Log deadline ' + facts.dateText;
+      if (facts.moneyText) return 'Log agreed consideration ' + facts.moneyText;
+      return 'Log matter update';
+    }
   },
   {
     id: 'finance',
     label: 'Finance & billing',
     entity: 'Invoice / vendor',
-    verbs: ['invoice received', 'amount mismatch', 'payment approved'],
-    actionVerb: (ctx) => `flag payment exception — ${ctx.detail || 'amount mismatch'}`,
-    demoTriggers: [
-      { pattern: /(invoice)[^.]{0,40}(\$[\d,]+(?:\.\d+)?)/i,
-        buildAction: (m) => `log invoice — ${m[2]}` },
-      { pattern: /(amount doesn't match|billing error|double charged)/i,
-        buildAction: () => `flag payment exception for review` }
-    ]
+    entityWords: /\b(invoice|bill|billing|payment|remittance|receipt|vendor|supplier|statement|credit note|purchase order|po number|net ?\d{2})\b/i,
+    title(facts) {
+      if (facts.dispute) return 'Log billing exception';
+      if (facts.moneyText && facts.date) return 'Log ' + facts.moneyText + ' due ' + facts.dateText;
+      if (facts.moneyText) return 'Log invoice ' + facts.moneyText;
+      if (facts.date) return 'Log payment date ' + facts.dateText;
+      return 'Log billing update';
+    }
   },
   {
     id: 'ops',
     label: 'Operations & admin',
     entity: 'Task / request',
-    verbs: ['new request', 'status changed', 'needs follow-up'],
-    actionVerb: () => `create a follow-up task`,
-    demoTriggers: [
-      { pattern: /(please handle|can you update|still waiting on your reply)/i,
-        buildAction: () => `create a follow-up task` }
-    ]
+    entityWords: /\b(request|ticket|order|shipment|delivery|schedule|booking|onboarding|access|approval|handover|sla)\b/i,
+    title(facts) {
+      if (facts.date) return 'Log commitment due ' + facts.dateText;
+      if (facts.moneyText) return 'Log ' + facts.moneyText + ' agreed';
+      return 'Log follow-up commitment';
+    }
   }
 ];
 
-// Exposed for popup + content script (classic scripts share this global).
 if (typeof module !== 'undefined') module.exports = { FLOW_DOMAINS };

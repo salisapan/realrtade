@@ -1,108 +1,110 @@
 # Flow Trial
 
 The free, lean version of Flow: a Chrome extension that watches Gmail
-passively and surfaces one `Do It` chip when it recognizes something worth
-logging to a connected system. No prompts, no if-this-then-that rules.
+passively and, when an email actually decides something, puts one `Do It`
+button next to it that writes the record for you. No chat, no prompts, no
+if-this-then-that rules.
 
-**HubSpot is now a real, working connector** — not a simulation. Once
-configured (see below), clicking `Do It` looks up the Gmail sender by email
-address in your HubSpot account and logs a real Note on the matching
-Contact. If there's no matching contact, it says so rather than creating
-one — this build never auto-creates records.
+## What actually works today
 
-**Judgment is still a stub.** Deciding *whether* an email is worth flagging
-runs on a keyword table per work domain (`src/domains.js`), not a model call.
-That's the one piece that still needs an Anthropic API key wired into a
-Netlify function — see "What Phase 2 replaces" below. The entity match
-(which HubSpot contact an email corresponds to) is fully deterministic
-today and needs no model at all: it's just the sender's email address.
+**Judgment runs on this device.** `src/judgment.js` scores each message from
+weighted, named signals — a currency figure, a commitment verb, a dated
+obligation, a direct request, a stated loss — against negative ones like an
+automated sender or mailing-list boilerplate. It speaks only above a threshold
+that moves as you click and dismiss. No email text is sent anywhere to reach
+this decision, which is what lets the trial hold the same local-first line as
+the full product.
 
-## Set up the real HubSpot connection
+**Facts are extracted, not just detected.** `src/extract.js` pulls the amount
+(with currency, `k`/`m` suffixes, and a refusal to treat a bare number or a
+percentage as money), the date (resolving weekday references and month names,
+and refusing to normalise a genuinely ambiguous `3/4`), and the sentence that
+carried the decision. That is what makes the written record worth having.
 
-1. Go to [developers.hubspot.com](https://developers.hubspot.com) → create
-   a developer account (free) → **Create app**.
+**Two real write paths, both undoable.**
+
+| Connector | Auth | What one click does |
+|---|---|---|
+| **Notion** | Internal integration token you create yourself | Creates a page in a database you choose, filling whichever Amount / Date / Email / URL columns that database happens to have, with the quoted sentence and a link back to the Gmail thread in the body. Undo archives it. |
+| **HubSpot** | OAuth (needs the owner to configure an app) | Logs a Note on the Contact matching the sender, with the same fields. Undo deletes it. |
+
+Both paths are additive only: they create one new record and never edit or
+delete anything that was already there.
+
+## Set up Notion (works immediately, no server, no app review)
+
+1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) →
+   **New integration** → give it a name → copy the **Internal Integration
+   Token**.
+2. Open the Notion database you want Flow to write to as a full page, click
+   **⋯ › Connections › Connect to**, and pick your integration. Without this
+   step Notion returns 404 and the popup will tell you exactly that.
+3. Copy that database's URL from the address bar.
+4. Paste both into the extension popup and click **Connect Notion**. The
+   credential is verified against the real API before it is stored, so a typo
+   surfaces immediately rather than at the first click in Gmail.
+
+Any column layout works. Flow fills a `title` property with the action, and
+matches by name and type for the rest — a `number` column called Amount, a
+`date` column called Due date, an `email` column called Contact, a `url`
+column called Source. Anything it cannot map still reaches the page body, so
+nothing extracted is silently dropped.
+
+## Set up HubSpot (needs the site owner)
+
+1. [developers.hubspot.com](https://developers.hubspot.com) → create a free
+   developer account → **Create app**.
 2. Under **Auth**, add this exact redirect URL:
    ```
    https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
    ```
-   This is derived from the `key` already pinned in `manifest.json`, so the
-   extension's ID — and this redirect URL — stays the same across reloads.
-   Don't regenerate the key unless you also update this redirect URL to
-   match.
+   It is derived from the `key` pinned in `manifest.json`, so the extension ID
+   — and this redirect URL — stays stable across reloads. Don't regenerate the
+   key without updating this URL.
 3. Under **Scopes**, add `crm.objects.contacts.read` and
    `crm.objects.contacts.write`.
-4. Copy the app's **Client ID** into `src/background.js`
-   (`HUBSPOT_CLIENT_ID` constant, top of the file).
-5. In the site's Netlify project, set two environment variables:
-   `HUBSPOT_CLIENT_ID` (same value as step 4) and `HUBSPOT_CLIENT_SECRET`
-   (from the same HubSpot app page). These back the two new functions:
-   `netlify/functions/hubspot-oauth-exchange` and
-   `netlify/functions/hubspot-oauth-refresh` — the only two places the
-   Client Secret is ever used.
-6. If you don't have a live HubSpot portal to test against, HubSpot's
-   developer accounts include a free **test account** (a full CRM sandbox)
-   for exactly this purpose — no paid subscription needed to build and test
-   the connector.
-7. In the extension popup, click **Connect** next to HubSpot. This opens a
-   real HubSpot OAuth consent screen via `chrome.identity.launchWebAuthFlow`.
+4. Put the app's **Client ID** into `src/background.js`
+   (`HUBSPOT_CLIENT_ID`, top of the file). It is public, like a GA4
+   measurement ID.
+5. In the Netlify project, set `HUBSPOT_CLIENT_ID` and
+   `HUBSPOT_CLIENT_SECRET`. Those back `netlify/functions/hubspot-oauth-exchange`
+   and `hubspot-oauth-refresh` — the only two places the secret is ever used.
+   **The secret must never appear in this repository or in the extension.**
+6. HubSpot developer accounts include a free **test account** (a full CRM
+   sandbox) if you don't have a live portal to try it against.
+
+Until step 4 is done the popup shows HubSpot as *Needs setup* and says so
+plainly rather than failing halfway through a handshake.
 
 ## Load it locally
 
-1. `chrome://extensions` → enable Developer Mode → **Load unpacked** → select
-   this folder. Because the ID is pinned via `manifest.json`'s `key`, it
-   will always load as `dnjhplgmnkabbjogfpbhofjedlkehkai`.
-2. Open the popup, connect HubSpot (see above), pick a work domain, save.
-3. Open Gmail, open an email from a sender who already exists as a HubSpot
-   Contact, whose text matches one of the demo triggers in
-   `src/domains.js` (e.g. "We're good at $12,000, signing Monday" for the
-   sales domain) — the chip should appear above the message.
-4. Click it. If the sender's email matches an existing HubSpot Contact, a
-   real Note is created on that Contact — check the Contact's timeline in
-   HubSpot to confirm.
+1. `chrome://extensions` → turn on **Developer mode**.
+2. **Load unpacked** → select this folder.
+3. Open the popup, connect a system, pick the kind of work you do, **Save &
+   start**.
+4. Open Gmail. Most messages produce nothing — that is the product working.
 
-## What's real vs. stubbed
+## Layout
 
-| Piece | Status |
-|---|---|
-| Extension shell, manifest, injection into Gmail | Real |
-| Onboarding (connector checklist + domain picker), stored via `chrome.storage.local` | Real |
-| Activity log (shown/clicked/dismissed) | Real |
-| Chip rendering, dismiss, pending/done/warning/error states | Real |
-| **HubSpot OAuth connect/disconnect** (`chrome.identity.launchWebAuthFlow` + the two Netlify functions) | **Real**, once `HUBSPOT_CLIENT_ID`/`HUBSPOT_CLIENT_SECRET` are set |
-| **HubSpot write** (contact lookup by email + Note creation via the CRM API) | **Real** |
-| **Judgment** (`src/judgment.js`) — *should* I flag this email at all | **Stub** — regex table per domain in `src/domains.js`, not a model call |
-| Monday / Notion / Salesforce / Pipedrive | Not built yet (`status: 'planned'` in `src/connectors.js`) |
+```
+manifest.json          MV3, pinned key so the extension ID is stable
+src/extract.js         money / date / decisive-sentence extraction (no network)
+src/judgment.js        weighted on-device scorer + adaptive threshold
+src/domains.js         per-field vocabulary and phrasing — never rules
+src/connectors.js      catalog: what each destination is and how it authenticates
+src/storage.js         chrome.storage wrapper; log and calibration
+src/content-gmail.js   Gmail watcher, the chip, and the receipt after a write
+src/background.js      credentials and the two write paths, plus undo
+popup/                 the only configuration surface — two questions long
+```
 
-## What Phase 2 replaces, and what it doesn't touch
+## What is still deliberately narrow
 
-Wiring in the real judgment model touches exactly one file:
-
-- `src/judgment.js` — `evaluate()` becomes a message to `background.js`,
-  which calls a two-stage judgment endpoint (cheap filter, then the model
-  call on survivors) instead of running the regex table. **The function
-  signature and return shape (`{ label, confidence, domain }` or `null`)
-  stay identical**, so neither `content-gmail.js` nor the HubSpot write path
-  in `background.js` need to change.
-
-Adding a new connector never touches the content script or the judgment
-contract — it's a new entry in `src/connectors.js` plus its own OAuth +
-write functions in `background.js`, following the same shape as the HubSpot
-ones.
-
-## Known fragility (by design, not an oversight)
-
-Gmail's DOM has no public contract; the selectors in `content-gmail.js`
-(`div[role="main"]`, `div[role="listitem"]`, the sender's `[email]`
-attribute) are a best-effort reading of the current structure. If Gmail
-changes it, the failure mode is "the chip stops appearing" — never a wrong
-action, because judgment only ever reads `innerText`, it never simulates a
-click inside Gmail.
-
-## Still needed before this can go live (see the spec, §11)
-
-- An Anthropic API key, wired into `background.js` via a Netlify function
-  (reusing the existing `netlify/functions/` pattern in the main site repo),
-  to replace the keyword-table judgment stub with a real model call
-- Chrome Web Store developer account, before submitting for review
-- A real HubSpot production portal once you're ready to move past the free
-  developer test account
+- **Gmail only.** The judgment engine takes plain text and knows nothing about
+  Gmail; adding a second source surface is a content script, not a rewrite.
+- **The scorer is not a language model.** It is a transparent, explainable
+  weighting, which is why the popup can show why Flow spoke. A model would
+  catch phrasings this misses; it would also need email text to leave the
+  device, which is the trade this build declines to make.
+- **Not on the Chrome Web Store.** Store submission needs a completed data-use
+  disclosure; until then, Load unpacked.
