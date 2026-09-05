@@ -4,7 +4,7 @@
 .flow-chip-host {
   all: initial;
   font-family: 'Assistant', system-ui, -apple-system, sans-serif;
-  direction: rtl;
+  direction: ltr;
 }
 
 .flow-chip {
@@ -46,6 +46,11 @@
   padding: 2px 4px;
 }
 .flow-chip-dismiss:hover { color: #fff; }
+
+.flow-chip.flow-chip-pending { background: #454E63; cursor: default; }
+.flow-chip.flow-chip-done { background: #166B44; cursor: default; }
+.flow-chip.flow-chip-warn { background: #8A5A00; cursor: default; }
+.flow-chip.flow-chip-error { background: #A32F22; cursor: default; }
 
 @keyframes flow-chip-in {
   from { opacity: 0; transform: translateY(-4px); }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <title>Flow Trial</title>
@@ -12,38 +12,38 @@
   </header>
 
   <nav class="tabs" role="tablist">
-    <button class="tab" data-tab="setup" role="tab" aria-selected="true">הגדרה</button>
-    <button class="tab" data-tab="log" role="tab" aria-selected="false">יומן</button>
+    <button class="tab" data-tab="setup" role="tab" aria-selected="true">Setup</button>
+    <button class="tab" data-tab="log" role="tab" aria-selected="false">Log</button>
   </nav>
 
   <main>
     <section data-panel="setup" class="panel active">
 
       <div class="block" id="step-connectors">
-        <p class="label">אילו מערכות מותר ל-Flow לגעת בהן?</p>
-        <p class="hint">רק הרשאה — לא הגדרת לוגיקה. אפשר לסמן יותר מאחת.</p>
+        <p class="label">Which systems may Flow touch?</p>
+        <p class="hint">A permission, not a rule. You can check more than one.</p>
         <div id="connector-list" class="check-list"></div>
       </div>
 
       <div class="block" id="step-domain">
-        <p class="label">מה סוג העבודה שלך?</p>
-        <p class="hint">מכוון את שיקול הדעת של Flow — לא קובע חוק.</p>
+        <p class="label">What kind of work do you do?</p>
+        <p class="hint">Steers Flow's judgment — it doesn't set a rule.</p>
         <div id="domain-list" class="radio-list"></div>
       </div>
 
-      <button id="save" class="primary">שמור והתחל</button>
-      <p id="saved-note" class="saved-note" hidden>נשמר. חוזרים ל-Gmail ופותחים מייל.</p>
+      <button id="save" class="primary">Save &amp; Start</button>
+      <p id="saved-note" class="saved-note" hidden>Saved. Go back to Gmail and open an email.</p>
     </section>
 
     <section data-panel="log" class="panel">
-      <p class="label">מה Flow ראתה</p>
+      <p class="label">What Flow has seen</p>
       <div id="log-list" class="log-list"></div>
-      <p id="log-empty" class="hint" hidden>עדיין לא קרה כלום. זה בסדר — Flow מדברת רק כשיש סיבה.</p>
+      <p id="log-empty" class="hint" hidden>Nothing yet — that's fine, Flow only speaks up when there's a reason to.</p>
     </section>
   </main>
 
   <footer class="ftr">
-    <span>גרסת ניסיון · הנתונים נשארים במכשיר שלך</span>
+    <span>Trial build · your data stays on this device</span>
   </footer>
 
   <script src="../src/domains.js"></script>

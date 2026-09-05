@@ -25,9 +25,9 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Flow Trial","item":"https://theflow-ai.com/trial.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Flow Trial","url":"https://theflow-ai.com/trial.html","description":"A free browser extension that watches Gmail quietly and surfaces a single Do It action when it recognizes something worth syncing to a connected work system.","applicationCategory":"BusinessApplication","operatingSystem":"Chrome","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","url":"https://theflow-ai.com/trial.html"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[
-{"@type":"Question","name":"Does Flow Trial read all of my email?","acceptedAnswer":{"@type":"Answer","text":"It reads the message you have open in Gmail's reading pane, one at a time, only to decide whether it matches something in your connected work system. It does not crawl your inbox or read messages you haven't opened."}},
-{"@type":"Question","name":"Is my email content stored anywhere?","acceptedAnswer":{"@type":"Answer","text":"Message text is sent to a cloud endpoint for a moment to judge whether an action is warranted, and is not retained afterward. The connector, domain choice, and activity log stay on your device in local browser storage."}},
-{"@type":"Question","name":"Why isn't Flow Trial on the Chrome Web Store yet?","acceptedAnswer":{"@type":"Answer","text":"It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the first connector is live."}},
+{"@type":"Question","name":"Does clicking Do It actually change anything in HubSpot?","acceptedAnswer":{"@type":"Answer","text":"Yes. It looks up the Gmail sender's email address against your connected HubSpot account and, if there's a matching Contact, logs a real Note on it."}},
+{"@type":"Question","name":"What if there's no matching HubSpot contact?","acceptedAnswer":{"@type":"Answer","text":"The chip says so and nothing is written. This build never creates a new Contact on your behalf — only logs to one that already exists."}},
+{"@type":"Question","name":"Why isn't Flow Trial on the Chrome Web Store yet?","acceptedAnswer":{"@type":"Answer","text":"It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the connector is further along."}},
 {"@type":"Question","name":"What happens if I ignore a suggestion?","acceptedAnswer":{"@type":"Answer","text":"The chip disappears and Flow will not ask about that same email again. Both a click and a dismissal quietly retune how confident the system needs to be before it speaks up next time."}},
 {"@type":"Question","name":"Can I remove my data?","acceptedAnswer":{"@type":"Answer","text":"Uninstalling the extension deletes everything stored locally. To remove your waitlist email, contact hello@theflow-ai.com."}}
 ]}</script>
@@ -151,12 +151,23 @@ p{margin:0 0 15px}
 .choicepanel{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow)}
 .choicepanel h4{margin:0 0 4px; font-size:1rem; font-weight:700; color:var(--ink)}
 .choicepanel .sub{font-size:.87rem; color:var(--ink-3); margin:0 0 16px}
-.chipgrid{display:flex; flex-wrap:wrap; gap:9px}
-.opt{display:inline-flex; align-items:center; gap:7px; font-family:var(--sans); font-size:.87rem; font-weight:600; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:8px 14px; color:var(--ink)}
-.opt.dim{opacity:.55}
-.opt .st{font-family:var(--mono); font-weight:500; font-size:.66rem; color:var(--ink-3); text-transform:uppercase; letter-spacing:.04em}
 .flex-note{font-size:.95rem; color:var(--ink-2); margin:22px 0 0}
 .flex-note i{color:var(--ink)}
+
+/* mocklist — a faithful stand-in for the real extension popup UI */
+.mocklist{display:flex; flex-direction:column; gap:7px}
+.mockrow{display:flex; align-items:center; gap:10px; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:9px 12px}
+.mockrow.dim{opacity:.6}
+.mockrow .box{width:15px; height:15px; border-radius:4px; border:1.5px solid var(--line-2); flex:none; position:relative}
+.mockrow .box.checked{background:var(--accent); border-color:var(--accent)}
+.mockrow .box.checked::after{content:''; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg)}
+.mockrow .circle{width:15px; height:15px; border-radius:50%; border:1.5px solid var(--line-2); flex:none; position:relative}
+.mockrow .circle.checked{border-color:var(--accent)}
+.mockrow .circle.checked::after{content:''; position:absolute; inset:3px; border-radius:50%; background:var(--accent)}
+.mockrow .txt{flex:1; min-width:0; display:flex; flex-direction:column}
+.mockrow .txt b{font-size:.86rem; font-weight:600; color:var(--ink)}
+.mockrow .txt i{font-style:normal; font-size:.74rem; color:var(--ink-3)}
+.mockrow .badge{font-family:var(--mono); font-size:.64rem; font-weight:500; color:var(--ink-3); background:var(--surface); border:1px solid var(--line); border-radius:4px; padding:2px 7px; flex:none}
 
 /* callout */
 .note-box{border:1px solid color-mix(in srgb, var(--warn) 35%, transparent); background:var(--warn-wash); border-radius:14px; padding:20px 22px; margin:26px 0 0; font-size:.97rem; display:flex; gap:14px; align-items:flex-start}
@@ -174,6 +185,9 @@ p{margin:0 0 15px}
 .faq details[open] summary::after{content:'\2212'}
 .faq details[open] summary{border-bottom:1px solid var(--line)}
 .faq p{margin:16px 0 18px; font-size:.96rem; color:var(--ink-3); line-height:1.6}
+
+/* signup band — the one section that breaks the white-card rhythm, because it's the one CTA left */
+.band{background:var(--surface-2); margin-inline:calc(50% - 50vw); padding:56px calc(50vw - 50%) 68px; border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
 
 /* signup */
 .formcard{background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:34px; box-shadow:var(--shadow-lg); max-width:600px}
@@ -250,7 +264,6 @@ footer.site a{color:var(--ink-3)}
       <p class="lead">A browser extension that watches Gmail quietly, and&nbsp;&mdash; once in a while, when something actually changed &mdash;&nbsp;surfaces one <code>Do It</code> button. No chat window. No prompts. No if-this-then-that rules to build.</p>
       <div class="hero-cta">
         <a class="btn" href="#signup">Request Early Access</a>
-        <a class="btn ghost" href="#how">See how it works</a>
       </div>
       <div class="status-row">
         <span>Pre-release developer preview</span>
@@ -266,7 +279,7 @@ footer.site a{color:var(--ink-3)}
         <span>Dana Cole &middot; 9:41 AM &middot; "We're good at $3,900/mo, signing Monday"</span>
       </div>
       <span class="chip">Do It: update deal value to $3,900/mo <span class="target">&middot; HubSpot</span></span>
-      <p class="note">The label on the chip is generated live from the specific situation &mdash; it isn't picked from a list configured in advance.</p>
+      <p class="note">Clicking it is a real write: Flow looks up the sender by email in your connected HubSpot account and logs a Note on the matching Contact. What still needs work is <i>recognizing</i> the moment &mdash; today that runs on a keyword match, not a model, so it will miss things a smarter version won't.</p>
     </div>
 
     <nav class="jumpnav narrow" aria-label="On this page">
@@ -322,23 +335,22 @@ footer.site a{color:var(--ink-3)}
       <div class="choicegrid">
         <div class="choicepanel">
           <h4>Which systems Flow may touch</h4>
-          <p class="sub">A permission, not a configuration. Check the ones you actually use.</p>
-          <div class="chipgrid">
-            <span class="opt">HubSpot <span class="st">building</span></span>
-            <span class="opt dim">Monday.com <span class="st">planned</span></span>
-            <span class="opt dim">Notion <span class="st">planned</span></span>
-            <span class="opt dim">Salesforce <span class="st">planned</span></span>
-            <span class="opt dim">Pipedrive <span class="st">planned</span></span>
+          <p class="sub">This is the actual popup — a permission, not a configuration.</p>
+          <div class="mocklist">
+            <div class="mockrow"><span class="box checked"></span><span class="txt"><b>HubSpot</b><i>CRM</i></span><span class="badge">Building</span></div>
+            <div class="mockrow dim"><span class="box"></span><span class="txt"><b>Monday.com</b><i>Work management</i></span><span class="badge">Planned</span></div>
+            <div class="mockrow dim"><span class="box"></span><span class="txt"><b>Notion</b><i>Docs / database</i></span><span class="badge">Planned</span></div>
+            <div class="mockrow dim"><span class="box"></span><span class="txt"><b>Salesforce</b><i>CRM</i></span><span class="badge">Planned</span></div>
           </div>
         </div>
         <div class="choicepanel">
           <h4>What kind of work you do</h4>
-          <p class="sub">Biases the model's judgment toward what matters in your field &mdash; it doesn't hard-code a trigger.</p>
-          <div class="chipgrid">
-            <span class="opt">Sales &amp; deals</span>
-            <span class="opt">Legal &amp; deal coordination</span>
-            <span class="opt">Finance &amp; billing</span>
-            <span class="opt">Operations &amp; admin</span>
+          <p class="sub">Steers judgment toward what matters in your field &mdash; it doesn't hard-code a trigger.</p>
+          <div class="mocklist">
+            <div class="mockrow"><span class="circle checked"></span><span class="txt"><b>Sales &amp; business development</b><i>Deal / client</i></span></div>
+            <div class="mockrow"><span class="circle"></span><span class="txt"><b>Legal &amp; deal coordination</b><i>Matter / agreement</i></span></div>
+            <div class="mockrow"><span class="circle"></span><span class="txt"><b>Finance &amp; billing</b><i>Invoice / vendor</i></span></div>
+            <div class="mockrow"><span class="circle"></span><span class="txt"><b>Operations &amp; admin</b><i>Task / request</i></span></div>
           </div>
         </div>
       </div>
@@ -360,19 +372,20 @@ footer.site a{color:var(--ink-3)}
           <h3>What it touches</h3>
           <ul>
             <li>The single message open in Gmail's reading pane &mdash; not your inbox, not older messages, not attachments</li>
-            <li>A compact snapshot of the matching record in your connected work system</li>
+            <li>Your connected HubSpot contacts, to check whether the sender's email matches an existing record</li>
+            <li>If it matches: a real Note gets logged on that Contact &mdash; that's the one write this build performs</li>
           </ul>
         </div>
         <div class="card isnt">
           <h3>What it never does</h3>
           <ul>
             <li>No ad targeting, no reselling of data, no use for training a model</li>
-            <li>No write happens without a click &mdash; no autonomous send, delete, or bulk edit</li>
+            <li>Never creates a new Contact, never edits a deal, never sends anything &mdash; only logs a Note, and only on a match</li>
             <li>No crawling your mailbox in the background</li>
           </ul>
         </div>
       </div>
-      <p class="flex-note narrow">Message text is sent to a cloud endpoint for the moment it takes to judge it, then discarded &mdash; never written to a database. Your connector choice, domain choice, and activity log live only in local browser storage; uninstalling the extension deletes them. To remove your early-access email, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
+      <p class="flex-note narrow">Message text is sent to a cloud endpoint for the moment it takes to judge it, then discarded &mdash; never written to a database. Your HubSpot connection, domain choice, and activity log live only in local browser storage; uninstalling the extension deletes them (HubSpot's own record of the Note stays in HubSpot, since that write already happened). To remove your early-access email, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
     </section>
 
     <section id="faq">
@@ -382,16 +395,16 @@ footer.site a{color:var(--ink-3)}
       </div>
       <div class="faq narrow">
         <details>
-          <summary>Does Flow Trial read all of my email?</summary>
-          <p>It reads the message you have open in Gmail's reading pane, one at a time, only to decide whether it matches something in your connected work system. It does not crawl your inbox or read messages you haven't opened.</p>
+          <summary>Does clicking Do It actually change anything in HubSpot?</summary>
+          <p>Yes. It looks up the Gmail sender's email address against your connected HubSpot account and, if there's a matching Contact, logs a real Note on it &mdash; check that Contact's timeline in HubSpot afterward to confirm.</p>
         </details>
         <details>
-          <summary>Is my email content stored anywhere?</summary>
-          <p>Message text is sent to a cloud endpoint for a moment to judge whether an action is warranted, and is not retained afterward. The connector, domain choice, and activity log stay on your device in local browser storage.</p>
+          <summary>What if there's no matching HubSpot contact?</summary>
+          <p>The chip says so and nothing is written. This build never creates a new Contact on your behalf &mdash; only logs to one that already exists.</p>
         </details>
         <details>
           <summary>Why isn't Flow Trial on the Chrome Web Store yet?</summary>
-          <p>It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the first connector is live.</p>
+          <p>It's a pre-release developer preview. Submission requires a completed data-use disclosure and store review, which happens once the connector is further along.</p>
         </details>
         <details>
           <summary>What happens if I ignore a suggestion?</summary>
@@ -404,11 +417,11 @@ footer.site a{color:var(--ink-3)}
       </div>
     </section>
 
-    <section id="signup">
+    <section id="signup" class="band">
       <div class="sec-head narrow">
         <span class="eyebrow">06</span>
         <h2>Request early access</h2>
-        <p>Confirmed by email (double opt-in) before anything is sent &mdash; the same signup infrastructure the rest of the site uses.</p>
+        <p>Confirmed by email (double opt-in) before the extension is released to you &mdash; the same signup infrastructure the rest of the site uses. The download link only exists after you confirm.</p>
       </div>
       <div class="formcard">
         <form id="trialForm">
@@ -418,7 +431,7 @@ footer.site a{color:var(--ink-3)}
             <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
             <button type="submit" id="trialBtn">Request Access</button>
           </div>
-          <p class="fine">We'll email you a confirmation link, then the install instructions.</p>
+          <p class="fine">Confirm your email and you'll land straight on a page with the real download button &mdash; we'll also send it to your inbox.</p>
           <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
         </form>
       </div>
@@ -427,18 +440,17 @@ footer.site a{color:var(--ink-3)}
     <section id="install">
       <div class="sec-head narrow">
         <span class="eyebrow">07</span>
-        <h2>Install it now</h2>
-        <p>Already confirmed, or just want to try it immediately? It's not on the Chrome Web Store yet, so installing it takes a few manual steps &mdash; same as any extension in active development.</p>
+        <h2>After you confirm</h2>
+        <p>The confirmation page and email both carry a working, time-limited download link &mdash; nothing to hunt for.</p>
       </div>
       <div class="installbox">
         <div class="wizard">
-          <div class="wstep"><span class="num">1</span><p>Download the ZIP and unzip it to a folder.</p></div>
-          <div class="wstep"><span class="num">2</span><p>In Chrome, open <code>chrome://extensions</code>.</p></div>
+          <div class="wstep"><span class="num">1</span><p>Confirm your email above, then download from that page or the email.</p></div>
+          <div class="wstep"><span class="num">2</span><p>Unzip it to a folder, then in Chrome open <code>chrome://extensions</code>.</p></div>
           <div class="wstep"><span class="num">3</span><p>Turn on <b>Developer mode</b> (top-right).</p></div>
           <div class="wstep"><span class="num">4</span><p>Click <b>Load unpacked</b>, select the folder.</p></div>
-          <div class="wstep"><span class="num">5</span><p>Pick a connector + work domain, save.</p></div>
+          <div class="wstep"><span class="num">5</span><p>Connect HubSpot, pick a work domain, save.</p></div>
         </div>
-        <a class="btn" id="zipBtn" href="/downloads/flow-trial-extension.zip">Download flow-trial-extension.zip</a>
       </div>
     </section>
 
@@ -505,14 +517,6 @@ footer.site a{color:var(--ink-3)}
       .catch(function(){ done(false); });
 
     if(typeof gtag==='function') gtag('event','trial_signup_submit');
-  });
-})();
-
-(function(){
-  var zipBtn = document.getElementById('zipBtn');
-  if(!zipBtn) return;
-  zipBtn.addEventListener('click', function(){
-    if(typeof gtag==='function') gtag('event','trial_zip_download');
   });
 })();
 </script>

@@ -5,6 +5,11 @@ const SITE_URL = 'https://theflow-ai.com';
 const SB_URL = 'https://nlvljclvoguvrnntwufu.supabase.co';
 const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5sdmxqY2x2b2d1dnJubnR3dWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIxMjQxMTcsImV4cCI6MjA1NzcwMDExN30.G-Kap81tXWNWkggTEH9d47fNU2-RNKzyokgVivy201M';
 const LOG_PREFIX = '[confirm-signup]';
+const DOWNLOAD_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — long enough that "check your email later" still works
+
+function signDownload(email, exp, secret) {
+  return crypto.createHmac('sha256', secret).update(email + '|download|' + exp).digest('base64url');
+}
 
 const COPY = {
   playbook: {
@@ -41,7 +46,7 @@ const COPY = {
   },
 };
 
-function page(lang, ok, kind) {
+function page(lang, ok, kind, downloadUrl) {
   var isHe = lang === 'he';
   var dir = isHe ? 'rtl' : 'ltr';
   var c = (COPY[kind] || COPY.playbook)[lang] || (COPY[kind] || COPY.playbook).en;
@@ -51,6 +56,10 @@ function page(lang, ok, kind) {
   var icon = ok
     ? '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>'
     : '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>';
+  var downloadLabel = isHe ? 'הורדת התוסף' : 'Download the extension';
+  var downloadBtn = ok && kind === 'trial' && downloadUrl
+    ? '<a href="' + downloadUrl + '" style="display:inline-block; background:#1A4EF5; color:#fff; text-decoration:none; font-weight:700; padding:13px 28px; border-radius:999px; margin-bottom:14px;">' + downloadLabel + '</a><br>'
+    : '';
 
   return (
     '<!doctype html><html lang="' + lang + '" dir="' + dir + '"><head><meta charset="utf-8">' +
@@ -61,10 +70,11 @@ function page(lang, ok, kind) {
     '.card{max-width:420px}' +
     '.card h1{font-size:1.5rem; margin:20px 0 12px}' +
     '.card p{color:#AEB9D6; line-height:1.6; margin:0 0 28px}' +
-    '.card a{display:inline-block; background:#1A4EF5; color:#fff; text-decoration:none; font-weight:700; padding:13px 28px; border-radius:999px}' +
+    '.card a.home{display:inline-block; color:#8891A4; text-decoration:none; font-weight:600; font-size:.9rem}' +
     '</style></head><body>' +
     '<div class="card">' + icon + '<h1>' + title + '</h1><p>' + body + '</p>' +
-    '<a href="' + SITE_URL + '/">' + c.home + '</a>' +
+    downloadBtn +
+    '<a class="home" href="' + SITE_URL + '/">' + c.home + '</a>' +
     '</div></body></html>'
   );
 }
@@ -100,11 +110,22 @@ exports.handler = async function (event) {
   var followUpFn = kind === 'trial' ? 'send-trial-access' : 'send-playbook';
   log('token verified, triggering follow-up send', { email: email, kind: kind, followUpFn: followUpFn });
 
+  var downloadUrl;
+  if (kind === 'trial') {
+    var downloadExp = Date.now() + DOWNLOAD_TTL_MS;
+    var downloadSig = signDownload(email, downloadExp, secret);
+    downloadUrl =
+      SITE_URL + '/.netlify/functions/download-trial-zip?email=' + encodeURIComponent(email) +
+      '&exp=' + downloadExp + '&sig=' + encodeURIComponent(downloadSig);
+  }
+
   try {
+    var followUpBody = { email: email, lang: lang };
+    if (downloadUrl) followUpBody.downloadUrl = downloadUrl;
     await fetch(SITE_URL + '/.netlify/functions/' + followUpFn, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, lang: lang }),
+      body: JSON.stringify(followUpBody),
     });
   } catch (err) {
     logErr('failed to trigger ' + followUpFn + ' (customer will still see success page)', String(err));
@@ -120,5 +141,5 @@ exports.handler = async function (event) {
     // best-effort only — column may not exist yet, never blocks the confirmation UX
   }
 
-  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true, kind) };
+  return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true, kind, downloadUrl) };
 };

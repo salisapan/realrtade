@@ -1,12 +1,17 @@
 (async function popupInit() {
   const state = await FlowStorage.get();
-  renderConnectors(state);
+  const hubspotStatus = await sendToBackground({ type: 'flow:hubspot-status' });
+  renderConnectors(state, hubspotStatus?.connected);
   renderDomains(state);
   wireTabs();
   wireSave();
   await renderLog();
 
-  function renderConnectors(state) {
+  function sendToBackground(msg) {
+    return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
+  }
+
+  function renderConnectors(state, hubspotConnected) {
     const host = document.getElementById('connector-list');
     host.innerHTML = '';
     FLOW_CONNECTORS.forEach((c) => {
@@ -17,26 +22,76 @@
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.value = c.id;
-      input.disabled = disabled;
+      input.disabled = disabled || Boolean(c.oauth); // OAuth connectors are driven by the Connect button, not the checkbox
       input.checked = state.connectorId === c.id;
-      input.addEventListener('change', () => {
-        // Single-connector selection for Phase 1 (radio-like checkbox group);
-        // the data model already supports more than one, this just keeps the
-        // UI honest about what's actually wired up.
-        document.querySelectorAll('#connector-list input').forEach((i) => {
-          if (i !== input) i.checked = false;
-        });
-      });
 
       const txt = document.createElement('span');
       txt.className = 'txt';
       txt.innerHTML = `<span class="name">${c.label}</span><span class="kind">${c.kind}${c.note ? ' · ' + c.note : ''}</span>`;
+      if (c.oauth) {
+        const err = document.createElement('span');
+        err.className = 'connect-err';
+        err.hidden = true;
+        txt.appendChild(err);
+      }
 
-      const badge = document.createElement('span');
-      badge.className = 'badge';
-      badge.textContent = c.status === 'live' ? 'זמין' : c.status === 'building' ? 'בבנייה' : 'בהמשך';
+      label.append(input, txt);
 
-      label.append(input, txt, badge);
+      if (c.oauth && c.status !== 'planned') {
+        if (hubspotConnected) {
+          const badge = document.createElement('span');
+          badge.className = 'badge connected';
+          badge.textContent = 'Connected';
+          label.appendChild(badge);
+          const disconnectBtn = document.createElement('button');
+          disconnectBtn.type = 'button';
+          disconnectBtn.className = 'connect-btn';
+          disconnectBtn.textContent = 'Disconnect';
+          disconnectBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            await sendToBackground({ type: 'flow:disconnect-hubspot' });
+            await FlowStorage.set({ connectorId: null, onboarded: false });
+            renderConnectors(await FlowStorage.get(), false);
+          });
+          label.appendChild(disconnectBtn);
+          input.checked = true;
+        } else {
+          const connectBtn = document.createElement('button');
+          connectBtn.type = 'button';
+          connectBtn.className = 'connect-btn';
+          connectBtn.textContent = 'Connect';
+          connectBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            connectBtn.textContent = 'Connecting…';
+            connectBtn.disabled = true;
+            const res = await sendToBackground({ type: 'flow:connect-hubspot' });
+            if (res?.ok) {
+              await FlowStorage.set({ connectorId: c.id });
+              renderConnectors(await FlowStorage.get(), true);
+            } else {
+              connectBtn.textContent = 'Connect';
+              connectBtn.disabled = false;
+              const errEl = label.querySelector('.connect-err');
+              if (errEl) {
+                errEl.textContent = res?.error || 'Connection failed.';
+                errEl.hidden = false;
+              }
+            }
+          });
+          label.appendChild(connectBtn);
+        }
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.textContent = c.status === 'live' ? 'Live' : c.status === 'building' ? 'Building' : 'Planned';
+        label.appendChild(badge);
+        input.addEventListener('change', () => {
+          document.querySelectorAll('#connector-list input').forEach((i) => {
+            if (i !== input) i.checked = false;
+          });
+        });
+      }
+
       host.appendChild(label);
     });
   }
@@ -76,7 +131,8 @@
 
   function wireSave() {
     document.getElementById('save').addEventListener('click', async () => {
-      const connectorId = document.querySelector('#connector-list input:checked')?.value || null;
+      const checkedBox = document.querySelector('#connector-list input:checked');
+      const connectorId = checkedBox ? checkedBox.value : (await FlowStorage.get()).connectorId;
       const domainId = document.querySelector('#domain-list input:checked')?.value || null;
       await FlowStorage.set({ connectorId, domainId, onboarded: Boolean(connectorId && domainId) });
       const note = document.getElementById('saved-note');
@@ -98,8 +154,8 @@
     s.log.forEach((entry) => {
       const item = document.createElement('div');
       item.className = 'log-item';
-      const kindLabel = { shown: 'הוצע', clicked: 'בוצע', dismissed: 'נדחה' }[entry.kind] || entry.kind;
-      item.innerHTML = `<span class="kind ${entry.kind}">${kindLabel}</span>${entry.label}<span class="when">${new Date(entry.ts).toLocaleString('he-IL')}</span>`;
+      const kindLabel = { shown: 'Shown', clicked: 'Done', dismissed: 'Dismissed' }[entry.kind] || entry.kind;
+      item.innerHTML = `<span class="kind ${entry.kind}">${kindLabel}</span>${entry.label}<span class="when">${new Date(entry.ts).toLocaleString('en-US')}</span>`;
       host.appendChild(item);
     });
   }

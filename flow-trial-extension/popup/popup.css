@@ -20,7 +20,7 @@
 *{box-sizing:border-box}
 body{
   margin:0; width:340px; background:var(--paper); color:var(--ink);
-  font-family:'Assistant',system-ui,sans-serif; direction:rtl;
+  font-family:'Assistant',system-ui,sans-serif; direction:ltr;
 }
 .hdr{display:flex;align-items:center;gap:9px;padding:16px 16px 12px}
 .hdr .mark{width:10px;height:10px;border-radius:50%;background:var(--accent);flex:none}
@@ -55,6 +55,13 @@ main{padding:16px}
   font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:.05em;
   color:var(--ink-3);background:var(--surface-2);border-radius:4px;padding:2px 6px;flex:none;
 }
+.opt .badge.connected{background:var(--ok-wash);color:var(--ok)}
+.opt .connect-btn{
+  all:unset;font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:600;
+  color:var(--accent);cursor:pointer;flex:none;padding:2px 4px;
+}
+.opt .connect-btn:hover{text-decoration:underline}
+.opt .connect-err{font-size:.68rem;color:#C0392B;display:block;margin-top:2px}
 
 .primary{
   all:unset;display:block;text-align:center;width:100%;background:var(--accent);

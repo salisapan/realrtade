@@ -9,58 +9,59 @@
 // judged() in judgment.js reads whichever profile the user picked at
 // onboarding and uses it purely as context for the (future) model call.
 // Everything under `demoTriggers` exists only so Phase 1 can render a
-// realistic end-to-end chip without a live API key — it is replaced wholesale
-// once judgment.js talks to a real model.
+// realistic end-to-end chip without a live model call — it is replaced
+// wholesale once judgment.js talks to a real model, and until then it's the
+// only thing standing in for "is this worth flagging."
 
 const FLOW_DOMAINS = [
   {
     id: 'sales',
-    label: 'מכירות ופיתוח עסקי',
-    entity: 'עסקה / לקוח',
-    verbs: ['סגירת מחיר', 'שינוי היקף', 'תאריך חתימה', 'אובדן עסקה'],
-    actionVerb: (ctx) => `עדכן שווי עסקה ל-${ctx.amount || '…'}`,
+    label: 'Sales & business development',
+    entity: 'Deal / client',
+    verbs: ['price confirmed', 'scope changed', 'signing date', 'deal lost'],
+    actionVerb: (ctx) => `update deal value to ${ctx.amount || '…'}`,
     demoTriggers: [
-      { pattern: /(סגרנו|התחייבנו|אישרנו)[^.]{0,40}(\d[\d,]*\s?(₪|ש"ח|\$|usd))/i,
-        buildAction: (m) => `עדכן שווי עסקה ל-${m[2]}` },
-      { pattern: /(לא ממשיכים|ביטלנו|פרשנו מ)/i,
-        buildAction: () => `סמן עסקה כאבודה` }
+      { pattern: /(we're good at|agreed on|confirmed)[^.]{0,40}(\$[\d,]+(?:\.\d+)?|\d[\d,]*\s?(usd|dollars))/i,
+        buildAction: (m) => `update deal value to ${m[2]}` },
+      { pattern: /(not moving forward|we're pulling out|decided to go with someone else)/i,
+        buildAction: () => `mark deal as lost` }
     ]
   },
   {
     id: 'legal',
-    label: 'משפט ותיאום עסקאות',
-    entity: 'תיק / הסכם',
-    verbs: ['טיוטת הסכם', 'מועד הגשה', 'חתימה', 'תיקון סעיף'],
-    actionVerb: (ctx) => `עדכן תאריך יעד בתיק ל-${ctx.date || '…'}`,
+    label: 'Legal & deal coordination',
+    entity: 'Matter / agreement',
+    verbs: ['draft agreement', 'filing deadline', 'signed', 'clause revised'],
+    actionVerb: (ctx) => `update matter deadline to ${ctx.date || '…'}`,
     demoTriggers: [
-      { pattern: /(מועד הגשה|דדליין|יש להגיש עד)[^.]{0,30}(\d{1,2}[./]\d{1,2})/i,
-        buildAction: (m) => `עדכן תאריך יעד בתיק ל-${m[2]}` },
-      { pattern: /(נחתם|חתמנו על ההסכם)/i,
-        buildAction: () => `סמן תיק כחתום` }
+      { pattern: /(deadline|due date|must be filed by)[^.]{0,30}(\d{1,2}\/\d{1,2})/i,
+        buildAction: (m) => `update matter deadline to ${m[2]}` },
+      { pattern: /(fully executed|signed the agreement|countersigned)/i,
+        buildAction: () => `mark matter as signed` }
     ]
   },
   {
     id: 'finance',
-    label: 'כספים ותפעול פיננסי',
-    entity: 'חשבונית / ספק',
-    verbs: ['חשבונית התקבלה', 'אי-התאמה בסכום', 'אישור תשלום'],
-    actionVerb: (ctx) => `פתח חריגת תשלום — ${ctx.detail || 'אי-התאמה בסכום'}`,
+    label: 'Finance & billing',
+    entity: 'Invoice / vendor',
+    verbs: ['invoice received', 'amount mismatch', 'payment approved'],
+    actionVerb: (ctx) => `flag payment exception — ${ctx.detail || 'amount mismatch'}`,
     demoTriggers: [
-      { pattern: /(חשבונית מס|invoice)[^.]{0,40}(\d[\d,]*\s?(₪|ש"ח|\$))/i,
-        buildAction: (m) => `רשום חשבונית — ${m[2]}` },
-      { pattern: /(הסכום לא תואם|טעות בחיוב|חיוב כפול)/i,
-        buildAction: () => `פתח חריגת תשלום לבדיקה` }
+      { pattern: /(invoice)[^.]{0,40}(\$[\d,]+(?:\.\d+)?)/i,
+        buildAction: (m) => `log invoice — ${m[2]}` },
+      { pattern: /(amount doesn't match|billing error|double charged)/i,
+        buildAction: () => `flag payment exception for review` }
     ]
   },
   {
     id: 'ops',
-    label: 'תפעול ואדמיניסטרציה',
-    entity: 'משימה / בקשה',
-    verbs: ['בקשה חדשה', 'סטטוס השתנה', 'צריך מעקב'],
-    actionVerb: () => `צור משימת מעקב`,
+    label: 'Operations & admin',
+    entity: 'Task / request',
+    verbs: ['new request', 'status changed', 'needs follow-up'],
+    actionVerb: () => `create a follow-up task`,
     demoTriggers: [
-      { pattern: /(אנא טפל|בבקשה תעדכן|ממתין לתשובה)/i,
-        buildAction: () => `צור משימת מעקב` }
+      { pattern: /(please handle|can you update|still waiting on your reply)/i,
+        buildAction: () => `create a follow-up task` }
     ]
   }
 ];

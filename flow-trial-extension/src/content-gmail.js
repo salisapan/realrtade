@@ -5,10 +5,11 @@
 //
 // Honesty about fragility: Gmail's DOM has no public class-name contract and
 // changes without notice. The selectors below are a best-effort reading of
-// the current DOM (role="main" reading pane, div[role="listitem"] messages).
-// If Gmail changes structure, this degrades to "chip stops appearing" — never
-// to a crash or a wrong action, because judgment only ever reads text, it
-// never simulates clicks inside Gmail itself.
+// the current DOM (role="main" reading pane, div[role="listitem"] messages,
+// the `email` attribute Gmail puts on the sender's name span). If Gmail
+// changes structure, this degrades to "chip stops appearing" — never to a
+// crash or a wrong action, because judgment only ever reads text, it never
+// simulates clicks inside Gmail itself.
 
 (function flowGmailWatcher() {
   let currentDomainId = null;
@@ -39,6 +40,12 @@
     };
   }
 
+  function extractSender(messageNode) {
+    const el = messageNode.querySelector('[email]');
+    if (!el) return { email: null, name: null };
+    return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
+  }
+
   async function scanReadingPane() {
     if (!watching) return;
     const main = document.querySelector('div[role="main"]');
@@ -60,7 +67,8 @@
     const result = FlowJudgment.evaluate(text, currentDomainId);
     if (!result) return;
 
-    injectChip(message, messageId, result);
+    const sender = extractSender(message);
+    injectChip(message, messageId, result, sender, text);
     FlowStorage.appendLog({ kind: 'shown', label: result.label, messageId });
   }
 
@@ -72,7 +80,7 @@
     return 'h' + h;
   }
 
-  function injectChip(messageNode, messageId, result) {
+  function injectChip(messageNode, messageId, result, sender, fullText) {
     if (messageNode.querySelector('.flow-chip-host')) return;
 
     const host = document.createElement('div');
@@ -88,19 +96,20 @@
     chip.appendChild(labelEl);
 
     if (currentConnector) {
+      const conn = FLOW_CONNECTORS.find((c) => c.id === currentConnector);
       const target = document.createElement('span');
       target.className = 'flow-chip-target';
-      target.textContent = currentConnector;
+      target.textContent = conn ? conn.label : currentConnector;
       chip.appendChild(target);
     }
 
     const dismiss = document.createElement('button');
     dismiss.className = 'flow-chip-dismiss';
     dismiss.type = 'button';
-    dismiss.setAttribute('aria-label', 'התעלם');
+    dismiss.setAttribute('aria-label', 'Dismiss');
     dismiss.textContent = '×';
 
-    chip.addEventListener('click', () => onDoIt(host, messageId, result));
+    chip.addEventListener('click', () => onDoIt(host, chip, messageId, result, sender, fullText));
     dismiss.addEventListener('click', (e) => {
       e.stopPropagation();
       onDismiss(host, messageId, result);
@@ -111,11 +120,52 @@
     messageNode.insertBefore(host, messageNode.firstChild);
   }
 
-  function onDoIt(host, messageId, result) {
-    // Phase 1: no live connector write yet — record intent + show confirmation.
-    // The call this becomes: FlowConnectors.execute(currentConnector, result).
-    host.innerHTML = '<span class="flow-chip" style="cursor:default">בוצע ✓ <span class="flow-chip-target">בטל</span></span>';
+  function setChipState(chip, cls, text) {
+    chip.className = 'flow-chip ' + cls;
+    chip.innerHTML = '';
+    const span = document.createElement('span');
+    span.className = 'flow-chip-label';
+    span.textContent = text;
+    chip.appendChild(span);
+  }
+
+  function onDoIt(host, chip, messageId, result, sender, fullText) {
+    setChipState(chip, 'flow-chip-pending', 'Working…');
     FlowStorage.appendLog({ kind: 'clicked', label: result.label, messageId });
+
+    const excerpt = fullText.slice(0, 400);
+    chrome.runtime.sendMessage(
+      {
+        type: 'flow:execute-action',
+        payload: {
+          connectorId: currentConnector,
+          label: result.label,
+          senderEmail: sender.email,
+          senderName: sender.name,
+          excerpt
+        }
+      },
+      (response) => {
+        if (!response) {
+          setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.');
+          return;
+        }
+        if (response.ok) {
+          const conn = FLOW_CONNECTORS.find((c) => c.id === currentConnector);
+          setChipState(chip, 'flow-chip-done', `Done ✓ · Logged to ${conn ? conn.label : 'your CRM'}`);
+          return;
+        }
+        if (response.reason === 'connector-not-live') {
+          setChipState(chip, 'flow-chip-warn', 'This connector isn’t wired up yet.');
+        } else if (response.reason === 'not-connected') {
+          setChipState(chip, 'flow-chip-warn', 'Connect HubSpot in the Flow popup first.');
+        } else if (response.reason === 'no-matching-contact') {
+          setChipState(chip, 'flow-chip-warn', `No HubSpot contact found for ${sender.email || 'this sender'}.`);
+        } else {
+          setChipState(chip, 'flow-chip-error', 'Couldn’t complete that action.');
+        }
+      }
+    );
   }
 
   function onDismiss(host, messageId, result) {
