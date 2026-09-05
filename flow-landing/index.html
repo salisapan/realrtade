@@ -2,12 +2,13 @@
 <html lang="en" dir="ltr" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
 <meta name="description" content="Flow — Cognitive Workflow Engine: a secure AI workflow engine deployed in a masked, secure cloud or fully on your own infrastructure.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
@@ -106,7 +107,7 @@
   --nav-bg:rgba(255,255,255,.82);
 }
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
+html{scroll-behavior:smooth; overflow-x:hidden}
 body{
   margin:0; background:var(--bg); color:var(--txt);
   font-family:var(--body); font-size:var(--step-0); line-height:1.7;
@@ -621,36 +622,12 @@ canvas.terrain-canvas.show{opacity:1}
 .agraph-legend .exp{background:#dce6ff; box-shadow:0 0 10px var(--glow)}
 .agraph-legend .team{background:var(--accent); opacity:.7}
 
-/* insights — scroll-morphing article carousel: circle of covers unwinds into an arc as you scroll */
-.ins-sec{position:relative}
-.ins-head{padding:64px 0 8px; text-align:center}
-.ins-head h2{font-family:var(--disp); font-weight:700; font-size:clamp(1.5rem,3.2vw,2.2rem); color:var(--txt-hi); margin:12px 0 0; letter-spacing:-.01em}
-.ins-morph{position:relative; height:280vh}
-.ins-stage{position:sticky; top:0; height:100vh; overflow:hidden}
-:root[data-theme="dark"] .ins-stage{background:radial-gradient(120% 90% at 50% 42%, #14161d 0%, #0a0b10 55%, #06070a 100%)}
-.ins-cards{position:absolute; inset:0}
-.ins-card{position:absolute; top:50%; left:50%; width:56px; height:78px; margin:-39px 0 0 -28px; display:block; text-decoration:none; opacity:0; will-change:transform,opacity}
-@media (min-width:640px){ .ins-card{width:72px; height:100px; margin:-50px 0 0 -36px} }
-.ins-cards.ins-intro .ins-card{transition:transform 1s cubic-bezier(.2,.8,.2,1), opacity .8s}
-.ins-card-inner{position:relative; display:block; width:100%; height:100%; border-radius:20px; transition:transform .5s cubic-bezier(.2,.8,.2,1); transform-style:preserve-3d}
-.ins-card:hover .ins-card-inner{transform:rotateY(180deg)}
-.ins-card-face{position:absolute; inset:0; border-radius:20px; overflow:hidden; backface-visibility:hidden; box-shadow:0 24px 50px -20px rgba(0,0,0,.6), inset 0 0 0 1px var(--line-hi), inset 0 1px 0 rgba(255,255,255,.14)}
-.ins-card-face.front img{width:100%; height:100%; object-fit:cover; display:block}
-.ins-card-face.back{transform:rotateY(180deg); background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 26%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); border:1px solid var(--glass-border); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:8px; gap:4px}
-@media (hover:none){
-  .ins-card:hover .ins-card-inner{transform:none}
-  .ins-card-face.front::after{content:attr(data-cat); position:absolute; inset-inline:0; bottom:0; padding:5px 4px 4px; background:linear-gradient(0deg,rgba(0,0,0,.72),transparent); color:#fff; font-family:var(--sans); font-size:.5rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; text-align:center; line-height:1.15}
-}
-.ins-card-cat{font-family:var(--body); font-size:.54rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--accent-2)}
-.ins-card-title{font-family:var(--disp); font-size:.64rem; line-height:1.25; color:var(--txt-hi); font-weight:600; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden}
-.ins-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; pointer-events:none; padding:0 24px}
-.ins-center-title{font-family:var(--disp); font-weight:700; font-size:clamp(1.05rem,2.4vw,1.5rem); color:var(--txt-hi); max-width:17ch; margin:0}
-.ins-center-hint{margin-top:10px; font-family:var(--body); font-size:.7rem; font-weight:700; letter-spacing:.2em; color:var(--muted)}
-.ins-reveal{position:absolute; top:8%; left:0; right:0; display:flex; flex-direction:column; align-items:center; text-align:center; pointer-events:none; opacity:0; padding:0 24px}
-.ins-reveal h3{font-family:var(--disp); font-weight:700; font-size:clamp(1.4rem,3.4vw,2.1rem); color:var(--txt-hi); margin:0 0 12px}
-.ins-reveal p{font-family:var(--body); color:var(--muted); font-size:1rem; max-width:52ch; margin:0 0 20px; line-height:1.6}
-.ins-reveal .ins-viewall{pointer-events:auto; font-family:var(--disp); font-weight:700; color:var(--accent-2); text-decoration:none; font-size:1rem}
-.ins-reveal .ins-viewall:hover{text-decoration:underline}
+/* insights — simple heading + CTA to the blog, no carousel component */
+.ins-sec-simple{padding:72px 0; text-align:center}
+.ins-sec-simple h2{font-family:var(--disp); font-weight:700; font-size:clamp(1.5rem,3.2vw,2.2rem); color:var(--txt-hi); margin:12px 0 14px; letter-spacing:-.01em}
+.ins-sec-simple p{font-family:var(--body); color:var(--muted); font-size:1.05rem; max-width:56ch; margin:0 auto 22px; line-height:1.6}
+.ins-viewall{font-family:var(--disp); font-weight:700; color:var(--accent-2); text-decoration:none; font-size:1rem}
+.ins-viewall:hover{text-decoration:underline}
 
 /* waitlist */
 .cta-sec{border-block-start:1px solid var(--line); background:radial-gradient(900px 500px at 50% 120%,var(--hero-glow1),transparent 60%)}
@@ -1178,44 +1155,12 @@ Best,
   </section>
 
   <!-- INSIGHTS -->
-  <section id="insights" class="ins-sec">
-    <div class="wrap ins-head reveal" data-d="1">
+  <section id="insights" class="ins-sec-simple">
+    <div class="wrap">
       <span class="eyebrow" data-i18n="ins.eyebrow">INSIGHTS</span>
       <h2 data-i18n="ins.title">Research on Regulated AI Deployment</h2>
-    </div>
-    <div class="ins-morph" id="insMorph">
-      <div class="ins-stage" id="insStage">
-        <div class="ins-cards" id="insCards">
-            <a class="ins-card" href="/blog/action-graph-institutional-knowledge.html" style="--i:0" aria-label="The Action Graph: How Institutional Knowledge Gets Captured Without Centralizing Raw Data" data-cat="Product Architecture"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Product Architecture"><img src="/blog/img/action-graph-institutional-knowledge.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Product Architecture</span><span class="ins-card-title">The Action Graph: How Institutional Knowledge Gets Captured Without Centralizing Raw Data</span></span></span></a>
-            <a class="ins-card" href="/blog/ai-observability-tracing-debugging.html" style="--i:1" aria-label="AI Observability: Tracing a Workflow Decision Back to Its Source" data-cat="AI Architecture"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="AI Architecture"><img src="/blog/img/ai-observability-tracing-debugging.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">AI Architecture</span><span class="ins-card-title">AI Observability: Tracing a Workflow Decision Back to Its Source</span></span></span></a>
-            <a class="ins-card" href="/blog/aml-kyc-ai-automation.html" style="--i:2" aria-label="Automating AML and KYC: AI Workflow Design Under the Bank Secrecy Act" data-cat="Financial Services"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Financial Services"><img src="/blog/img/aml-kyc-ai-automation.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Financial Services</span><span class="ins-card-title">Automating AML and KYC: AI Workflow Design Under the Bank Secrecy Act</span></span></span></a>
-            <a class="ins-card" href="/blog/auditability-by-design-ai-systems.html" style="--i:3" aria-label="Auditability by Design: Logging, Provenance, and Human Oversight in Regulated AI Systems" data-cat="Architecture & Security"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Architecture & Security"><img src="/blog/img/auditability-by-design-ai-systems.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Architecture &amp; Security</span><span class="ins-card-title">Auditability by Design: Logging, Provenance, and Human Oversight in Regulated AI Systems</span></span></span></a>
-            <a class="ins-card" href="/blog/customs-trade-compliance-ai.html" style="--i:4" aria-label="AI in Customs and Trade Compliance: C-TPAT, CBP Data Rules, and Denied-Party Screening" data-cat="Trade & Customs Compliance"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Trade & Customs Compliance"><img src="/blog/img/customs-trade-compliance-ai.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Trade &amp; Customs Compliance</span><span class="ins-card-title">AI in Customs and Trade Compliance: C-TPAT, CBP Data Rules, and Denied-Party Screening</span></span></span></a>
-            <a class="ins-card" href="/blog/edge-ai-inference-architecture-technical.html" style="--i:5" aria-label="Inside a Fully Local AI Deployment: The Technical Architecture Behind On-Premises Inference" data-cat="AI Infrastructure"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="AI Infrastructure"><img src="/blog/img/edge-ai-inference-architecture-technical.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">AI Infrastructure</span><span class="ins-card-title">Inside a Fully Local AI Deployment: The Technical Architecture Behind On-Premises Inference</span></span></span></a>
-            <a class="ins-card" href="/blog/ediscovery-tar-generative-ai.html" style="--i:6" aria-label="Technology-Assisted Review Meets Generative AI: Defensibility in e-Discovery Automation" data-cat="Legal"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Legal"><img src="/blog/img/ediscovery-tar-generative-ai.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Legal</span><span class="ins-card-title">Technology-Assisted Review Meets Generative AI: Defensibility in e-Discovery Automation</span></span></span></a>
-            <a class="ins-card" href="/blog/education-ai-ferpa.html" style="--i:7" aria-label="AI Automation in Education Administration: FERPA and Student Data Governance" data-cat="Education"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Education"><img src="https://d8j0ntlcm91z4.cloudfront.net/user_3IXIoov5CmuBCm6ETp865KISVuz/hf_20260902_083912_f894da18-f86f-4796-98f0-46e1259bd40d.png" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Education</span><span class="ins-card-title">AI Automation in Education Administration: FERPA and Student Data Governance</span></span></span></a>
-            <a class="ins-card" href="/blog/energy-utilities-ai-nerc-cip.html" style="--i:8" aria-label="AI Workflow Automation in Critical Infrastructure: NERC CIP and the Limits of Cloud Processing" data-cat="Energy & Utilities"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Energy & Utilities"><img src="/blog/img/energy-utilities-ai-nerc-cip.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Energy &amp; Utilities</span><span class="ins-card-title">AI Workflow Automation in Critical Infrastructure: NERC CIP and the Limits of Cloud Processing</span></span></span></a>
-            <a class="ins-card" href="/blog/government-ai-automation-fedramp-cmmc.html" style="--i:9" aria-label="Deploying AI Automation in Government: Meeting the Federal Procurement Security Bar" data-cat="Government & Public Sector"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Government & Public Sector"><img src="/blog/img/government-ai-automation-fedramp-cmmc.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Government &amp; Public Sector</span><span class="ins-card-title">Deploying AI Automation in Government: Meeting the Federal Procurement Security Bar</span></span></span></a>
-            <a class="ins-card" href="/blog/hipaa-compliant-ai-automation.html" style="--i:10" aria-label="Compliance by Design: Architecting AI Workflow Automation Under HIPAA" data-cat="Healthcare"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Healthcare"><img src="/blog/img/hipaa-compliant-ai-automation.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Healthcare</span><span class="ins-card-title">Compliance by Design: Architecting AI Workflow Automation Under HIPAA</span></span></span></a>
-            <a class="ins-card" href="/blog/hr-hiring-ai-bias-fcra.html" style="--i:11" aria-label="AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook" data-cat="HR & People Operations"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="HR & People Operations"><img src="/blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">HR &amp; People Operations</span><span class="ins-card-title">AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook</span></span></span></a>
-            <a class="ins-card" href="/blog/insurance-claims-ai-automation.html" style="--i:12" aria-label="AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight" data-cat="Insurance"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Insurance"><img src="/blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Insurance</span><span class="ins-card-title">AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</span></span></span></a>
-            <a class="ins-card" href="/blog/manufacturing-ai-export-controls.html" style="--i:13" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing" data-cat="Manufacturing & Supply Chain"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Manufacturing & Supply Chain"><img src="/blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Manufacturing &amp; Supply Chain</span><span class="ins-card-title">AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing</span></span></span></a>
-            <a class="ins-card" href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="--i:14" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records" data-cat="Pharma & Life Sciences"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Pharma & Life Sciences"><img src="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Pharma &amp; Life Sciences</span><span class="ins-card-title">AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records</span></span></span></a>
-            <a class="ins-card" href="/blog/retail-ecommerce-ai-ccpa-cpra.html" style="--i:15" aria-label="AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook" data-cat="Retail & E-Commerce"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Retail & E-Commerce"><img src="/blog/img/retail-ecommerce-ai-ccpa-cpra.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Retail &amp; E-Commerce</span><span class="ins-card-title">AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook</span></span></span></a>
-            <a class="ins-card" href="/blog/state-local-government-ai-public-records.html" style="--i:16" aria-label="AI in State and Local Government: Public Records Law and the Transparency Paradox" data-cat="State & Local Government"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="State & Local Government"><img src="/blog/img/state-local-government-ai-public-records.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">State &amp; Local Government</span><span class="ins-card-title">AI in State and Local Government: Public Records Law and the Transparency Paradox</span></span></span></a>
-            <a class="ins-card" href="/blog/telecom-ai-cpni-fcc.html" style="--i:17" aria-label="AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement" data-cat="Telecommunications"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Telecommunications"><img src="/blog/img/telecom-ai-cpni-fcc.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Telecommunications</span><span class="ins-card-title">AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement</span></span></span></a>
-            <a class="ins-card" href="/blog/title-escrow-ai-wire-fraud.html" style="--i:18" aria-label="AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard" data-cat="Real Estate & Title"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Real Estate & Title"><img src="/blog/img/title-escrow-ai-wire-fraud.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Real Estate &amp; Title</span><span class="ins-card-title">AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard</span></span></span></a>
-            <a class="ins-card" href="/blog/zero-retention-ai-architecture.html" style="--i:19" aria-label="Zero-Retention AI: What It Actually Means and How to Verify a Vendor&#x27;s Claim" data-cat="Data Security"><span class="ins-card-inner"><span class="ins-card-face front" data-cat="Data Security"><img src="/blog/img/zero-retention-ai-architecture.jpg" alt="" loading="lazy"></span><span class="ins-card-face back"><span class="ins-card-cat">Data Security</span><span class="ins-card-title">Zero-Retention AI: What It Actually Means and How to Verify a Vendor&#x27;s Claim</span></span></span></a>
-        <div class="ins-center" id="insCenter">
-          <p class="ins-center-title" data-i18n="ins.center">Our research library.</p>
-          <span class="ins-center-hint" data-i18n="ins.hint">SCROLL TO EXPLORE</span>
-        </div>
-        <div class="ins-reveal" id="insReveal">
-          <h3 data-i18n="ins.title2">Explore the Research</h3>
-          <p data-i18n="ins.lead">Compliance, architecture, and efficiency — across law, healthcare, finance, insurance, government, and technical AI infrastructure.</p>
-          <a href="/blog/" class="ins-viewall" data-i18n="ins.viewall">Read the research →</a>
-        </div>
-      </div>
+      <p data-i18n="ins.lead">Compliance, architecture, and efficiency — across law, healthcare, finance, insurance, government, and technical AI infrastructure.</p>
+      <a href="/blog/" class="ins-viewall" data-i18n="ins.viewall">Read the research →</a>
     </div>
   </section>
 
@@ -1224,7 +1169,6 @@ Best,
   <section id="waitlist" class="cta-sec">
     <div class="wrap">
       <div class="cta-box">
-        <img class="logo reveal in" src="/logo.png" width="660" height="291" alt="Flow">
         <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">EARLY ACCESS</span>
         <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
         <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Join the waitlist for early access to Flow. Experience the future of autonomous, secure workflow automation — deployed your way.</p>
@@ -1677,119 +1621,11 @@ Best,
     });
   }
 
-  /* ---------- insights: scroll-morphing article carousel (circle → arc) ---------- */
+  /* ---------- insights CTA click tracking ---------- */
   (function(){
-    var morph=document.getElementById('insMorph'), stage=document.getElementById('insStage'), cardsWrap=document.getElementById('insCards');
-    if(!morph||!stage||!cardsWrap) return;
-    var cards=Array.prototype.slice.call(cardsWrap.querySelectorAll('.ins-card'));
-    cardsWrap.addEventListener('click',function(ev){
-      var a=ev.target.closest('.ins-card');
-      if(a && typeof gtag==='function') gtag('event','ins_card_click',{article_path:a.getAttribute('href')});
-    });
-    var centerEl=document.getElementById('insCenter'), revealEl=document.getElementById('insReveal');
-    var N=cards.length, W=0, H=0, parallaxX=0, targetParallaxX=0, introDone=false, started=false, visible=false, raf=null;
-
-    function lerp(a,b,t){ return a+(b-a)*t; }
-    function size(){ var r=stage.getBoundingClientRect(); W=r.width; H=r.height; }
-
-    function circlePos(i){
-      var radius=Math.min(Math.min(W,H)*0.40,360);
-      var angle=(i/N)*Math.PI*2;
-      return {x:Math.cos(angle)*radius, y:Math.sin(angle)*radius, rot:angle*180/Math.PI+90, scale:1};
-    }
-    function arcPos(i,rotOffset){
-      var isMobile=W<640;
-      var radius=Math.min(W,H)*(isMobile?0.62:0.65);
-      var apexY=H*(isMobile?0.3:0.34);
-      var centerY=apexY+radius;
-      var spread=isMobile?100:140;
-      var start=-90-spread/2, step=spread/(N-1);
-      var angleDeg=start+i*step+rotOffset, rad=angleDeg*Math.PI/180;
-      return {x:Math.cos(rad)*radius+parallaxX, y:Math.sin(rad)*radius+centerY, rot:angleDeg+90, scale:isMobile?1.15:1.35};
-    }
-    function scatterPos(i){
-      var seed=(i*9301+49297)%233280, rx=((seed*49297)%233280)/233280, ry=((seed*12345+6789)%233280)/233280;
-      return {x:(rx-0.5)*Math.min(W,900)*1.4, y:(ry-0.5)*Math.min(H,600), rot:(rx-0.5)*180, scale:0.6};
-    }
-    function linePos(i){
-      var spacing=W<640?46:62, total=N*spacing;
-      return {x:i*spacing-total/2, y:0, rot:0, scale:1};
-    }
-    function apply(card,p,opacity){
-      card.style.transform='translate3d('+p.x.toFixed(1)+'px,'+p.y.toFixed(1)+'px,0) rotate('+p.rot.toFixed(1)+'deg) scale('+p.scale.toFixed(3)+')';
-      card.style.opacity=(opacity!==undefined?opacity:1);
-      card.style.zIndex=String(1000-Math.round(Math.abs(p.y)));
-    }
-
-    function update(){
-      raf=null;
-      if(!introDone) return;
-      var rect=morph.getBoundingClientRect();
-      var total=Math.max(1,rect.height-H);
-      var sp=Math.max(0,Math.min(1,-rect.top/total));
-      var morphT=Math.min(1,sp/0.5);
-      cards.forEach(function(card,i){
-        var c=circlePos(i), a=arcPos(i,0);
-        apply(card,{ x:lerp(c.x,a.x,morphT), y:lerp(c.y,a.y,morphT), rot:lerp(c.rot,a.rot,morphT), scale:lerp(c.scale,a.scale,morphT) },1);
-      });
-      centerEl.style.opacity=String(Math.max(0,1-sp/0.35));
-      var revealOpacity=Math.max(0,Math.min(1,(sp-0.55)/0.3));
-      revealEl.style.opacity=String(revealOpacity);
-      revealEl.style.transform='translateY('+((1-revealOpacity)*16).toFixed(1)+'px)';
-    }
-    function schedule(){ if(!raf) raf=requestAnimationFrame(update); }
-
-    function runIntro(){
-      size();
-      if(rm){
-        // no scatter/line entrance for reduced-motion — land straight on the circle
-        cards.forEach(function(card,i){ apply(card,circlePos(i),1); });
-        centerEl.style.opacity='1';
-        introDone=true; schedule();
-        return;
-      }
-      cards.forEach(function(card,i){ apply(card,scatterPos(i),0); });
-      requestAnimationFrame(function(){ requestAnimationFrame(function(){
-        cardsWrap.classList.add('ins-intro');
-        cards.forEach(function(card,i){ apply(card,scatterPos(i),1); });
-      }); });
-      setTimeout(function(){ cards.forEach(function(card,i){ apply(card,linePos(i),1); }); },450);
-      setTimeout(function(){ cards.forEach(function(card,i){ apply(card,circlePos(i),1); }); centerEl.style.opacity='1'; },1500);
-      setTimeout(function(){ cardsWrap.classList.remove('ins-intro'); introDone=true; schedule(); },2300);
-    }
-
-    var inViewport=false;
-    new IntersectionObserver(function(es){
-      es.forEach(function(e){
-        inViewport=e.isIntersecting;
-        visible=inViewport && !document.hidden;
-        if(visible && !started){ started=true; runIntro(); }
-        if(visible) schedule();
-      });
-    },{threshold:0}).observe(morph);
-
-    document.addEventListener('visibilitychange',function(){
-      visible=inViewport && !document.hidden;
-      if(visible && !started){ started=true; runIntro(); }
-      if(visible) schedule();
-    });
-
-    addEventListener('scroll',function(){ if(visible) schedule(); },{passive:true});
-    addEventListener('resize',function(){ size(); if(visible) schedule(); });
-
-    if(fine && !rm){
-      stage.addEventListener('pointermove',function(ev){
-        var r=stage.getBoundingClientRect();
-        targetParallaxX=((ev.clientX-r.left)/r.width-0.5)*2*60;
-      });
-      (function drift(){
-        if(visible){
-          parallaxX+=(targetParallaxX-parallaxX)*0.08;
-          if(introDone) schedule();
-        }
-        requestAnimationFrame(drift);
-      })();
-    }
+    var a=document.querySelector('.ins-viewall');
+    if(!a) return;
+    a.addEventListener('click',function(){ if(typeof gtag==='function') gtag('event','ins_viewall_click'); });
   })();
 
   /* ---------- waitlist (Supabase REST + graceful localStorage fallback) ---------- */
@@ -1923,7 +1759,7 @@ Best,
   /* ---------- Action Graph: scroll-scrubbed hero video (chaos → order knowledge graph) ---------- */
   (function(){
     var v=document.getElementById('agraphVideo'); if(!v) return;
-    var duration=v.duration||0, raf=null, visible=false;
+    var duration=v.duration||0, raf=null, visible=false, woken=false;
     function prog(){
       var r=v.getBoundingClientRect();
       var total=Math.max(1, r.height+innerHeight);
@@ -1934,9 +1770,20 @@ Best,
       if(duration>0) v.currentTime=prog()*duration*0.999;
     }
     function schedule(){ if(!raf) raf=requestAnimationFrame(update); }
-    function onMeta(){ duration=v.duration||0; update(); }
+    // iOS Safari will not decode/paint a frame from a bare currentTime seek
+    // until the element has actually started playback at least once — a
+    // muted+playsinline video is allowed to autoplay without a user gesture,
+    // so kick it off and immediately pause to "wake" the decoder, then seek.
+    function wake(){
+      if(woken) return;
+      woken=true;
+      var p=v.play();
+      if(p && typeof p.then==='function'){ p.then(function(){ v.pause(); update(); }).catch(function(){ update(); }); }
+      else { update(); }
+    }
+    function onMeta(){ duration=v.duration||0; wake(); }
     if(v.readyState>=1) onMeta(); else v.addEventListener('loadedmetadata',onMeta);
-    new IntersectionObserver(function(es){ es.forEach(function(e){ visible=e.isIntersecting; if(visible) schedule(); }); },{threshold:0}).observe(v);
+    new IntersectionObserver(function(es){ es.forEach(function(e){ visible=e.isIntersecting; if(visible){ wake(); schedule(); } }); },{threshold:0}).observe(v);
     addEventListener('scroll',function(){ if(visible) schedule(); },{passive:true});
     addEventListener('resize',function(){ if(visible) schedule(); });
   })();
