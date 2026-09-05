@@ -105,6 +105,9 @@ article h2::before{
   background:linear-gradient(180deg, var(--accent-2,#3B74FF), transparent);
   box-shadow:0 0 14px var(--p-glow);
 }
+/* Centred panel headings carry no text indent, so the marker would sit against
+   the panel edge rather than beside the words. */
+.cta h2::before, .sec-head h2::before, .cta-box h2::before{display:none}
 .lead{color:var(--muted, var(--ink-2, inherit)); font-size:1.19rem; line-height:1.7; text-wrap:pretty}
 article a, .lead a{
   text-decoration:none; background-image:linear-gradient(currentColor,currentColor);
@@ -145,29 +148,101 @@ article a:hover, .lead a:hover{background-size:100% 1px}
 }
 .note{border-radius:14px; padding:16px 18px; border-inline-start:3px solid var(--accent-2,#3B74FF) !important}
 
-/* --- the Do It pill ------------------------------------------------------- */
+/* --- the Do It button ------------------------------------------------------
+   There were three separate implementations of this button on the site — one on
+   the homepage, one on the trial page, one copied into all thirty articles — and
+   a flat .btn pill on top of that for "Contact us", "Request pricing" and the
+   rest. This is the single canonical version, and because the layer loads after
+   each page's own CSS it wins everywhere. Its tokens are prefixed --p- so they
+   never collide with a page's local --glass-* set.
+
+   Markup: <a class="doit"><span class="shell"></span><span class="ring"></span>
+           <span class="shine"></span>Label</a>
+   ------------------------------------------------------------------------- */
+:root{
+  --p-doit-top:rgba(255,255,255,.97); --p-doit-bot:rgba(219,230,250,.72);
+  --p-doit-border:rgba(40,70,150,.3); --p-doit-gloss:rgba(255,255,255,.95);
+  --p-doit-text:#123ccb; --p-doit-ring:#2f5bd8; --p-doit-ring-hi:#1A4EF5;
+  --p-doit-inner:rgba(14,32,80,.12);
+}
+:root[data-theme="dark"]{
+  --p-doit-top:rgba(228,236,250,.2); --p-doit-bot:rgba(9,13,24,.34);
+  --p-doit-border:rgba(228,236,250,.3); --p-doit-gloss:rgba(255,255,255,.55);
+  --p-doit-text:#e6efff; --p-doit-ring:#5b8cff; --p-doit-ring-hi:#9dbcff;
+  --p-doit-inner:rgba(14,32,80,.24);
+}
+
+.doit{
+  --pad-y:16px; --pad-x:34px;
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate;
+  border-radius:999px; background:transparent; -webkit-tap-highlight-color:transparent;
+  font-family:var(--sans, var(--disp, inherit)); font-weight:700; font-size:1.04rem;
+  color:var(--p-doit-text) !important; text-decoration:none; text-shadow:0 1px 10px var(--p-glow);
+  transition:transform .28s cubic-bezier(.2,.8,.2,1);
+}
+.doit .shell{
+  position:absolute; inset:0; border-radius:inherit; z-index:-2;
+  background:linear-gradient(180deg, var(--p-doit-gloss) 0%, transparent 24%),
+             linear-gradient(180deg, var(--p-doit-top), var(--p-doit-bot));
+  border:1px solid var(--p-doit-border);
+  box-shadow:inset 0 1.5px 0 var(--p-doit-gloss), inset 0 -12px 26px var(--p-doit-inner),
+             0 16px 46px -10px var(--p-glow);
+  transition:box-shadow .3s;
+}
+.doit .ring{
+  position:absolute; inset:6px; border-radius:999px; z-index:-1;
+  border:2px solid var(--p-doit-ring);
+  box-shadow:0 0 12px var(--p-glow), inset 0 0 0 1px rgba(255,255,255,.28),
+             inset 0 0 11px color-mix(in srgb, var(--p-doit-ring) 42%, transparent);
+  transition:box-shadow .3s, border-color .3s;
+}
+.doit .shine{position:absolute; inset:0; border-radius:inherit; overflow:hidden; z-index:-1}
+.doit .shine::before{
+  content:""; position:absolute; inset-block:-40%; inline-size:40%; inset-inline-start:-60%;
+  background:linear-gradient(105deg, transparent, rgba(255,255,255,.5), transparent);
+  transform:skewX(-18deg);
+}
+.doit:hover{transform:translateY(-2px) scale(1.035)}
+.doit:hover .shell{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 -10px 22px var(--p-doit-inner),
+             0 20px 60px -8px var(--p-glow);
+}
+.doit:hover .ring{border-color:var(--p-doit-ring-hi); box-shadow:0 0 22px var(--p-glow), inset 0 0 16px var(--p-glow)}
+.doit:hover .shine::before{animation:p-sweep .85s cubic-bezier(.3,.6,.2,1) forwards}
+.doit:active{transform:translateY(0) scale(.99)}
+.doit:focus-visible{outline:2px solid var(--p-doit-ring-hi); outline-offset:4px}
+.doit.sm{--pad-y:12px; --pad-x:24px; font-size:.94rem}
+.doit.lg{--pad-y:20px; --pad-x:48px; font-size:1.28rem}
+
+/* Secondary actions stay the same component, just quieter — a different weight
+   of the same button, never a different button. */
+.doit.ghost .shell{background:transparent; box-shadow:inset 0 1px 0 rgba(255,255,255,.14)}
+.doit.ghost .ring{border-color:color-mix(in srgb, var(--p-doit-ring) 55%, transparent); box-shadow:none}
+.doit.ghost{color:var(--txt-hi, var(--ink, inherit)) !important; text-shadow:none}
+.doit.ghost:hover .ring{border-color:var(--p-doit-ring); box-shadow:0 0 16px var(--p-glow)}
+
+.doit .btn-spin{
+  display:none; width:18px; height:18px; border-radius:50%;
+  border:2px solid color-mix(in srgb, var(--p-doit-text) 30%, transparent);
+  border-top-color:var(--p-doit-text); animation:p-spin .7s linear infinite;
+}
+.doit.loading{cursor:default}
+.doit.loading .btn-label, .doit.loading #trialBtnLabel{opacity:0}
+.doit.loading .btn-spin{display:block}
+
+@keyframes p-sweep{to{inset-inline-start:130%}}
+@keyframes p-spin{to{transform:rotate(360deg)}}
+
+/* Legacy .btn is gone from the markup; this remains only so a stray one would
+   still look like it belongs rather than like a browser default. */
 .btn{
-  position:relative; isolation:isolate; border-radius:999px; letter-spacing:.01em;
+  position:relative; border-radius:999px; letter-spacing:.01em;
   background:linear-gradient(180deg, color-mix(in srgb, var(--cat,#1A4EF5) 88%, #ffffff), var(--cat,#1A4EF5)) !important;
-  box-shadow:
-    inset 0 1.5px 0 rgba(255,255,255,.42),
-    inset 0 -10px 22px rgba(10,24,70,.28),
-    0 16px 40px -14px var(--p-glow);
-  transition:transform .3s var(--p-ease), box-shadow .3s var(--p-ease), filter .3s;
-  overflow:hidden;
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.42), 0 16px 40px -14px var(--p-glow);
+  transition:transform .3s var(--p-ease), box-shadow .3s var(--p-ease);
 }
-.btn::after{
-  content:""; position:absolute; inset:5px; border-radius:999px; z-index:-1;
-  border:1.5px solid rgba(255,255,255,.34);
-}
-.btn:hover{
-  transform:translateY(-2px);
-  box-shadow:
-    inset 0 1.5px 0 rgba(255,255,255,.5),
-    inset 0 -10px 22px rgba(10,24,70,.3),
-    0 22px 52px -14px var(--p-glow);
-}
-.btn:active{transform:translateY(0)}
+.btn:hover{transform:translateY(-2px)}
 .btn:focus-visible{outline:2px solid var(--p-ring); outline-offset:3px}
 
 /* --- details / FAQ -------------------------------------------------------- */
