@@ -89,6 +89,15 @@ footer.site a{color:var(--muted)}
 .pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
 .pagenav a{color:var(--muted); margin-inline-end:16px}
 .note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
 </style>
 <script>
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'light');}catch(e){}})();
@@ -108,7 +117,10 @@ footer.site a{color:var(--muted)}
   <div class="wrap">
     <a class="brand" href="/"><img src="/logo.png" width="660" height="291" alt="Flow"></a>
     <nav>
-      <a href="/">Home</a><a href="/security.html">Security</a><a href="/trial.html">Flow Trial</a><a href="/blog/">Insights</a><a href="/#waitlist">Join Waitlist</a>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+      </button>
+      
       <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
@@ -116,6 +128,9 @@ footer.site a{color:var(--muted)}
     </nav>
   </div>
 </header>
+<div class="mobile-nav" id="mobileNav" hidden>
+  <a href="/">Home</a><a href="/security.html">Security</a><a href="/trial.html">Flow Trial</a><a href="/blog/">Insights</a><a href="/#waitlist">Join Waitlist</a>
+</div>
 <main id="main">
   <div class="wrap">
     <span class="eyebrow">Solutions</span>
@@ -172,6 +187,17 @@ footer.site a{color:var(--muted)}
   });
 })();
 
+</script>
+<script>
+(function(){
+  var mb=document.getElementById('menuBtn'), mn=document.getElementById('mobileNav');
+  if(!mb||!mn) return;
+  function close(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); setTimeout(function(){ mn.hidden=true; },250); }
+  function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
+  mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
+  mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
+})();
 </script>
 </body>
 </html>
