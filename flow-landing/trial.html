@@ -45,9 +45,15 @@
   --warn:#8A5A00; --warn-wash:#FBF1DD;
   --navy:#07090F;
   --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace;
   --shadow:0 1px 2px rgba(11,15,26,.04), 0 16px 32px -20px rgba(11,15,26,.16);
   --shadow-lg:0 2px 4px rgba(11,15,26,.05), 0 28px 56px -24px rgba(11,15,26,.28);
+  /* the same premium surface language as theflow-ai.com's homepage — reused, not reinvented */
+  --glow:rgba(26,78,245,.30); --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72);
+  --glass-border:rgba(40,70,150,.3); --glass-gloss:rgba(255,255,255,.95); --doit-text:#123ccb; --ring:#2f5bd8;
+  --net:52,104,230; --net-line:40,100,255; --net-a:.6;
+  --hero-glow1:rgba(52,124,255,.18); --hero-glow2:rgba(90,158,255,.13);
 }
 :root[data-theme="dark"]{
   --bg:#07090F; --surface:#10141D; --surface-2:#141924; --surface-3:#1A2130;
@@ -58,10 +64,17 @@
   --warn:#F0B65B; --warn-wash:#221A0C;
   --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 32px -20px rgba(0,0,0,.7);
   --shadow-lg:0 2px 4px rgba(0,0,0,.5), 0 28px 56px -24px rgba(0,0,0,.85);
+  --glow:rgba(59,116,255,.5); --glass-top:rgba(228,236,250,.2); --glass-bot:rgba(9,13,24,.34);
+  --glass-border:rgba(228,236,250,.3); --glass-gloss:rgba(255,255,255,.55); --doit-text:#e6efff; --ring:#5b8cff;
+  --net:150,170,220; --net-line:59,116,255; --net-a:.5;
+  --hero-glow1:rgba(59,116,255,.18); --hero-glow2:rgba(59,116,255,.10);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
-body{margin:0; background:var(--bg); color:var(--ink-2); font-family:var(--sans); line-height:1.6; font-size:1rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+body{margin:0; background:var(--bg); color:var(--ink-2); font-family:var(--sans); line-height:1.6; font-size:1rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s; position:relative}
+#bgcanvas{position:fixed; inset:0; width:100%; height:100%; z-index:0; opacity:.55; pointer-events:none}
+:root[data-theme="light"] #bgcanvas{opacity:.85}
+header.site,main,footer.site{position:relative; z-index:1}
 .wrap{max-width:1040px; margin:0 auto; padding:0 24px}
 .narrow{max-width:760px}
 
@@ -87,7 +100,9 @@ a{color:var(--accent-ink)}
 b,strong{color:var(--ink)}
 
 /* ---------------- hero ---------------- */
-.hero{padding:64px 0 8px}
+.hero{padding:64px 0 8px; position:relative}
+.hero::before{content:''; position:absolute; top:-120px; left:-160px; width:560px; height:560px; background:radial-gradient(circle, var(--hero-glow1), transparent 65%); pointer-events:none; z-index:-1}
+.hero::after{content:''; position:absolute; top:60px; left:280px; width:420px; height:420px; background:radial-gradient(circle, var(--hero-glow2), transparent 70%); pointer-events:none; z-index:-1}
 .eyebrow{font-family:var(--mono); font-size:.76rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:8px}
 .eyebrow::before{content:'';width:7px; height:7px; border-radius:50%; background:var(--accent)}
 h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.4rem,5.4vw,3.4rem); line-height:1.05; letter-spacing:-.02em; color:var(--ink); margin:16px 0 16px; max-width:14ch}
@@ -102,14 +117,31 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.4rem,5.4vw,
 .btn.ghost:hover{border-color:var(--accent); color:var(--accent-ink) !important}
 .btn.block{width:100%; justify-content:center}
 
+/* the site's real [Do It] button — same component as the homepage, not a lookalike */
+.doit{--pad-y:16px; --pad-x:32px; position:relative; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; text-decoration:none; -webkit-tap-highlight-color:transparent; font-family:var(--disp); font-weight:700; font-size:1.05rem; color:var(--doit-text); text-shadow:0 1px 10px var(--glow); transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.doit .shell{position:absolute; inset:0; border-radius:inherit; z-index:-2; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); box-shadow:inset 0 1.5px 0 var(--glass-gloss), inset 0 -12px 26px rgba(14,32,80,.24), 0 16px 46px -10px var(--glow); transition:box-shadow .3s}
+.doit .ring{position:absolute; inset:6px; border-radius:999px; z-index:-1; border:2px solid var(--ring); box-shadow:0 0 12px var(--glow), inset 0 0 0 1px rgba(255,255,255,.22), inset 0 0 11px color-mix(in srgb,var(--ring) 42%,transparent); transition:box-shadow .3s, border-color .3s}
+.doit .shine{position:absolute; inset:0; border-radius:inherit; overflow:hidden; z-index:-1}
+.doit .shine::before{content:""; position:absolute; inset-block:-40%; inline-size:40%; inset-inline-start:-60%; background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent); transform:skewX(-18deg)}
+.doit:hover{transform:translateY(-2px) scale(1.03)}
+.doit:hover .shell{box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -10px 22px rgba(14,32,80,.4), 0 20px 60px -8px var(--glow)}
+.doit:hover .ring{border-color:var(--accent-ink); box-shadow:0 0 22px var(--glow), inset 0 0 16px var(--glow)}
+.doit:hover .shine::before{animation:sweep .85s cubic-bezier(.3,.6,.2,1) forwards}
+.doit:active{transform:translateY(0) scale(.99)}
+.doit:disabled{cursor:default; opacity:.75}
+@keyframes sweep{ to{ transform:translateX(260%) skewX(-18deg); } }
+@media (prefers-reduced-motion:reduce){ .doit,.doit *{transition:none!important; animation:none!important} }
+
 /* ---------------- specimen (moved up, primary proof) ---------------- */
-.specimen{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:26px 28px; margin:8px 0 64px; box-shadow:var(--shadow-lg); max-width:640px}
+.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:18px; padding:26px 28px; margin:8px 0 64px; box-shadow:var(--shadow-lg); max-width:640px}
 .specimen .tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 16px}
 .mail{border-inline-start:3px solid var(--line-2); padding-inline-start:14px; margin-bottom:18px}
 .mail b{display:block; font-size:1rem; color:var(--ink); margin-bottom:3px; font-weight:700}
 .mail span{font-size:.88rem; color:var(--ink-3)}
-.chip{display:inline-flex; align-items:center; gap:9px; background:var(--accent); color:#fff; border-radius:9px; padding:11px 16px; font-weight:700; font-size:.92rem; box-shadow:0 10px 22px -10px rgba(26,78,245,.65)}
-.chip .target{font-family:var(--mono); font-weight:400; opacity:.75; font-size:.8rem}
+.chip{display:inline-flex; align-items:center; gap:9px; font-family:var(--disp); font-weight:700; font-size:.92rem; color:var(--doit-text); text-shadow:0 1px 8px var(--glow); border-radius:10px; padding:11px 16px; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 26%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(7px); -webkit-backdrop-filter:blur(7px); box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 12px 30px -12px var(--glow); animation:chip-pulse 3.2s ease-in-out infinite}
+.chip .target{font-family:var(--mono); font-weight:400; opacity:.75; font-size:.8rem; text-shadow:none}
+@keyframes chip-pulse{ 0%,100%{ box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 12px 30px -12px var(--glow); } 50%{ box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 16px 38px -10px var(--glow); } }
+@media (prefers-reduced-motion:reduce){ .chip{animation:none} }
 .specimen .note{font-size:.86rem; color:var(--ink-3); margin:16px 0 0; line-height:1.55}
 
 /* ---------------- section rhythm ---------------- */
@@ -128,7 +160,7 @@ p{margin:0 0 15px}
 /* is / isn't */
 .cards{display:grid; gap:18px}
 @media (min-width:720px){ .cards.two{grid-template-columns:1fr 1fr} }
-.card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:24px 26px; box-shadow:var(--shadow)}
+.card{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:16px; padding:24px 26px; box-shadow:var(--shadow)}
 .card h3{font-family:var(--mono); font-size:.74rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:0 0 14px; display:flex; align-items:center; gap:8px}
 .card.is h3{color:var(--ok)}
 .card.isnt h3{color:var(--ink-3)}
@@ -140,7 +172,8 @@ p{margin:0 0 15px}
 /* how it works — 2x2 modern grid, not a text timeline */
 .stepgrid{display:grid; gap:16px; grid-template-columns:1fr}
 @media (min-width:640px){ .stepgrid{grid-template-columns:1fr 1fr} }
-.stepcard{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow); position:relative}
+.stepcard{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow); position:relative; transition:transform .2s,box-shadow .2s}
+.stepcard:hover{transform:translateY(-2px); box-shadow:var(--shadow-lg)}
 .stepcard .num{width:34px; height:34px; border-radius:10px; background:var(--accent-wash); color:var(--accent-ink); font-family:var(--mono); font-weight:700; font-size:.95rem; display:flex; align-items:center; justify-content:center; margin-bottom:14px}
 .stepcard h4{margin:0 0 6px; font-size:1.04rem; font-weight:700; color:var(--ink)}
 .stepcard p{margin:0; font-size:.94rem; color:var(--ink-3); line-height:1.55}
@@ -148,7 +181,7 @@ p{margin:0 0 15px}
 /* flexibility: two-column choice panel */
 .choicegrid{display:grid; gap:18px}
 @media (min-width:720px){ .choicegrid{grid-template-columns:1fr 1fr} }
-.choicepanel{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow)}
+.choicepanel{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow)}
 .choicepanel h4{margin:0 0 4px; font-size:1rem; font-weight:700; color:var(--ink)}
 .choicepanel .sub{font-size:.87rem; color:var(--ink-3); margin:0 0 16px}
 .flex-note{font-size:.95rem; color:var(--ink-2); margin:22px 0 0}
@@ -178,7 +211,7 @@ p{margin:0 0 15px}
 
 /* faq */
 .faq{display:flex; flex-direction:column; gap:10px}
-.faq details{background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:2px 22px; box-shadow:var(--shadow)}
+.faq details{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:14px; padding:2px 22px; box-shadow:var(--shadow)}
 .faq summary{font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); padding:18px 0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:14px}
 .faq summary::-webkit-details-marker{display:none}
 .faq summary::after{content:'+'; font-size:1.4rem; color:var(--accent); flex:none; font-weight:400; line-height:1}
@@ -187,10 +220,11 @@ p{margin:0 0 15px}
 .faq p{margin:16px 0 18px; font-size:.96rem; color:var(--ink-3); line-height:1.6}
 
 /* signup band — the one section that breaks the white-card rhythm, because it's the one CTA left */
-.band{background:var(--surface-2); margin-inline:calc(50% - 50vw); padding:56px calc(50vw - 50%) 68px; border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+.band{position:relative; overflow:hidden; background:var(--surface-2); margin-inline:calc(50% - 50vw); padding:56px calc(50vw - 50%) 68px; border-top:1px solid var(--line); border-bottom:1px solid var(--line)}
+.band::before{content:''; position:absolute; top:-140px; right:8%; width:480px; height:480px; background:radial-gradient(circle, var(--hero-glow1), transparent 68%); pointer-events:none}
 
 /* signup */
-.formcard{background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:34px; box-shadow:var(--shadow-lg); max-width:600px}
+.formcard{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:20px; padding:34px; box-shadow:var(--shadow-lg); max-width:600px}
 .formcard .row{display:flex; gap:10px; flex-wrap:wrap}
 .formcard input[type=email]{flex:1; min-width:220px; font-family:var(--sans); font-size:1.02rem; padding:14px 16px; border-radius:11px; border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink)}
 .formcard input[type=email]:focus{outline:2px solid var(--accent); outline-offset:1px; background:var(--surface)}
@@ -205,7 +239,7 @@ p{margin:0 0 15px}
 .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
 
 /* install — horizontal wizard */
-.installbox{background:var(--surface); border:1px solid var(--line); border-radius:20px; padding:30px 32px; box-shadow:var(--shadow-lg)}
+.installbox{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:20px; padding:30px 32px; box-shadow:var(--shadow-lg)}
 .wizard{display:grid; gap:18px; margin:0 0 26px; grid-template-columns:1fr}
 @media (min-width:820px){ .wizard{grid-template-columns:repeat(5,1fr)} }
 .wstep{display:flex; flex-direction:column; gap:8px}
@@ -213,7 +247,7 @@ p{margin:0 0 15px}
 .wstep p{margin:0; font-size:.9rem; color:var(--ink-2); line-height:1.5}
 
 /* final cta */
-.cta-box{padding:36px 32px; background:linear-gradient(135deg, var(--accent-wash), var(--surface) 60%); border:1px solid var(--line); border-radius:20px; text-align:center; box-shadow:var(--shadow)}
+.cta-box{padding:36px 32px; background:linear-gradient(135deg, var(--accent-wash), var(--glass-bot) 70%); border:1px solid var(--glass-border); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-radius:20px; text-align:center; box-shadow:0 20px 50px -20px var(--glow), var(--shadow)}
 .cta-box h2{margin:0 0 10px; font-size:1.5rem}
 .cta-box p{margin:0 0 22px; color:var(--ink-2); max-width:48ch; margin-inline:auto}
 
@@ -242,6 +276,7 @@ footer.site a{color:var(--ink-3)}
 </script>
 </head>
 <body>
+<canvas id="bgcanvas" aria-hidden="true"></canvas>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site">
   <div class="wrap">
@@ -263,7 +298,7 @@ footer.site a{color:var(--ink-3)}
       <h1 class="title">The lean, free version of Flow</h1>
       <p class="lead">A browser extension that watches Gmail quietly, and&nbsp;&mdash; once in a while, when something actually changed &mdash;&nbsp;surfaces one <code>Do It</code> button. No chat window. No prompts. No if-this-then-that rules to build.</p>
       <div class="hero-cta">
-        <a class="btn" href="#signup">Request Early Access</a>
+        <a class="doit" href="#signup"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Request Early Access</a>
       </div>
       <div class="status-row">
         <span>Pre-release developer preview</span>
@@ -429,7 +464,7 @@ footer.site a{color:var(--ink-3)}
             <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
             <label class="sr-only" for="trialEmail">Email address</label>
             <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
-            <button type="submit" id="trialBtn">Request Access</button>
+            <button type="submit" class="doit" id="trialBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="trialBtnLabel">Request Access</span></button>
           </div>
           <p class="fine">Confirm your email and you'll land straight on a page with the real download button &mdash; we'll also send it to your inbox.</p>
           <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
@@ -480,7 +515,37 @@ footer.site a{color:var(--ink-3)}
     var next = cur === 'light' ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', next);
     try{localStorage.setItem('flow_theme', next);}catch(e){}
+    if(typeof readNetColors === 'function') readNetColors();
   });
+})();
+
+/* ---------- ambient particle network (theme-aware) — same component as the homepage ---------- */
+(function(){
+  var rm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var c=document.getElementById('bgcanvas'); if(!c) return;
+  var x=c.getContext('2d'), W,H,pts,raf,NET='150,170,220',NL='59,116,255',NA=.5;
+  var root=document.documentElement;
+  window.readNetColors=function(){
+    var cs=getComputedStyle(root);
+    NET=(cs.getPropertyValue('--net')||'150,170,220').trim();
+    NL=(cs.getPropertyValue('--net-line')||'59,116,255').trim();
+    NA=parseFloat(cs.getPropertyValue('--net-a'))||.5;
+  };
+  function size(){ W=c.width=innerWidth*devicePixelRatio; H=c.height=innerHeight*devicePixelRatio; }
+  function initNet(){ size(); var n=Math.min(60,Math.floor(innerWidth/26)); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*devicePixelRatio,vy:(Math.random()-.5)*.14*devicePixelRatio}); }
+  function draw(){
+    x.clearRect(0,0,W,H);
+    for(var i=0;i<pts.length;i++){
+      var p=pts[i]; p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
+      for(var j=i+1;j<pts.length;j++){ var q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=dx*dx+dy*dy,R=140*devicePixelRatio; if(d<R*R){ var a=(1-Math.sqrt(d)/R)*.2; x.strokeStyle='rgba('+NL+','+a+')'; x.lineWidth=1*devicePixelRatio; x.beginPath(); x.moveTo(p.x,p.y); x.lineTo(q.x,q.y); x.stroke(); } }
+      x.fillStyle='rgba('+NET+','+NA+')'; x.beginPath(); x.arc(p.x,p.y,1.3*devicePixelRatio,0,6.283); x.fill();
+    }
+    raf=requestAnimationFrame(draw);
+  }
+  readNetColors();
+  if(!rm){ initNet(); draw(); addEventListener('resize',function(){ cancelAnimationFrame(raf); initNet(); draw(); }); } else { size(); }
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ cancelAnimationFrame(raf); } else if(!rm){ cancelAnimationFrame(raf); draw(); } });
 })();
 
 (function(){
@@ -489,7 +554,7 @@ footer.site a{color:var(--ink-3)}
   var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var form=document.getElementById('trialForm');
   if(!form) return;
-  var email=document.getElementById('trialEmail'), btn=document.getElementById('trialBtn'), status=document.getElementById('trialStatus'), honey=form.querySelector('.hp');
+  var email=document.getElementById('trialEmail'), btn=document.getElementById('trialBtn'), btnLabel=document.getElementById('trialBtnLabel'), status=document.getElementById('trialStatus'), honey=form.querySelector('.hp');
 
   form.addEventListener('submit', function(ev){
     ev.preventDefault();
@@ -498,11 +563,11 @@ footer.site a{color:var(--ink-3)}
     if(!EMAIL_RE.test(v)){
       status.className='status err'; status.textContent='Enter a valid email address.'; email.focus(); return;
     }
-    btn.disabled=true; btn.textContent='Sending…';
+    btn.disabled=true; btnLabel.textContent='Sending…';
     status.className=''; status.textContent='';
 
     function done(ok){
-      btn.disabled=false; btn.textContent='Request Access';
+      btn.disabled=false; btnLabel.textContent='Request Access';
       status.className='status ' + (ok?'ok':'err');
       status.textContent = ok
         ? 'Check your inbox for a confirmation link.'
