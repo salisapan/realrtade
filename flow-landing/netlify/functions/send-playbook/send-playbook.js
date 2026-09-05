@@ -9,6 +9,23 @@ const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
 const DOIT_BUTTON_URL = 'https://theflow-ai.com/email-doit-button.png';
 const LOG_PREFIX = '[send-playbook]';
 
+// This function is only ever meant to be called by confirm-signup.js right
+// after a real double opt-in, never directly by the browser. Without this
+// check it would be a free, unauthenticated way to send a real branded
+// email + PDF attachment to any address from Flow's trusted sending domain
+// — i.e. an open spam/reputation-abuse relay. Require a short-lived
+// signature that only confirm-signup.js (which holds EMAIL_VERIFY_SECRET)
+// can produce.
+function verifyInternalAuth(email, authExp, authSig, secret) {
+  if (!authExp || !authSig) return false;
+  if (Date.now() > Number(authExp)) return false;
+  const expected = crypto.createHmac('sha256', secret).update('internal-send|' + email + '|' + authExp).digest('base64url');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(String(authSig));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 // Temporary CTA until a real scheduling link (e.g. Calendly) is wired up.
 // Uses a plain https:// URL rather than mailto: — mailto links are not
 // reliably clickable inside sandboxed/embedded viewers (e.g. a PDF opened
@@ -148,6 +165,16 @@ exports.handler = async function (event) {
   if (!EMAIL_RE.test(email)) {
     logErr('rejected: invalid email', email);
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid email' }) };
+  }
+
+  var verifySecret = process.env.EMAIL_VERIFY_SECRET;
+  if (!verifySecret) {
+    logErr('EMAIL_VERIFY_SECRET is not set');
+    return { statusCode: 500, body: JSON.stringify({ error: 'Confirmation service not configured' }) };
+  }
+  if (!verifyInternalAuth(email, payload.authExp, payload.authSig, verifySecret)) {
+    logErr('rejected: missing or invalid internal auth (this function is only ever called by confirm-signup)', { email: email });
+    return { statusCode: 400, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
 
   log('validated request', { email: email, lang: lang, from: FROM });

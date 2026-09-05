@@ -11,6 +11,17 @@ function signDownload(email, exp, secret) {
   return crypto.createHmac('sha256', secret).update(email + '|download|' + exp).digest('base64url');
 }
 
+// send-playbook is a public Netlify function like any other — it's only ever
+// meant to be triggered by this file after a real double opt-in, but nothing
+// else stops someone from POSTing to it directly and spamming an arbitrary
+// inbox with a real branded email + PDF attachment from Flow's trusted
+// sending domain. This short-lived signature proves the call actually came
+// from here, right after token verification succeeded.
+const INTERNAL_AUTH_TTL_MS = 5 * 60 * 1000; // 5 minutes — this is an immediate server-to-server call
+function signInternalAuth(email, exp, secret) {
+  return crypto.createHmac('sha256', secret).update('internal-send|' + email + '|' + exp).digest('base64url');
+}
+
 const COPY = {
   playbook: {
     en: {
@@ -120,7 +131,9 @@ exports.handler = async function (event) {
   }
 
   try {
-    var followUpBody = { email: email, lang: lang };
+    var authExp = Date.now() + INTERNAL_AUTH_TTL_MS;
+    var authSig = signInternalAuth(email, authExp, secret);
+    var followUpBody = { email: email, lang: lang, authExp: authExp, authSig: authSig };
     if (downloadUrl) followUpBody.downloadUrl = downloadUrl;
     await fetch(SITE_URL + '/.netlify/functions/' + followUpFn, {
       method: 'POST',

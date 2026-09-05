@@ -5,7 +5,41 @@ const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
 const INSTALL_PAGE_URL = 'https://theflow-ai.com/trial.html#install';
+const SITE_URL = 'https://theflow-ai.com';
+const DOWNLOAD_PATH = '/.netlify/functions/download-trial-zip';
 const LOG_PREFIX = '[send-trial-access]';
+
+// This function is never called by the browser directly — it's only ever
+// invoked server-side by confirm-signup.js after a real double opt-in, with
+// a downloadUrl it minted itself. But this is a public POST endpoint like
+// any other Netlify function, so nothing stops someone from calling it
+// directly with an arbitrary `downloadUrl`. Without this check, that would
+// let an attacker send a phishing email from Flow's own trusted sending
+// domain with a "Download the install file" button pointing anywhere they
+// want. So: re-derive the signature the same way confirm-signup.js did and
+// refuse to send unless the URL is a genuine, unexpired download link for
+// this exact email.
+function verifyDownloadUrl(downloadUrl, email, secret) {
+  let parsed;
+  try {
+    parsed = new URL(downloadUrl);
+  } catch (err) {
+    return false;
+  }
+  if (parsed.origin + parsed.pathname !== SITE_URL + DOWNLOAD_PATH) return false;
+
+  const urlEmail = parsed.searchParams.get('email') || '';
+  const exp = parsed.searchParams.get('exp') || '';
+  const sig = parsed.searchParams.get('sig') || '';
+  if (urlEmail !== email || !exp || !sig) return false;
+  if (Date.now() > Number(exp)) return false;
+
+  const expected = crypto.createHmac('sha256', secret).update(email + '|download|' + exp).digest('base64url');
+  const a = Buffer.from(expected);
+  const b = Buffer.from(sig);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
 
 const SUBJECT = {
   en: 'Your Flow Trial install instructions',
@@ -136,6 +170,16 @@ exports.handler = async function (event) {
   if (!downloadUrl) {
     logErr('rejected: missing downloadUrl (this function is only ever called by confirm-signup, which mints it)');
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing downloadUrl' }) };
+  }
+
+  var verifySecret = process.env.EMAIL_VERIFY_SECRET;
+  if (!verifySecret) {
+    logErr('EMAIL_VERIFY_SECRET is not set');
+    return { statusCode: 500, body: JSON.stringify({ error: 'Confirmation service not configured' }) };
+  }
+  if (!verifyDownloadUrl(downloadUrl, email, verifySecret)) {
+    logErr('rejected: downloadUrl is not a genuine signed download link for this email', { email: email });
+    return { statusCode: 400, body: JSON.stringify({ error: 'Invalid downloadUrl' }) };
   }
 
   var apiKey = process.env.RESEND_API_KEY;
