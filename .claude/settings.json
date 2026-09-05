@@ -11,10 +11,25 @@
         "source": "github",
         "repo": "21st-dev/claude-code-plugin"
       }
+    },
+    "ecc": {
+      "source": {
+        "source": "github",
+        "repo": "affaan-m/ECC"
+      }
     }
   },
   "enabledPlugins": {
     "ui-ux-pro-max@ui-ux-pro-max-skill": true,
-    "21st@21st": true
+    "21st@21st": true,
+    "ecc@ecc": true
+  },
+  "pluginConfigs": {
+    "ecc@ecc": {
+      "options": {
+        "hooks_enabled": true,
+        "hook_profile": "standard"
+      }
+    }
   }
 }
