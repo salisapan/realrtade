@@ -27,14 +27,14 @@ function htmlBody(lang, downloadUrl) {
         'ב-Chrome, פתחו chrome://extensions.',
         'הפעילו את מצב המפתחים (Developer mode) בפינה הימנית העליונה.',
         'לחצו Load unpacked ובחרו את התיקייה שחילצתם.',
-        'פתחו את התוסף, סמנו מערכת עבודה ותחום עבודה, ושמרו.',
+        'פתחו את התוסף, חברו את Notion (או HubSpot), בחרו את סוג העבודה שלכם, ולחצו שמירה.',
       ]
     : [
         'Download the ZIP file and unzip it to a folder.',
         'In Chrome, open chrome://extensions.',
         'Turn on Developer mode (top-right corner).',
         'Click Load unpacked and select the unzipped folder.',
-        'Open the extension, pick a connector and a work domain, and save.',
+        'Open the extension, connect Notion (or HubSpot), pick the kind of work you do, and hit Save & start.',
       ];
   var stepsHtml = steps
     .map(function (s, i) {
