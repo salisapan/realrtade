@@ -89,6 +89,7 @@
   --accent:#3B74FF; --accent-2:#6E9BFF; --accent-deep:#0E2050; --glow:rgba(59,116,255,.5); --warm:#E5642A;
   --glass-top:rgba(228,236,250,.2); --glass-bot:rgba(9,13,24,.34); --glass-border:rgba(228,236,250,.3); --doit-text:#e6efff; --ring:#5b8cff; --glass-gloss:rgba(255,255,255,.55);
   --net:150,170,220; --net-line:59,116,255; --net-a:.5;
+  --ag-exp:214,228,255; --ag-team:82,132,255; --ag-line:59,116,255; --ag-dim:120,140,185;
   --logo-shadow:drop-shadow(0 0 38px rgba(59,116,255,.32));
   --card-shadow:0 24px 60px -34px rgba(0,0,0,.7);
   --hero-glow1:rgba(59,116,255,.18); --hero-glow2:rgba(59,116,255,.10); --blob:rgba(59,116,255,.28); --blob2:rgba(150,180,255,.16);
@@ -101,6 +102,7 @@
   --accent:#1A4EF5; --accent-2:#0F37C6; --accent-deep:#C9D6FF; --glow:rgba(26,78,245,.30); --warm:#CF5220;
   --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72); --glass-border:rgba(40,70,150,.3); --doit-text:#123ccb; --ring:#2f5bd8; --glass-gloss:rgba(255,255,255,.95);
   --net:52,104,230; --net-line:40,100,255; --net-a:.6;
+  --ag-exp:24,38,78; --ag-team:26,78,245; --ag-line:40,100,255; --ag-dim:120,136,170;
   --logo-shadow:drop-shadow(0 8px 20px rgba(24,44,96,.24)) drop-shadow(0 1px 1px rgba(24,44,96,.22));
   --card-shadow:0 30px 60px -26px rgba(28,64,150,.30), 0 10px 24px -12px rgba(28,64,150,.16);
   --hero-glow1:rgba(52,124,255,.18); --hero-glow2:rgba(90,158,255,.13); --blob:rgba(60,134,255,.20); --blob2:rgba(120,178,255,.15);
@@ -615,12 +617,12 @@ canvas.terrain-canvas.show{opacity:1}
 .ag-tag{font-family:var(--mono); font-size:.86rem; letter-spacing:.02em; color:var(--accent-2); direction:ltr; margin:8px 0 2px; line-height:1.5}
 .agraph-head .lead{text-align:center; max-width:60ch}
 .agraph-stage{position:relative; width:100%; height:min(62vh,600px); margin-block:clamp(4px,1.5vw,14px)}
-.agraph-stage video{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; border-radius:20px; background:var(--navy,#07090F)}
+.agraph-stage canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
 .agraph-legend{display:flex; gap:24px; flex-wrap:wrap; justify-content:center; color:var(--muted); font-size:.86rem; position:relative; z-index:2}
 .agraph-legend span{display:inline-flex; align-items:center; gap:8px}
 .agraph-legend i{width:10px; height:10px; border-radius:50%; display:inline-block; flex:0 0 auto}
-.agraph-legend .exp{background:#dce6ff; box-shadow:0 0 10px var(--glow)}
-.agraph-legend .team{background:var(--accent); opacity:.7}
+.agraph-legend .exp{background:rgb(var(--ag-exp)); box-shadow:0 0 10px var(--glow)}
+.agraph-legend .team{background:rgb(var(--ag-team)); box-shadow:0 0 10px var(--glow)}
 
 /* insights — simple heading + CTA to the blog, no carousel component */
 .ins-sec-simple{padding:72px 0; text-align:center}
@@ -711,7 +713,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 <header class="nav" id="nav">
   <div class="nav-in">
     <a class="brand" href="#top" aria-label="Flow — Cognitive Workflow Engine">
-      <img src="/logo.png" width="660" height="291" alt="Flow">
+      <img src="/logo.png" width="880" height="388" alt="Flow">
       <span class="desc" data-i18n="nav.desc">Cognitive Workflow Engine</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
@@ -756,7 +758,7 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
   <section class="hero" id="hero">
     <div class="hero-blobs" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
     <div class="wrap hero-in">
-      <img class="hero-logo reveal in" src="/logo.png" width="660" height="291" alt="Flow — Cognitive Workflow Engine">
+      <img class="hero-logo reveal in" src="/logo.png" width="880" height="388" alt="Flow — Cognitive Workflow Engine">
       <div class="eyebrow reveal in" data-d="1" style="margin-bottom:16px" data-i18n="hero.eyebrow">SECURE CLOUD · FLOW-EDGE</div>
       <h1 class="reveal in" data-d="1" data-i18n="hero.h1">Autonomous Execution.<br><span class="chrome-text">Deployed On Your Terms.</span></h1>
       <p class="lead reveal in" data-d="2" data-i18n="hero.sub">Flow is a secure AI workflow engine — run it in our masked, secure cloud, or fully within your own infrastructure with Flow-Edge — accelerating mission-critical tasks without compromising compliance.</p>
@@ -978,7 +980,7 @@ Best,
         <p class="lead muted" data-i18n="ag.body">Flow decodes causal chains and hidden work patterns at the OS level, turning professional intuition into Execution Memory. The judgment of your most senior experts is replicated automatically to every teammate's machine — in zero clicks, at exactly the right second.</p>
       </div>
     </div>
-    <div class="agraph-stage" aria-hidden="true"><video id="agraphVideo" muted playsinline preload="auto" src="/media/agraph.mp4"></video></div>
+    <div class="agraph-stage" aria-hidden="true"><canvas id="agraphCanvas"></canvas></div>
     <div class="wrap">
       <div class="agraph-legend reveal">
         <span><i class="exp"></i><span data-i18n="ag.l1">Senior expertise</span></span>
@@ -1169,6 +1171,7 @@ Best,
   <section id="waitlist" class="cta-sec">
     <div class="wrap">
       <div class="cta-box">
+        <img class="logo reveal in" src="/logo.png" width="880" height="388" alt="Flow" loading="lazy" decoding="async">
         <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">EARLY ACCESS</span>
         <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
         <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Join the waitlist for early access to Flow. Experience the future of autonomous, secure workflow automation — deployed your way.</p>
@@ -1206,7 +1209,7 @@ Best,
 <footer>
   <div class="wrap">
     <div class="foot-in">
-      <a class="foot-brand" href="#top"><img src="/logo.png" width="660" height="291" alt="Flow"></a>
+      <a class="foot-brand" href="#top"><img src="/logo.png" width="880" height="388" alt="Flow"></a>
       <nav class="foot-links" aria-label="Footer">
         <a href="#architecture" data-i18n="foot.features">Features</a>
         <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
@@ -1756,36 +1759,163 @@ Best,
   if(!rm){ initNet(); draw(); addEventListener('resize',function(){ cancelAnimationFrame(raf); initNet(); draw(); }); } else { size(); }
   document.addEventListener('visibilitychange',function(){ if(document.hidden){ cancelAnimationFrame(raf); } else if(!rm){ cancelAnimationFrame(raf); draw(); } });
 
-  /* ---------- Action Graph: scroll-scrubbed hero video (chaos → order knowledge graph) ---------- */
+  /* ---------- Action Graph: scroll-driven canvas (chaos -> ordered knowledge graph).
+     Deliberately NOT a <video>: on iOS a scrubbed video never paints a frame while
+     Low Power Mode blocks autoplay, so the whole section rendered blank. Canvas has
+     no codec, no autoplay policy and no decode step — it draws everywhere. ---------- */
   (function(){
-    var v=document.getElementById('agraphVideo'); if(!v) return;
-    var duration=v.duration||0, raf=null, visible=false, woken=false;
-    function prog(){
-      var r=v.getBoundingClientRect();
-      var total=Math.max(1, r.height+innerHeight);
-      return Math.max(0,Math.min(1,(innerHeight-r.top)/total));
+    var cv=document.getElementById('agraphCanvas'); if(!cv||!cv.getContext) return;
+    var g=cv.getContext('2d'); if(!g) return;
+    var stage=cv.parentNode;
+    var EXP='214,228,255', TEAM='82,132,255', LINE='59,116,255', DIM='120,140,185';
+
+    function agColors(){
+      var cs=getComputedStyle(root);
+      EXP=(cs.getPropertyValue('--ag-exp')||EXP).trim();
+      TEAM=(cs.getPropertyValue('--ag-team')||TEAM).trim();
+      LINE=(cs.getPropertyValue('--ag-line')||LINE).trim();
+      DIM=(cs.getPropertyValue('--ag-dim')||DIM).trim();
     }
-    function update(){
+    window.__agraphColors=function(){ agColors(); render(); };
+
+    /* deterministic PRNG — the layout must be byte-identical across resizes and
+       reloads, otherwise the graph reshuffles every time the viewport changes. */
+    function rng(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+    var NODES=[], EDGES=[], CLUSTERS=6, RING=18;
+    (function build(){
+      var r=rng(20260905), hubs=[];
+      NODES.push({ox:.5,oy:.5,rad:10,kind:'core',d:0});
+      for(var i=0;i<CLUSTERS;i++){
+        var a=-Math.PI/2+i*(Math.PI*2/CLUSTERS), hi=NODES.length;
+        hubs.push(hi);
+        NODES.push({ox:.5+Math.cos(a)*.215,oy:.5+Math.sin(a)*.215,rad:6,kind:'hub',d:.05+i*.016});
+        EDGES.push({a:0,b:hi,d:.09+i*.018,w:1.6,spine:true});
+        var leaves=5+Math.floor(r()*4);
+        for(var j=0;j<leaves;j++){
+          var la=a+(r()-.5)*1.25, lr=.095+r()*.08, li=NODES.length;
+          NODES.push({ox:.5+Math.cos(a)*.215+Math.cos(la)*lr,oy:.5+Math.sin(a)*.215+Math.sin(la)*lr,rad:2.6+r()*1.8,kind:'leaf',d:.17+r()*.15});
+          EDGES.push({a:hi,b:li,d:.22+r()*.17,w:.95});
+        }
+      }
+      for(var k=0;k<RING;k++){
+        var ra=-Math.PI/2+k*(Math.PI*2/RING)+.12, ri=NODES.length;
+        NODES.push({ox:.5+Math.cos(ra)*.415,oy:.5+Math.sin(ra)*.415,rad:4.4,kind:'team',d:.38+k*.0085});
+        EDGES.push({a:hubs[k%CLUSTERS],b:ri,d:.44+k*.0095,w:1.1,beam:true});
+      }
+      for(var n=0;n<NODES.length;n++){
+        var q=NODES[n];
+        q.cx=.05+r()*.90; q.cy=.07+r()*.86; q.ph=r()*6.283; q.sp=.5+r()*.9;
+      }
+    })();
+
+    var W=0,H=0,DPR=1,U=0,prog=0,live=false,raf=null,t0=(typeof performance!=='undefined'?performance.now():Date.now());
+
+    function size(){
+      /* cap DPR: a full-bleed 2x+ canvas is the kind of layer that gets dropped
+         under compositor memory pressure on phones. */
+      DPR=Math.min(devicePixelRatio||1,2);
+      var w=stage.clientWidth||1, h=stage.clientHeight||1;
+      W=Math.max(1,Math.round(w*DPR)); H=Math.max(1,Math.round(h*DPR));
+      if(cv.width!==W) cv.width=W;
+      if(cv.height!==H) cv.height=H;
+      U=Math.min(W,H);
+    }
+
+    function scrollProg(){
+      var b=stage.getBoundingClientRect();
+      /* the arc must complete while the section is still centred on screen —
+         the earlier mapping only finished after the graph had scrolled away, so
+         visitors never saw the ordered state. */
+      var travel=Math.max(1,innerHeight*.86);
+      return Math.max(0,Math.min(1,(innerHeight-b.top)/travel));
+    }
+
+    function ease(t){ return t<0?0:t>1?1:t*t*(3-2*t); }
+    function px(node,p,tm){
+      var e=ease((p-node.d)/Math.max(.18,.72-node.d*.45)),
+          fx=W/2+(node.ox-.5)*U, fy=H/2+(node.oy-.5)*U,
+          sx=node.cx*W, sy=node.cy*H,
+          /* residual drift, strongest while scattered, a slow breath once settled */
+          amp=(1-e*.86)*10*DPR,
+          dx=Math.cos(tm*.00042*node.sp+node.ph)*amp,
+          dy=Math.sin(tm*.00037*node.sp+node.ph*1.7)*amp;
+      return [sx+(fx-sx)*e+dx, sy+(fy-sy)*e+dy, e];
+    }
+
+    function render(){
       raf=null;
-      if(duration>0) v.currentTime=prog()*duration*0.999;
+      if(!W||!H) size();
+      var tm=(typeof performance!=='undefined'?performance.now():Date.now())-t0;
+      if(rm) tm=0;
+      var p=prog, i, pos=new Array(NODES.length);
+      for(i=0;i<NODES.length;i++) pos[i]=px(NODES[i],p,tm);
+
+      g.clearRect(0,0,W,H);
+      g.lineCap='round';
+
+      for(i=0;i<EDGES.length;i++){
+        var ed=EDGES[i], t=(p-ed.d)/.16;
+        if(t<=0) continue; if(t>1) t=1;
+        var A=pos[ed.a], B=pos[ed.b];
+        var ex=A[0]+(B[0]-A[0])*t, ey=A[1]+(B[1]-A[1])*t;
+        g.strokeStyle='rgba('+LINE+','+(t*(ed.spine?.62:ed.beam?.46:.34)).toFixed(3)+')';
+        g.lineWidth=ed.w*DPR;
+        g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(ex,ey); g.stroke();
+        /* once an edge is complete, a signal keeps travelling it — this is the
+           "replicated to every teammate" beat, and it is what makes the graph
+           read as running infrastructure rather than a static diagram. */
+        if(t===1 && !rm && p>.5){
+          var ph=((tm*.00028)+i*.137)%1, gx=A[0]+(B[0]-A[0])*ph, gy=A[1]+(B[1]-A[1])*ph;
+          var fade=Math.min(1,(p-.5)/.18)*(1-Math.abs(ph-.5)*1.1);
+          if(fade>0){
+            g.fillStyle='rgba('+TEAM+','+(fade*.85).toFixed(3)+')';
+            g.beginPath(); g.arc(gx,gy,1.5*DPR,0,6.283); g.fill();
+          }
+        }
+      }
+
+      for(i=0;i<NODES.length;i++){
+        var nd=NODES[i], P=pos[i], e=P[2];
+        var col = nd.kind==='team' ? TEAM : nd.kind==='leaf' ? DIM : EXP;
+        var alpha = nd.kind==='leaf' ? .32+e*.50 : .44+e*.54;
+        var rr = nd.rad*DPR*(.62+e*.38);
+        if(nd.kind==='core'||nd.kind==='hub'||nd.kind==='team'){
+          var halo=g.createRadialGradient(P[0],P[1],0,P[0],P[1],rr*4.6);
+          halo.addColorStop(0,'rgba('+col+','+(e*(nd.kind==='core'?.40:.24)).toFixed(3)+')');
+          halo.addColorStop(1,'rgba('+col+',0)');
+          g.fillStyle=halo; g.beginPath(); g.arc(P[0],P[1],rr*4.6,0,6.283); g.fill();
+        }
+        g.fillStyle='rgba('+col+','+alpha.toFixed(3)+')';
+        g.beginPath(); g.arc(P[0],P[1],rr,0,6.283); g.fill();
+      }
+
+      if(live && !rm) raf=requestAnimationFrame(render);
     }
-    function schedule(){ if(!raf) raf=requestAnimationFrame(update); }
-    // iOS Safari will not decode/paint a frame from a bare currentTime seek
-    // until the element has actually started playback at least once — a
-    // muted+playsinline video is allowed to autoplay without a user gesture,
-    // so kick it off and immediately pause to "wake" the decoder, then seek.
-    function wake(){
-      if(woken) return;
-      woken=true;
-      var p=v.play();
-      if(p && typeof p.then==='function'){ p.then(function(){ v.pause(); update(); }).catch(function(){ update(); }); }
-      else { update(); }
+
+    function schedule(){ if(!raf) raf=requestAnimationFrame(render); }
+    function start(){ if(live) return; live=true; schedule(); }
+    function stop(){ live=false; if(raf){ cancelAnimationFrame(raf); raf=null; } }
+
+    agColors();
+    size();
+    prog=rm?1:scrollProg();
+    render();
+
+    if(rm){
+      /* reduced motion: one static frame of the finished graph, no rAF at all */
+      addEventListener('resize',function(){ size(); prog=1; render(); });
+      return;
     }
-    function onMeta(){ duration=v.duration||0; wake(); }
-    if(v.readyState>=1) onMeta(); else v.addEventListener('loadedmetadata',onMeta);
-    new IntersectionObserver(function(es){ es.forEach(function(e){ visible=e.isIntersecting; if(visible){ wake(); schedule(); } }); },{threshold:0}).observe(v);
-    addEventListener('scroll',function(){ if(visible) schedule(); },{passive:true});
-    addEventListener('resize',function(){ if(visible) schedule(); });
+
+    addEventListener('scroll',function(){ prog=scrollProg(); if(!live) schedule(); },{passive:true});
+    addEventListener('resize',function(){ size(); prog=scrollProg(); schedule(); });
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(es){
+        es.forEach(function(e){ if(e.isIntersecting){ prog=scrollProg(); start(); } else stop(); });
+      },{threshold:0}).observe(stage);
+    } else { start(); }
+    document.addEventListener('visibilitychange',function(){ if(document.hidden) stop(); else if(stage.getBoundingClientRect().top<innerHeight) start(); });
   })();
 
   /* ---------- dual-core sector carousel (window + tasks cycle per sector, synced to the 6s demo loop) ---------- */
