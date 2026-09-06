@@ -429,10 +429,11 @@ footer.site a{color:var(--ink-3)}
           <h4>Which systems Flow may touch</h4>
           <p class="sub">This is the actual popup &mdash; a permission, not a configuration. Try it.</p>
           <div class="mocklist" id="connectorPicker" role="radiogroup" aria-label="Which systems Flow may touch">
-            <button type="button" class="mockrow" role="radio" aria-checked="true" data-connector="Notion"><span class="box checked"></span><span class="txt"><b>Notion</b><i>Database</i></span><span class="badge live">Works now</span></button>
-            <button type="button" class="mockrow" role="radio" aria-checked="false" data-connector="HubSpot"><span class="box"></span><span class="txt"><b>HubSpot</b><i>CRM</i></span><span class="badge">Needs setup</span></button>
-            <button type="button" class="mockrow dim" role="radio" aria-checked="false" aria-disabled="true" disabled data-connector="Salesforce"><span class="box"></span><span class="txt"><b>Salesforce</b><i>CRM</i></span><span class="badge">Planned</span></button>
-            <button type="button" class="mockrow dim" role="radio" aria-checked="false" aria-disabled="true" disabled data-connector="Monday.com"><span class="box"></span><span class="txt"><b>Monday.com</b><i>Work management</i></span><span class="badge">Planned</span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-connector="Notion"><span class="box checked"></span><span class="txt"><b>Notion</b><i>Database</i></span><span class="badge live">Works now</span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-connector="HubSpot"><span class="box"></span><span class="txt"><b>HubSpot</b><i>CRM</i></span><span class="badge">Needs setup</span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-connector="Salesforce"><span class="box"></span><span class="txt"><b>Salesforce</b><i>CRM</i></span><span class="badge">Needs setup</span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-connector="Slack"><span class="box"></span><span class="txt"><b>Slack</b><i>Team chat</i></span><span class="badge">Needs setup</span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-connector="Monday.com"><span class="box"></span><span class="txt"><b>Monday.com</b><i>Work management</i></span><span class="badge">Needs setup</span></button>
           </div>
           <p class="sub">Notion connects with a token you create yourself in about thirty seconds &mdash; no app registration, no review queue, nothing for us to approve. It writes into a database you choose, filling whichever Amount, Date, Email or Source columns that database happens to have.</p>
         </div>
@@ -440,12 +441,12 @@ footer.site a{color:var(--ink-3)}
           <h4>What kind of work you do</h4>
           <p class="sub">Steers judgment toward what matters in your field &mdash; it doesn't hard-code a trigger.</p>
           <div class="mocklist" id="domainPicker" role="radiogroup" aria-label="What kind of work you do">
-            <button type="button" class="mockrow" role="radio" aria-checked="true" data-domain="Sales &amp; business development"><span class="circle checked"></span><span class="txt"><b>Sales &amp; business development</b><i>Deal / client</i></span></button>
-            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Legal &amp; deal coordination"><span class="circle"></span><span class="txt"><b>Legal &amp; deal coordination</b><i>Matter / agreement</i></span></button>
-            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Finance &amp; billing"><span class="circle"></span><span class="txt"><b>Finance &amp; billing</b><i>Invoice / vendor</i></span></button>
-            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Operations &amp; admin"><span class="circle"></span><span class="txt"><b>Operations &amp; admin</b><i>Task / request</i></span></button>
-            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Customer success &amp; support"><span class="circle"></span><span class="txt"><b>Customer success &amp; support</b><i>Ticket / renewal</i></span></button>
-            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Recruiting &amp; hiring"><span class="circle"></span><span class="txt"><b>Recruiting &amp; hiring</b><i>Candidate / offer</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-domain="Sales &amp; business development"><span class="circle checked"></span><span class="txt"><b>Sales &amp; business development</b><i>Deal / client</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-domain="Legal &amp; deal coordination"><span class="circle"></span><span class="txt"><b>Legal &amp; deal coordination</b><i>Matter / agreement</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-domain="Finance &amp; billing"><span class="circle"></span><span class="txt"><b>Finance &amp; billing</b><i>Invoice / vendor</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-domain="Operations &amp; admin"><span class="circle"></span><span class="txt"><b>Operations &amp; admin</b><i>Task / request</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-domain="Customer success &amp; support"><span class="circle"></span><span class="txt"><b>Customer success &amp; support</b><i>Ticket / renewal</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-domain="Recruiting &amp; hiring"><span class="circle"></span><span class="txt"><b>Recruiting &amp; hiring</b><i>Candidate / offer</i></span></button>
           </div>
         </div>
       </div>
@@ -669,8 +670,19 @@ footer.site a{color:var(--ink-3)}
     'Recruiting & hiring': 'hiring signals — an offer made, a start date set, a candidate lost'
   };
 
+  var WRITE_TARGET={ 'Notion':'your database', 'Slack':'the channel', 'Monday.com':'the board' };
+
+  // Roving tabindex: only the checked radio in each group is ever a Tab stop,
+  // same as a native <input type=radio> group — the alternative (every button
+  // independently focusable) is a common but incorrect ARIA radiogroup
+  // implementation that makes keyboard users Tab through every option.
   function selectIn(group, btn){
-    group.querySelectorAll('[role="radio"]').forEach(function(b){ b.setAttribute('aria-checked', String(b===btn)); b.querySelector('.box,.circle').classList.toggle('checked', b===btn); });
+    group.querySelectorAll('[role="radio"]').forEach(function(b){
+      var isBtn=b===btn;
+      b.setAttribute('aria-checked', String(isBtn));
+      b.setAttribute('tabindex', isBtn ? '0' : '-1');
+      b.querySelector('.box,.circle').classList.toggle('checked', isBtn);
+    });
   }
 
   function currentLabel(group, attr){
@@ -682,7 +694,8 @@ footer.site a{color:var(--ink-3)}
     var connector=currentLabel(connGroup,'data-connector'), domain=currentLabel(domGroup,'data-domain');
     if(!connector||!domain) return;
     var signals=SIGNAL_WORDS[domain] || 'the signals that matter in your field';
-    summary.innerHTML='Connect <b>'+connector+'</b> and pick <b>'+domain+'</b>, and Flow watches for '+signals+' &mdash; and writes straight into '+(connector==='Notion'?'your database':'the matching record')+'.';
+    summary.innerHTML='Connect <b>'+connector+'</b> and pick <b>'+domain+'</b>, and Flow watches for '+signals+' &mdash; and writes straight into '+(WRITE_TARGET[connector]||'the matching record')+'.';
+    if(typeof gtag==='function') gtag('event','picker_select',{connector:connector, domain:domain});
   }
 
   [connGroup, domGroup].forEach(function(group){
@@ -691,6 +704,29 @@ footer.site a{color:var(--ink-3)}
       if(!btn || btn.disabled) return;
       selectIn(group, btn);
       updateSummary();
+      btn.focus();
+    });
+
+    // WAI-ARIA radiogroup pattern: arrow keys move AND select in one step
+    // (native <input type=radio> behaves the same way); Home/End jump to the
+    // ends. Tab never moves within the group — it moves past it, to whatever
+    // the roving tabindex above lands on.
+    group.addEventListener('keydown', function(ev){
+      var keys=['ArrowDown','ArrowRight','ArrowUp','ArrowLeft','Home','End'];
+      if(keys.indexOf(ev.key)===-1) return;
+      var items=Array.prototype.filter.call(group.querySelectorAll('[role="radio"]'), function(b){ return !b.disabled; });
+      if(!items.length) return;
+      var cur=group.querySelector('[aria-checked="true"]');
+      var i=Math.max(0, items.indexOf(cur));
+      var next;
+      if(ev.key==='Home') next=items[0];
+      else if(ev.key==='End') next=items[items.length-1];
+      else if(ev.key==='ArrowDown'||ev.key==='ArrowRight') next=items[(i+1)%items.length];
+      else next=items[(i-1+items.length)%items.length];
+      ev.preventDefault();
+      selectIn(group, next);
+      updateSummary();
+      next.focus();
     });
   });
 })();

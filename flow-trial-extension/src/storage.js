@@ -12,7 +12,11 @@ const FlowStorage = (() => {
     seenMessageIds: [],
     // The only thing that learns. Clicks make Flow slightly more willing to
     // speak; dismissals make it quieter. The user never sees or sets a number.
-    calibration: { clicks: 0, dismissals: 0 }
+    calibration: { clicks: 0, dismissals: 0 },
+    // Whether the one-time "share with a teammate" prompt in the Activity
+    // tab has been dismissed. It earns its place after real usage (see
+    // popup.js renderReferral) and, once dismissed, never comes back.
+    referralDismissed: false
   };
 
   function get() {

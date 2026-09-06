@@ -85,9 +85,11 @@
       return card;
     }
 
-    // Token connectors carry their own tiny form; OAuth ones are a single button.
+    // Connectors that need a value only the user knows (a token, or which
+    // channel/board to write to) carry their own tiny form regardless of
+    // whether connecting itself is a pasted token or an OAuth redirect.
     const inputs = {};
-    if (c.auth === 'token') {
+    if (c.fields && c.fields.length) {
       const form = el('div', 'conn-form');
       (c.fields || []).forEach((f) => {
         const input = el('input');
@@ -222,10 +224,41 @@
     wrap.hidden = false;
   }
 
+  // Earns its place after real usage rather than nagging on first open —
+  // three real writes is evidence Flow is actually working for this person,
+  // which is the only moment "tell a teammate" is credible instead of noise.
+  // Dismissing it is permanent; it never reappears once the user has said no.
+  function renderReferral(s) {
+    const wrap = document.getElementById('referral');
+    const written = (s.log || []).filter((e) => e.kind === 'written');
+    if (s.referralDismissed || written.length < 3) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+  }
+
+  function wireReferral() {
+    document.getElementById('referralDismiss').addEventListener('click', async () => {
+      await FlowStorage.set({ referralDismissed: true });
+      document.getElementById('referral').hidden = true;
+    });
+    document.getElementById('referralCopy').addEventListener('click', async () => {
+      const btn = document.getElementById('referralCopy');
+      try {
+        await navigator.clipboard.writeText('https://theflow-ai.com/trial.html?ref=share');
+        const original = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(() => { btn.textContent = original; }, 1800);
+      } catch (e) {
+        btn.textContent = 'https://theflow-ai.com/trial.html';
+      }
+    });
+  }
+  wireReferral();
+
   async function renderLog() {
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderSensitivity(s);
+    renderReferral(s);
     const host = document.getElementById('log-list');
     const empty = document.getElementById('log-empty');
     host.replaceChildren();

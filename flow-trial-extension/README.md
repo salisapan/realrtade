@@ -21,15 +21,18 @@ percentage as money), the date (resolving weekday references and month names,
 and refusing to normalise a genuinely ambiguous `3/4`), and the sentence that
 carried the decision. That is what makes the written record worth having.
 
-**Two real write paths, both undoable.**
+**Five real write paths, all undoable.**
 
 | Connector | Auth | What one click does |
 |---|---|---|
 | **Notion** | Internal integration token you create yourself | Creates a page in a database you choose, filling whichever Amount / Date / Email / URL columns that database happens to have, with the quoted sentence and a link back to the Gmail thread in the body. Undo archives it. |
 | **HubSpot** | OAuth (needs the owner to configure an app) | Logs a Note on the Contact matching the sender, with the same fields. Undo deletes it. |
+| **Salesforce** | OAuth (needs the owner to configure an app) | Logs a Task on the Contact matching the sender, with the same fields. Undo deletes it. |
+| **Slack** | OAuth (needs the owner to configure an app) | Posts one message to a channel you name, with the amount, the date and the quoted sentence. Undo deletes the message. |
+| **Monday.com** | OAuth (needs the owner to configure an app) | Creates one item on a board you name, with the facts attached as an update. Undo deletes the item. |
 
-Both paths are additive only: they create one new record and never edit or
-delete anything that was already there.
+Every path is additive only: it creates one new record and never edits or
+deletes anything that was already there.
 
 ## Set up Notion (works immediately, no server, no app review)
 
@@ -76,6 +79,80 @@ nothing extracted is silently dropped.
 Until step 4 is done the popup shows HubSpot as *Needs setup* and says so
 plainly rather than failing halfway through a handshake.
 
+## Set up Salesforce (needs the site owner)
+
+1. In your Salesforce org: **Setup → App Manager → New Connected App.**
+2. Enable OAuth Settings, and add this exact callback URL:
+   ```
+   https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
+   ```
+   Same derivation as HubSpot's — it comes from the pinned `key` in
+   `manifest.json`, so don't regenerate that key without updating this URL
+   everywhere it's registered.
+3. Under **Selected OAuth Scopes**, add `Manage user data via APIs (api)` and
+   `Perform requests at any time (refresh_token, offline_access)`.
+4. Put the app's **Consumer Key** into `src/background.js`
+   (`SALESFORCE_CLIENT_ID`, top of the file). It is public, like a GA4
+   measurement ID.
+5. In the Netlify project, set `SALESFORCE_CLIENT_ID` and
+   `SALESFORCE_CLIENT_SECRET`. Those back
+   `netlify/functions/salesforce-oauth-exchange` and
+   `salesforce-oauth-refresh` — the only two places the secret is ever used.
+   **The secret must never appear in this repository or in the extension.**
+6. A free [Salesforce Developer Edition](https://developer.salesforce.com/signup)
+   org gives you a full CRM to test against if you don't have a live one.
+
+Until step 4 is done the popup shows Salesforce as *Needs setup*.
+
+## Set up Slack (needs the site owner)
+
+1. [api.slack.com/apps](https://api.slack.com/apps) → **Create New App** →
+   **From scratch**.
+2. Under **OAuth & Permissions**, add this exact redirect URL:
+   ```
+   https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
+   ```
+3. Still under **OAuth & Permissions → Scopes → Bot Token Scopes**, add
+   `chat:write` and `chat:write.public`.
+4. Put the app's **Client ID** (Basic Information → App Credentials) into
+   `src/background.js` (`SLACK_CLIENT_ID`, top of the file). It is public,
+   like a GA4 measurement ID.
+5. In the Netlify project, set `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET`.
+   Those back `netlify/functions/slack-oauth-exchange` — the only place the
+   secret is ever used. **The secret must never appear in this repository or
+   in the extension.** There is no Slack refresh function: a bot token
+   issued this way doesn't expire unless you separately opt this app into
+   Slack's token-rotation beta, which it does not use.
+6. In the popup, after connecting, paste the **Channel ID** of the channel
+   Flow should post to (open the channel in Slack → **View channel
+   details** → the ID is at the bottom). The bot only needs to be invited to
+   a private channel; `chat:write.public` lets it post to public ones
+   without an invite.
+
+Until step 4 is done the popup shows Slack as *Needs setup*.
+
+## Set up Monday.com (needs the site owner)
+
+1. [monday.com](https://monday.com) → your avatar → **Developers** →
+   **My Apps** → **Create app**.
+2. Under **OAuth**, add this exact redirect URL:
+   ```
+   https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
+   ```
+3. Under **Scopes**, add `boards:read` and `boards:write` (also grants
+   `updates:write`, which the write path uses to attach the fact lines).
+4. Put the app's **Client ID** into `src/background.js`
+   (`MONDAY_CLIENT_ID`, top of the file). It is public, like a GA4
+   measurement ID.
+5. In the Netlify project, set `MONDAY_CLIENT_ID` and `MONDAY_CLIENT_SECRET`.
+   Those back `netlify/functions/monday-oauth-exchange` and
+   `monday-oauth-refresh` — the only two places the secret is ever used.
+   **The secret must never appear in this repository or in the extension.**
+6. In the popup, after connecting, paste the **Board ID** Flow should write
+   to (open the board — it's the number in the URL after `/boards/`).
+
+Until step 4 is done the popup shows Monday.com as *Needs setup*.
+
 ## Load it locally
 
 1. `chrome://extensions` → turn on **Developer mode**.
@@ -94,7 +171,7 @@ src/domains.js         per-field vocabulary and phrasing — never rules
 src/connectors.js      catalog: what each destination is and how it authenticates
 src/storage.js         chrome.storage wrapper; log and calibration
 src/content-gmail.js   Gmail watcher, the chip, and the receipt after a write
-src/background.js      credentials and the two write paths, plus undo
+src/background.js      credentials and the five write paths, plus undo
 popup/                 the only configuration surface — two questions long
 ```
 

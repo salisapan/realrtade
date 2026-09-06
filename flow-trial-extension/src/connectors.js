@@ -33,8 +33,36 @@ const FLOW_CONNECTORS = [
     auth: 'oauth',
     note: 'Logs a real Note on the Contact matching the sender. Needs a HubSpot app Client ID configured by the site owner — see README.'
   },
-  { id: 'salesforce', label: 'Salesforce', kind: 'CRM', status: 'planned' },
-  { id: 'monday', label: 'Monday.com', kind: 'Work management', status: 'planned' },
+  {
+    id: 'salesforce',
+    label: 'Salesforce',
+    kind: 'CRM',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Logs a Task on the Contact matching the sender. Needs a Salesforce Connected App Consumer Key configured by the site owner — see README.'
+  },
+  {
+    id: 'slack',
+    label: 'Slack',
+    kind: 'Team chat',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Posts one message to a channel you choose, with the amount, the date and the quoted sentence. Needs a Slack App Client ID configured by the site owner — see README.',
+    fields: [
+      { key: 'channel', label: 'Channel ID', placeholder: 'C0123456789', type: 'text' }
+    ]
+  },
+  {
+    id: 'monday',
+    label: 'Monday.com',
+    kind: 'Work management',
+    status: 'building',
+    auth: 'oauth',
+    note: 'Creates one item on a board you choose, with the facts attached as an update. Needs a Monday.com OAuth app Client ID configured by the site owner — see README.',
+    fields: [
+      { key: 'board', label: 'Board ID', placeholder: '1234567890', type: 'text' }
+    ]
+  },
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 

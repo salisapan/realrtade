@@ -2,20 +2,25 @@
 // credentials, talking to third-party APIs, and performing the one write per
 // click that this product exists for.
 //
-// Two connectors are wired up here.
+// Five connectors are wired up here.
 //
 //   Notion works today. It authenticates with an internal integration token the
 //   user creates themselves, so there is no app registration, no review queue and
 //   no server-side secret anywhere in the path.
 //
-//   HubSpot uses OAuth, which requires a registered app whose Client Secret must
-//   never ship inside an extension. The secret lives only as a Netlify
-//   environment variable read by the two exchange functions; the Client ID below
-//   is public, in the same way a GA4 measurement ID is public.
+//   HubSpot, Salesforce, Slack and Monday.com all use OAuth, which requires a
+//   registered app whose Client Secret must never ship inside an extension.
+//   Each secret lives only as a Netlify environment variable read by that
+//   connector's own exchange (and, where the platform issues one, refresh)
+//   function; the Client ID constants below are public, in the same way a
+//   GA4 measurement ID is public.
 //
-// Both write paths are deliberately additive: they create one new record and
-// return enough information to undo it. Nothing here ever edits or deletes
-// something the user already had.
+// Every write path is deliberately additive and conservative: it only ever
+// writes to something that already exists — an existing matching Contact, a
+// channel or board the user names — never creating or editing a Contact,
+// Deal, or item beyond the one new record. Each returns enough information
+// to undo it. Nothing here ever edits or deletes something the user already
+// had.
 
 // TODO(owner): set this to the Client ID from your HubSpot public app
 // (developers.hubspot.com > your app > Auth). Until then the HubSpot connector
@@ -27,6 +32,42 @@ const HUBSPOT_SCOPES = 'crm.objects.contacts.read crm.objects.contacts.write';
 const HUBSPOT_API = 'https://api.hubapi.com';
 const EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/hubspot-oauth-exchange';
 const REFRESH_URL = 'https://theflow-ai.com/.netlify/functions/hubspot-oauth-refresh';
+
+// TODO(owner): set this to the Consumer Key from your Salesforce Connected App
+// (Setup > App Manager > your app > View > Consumer Key). Until then the
+// Salesforce connector reports itself unconfigured rather than failing
+// halfway through a handshake.
+const SALESFORCE_CLIENT_ID = 'YOUR_SALESFORCE_CLIENT_ID';
+// login.salesforce.com is the standard entry point and redirects sandbox/My
+// Domain orgs correctly on its own; instance_url (returned by the token
+// exchange) is what every API call after that actually uses.
+const SALESFORCE_AUTH_BASE = 'https://login.salesforce.com/services/oauth2/authorize';
+const SALESFORCE_SCOPES = 'api refresh_token';
+const SALESFORCE_API_VERSION = 'v59.0';
+const SF_EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/salesforce-oauth-exchange';
+const SF_REFRESH_URL = 'https://theflow-ai.com/.netlify/functions/salesforce-oauth-refresh';
+
+// TODO(owner): set this to the Client ID from your Slack App
+// (api.slack.com/apps > your app > Basic Information > App Credentials).
+// Until then the Slack connector reports itself unconfigured rather than
+// failing halfway through a handshake.
+const SLACK_CLIENT_ID = 'YOUR_SLACK_CLIENT_ID';
+const SLACK_AUTH_BASE = 'https://slack.com/oauth/v2/authorize';
+// chat:write.public lets the bot post to public channels without an explicit
+// /invite first — the closest a bot token gets to Notion's zero-friction feel.
+const SLACK_SCOPES = 'chat:write,chat:write.public';
+const SLACK_API = 'https://slack.com/api';
+const SLACK_EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/slack-oauth-exchange';
+
+// TODO(owner): set this to the Client ID from your Monday.com OAuth app
+// (monday.com > Developer > My Apps > your app > OAuth). Until then the
+// Monday.com connector reports itself unconfigured rather than failing
+// halfway through a handshake.
+const MONDAY_CLIENT_ID = 'YOUR_MONDAY_CLIENT_ID';
+const MONDAY_AUTH_BASE = 'https://auth.monday.com/oauth2/authorize';
+const MONDAY_API = 'https://api.monday.com/v2';
+const MONDAY_EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/monday-oauth-exchange';
+const MONDAY_REFRESH_URL = 'https://theflow-ai.com/.netlify/functions/monday-oauth-refresh';
 
 // HubSpot's documented default association type ID for "note to contact". If it
 // ever changes, note creation fails loudly with a 4xx rather than silently
@@ -203,6 +244,324 @@ async function hubspotUndo(ref) {
   return { ok: res.ok || res.status === 404 };
 }
 
+/* -------------------------------------------------------------- Salesforce */
+
+async function getSalesforceAuth() {
+  const { salesforceAuth } = await chrome.storage.local.get('salesforceAuth');
+  return salesforceAuth || null;
+}
+
+async function saveSalesforceAuth(tokenResponse, extra) {
+  const prev = (await getSalesforceAuth()) || {};
+  await chrome.storage.local.set({
+    salesforceAuth: Object.assign({}, prev, {
+      access_token: tokenResponse.access_token,
+      refresh_token: tokenResponse.refresh_token || prev.refresh_token,
+      instance_url: tokenResponse.instance_url || prev.instance_url
+      // Salesforce doesn't return expires_in — access tokens are valid until
+      // revoked or the org's session-timeout policy ends them. Refresh
+      // reactively on a 401 instead of tracking an expiry we're never told.
+    }, extra || {})
+  });
+}
+
+async function connectSalesforce() {
+  if (!SALESFORCE_CLIENT_ID || SALESFORCE_CLIENT_ID === 'YOUR_SALESFORCE_CLIENT_ID') {
+    throw new Error('Salesforce isn’t configured on this build yet. Notion works today — connect that instead.');
+  }
+  const redirectUri = chrome.identity.getRedirectURL();
+  const authUrl =
+    SALESFORCE_AUTH_BASE +
+    '?response_type=code&client_id=' + encodeURIComponent(SALESFORCE_CLIENT_ID) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri) +
+    '&scope=' + encodeURIComponent(SALESFORCE_SCOPES);
+
+  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+  const code = new URL(resultUrl).searchParams.get('code');
+  if (!code) throw new Error('Salesforce did not return an authorization code.');
+
+  const res = await fetch(SF_EXCHANGE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirect_uri: redirectUri })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Salesforce connection failed.');
+  await saveSalesforceAuth(data);
+  return true;
+}
+
+async function salesforceRefresh() {
+  const auth = await getSalesforceAuth();
+  if (!auth || !auth.refresh_token) return null;
+  const res = await fetch(SF_REFRESH_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: auth.refresh_token })
+  });
+  const data = await res.json();
+  if (!res.ok) return null; // refresh failed — caller treats this as "not connected"
+  await saveSalesforceAuth(data);
+  return getSalesforceAuth();
+}
+
+async function salesforceFindContactByEmail(auth, email) {
+  const soql = "SELECT Id FROM Contact WHERE Email = '" + email.replace(/'/g, "\\'") + "' LIMIT 1";
+  const res = await fetch(
+    auth.instance_url + '/services/data/' + SALESFORCE_API_VERSION + '/query?q=' + encodeURIComponent(soql),
+    { headers: { Authorization: 'Bearer ' + auth.access_token } }
+  );
+  if (res.status === 401) return 'expired';
+  if (!res.ok) throw new Error('Salesforce contact lookup failed: ' + res.status);
+  const data = await res.json();
+  return (data.records && data.records[0]) || null;
+}
+
+function salesforceTaskDescription(p) {
+  const lines = factLines(p).map((r) => r[0] + ': ' + r[1]);
+  if (p.facts && p.facts.quote) lines.push('"' + p.facts.quote + '"');
+  if (p.threadUrl) lines.push('Original email: ' + p.threadUrl);
+  lines.push(ATTRIBUTION_TEXT + ' — ' + ATTRIBUTION_URL);
+  return lines.join('\n');
+}
+
+// Deliberately conservative, same shape as HubSpot: only ever logs a Task on
+// an EXISTING matching Contact. Never creates a Contact, never edits a deal.
+async function salesforceWrite(p) {
+  let auth = await getSalesforceAuth();
+  if (!auth) return { ok: false, reason: 'not-connected' };
+  if (!p.senderEmail) return { ok: false, reason: 'no-matching-contact' };
+
+  let contact = await salesforceFindContactByEmail(auth, p.senderEmail);
+  if (contact === 'expired') {
+    auth = await salesforceRefresh();
+    if (!auth) return { ok: false, reason: 'not-connected' };
+    contact = await salesforceFindContactByEmail(auth, p.senderEmail);
+  }
+  if (!contact) return { ok: false, reason: 'no-matching-contact', senderEmail: p.senderEmail };
+
+  const res = await fetch(auth.instance_url + '/services/data/' + SALESFORCE_API_VERSION + '/sobjects/Task/', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + auth.access_token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      WhoId: contact.Id,
+      Subject: p.label,
+      Description: salesforceTaskDescription(p),
+      Status: 'Completed',
+      ActivityDate: new Date().toISOString().slice(0, 10)
+    })
+  });
+  if (!res.ok) throw new Error('Salesforce task creation failed: ' + res.status);
+  const task = await res.json();
+
+  return {
+    ok: true,
+    where: 'Salesforce',
+    target: 'the contact record',
+    ref: { taskId: task.id },
+    url: auth.instance_url + '/lightning/r/Contact/' + contact.Id + '/view'
+  };
+}
+
+async function salesforceUndo(ref) {
+  const auth = await getSalesforceAuth();
+  if (!auth || !ref || !ref.taskId) return { ok: false };
+  const res = await fetch(
+    auth.instance_url + '/services/data/' + SALESFORCE_API_VERSION + '/sobjects/Task/' + encodeURIComponent(ref.taskId),
+    { method: 'DELETE', headers: { Authorization: 'Bearer ' + auth.access_token } }
+  );
+  return { ok: res.ok || res.status === 404 };
+}
+
+/* ------------------------------------------------------------------- Slack */
+
+async function getSlackAuth() {
+  const { slackAuth } = await chrome.storage.local.get('slackAuth');
+  return slackAuth || null;
+}
+
+async function connectSlack(channel) {
+  if (!SLACK_CLIENT_ID || SLACK_CLIENT_ID === 'YOUR_SLACK_CLIENT_ID') {
+    throw new Error('Slack isn’t configured on this build yet. Notion works today — connect that instead.');
+  }
+  const channelId = String(channel || '').trim();
+  if (!channelId) {
+    throw new Error('Paste the channel ID Flow should post to — open the channel in Slack, "View channel details", it’s at the bottom.');
+  }
+
+  const redirectUri = chrome.identity.getRedirectURL();
+  const authUrl =
+    SLACK_AUTH_BASE +
+    '?client_id=' + encodeURIComponent(SLACK_CLIENT_ID) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri) +
+    '&scope=' + encodeURIComponent(SLACK_SCOPES);
+
+  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+  const code = new URL(resultUrl).searchParams.get('code');
+  if (!code) throw new Error('Slack did not return an authorization code.');
+
+  const res = await fetch(SLACK_EXCHANGE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirect_uri: redirectUri })
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error((data && data.error) || 'Slack connection failed.');
+
+  await chrome.storage.local.set({
+    slackAuth: { access_token: data.access_token, teamName: data.team && data.team.name, channelId }
+  });
+  return { title: (data.team && data.team.name ? data.team.name + ' ' : '') + '#' + channelId };
+}
+
+function slackMessageText(p) {
+  const lines = factLines(p).map((r) => '*' + r[0] + ':* ' + r[1]);
+  const parts = ['*' + p.label + '*'].concat(lines);
+  if (p.facts && p.facts.quote) parts.push('> ' + p.facts.quote);
+  if (p.threadUrl) parts.push('<' + p.threadUrl + '|Open the original email in Gmail>');
+  parts.push('_<' + ATTRIBUTION_URL + '|Logged by Flow> — one click, from the message itself._');
+  return parts.join('\n');
+}
+
+async function slackWrite(p) {
+  const auth = await getSlackAuth();
+  if (!auth) return { ok: false, reason: 'not-connected' };
+
+  const res = await fetch(SLACK_API + '/chat.postMessage', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + auth.access_token, 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ channel: auth.channelId, text: slackMessageText(p), unfurl_links: false })
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    if (data.error === 'invalid_auth' || data.error === 'token_revoked') return { ok: false, reason: 'not-connected' };
+    throw new Error('Slack post failed: ' + data.error);
+  }
+  return { ok: true, where: 'Slack', target: '#' + auth.channelId, ref: { channel: data.channel, ts: data.ts }, url: null };
+}
+
+async function slackUndo(ref) {
+  const auth = await getSlackAuth();
+  if (!auth || !ref || !ref.ts) return { ok: false };
+  const res = await fetch(SLACK_API + '/chat.delete', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + auth.access_token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ channel: ref.channel, ts: ref.ts })
+  });
+  const data = await res.json();
+  return { ok: Boolean(data.ok) };
+}
+
+/* --------------------------------------------------------------- Monday.com */
+
+async function getMondayAuth() {
+  const { mondayAuth } = await chrome.storage.local.get('mondayAuth');
+  return mondayAuth || null;
+}
+
+async function saveMondayAuth(tokenResponse, extra) {
+  const prev = (await getMondayAuth()) || {};
+  await chrome.storage.local.set({
+    mondayAuth: Object.assign({}, prev, {
+      access_token: tokenResponse.access_token,
+      refresh_token: tokenResponse.refresh_token || prev.refresh_token
+    }, extra || {})
+  });
+}
+
+async function connectMonday(boardId) {
+  if (!MONDAY_CLIENT_ID || MONDAY_CLIENT_ID === 'YOUR_MONDAY_CLIENT_ID') {
+    throw new Error('Monday.com isn’t configured on this build yet. Notion works today — connect that instead.');
+  }
+  const board = String(boardId || '').trim();
+  if (!board) {
+    throw new Error('Paste the board ID Flow should write to — open the board in Monday.com, it’s the number in the URL after /boards/.');
+  }
+
+  const redirectUri = chrome.identity.getRedirectURL();
+  const authUrl =
+    MONDAY_AUTH_BASE +
+    '?client_id=' + encodeURIComponent(MONDAY_CLIENT_ID) +
+    '&redirect_uri=' + encodeURIComponent(redirectUri);
+
+  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
+  const code = new URL(resultUrl).searchParams.get('code');
+  if (!code) throw new Error('Monday.com did not return an authorization code.');
+
+  const res = await fetch(MONDAY_EXCHANGE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirect_uri: redirectUri })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Monday.com connection failed.');
+  await saveMondayAuth(data, { boardId: board });
+  return true;
+}
+
+// Monday's API v2 takes the token directly as the Authorization header value
+// (no "Bearer " prefix) for both personal tokens and OAuth access tokens —
+// a genuine quirk of their API, not a typo.
+async function mondayGraphQL(token, query, variables) {
+  const res = await fetch(MONDAY_API, {
+    method: 'POST',
+    headers: { Authorization: token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, variables })
+  });
+  const data = await res.json();
+  if (data.errors) throw new Error((data.errors[0] && data.errors[0].message) || 'Monday.com API error');
+  return data.data;
+}
+
+function mondayUpdateBody(p) {
+  const lines = factLines(p).map((r) => r[0] + ': ' + r[1]);
+  if (p.facts && p.facts.quote) lines.push('"' + p.facts.quote + '"');
+  if (p.threadUrl) lines.push('Original email: ' + p.threadUrl);
+  lines.push(ATTRIBUTION_TEXT + ' — ' + ATTRIBUTION_URL);
+  return lines.join('\n');
+}
+
+// Deliberately simple, for the same reason Notion writes unmatched facts to
+// the page body instead of guessing at columns: one new item named after the
+// decision, with the facts attached as an Update (Monday's version of a
+// comment/note) rather than matched into board-specific column schema.
+async function mondayWrite(p) {
+  const auth = await getMondayAuth();
+  if (!auth) return { ok: false, reason: 'not-connected' };
+
+  let item;
+  try {
+    const created = await mondayGraphQL(
+      auth.access_token,
+      'mutation($board: ID!, $name: String!) { create_item(board_id: $board, item_name: $name) { id } }',
+      { board: auth.boardId, name: p.label }
+    );
+    item = created.create_item;
+  } catch (err) {
+    if (/invalid|unauthoriz/i.test(String(err.message))) return { ok: false, reason: 'not-connected' };
+    throw err;
+  }
+
+  await mondayGraphQL(
+    auth.access_token,
+    'mutation($item: ID!, $body: String!) { create_update(item_id: $item, body: $body) { id } }',
+    { item: item.id, body: mondayUpdateBody(p) }
+  );
+
+  return { ok: true, where: 'Monday.com', target: 'the board', ref: { itemId: item.id }, url: 'https://view.monday.com/' + item.id };
+}
+
+async function mondayUndo(ref) {
+  const auth = await getMondayAuth();
+  if (!auth || !ref || !ref.itemId) return { ok: false };
+  try {
+    await mondayGraphQL(auth.access_token, 'mutation($item: ID!) { delete_item(item_id: $item) { id } }', { item: ref.itemId });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false };
+  }
+}
+
 /* ------------------------------------------------------------------ Notion */
 
 async function getNotionAuth() {
@@ -346,18 +705,35 @@ async function notionUndo(ref) {
 
 /* ---------------------------------------------------------------- dispatch */
 
-const WRITERS = { hubspot: hubspotWrite, notion: notionWrite };
-const UNDOERS = { hubspot: hubspotUndo, notion: notionUndo };
+const WRITERS = { hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite };
+const UNDOERS = { hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo };
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
   const nt = await getNotionAuth();
+  const sf = await getSalesforceAuth();
+  const sl = await getSlackAuth();
+  const md = await getMondayAuth();
   return {
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID && HUBSPOT_CLIENT_ID !== 'YOUR_HUBSPOT_CLIENT_ID')
     },
-    notion: { connected: Boolean(nt), configured: true, detail: nt ? nt.dbTitle : null }
+    notion: { connected: Boolean(nt), configured: true, detail: nt ? nt.dbTitle : null },
+    salesforce: {
+      connected: Boolean(sf),
+      configured: Boolean(SALESFORCE_CLIENT_ID && SALESFORCE_CLIENT_ID !== 'YOUR_SALESFORCE_CLIENT_ID')
+    },
+    slack: {
+      connected: Boolean(sl),
+      configured: Boolean(SLACK_CLIENT_ID && SLACK_CLIENT_ID !== 'YOUR_SLACK_CLIENT_ID'),
+      detail: sl ? '#' + sl.channelId : null
+    },
+    monday: {
+      connected: Boolean(md),
+      configured: Boolean(MONDAY_CLIENT_ID && MONDAY_CLIENT_ID !== 'YOUR_MONDAY_CLIENT_ID'),
+      detail: md ? 'Board ' + md.boardId : null
+    }
   };
 }
 
@@ -376,11 +752,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'flow:connect') {
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));
+    if (msg.connectorId === 'slack') return reply(sendResponse, connectSlack(msg.channel).then((r) => ({ ok: true, detail: r.title })));
+    if (msg.connectorId === 'monday') return reply(sendResponse, connectMonday(msg.board).then(() => ({ ok: true })));
     return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
   }
 
   if (msg.type === 'flow:disconnect') {
-    const key = msg.connectorId === 'hubspot' ? 'hubspotAuth' : msg.connectorId === 'notion' ? 'notionAuth' : null;
+    const STORAGE_KEYS = {
+      hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth'
+    };
+    const key = STORAGE_KEYS[msg.connectorId] || null;
     if (!key) return reply(sendResponse, Promise.resolve({ ok: false }));
     return reply(sendResponse, chrome.storage.local.remove(key).then(() => ({ ok: true })));
   }

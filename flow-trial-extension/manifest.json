@@ -48,6 +48,9 @@
   "host_permissions": [
     "https://mail.google.com/*",
     "https://api.hubapi.com/*",
-    "https://api.notion.com/*"
+    "https://api.notion.com/*",
+    "https://*.salesforce.com/*",
+    "https://slack.com/*",
+    "https://api.monday.com/*"
   ]
 }
