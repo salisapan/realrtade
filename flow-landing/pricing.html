@@ -30,7 +30,7 @@
 <style>
 
 :root{
-  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --panel-2:#FFFFFF; --line:rgba(20,44,100,.12);
   --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
   --navy:#07090F; --cat:#1A4EF5;
   --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
@@ -38,7 +38,7 @@
   --serif:'Source Serif 4',Georgia,serif;
 }
 :root[data-theme="dark"]{
-  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --panel-2:#141A2C; --line:rgba(150,166,204,.16);
   --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
 }
 *{box-sizing:border-box}
@@ -100,23 +100,31 @@ footer.site a{color:var(--muted)}
 .product-head{font-family:var(--disp); font-weight:560; font-size:1.5rem; line-height:1.25; color:var(--txt-hi); margin:0 0 10px; border:0; padding:0}
 .product-divider{margin-top:48px; padding-top:32px; border-top:1px solid var(--line)}
 .product-divider .product-eyebrow{margin-top:0}
-.tier{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px 22px; display:flex; flex-direction:column; font-family:var(--sans)}
+/* card shell (outer) + head panel (inner, "raised" sub-panel) echoes the
+   Card > Header nesting of the shadcn pricing-card component: a slim outer
+   frame wrapping a visually distinct inset panel that holds plan/price/CTA,
+   with a soft top sheen — adapted to Flow's own tokens, not copied verbatim. */
+.tier{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:8px; display:flex; flex-direction:column; font-family:var(--sans)}
 .tier.tier-pro{border-color:var(--cat); box-shadow:0 10px 30px -16px rgba(26,78,245,.4)}
-.tier-badge{font-size:.68rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--cat); margin:0 0 6px}
-.tier-name{font-family:var(--disp); font-weight:560; font-size:1.25rem; color:var(--txt-hi); margin:0 0 3px}
-.tier-sub{font-size:.82rem; color:var(--muted); margin:0 0 18px}
-.tier-price{margin:0 0 4px; line-height:1}
+.tier-head{position:relative; background:var(--panel-2); border:1px solid var(--line); border-radius:14px; padding:20px 18px 18px; overflow:hidden}
+.tier-head::before{content:''; position:absolute; inset:0 0 auto; height:56px; background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,0)); pointer-events:none}
+:root[data-theme="dark"] .tier-head::before{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0))}
+.tier-plan{position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 16px}
+.tier-name{font-family:var(--disp); font-weight:560; font-size:1.2rem; color:var(--txt-hi)}
+.tier-badge{position:relative; font-size:.66rem; font-weight:700; letter-spacing:.03em; color:var(--cat); border:1px solid var(--cat); border-radius:999px; padding:3px 10px; white-space:nowrap}
+.tier-price{position:relative; display:flex; align-items:flex-end; gap:4px; margin:0 0 6px; line-height:1}
 .tier-price .amt{font-size:1.85rem; font-weight:800; color:var(--txt-hi)}
-.tier-price .period{font-size:.82rem; color:var(--muted); margin-inline-start:3px}
-.tier-note{font-size:.76rem; color:var(--muted); margin:0 0 18px}
-.tier-list{list-style:none; margin:0 0 22px; padding:0; flex:1; font-size:.9rem}
-.tier-list li{position:relative; padding-inline-start:20px; margin-bottom:9px; color:var(--txt); line-height:1.45}
-.tier-list li::before{content:'\2713'; position:absolute; inset-inline-start:0; color:var(--cat); font-weight:700}
-.tier-cta{display:block; text-align:center; font-weight:700; font-size:.9rem; text-decoration:none; border-radius:999px; padding:12px}
+.tier-price .period{font-size:.82rem; color:var(--muted); padding-bottom:2px}
+.tier-note{position:relative; font-size:.76rem; color:var(--muted); margin:0 0 16px}
+.tier-cta{position:relative; display:block; text-align:center; font-weight:700; font-size:.9rem; text-decoration:none; border-radius:999px; padding:12px}
 .tier-cta.primary{background:var(--cat); color:#fff !important}
 .tier-cta.primary:hover{filter:brightness(1.08)}
-.tier-cta.ghost{border:1px solid var(--line); color:var(--txt-hi) !important}
+.tier-cta.ghost{border:1px solid var(--line); background:var(--bg); color:var(--txt-hi) !important}
 .tier-cta.ghost:hover{border-color:var(--cat); color:var(--cat) !important}
+.tier-body{padding:18px 14px 6px; flex:1; display:flex; flex-direction:column}
+.tier-list{list-style:none; margin:0; padding:0; flex:1; font-size:.9rem}
+.tier-list li{position:relative; padding-inline-start:22px; margin-bottom:10px; color:var(--txt); line-height:1.45}
+.tier-list li::before{content:'\2713'; position:absolute; inset-inline-start:0; top:1px; color:var(--cat); font-weight:700}
 .cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
 .cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
 .cta p{margin:0 0 18px; color:var(--muted)}
@@ -188,33 +196,37 @@ footer.site a{color:var(--muted)}
 
 <div class="tiers-wide"><div class="tiers two">
   <div class="tier">
-    <p class="tier-badge">Just you</p>
-    <h3 class="tier-name">Free</h3>
-    <p class="tier-sub">Forever, no card required</p>
-    <p class="tier-price"><span class="amt">$0</span></p>
-    <p class="tier-note">&nbsp;</p>
-    <ul class="tier-list">
-      <li>One connector active (Notion, HubSpot, Salesforce, Slack, or Monday.com)</li>
-      <li>Unlimited moments &mdash; Flow watches every email you open, no cap</li>
-      <li>Undo on every write</li>
-      <li>Email support</li>
-    </ul>
-    <a class="tier-cta ghost" href="/trial.html">Get Flow Trial</a>
+    <div class="tier-head">
+      <div class="tier-plan"><h3 class="tier-name">Free</h3><span class="tier-badge">Just you</span></div>
+      <p class="tier-price"><span class="amt">$0</span></p>
+      <p class="tier-note">Forever, no card required</p>
+      <a class="tier-cta ghost" href="/trial.html">Get Flow Trial</a>
+    </div>
+    <div class="tier-body">
+      <ul class="tier-list">
+        <li>One connector active (Notion, HubSpot, Salesforce, Slack, or Monday.com)</li>
+        <li>Unlimited moments &mdash; Flow watches every email you open, no cap</li>
+        <li>Undo on every write</li>
+        <li>Email support</li>
+      </ul>
+    </div>
   </div>
   <div class="tier tier-pro">
-    <p class="tier-badge">Small team (2&ndash;10)</p>
-    <h3 class="tier-name">Pro</h3>
-    <p class="tier-sub">Billed per user</p>
-    <p class="tier-price"><span class="amt">$14</span><span class="period">/user/mo</span></p>
-    <p class="tier-note">$11/user/mo billed annually</p>
-    <ul class="tier-list">
-      <li>Everything in Free</li>
-      <li>Run more than one connector at once</li>
-      <li>One shared invoice for the whole team</li>
-      <li>Weekly digest of what Flow caught and wrote</li>
-      <li>Priority support</li>
-    </ul>
-    <a class="tier-cta primary" href="mailto:hello@theflow-ai.com?subject=Flow%20Pro">Notify Me</a>
+    <div class="tier-head">
+      <div class="tier-plan"><h3 class="tier-name">Pro</h3><span class="tier-badge">Small team (2&ndash;10)</span></div>
+      <p class="tier-price"><span class="amt">$14</span><span class="period">/user/mo</span></p>
+      <p class="tier-note">$11/user/mo billed annually</p>
+      <a class="tier-cta primary" href="mailto:hello@theflow-ai.com?subject=Flow%20Pro">Notify Me</a>
+    </div>
+    <div class="tier-body">
+      <ul class="tier-list">
+        <li>Everything in Free</li>
+        <li>Run more than one connector at once</li>
+        <li>One shared invoice for the whole team</li>
+        <li>Weekly digest of what Flow caught and wrote</li>
+        <li>Priority support</li>
+      </ul>
+    </div>
   </div>
 </div></div>
 
@@ -226,20 +238,22 @@ footer.site a{color:var(--muted)}
 
 <div class="tiers-wide"><div class="tier-solo">
   <div class="tier">
-    <p class="tier-badge">Whole department</p>
-    <h3 class="tier-name">Enterprise</h3>
-    <p class="tier-sub">Annual, per seat</p>
-    <p class="tier-price"><span class="amt">$80</span><span class="period">/user/mo</span></p>
-    <p class="tier-note">+ a one-time setup fee, scoped to your deployment</p>
-    <ul class="tier-list">
-      <li>Admin console for the whole org, not per-person setup</li>
-      <li>SSO and an audit log</li>
-      <li>Security review / DPA for regulated environments</li>
-      <li>Masked secure cloud, or Flow-Edge on your own infrastructure</li>
-      <li>Custom connector development, scoped separately</li>
-      <li>Dedicated onboarding contact</li>
-    </ul>
-    <a class="tier-cta ghost" href="/contact.html">Request Pricing</a>
+    <div class="tier-head">
+      <div class="tier-plan"><h3 class="tier-name">Enterprise</h3><span class="tier-badge">Whole department</span></div>
+      <p class="tier-price"><span class="amt">$80</span><span class="period">/user/mo</span></p>
+      <p class="tier-note">Billed annually, per seat &mdash; plus a one-time setup fee scoped to your deployment</p>
+      <a class="tier-cta ghost" href="/contact.html">Request Pricing</a>
+    </div>
+    <div class="tier-body">
+      <ul class="tier-list">
+        <li>Admin console for the whole org, not per-person setup</li>
+        <li>SSO and an audit log</li>
+        <li>Security review / DPA for regulated environments</li>
+        <li>Masked secure cloud, or Flow-Edge on your own infrastructure</li>
+        <li>Custom connector development, scoped separately</li>
+        <li>Dedicated onboarding contact</li>
+      </ul>
+    </div>
   </div>
 </div></div>
 
