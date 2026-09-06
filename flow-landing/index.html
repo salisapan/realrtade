@@ -52,11 +52,10 @@
 (function(){
   try{
     var t=localStorage.getItem('flow_theme')||'dark';
-    var l=localStorage.getItem('flow_lang')||'en';
     var r=document.documentElement;
     r.setAttribute('data-theme',t);
-    r.setAttribute('lang',l);
-    r.setAttribute('dir', l==='he'?'rtl':'ltr');
+    r.setAttribute('lang','en');
+    r.setAttribute('dir','ltr');
   }catch(e){ document.documentElement.setAttribute('data-theme','dark'); document.documentElement.setAttribute('dir','ltr'); }
   document.title='Flow — Cognitive Workflow Engine';
 })();
@@ -74,21 +73,19 @@
       <span class="desc" data-i18n="nav.desc">Cognitive Workflow Engine</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#challenge" data-i18n="nav.challenge">Challenge</a>
-      <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
-      <a href="/security.html" data-i18n="nav.security">Security</a>
       <a href="/trial.html" data-i18n="nav.trial">Flow Trial</a>
-      <a href="#performance" data-i18n="nav.performance">Performance</a>
+      <a href="/security.html" data-i18n="nav.security">Security</a>
+      <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
+      <a href="/about.html" data-i18n="nav.about">About</a>
       <a href="/blog/" data-i18n="nav.blog">Insights</a>
-      <a href="#waitlist" data-i18n="nav.waitlist">Waitlist</a>
+      <a href="/contact.html" data-i18n="nav.contact">Contact</a>
     </nav>
     <div class="nav-tools">
-      <button class="icon-btn" id="langBtn" aria-label="Switch language" title="Switch language"><span id="langLabel">עב</span></button>
       <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
       </button>
-      <span class="magnetic nav-cta"><button class="doit sm" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Join Waitlist</span></button></span>
+      <span class="magnetic nav-cta"><button class="doit sm" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></button></span>
       <button class="icon-btn hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <svg viewBox="0 0 24 24"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg>
       </button>
@@ -98,16 +95,24 @@
 
 <div class="mobile-menu" id="mobileMenu" hidden>
   <nav aria-label="Mobile">
-    <a href="#challenge" data-i18n="nav.challenge">Challenge</a>
-    <a href="#actiongraph" data-i18n="ag.title">The Action Graph</a>
-    <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
-    <a href="#performance" data-i18n="nav.performance">Performance</a>
-    <a href="/security.html" data-i18n="nav.security">Security</a>
     <a href="/trial.html" data-i18n="nav.trial">Flow Trial</a>
+    <a href="/security.html" data-i18n="nav.security">Security</a>
+    <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
+    <a href="/about.html" data-i18n="nav.about">About</a>
     <a href="/blog/" data-i18n="nav.blog">Insights</a>
-    <a href="#waitlist" data-i18n="nav.waitlist">Waitlist</a>
+    <a href="/contact.html" data-i18n="nav.contact">Contact</a>
+    <div class="mobile-menu-group">
+      <span class="mobile-menu-group-label">Solutions</span>
+      <a href="/solutions/legal.html">Legal</a>
+      <a href="/solutions/healthcare.html">Healthcare</a>
+      <a href="/solutions/financial-services.html">Financial Services</a>
+    </div>
+    <div class="mobile-menu-legal">
+      <a href="/privacy.html" data-i18n="nav.privacy">Privacy</a>
+      <a href="/terms.html" data-i18n="nav.terms">Terms</a>
+    </div>
   </nav>
-  <span class="magnetic"><button class="doit" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Join Waitlist</span></button></span>
+  <span class="magnetic"><button class="doit" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></button></span>
 </div>
 
 <main id="top">
@@ -121,7 +126,7 @@
       <p class="lead reveal in" data-d="2" data-i18n="hero.sub">Flow is a secure AI workflow engine — run it in our masked, secure cloud, or fully within your own infrastructure with Flow-Edge — accelerating mission-critical tasks without compromising compliance.</p>
       <div class="hero-cta reveal in" data-d="3">
         <span class="magnetic"><button class="doit lg breathe" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Join Waitlist</span></button></span>
-        <button class="ghost" data-scroll="#challenge"><span data-i18n="hero.cta2">Join Waitlist</span><span class="arw">←</span></button>
+        <button class="ghost" data-scroll="#challenge"><span data-i18n="hero.cta2">See How It Works</span><span class="arw">←</span></button>
       </div>
       <div class="hero-foot reveal in" data-d="4"><span class="dot"></span><span data-i18n="hero.foot">Cloud or fully local — your data, your rules.</span></div>
     </div>
@@ -566,7 +571,6 @@ Best,
 <footer>
   <div class="wrap">
     <div class="foot-in">
-      <a class="foot-brand" href="#top"><img src="/logo.png" width="880" height="388" alt="Flow"></a>
       <nav class="foot-links" aria-label="Footer">
         <a href="#architecture" data-i18n="foot.features">Features</a>
         <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
@@ -605,6 +609,11 @@ Best,
     'nav.performance':{en:'Performance',he:'ביצועים'},
     'nav.waitlist':{en:'Waitlist',he:'רשימת המתנה'},
     'nav.blog':{en:'Insights',he:'תובנות'},
+    'nav.pricing':{en:'Pricing',he:'תמחור'},
+    'nav.about':{en:'About',he:'אודות'},
+    'nav.contact':{en:'Contact',he:'צור קשר'},
+    'nav.privacy':{en:'Privacy',he:'פרטיות'},
+    'nav.terms':{en:'Terms',he:'תנאים'},
     'ins.eyebrow':{en:'INSIGHTS',he:'תובנות'},
     'ins.title':{en:'Research on Regulated AI Deployment',he:'מחקר על פריסת AI בתעשיות מוסדרות'},
     'nav.security':{en:'Security',he:'אבטחה'},
@@ -621,7 +630,7 @@ Best,
     'hero.h1':{en:'Autonomous Execution.<br><span class="chrome-text">Deployed On Your Terms.</span>',he:'ביצוע אוטונומי.<br><span class="chrome-text">בתנאים שלכם.</span>'},
     'hero.sub':{en:'Flow is a secure AI workflow engine — run it in our masked, secure cloud, or fully within your own infrastructure with Flow-Edge — accelerating mission-critical tasks without compromising compliance.',he:'Flow הוא מנוע AI מאובטח לתהליכי עבודה — הריצו אותו בענן המאובטח והממוסך שלנו, או באופן מלא בתשתית שלכם עם Flow-Edge — ומאיצים משימות קריטיות בלי לפגוע בעמידה ברגולציה.'},
     'hero.cta1':{en:'Join Waitlist',he:'להצטרפות לרשימה'},
-    'nav.cta':{en:'Join Waitlist',he:'להצטרפות לרשימה'},
+    'nav.cta':{en:'Do It',he:'עשו את זה'},
     'wl.submit':{en:'Join Waitlist',he:'להצטרפות לרשימה'},
     'hero.cta2':{en:'See How It Works',he:'איך זה עובד'},
     'hero.foot':{en:'Cloud or fully local — your data, your rules.',he:'בענן או מקומי לחלוטין — המידע שלכם, החוקים שלכם.'},
@@ -818,11 +827,7 @@ Best,
     document.querySelectorAll('[data-i18n-aria]').forEach(function(el){
       var k=el.getAttribute('data-i18n-aria'); if(I18N[k]) el.setAttribute('aria-label',I18N[k][lang]);
     });
-    document.getElementById('langLabel').textContent = lang==='he' ? 'EN' : 'עב';
-    var lb=document.getElementById('langBtn'); lb.setAttribute('aria-pressed', lang==='he'?'true':'false'); lb.setAttribute('aria-label', lang==='he'?'עבור לאנגלית':'Switch to Hebrew');
-    try{localStorage.setItem('flow_lang',lang);}catch(e){}
   }
-  document.getElementById('langBtn').addEventListener('click',function(){ applyLang(curLang==='he'?'en':'he'); });
 
   /* ---------- theme ---------- */
   function applyTheme(t){
@@ -1141,34 +1146,44 @@ Best,
        reloads, otherwise the graph reshuffles every time the viewport changes. */
     function rng(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 
+    /* True 3D now: every node carries ox/oy/oz (its settled position) and
+       cx/cy/cz (where it starts, scattered). A fixed camera tilt plus a slow
+       yaw — partly ambient, partly driven by scroll progress — means the
+       structure is never viewed flat-on, and scrolling visibly turns it
+       rather than only revealing it. Perspective divide handles size/depth;
+       a painter's-algorithm sort keeps near nodes correctly over far ones. */
     var NODES=[], EDGES=[], CLUSTERS=6, RING=18;
     (function build(){
       var r=rng(20260905), hubs=[];
-      NODES.push({ox:.5,oy:.5,rad:10,kind:'core',d:0});
+      NODES.push({ox:0,oy:0,oz:0,rad:10,kind:'core',d:0});
       for(var i=0;i<CLUSTERS;i++){
         var a=-Math.PI/2+i*(Math.PI*2/CLUSTERS), hi=NODES.length;
         hubs.push(hi);
-        NODES.push({ox:.5+Math.cos(a)*.215,oy:.5+Math.sin(a)*.215,rad:6,kind:'hub',d:.05+i*.016});
+        /* a wavy elevation per hub — coplanar hubs would look flat even in 3D */
+        var elev=Math.sin(i*1.7+.6)*.15, hx=Math.cos(a)*.30, hz=Math.sin(a)*.30;
+        NODES.push({ox:hx,oy:elev,oz:hz,rad:6,kind:'hub',d:.05+i*.016});
         EDGES.push({a:0,b:hi,d:.09+i*.018,w:1.6,spine:true});
         var leaves=5+Math.floor(r()*4);
         for(var j=0;j<leaves;j++){
-          var la=a+(r()-.5)*1.25, lr=.095+r()*.08, li=NODES.length;
-          NODES.push({ox:.5+Math.cos(a)*.215+Math.cos(la)*lr,oy:.5+Math.sin(a)*.215+Math.sin(la)*lr,rad:2.6+r()*1.8,kind:'leaf',d:.17+r()*.15});
+          var la=a+(r()-.5)*1.25, lr=.10+r()*.09, li=NODES.length;
+          NODES.push({ox:hx+Math.cos(la)*lr,oy:elev+(r()-.5)*.13,oz:hz+Math.sin(la)*lr,rad:2.6+r()*1.8,kind:'leaf',d:.17+r()*.15});
           EDGES.push({a:hi,b:li,d:.22+r()*.17,w:.95});
         }
       }
       for(var k=0;k<RING;k++){
-        var ra=-Math.PI/2+k*(Math.PI*2/RING)+.12, ri=NODES.length;
-        NODES.push({ox:.5+Math.cos(ra)*.415,oy:.5+Math.sin(ra)*.415,rad:4.4,kind:'team',d:.38+k*.0085});
+        var ra=-Math.PI/2+k*(Math.PI*2/RING)+.12, ri=NODES.length, telev=Math.sin(k*.9)*.22;
+        NODES.push({ox:Math.cos(ra)*.52,oy:telev,oz:Math.sin(ra)*.52,rad:4.4,kind:'team',d:.38+k*.0085});
         EDGES.push({a:hubs[k%CLUSTERS],b:ri,d:.44+k*.0095,w:1.1,beam:true});
       }
       for(var n=0;n<NODES.length;n++){
         var q=NODES[n];
-        q.cx=.05+r()*.90; q.cy=.07+r()*.86; q.ph=r()*6.283; q.sp=.5+r()*.9;
+        /* chaos start: a scattered 3D cloud filling the view volume, not a flat scatter */
+        q.cx=(r()-.5)*1.15; q.cy=(r()-.5)*.9; q.cz=(r()-.5)*1.15; q.ph=r()*6.283; q.sp=.5+r()*.9;
       }
     })();
 
     var W=0,H=0,DPR=1,U=0,prog=0,live=false,raf=null,t0=(typeof performance!=='undefined'?performance.now():Date.now());
+    var TILT=-.30, TCOS=Math.cos(TILT), TSIN=Math.sin(TILT), CAM=2.35, FOG='7,9,15';
 
     function size(){
       /* cap DPR: a full-bleed 2x+ canvas is the kind of layer that gets dropped
@@ -1191,15 +1206,36 @@ Best,
     }
 
     function ease(t){ return t<0?0:t>1?1:t*t*(3-2*t); }
-    function px(node,p,tm){
+
+    function yaw(p,tm){ return (rm?0:tm*.00005) + p*1.05; }
+
+    function project(x,y,z,ya){
+      var y1=y*TCOS-z*TSIN, z1=y*TSIN+z*TCOS;
+      var cy=Math.cos(ya), sy=Math.sin(ya);
+      var x2=x*cy+z1*sy, z2=-x*sy+z1*cy;
+      var f=CAM/(CAM+z2);
+      return [W/2+x2*U*f, H/2+y1*U*f, f, z2];
+    }
+
+    function px(node,p,tm,ya){
       var e=ease((p-node.d)/Math.max(.18,.72-node.d*.45)),
-          fx=W/2+(node.ox-.5)*U, fy=H/2+(node.oy-.5)*U,
-          sx=node.cx*W, sy=node.cy*H,
           /* residual drift, strongest while scattered, a slow breath once settled */
-          amp=(1-e*.86)*10*DPR,
+          amp=(1-e*.86)*.02,
           dx=Math.cos(tm*.00042*node.sp+node.ph)*amp,
-          dy=Math.sin(tm*.00037*node.sp+node.ph*1.7)*amp;
-      return [sx+(fx-sx)*e+dx, sy+(fy-sy)*e+dy, e];
+          dy=Math.sin(tm*.00037*node.sp+node.ph*1.7)*amp,
+          dz=Math.sin(tm*.00031*node.sp+node.ph*2.3)*amp,
+          x=node.cx+(node.ox-node.cx)*e+dx,
+          y=node.cy+(node.oy-node.cy)*e+dy,
+          z=node.cz+(node.oz-node.cz)*e+dz,
+          P=project(x,y,z,ya);
+      return [P[0],P[1],P[2],P[3],e];
+    }
+
+    function fogMix(col,f){
+      var amt=Math.max(0,Math.min(1,(1-f)*2.2));
+      if(!amt) return col;
+      var c=col.split(','), g0=FOG.split(',');
+      return Math.round(+c[0]+(+g0[0]-c[0])*amt)+','+Math.round(+c[1]+(+g0[1]-c[1])*amt)+','+Math.round(+c[2]+(+g0[2]-c[2])*amt);
     }
 
     function render(){
@@ -1207,8 +1243,8 @@ Best,
       if(!W||!H) size();
       var tm=(typeof performance!=='undefined'?performance.now():Date.now())-t0;
       if(rm) tm=0;
-      var p=prog, i, pos=new Array(NODES.length);
-      for(i=0;i<NODES.length;i++) pos[i]=px(NODES[i],p,tm);
+      var p=prog, i, pos=new Array(NODES.length), ya=yaw(p,tm);
+      for(i=0;i<NODES.length;i++) pos[i]=px(NODES[i],p,tm,ya);
 
       g.clearRect(0,0,W,H);
       g.lineCap='round';
@@ -1216,10 +1252,10 @@ Best,
       for(i=0;i<EDGES.length;i++){
         var ed=EDGES[i], t=(p-ed.d)/.16;
         if(t<=0) continue; if(t>1) t=1;
-        var A=pos[ed.a], B=pos[ed.b];
+        var A=pos[ed.a], B=pos[ed.b], favg=(A[2]+B[2])/2;
         var ex=A[0]+(B[0]-A[0])*t, ey=A[1]+(B[1]-A[1])*t;
-        g.strokeStyle='rgba('+LINE+','+(t*(ed.spine?.62:ed.beam?.46:.34)).toFixed(3)+')';
-        g.lineWidth=ed.w*DPR;
+        g.strokeStyle='rgba('+fogMix(LINE,favg)+','+(t*(ed.spine?.62:ed.beam?.46:.34)*Math.max(.35,favg)).toFixed(3)+')';
+        g.lineWidth=ed.w*DPR*Math.max(.5,favg);
         g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(ex,ey); g.stroke();
         /* once an edge is complete, a signal keeps travelling it — this is the
            "replicated to every teammate" beat, and it is what makes the graph
@@ -1228,24 +1264,42 @@ Best,
           var ph=((tm*.00028)+i*.137)%1, gx=A[0]+(B[0]-A[0])*ph, gy=A[1]+(B[1]-A[1])*ph;
           var fade=Math.min(1,(p-.5)/.18)*(1-Math.abs(ph-.5)*1.1);
           if(fade>0){
-            g.fillStyle='rgba('+TEAM+','+(fade*.85).toFixed(3)+')';
-            g.beginPath(); g.arc(gx,gy,1.5*DPR,0,6.283); g.fill();
+            g.fillStyle='rgba('+fogMix(TEAM,favg)+','+(fade*.85*Math.max(.4,favg)).toFixed(3)+')';
+            g.beginPath(); g.arc(gx,gy,1.5*DPR*Math.max(.5,favg),0,6.283); g.fill();
           }
         }
       }
 
-      for(i=0;i<NODES.length;i++){
-        var nd=NODES[i], P=pos[i], e=P[2];
-        var col = nd.kind==='team' ? TEAM : nd.kind==='leaf' ? DIM : EXP;
-        var alpha = nd.kind==='leaf' ? .32+e*.50 : .44+e*.54;
-        var rr = nd.rad*DPR*(.62+e*.38);
+      /* painter's algorithm: far nodes first so near ones correctly sit in front */
+      var order=new Array(NODES.length);
+      for(i=0;i<NODES.length;i++) order[i]=i;
+      order.sort(function(a,b){ return pos[b][3]-pos[a][3]; });
+
+      for(var oi=0;oi<order.length;oi++){
+        i=order[oi];
+        var nd=NODES[i], P=pos[i], e=P[4], f=Math.max(.18,P[2]);
+        var col = fogMix(nd.kind==='team' ? TEAM : nd.kind==='leaf' ? DIM : EXP, P[2]);
+        var alpha = (nd.kind==='leaf' ? .32+e*.50 : .44+e*.54) * Math.max(.3,f);
+        var rr = nd.rad*DPR*(.62+e*.38)*f;
+
+        /* a soft, offset shadow beneath nodes near the camera — what actually
+           reads as "depth" is nearby things casting weight, not just fading
+           distant ones out. */
+        var shOff=rr*1.1*Math.max(0,f-.7)*3;
+        if(shOff>.3){
+          var shg=g.createRadialGradient(P[0]+shOff*.5,P[1]+shOff*.7,0,P[0]+shOff*.5,P[1]+shOff*.7,rr*2.4);
+          shg.addColorStop(0,'rgba(2,4,10,'+(.32*Math.min(1,f-.6)).toFixed(3)+')');
+          shg.addColorStop(1,'rgba(2,4,10,0)');
+          g.fillStyle=shg; g.beginPath(); g.arc(P[0]+shOff*.5,P[1]+shOff*.7,rr*2.4,0,6.283); g.fill();
+        }
+
         if(nd.kind==='core'||nd.kind==='hub'||nd.kind==='team'){
           var halo=g.createRadialGradient(P[0],P[1],0,P[0],P[1],rr*4.6);
-          halo.addColorStop(0,'rgba('+col+','+(e*(nd.kind==='core'?.40:.24)).toFixed(3)+')');
+          halo.addColorStop(0,'rgba('+col+','+(e*(nd.kind==='core'?.40:.24)*f).toFixed(3)+')');
           halo.addColorStop(1,'rgba('+col+',0)');
           g.fillStyle=halo; g.beginPath(); g.arc(P[0],P[1],rr*4.6,0,6.283); g.fill();
         }
-        g.fillStyle='rgba('+col+','+alpha.toFixed(3)+')';
+        g.fillStyle='rgba('+col+','+Math.max(0,alpha).toFixed(3)+')';
         g.beginPath(); g.arc(P[0],P[1],rr,0,6.283); g.fill();
       }
 
