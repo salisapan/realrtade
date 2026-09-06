@@ -101,8 +101,8 @@ b,strong{color:var(--ink)}
 
 /* ---------------- hero ---------------- */
 .hero{padding:64px 0 8px; position:relative}
-.hero::before{content:''; position:absolute; top:-120px; left:-160px; width:560px; height:560px; background:radial-gradient(circle, var(--hero-glow1), transparent 65%); pointer-events:none; z-index:-1}
-.hero::after{content:''; position:absolute; top:60px; left:280px; width:420px; height:420px; background:radial-gradient(circle, var(--hero-glow2), transparent 70%); pointer-events:none; z-index:-1}
+.hero:not(.hero-banner)::before{content:''; position:absolute; top:-120px; left:-160px; width:560px; height:560px; background:radial-gradient(circle, var(--hero-glow1), transparent 65%); pointer-events:none; z-index:-1}
+.hero:not(.hero-banner)::after{content:''; position:absolute; top:60px; left:280px; width:420px; height:420px; background:radial-gradient(circle, var(--hero-glow2), transparent 70%); pointer-events:none; z-index:-1}
 .eyebrow{font-family:var(--mono); font-size:.76rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:8px}
 .eyebrow::before{content:'';width:7px; height:7px; border-radius:50%; background:var(--accent)}
 h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,3.15rem); line-height:1.08; letter-spacing:-.02em; color:var(--ink); margin:16px 0 18px; max-width:19ch}
@@ -110,6 +110,27 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 .hero-cta{display:flex; flex-wrap:wrap; gap:12px; margin-bottom:28px}
 .status-row{display:flex; flex-wrap:wrap; gap:8px; font-family:var(--mono); font-size:.74rem}
 .status-row span{background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:5px 10px; color:var(--ink-3)}
+
+/* hero-banner: full-bleed centered layout — badge, headline, dual CTA, connector strip.
+   The site's real header/hamburger nav above this is untouched; only the content
+   below it takes the banner treatment. */
+.hero-banner{padding:76px 0 8px; text-align:center}
+.hero-banner::before{content:''; position:absolute; top:-160px; left:50%; transform:translateX(-50%); width:900px; height:560px; background:radial-gradient(ellipse at center, var(--hero-glow1), transparent 68%); pointer-events:none; z-index:-1}
+.hero-banner .eyebrow{display:none}
+.hb-badge{display:inline-flex; align-items:center; gap:9px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:6px 16px 6px 6px; margin-bottom:22px; font-family:var(--mono); font-size:.78rem; color:var(--ink-2)}
+.hb-badge b{background:var(--accent); color:#fff; font-family:var(--sans); font-weight:700; font-size:.66rem; text-transform:uppercase; letter-spacing:.04em; border-radius:999px; padding:4px 11px}
+.hero-banner .title{max-width:820px; margin-inline:auto}
+.hero-banner .lead{max-width:640px; margin-inline:auto}
+.hero-banner .hero-cta{justify-content:center}
+.hero-banner .status-row{justify-content:center}
+.hb-partners{margin:42px 0 0}
+.hb-partners p{font-family:var(--mono); font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); margin:0 0 18px}
+.hb-partner-row{display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:30px}
+.hb-partner{display:inline-flex; align-items:center; gap:7px; color:var(--ink-3); opacity:.7; transition:opacity .2s,color .2s,transform .2s; text-decoration:none}
+.hb-partner:hover{opacity:1; color:var(--accent); transform:translateY(-1px)}
+.hb-partner svg{width:19px; height:19px; flex:none}
+.hb-partner span{font-family:var(--sans); font-weight:600; font-size:.85rem; white-space:nowrap}
+@media (max-width:640px){ .hero-banner{padding:56px 0 4px} .hb-partner-row{gap:18px 22px} }
 
 .btn{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:14px 26px; border-radius:11px; border:0; cursor:pointer; box-shadow:0 10px 24px -12px rgba(26,78,245,.55); transition:transform .12s,box-shadow .12s,filter .12s}
 .btn:hover{filter:brightness(1.07); transform:translateY(-1px)}
@@ -225,6 +246,28 @@ p{margin:0 0 15px}
 .note-box .ic{flex:none; width:20px; height:20px; margin-top:2px; color:var(--warn)}
 .note-box b{color:var(--ink)}
 
+/* third characterization row: team size — lighter weight than the two main pickers */
+.teamsize-row{margin-top:24px}
+.pillgroup{display:flex; gap:8px; flex-wrap:wrap}
+.pill{all:unset; box-sizing:border-box; font-family:var(--sans); font-size:.88rem; font-weight:600; padding:9px 17px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink-2); cursor:pointer; transition:border-color .15s,background .15s,color .15s,transform .15s}
+.pill:hover{transform:translateY(-1px); border-color:var(--accent)}
+.pill[aria-checked="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.pill:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+
+/* glass shimmer CTA — sits right after the characterization is complete */
+.cta-wrap{display:flex; justify-content:center; margin-top:30px}
+.glass-cta{position:relative; isolation:isolate; display:inline-flex; border-radius:999px; padding:3px; cursor:pointer; text-decoration:none; overflow:hidden; box-shadow:0 10px 30px -10px var(--glow); transition:transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s}
+.glass-cta:hover{transform:translateY(-2px) scale(1.03); box-shadow:0 0 42px 6px var(--glow)}
+.glass-cta:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+.glass-cta::before{content:''; position:absolute; inset:-60%; background:conic-gradient(from 220deg, transparent 0deg, #fff 70deg, transparent 130deg); animation:gc-spin 4s linear infinite; z-index:0}
+.glass-cta .gc-inner{position:relative; z-index:1; display:flex; align-items:center; gap:11px; background:linear-gradient(180deg,var(--glass-top),var(--glass-bot)); backdrop-filter:blur(10px); border-radius:999px; padding:12px 24px 12px 12px}
+.glass-cta .gc-badge{flex:none; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:grid; place-items:center; font-family:var(--disp); font-weight:800; font-size:1rem; box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
+.glass-cta .gc-label{font-family:var(--sans); font-weight:700; font-size:1.03rem; white-space:nowrap; color:var(--ink)}
+.glass-cta .gc-spark{flex:none; width:26px; height:26px; border-radius:50%; background:var(--accent-wash); color:var(--accent); display:grid; place-items:center}
+.glass-cta .gc-spark svg{width:15px; height:15px}
+@keyframes gc-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){ .glass-cta::before{animation:none} }
+
 /* data cards reuse .card two */
 
 /* faq */
@@ -269,9 +312,16 @@ p{margin:0 0 15px}
 .wstep p{margin:0; font-size:.9rem; color:var(--ink-2); line-height:1.5}
 
 /* final cta */
-.cta-box{padding:36px 32px; background:linear-gradient(135deg, var(--accent-wash), var(--glass-bot) 70%); border:1px solid var(--glass-border); border-radius:20px; text-align:center; box-shadow:0 20px 50px -20px var(--glow), var(--shadow)}
+.cta-box{position:relative; z-index:1; padding:36px 32px; background:linear-gradient(135deg, var(--accent-wash), var(--glass-bot) 70%); border:1px solid var(--glass-border); border-radius:20px; text-align:center; box-shadow:0 20px 50px -20px var(--glow), var(--shadow)}
 .cta-box h2{margin:0 0 10px; font-size:1.5rem}
 .cta-box p{margin:0 0 22px; color:var(--ink-2); max-width:48ch; margin-inline:auto}
+
+/* closing section: full-bleed breathing radial gradient behind the last CTA */
+.closing-sec{position:relative}
+.closing-gradient{
+  position:absolute; z-index:0; inset-block:0; inset-inline:calc(50% - 50vw);
+  width:100vw; pointer-events:none; overflow:hidden;
+}
 
 footer.site{padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--ink-3); font-size:.86rem; border-top:1px solid var(--line)}
 footer.site a{color:var(--ink-3)}
@@ -334,13 +384,15 @@ footer.site a{color:var(--ink-3)}
 <main id="main">
   <div class="wrap">
 
-    <div class="hero narrow">
+    <div class="hero hero-banner">
       <span class="eyebrow">Free Chrome extension for Gmail &middot; Works today</span>
+      <div class="hb-badge"><b>Free</b> Chrome extension for Gmail &middot; works today</div>
       <h1 class="title">Your software is still waiting for you to type what already happened.</h1>
       <p class="lead"><b>Flow Trial</b> reads the email you're already looking at. When it decides something &mdash; a price agreed, a deadline set, a deal lost &mdash; one <code>Do It</code> button appears next to it. Click it, and the record writes itself into Notion or your CRM: the amount, the date, the sentence that decided it.</p>
       <p class="lead" style="margin-top:-8px">Nothing to configure. Nothing leaves your device to decide.</p>
       <div class="hero-cta">
-        <a class="doit" href="#signup"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Request Early Access</a>
+        <span class="magnetic"><a class="doit" href="#signup"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Request Early Access</a></span>
+        <span class="magnetic"><a class="doit ghost" href="#proof"><span class="shell"></span><span class="ring"></span><span class="shine"></span>See It In Action</a></span>
       </div>
       <div class="status-row">
         <span>Free, no card</span>
@@ -348,9 +400,19 @@ footer.site a{color:var(--ink-3)}
         <span>Judgment stays on your device</span>
         <span>Undo on every write</span>
       </div>
+      <div class="hb-partners">
+        <p>Works with the systems your team already uses</p>
+        <div class="hb-partner-row">
+          <span class="hb-partner"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg><span>Notion</span></span>
+          <span class="hb-partner"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.164 7.93V5.084a2.198 2.198 0 001.267-1.978v-.067A2.2 2.2 0 0017.238.845h-.067a2.2 2.2 0 00-2.193 2.193v.067a2.196 2.196 0 001.252 1.973l.013.006v2.852a6.22 6.22 0 00-2.969 1.31l.012-.01-7.828-6.095A2.497 2.497 0 104.3 4.656l-.012.006 7.697 5.991a6.176 6.176 0 00-1.038 3.446c0 1.343.425 2.588 1.147 3.607l-.013-.02-2.342 2.343a1.968 1.968 0 00-.58-.095h-.002a2.033 2.033 0 102.033 2.033 1.978 1.978 0 00-.1-.595l.005.014 2.317-2.317a6.247 6.247 0 104.782-11.134l-.036-.005zm-.964 9.378a3.206 3.206 0 113.215-3.207v.002a3.206 3.206 0 01-3.207 3.207z"/></svg><span>HubSpot</span></span>
+          <span class="hb-partner"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.006 5.415a4.195 4.195 0 013.045-1.306c1.56 0 2.954.9 3.69 2.205.63-.3 1.35-.45 2.1-.45 2.85 0 5.159 2.34 5.159 5.22s-2.31 5.22-5.176 5.22c-.345 0-.69-.044-1.02-.104a3.75 3.75 0 01-3.3 1.95c-.6 0-1.155-.15-1.65-.375A4.314 4.314 0 018.88 20.4a4.302 4.302 0 01-4.05-2.82c-.27.062-.54.076-.825.076-2.204 0-4.005-1.8-4.005-4.05 0-1.5.811-2.805 2.01-3.51-.255-.57-.39-1.2-.39-1.846 0-2.58 2.1-4.65 4.65-4.65 1.53 0 2.85.705 3.72 1.8"/></svg><span>Salesforce</span></span>
+          <span class="hb-partner"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg><span>Slack</span></span>
+          <span class="hb-partner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="5" height="16" rx="1.5"/><rect x="9.5" y="8" width="5" height="12" rx="1.5"/><rect x="16" y="11" width="5" height="9" rx="1.5"/></svg><span>Monday.com</span></span>
+        </div>
+      </div>
     </div>
 
-    <div class="specimen">
+    <div class="specimen" id="proof">
       <p class="tag">One email. One click. One record.</p>
       <div class="mail">
         <b>Re: Office Lease — Meridian Tower, 14th Floor</b>
@@ -450,9 +512,23 @@ footer.site a{color:var(--ink-3)}
           </div>
         </div>
       </div>
-      <p class="flex-note narrow" id="pickerSummary" aria-live="polite">Connect <b>Notion</b> and pick <b>Sales &amp; business development</b>, and Flow watches for deal signals &mdash; a price agreed, a renewal lost, a date set &mdash; and writes straight into your database.</p>
-      <div class="note-box narrow">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
+      <div class="teamsize-row narrow">
+        <p class="sub" style="margin:0 0 10px">And one more thing &mdash; how big is the team?</p>
+        <div class="pillgroup" id="teamPicker" role="radiogroup" aria-label="How big is the team">
+          <button type="button" class="pill" role="radio" aria-checked="true" tabindex="0" data-team="just you">Just me</button>
+          <button type="button" class="pill" role="radio" aria-checked="false" tabindex="-1" data-team="your team">Small team (2&ndash;10)</button>
+          <button type="button" class="pill" role="radio" aria-checked="false" tabindex="-1" data-team="the department">Whole department</button>
+        </div>
+      </div>
+      <p class="flex-note narrow" id="pickerSummary" aria-live="polite">Connect <b>Notion</b> and pick <b>Sales &amp; business development</b>, and Flow watches for deal signals &mdash; a price agreed, a renewal lost, a date set &mdash; and writes straight into your database, for just you.</p>
+      <div class="cta-wrap narrow">
+        <a class="glass-cta" href="#signup">
+          <span class="gc-inner">
+            <span class="gc-badge" aria-hidden="true">F</span>
+            <span class="gc-label">Set Up My Flow</span>
+            <span class="gc-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z"/></svg></span>
+          </span>
+        </a>
       </div>
     </section>
 
@@ -561,7 +637,8 @@ footer.site a{color:var(--ink-3)}
       </div>
     </section>
 
-    <section style="padding-bottom:8px">
+    <section class="closing-sec" style="padding-bottom:8px">
+      <div class="closing-gradient" id="closingGradient" aria-hidden="true"></div>
       <div class="cta-box">
         <h2>This is the small end of a much larger idea</h2>
         <p>One inbox and one destination is where it starts. The same engine &mdash; watch, recognise, act, always reversible &mdash; is what Flow runs across every application on a machine, on infrastructure you control.</p>
@@ -658,7 +735,7 @@ footer.site a{color:var(--ink-3)}
 })();
 
 (function(){
-  var connGroup=document.getElementById('connectorPicker'), domGroup=document.getElementById('domainPicker'), summary=document.getElementById('pickerSummary');
+  var connGroup=document.getElementById('connectorPicker'), domGroup=document.getElementById('domainPicker'), teamGroup=document.getElementById('teamPicker'), summary=document.getElementById('pickerSummary');
   if(!connGroup||!domGroup||!summary) return;
 
   var SIGNAL_WORDS={
@@ -681,24 +758,26 @@ footer.site a{color:var(--ink-3)}
       var isBtn=b===btn;
       b.setAttribute('aria-checked', String(isBtn));
       b.setAttribute('tabindex', isBtn ? '0' : '-1');
-      b.querySelector('.box,.circle').classList.toggle('checked', isBtn);
+      var mark=b.querySelector('.box,.circle');
+      if(mark) mark.classList.toggle('checked', isBtn);
     });
   }
 
   function currentLabel(group, attr){
+    if(!group) return null;
     var checked=group.querySelector('[aria-checked="true"]');
     return checked ? checked.getAttribute(attr) : null;
   }
 
   function updateSummary(){
-    var connector=currentLabel(connGroup,'data-connector'), domain=currentLabel(domGroup,'data-domain');
+    var connector=currentLabel(connGroup,'data-connector'), domain=currentLabel(domGroup,'data-domain'), team=currentLabel(teamGroup,'data-team') || 'just you';
     if(!connector||!domain) return;
     var signals=SIGNAL_WORDS[domain] || 'the signals that matter in your field';
-    summary.innerHTML='Connect <b>'+connector+'</b> and pick <b>'+domain+'</b>, and Flow watches for '+signals+' &mdash; and writes straight into '+(WRITE_TARGET[connector]||'the matching record')+'.';
-    if(typeof gtag==='function') gtag('event','picker_select',{connector:connector, domain:domain});
+    summary.innerHTML='Connect <b>'+connector+'</b> and pick <b>'+domain+'</b>, and Flow watches for '+signals+' &mdash; and writes straight into '+(WRITE_TARGET[connector]||'the matching record')+', for '+team+'.';
+    if(typeof gtag==='function') gtag('event','picker_select',{connector:connector, domain:domain, team_size:team});
   }
 
-  [connGroup, domGroup].forEach(function(group){
+  [connGroup, domGroup, teamGroup].filter(Boolean).forEach(function(group){
     group.addEventListener('click', function(ev){
       var btn=ev.target.closest('[role="radio"]');
       if(!btn || btn.disabled) return;
@@ -770,6 +849,41 @@ footer.site a{color:var(--ink-3)}
   addEventListener('scroll',schedule,{passive:true});
   addEventListener('resize',function(){ items.forEach(function(el,i){ el.style.top=(HEADER+i*STEP)+'px'; }); schedule(); });
   apply();
+})();
+
+/* closing section: a slow breathing radial gradient, blue-toned to match the
+   rest of the page. Paused off-screen and when the tab is hidden, frozen to a
+   single static frame under reduced motion — same guards used elsewhere on
+   this site rather than a new pattern. */
+(function(){
+  var el=document.getElementById('closingGradient');
+  if(!el) return;
+  var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#3B74FF';
+  function paint(w){
+    el.style.background='radial-gradient('+w+'% '+(w+18)+'% at 50% 28%, color-mix(in srgb, '+accent+' 24%, transparent), transparent 72%)';
+  }
+  if(rm){ paint(72); return; }
+  var raf=null, w=70, dir=1;
+  function tick(){
+    w+=dir*0.045;
+    if(w>=82) dir=-1;
+    if(w<=58) dir=1;
+    paint(w);
+    raf=requestAnimationFrame(tick);
+  }
+  if('IntersectionObserver' in window){
+    new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){ if(!raf) raf=requestAnimationFrame(tick); }
+        else if(raf){ cancelAnimationFrame(raf); raf=null; }
+      });
+    },{threshold:0}).observe(el);
+  } else { raf=requestAnimationFrame(tick); }
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){ if(raf){ cancelAnimationFrame(raf); raf=null; } }
+    else if(el.getBoundingClientRect().top<innerHeight && !raf){ raf=requestAnimationFrame(tick); }
+  });
 })();
 </script>
 <script>
