@@ -25,7 +25,7 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Flow Trial","item":"https://theflow-ai.com/trial.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Flow Trial","url":"https://theflow-ai.com/trial.html","description":"A free browser extension that reads the open email, recognises when something has actually been decided, and writes the record into Notion or a connected CRM in one click. Judgment runs on the device.","applicationCategory":"BusinessApplication","operatingSystem":"Chrome","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","url":"https://theflow-ai.com/trial.html"}}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does clicking Do It really change anything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It creates a real record in the system you connected — a page in your Notion database, or a Note on the matching HubSpot Contact — with the amount, the date, the sender, the quoted sentence and a link back to the email. Open it afterwards and it is there. Every write comes back with an Undo, and undoing it removes the record."}}, {"@type": "Question", "name": "How does it decide when to speak?", "acceptedAnswer": {"@type": "Answer", "text": "It scores the open message against weighted signals: a currency figure, a commitment verb, a dated obligation, a direct request, a stated loss — set against negatives like an automated sender or mailing-list boilerplate. A figure with nothing decided around it is pushed back down, which is what keeps price lists quiet. It speaks only above a threshold, and that threshold moves as you click and dismiss. All of it runs on your device."}}, {"@type": "Question", "name": "What do I have to configure?", "acceptedAnswer": {"@type": "Answer", "text": "Two things, once. Where Flow may write, and what kind of work you do. There is no trigger screen, no field mapping and no rule syntax — that absence is the product, not a missing feature."}}, {"@type": "Question", "name": "Is my email sent to a server?", "acceptedAnswer": {"@type": "Answer", "text": "Not to decide. The scoring happens in the page, on your machine. The only outbound call is to the system you connected, and only at the moment you click Do It."}}, {"@type": "Question", "name": "What if the Notion database has different columns?", "acceptedAnswer": {"@type": "Answer", "text": "It adapts. Flow fills the title, then matches the rest by name and type — a number column called Amount, a date column called Due, an email column, a URL column. Anything it cannot map still goes into the page body, so nothing it extracted is quietly dropped."}}, {"@type": "Question", "name": "What happens if I ignore a suggestion?", "acceptedAnswer": {"@type": "Answer", "text": "It disappears and Flow never asks about that message again. Both clicking and dismissing quietly retune how confident it needs to be before speaking next time; the popup shows you where that has landed."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "Confirm your email, download the file, and load it into Chrome — the whole thing takes under a minute, and the install steps below walk through exactly what to click."}}, {"@type": "Question", "name": "Can I remove my data?", "acceptedAnswer": {"@type": "Answer", "text": "Uninstalling the extension deletes everything it stored on your machine. To remove your early-access email from our list, contact hello@theflow-ai.com."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does clicking Do It really change anything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It creates a real record in the system you connected — a page in your Notion database, or a Note on the matching HubSpot Contact — with the amount, the date, the sender, the quoted sentence and a link back to the email. Every write comes with an Undo, and undoing it removes the record."}}, {"@type": "Question", "name": "How does it decide when to speak?", "acceptedAnswer": {"@type": "Answer", "text": "It scores the open message for real signals — a currency figure, a commitment, a deadline, a stated loss — and stays quiet on things like price lists or automated mail. It speaks only above a confidence threshold, and that threshold adjusts as you click and dismiss. All of it runs on your device."}}, {"@type": "Question", "name": "What do I have to configure?", "acceptedAnswer": {"@type": "Answer", "text": "Two things, once: where Flow may write, and what kind of work you do. No trigger screen, no field mapping, no rule syntax."}}, {"@type": "Question", "name": "Is my email sent to a server?", "acceptedAnswer": {"@type": "Answer", "text": "Not to decide. That scoring happens on your machine. The only outbound call goes to the system you connected, and only when you click Do It."}}, {"@type": "Question", "name": "What if my Notion database has different columns?", "acceptedAnswer": {"@type": "Answer", "text": "Flow adapts. It fills the title, then matches the rest by name and type — an Amount column, a Due date column, an email column, and so on. Anything it can't map still goes into the page body, so nothing gets dropped."}}, {"@type": "Question", "name": "What happens if I ignore a suggestion?", "acceptedAnswer": {"@type": "Answer", "text": "It disappears and Flow won't ask about that message again. Both clicking and dismissing quietly tune how confident it needs to be before speaking up next time."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "Confirm your email, download the file, and load it into Chrome — under a minute. The install steps below walk through exactly what to click."}}, {"@type": "Question", "name": "Can I remove my data?", "acceptedAnswer": {"@type": "Answer", "text": "Uninstalling the extension deletes everything it stored on your machine. To remove your email from our list, contact hello@theflow-ai.com."}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -403,9 +403,9 @@ footer.site a{color:var(--ink-3)}
       <div class="hb-badge"><b>Free</b> Chrome extension for Gmail &middot; works today</div>
       <h1 class="title">Your software is still waiting for you to type what already happened.</h1>
       <p class="lead"><b>Flow Trial</b> reads the email you're already looking at. When it decides something &mdash; a price agreed, a deadline set, a deal lost &mdash; one <code>Do It</code> button appears next to it. Click it, and the record writes itself into Notion or your CRM: the amount, the date, the sentence that decided it.</p>
-      <p class="lead" style="margin-top:-8px">Nothing to configure. Nothing leaves your device to decide.</p>
+      <p class="lead" style="margin-top:-8px">Two questions to set up. Nothing leaves your device to decide.</p>
       <div class="hero-cta">
-        <span class="magnetic"><a class="doit" href="#signup"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Request Early Access</a></span>
+        <span class="magnetic"><a class="doit" href="#signup"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Flow Trial — Free</a></span>
         <span class="magnetic"><a class="doit ghost" href="#proof"><span class="shell"></span><span class="ring"></span><span class="shine"></span>See It In Action</a></span>
       </div>
       <div class="status-row">
@@ -449,32 +449,32 @@ footer.site a{color:var(--ink-3)}
     </div>
 
     <nav class="jumpnav narrow" aria-label="On this page">
-      <a href="#how">How it works</a><a href="#flexible">Flexibility</a><a href="#data-use">Data &amp; privacy</a><a href="#faq">FAQ</a><a href="#signup">Get access</a>
+      <a href="#how">How it works</a><a href="#flexible">Setup</a><a href="#data-use">Data &amp; privacy</a><a href="#faq">FAQ</a><a href="#signup">Get access</a>
     </nav>
 
     <section id="what">
       <div class="sec-head narrow">
         <span class="eyebrow">01</span>
-        <h2>What it is, and deliberately isn't</h2>
+        <h2>What it is &mdash; and isn't</h2>
       </div>
       <div class="cards two">
         <div class="card is">
           <h3>It is</h3>
           <ul>
-            <li><b>Passive</b> &mdash; silent until something is actually decided. Most days it says nothing.</li>
-            <li><b>Zero-prompt</b> &mdash; you never type anything, at setup or at runtime. There is no box to write in.</li>
-            <li><b>Cross-platform</b> &mdash; it reaches out of your inbox into a system that isn't Google's, which is the whole point.</li>
-            <li><b>Local</b> &mdash; the decision to speak is made on your device. No email text is sent anywhere to reach it.</li>
-            <li><b>Reversible</b> &mdash; every write returns an Undo. Nothing it does is one-way.</li>
+            <li><b>Silent by default</b> &mdash; it only speaks up when something is actually decided. Most days it says nothing at all.</li>
+            <li><b>Zero-typing</b> &mdash; no prompts, no chat box. You never write anything to it.</li>
+            <li><b>Cross-app</b> &mdash; it writes the record into Notion or your CRM, not just Gmail.</li>
+            <li><b>Local</b> &mdash; the reading happens on your device. Your email text isn't sent anywhere to make that call.</li>
+            <li><b>Reversible</b> &mdash; every write comes with an Undo button.</li>
           </ul>
         </div>
         <div class="card isnt">
           <h3>It isn't</h3>
           <ul>
-            <li><b>A chat assistant.</b> There is nothing to ask it.</li>
-            <li><b>A rule builder.</b> There is no "when X happens, do Y" screen &mdash; that is exactly the configuration burden Flow exists to remove.</li>
-            <li><b>A nagging notifier.</b> If nothing happens for two days, that is the product working correctly.</li>
-            <li><b>A mailbox crawler.</b> It only ever reads the one message open in front of you.</li>
+            <li><b>A chatbot.</b> There's nothing to ask it and no conversation to have.</li>
+            <li><b>A rule builder.</b> There's no "when X happens, do Y" screen to set up.</li>
+            <li><b>A notifier.</b> It doesn't ping you to check in &mdash; going quiet for days is normal.</li>
+            <li><b>An inbox scanner.</b> It only reads the one email you have open, nothing else.</li>
           </ul>
         </div>
       </div>
@@ -484,26 +484,26 @@ footer.site a{color:var(--ink-3)}
       <div class="sec-head narrow">
         <span class="eyebrow">02</span>
         <h2>How it works</h2>
-        <p>Four moments. Three of them are silence.</p>
+        <p>Most days it does nothing. Here's what happens on the days it does.</p>
       </div>
       <div class="stepgrid">
-        <div class="stepcard"><span class="num">1</span><h4>Connect, in a minute</h4><p>Paste one credential for where Flow may write, and answer one question about the kind of work you do. That is the entire setup. No field mapping, no rules, no trigger screen.</p></div>
-        <div class="stepcard"><span class="num">2</span><h4>It stays quiet</h4><p>Most days nothing happens. A tool that talks when it has nothing to say gets uninstalled by day two, so silence is the default state and the bar to break it is deliberately high.</p></div>
-        <div class="stepcard"><span class="num">3</span><h4>The moment</h4><p>An email decides something &mdash; a figure agreed, a date committed to, a deal lost. Flow reads the figure, the date and the sentence that carried it, and puts one small button beside that message. Not a popup. Not a notification.</p></div>
-        <div class="stepcard"><span class="num">4</span><h4>Click, or ignore</h4><p>Click and the record is written, with View and Undo beside it. Ignore it and it disappears for good. Either way Flow gets slightly more or less willing to speak next time &mdash; the one thing it learns, and you never set a number for it.</p></div>
+        <div class="stepcard"><span class="num">1</span><h4>Set up in a minute</h4><p>Tell Flow where it may write, and what kind of work you do. That's the whole setup &mdash; no field mapping, no rules, no trigger screen.</p></div>
+        <div class="stepcard"><span class="num">2</span><h4>It stays quiet</h4><p>On a normal day, nothing happens. Flow only speaks up when it's confident something real just got decided.</p></div>
+        <div class="stepcard"><span class="num">3</span><h4>The moment</h4><p>An email decides something &mdash; a figure agreed, a date committed to, a deal lost. Flow reads the amount, the date and the sentence that carried it, and puts one small button beside that message.</p></div>
+        <div class="stepcard"><span class="num">4</span><h4>Click, or ignore</h4><p>Click it and the record is written, with View and Undo right beside it. Ignore it and it disappears &mdash; Flow quietly adjusts how easily it speaks up next time.</p></div>
       </div>
     </section>
 
     <section id="flexible">
       <div class="sec-head narrow">
         <span class="eyebrow">03</span>
-        <h2>Two choices, and neither one is a rule</h2>
-        <p>Where Flow may write, and what kind of work you do. That is the whole configuration surface.</p>
+        <h2>Set it up in under a minute</h2>
+        <p>Where Flow may write, and what kind of work you do &mdash; that's the entire setup.</p>
       </div>
       <div class="choicegrid">
         <div class="choicepanel">
           <h4>Which systems Flow may touch</h4>
-          <p class="sub">This is the actual popup &mdash; a permission, not a configuration. Try it.</p>
+          <p class="sub">This is the real extension popup. Try it below.</p>
           <div class="mocklist" id="connectorPicker" role="radiogroup" aria-label="Which systems Flow may touch">
             <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-connector="Notion"><span class="box checked"></span><span class="txt"><b>Notion</b><i>Database</i></span><span class="badge live">Works now</span></button>
             <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-connector="HubSpot"><span class="box"></span><span class="txt"><b>HubSpot</b><i>CRM</i></span><span class="badge">Needs setup</span></button>
@@ -511,11 +511,11 @@ footer.site a{color:var(--ink-3)}
             <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-connector="Slack"><span class="box"></span><span class="txt"><b>Slack</b><i>Team chat</i></span><span class="badge">Needs setup</span></button>
             <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-connector="Monday.com"><span class="box"></span><span class="txt"><b>Monday.com</b><i>Work management</i></span><span class="badge">Needs setup</span></button>
           </div>
-          <p class="sub">Notion connects with a token you create yourself in about thirty seconds &mdash; no app registration, no review queue, nothing for us to approve. It writes into a database you choose, filling whichever Amount, Date, Email or Source columns that database happens to have.</p>
+          <p class="sub">Notion connects with a token you create yourself in about thirty seconds. It writes into a database you choose, filling in whichever Amount, Date, Email or Source columns that database already has.</p>
         </div>
         <div class="choicepanel">
           <h4>What kind of work you do</h4>
-          <p class="sub">Steers judgment toward what matters in your field &mdash; it doesn't hard-code a trigger.</p>
+          <p class="sub">Helps Flow recognize what matters in your field.</p>
           <div class="mocklist" id="domainPicker" role="radiogroup" aria-label="What kind of work you do">
             <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-domain="Sales &amp; business development"><span class="circle checked"></span><span class="txt"><b>Sales &amp; business development</b><i>Deal / client</i></span></button>
             <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-domain="Legal &amp; deal coordination"><span class="circle"></span><span class="txt"><b>Legal &amp; deal coordination</b><i>Matter / agreement</i></span></button>
@@ -550,24 +550,24 @@ footer.site a{color:var(--ink-3)}
       <div class="sec-head narrow">
         <span class="eyebrow">04</span>
         <h2>What it does with your data</h2>
-        <p>This reads the email in front of you, so it owes you a precise answer rather than a generic privacy paragraph.</p>
+        <p>The short, precise version &mdash; not a generic privacy paragraph.</p>
       </div>
       <div class="cards two">
         <div class="card is">
           <h3>What it touches</h3>
           <ul>
-            <li>The single message open in Gmail's reading pane &mdash; not your inbox, not older messages, not attachments</li>
-            <li>When you click: the destination you connected, to create one new record there</li>
-            <li>Locally, on your machine: which system you connected, the kind of work you chose, and a log of what Flow proposed</li>
+            <li>The one email open in Gmail's reading pane &mdash; not your inbox, not older messages, not attachments</li>
+            <li>When you click Do It: the system you connected, to create one new record there</li>
+            <li>On your machine only: which system you connected, the kind of work you chose, and a log of what Flow suggested</li>
           </ul>
         </div>
         <div class="card isnt">
           <h3>What it never does</h3>
           <ul>
-            <li><b>It never sends your email anywhere to decide.</b> The judgment is computed on your device, in the page.</li>
+            <li><b>Never sends your email anywhere to decide.</b> That judgment runs on your device.</li>
             <li>No ad targeting, no reselling, no training a model on your mail</li>
-            <li>Never edits or deletes anything you already had &mdash; it only ever adds one record, and hands you the Undo</li>
-            <li>No crawling your mailbox in the background</li>
+            <li>Never edits or deletes anything &mdash; it only adds one record, and gives you Undo</li>
+            <li>Never scans your mailbox in the background</li>
           </ul>
         </div>
       </div>
@@ -581,35 +581,35 @@ footer.site a{color:var(--ink-3)}
       <div class="faq narrow">
         <details>
           <summary>Does clicking Do It really change anything?</summary>
-          <p>Yes. It creates a real record in the system you connected &mdash; a page in your Notion database, or a Note on the matching HubSpot Contact &mdash; with the amount, the date, the sender, the quoted sentence and a link back to the email. Open it afterwards and it is there. Every write comes back with an Undo, and undoing it removes the record.</p>
+          <p>Yes. It creates a real record in the system you connected &mdash; a page in your Notion database, or a Note on the matching HubSpot Contact &mdash; with the amount, the date, the sender, the quoted sentence and a link back to the email. Every write comes with an Undo, and undoing it removes the record.</p>
         </details>
         <details>
           <summary>How does it decide when to speak?</summary>
-          <p>It scores the open message against weighted signals: a currency figure, a commitment verb, a dated obligation, a direct request, a stated loss &mdash; set against negatives like an automated sender or mailing-list boilerplate. A figure with nothing decided around it is pushed back down, which is what keeps price lists quiet. It speaks only above a threshold, and that threshold moves as you click and dismiss. All of it runs on your device.</p>
+          <p>It scores the open message for real signals &mdash; a currency figure, a commitment, a deadline, a stated loss &mdash; and stays quiet on things like price lists or automated mail. It speaks only above a confidence threshold, and that threshold adjusts as you click and dismiss. All of it runs on your device.</p>
         </details>
         <details>
           <summary>What do I have to configure?</summary>
-          <p>Two things, once. Where Flow may write, and what kind of work you do. There is no trigger screen, no field mapping and no rule syntax &mdash; that absence is the product, not a missing feature.</p>
+          <p>Two things, once: where Flow may write, and what kind of work you do. No trigger screen, no field mapping, no rule syntax.</p>
         </details>
         <details>
           <summary>Is my email sent to a server?</summary>
-          <p>Not to decide. The scoring happens in the page, on your machine. The only outbound call is to the system you connected, and only at the moment you click Do It.</p>
+          <p>Not to decide. That scoring happens on your machine. The only outbound call goes to the system you connected, and only when you click Do It.</p>
         </details>
         <details>
-          <summary>What if the Notion database has different columns?</summary>
-          <p>It adapts. Flow fills the title, then matches the rest by name and type &mdash; a number column called Amount, a date column called Due, an email column, a URL column. Anything it cannot map still goes into the page body, so nothing it extracted is quietly dropped.</p>
+          <summary>What if my Notion database has different columns?</summary>
+          <p>Flow adapts. It fills the title, then matches the rest by name and type &mdash; an Amount column, a Due date column, an email column, and so on. Anything it can't map still goes into the page body, so nothing gets dropped.</p>
         </details>
         <details>
           <summary>What happens if I ignore a suggestion?</summary>
-          <p>It disappears and Flow never asks about that message again. Both clicking and dismissing quietly retune how confident it needs to be before speaking next time; the popup shows you where that has landed.</p>
+          <p>It disappears and Flow won't ask about that message again. Both clicking and dismissing quietly tune how confident it needs to be before speaking up next time.</p>
         </details>
         <details>
           <summary>How do I install it?</summary>
-          <p>Confirm your email, download the file, and load it into Chrome &mdash; the whole thing takes under a minute, and the install steps below walk through exactly what to click.</p>
+          <p>Confirm your email, download the file, and load it into Chrome &mdash; under a minute. The install steps below walk through exactly what to click.</p>
         </details>
         <details>
           <summary>Can I remove my data?</summary>
-          <p>Uninstalling the extension deletes everything it stored on your machine. To remove your early-access email from our list, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
+          <p>Uninstalling the extension deletes everything it stored on your machine. To remove your email from our list, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
         </details>
       </div>
     </section>
@@ -617,8 +617,8 @@ footer.site a{color:var(--ink-3)}
     <section id="signup" class="band">
       <div class="sec-head narrow">
         <span class="eyebrow">06</span>
-        <h2>Request early access</h2>
-        <p>Confirmed by email (double opt-in) before the extension is released to you &mdash; the same signup infrastructure the rest of the site uses. The download link only exists after you confirm.</p>
+        <h2>Get Flow Trial</h2>
+        <p>Free. Enter your email and confirm it &mdash; that's just to keep the download link from being shared publicly, not a waitlist.</p>
       </div>
       <div class="formcard">
         <form id="trialForm">
@@ -626,9 +626,9 @@ footer.site a{color:var(--ink-3)}
             <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
             <label class="sr-only" for="trialEmail">Email address</label>
             <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
-            <span class="magnetic"><button type="submit" class="doit" id="trialBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="trialBtnLabel">Request Access</span></button></span>
+            <span class="magnetic"><button type="submit" class="doit" id="trialBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="trialBtnLabel">Get Flow Trial</span></button></span>
           </div>
-          <p class="fine">Confirm your email and you'll land straight on a page with the real download button &mdash; we'll also send it to your inbox.</p>
+          <p class="fine">Confirm your email and the download button unlocks &mdash; we'll also send the link to your inbox.</p>
           <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
         </form>
       </div>
@@ -654,8 +654,8 @@ footer.site a{color:var(--ink-3)}
     <section class="closing-sec" style="padding-bottom:8px">
       <div class="closing-gradient" id="closingGradient" aria-hidden="true"></div>
       <div class="cta-box">
-        <h2>This is the small end of a much larger idea</h2>
-        <p>One inbox and one destination is where it starts. The same engine &mdash; watch, recognise, act, always reversible &mdash; is what Flow runs across every application on a machine, on infrastructure you control.</p>
+        <h2>Built to be trusted, not just used</h2>
+        <p>Every write is logged and reversible. Your email is never sent anywhere to be judged &mdash; the decision happens on your device. See exactly how that works.</p>
         <span class="magnetic"><a class="doit ghost" href="/security.html"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Read the Security Model</a></span>
       </div>
     </section>
@@ -730,7 +730,7 @@ footer.site a{color:var(--ink-3)}
     status.className=''; status.textContent='';
 
     function done(ok){
-      btn.disabled=false; btnLabel.textContent='Request Access';
+      btn.disabled=false; btnLabel.textContent='Get Flow Trial';
       status.className='status ' + (ok?'ok':'err');
       status.textContent = ok
         ? 'Check your inbox for a confirmation link.'
