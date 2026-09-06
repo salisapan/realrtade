@@ -5,27 +5,36 @@
 // and all three look identical from the browser. This endpoint answers which
 // one it is without ever printing a secret value.
 //
-// Access is gated behind knowing EMAIL_VERIFY_SECRET itself (passed as
-// ?key=), the same secret already used to sign confirmation links, so this
-// never needs a second credential to manage.
+// Access is gated behind knowing EMAIL_VERIFY_SECRET itself, the same secret
+// already used to sign confirmation links, so this never needs a second
+// credential to manage. It is sent as a POST header rather than a query
+// parameter: EMAIL_VERIFY_SECRET signs every confirmation link and every
+// 30-day download link, and query strings are recorded in Netlify access logs,
+// CDN logs, browser history and Referer headers. Anyone who read one of those
+// logs could mint confirmation and download links for arbitrary addresses.
 //
-// Usage: GET /.netlify/functions/check-email-config?key=<EMAIL_VERIFY_SECRET>
+// Usage:
+//   curl -X POST https://theflow-ai.com/.netlify/functions/check-email-config \
+//        -H "x-flow-key: $EMAIL_VERIFY_SECRET"
 const crypto = require('crypto');
 
 const SENDING_DOMAIN = 'theflow-ai.com';
 
+// Compares digests rather than the raw values so the comparison is constant
+// time regardless of length — returning early on a length mismatch leaks how
+// long the secret is.
 function safeEqual(a, b) {
-  var bufA = Buffer.from(String(a));
-  var bufB = Buffer.from(String(b));
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  var da = crypto.createHash('sha256').update(String(a)).digest();
+  var db = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(da, db);
 }
 
 exports.handler = async function (event) {
   var secret = process.env.EMAIL_VERIFY_SECRET;
-  var providedKey = (event.queryStringParameters || {}).key || '';
+  var headers = event.headers || {};
+  var providedKey = headers['x-flow-key'] || headers['X-Flow-Key'] || '';
 
-  if (!secret || !providedKey || !safeEqual(providedKey, secret)) {
+  if (event.httpMethod !== 'POST' || !secret || !providedKey || !safeEqual(providedKey, secret)) {
     return { statusCode: 404, body: 'Not found' };
   }
 

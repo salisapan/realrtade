@@ -6,6 +6,11 @@
 // extension's background service worker, which is allowed to call
 // api.hubapi.com cross-origin because it declares that host in
 // manifest.json's host_permissions.
+const EXTENSION_ID = 'dnjhplgmnkabbjogfpbhofjedlkehkai';
+const ALLOWED_REDIRECTS = [
+  'https://' + EXTENSION_ID + '.chromiumapp.org/',
+  'https://' + EXTENSION_ID + '.chromiumapp.org',
+];
 const LOG_PREFIX = '[hubspot-oauth-exchange]';
 
 exports.handler = async function (event) {
@@ -27,6 +32,14 @@ exports.handler = async function (event) {
   const redirectUri = String(payload.redirect_uri || '').trim();
   if (!code || !redirectUri) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing code or redirect_uri' }) };
+  }
+  // Without this the endpoint is a free token-minting oracle: anyone could POST
+  // a code plus their own redirect_uri and have Flow's server apply its client
+  // secret on their behalf. Chrome derives this URL from the extension's public
+  // key in manifest.json, so it is fixed for every real install.
+  if (!ALLOWED_REDIRECTS.includes(redirectUri)) {
+    logErr('rejected: redirect_uri is not this extension', redirectUri);
+    return { statusCode: 400, body: JSON.stringify({ error: 'Unrecognised redirect_uri' }) };
   }
 
   const clientId = process.env.HUBSPOT_CLIENT_ID;

@@ -10,6 +10,11 @@
 // expire on its own unless the app owner has explicitly turned on token
 // rotation (Slack's opt-in "token rotation" beta) — which this app does not
 // use, so there is nothing to refresh.
+const EXTENSION_ID = 'dnjhplgmnkabbjogfpbhofjedlkehkai';
+const ALLOWED_REDIRECTS = [
+  'https://' + EXTENSION_ID + '.chromiumapp.org/',
+  'https://' + EXTENSION_ID + '.chromiumapp.org',
+];
 const LOG_PREFIX = '[slack-oauth-exchange]';
 
 exports.handler = async function (event) {
@@ -31,6 +36,14 @@ exports.handler = async function (event) {
   const redirectUri = String(payload.redirect_uri || '').trim();
   if (!code || !redirectUri) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing code or redirect_uri' }) };
+  }
+  // Without this the endpoint is a free token-minting oracle: anyone could POST
+  // a code plus their own redirect_uri and have Flow's server apply its client
+  // secret on their behalf. Chrome derives this URL from the extension's public
+  // key in manifest.json, so it is fixed for every real install.
+  if (!ALLOWED_REDIRECTS.includes(redirectUri)) {
+    logErr('rejected: redirect_uri is not this extension', redirectUri);
+    return { statusCode: 400, body: JSON.stringify({ error: 'Unrecognised redirect_uri' }) };
   }
 
   const clientId = process.env.SLACK_CLIENT_ID;
