@@ -91,6 +91,15 @@ footer.site a{color:var(--muted)}
 .tiers-wide{margin-inline:calc(50% - 50vw); padding-inline:calc(50vw - 50%)}
 .tiers{display:grid; gap:16px; margin:26px auto 40px; max-width:940px}
 @media (min-width:760px){ .tiers{grid-template-columns:repeat(3,1fr)} }
+@media (min-width:560px){ .tiers.two{grid-template-columns:repeat(2,1fr)} }
+.tier-solo{max-width:420px; margin:26px auto 40px}
+
+/* the two products get a visibly different heading treatment so neither
+   reads as a continuation of the other's pricing ladder */
+.product-eyebrow{font-family:var(--sans); font-size:.74rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:36px 0 8px}
+.product-head{font-family:var(--disp); font-weight:560; font-size:1.5rem; line-height:1.25; color:var(--txt-hi); margin:0 0 10px; border:0; padding:0}
+.product-divider{margin-top:48px; padding-top:32px; border-top:1px solid var(--line)}
+.product-divider .product-eyebrow{margin-top:0}
 .tier{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px 22px; display:flex; flex-direction:column; font-family:var(--sans)}
 .tier.tier-pro{border-color:var(--cat); box-shadow:0 10px 30px -16px rgba(26,78,245,.4)}
 .tier-badge{font-size:.68rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--cat); margin:0 0 6px}
@@ -171,9 +180,13 @@ footer.site a{color:var(--muted)}
     <h1 class="title">How Flow is priced.</h1>
     
     <article>
-<p class="lead">Free for one person. Priced per seat for a small team. A custom quote once Flow needs to run across a whole department.</p>
+<p class="lead">Two different products, for two different audiences &mdash; not one pricing ladder.</p>
 
-<div class="tiers-wide"><div class="tiers">
+<p class="product-eyebrow">Product 1 &middot; Flow Trial</p>
+<h2 class="product-head">For general business use</h2>
+<p>Free, or priced per seat for a small team. Plain cloud SaaS &mdash; built for teams who don't handle sensitive or regulated data.</p>
+
+<div class="tiers-wide"><div class="tiers two">
   <div class="tier">
     <p class="tier-badge">Just you</p>
     <h3 class="tier-name">Free</h3>
@@ -203,6 +216,15 @@ footer.site a{color:var(--muted)}
     </ul>
     <a class="tier-cta primary" href="mailto:hello@theflow-ai.com?subject=Flow%20Pro">Notify Me</a>
   </div>
+</div></div>
+
+<div class="product-divider">
+  <p class="product-eyebrow">Product 2 &middot; Flow</p>
+  <h2 class="product-head">For organizations with sensitive data</h2>
+  <p>Law firms, security companies, insurance agencies, and similar regulated environments. This is a separate product from Flow Trial above &mdash; implemented in a masked secure cloud tenant or fully on your own infrastructure (Flow-Edge), not installed by an individual user.</p>
+</div>
+
+<div class="tiers-wide"><div class="tier-solo">
   <div class="tier">
     <p class="tier-badge">Whole department</p>
     <h3 class="tier-name">Enterprise</h3>
@@ -210,10 +232,10 @@ footer.site a{color:var(--muted)}
     <p class="tier-price"><span class="amt">$80</span><span class="period">/user/mo</span></p>
     <p class="tier-note">+ a one-time setup fee, scoped to your deployment</p>
     <ul class="tier-list">
-      <li>Everything in Pro</li>
       <li>Admin console for the whole org, not per-person setup</li>
       <li>SSO and an audit log</li>
       <li>Security review / DPA for regulated environments</li>
+      <li>Masked secure cloud, or Flow-Edge on your own infrastructure</li>
       <li>Custom connector development, scoped separately</li>
       <li>Dedicated onboarding contact</li>
     </ul>

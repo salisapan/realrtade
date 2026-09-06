@@ -1,3 +1,12 @@
+## Product architecture — read before touching pricing, positioning, or feature scope
+
+Flow Trial (Free + Pro) and Flow (the core product) are **two separate
+products for two separate audiences** — not one product on a pricing
+ladder. Full detail, including what each tier may and may not claim, is in
+`docs/product-architecture.md`. Read it before editing `pricing.html`,
+`trial.html`'s positioning, or any copy that could imply the two products
+share security/compliance guarantees.
+
 ## ECC Agent Routing Protocol
 
 For every task requested by the user:
