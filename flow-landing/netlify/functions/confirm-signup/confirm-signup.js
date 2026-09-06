@@ -2,6 +2,23 @@ const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SITE_URL = 'https://theflow-ai.com';
+const FROM = 'Flow <hello@theflow-ai.com>';
+const OWNER_EMAIL = 'ai.local.flow@gmail.com';
+
+// Bottom-up adoption inside a company with sensitive data is a good thing
+// happening in the wrong product — Flow Trial is explicitly the general,
+// non-sensitive-data tier (see docs/product-architecture.md). Rather than
+// build a whole separate distribution channel to chase that signal, this
+// just tells sales when it's already happening: several confirmed signups
+// from the same real work domain is a warm, low-effort Enterprise lead.
+// Public mailbox providers are excluded since a cluster of gmail.com
+// addresses says nothing about who employs them.
+const FREE_EMAIL_DOMAINS = new Set([
+  'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'live.com',
+  'icloud.com', 'me.com', 'aol.com', 'protonmail.com', 'proton.me',
+  'msn.com', 'mail.com', 'gmx.com', 'yandex.com', 'zoho.com', 'fastmail.com',
+]);
+const CLUSTER_THRESHOLDS = [3, 5, 10, 20, 50];
 const SB_URL = 'https://zjquktirlrhbqcnkfaok.supabase.co';
 // Confirming a signup means PATCHing a row by email with no prior SELECT --
 // Postgres RLS requires SELECT visibility to even locate a row for UPDATE,
@@ -96,6 +113,49 @@ function page(lang, ok, kind, downloadUrl) {
   );
 }
 
+async function sendEmail(apiKey, opts) {
+  var res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  });
+  var text = await res.text();
+  return { ok: res.ok, status: res.status, text: text };
+}
+
+// Counts confirmed waitlist signups sharing this email's domain and, if the
+// new total lands exactly on a threshold, emails one heads-up to sales. The
+// exact-match check (rather than "N or more") is what keeps this a one-time
+// nudge per milestone instead of an alert on every subsequent signup.
+async function checkDomainCluster(email, log, logErr) {
+  var domain = email.split('@')[1].toLowerCase();
+  if (FREE_EMAIL_DOMAINS.has(domain)) return;
+  if (!SB_SERVICE_KEY) return;
+  var apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return;
+
+  var url = SB_URL + '/rest/v1/waitlist?select=id&confirmed_at=not.is.null&email=ilike.*%40' + encodeURIComponent(domain);
+  var res = await fetch(url, { headers: { apikey: SB_SERVICE_KEY, Authorization: 'Bearer ' + SB_SERVICE_KEY } });
+  if (!res.ok) { logErr('domain cluster count query failed', res.status); return; }
+  var rows = await res.json();
+  var count = Array.isArray(rows) ? rows.length : 0;
+  if (!CLUSTER_THRESHOLDS.includes(count)) return;
+
+  log('domain cluster threshold reached', { domain: domain, count: count });
+  var html =
+    '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
+    '<p><b>' + count + '</b> confirmed Flow Trial signups now share the domain <b>' + domain + '</b>.</p>' +
+    '<p>Might be worth a warm Enterprise outreach — this usually means a team is already using Flow Trial inside an organization.</p>' +
+    '</div>';
+  var result = await sendEmail(apiKey, {
+    from: FROM,
+    to: [OWNER_EMAIL],
+    subject: count + ' Flow Trial signups from ' + domain,
+    html: html,
+  });
+  if (!result.ok) logErr('domain cluster alert send failed', { status: result.status, response: result.text });
+}
+
 function verify(email, exp, sig, secret) {
   var expected = crypto.createHmac('sha256', secret).update(email + '|' + exp).digest('base64url');
   var a = Buffer.from(expected);
@@ -159,6 +219,12 @@ exports.handler = async function (event) {
     });
   } catch (err) {
     logErr('failed to mark waitlist row confirmed (customer will still see success page)', String(err));
+  }
+
+  try {
+    await checkDomainCluster(email, log, logErr);
+  } catch (err) {
+    logErr('domain cluster check failed (non-fatal)', String(err));
   }
 
   return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true, kind, downloadUrl) };
