@@ -146,6 +146,11 @@ main{padding:16px}
 .ghost:hover{border-color:var(--accent); color:var(--accent); background:var(--accent-wash)}
 .saved-note{font-size:.8rem; color:var(--ok); margin-top:10px; text-align:center; line-height:1.5}
 
+/* ---- recipe export/import ---- */
+.recipe-block{margin-top:-6px}
+.recipe-row{display:flex; gap:8px}
+.recipe-row .ghost{margin-top:0; flex:1; text-align:center}
+
 /* ---- weekly value read-out ---- */
 .week-stat{
   display:flex; align-items:baseline; gap:5px; margin-bottom:14px;

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Flow Trial",
   "short_name": "Flow",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Flow watches Gmail quietly and, when an email actually decides something, puts one Do It button next to it that writes the record for you. No prompts, no rules, no chat.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0oW6F6XmCie6fLFo3kGjzO7lmgMxNkc2p3CrezAS4qV8VB39agewLKiV4+uJYmA9PMQ2whv0aUXGRhGIue/lIv9RVAGF4lRtiAgvjTTug/GijDYFP89iacyUEVU18S5JhCZ+CZ8s1v/BdvPv6udW8W9zLXV/M7ch2awGjO3UoyLPkUgTqyAIA71da+wX++5kSK2TThOhF9+EL9C9rDOuZEc4d86PHxYhOHiQU4+vE7CxzJd99CrQ0+REL6d2BjR+TMNECqldQNqeAtmaR+iNFj0OFDV6D4JbPwK8AUCDT2S0risK9CzRCkdiYT+cFh2QfNJrMMIuqcgsJV3fsF/UbQIDAQAB",
   "icons": {

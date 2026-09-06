@@ -33,6 +33,17 @@
 
       <button id="save" class="primary">Save &amp; start</button>
       <p id="saved-note" class="saved-note" hidden>Saved. Open an email in Gmail — Flow will stay quiet until one matters.</p>
+
+      <div class="block recipe-block">
+        <p class="label">Share this setup</p>
+        <p class="hint">A .flow file carries only the domain and connector you picked — never a token, never anything Flow has written.</p>
+        <div class="recipe-row">
+          <button id="recipeExport" type="button" class="ghost sm">Export recipe</button>
+          <label for="recipeImport" class="ghost sm">Import recipe</label>
+          <input id="recipeImport" type="file" accept=".flow,application/json" hidden>
+        </div>
+        <p id="recipeNote" class="saved-note" hidden></p>
+      </div>
     </section>
 
     <section data-panel="log" class="panel">

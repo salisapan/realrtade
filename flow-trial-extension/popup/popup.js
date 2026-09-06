@@ -8,6 +8,7 @@
 
   wireTabs();
   wireSave();
+  wireRecipe();
   renderConnectors();
   renderDomains();
   renderStatusPill();
@@ -168,6 +169,71 @@
       state = await FlowStorage.get();
       note.textContent = 'Saved. Open an email in Gmail — Flow will stay quiet until one matters.';
       note.hidden = false;
+    });
+  }
+
+  /* --------------------------------------------------------------- recipe */
+  // A recipe is a shareable "how someone else set Flow up" — literally just
+  // the two picks on this screen. It never carries a token, a log entry, or
+  // anything Flow wrote, so passing a .flow file around is as safe as
+  // describing your setup in a Slack message.
+
+  function noteRecipe(text, ok) {
+    const note = document.getElementById('recipeNote');
+    note.textContent = text;
+    note.style.color = ok ? 'var(--ok)' : 'var(--err)';
+    note.hidden = false;
+  }
+
+  function wireRecipe() {
+    document.getElementById('recipeExport').addEventListener('click', () => {
+      const domain = FLOW_DOMAINS.find((d) => d.id === state.domainId) || FLOW_DOMAINS.find((d) => d.id === 'sales');
+      const connector = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
+      const recipe = {
+        flowRecipe: 1,
+        domainId: domain.id,
+        domainLabel: domain.label,
+        connectorId: connector ? connector.id : null,
+        connectorLabel: connector ? connector.label : null
+      };
+      const blob = new Blob([JSON.stringify(recipe, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'flow-recipe-' + domain.id + (connector ? '-' + connector.id : '') + '.flow';
+      a.click();
+      URL.revokeObjectURL(url);
+      noteRecipe('Recipe exported. Anyone can drop this file into their own Flow to match your setup.', true);
+    });
+
+    document.getElementById('recipeImport').addEventListener('change', async (e) => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      let parsed;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch (err) {
+        noteRecipe('That file isn’t a valid Flow recipe.', false);
+        return;
+      }
+      // Only ever read two known string fields off the parsed JSON — never
+      // trust or store anything else a file could contain.
+      const validDomain = FLOW_DOMAINS.find((d) => d.id === parsed.domainId);
+      if (!validDomain) {
+        noteRecipe('That file isn’t a valid Flow recipe.', false);
+        return;
+      }
+      await FlowStorage.set({ domainId: validDomain.id });
+      state = await FlowStorage.get();
+      renderDomains();
+      const wantedConnector = FLOW_CONNECTORS.find((c) => c.id === parsed.connectorId);
+      const alreadyConnected = wantedConnector && status && status[wantedConnector.id] && status[wantedConnector.id].connected;
+      if (wantedConnector && !alreadyConnected) {
+        noteRecipe('Loaded — ' + validDomain.label + '. Connect ' + wantedConnector.label + ' above to match it exactly, or use whatever you already have.', true);
+      } else {
+        noteRecipe('Loaded — ' + validDomain.label + '. Click Save & start to apply it.', true);
+      }
     });
   }
 
