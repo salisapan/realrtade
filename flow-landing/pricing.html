@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="How Flow is priced: deployment models, what drives cost, and how to get a quote during pre-release.">
+<meta name="description" content="Flow pricing: free for individuals, per-seat for small teams, and a custom quote for enterprise deployments.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/pricing.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -15,12 +15,12 @@
 <title>Pricing — Flow</title>
 <meta property="og:type" content="website">
 <meta property="og:title" content="Pricing — Flow">
-<meta property="og:description" content="How Flow is priced: deployment models, what drives cost, and how to get a quote during pre-release.">
+<meta property="og:description" content="Flow pricing: free for individuals, per-seat for small teams, and a custom quote for enterprise deployments.">
 <meta property="og:url" content="https://theflow-ai.com/pricing.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Pricing — Flow">
-<meta name="twitter:description" content="How Flow is priced: deployment models, what drives cost, and how to get a quote during pre-release.">
+<meta name="twitter:description" content="Flow pricing: free for individuals, per-seat for small teams, and a custom quote for enterprise deployments.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Pricing","item":"https://theflow-ai.com/pricing.html"}]}</script>
@@ -83,6 +83,31 @@ footer.site a{color:var(--muted)}
 .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
 .card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 8px}
 .card p{margin:0; font-size:1rem}
+
+/* pricing tiers: this section needs more width than the 760px reading column,
+   so it opts out of .wrap via a negative-margin full-bleed technique (same
+   pattern used for wide decorative bands elsewhere on the site), capped at
+   a comfortable 940px rather than true full-bleed. */
+.tiers-wide{margin-inline:calc(50% - 50vw); padding-inline:calc(50vw - 50%)}
+.tiers{display:grid; gap:16px; margin:26px auto 40px; max-width:940px}
+@media (min-width:760px){ .tiers{grid-template-columns:repeat(3,1fr)} }
+.tier{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px 22px; display:flex; flex-direction:column; font-family:var(--sans)}
+.tier.tier-pro{border-color:var(--cat); box-shadow:0 10px 30px -16px rgba(26,78,245,.4)}
+.tier-badge{font-size:.68rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--cat); margin:0 0 6px}
+.tier-name{font-family:var(--disp); font-weight:560; font-size:1.25rem; color:var(--txt-hi); margin:0 0 3px}
+.tier-sub{font-size:.82rem; color:var(--muted); margin:0 0 18px}
+.tier-price{margin:0 0 4px; line-height:1}
+.tier-price .amt{font-size:1.85rem; font-weight:800; color:var(--txt-hi)}
+.tier-price .period{font-size:.82rem; color:var(--muted); margin-inline-start:3px}
+.tier-note{font-size:.76rem; color:var(--muted); margin:0 0 18px}
+.tier-list{list-style:none; margin:0 0 22px; padding:0; flex:1; font-size:.9rem}
+.tier-list li{position:relative; padding-inline-start:20px; margin-bottom:9px; color:var(--txt); line-height:1.45}
+.tier-list li::before{content:'\2713'; position:absolute; inset-inline-start:0; color:var(--cat); font-weight:700}
+.tier-cta{display:block; text-align:center; font-weight:700; font-size:.9rem; text-decoration:none; border-radius:999px; padding:12px}
+.tier-cta.primary{background:var(--cat); color:#fff !important}
+.tier-cta.primary:hover{filter:brightness(1.08)}
+.tier-cta.ghost{border:1px solid var(--line); color:var(--txt-hi) !important}
+.tier-cta.ghost:hover{border-color:var(--cat); color:var(--cat) !important}
 .cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
 .cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
 .cta p{margin:0 0 18px; color:var(--muted)}
@@ -108,13 +133,13 @@ footer.site a{color:var(--muted)}
 <script>
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
 </script>
-<!-- Analytics: replace G-XXXXXXXXXX with the real GA4 Measurement ID from analytics.google.com -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-XXXXXXXXXX', { anonymize_ip: true });
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
 </script>
 </head>
 <body>
@@ -146,21 +171,70 @@ footer.site a{color:var(--muted)}
     <h1 class="title">How Flow is priced.</h1>
     
     <article>
-<p class="lead">Flow is in pre-release, and pricing is set per deployment. This page explains what actually drives the number, so you can size a budget before you talk to us.</p>
+<p class="lead">Free for one person. Priced per seat for a small team. A custom quote once Flow needs to run across a whole department.</p>
 
-<h2>What determines cost</h2>
+<div class="tiers-wide"><div class="tiers">
+  <div class="tier">
+    <p class="tier-badge">Just you</p>
+    <h3 class="tier-name">Free</h3>
+    <p class="tier-sub">Forever, no card required</p>
+    <p class="tier-price"><span class="amt">$0</span></p>
+    <p class="tier-note">&nbsp;</p>
+    <ul class="tier-list">
+      <li>One connector active (Notion, HubSpot, Salesforce, Slack, or Monday.com)</li>
+      <li>Unlimited moments &mdash; Flow watches every email you open, no cap</li>
+      <li>Undo on every write</li>
+      <li>Email support</li>
+    </ul>
+    <a class="tier-cta ghost" href="/trial.html">Get Flow Trial</a>
+  </div>
+  <div class="tier tier-pro">
+    <p class="tier-badge">Small team (2&ndash;10)</p>
+    <h3 class="tier-name">Pro</h3>
+    <p class="tier-sub">Billed per user</p>
+    <p class="tier-price"><span class="amt">$14</span><span class="period">/user/mo</span></p>
+    <p class="tier-note">$11/user/mo billed annually</p>
+    <ul class="tier-list">
+      <li>Everything in Free</li>
+      <li>Run more than one connector at once</li>
+      <li>One shared invoice for the whole team</li>
+      <li>Weekly digest of what Flow caught and wrote</li>
+      <li>Priority support</li>
+    </ul>
+    <a class="tier-cta primary" href="mailto:hello@theflow-ai.com?subject=Flow%20Pro">Notify Me</a>
+  </div>
+  <div class="tier">
+    <p class="tier-badge">Whole department</p>
+    <h3 class="tier-name">Enterprise</h3>
+    <p class="tier-sub">Annual, custom quote</p>
+    <p class="tier-price"><span class="amt">From $80</span><span class="period">/user/mo</span></p>
+    <p class="tier-note">&nbsp;</p>
+    <ul class="tier-list">
+      <li>Everything in Pro</li>
+      <li>Admin console for the whole org, not per-person setup</li>
+      <li>SSO and an audit log</li>
+      <li>Security review / DPA for regulated environments</li>
+      <li>Custom connector development, scoped separately</li>
+      <li>Dedicated onboarding contact</li>
+    </ul>
+    <a class="tier-cta ghost" href="/contact.html">Request Pricing</a>
+  </div>
+</div></div>
+
+<h2>What can move the Enterprise number</h2>
+<p>The per-seat price above is the starting point. These are the things that change it.</p>
 <div class="cards two">
   <div class="card">
     <h3>Deployment Model</h3>
     <p>The masked secure cloud and a fully local Flow-Edge installation have materially different cost structures. Flow-Edge runs on your infrastructure, so you carry the compute and we license the engine.</p>
   </div>
   <div class="card">
-    <h3>Scope of Workflows</h3>
-    <p>How many workflows are automated, and how deeply they reach into your systems &mdash; a single document pipeline is not the same as an engine acting across a department.</p>
+    <h3>Custom Connectors</h3>
+    <p>Notion, HubSpot, Salesforce, Slack and Monday.com are included. A system we haven't built yet is scoped and priced separately, not bundled into the seat price.</p>
   </div>
   <div class="card">
     <h3>Seats</h3>
-    <p>How many people have Flow observing and acting alongside their work.</p>
+    <p>How many people have Flow observing and acting alongside their work &mdash; volume discounts apply above 50 seats.</p>
   </div>
   <div class="card">
     <h3>Compliance Requirements</h3>
@@ -168,20 +242,10 @@ footer.site a{color:var(--muted)}
   </div>
 </div>
 
-<h2>Why there is no price list yet</h2>
-<p>Publishing a per-seat number would be misleading for this product. A fully local deployment inside a hospital network and a masked cloud deployment for a twelve-person firm are different engagements, and the difference is not a discount tier. During pre-release we scope each deployment directly.</p>
-
-<div class="note">If you need a budgetary figure for a planning cycle, say so in your first email &mdash; we will give you a range with the assumptions written out, rather than asking you to sit through a call for it.</div>
-
-<h2>Early access</h2>
-<p>Flow is working with a limited number of design partners ahead of general availability. Early partners get direct input into the deployment model and roadmap. <a href="/#waitlist">Join the waitlist</a> to be considered.</p>
-
-<!-- TODO (owner): once pricing is set, replace this page with real tiers/figures.
-     Buyers filter out vendors with no pricing signal; this page is the honest
-     pre-release version, not the final one. -->
+<div class="note">Need a budgetary figure for a planning cycle? Say so in your first email &mdash; we will give you a range with the assumptions written out, rather than asking you to sit through a call for it.</div>
 
 <div class="cta">
-  <h2>Need a quote?</h2>
+  <h2>Ready to talk Enterprise?</h2>
   <p>Tell us your deployment model and rough scope, and we will come back with a range.</p>
   <a class="doit" href="/contact.html"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Request Pricing</a>
 </div>
