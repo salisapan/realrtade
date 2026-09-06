@@ -272,6 +272,7 @@ footer.site a{color:var(--muted)}
   function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
   mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
   mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
 })();
 </script>

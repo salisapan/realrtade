@@ -25,7 +25,7 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Flow Trial","item":"https://theflow-ai.com/trial.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Flow Trial","url":"https://theflow-ai.com/trial.html","description":"A free browser extension that reads the open email, recognises when something has actually been decided, and writes the record into Notion or a connected CRM in one click. Judgment runs on the device.","applicationCategory":"BusinessApplication","operatingSystem":"Chrome","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","url":"https://theflow-ai.com/trial.html"}}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does clicking Do It really change anything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It creates a real record in the system you connected — a page in your Notion database, or a Note on the matching HubSpot Contact — with the amount, the date, the sender, the quoted sentence and a link back to the email. Open it afterwards and it is there. Every write comes back with an Undo, and undoing it removes the record."}}, {"@type": "Question", "name": "How does it decide when to speak?", "acceptedAnswer": {"@type": "Answer", "text": "It scores the open message against weighted signals: a currency figure, a commitment verb, a dated obligation, a direct request, a stated loss — set against negatives like an automated sender or mailing-list boilerplate. A figure with nothing decided around it is pushed back down, which is what keeps price lists quiet. It speaks only above a threshold, and that threshold moves as you click and dismiss. All of it runs on your device."}}, {"@type": "Question", "name": "What do I have to configure?", "acceptedAnswer": {"@type": "Answer", "text": "Two things, once. Where Flow may write, and what kind of work you do. There is no trigger screen, no field mapping and no rule syntax — that absence is the product, not a missing feature."}}, {"@type": "Question", "name": "Is my email sent to a server?", "acceptedAnswer": {"@type": "Answer", "text": "Not to decide. The scoring happens in the page, on your machine. The only outbound call is to the system you connected, and only at the moment you click Do It."}}, {"@type": "Question", "name": "What if the Notion database has different columns?", "acceptedAnswer": {"@type": "Answer", "text": "It adapts. Flow fills the title, then matches the rest by name and type — a number column called Amount, a date column called Due, an email column, a URL column. Anything it cannot map still goes into the page body, so nothing it extracted is quietly dropped."}}, {"@type": "Question", "name": "What happens if I ignore a suggestion?", "acceptedAnswer": {"@type": "Answer", "text": "It disappears and Flow never asks about that message again. Both clicking and dismissing quietly retune how confident it needs to be before speaking next time; the popup shows you where that has landed."}}, {"@type": "Question", "name": "Why isn't it on the Chrome Web Store?", "acceptedAnswer": {"@type": "Answer", "text": "Store submission needs a completed data-use disclosure, and that is in progress. Until then it installs through Chrome's own Load unpacked flow, which takes about a minute and is what the install steps below walk through."}}, {"@type": "Question", "name": "Can I remove my data?", "acceptedAnswer": {"@type": "Answer", "text": "Uninstalling the extension deletes everything it stored on your machine. To remove your early-access email from our list, contact hello@theflow-ai.com."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does clicking Do It really change anything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It creates a real record in the system you connected — a page in your Notion database, or a Note on the matching HubSpot Contact — with the amount, the date, the sender, the quoted sentence and a link back to the email. Open it afterwards and it is there. Every write comes back with an Undo, and undoing it removes the record."}}, {"@type": "Question", "name": "How does it decide when to speak?", "acceptedAnswer": {"@type": "Answer", "text": "It scores the open message against weighted signals: a currency figure, a commitment verb, a dated obligation, a direct request, a stated loss — set against negatives like an automated sender or mailing-list boilerplate. A figure with nothing decided around it is pushed back down, which is what keeps price lists quiet. It speaks only above a threshold, and that threshold moves as you click and dismiss. All of it runs on your device."}}, {"@type": "Question", "name": "What do I have to configure?", "acceptedAnswer": {"@type": "Answer", "text": "Two things, once. Where Flow may write, and what kind of work you do. There is no trigger screen, no field mapping and no rule syntax — that absence is the product, not a missing feature."}}, {"@type": "Question", "name": "Is my email sent to a server?", "acceptedAnswer": {"@type": "Answer", "text": "Not to decide. The scoring happens in the page, on your machine. The only outbound call is to the system you connected, and only at the moment you click Do It."}}, {"@type": "Question", "name": "What if the Notion database has different columns?", "acceptedAnswer": {"@type": "Answer", "text": "It adapts. Flow fills the title, then matches the rest by name and type — a number column called Amount, a date column called Due, an email column, a URL column. Anything it cannot map still goes into the page body, so nothing it extracted is quietly dropped."}}, {"@type": "Question", "name": "What happens if I ignore a suggestion?", "acceptedAnswer": {"@type": "Answer", "text": "It disappears and Flow never asks about that message again. Both clicking and dismissing quietly retune how confident it needs to be before speaking next time; the popup shows you where that has landed."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "Confirm your email, download the file, and load it into Chrome — the whole thing takes under a minute, and the install steps below walk through exactly what to click."}}, {"@type": "Question", "name": "Can I remove my data?", "acceptedAnswer": {"@type": "Answer", "text": "Uninstalling the extension deletes everything it stored on your machine. To remove your early-access email from our list, contact hello@theflow-ai.com."}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -202,7 +202,12 @@ p{margin:0 0 15px}
 
 /* mocklist — a faithful stand-in for the real extension popup UI */
 .mocklist{display:flex; flex-direction:column; gap:7px}
-.mockrow{display:flex; align-items:center; gap:10px; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:9px 12px}
+.mockrow{all:unset; box-sizing:border-box; display:flex; align-items:center; gap:10px; width:100%; background:var(--surface-2); border:1px solid var(--line); border-radius:9px; padding:9px 12px; cursor:pointer; transition:border-color .18s,background .18s,transform .18s}
+.mockrow:hover:not(:disabled){border-color:var(--accent); transform:translateY(-1px)}
+.mockrow:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.mockrow[aria-checked="true"]{border-color:var(--accent); background:var(--accent-wash)}
+.mockrow:disabled{cursor:default; opacity:.6}
+.mockrow:disabled:hover{transform:none; border-color:var(--line)}
 .mockrow.dim{opacity:.6}
 .mockrow .box{width:15px; height:15px; border-radius:4px; border:1.5px solid var(--line-2); flex:none; position:relative}
 .mockrow .box.checked{background:var(--accent); border-color:var(--accent)}
@@ -224,7 +229,10 @@ p{margin:0 0 15px}
 
 /* faq */
 .faq{display:flex; flex-direction:column; gap:10px}
+.faq.stacking{gap:18px; padding-bottom:40vh}
 .faq details{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:14px; padding:2px 22px; box-shadow:var(--shadow)}
+.faq.stacking details{position:sticky; transform-origin:top center; will-change:transform; background:var(--surface,#fff)}
+.magnetic{display:inline-flex}
 .faq summary{font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); padding:18px 0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:14px}
 .faq summary::-webkit-details-marker{display:none}
 .faq summary::after{content:'+'; font-size:1.4rem; color:var(--accent); flex:none; font-weight:400; line-height:1}
@@ -242,9 +250,10 @@ p{margin:0 0 15px}
 .formcard input[type=email]{flex:1; min-width:220px; font-family:var(--sans); font-size:1.02rem; padding:14px 16px; border-radius:11px; border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink)}
 .formcard input[type=email]:focus{outline:2px solid var(--accent); outline-offset:1px; background:var(--surface)}
 .formcard .hp{position:absolute; left:-9999px}
-.formcard button{font-family:var(--sans); font-weight:700; font-size:1rem; background:var(--accent); color:#fff; border:0; border-radius:11px; padding:14px 26px; cursor:pointer; box-shadow:0 10px 24px -12px rgba(26,78,245,.55)}
-.formcard button:hover{filter:brightness(1.08)}
-.formcard button:disabled{opacity:.6; cursor:default}
+.formcard button:not(.doit){font-family:var(--sans); font-weight:700; font-size:1rem; background:var(--accent); color:#fff; border:0; border-radius:11px; padding:14px 26px; cursor:pointer; box-shadow:0 10px 24px -12px rgba(26,78,245,.55)}
+.formcard button:not(.doit):hover{filter:brightness(1.08)}
+.formcard button:not(.doit):disabled{opacity:.6; cursor:default}
+.formcard button.doit:disabled{pointer-events:none}
 .formcard .fine{font-family:var(--sans); font-size:.83rem; color:var(--ink-3); margin:14px 0 0}
 .formcard .status{font-family:var(--sans); font-size:.92rem; margin-top:12px; display:none}
 .formcard .status.ok{display:block; color:var(--ok)}
@@ -387,7 +396,7 @@ footer.site a{color:var(--ink-3)}
           <h3>It isn't</h3>
           <ul>
             <li><b>A chat assistant.</b> There is nothing to ask it.</li>
-            <li><b>A rule builder.</b> There is no "when X happens, do Y" screen. That is Zapier, and it is exactly the configuration burden Flow exists to remove.</li>
+            <li><b>A rule builder.</b> There is no "when X happens, do Y" screen &mdash; that is exactly the configuration burden Flow exists to remove.</li>
             <li><b>A nagging notifier.</b> If nothing happens for two days, that is the product working correctly.</li>
             <li><b>A mailbox crawler.</b> It only ever reads the one message open in front of you.</li>
           </ul>
@@ -418,30 +427,31 @@ footer.site a{color:var(--ink-3)}
       <div class="choicegrid">
         <div class="choicepanel">
           <h4>Which systems Flow may touch</h4>
-          <p class="sub">This is the actual popup — a permission, not a configuration.</p>
-          <div class="mocklist">
-            <div class="mockrow"><span class="box checked"></span><span class="txt"><b>Notion</b><i>Database</i></span><span class="badge live">Works now</span></div>
-            <div class="mockrow"><span class="box"></span><span class="txt"><b>HubSpot</b><i>CRM</i></span><span class="badge">Needs setup</span></div>
-            <div class="mockrow dim"><span class="box"></span><span class="txt"><b>Salesforce</b><i>CRM</i></span><span class="badge">Planned</span></div>
-            <div class="mockrow dim"><span class="box"></span><span class="txt"><b>Monday.com</b><i>Work management</i></span><span class="badge">Planned</span></div>
+          <p class="sub">This is the actual popup &mdash; a permission, not a configuration. Try it.</p>
+          <div class="mocklist" id="connectorPicker" role="radiogroup" aria-label="Which systems Flow may touch">
+            <button type="button" class="mockrow" role="radio" aria-checked="true" data-connector="Notion"><span class="box checked"></span><span class="txt"><b>Notion</b><i>Database</i></span><span class="badge live">Works now</span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" data-connector="HubSpot"><span class="box"></span><span class="txt"><b>HubSpot</b><i>CRM</i></span><span class="badge">Needs setup</span></button>
+            <button type="button" class="mockrow dim" role="radio" aria-checked="false" aria-disabled="true" disabled data-connector="Salesforce"><span class="box"></span><span class="txt"><b>Salesforce</b><i>CRM</i></span><span class="badge">Planned</span></button>
+            <button type="button" class="mockrow dim" role="radio" aria-checked="false" aria-disabled="true" disabled data-connector="Monday.com"><span class="box"></span><span class="txt"><b>Monday.com</b><i>Work management</i></span><span class="badge">Planned</span></button>
           </div>
           <p class="sub">Notion connects with a token you create yourself in about thirty seconds &mdash; no app registration, no review queue, nothing for us to approve. It writes into a database you choose, filling whichever Amount, Date, Email or Source columns that database happens to have.</p>
         </div>
         <div class="choicepanel">
           <h4>What kind of work you do</h4>
           <p class="sub">Steers judgment toward what matters in your field &mdash; it doesn't hard-code a trigger.</p>
-          <div class="mocklist">
-            <div class="mockrow"><span class="circle checked"></span><span class="txt"><b>Sales &amp; business development</b><i>Deal / client</i></span></div>
-            <div class="mockrow"><span class="circle"></span><span class="txt"><b>Legal &amp; deal coordination</b><i>Matter / agreement</i></span></div>
-            <div class="mockrow"><span class="circle"></span><span class="txt"><b>Finance &amp; billing</b><i>Invoice / vendor</i></span></div>
-            <div class="mockrow"><span class="circle"></span><span class="txt"><b>Operations &amp; admin</b><i>Task / request</i></span></div>
+          <div class="mocklist" id="domainPicker" role="radiogroup" aria-label="What kind of work you do">
+            <button type="button" class="mockrow" role="radio" aria-checked="true" data-domain="Sales &amp; business development"><span class="circle checked"></span><span class="txt"><b>Sales &amp; business development</b><i>Deal / client</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Legal &amp; deal coordination"><span class="circle"></span><span class="txt"><b>Legal &amp; deal coordination</b><i>Matter / agreement</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Finance &amp; billing"><span class="circle"></span><span class="txt"><b>Finance &amp; billing</b><i>Invoice / vendor</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Operations &amp; admin"><span class="circle"></span><span class="txt"><b>Operations &amp; admin</b><i>Task / request</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Customer success &amp; support"><span class="circle"></span><span class="txt"><b>Customer success &amp; support</b><i>Ticket / renewal</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" data-domain="Recruiting &amp; hiring"><span class="circle"></span><span class="txt"><b>Recruiting &amp; hiring</b><i>Candidate / offer</i></span></button>
           </div>
         </div>
       </div>
-      <p class="flex-note narrow">The destination is deliberately never Google Sheets. If both ends of the sync sit inside Google, Google already solves that better than we can &mdash; the value here is specifically in reaching <i>outside</i> one ecosystem into another.</p>
+      <p class="flex-note narrow" id="pickerSummary" aria-live="polite">Connect <b>Notion</b> and pick <b>Sales &amp; business development</b>, and Flow watches for deal signals &mdash; a price agreed, a renewal lost, a date set &mdash; and writes straight into your database.</p>
       <div class="note-box narrow">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>
-        <div><b>The trade this build makes, stated plainly:</b> the scorer that decides whether to speak is a transparent weighting of named signals, not a language model. That is what lets it run entirely on your device and explain itself &mdash; and it is also why a model would catch phrasings this one misses. We took explainable and local over slightly better recall. The same Local-First principle runs through the full platform; the reasoning is on the <a href="/security.html">Security &amp; Architecture</a> page.</div>
       </div>
     </section>
 
@@ -470,7 +480,6 @@ footer.site a{color:var(--ink-3)}
           </ul>
         </div>
       </div>
-      <p class="flex-note narrow">The only network calls this extension makes are to the system you chose to connect, and only at the moment you click. Your credential, the kind of work you picked, and the activity log live in local browser storage &mdash; uninstalling deletes all of it. Records already written stay where they were written, because that write really happened; each one has an Undo next to it for as long as the log keeps it. To remove your early-access email from our list, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Flow%20Trial%20signup">hello@theflow-ai.com</a>.</p>
     </section>
 
     <section id="faq">
@@ -504,8 +513,8 @@ footer.site a{color:var(--ink-3)}
           <p>It disappears and Flow never asks about that message again. Both clicking and dismissing quietly retune how confident it needs to be before speaking next time; the popup shows you where that has landed.</p>
         </details>
         <details>
-          <summary>Why isn't it on the Chrome Web Store?</summary>
-          <p>Store submission needs a completed data-use disclosure, and that is in progress. Until then it installs through Chrome's own Load unpacked flow, which takes about a minute and is what the install steps below walk through.</p>
+          <summary>How do I install it?</summary>
+          <p>Confirm your email, download the file, and load it into Chrome &mdash; the whole thing takes under a minute, and the install steps below walk through exactly what to click.</p>
         </details>
         <details>
           <summary>Can I remove my data?</summary>
@@ -526,7 +535,7 @@ footer.site a{color:var(--ink-3)}
             <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
             <label class="sr-only" for="trialEmail">Email address</label>
             <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
-            <button type="submit" class="doit" id="trialBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="trialBtnLabel">Request Access</span></button>
+            <span class="magnetic"><button type="submit" class="doit" id="trialBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="trialBtnLabel">Request Access</span></button></span>
           </div>
           <p class="fine">Confirm your email and you'll land straight on a page with the real download button &mdash; we'll also send it to your inbox.</p>
           <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
@@ -555,7 +564,7 @@ footer.site a{color:var(--ink-3)}
       <div class="cta-box">
         <h2>This is the small end of a much larger idea</h2>
         <p>One inbox and one destination is where it starts. The same engine &mdash; watch, recognise, act, always reversible &mdash; is what Flow runs across every application on a machine, on infrastructure you control.</p>
-        <a class="doit ghost" href="/security.html"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Read the Security Model</a>
+        <span class="magnetic"><a class="doit ghost" href="/security.html"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Read the Security Model</a></span>
       </div>
     </section>
 
@@ -646,6 +655,86 @@ footer.site a{color:var(--ink-3)}
     if(typeof gtag==='function') gtag('event','trial_signup_submit');
   });
 })();
+
+(function(){
+  var connGroup=document.getElementById('connectorPicker'), domGroup=document.getElementById('domainPicker'), summary=document.getElementById('pickerSummary');
+  if(!connGroup||!domGroup||!summary) return;
+
+  var SIGNAL_WORDS={
+    'Sales & business development': 'deal signals — a price agreed, a renewal lost, a date set',
+    'Legal & deal coordination': 'matter signals — an agreement executed, a filing deadline, a consideration agreed',
+    'Finance & billing': 'billing signals — an invoice due, a payment confirmed, a discrepancy raised',
+    'Operations & admin': 'commitment signals — an approval given, a delivery date, a follow-up promised',
+    'Customer success & support': 'account signals — a renewal due, a cancellation risk, a refund agreed',
+    'Recruiting & hiring': 'hiring signals — an offer made, a start date set, a candidate lost'
+  };
+
+  function selectIn(group, btn){
+    group.querySelectorAll('[role="radio"]').forEach(function(b){ b.setAttribute('aria-checked', String(b===btn)); b.querySelector('.box,.circle').classList.toggle('checked', b===btn); });
+  }
+
+  function currentLabel(group, attr){
+    var checked=group.querySelector('[aria-checked="true"]');
+    return checked ? checked.getAttribute(attr) : null;
+  }
+
+  function updateSummary(){
+    var connector=currentLabel(connGroup,'data-connector'), domain=currentLabel(domGroup,'data-domain');
+    if(!connector||!domain) return;
+    var signals=SIGNAL_WORDS[domain] || 'the signals that matter in your field';
+    summary.innerHTML='Connect <b>'+connector+'</b> and pick <b>'+domain+'</b>, and Flow watches for '+signals+' &mdash; and writes straight into '+(connector==='Notion'?'your database':'the matching record')+'.';
+  }
+
+  [connGroup, domGroup].forEach(function(group){
+    group.addEventListener('click', function(ev){
+      var btn=ev.target.closest('[role="radio"]');
+      if(!btn || btn.disabled) return;
+      selectIn(group, btn);
+      updateSummary();
+    });
+  });
+})();
+
+/* FAQ: cards stack and settle slightly smaller as the next one scrolls over
+   it — same stagger-and-scale idea as a sticky image stack, applied to an
+   accordion that still opens and closes normally. Skipped entirely under
+   reduced motion, where plain static stacking (no sticky, no scale) reads
+   better than a partial effect. */
+(function(){
+  var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fine=matchMedia('(pointer: fine)').matches;
+  if(fine && !rm){
+    document.querySelectorAll('.magnetic').forEach(function(w){
+      var btn=w.querySelector('.doit'); if(!btn) return;
+      w.addEventListener('pointermove',function(ev){ var r=w.getBoundingClientRect(); var x=(ev.clientX-r.left-r.width/2)/r.width, y=(ev.clientY-r.top-r.height/2)/r.height; btn.style.transform='translate('+(x*10)+'px,'+(y*8)+'px)'; });
+      w.addEventListener('pointerleave',function(){ btn.style.transform=''; });
+    });
+  }
+
+  var list=document.querySelector('.faq'); if(!list||rm) return;
+  var items=Array.prototype.slice.call(list.children); if(items.length<2) return;
+  list.classList.add('stacking');
+
+  var HEADER=84, STEP=14, MIN_SCALE=0.92;
+  items.forEach(function(el,i){ el.style.top=(HEADER+i*STEP)+'px'; });
+
+  var raf=null;
+  function apply(){
+    raf=null;
+    for(var i=0;i<items.length-1;i++){
+      var el=items[i], next=items[i+1];
+      var elTop=el.getBoundingClientRect().top, nextTop=next.getBoundingClientRect().top;
+      var gap=nextTop-elTop; // shrinks toward 0 as `next` catches up and covers `el`
+      var t=1-Math.max(0,Math.min(1,gap/(el.offsetHeight||200)));
+      el.style.transform='scale('+(1-t*(1-MIN_SCALE)).toFixed(3)+')';
+    }
+    items[items.length-1].style.transform='';
+  }
+  function schedule(){ if(!raf) raf=requestAnimationFrame(apply); }
+  addEventListener('scroll',schedule,{passive:true});
+  addEventListener('resize',function(){ items.forEach(function(el,i){ el.style.top=(HEADER+i*STEP)+'px'; }); schedule(); });
+  apply();
+})();
 </script>
 <script>
 (function(){
@@ -655,6 +744,7 @@ footer.site a{color:var(--ink-3)}
   function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
   mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
   mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
 })();
 </script>

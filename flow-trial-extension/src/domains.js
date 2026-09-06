@@ -60,6 +60,32 @@ const FLOW_DOMAINS = [
       if (facts.moneyText) return 'Log ' + facts.moneyText + ' agreed';
       return 'Log follow-up commitment';
     }
+  },
+  {
+    id: 'support',
+    label: 'Customer success & support',
+    entity: 'Ticket / renewal',
+    entityWords: /\b(ticket|renewal|churn|escalation|refund|complaint|support case|csat|downgrade|cancel(?:lation)?)\b/i,
+    title(facts) {
+      if (facts.lost) return 'Log churn risk';
+      if (facts.date && facts.moneyText) return 'Log renewal ' + facts.moneyText + ' due ' + facts.dateText;
+      if (facts.moneyText) return 'Log refund ' + facts.moneyText;
+      if (facts.date) return 'Log renewal date ' + facts.dateText;
+      return 'Log account update';
+    }
+  },
+  {
+    id: 'hr',
+    label: 'Recruiting & hiring',
+    entity: 'Candidate / offer',
+    entityWords: /\b(candidate|offer letter|interview|hire|hiring|onboarding|background check|reference check|start date|headcount)\b/i,
+    title(facts) {
+      if (facts.lost) return 'Log candidate declined';
+      if (facts.date && facts.moneyText) return 'Log offer ' + facts.moneyText + ', starts ' + facts.dateText;
+      if (facts.moneyText) return 'Log offer ' + facts.moneyText;
+      if (facts.date) return 'Log start date ' + facts.dateText;
+      return 'Log hiring update';
+    }
   }
 ];
 

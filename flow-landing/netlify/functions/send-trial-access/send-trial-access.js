@@ -53,8 +53,8 @@ function htmlBody(lang, downloadUrl) {
 
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
-    ? 'תודה שביקשתם גישה מוקדמת ל-Flow Trial. זו עדיין גרסת בדיקה מוקדמת — לא בחנות Chrome עדיין — כך שההתקנה דורשת כמה צעדים ידניים.'
-    : "Thanks for requesting early access to Flow Trial. This is still a pre-release build — not yet on the Chrome Web Store — so installing it takes a few manual steps.";
+    ? 'תודה שביקשתם גישה מוקדמת ל-Flow Trial. ההתקנה לוקחת פחות מדקה &mdash; פשוט עקבו אחר הצעדים למטה.'
+    : "Thanks for requesting early access to Flow Trial. Installing it takes under a minute — just follow the steps below.";
   var steps = isHe
     ? [
         'הורידו את קובץ ה-ZIP וחלצו אותו לתיקייה.',
