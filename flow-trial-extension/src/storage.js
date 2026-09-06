@@ -12,7 +12,7 @@ const FlowStorage = (() => {
     seenMessageIds: [],
     // The only thing that learns. Clicks make Flow slightly more willing to
     // speak; dismissals make it quieter. The user never sees or sets a number.
-    calibration: { clicks: 0, dismissals: 0 },
+    calibration: { clicks: 0, dismissals: 0, ts: 0 },
     // Whether the one-time "share with a teammate" prompt in the Activity
     // tab has been dismissed. It earns its place after real usage (see
     // popup.js renderReferral) and, once dismissed, never comes back.
@@ -47,12 +47,26 @@ const FlowStorage = (() => {
 
   // Recent behaviour should count for more than something from three months ago,
   // so both counters decay rather than accumulating forever.
+  //
+  // Decay is applied against elapsed time before the new event is counted, not
+  // just against the opposite event. Decaying dismissals only on a click made
+  // silence self-reinforcing: enough dismissals raised the threshold past what
+  // any email could score, so no chip appeared, so no click could ever arrive to
+  // decay it back. FlowJudgment.thresholdFrom applies the same half-life when it
+  // reads this, and folding it in here keeps the stored value from drifting.
+  const HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
+
   async function calibrate(kind) {
     const state = await get();
-    const c = state.calibration || { clicks: 0, dismissals: 0 };
+    const c = state.calibration || { clicks: 0, dismissals: 0, ts: 0 };
+    const now = Date.now();
+    const decay = c.ts ? Math.pow(0.5, Math.max(0, now - c.ts) / HALF_LIFE_MS) : 1;
+    const clicks = (c.clicks || 0) * decay;
+    const dismissals = (c.dismissals || 0) * decay;
     const next = {
-      clicks: Math.min(6, kind === 'click' ? c.clicks + 1 : c.clicks * 0.9),
-      dismissals: Math.min(6, kind === 'dismiss' ? c.dismissals + 1 : c.dismissals * 0.9)
+      clicks: Math.min(6, kind === 'click' ? clicks + 1 : clicks),
+      dismissals: Math.min(6, kind === 'dismiss' ? dismissals + 1 : dismissals),
+      ts: now
     };
     await set({ calibration: next });
     return next;

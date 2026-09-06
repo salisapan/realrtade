@@ -81,20 +81,25 @@ const FlowExtract = (() => {
     if (m) return { raw: m[0], iso: m[0] };
 
     const monthNames = MONTHS.join('|');
+    // A bare "March 3" carries no year, so resolving it means guessing. Guessing
+    // forward ("it must mean next March") silently rewrites "the March 3 kickoff
+    // already happened" into a future commitment and writes that wrong ISO date
+    // into someone's CRM. When the year is genuinely ambiguous we keep the words
+    // the sender used and refuse to emit an ISO date at all — no date beats a
+    // confidently wrong one, which is the same rule the rest of this file follows.
+    const STALE_MS = 1000 * 60 * 60 * 24 * 30;
+
     m = text.match(new RegExp('\\b(' + monthNames + ')\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b', 'i'));
     if (m) {
-      const y = m[3] ? +m[3] : now.getFullYear();
-      const d = new Date(y, MONTHS.indexOf(m[1].toLowerCase()), +m[2]);
-      // A bare "March 3" written in November means next March.
-      if (!m[3] && d < now && (now - d) > 1000 * 60 * 60 * 24 * 30) d.setFullYear(y + 1);
+      const d = new Date(m[3] ? +m[3] : now.getFullYear(), MONTHS.indexOf(m[1].toLowerCase()), +m[2]);
+      if (!m[3] && d < now && (now - d) > STALE_MS) return { raw: m[0], iso: null, ambiguousYear: true };
       return { raw: m[0], iso: iso(d) };
     }
 
     m = text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + monthNames + ')(?:,?\\s+(\\d{4}))?\\b', 'i'));
     if (m) {
-      const y = m[3] ? +m[3] : now.getFullYear();
-      const d = new Date(y, MONTHS.indexOf(m[2].toLowerCase()), +m[1]);
-      if (!m[3] && d < now && (now - d) > 1000 * 60 * 60 * 24 * 30) d.setFullYear(y + 1);
+      const d = new Date(m[3] ? +m[3] : now.getFullYear(), MONTHS.indexOf(m[2].toLowerCase()), +m[1]);
+      if (!m[3] && d < now && (now - d) > STALE_MS) return { raw: m[0], iso: null, ambiguousYear: true };
       return { raw: m[0], iso: iso(d) };
     }
 
