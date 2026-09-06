@@ -2,8 +2,14 @@ const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SITE_URL = 'https://theflow-ai.com';
-const SB_URL = 'https://nlvljclvoguvrnntwufu.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5sdmxqY2x2b2d1dnJubnR3dWZ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIxMjQxMTcsImV4cCI6MjA1NzcwMDExN30.G-Kap81tXWNWkggTEH9d47fNU2-RNKzyokgVivy201M';
+const SB_URL = 'https://zjquktirlrhbqcnkfaok.supabase.co';
+// Confirming a signup means PATCHing a row by email with no prior SELECT --
+// Postgres RLS requires SELECT visibility to even locate a row for UPDATE,
+// and this table deliberately has no SELECT policy for anon (so the public
+// anon key can never list signup emails). This function runs server-side on
+// Netlify only, never reaching the browser, so it's the one place safe to
+// hold a key that bypasses RLS entirely.
+const SB_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const LOG_PREFIX = '[confirm-signup]';
 const DOWNLOAD_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days — long enough that "check your email later" still works
 
@@ -145,13 +151,14 @@ exports.handler = async function (event) {
   }
 
   try {
+    if (!SB_SERVICE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
     await fetch(SB_URL + '/rest/v1/waitlist?email=eq.' + encodeURIComponent(email), {
       method: 'PATCH',
-      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      headers: { apikey: SB_SERVICE_KEY, Authorization: 'Bearer ' + SB_SERVICE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({ confirmed_at: new Date().toISOString() }),
     });
   } catch (err) {
-    // best-effort only — column may not exist yet, never blocks the confirmation UX
+    logErr('failed to mark waitlist row confirmed (customer will still see success page)', String(err));
   }
 
   return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true, kind, downloadUrl) };
