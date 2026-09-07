@@ -114,20 +114,18 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 /* hero-banner: full-bleed centered layout — badge, headline, dual CTA, connector strip.
    The site's real header/hamburger nav above this is untouched; only the content
    below it takes the banner treatment. */
-.hero-banner{padding:76px 0 8px; text-align:center; background:var(--navy,#07090F)}
+.hero-banner{padding:76px 0 8px; text-align:center}
 .hero-banner::before{content:''; position:absolute; top:-160px; left:50%; transform:translateX(-50%); width:900px; height:560px; background:radial-gradient(ellipse at center, var(--hero-glow1), transparent 68%); pointer-events:none; z-index:-1}
 .hero-banner .eyebrow{display:none}
-.hb-bg{position:absolute; z-index:-1; overflow:hidden; pointer-events:none; top:0; bottom:0; left:50%; width:100vw; transform:translateX(-50%); background:var(--navy,#07090F)}
+/* Full-bleed background layer: .hero-banner itself must stay transparent, or
+   its own solid box-background (only as wide as .wrap) paints in front of
+   this z-index:-1 layer everywhere except the side margins — that was the
+   bug that made the streak only visible at the far left/right edges. */
+.hb-bg{position:absolute; z-index:-1; overflow:hidden; pointer-events:none; top:0; bottom:0; left:50%; width:100vw; transform:translateX(-50%); background:var(--bg)}
 #heroStreak{position:absolute; inset:0; width:100%; height:100%; display:block}
-.hb-bg::after{content:''; position:absolute; inset:0; background:radial-gradient(ellipse 115% 130% at 50% 40%, transparent 70%, var(--navy,#07090F) 100%)}
-.hero-banner .title,.hero-banner .lead{color:#fff}
-.hero-banner .lead{color:rgba(255,255,255,.78)}
-.hero-banner .lead b{color:#fff}
-.hero-banner .status-row span{background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.14); color:rgba(255,255,255,.7)}
-.hero-banner .hb-partners p{color:rgba(255,255,255,.45)}
-.hero-banner .hb-partner{color:rgba(255,255,255,.55)}
-.hero-banner .hb-partner:hover{color:#fff}
-.hero-banner .doit{--doit-text:#e6efff; --ring:#5b8cff; --glass-top:rgba(228,236,250,.2); --glass-bot:rgba(9,13,24,.34); --glass-border:rgba(228,236,250,.3); --glass-gloss:rgba(255,255,255,.55)}
+.hb-bg::after{content:''; position:absolute; inset:0; background:radial-gradient(ellipse 115% 130% at 50% 40%, transparent 70%, var(--bg) 100%)}
+.hero-banner .title,.hero-banner .lead b{color:var(--ink)}
+.hero-banner .lead{color:var(--ink-2)}
 .hb-badge{position:relative; display:inline-flex; align-items:center; gap:9px; background:linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:6px 16px 6px 6px; margin-bottom:22px; font-family:var(--mono); font-size:.78rem; color:rgba(255,255,255,.82); box-shadow:0 0 0 1px rgba(91,140,255,.14) inset, 0 8px 20px -12px rgba(59,116,255,.45)}
 .hb-badge b{background:var(--accent); color:#fff; font-family:var(--sans); font-weight:700; font-size:.66rem; text-transform:uppercase; letter-spacing:.04em; border-radius:999px; padding:4px 11px}
 .hero-banner .title{max-width:820px; margin-inline:auto}
@@ -213,11 +211,18 @@ p{margin:0 0 15px}
 /* flexibility: two-column choice panel */
 .choicegrid{display:grid; gap:18px}
 @media (min-width:720px){ .choicegrid{grid-template-columns:1fr 1fr} }
-.choicepanel{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow)}
-.choicepanel h4{margin:0 0 4px; font-size:1rem; font-weight:700; color:var(--ink)}
+.choicepanel{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow); transition:transform .2s,box-shadow .2s}
+.choicepanel:hover{transform:translateY(-2px); box-shadow:var(--shadow-lg)}
+.choicepanel h4{margin:0 0 4px; font-size:1rem; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px}
 .choicepanel .sub{font-size:.87rem; color:var(--ink-3); margin:0 0 16px}
 .flex-note{font-size:.95rem; color:var(--ink-2); margin:22px 0 0}
 .flex-note i{color:var(--ink)}
+/* required-setup framing: numbered question badges + "required" chip, reused
+   from stepcard's num styling so the wizard reads as one continuous, ordered
+   flow the user must complete before the signup form further down the page */
+.req-chip{display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--accent-ink); background:var(--accent-wash); border:1px solid var(--accent); border-radius:999px; padding:3px 11px; margin:0 8px 6px 0; vertical-align:middle}
+.qnum{flex:none; width:26px; height:26px; border-radius:8px; background:var(--accent-wash); color:var(--accent-ink); font-family:var(--mono); font-weight:700; font-size:.82rem; display:inline-flex; align-items:center; justify-content:center}
+.qnum.inline{margin-inline-end:8px}
 
 /* the written record — the strongest proof on the page is showing the actual
    fields that land in someone's database, not describing them */
@@ -262,30 +267,24 @@ p{margin:0 0 15px}
 .pillgroup{display:flex; gap:8px; flex-wrap:wrap}
 .pill{all:unset; box-sizing:border-box; font-family:var(--sans); font-size:.88rem; font-weight:600; padding:9px 17px; border-radius:999px; border:1px solid var(--line); background:var(--surface-2); color:var(--ink-2); cursor:pointer; transition:border-color .15s,background .15s,color .15s,transform .15s}
 .pill:hover{transform:translateY(-1px); border-color:var(--accent)}
-.pill[aria-checked="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+.pill[aria-checked="true"]{
+  position:relative; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--glass-top),var(--glass-bot));
+  border:2px solid var(--ring); color:var(--doit-text); font-weight:700;
+  box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 0 14px var(--glow), inset 0 0 10px color-mix(in srgb, var(--ring) 35%, transparent);
+}
 .pill:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
-/* glass shimmer CTA — sits right after the characterization is complete */
 .cta-wrap{display:flex; justify-content:center; margin-top:30px}
-.glass-cta{position:relative; isolation:isolate; display:inline-flex; border-radius:999px; padding:3px; cursor:pointer; text-decoration:none; overflow:hidden; box-shadow:0 10px 30px -10px var(--glow); transition:transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s}
-.glass-cta:hover{transform:translateY(-2px) scale(1.03); box-shadow:0 0 42px 6px var(--glow)}
-.glass-cta:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
-.glass-cta::before{content:''; position:absolute; inset:-60%; background:conic-gradient(from 220deg, transparent 0deg, #fff 70deg, transparent 130deg); animation:gc-spin 4s linear infinite; z-index:0}
-.glass-cta .gc-inner{position:relative; z-index:1; display:flex; align-items:center; gap:11px; background:linear-gradient(180deg,var(--glass-top),var(--glass-bot)); backdrop-filter:blur(10px); border-radius:999px; padding:12px 24px 12px 12px}
-.glass-cta .gc-badge{flex:none; width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fff; display:grid; place-items:center; font-family:var(--disp); font-weight:800; font-size:1rem; box-shadow:0 0 0 1px rgba(255,255,255,.25) inset}
-.glass-cta .gc-label{font-family:var(--sans); font-weight:700; font-size:1.03rem; white-space:nowrap; color:var(--ink)}
-.glass-cta .gc-spark{flex:none; width:26px; height:26px; border-radius:50%; background:var(--accent-wash); color:var(--accent); display:grid; place-items:center}
-.glass-cta .gc-spark svg{width:15px; height:15px}
-@keyframes gc-spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion: reduce){ .glass-cta::before{animation:none} }
+/* small monogram badge inside the hero's "Set Up My Glance" button, styled
+   to match the Glance mark (dot + glow ring) rather than a generic circle */
+.gc-badge-inline{position:relative; flex:none; width:22px; height:22px; border-radius:50%; background:var(--doit-text); color:var(--navy,#07090F); display:grid; place-items:center; font-family:var(--disp); font-weight:800; font-size:.78rem; margin-inline-end:2px}
+.gc-badge-inline::after{content:''; position:absolute; inset:-4px; border-radius:50%; border:1.4px solid color-mix(in srgb, var(--ring) 55%, transparent)}
 
 /* data cards reuse .card two */
 
 /* faq */
 .faq{display:flex; flex-direction:column; gap:10px}
-.faq.stacking{gap:18px; padding-bottom:40vh}
 .faq details{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:14px; padding:2px 22px; box-shadow:var(--shadow)}
-.faq.stacking details{position:sticky; transform-origin:top center; will-change:transform; background:var(--surface,#fff)}
 .magnetic{display:inline-flex}
 .faq summary{font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); padding:18px 0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:14px}
 .faq summary::-webkit-details-marker{display:none}
@@ -399,18 +398,14 @@ footer.site a{color:var(--ink-3)}
       <div class="hb-bg" aria-hidden="true">
         <canvas id="heroStreak"></canvas>
       </div>
-      <span class="eyebrow">The record-keeping layer for your inbox &middot; Free to start</span>
-      <div class="hb-badge"><b>Free to start</b> &middot; live in Gmail today</div>
-      <h1 class="title">Your software is still waiting for you to type what already happened.</h1>
-      <p class="lead"><b>Glance</b> reads the email you're already looking at. When it decides something &mdash; a price agreed, a deadline set, a deal lost &mdash; one <code>Do It</code> button appears next to it. Click it, and the record writes itself into Notion or your CRM: the amount, the date, the sentence that decided it.</p>
-      <p class="lead" style="margin-top:-8px">Two questions to set up. Nothing leaves your device to decide.</p>
+      <h1 class="title">You choose the system. Glance decides what's worth writing to it.</h1>
+      <p class="lead"><b>Connect Notion, HubSpot, Salesforce, Slack, or Monday.com</b> &mdash; whichever you already use. Glance then watches the Gmail message you have open, and when something real gets decided &mdash; a price agreed, a deadline set, a deal lost &mdash; one click writes the amount, the date and the sentence that decided it straight into the system you picked.</p>
       <div class="hero-cta">
-        <span class="magnetic"><a class="doit glance" href="#signup"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Glance — Free</a></span>
-        <span class="magnetic"><a class="doit glance ghost" href="#proof"><span class="shell"></span><span class="ring"></span><span class="shine"></span>See It In Action</a></span>
+        <span class="magnetic"><a class="doit glance" href="#flexible"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="gc-badge-inline" aria-hidden="true">G</span>Set Up My Glance</a></span>
       </div>
       <div class="status-row">
         <span>Free, no card</span>
-        <span>Setup is two questions</span>
+        <span>Setup is a few clicks</span>
         <span>Judgment stays on your device</span>
         <span>Undo on every write</span>
       </div>
@@ -449,7 +444,7 @@ footer.site a{color:var(--ink-3)}
     </div>
 
     <nav class="jumpnav narrow" aria-label="On this page">
-      <a href="#how">How it works</a><a href="#flexible">Setup</a><a href="#data-use">Data &amp; privacy</a><a href="#faq">FAQ</a><a href="#signup">Get access</a>
+      <a href="#how">How it works</a><a href="#flexible">Setup</a><a href="#signup">Get access</a><a href="#data-use">Data &amp; privacy</a><a href="#faq">FAQ</a>
     </nav>
 
     <section id="what">
@@ -498,11 +493,11 @@ footer.site a{color:var(--ink-3)}
       <div class="sec-head narrow">
         <span class="eyebrow">03</span>
         <h2>Set it up in under a minute</h2>
-        <p>Where Glance may write, and what kind of work you do &mdash; that's the entire setup.</p>
+        <p><span class="req-chip">Required before signup</span> Four quick choices &mdash; where Glance may write, what kind of work you do, how cautious it should start, and who else will use it. Nothing here is a form; every answer is one click.</p>
       </div>
       <div class="choicegrid">
         <div class="choicepanel">
-          <h4>Which systems Glance may touch</h4>
+          <h4><span class="qnum">1</span>Which systems Glance may touch</h4>
           <p class="sub">This is the real extension popup. Try it below.</p>
           <div class="mocklist" id="connectorPicker" role="radiogroup" aria-label="Which systems Glance may touch">
             <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-connector="Notion"><span class="box checked"></span><span class="txt"><b>Notion</b><i>Database</i></span><span class="badge live">Works now</span></button>
@@ -514,7 +509,7 @@ footer.site a{color:var(--ink-3)}
           <p class="sub">Notion connects with a token you create yourself in about thirty seconds. It writes into a database you choose, filling in whichever Amount, Date, Email or Source columns that database already has.</p>
         </div>
         <div class="choicepanel">
-          <h4>What kind of work you do</h4>
+          <h4><span class="qnum">2</span>What kind of work you do</h4>
           <p class="sub">Helps Glance recognize what matters in your field.</p>
           <div class="mocklist" id="domainPicker" role="radiogroup" aria-label="What kind of work you do">
             <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-domain="Sales &amp; business development"><span class="circle checked"></span><span class="txt"><b>Sales &amp; business development</b><i>Deal / client</i></span></button>
@@ -525,30 +520,78 @@ footer.site a{color:var(--ink-3)}
             <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-domain="Recruiting &amp; hiring"><span class="circle"></span><span class="txt"><b>Recruiting &amp; hiring</b><i>Candidate / offer</i></span></button>
           </div>
         </div>
+        <div class="choicepanel">
+          <h4><span class="qnum">3</span>How cautious should it start</h4>
+          <p class="sub">Sets where Glance's confidence bar begins &mdash; it keeps adjusting from there as you click and dismiss.</p>
+          <div class="mocklist" id="sensitivityPicker" role="radiogroup" aria-label="How cautious should Glance start">
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-sensitivity="Only the sure things"><span class="circle"></span><span class="txt"><b>Only the sure things</b><i>Fewer suggestions, high confidence</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-sensitivity="Balanced"><span class="circle checked"></span><span class="txt"><b>Balanced</b><i>Recommended starting point</i></span><span class="badge live">Suggested</span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-sensitivity="Catch more"><span class="circle"></span><span class="txt"><b>Catch more</b><i>More suggestions, some you'll dismiss</i></span></button>
+          </div>
+        </div>
+        <div class="choicepanel">
+          <h4><span class="qnum">4</span>Who else will use it</h4>
+          <p class="sub">If it's more than you, Glance can export your exact setup as a file your teammates import in one click.</p>
+          <div class="mocklist" id="setupPicker" role="radiogroup" aria-label="Who else will use it">
+            <button type="button" class="mockrow" role="radio" aria-checked="true" tabindex="0" data-setup="Just me"><span class="circle checked"></span><span class="txt"><b>Just me</b><i>No recipe needed</i></span></button>
+            <button type="button" class="mockrow" role="radio" aria-checked="false" tabindex="-1" data-setup="My team, too"><span class="circle"></span><span class="txt"><b>My team, too</b><i>Export a &ldquo;.glance&rdquo; recipe once it's dialed in</i></span></button>
+          </div>
+        </div>
       </div>
       <div class="teamsize-row narrow">
-        <p class="sub" style="margin:0 0 10px">And one more thing &mdash; how big is the team?</p>
+        <p class="sub" style="margin:0 0 10px"><span class="qnum inline">5</span>And one more thing &mdash; how big is the team?</p>
         <div class="pillgroup" id="teamPicker" role="radiogroup" aria-label="How big is the team">
           <button type="button" class="pill" role="radio" aria-checked="true" tabindex="0" data-team="just you">Just me</button>
           <button type="button" class="pill" role="radio" aria-checked="false" tabindex="-1" data-team="your team">Small team (2&ndash;10)</button>
           <button type="button" class="pill" role="radio" aria-checked="false" tabindex="-1" data-team="the department">Whole department</button>
         </div>
       </div>
-      <p class="flex-note narrow" id="pickerSummary" aria-live="polite">Connect <b>Notion</b> and pick <b>Sales &amp; business development</b>, and Glance watches for deal signals &mdash; a price agreed, a renewal lost, a date set &mdash; and writes straight into your database, for just you.</p>
+      <p class="flex-note narrow" id="pickerSummary" aria-live="polite">Connect <b>Notion</b> and pick <b>Sales &amp; business development</b>, and Glance watches for deal signals &mdash; a price agreed, a renewal lost, a date set &mdash; starting balanced, and writes straight into your database, for just you.</p>
       <div class="cta-wrap narrow">
-        <a class="glass-cta" href="#signup">
-          <span class="gc-inner">
-            <span class="gc-badge" aria-hidden="true">G</span>
-            <span class="gc-label">Set Up My Glance</span>
-            <span class="gc-spark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6L12 3z"/></svg></span>
-          </span>
-        </a>
+        <span class="magnetic"><a class="doit glance" href="#signup"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Continue to Sign Up</a></span>
+      </div>
+    </section>
+
+    <section id="signup" class="band">
+      <div class="sec-head narrow">
+        <span class="eyebrow">04</span>
+        <h2>Get Glance</h2>
+        <p>Free. Enter your email and confirm it &mdash; that's just to keep the download link from being shared publicly, not a waitlist.</p>
+      </div>
+      <div class="formcard">
+        <form id="trialForm">
+          <div class="row">
+            <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+            <label class="sr-only" for="trialEmail">Email address</label>
+            <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
+            <span class="magnetic"><button type="submit" class="doit glance" id="trialBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="trialBtnLabel">Get Glance</span></button></span>
+          </div>
+          <p class="fine">Confirm your email and the download button unlocks &mdash; we'll also send the link to your inbox.</p>
+          <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="sec-head narrow">
+        <span class="eyebrow">05</span>
+        <h2>After you confirm</h2>
+        <p>The confirmation page and email both carry a working, time-limited download link &mdash; nothing to hunt for.</p>
+      </div>
+      <div class="installbox">
+        <div class="wizard">
+          <div class="wstep"><span class="num">1</span><p>Confirm your email above, then download from that page or the email.</p></div>
+          <div class="wstep"><span class="num">2</span><p>Unzip it to a folder, then in Chrome open <code>chrome://extensions</code>.</p></div>
+          <div class="wstep"><span class="num">3</span><p>Turn on <b>Developer mode</b> (top-right).</p></div>
+          <div class="wstep"><span class="num">4</span><p>Click <b>Load unpacked</b>, select the folder.</p></div>
+          <div class="wstep"><span class="num">5</span><p>In the popup, connect Notion (or HubSpot), pick the kind of work you do, and hit <b>Save &amp; start</b>.</p></div>
+        </div>
       </div>
     </section>
 
     <section id="data-use">
       <div class="sec-head narrow">
-        <span class="eyebrow">04</span>
+        <span class="eyebrow">06</span>
         <h2>What it does with your data</h2>
         <p>The short, precise version &mdash; not a generic privacy paragraph.</p>
       </div>
@@ -575,7 +618,7 @@ footer.site a{color:var(--ink-3)}
 
     <section id="faq">
       <div class="sec-head narrow">
-        <span class="eyebrow">05</span>
+        <span class="eyebrow">07</span>
         <h2>Questions worth asking first</h2>
       </div>
       <div class="faq narrow">
@@ -605,49 +648,12 @@ footer.site a{color:var(--ink-3)}
         </details>
         <details>
           <summary>How do I install it?</summary>
-          <p>Confirm your email, download the file, and load it into Chrome &mdash; under a minute. The install steps below walk through exactly what to click.</p>
+          <p>Confirm your email, download the file, and load it into Chrome &mdash; under a minute. The install steps above walk through exactly what to click.</p>
         </details>
         <details>
           <summary>Can I remove my data?</summary>
           <p>Uninstalling the extension deletes everything it stored on your machine. To remove your email from our list, contact <a href="mailto:hello@theflow-ai.com?subject=Remove%20my%20Glance%20signup">hello@theflow-ai.com</a>.</p>
         </details>
-      </div>
-    </section>
-
-    <section id="signup" class="band">
-      <div class="sec-head narrow">
-        <span class="eyebrow">06</span>
-        <h2>Get Glance</h2>
-        <p>Free. Enter your email and confirm it &mdash; that's just to keep the download link from being shared publicly, not a waitlist.</p>
-      </div>
-      <div class="formcard">
-        <form id="trialForm">
-          <div class="row">
-            <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true">
-            <label class="sr-only" for="trialEmail">Email address</label>
-            <input type="email" id="trialEmail" placeholder="you@company.com" required autocomplete="email">
-            <span class="magnetic"><button type="submit" class="doit glance" id="trialBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="trialBtnLabel">Get Glance</span></button></span>
-          </div>
-          <p class="fine">Confirm your email and the download button unlocks &mdash; we'll also send the link to your inbox.</p>
-          <p class="status" id="trialStatus" role="status" aria-live="polite"></p>
-        </form>
-      </div>
-    </section>
-
-    <section id="install">
-      <div class="sec-head narrow">
-        <span class="eyebrow">07</span>
-        <h2>After you confirm</h2>
-        <p>The confirmation page and email both carry a working, time-limited download link &mdash; nothing to hunt for.</p>
-      </div>
-      <div class="installbox">
-        <div class="wizard">
-          <div class="wstep"><span class="num">1</span><p>Confirm your email above, then download from that page or the email.</p></div>
-          <div class="wstep"><span class="num">2</span><p>Unzip it to a folder, then in Chrome open <code>chrome://extensions</code>.</p></div>
-          <div class="wstep"><span class="num">3</span><p>Turn on <b>Developer mode</b> (top-right).</p></div>
-          <div class="wstep"><span class="num">4</span><p>Click <b>Load unpacked</b>, select the folder.</p></div>
-          <div class="wstep"><span class="num">5</span><p>In the popup, connect Notion (or HubSpot), pick the kind of work you do, and hit <b>Save &amp; start</b>.</p></div>
-        </div>
       </div>
     </section>
 
@@ -679,6 +685,7 @@ footer.site a{color:var(--ink-3)}
     document.documentElement.setAttribute('data-theme', next);
     try{localStorage.setItem('flow_theme', next);}catch(e){}
     if(typeof readNetColors === 'function') readNetColors();
+    if(typeof window.__redrawHeroStreak === 'function') window.__redrawHeroStreak();
   });
 })();
 
@@ -749,7 +756,7 @@ footer.site a{color:var(--ink-3)}
 })();
 
 (function(){
-  var connGroup=document.getElementById('connectorPicker'), domGroup=document.getElementById('domainPicker'), teamGroup=document.getElementById('teamPicker'), summary=document.getElementById('pickerSummary');
+  var connGroup=document.getElementById('connectorPicker'), domGroup=document.getElementById('domainPicker'), teamGroup=document.getElementById('teamPicker'), sensGroup=document.getElementById('sensitivityPicker'), setupGroup=document.getElementById('setupPicker'), summary=document.getElementById('pickerSummary');
   if(!connGroup||!domGroup||!summary) return;
 
   var SIGNAL_WORDS={
@@ -762,6 +769,17 @@ footer.site a{color:var(--ink-3)}
   };
 
   var WRITE_TARGET={ 'Notion':'your database', 'Slack':'the channel', 'Monday.com':'the board' };
+
+  var SENSITIVITY_PHRASE={
+    'Only the sure things': 'starting cautious, so only the clearest cases get a button',
+    'Balanced': 'starting balanced',
+    'Catch more': 'starting eager, so you will see more to click through at first'
+  };
+
+  var SETUP_PHRASE={
+    'Just me': null,
+    'My team, too': ' — and once it feels right, one click exports it as a recipe your teammates import'
+  };
 
   // Roving tabindex: only the checked radio in each group is ever a Tab stop,
   // same as a native <input type=radio> group — the alternative (every button
@@ -785,13 +803,16 @@ footer.site a{color:var(--ink-3)}
 
   function updateSummary(){
     var connector=currentLabel(connGroup,'data-connector'), domain=currentLabel(domGroup,'data-domain'), team=currentLabel(teamGroup,'data-team') || 'just you';
+    var sensitivity=currentLabel(sensGroup,'data-sensitivity') || 'Balanced', setup=currentLabel(setupGroup,'data-setup') || 'Just me';
     if(!connector||!domain) return;
     var signals=SIGNAL_WORDS[domain] || 'the signals that matter in your field';
-    summary.innerHTML='Connect <b>'+connector+'</b> and pick <b>'+domain+'</b>, and Glance watches for '+signals+' &mdash; and writes straight into '+(WRITE_TARGET[connector]||'the matching record')+', for '+team+'.';
-    if(typeof gtag==='function') gtag('event','picker_select',{connector:connector, domain:domain, team_size:team});
+    var sensPhrase=SENSITIVITY_PHRASE[sensitivity] || 'starting balanced';
+    var setupPhrase=SETUP_PHRASE[setup] || '';
+    summary.innerHTML='Connect <b>'+connector+'</b> and pick <b>'+domain+'</b>, and Glance watches for '+signals+' &mdash; '+sensPhrase+', and writes straight into '+(WRITE_TARGET[connector]||'the matching record')+', for '+team+setupPhrase+'.';
+    if(typeof gtag==='function') gtag('event','picker_select',{connector:connector, domain:domain, team_size:team, sensitivity:sensitivity, setup_mode:setup});
   }
 
-  [connGroup, domGroup, teamGroup].filter(Boolean).forEach(function(group){
+  [connGroup, domGroup, teamGroup, sensGroup, setupGroup].filter(Boolean).forEach(function(group){
     group.addEventListener('click', function(ev){
       var btn=ev.target.closest('[role="radio"]');
       if(!btn || btn.disabled) return;
@@ -824,45 +845,16 @@ footer.site a{color:var(--ink-3)}
   });
 })();
 
-/* FAQ: cards stack and settle slightly smaller as the next one scrolls over
-   it — same stagger-and-scale idea as a sticky image stack, applied to an
-   accordion that still opens and closes normally. Skipped entirely under
-   reduced motion, where plain static stacking (no sticky, no scale) reads
-   better than a partial effect. */
+/* Magnetic hover: Do It buttons drift slightly toward the pointer. */
 (function(){
   var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
   var fine=matchMedia('(pointer: fine)').matches;
-  if(fine && !rm){
-    document.querySelectorAll('.magnetic').forEach(function(w){
-      var btn=w.querySelector('.doit'); if(!btn) return;
-      w.addEventListener('pointermove',function(ev){ var r=w.getBoundingClientRect(); var x=(ev.clientX-r.left-r.width/2)/r.width, y=(ev.clientY-r.top-r.height/2)/r.height; btn.style.transform='translate('+(x*10)+'px,'+(y*8)+'px)'; });
-      w.addEventListener('pointerleave',function(){ btn.style.transform=''; });
-    });
-  }
-
-  var list=document.querySelector('.faq'); if(!list||rm) return;
-  var items=Array.prototype.slice.call(list.children); if(items.length<2) return;
-  list.classList.add('stacking');
-
-  var HEADER=84, STEP=14, MIN_SCALE=0.92;
-  items.forEach(function(el,i){ el.style.top=(HEADER+i*STEP)+'px'; });
-
-  var raf=null;
-  function apply(){
-    raf=null;
-    for(var i=0;i<items.length-1;i++){
-      var el=items[i], next=items[i+1];
-      var elTop=el.getBoundingClientRect().top, nextTop=next.getBoundingClientRect().top;
-      var gap=nextTop-elTop; // shrinks toward 0 as `next` catches up and covers `el`
-      var t=1-Math.max(0,Math.min(1,gap/(el.offsetHeight||200)));
-      el.style.transform='scale('+(1-t*(1-MIN_SCALE)).toFixed(3)+')';
-    }
-    items[items.length-1].style.transform='';
-  }
-  function schedule(){ if(!raf) raf=requestAnimationFrame(apply); }
-  addEventListener('scroll',schedule,{passive:true});
-  addEventListener('resize',function(){ items.forEach(function(el,i){ el.style.top=(HEADER+i*STEP)+'px'; }); schedule(); });
-  apply();
+  if(!fine || rm) return;
+  document.querySelectorAll('.magnetic').forEach(function(w){
+    var btn=w.querySelector('.doit'); if(!btn) return;
+    w.addEventListener('pointermove',function(ev){ var r=w.getBoundingClientRect(); var x=(ev.clientX-r.left-r.width/2)/r.width, y=(ev.clientY-r.top-r.height/2)/r.height; btn.style.transform='translate('+(x*10)+'px,'+(y*8)+'px)'; });
+    w.addEventListener('pointerleave',function(){ btn.style.transform=''; });
+  });
 })();
 
 /* hero background streak: a single glowing curved arc across the hero, drawn
@@ -883,12 +875,19 @@ footer.site a{color:var(--ink-3)}
     ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.clearRect(0,0,w,h);
 
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    // Light theme sits on a white hero, so the mid-stop highlight has to stay
+    // a saturated blue rather than the near-white peak dark theme uses — white
+    // on white would just vanish.
+    var peak = isLight ? 'rgba(15,55,198,1)' : 'rgba(234,241,255,1)';
+    var glow = isLight ? 'rgba(26,78,245,.85)' : 'rgba(59,116,255,.95)';
+
     var p0=[-w*0.06, h*0.82], c1=[w*0.44, h*0.10], p1=[w*1.06, h*0.02];
     var grad=ctx.createLinearGradient(p0[0],p0[1],p1[0],p1[1]);
     grad.addColorStop(0,'rgba(59,116,255,0)');
-    grad.addColorStop(.38,'rgba(59,116,255,.95)');
-    grad.addColorStop(.55,'rgba(234,241,255,1)');
-    grad.addColorStop(.74,'rgba(59,116,255,.95)');
+    grad.addColorStop(.38,glow);
+    grad.addColorStop(.55,peak);
+    grad.addColorStop(.74,glow);
     grad.addColorStop(1,'rgba(59,116,255,0)');
 
     function strokeCurve(lineWidth, blur){
@@ -896,7 +895,7 @@ footer.site a{color:var(--ink-3)}
       ctx.lineCap='round';
       ctx.strokeStyle=grad;
       ctx.lineWidth=lineWidth;
-      if(blur){ ctx.shadowColor='rgba(59,116,255,.95)'; ctx.shadowBlur=blur; }
+      if(blur){ ctx.shadowColor=glow; ctx.shadowBlur=blur; }
       ctx.beginPath();
       ctx.moveTo(p0[0],p0[1]);
       ctx.quadraticCurveTo(c1[0],c1[1],p1[0],p1[1]);
@@ -904,14 +903,15 @@ footer.site a{color:var(--ink-3)}
       ctx.restore();
     }
 
-    strokeCurve(Math.max(16,h*0.03), 70);   // wide soft bloom
-    strokeCurve(Math.max(7,h*0.012), 28);   // mid glow
+    strokeCurve(Math.max(16,h*0.03), isLight ? 40 : 70);   // wide soft bloom
+    strokeCurve(Math.max(7,h*0.012), isLight ? 16 : 28);   // mid glow
     strokeCurve(Math.max(2,h*0.0035), 0);   // crisp bright core
   }
 
   draw();
   if('ResizeObserver' in window) new ResizeObserver(draw).observe(canvas);
   else addEventListener('resize',draw);
+  window.__redrawHeroStreak = draw;
 })();
 
 /* closing section: a slow breathing radial gradient, blue-toned to match the
