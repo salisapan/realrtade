@@ -712,16 +712,42 @@ function notionBlocks(p) {
   return blocks;
 }
 
+// The schema captured at connect time goes stale the moment the user adds,
+// renames, or retypes a column in their own database — notionProperties()
+// would then never see the new column as something to match, so a fact
+// that should now land in a real property silently falls back to the page
+// body forever, for the life of the connection, with no way to notice
+// short of reconnecting. Refetching before every write keeps property
+// matching current. If the refresh itself fails (a momentary network
+// blip, an expired-but-not-yet-revoked token), fall back to the last known
+// schema rather than failing the whole write over a staleness check that
+// isn't the reason the user clicked "Do It".
+async function notionCurrentSchema(auth) {
+  try {
+    const res = await fetch(NOTION_API + '/databases/' + auth.databaseId, { headers: notionHeaders(auth.token) });
+    if (!res.ok) return auth.schema || {};
+    const db = await res.json();
+    const schema = db.properties || {};
+    // Keep the cached copy warm for anything else that reads getNotionAuth()
+    // (e.g. dbTitle display) without making this write wait on it landing.
+    chrome.storage.local.set({ notionAuth: Object.assign({}, auth, { schema }) });
+    return schema;
+  } catch (e) {
+    return auth.schema || {};
+  }
+}
+
 async function notionWrite(p) {
   const auth = await getNotionAuth();
   if (!auth) return { ok: false, reason: 'not-connected' };
+  const schema = await notionCurrentSchema(auth);
 
   const res = await fetch(NOTION_API + '/pages', {
     method: 'POST',
     headers: notionHeaders(auth.token),
     body: JSON.stringify({
       parent: { database_id: auth.databaseId },
-      properties: notionProperties(auth.schema, p),
+      properties: notionProperties(schema, p),
       children: notionBlocks(p)
     })
   });
