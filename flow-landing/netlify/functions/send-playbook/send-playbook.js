@@ -130,6 +130,18 @@ async function sendEmail(apiKey, opts) {
   return { ok: res.ok, status: res.status, text: text };
 }
 
+// Netlify's log retention keeps whatever these print, and the raw address
+// isn't needed for what these lines are actually for — spotting a pattern
+// or diagnosing a specific rejection. Masking keeps the domain, which is
+// the part worth seeing, without a subprocessor holding full addresses in
+// plaintext log storage.
+function maskEmail(value) {
+  var s = String(value || '');
+  var at = s.indexOf('@');
+  if (at < 1) return '(invalid)';
+  return s.slice(0, Math.min(2, at)) + '***@' + s.slice(at + 1);
+}
+
 exports.handler = async function (event) {
   var reqId = crypto.randomBytes(4).toString('hex');
   var log = function (msg, extra) {
@@ -163,7 +175,7 @@ exports.handler = async function (event) {
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   }
   if (!EMAIL_RE.test(email)) {
-    logErr('rejected: invalid email', email);
+    logErr('rejected: invalid email', maskEmail(email));
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid email' }) };
   }
 
@@ -173,11 +185,11 @@ exports.handler = async function (event) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Confirmation service not configured' }) };
   }
   if (!verifyInternalAuth(email, payload.authExp, payload.authSig, verifySecret)) {
-    logErr('rejected: missing or invalid internal auth (this function is only ever called by confirm-signup)', { email: email });
+    logErr('rejected: missing or invalid internal auth (this function is only ever called by confirm-signup)', { email: maskEmail(email) });
     return { statusCode: 400, body: JSON.stringify({ error: 'Unauthorized' }) };
   }
 
-  log('validated request', { email: email, lang: lang, from: FROM });
+  log('validated request', { email: maskEmail(email), lang: lang, from: FROM });
 
   var apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
@@ -197,7 +209,7 @@ exports.handler = async function (event) {
   }
 
   try {
-    log('calling Resend API (customer email)', { to: email, from: FROM, subject: SUBJECT[lang] });
+    log('calling Resend API (customer email)', { to: maskEmail(email), from: FROM, subject: SUBJECT[lang] });
     var result = await sendEmail(apiKey, {
       from: FROM,
       to: [email],

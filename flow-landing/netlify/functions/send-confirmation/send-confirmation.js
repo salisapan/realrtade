@@ -134,6 +134,18 @@ async function sendEmail(apiKey, opts) {
   return { ok: res.ok, status: res.status, text: text };
 }
 
+// Netlify's log retention keeps whatever these print, and the raw address
+// isn't needed for what these lines are actually for — spotting a pattern
+// or diagnosing a specific rejection. Masking keeps the domain, which is
+// the part worth seeing, without a subprocessor holding full addresses in
+// plaintext log storage.
+function maskEmail(value) {
+  var s = String(value || '');
+  var at = s.indexOf('@');
+  if (at < 1) return '(invalid)';
+  return s.slice(0, Math.min(2, at)) + '***@' + s.slice(at + 1);
+}
+
 exports.handler = async function (event) {
   var reqId = crypto.randomBytes(4).toString('hex');
   var log = function (msg, extra) { console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : ''); };
@@ -160,7 +172,7 @@ exports.handler = async function (event) {
     return { statusCode: 200, body: JSON.stringify({ ok: true }) };
   }
   if (!EMAIL_RE.test(email)) {
-    logErr('rejected: invalid email', email);
+    logErr('rejected: invalid email', maskEmail(email));
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid email' }) };
   }
 
@@ -199,7 +211,7 @@ exports.handler = async function (event) {
       logErr('Resend API rejected the confirmation send', { status: result.status, response: result.text });
       return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send confirmation email' }) };
     }
-    log('confirmation email sent', { to: email, kind: kind });
+    log('confirmation email sent', { to: maskEmail(email), kind: kind });
 
     try {
       var ownerSubjectPrefix = kind === 'trial' ? 'New Flow Trial signup (pending confirmation): ' : 'New Flow waitlist signup (pending confirmation): ';
