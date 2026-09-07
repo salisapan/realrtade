@@ -1439,14 +1439,27 @@ Best,
         var ed=EDGES[i], t=(p-ed.d)/.16;
         if(t<=0) continue; if(t>1) t=1;
         var A=pos[ed.a], B=pos[ed.b], favg=(A[2]+B[2])/2;
+        /* Edges used to draw as soon as scroll passed their delay threshold,
+           connecting whatever screen position each endpoint's node happened
+           to be mid-flight through on its way from the scattered start to its
+           settled spot. Two still-drifting nodes are rarely anywhere near
+           their final relative position, so the connecting line was, most of
+           the time, a long diagonal to nowhere — with dozens of edges doing
+           this at once mid-scroll, the whole thing read as tangled scribble
+           rather than a graph. Gating visibility on how *settled* the more
+           mobile endpoint is (settle, 0..1) means a line only becomes visible
+           once both ends have essentially arrived, so structure appears as
+           resolved clusters rather than crossing static the entire way there. */
+        var settle=Math.min(A[4],B[4]), svis=Math.max(0,(settle-.42)/.58); svis*=svis;
+        if(svis<=0) continue;
         var ex=A[0]+(B[0]-A[0])*t, ey=A[1]+(B[1]-A[1])*t;
-        g.strokeStyle='rgba('+fogMix(LINE,favg)+','+(t*(ed.spine?.62:ed.beam?.46:.34)*Math.max(.35,favg)).toFixed(3)+')';
+        g.strokeStyle='rgba('+fogMix(LINE,favg)+','+(t*(ed.spine?.62:ed.beam?.46:.34)*Math.max(.35,favg)*svis).toFixed(3)+')';
         g.lineWidth=ed.w*DPR*Math.max(.5,favg);
         g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(ex,ey); g.stroke();
         /* once an edge is complete, a signal keeps travelling it — this is the
            "replicated to every teammate" beat, and it is what makes the graph
            read as running infrastructure rather than a static diagram. */
-        if(t===1 && !rm && p>.5){
+        if(t===1 && !rm && p>.5 && svis>.6){
           var ph=((tm*.00028)+i*.137)%1, gx=A[0]+(B[0]-A[0])*ph, gy=A[1]+(B[1]-A[1])*ph;
           var fade=Math.min(1,(p-.5)/.18)*(1-Math.abs(ph-.5)*1.1);
           if(fade>0){
