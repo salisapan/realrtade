@@ -45,6 +45,27 @@ const FlowStorage = (() => {
     return state.seenMessageIds.includes(messageId);
   }
 
+  // "Seen" alone isn't enough to decide whether to (re)inject a chip. Gmail
+  // tears down and rebuilds div[role="listitem"] nodes constantly — expanding
+  // a thread, switching labels, coming back to a tab — which destroys
+  // whatever was injected into them. A message marked seen was previously
+  // unrecoverable even though nothing about it had actually been resolved:
+  // the chip was gone and no rescan would ever bring it back.
+  //
+  // What should actually stay gone is a message the user took a final action
+  // on. The log is prepended (newest first), so the first matching entry for
+  // a messageId is its most recent outcome; only 'dismissed', 'written', and
+  // 'undone' are terminal. A message that only ever logged 'shown' has no
+  // recorded user decision, so it's safe — and correct — to judge and show
+  // again after Gmail rebuilds its node.
+  const TERMINAL_KINDS = new Set(['dismissed', 'written', 'undone']);
+
+  async function hasTerminalOutcome(messageId) {
+    const state = await get();
+    const entry = state.log.find((e) => e.messageId === messageId);
+    return !!entry && TERMINAL_KINDS.has(entry.kind);
+  }
+
   // Recent behaviour should count for more than something from three months ago,
   // so both counters decay rather than accumulating forever.
   //
@@ -72,7 +93,7 @@ const FlowStorage = (() => {
     return next;
   }
 
-  return { get, set, appendLog, markSeen, wasSeen, calibrate, DEFAULTS };
+  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, calibrate, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

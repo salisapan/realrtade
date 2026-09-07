@@ -36,6 +36,20 @@
     return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
   }
 
+  // Gmail renders any recipient who is the signed-in account as the literal
+  // text "me" rather than their name, on every message that arrived TO them.
+  // That gives a way to read the account's own address without any
+  // account-detection hack: scan the thread for a "me"-labeled [email] node.
+  function ownEmailFromThread(messages) {
+    for (const m of messages) {
+      const els = m.querySelectorAll('[email]');
+      for (const el of els) {
+        if ((el.textContent || '').trim() === 'me') return el.getAttribute('email');
+      }
+    }
+    return null;
+  }
+
   function currentSubject() {
     const h = document.querySelector('h2.hP') || document.querySelector('div[role="main"] h2');
     return h ? h.textContent.trim() : '';
@@ -58,15 +72,46 @@
     if (!messages.length) return;
 
     // Only the newest message in the thread — this mirrors "an email arrived",
-    // not "re-judge the entire history on every DOM mutation".
-    const message = messages[messages.length - 1];
+    // not "re-judge the entire history on every DOM mutation". But the newest
+    // *node* is your own reply the moment you send one, and judging it as an
+    // incoming decision meant Flow looked up your own address as the sender
+    // and re-offered to log whatever the thread was already about. Walking
+    // backward for the newest message that isn't from the account itself
+    // finds the thing this scanner exists to react to: mail that arrived.
+    const ownEmail = ownEmailFromThread(messages);
+    let message = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const candidate = messages[i];
+      const candidateSender = extractSender(candidate);
+      if (ownEmail && candidateSender.email && candidateSender.email.toLowerCase() === ownEmail.toLowerCase()) continue;
+      message = candidate;
+      break;
+    }
+    if (!message) return; // every visible message in the thread is the account's own outbound mail
+
+    // A live chip already sitting in this exact node means there is nothing
+    // to do — this is the fast path that avoids re-running judgment on every
+    // debounced mutation while a chip is already showing.
+    if (message.querySelector('.flow-chip-host')) return;
+
     const legacyId = message.getAttribute('data-legacy-message-id');
     const messageId = legacyId || hashNode(message);
-    if (!messageId || (await FlowStorage.wasSeen(messageId))) return;
+    if (!messageId) return;
+
+    // A message can reach "seen" with no live chip in front of you two very
+    // different ways: you dismissed it, or Gmail rebuilt the DOM out from
+    // under it. Those call for opposite responses, so the check below asks
+    // "did the user ever take a final action on this message" rather than
+    // "have we looked at this message before" — see hasTerminalOutcome for
+    // why "seen" alone used to make a rebuilt node's chip unrecoverable.
+    if (await FlowStorage.hasTerminalOutcome(messageId)) return;
 
     const text = (message.innerText || '').trim();
     if (text.length < 20) return; // still rendering
 
+    // Captured before markSeen flips it, so it still answers "is this the
+    // first time," which is what decides whether to log 'shown' below.
+    const alreadyLoggedShown = await FlowStorage.wasSeen(messageId);
     await FlowStorage.markSeen(messageId);
 
     state = await FlowStorage.get();
@@ -83,7 +128,13 @@
       messageId, result, sender, subject,
       threadUrl: threadUrl(legacyId)
     });
-    FlowStorage.appendLog({ kind: 'shown', label: result.label, messageId, score: result.score, signals: result.signals });
+    // Re-injecting after Gmail rebuilds the node is now expected behaviour,
+    // not a rare edge case — logging 'shown' again every time would fill the
+    // 200-entry cap with duplicates for one message and evict real history
+    // for others. Only record it the first time.
+    if (!alreadyLoggedShown) {
+      FlowStorage.appendLog({ kind: 'shown', label: result.label, messageId, score: result.score, signals: result.signals });
+    }
   }
 
   function hashNode(node) {

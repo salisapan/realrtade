@@ -305,8 +305,22 @@ async function salesforceRefresh() {
   return getSalesforceAuth();
 }
 
+// SOQL's escape character is backslash, so a literal backslash must be
+// escaped to \\ BEFORE a literal quote is escaped to \' — escaping in the
+// other order (the previous code only escaped quotes, which is order-of-one)
+// lets an address containing a backslash immediately before a quote produce
+// an unescaped quote that closes the string literal early. senderEmail comes
+// straight off Gmail's DOM (content-gmail.js reads the `email` attribute
+// Gmail itself sets), so it isn't something this file should treat as
+// pre-sanitized. Escaping backslash first, as done here, closes that gap
+// without rejecting the (rare but legal) apostrophe in an address's local
+// part, e.g. o'brien@example.com.
+function soqlEscape(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 async function salesforceFindContactByEmail(auth, email) {
-  const soql = "SELECT Id FROM Contact WHERE Email = '" + email.replace(/'/g, "\\'") + "' LIMIT 1";
+  const soql = "SELECT Id FROM Contact WHERE Email = '" + soqlEscape(email) + "' LIMIT 1";
   const res = await fetch(
     auth.instance_url + '/services/data/' + SALESFORCE_API_VERSION + '/query?q=' + encodeURIComponent(soql),
     { headers: { Authorization: 'Bearer ' + auth.access_token } }
