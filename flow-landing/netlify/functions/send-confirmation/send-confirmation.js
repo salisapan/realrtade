@@ -8,6 +8,35 @@ const SITE_URL = 'https://theflow-ai.com';
 const TOKEN_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 const LOG_PREFIX = '[send-confirmation]';
 
+// This endpoint sends branded mail from hello@theflow-ai.com to any address a
+// caller names, and notifies the founder's inbox for each one. Until now the
+// only defence was a honeypot field, which a script bypasses trivially — so a
+// single loop could mailbomb a victim from our domain, flood the founder's
+// inbox, exhaust the Resend quota, and burn the sending domain's reputation.
+//
+// Limits are per-IP and per-recipient, because the two abuse shapes differ: one
+// attacker hitting many addresses, and many sources hitting one victim. This is
+// in-memory and Netlify may run several containers, so it is a speed bump
+// rather than a guarantee — a durable limit belongs at the edge — but it turns a
+// trivial flood into something that takes real effort.
+var RATE_IP = new Map();
+var RATE_EMAIL = new Map();
+var RATE_WINDOW_MS = 10 * 60 * 1000;
+var RATE_MAX_IP = 5;
+var RATE_MAX_EMAIL = 3;
+
+function tooMany(store, key, max, now) {
+  var hits = (store.get(key) || []).filter(function (t) { return now - t < RATE_WINDOW_MS; });
+  hits.push(now);
+  store.set(key, hits);
+  if (store.size > 5000) {
+    store.forEach(function (v, k) {
+      if (!v.some(function (t) { return now - t < RATE_WINDOW_MS; })) store.delete(k);
+    });
+  }
+  return hits.length > max;
+}
+
 const SUBJECT = {
   playbook: {
     en: 'Confirm your email to get the Flow Playbook',
@@ -133,6 +162,14 @@ exports.handler = async function (event) {
   if (!EMAIL_RE.test(email)) {
     logErr('rejected: invalid email', email);
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid email' }) };
+  }
+
+  var hdrs = event.headers || {};
+  var ip = String(hdrs['x-nf-client-connection-ip'] || hdrs['x-forwarded-for'] || 'unknown').split(',')[0].trim();
+  var now = Date.now();
+  if (tooMany(RATE_IP, ip, RATE_MAX_IP, now) || tooMany(RATE_EMAIL, email.toLowerCase(), RATE_MAX_EMAIL, now)) {
+    logErr('rate limited', { ip: ip });
+    return { statusCode: 429, body: JSON.stringify({ error: 'Too many requests. Please try again shortly.' }) };
   }
 
   var apiKey = process.env.RESEND_API_KEY;
