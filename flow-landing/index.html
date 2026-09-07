@@ -129,8 +129,11 @@
       <h1 class="reveal in" data-d="1" data-i18n="hero.h1">Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span></h1>
       <p class="lead reveal in" data-d="2" data-i18n="hero.sub">When a deal closes, a contract is signed, or a case is approved, Flow updates Salesforce, your files, and the rest of your stack automatically — no rules to write. Run it in our masked cloud, or entirely on your own infrastructure when your data can't leave the building.</p>
       <div class="hero-cta reveal in" data-d="3">
-        <span class="magnetic"><a class="doit lg breathe" href="/contact.html" data-ga="hero_enterprise"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Talk to Us</span></a></span>
-        <a class="ghost" href="/trial.html" data-ga="hero_trial"><span data-i18n="hero.cta2">Try Glance — Free</span><span class="arw">←</span></a>
+        <span class="magnetic"><a class="doit lg breathe" href="#waitlist" data-ga="hero_doit"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Do It</span></a></span>
+      </div>
+      <div class="hero-glance reveal in" data-d="3">
+        <p><b data-i18n="hero.glance.b">Just want to see it work today?</b> <span data-i18n="hero.glance.p">Glance is a free Chrome extension — install it in a minute and watch it read your own Gmail before you talk to us about Flow.</span></p>
+        <span class="magnetic"><a class="doit sm" href="/trial.html" data-ga="hero_trial"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta2">Try Glance — Free</span></a></span>
       </div>
       <button class="hero-scroll reveal in" data-d="3" data-scroll="#challenge"><span data-i18n="hero.cta3">See how it works</span></button>
       <div class="hero-foot reveal in" data-d="4"><span class="dot"></span><span data-i18n="hero.foot">Cloud or fully local — your data, your rules.</span></div>
@@ -553,17 +556,13 @@ Best,
         <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">GET STARTED</span>
         <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
         <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Two ways in. Tell us how you would deploy Flow and we will come back with a real number — or install Glance free and watch it work on your own inbox first.</p>
-        <div class="cta-paths reveal in" data-d="2">
-          <a class="cta-path" href="/contact.html" data-ga="close_enterprise">
-            <b data-i18n="wl.path1.t">Talk to us about Flow</b>
-            <span data-i18n="wl.path1.s">Masked secure cloud or your own infrastructure. Priced per seat, quoted to your deployment.</span>
-          </a>
+        <div class="cta-paths single reveal in" data-d="2">
           <a class="cta-path" href="/trial.html" data-ga="close_trial">
             <b data-i18n="wl.path2.t">Get Glance — free</b>
             <span data-i18n="wl.path2.s">A Chrome extension for everyday business use. No card, no sales conversation.</span>
           </a>
         </div>
-        <p class="wl-alt reveal in" data-d="3" data-i18n="wl.alt">Not ready for either? Take the Hybrid Automation Playbook instead.</p>
+        <p class="wl-alt reveal in" data-d="3" data-i18n="wl.alt">Deploying Flow across your organization instead? Start with your email below — we will ask for the rest only after.</p>
         <div class="wait-wrap reveal" data-d="3" id="waitWrap" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:16px">
           <form class="wait-form" id="waitForm" novalidate>
             <input type="text" id="waitCompany" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
@@ -574,13 +573,13 @@ Best,
                 <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
               </span>
             </div>
-            <span class="magnetic"><button class="doit" type="submit" id="waitBtn" aria-label="Send me the Playbook"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.submit">Send Me the Playbook</span><span class="btn-spin" aria-hidden="true"></span></button></span>
+            <span class="magnetic"><button class="doit" type="submit" id="waitBtn" aria-label="Submit your email"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.submit">Do It</span><span class="btn-spin" aria-hidden="true"></span></button></span>
           </form>
-          <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">Check your inbox — confirm your email and the Playbook is on its way.</span></div>
-          <div class="wait-confirm-note" id="waitConfirmNote"><span data-i18n="wl.confirm.note">Check your inbox to confirm your email — that's how we'll send your Playbook.</span></div>
+          <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">Check your inbox — confirm your email and we will be in touch.</span></div>
+          <div class="wait-confirm-note" id="waitConfirmNote"><span data-i18n="wl.confirm.note">Check your inbox to confirm your email — that's how we'll know where to reply.</span></div>
           <div class="wait-msg" id="waitMsg" role="status" aria-live="polite"></div>
           <div class="wait-enrich" id="waitEnrich">
-            <p class="wait-enrich-note" data-i18n="wl.enrich.note">Optional — tell us about your team so we can send you what is actually relevant.</p>
+            <p class="wait-enrich-note" data-i18n="wl.enrich.note">Optional — tell us about your deployment so we can come back with a real number, not a generic reply.</p>
             <form class="wait-enrich-form" id="waitEnrichForm" novalidate>
               <input type="text" id="waitOrg" name="org" autocomplete="organization" data-i18n-ph="wl.enrich.company" placeholder="Company">
               <input type="text" id="waitRole" name="role" autocomplete="organization-title" data-i18n-ph="wl.enrich.role" placeholder="Role">
@@ -656,11 +655,13 @@ Best,
     'hero.eyebrow':{en:'SECURE CLOUD · FLOW-EDGE',he:'SECURE CLOUD · FLOW-EDGE'},
     'hero.h1':{en:'Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span>',he:'ביצוע אוטונומי.<br><span class="chrome-text">בתנאים שלכם.</span>'},
     'hero.sub':{en:'When a deal closes, a contract is signed, or a case is approved, Flow updates Salesforce, your files, and the rest of your stack automatically — no rules to write. Run it in our masked cloud, or entirely on your own infrastructure when your data can\'t leave the building.',he:'Flow הוא מנוע AI מאובטח לתהליכי עבודה — הריצו אותו בענן המאובטח והממוסך שלנו, או באופן מלא בתשתית שלכם עם Flow-Edge — ומאיצים משימות קריטיות בלי לפגוע בעמידה ברגולציה.'},
-    'hero.cta1':{en:'Talk to Us',he:'דברו איתנו'},
+    'hero.cta1':{en:'Do It',he:'עשו את זה'},
     'hero.cta3':{en:'See how it works',he:'איך זה עובד'},
     'nav.cta':{en:'Do It',he:'עשו את זה'},
-    'wl.submit':{en:'Send Me the Playbook',he:'שלחו לי את ה-Playbook'},
+    'wl.submit':{en:'Do It',he:'עשו את זה'},
     'hero.cta2':{en:'Try Glance — Free',he:'נסו את Glance — חינם'},
+    'hero.glance.b':{en:'Just want to see it work today?',he:'רק רוצים לראות את זה עובד כבר היום?'},
+    'hero.glance.p':{en:'Glance is a free Chrome extension — install it in a minute and watch it read your own Gmail before you talk to us about Flow.',he:'Glance הוא תוסף Chrome חינמי — התקינו אותו תוך דקה ותראו אותו קורא את ה-Gmail שלכם, עוד לפני שדיברתם איתנו על Flow.'},
     'hero.foot':{en:'Cloud or fully local — your data, your rules.',he:'בענן או מקומי לחלוטין — המידע שלכם, החוקים שלכם.'},
     'challenge.eyebrow':{en:'THE CHALLENGE',he:'THE CHALLENGE'},
     'challenge.title':{en:'Enterprise Workflows Are Broken',he:'תהליכי העבודה בארגון שבורים'},
@@ -765,19 +766,17 @@ Best,
     'win.f2':{en:'•••• 4821',he:'•••• 4821'},
     'win.f3':{en:'Cohen Ltd.',he:'כהן בע"מ'},
     'wl.eyebrow':{en:'GET STARTED',he:'איך מתחילים'},
-    'wl.path1.t':{en:'Talk to us about Flow',he:'דברו איתנו על Flow'},
-    'wl.path1.s':{en:'Masked secure cloud or your own infrastructure. Priced per seat, quoted to your deployment.',he:'ענן מאובטח וממוסך או התשתית שלכם. תמחור לפי משתמש, בהצעה שמותאמת לפריסה שלכם.'},
     'wl.path2.t':{en:'Get Glance — free',he:'קבלו את Glance — חינם'},
     'wl.path2.s':{en:'A Chrome extension for everyday business use. No card, no sales conversation.',he:'תוסף Chrome לעבודה היומיומית. בלי כרטיס אשראי, בלי שיחת מכירה.'},
-    'wl.alt':{en:'Not ready for either? Take the Hybrid Automation Playbook instead.',he:'לא בשלים לאף אחד מהם? קחו במקום את ה-Hybrid Automation Playbook.'},
+    'wl.alt':{en:'Deploying Flow across your organization instead? Start with your email below — we will ask for the rest only after.',he:'רוצים לפרוס את Flow בארגון שלכם? התחילו עם האימייל למטה — נבקש את שאר הפרטים רק אחר כך.'},
     'wl.title':{en:'Ready to Reclaim Your Workflows?',he:'מוכנים להשיב לעצמכם את תהליכי העבודה?'},
     'wl.lead':{en:'Two ways in. Tell us how you would deploy Flow and we will come back with a real number — or install Glance free and watch it work on your own inbox first.',he:'שתי דרכים להתחיל. ספרו לנו איך הייתם פורסים את Flow ונחזור עם מספר אמיתי — או התקינו את Glance בחינם ותראו אותו עובד על תיבת הדואר שלכם.'},
     'wl.ph':{en:'Enter your work email',he:'כתובת האימייל הארגוני שלכם'},
-    'wl.success':{en:"Check your inbox — confirm your email and the Playbook is on its way.",he:'בדקו את תיבת הדואר — אשרו את הכתובת וה-Playbook בדרך אליכם.'},
-    'wl.confirm.note':{en:"Check your inbox to confirm your email — that's how we'll send your Playbook.",he:'בדקו את תיבת הדוא"ל שלכם לאישור הכתובת — כך נשלח לכם את ה-Playbook.'},
+    'wl.success':{en:"Check your inbox — confirm your email and we will be in touch.",he:'בדקו את תיבת הדואר — אשרו את הכתובת ואנחנו ניצור קשר.'},
+    'wl.confirm.note':{en:"Check your inbox to confirm your email — that's how we'll know where to reply.",he:'בדקו את תיבת הדוא"ל שלכם לאישור הכתובת — כך נדע לאן להשיב.'},
     'wl.fine':{en:'No spam. Your details stay with you — exactly like the product works.',he:'ללא ספאם. הפרטים נשמרים אצלכם — בדיוק כמו שהמוצר עובד.'},
     'wl.err':{en:"That email doesn't look right. Please check it.",he:'כתובת האימייל לא נראית תקינה. בדקו שוב.'},
-    'wl.enrich.note':{en:"Optional — tell us about your team so we can send you what is actually relevant.",he:'נרשמתם בהצלחה. אופציונלי — ספרו לנו על הצוות שלכם כדי שנוכל להתאים את הגישה המוקדמת.'},
+    'wl.enrich.note':{en:"Optional — tell us about your deployment so we can come back with a real number, not a generic reply.",he:'אופציונלי — ספרו לנו על הפריסה שלכם כדי שנחזור עם מספר אמיתי, לא תשובה כללית.'},
     'wl.enrich.company':{en:'Company',he:'שם החברה'},
     'wl.enrich.role':{en:'Role',he:'תפקיד'},
     'wl.enrich.website':{en:'Company website',he:'אתר החברה'},
