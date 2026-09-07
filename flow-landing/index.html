@@ -60,6 +60,10 @@
   document.title='Flow — Cognitive Workflow Engine';
 })();
 </script>
+<!-- The hero wordmark is this page's LCP element. Preloading it lets the fetch
+     start alongside the stylesheet instead of waiting for CSS to parse and the
+     <img> to be discovered, which is the whole gap between first paint and LCP. -->
+<link rel="preload" as="image" href="/logo.png" fetchpriority="high">
 <link rel="stylesheet" href="/assets/home.css">
 
 <div class="progress" id="progress" aria-hidden="true"></div>
@@ -69,7 +73,7 @@
 <header class="nav" id="nav">
   <div class="nav-in">
     <a class="brand" href="#top" aria-label="Flow — Cognitive Workflow Engine">
-      <img src="/logo.png" width="880" height="388" alt="Flow">
+      <img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async">
       <span class="desc" data-i18n="nav.desc">Cognitive Workflow Engine</span>
     </a>
     <nav class="nav-links" aria-label="Primary">

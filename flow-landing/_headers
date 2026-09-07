@@ -5,3 +5,42 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
   Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://zjquktirlrhbqcnkfaok.supabase.co https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'
+
+# Caching. Netlify's default for everything here is max-age=0, must-revalidate,
+# so every asset costs a round trip on every repeat visit.
+#
+# Nothing on this site is fingerprinted — /assets/home.css keeps that name
+# across deploys — so a year-long immutable cache on it would strand visitors
+# on a stale stylesheet after a release, with no way to bust it short of
+# renaming the file. These durations are therefore picked per asset class by
+# how the file actually changes, not by how static it looks.
+
+# Images and video: content changes by filename in practice (logo-header.png,
+# a new blog thumbnail), so these are safe to pin hard.
+/*.png
+  Cache-Control: public, max-age=31536000, immutable
+/*.jpg
+  Cache-Control: public, max-age=31536000, immutable
+/*.webp
+  Cache-Control: public, max-age=31536000, immutable
+/*.svg
+  Cache-Control: public, max-age=31536000, immutable
+/*.ico
+  Cache-Control: public, max-age=31536000, immutable
+/blog/img/*
+  Cache-Control: public, max-age=31536000, immutable
+/*.mp4
+  Cache-Control: public, max-age=31536000, immutable
+
+# CSS and JS under /assets are edited in place under a stable name. A day of
+# caching plus revalidation keeps repeat visits cheap without pinning anyone to
+# a stylesheet from before the last deploy.
+/assets/*
+  Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# HTML must revalidate: these pages carry the copy and the CTAs, and shipping a
+# fix that visitors cannot see for a day is worse than the round trip.
+/*.html
+  Cache-Control: public, max-age=0, must-revalidate
+/
+  Cache-Control: public, max-age=0, must-revalidate
