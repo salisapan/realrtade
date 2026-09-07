@@ -7,6 +7,18 @@ ladder. Full detail, including what each tier may and may not claim, is in
 `trial.html`'s positioning, or any copy that could imply the two products
 share security/compliance guarantees.
 
+## Design & UX review principles — read before any UI, copy, or flow change
+
+Twelve standing review criteria distilled from the product owner's live
+feedback across the site, in `docs/design-principles.md`: total design
+consistency (every primary CTA is the canonical Do It component), zero gap
+between promise and reality, friction as the enemy, logical experience
+ordering, visual bugs as always-urgent blockers, and seven more derived
+from repeated instances of the same defect surviving in one place after
+being fixed in another. Apply these to every change, and when a fix
+reveals the same pattern elsewhere in the codebase, fix all instances in
+the same pass rather than waiting to be asked about each one.
+
 ## ECC Agent Routing Protocol
 
 For every task requested by the user:
