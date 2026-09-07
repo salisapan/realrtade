@@ -26,13 +26,15 @@ function verifyInternalAuth(email, authExp, authSig, secret) {
   return crypto.timingSafeEqual(a, b);
 }
 
-// Temporary CTA until a real scheduling link (e.g. Calendly) is wired up.
-// Uses a plain https:// URL rather than mailto: — mailto links are not
-// reliably clickable inside sandboxed/embedded viewers (e.g. a PDF opened
-// inline in Gmail or a browser), while https:// links work everywhere.
-// Swap this one constant for the real booking URL once it exists; nothing
-// else needs to change.
-const CTA_URL = 'https://theflow-ai.com/#waitlist';
+// Routes to the real enterprise lead-qualification form (contact.html),
+// which is the actual next step this email can deliver on: a specific,
+// asynchronous answer about deployment and pricing — not a discovery call
+// (there is no scheduling/calendar integration; see contact.html's own
+// copy, which explicitly promises "a real number... not a discovery call").
+// A recipient of this email already gave their address once to get the
+// Playbook, so the next ask should move them forward into that real
+// qualification flow, not back into the same top-of-funnel waitlist form.
+const CTA_URL = 'https://theflow-ai.com/contact.html';
 
 const SUBJECT = {
   en: 'Your Hybrid Automation Playbook',
@@ -58,12 +60,12 @@ function htmlBody(lang) {
     ? 'תודה שהצטרפתם לרשימת ההמתנה של Flow. כבר ראיתם את הדמו המשפטי החי באתר — מצורף כאן הסיפור המלא: <b>The Hybrid Automation Playbook</b>, על איך תעשיות מוסדרות מבטלות הזנת נתונים ידנית, ללא סיכון רגולטורי.'
     : "Thanks for joining the Flow waitlist. You've already seen the Legal Demo live on the site — attached is the full story: <b>The Hybrid Automation Playbook</b>, on exactly how regulated industries eliminate manual data entry with zero compliance risk.";
   var pitch = isHe
-    ? 'הדרך הכי מהירה לראות את זה עובד על הנתונים שלכם היא שיחת היכרות קצרה. נמפה יחד את תצורת הפריסה המדויקת — ענן מאובטח, או Flow-Edge / Flow-OnPrem — ונראה לכם איך זה נראה רץ אצלכם.'
-    : "The fastest way to see this running on your own data is a short discovery call. We'll map your exact deployment model — Secure Cloud, or Flow-Edge / Flow-OnPrem — and show you what it looks like in your environment.";
-  var ctaLabel = isHe ? 'תיאום שיחת היכרות' : 'Book a Discovery Call';
+    ? 'הדרך הכי מהירה לראות את זה עובד על הנתונים שלכם היא לספר לנו על תצורת הפריסה שלכם. נמפה את המודל המדויק — ענן מאובטח, או Flow-Edge / Flow-OnPrem — ונחזור עם תשובה אמיתית, לא שיחת מכירות גנרית.'
+    : "The fastest way to see this running on your own data is to tell us your deployment details. We'll map your exact model — Secure Cloud, or Flow-Edge / Flow-OnPrem — and reply with a real answer, not a generic sales call.";
+  var ctaLabel = isHe ? 'עשו את זה' : 'Do It';
   var ctaFine = isHe
-    ? 'לחצו למטה ונתאם זמן שנוח לכם.'
-    : "Click below and we'll find a time that works for you.";
+    ? 'לחצו למטה כדי לספר לנו על הסביבה שלכם.'
+    : "Click below to tell us about your environment.";
   var sigTeam = isHe ? 'FLOW TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
 
