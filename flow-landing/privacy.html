@@ -115,7 +115,7 @@ footer.site a{color:var(--muted)}
 
 <p>This Privacy Policy explains what information Flow ("Flow", "we", "us") collects when you visit theflow-ai.com, join our early-access waitlist, or install the Flow Trial Chrome extension — how it's used, and the choices you have. Flow is currently in pre-release, early-access status; this policy will be expanded as the product moves toward general availability.</p>
 
-<p>Two things are covered here, and they are separate products. <b>Flow Trial</b> is the free Chrome extension described in Section 4 — it is intended for general business use, not for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page. <b>Flow</b> (the core product) is deployed for an organization under its own agreement, in a masked cloud tenant or on the customer's own infrastructure, and its data handling is governed by that agreement rather than by this policy.</p>
+<p>Two things are covered here, and they are separate products. <b>Flow Trial</b> is the free Chrome extension described in Section 5 — it is intended for general business use, not for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page. <b>Flow</b> (the core product) is deployed for an organization under its own agreement, in a masked cloud tenant or on the customer's own infrastructure, and its data handling is governed by that agreement rather than by this policy.</p>
 
 <h2>1. Information We Collect</h2>
 <p>We collect information you provide directly, and a small amount of information automatically.</p>
@@ -141,32 +141,47 @@ footer.site a{color:var(--muted)}
 <h2>4. Who We Share Information With</h2>
 <p>We share information only with the service providers that operate the waitlist and site on our behalf, under their own data-processing terms:</p>
 <ul>
-<li><b>Supabase</b> — stores waitlist submissions (email, company, role, website).</li>
+<li><b>Supabase</b> — stores waitlist submissions (email, company, role, website) and enterprise enquiries submitted through the contact form.</li>
 <li><b>Resend</b> — delivers transactional email (confirmation link, Playbook, discovery-call follow-up).</li>
 <li><b>Netlify</b> — hosts the site and runs the serverless functions that process signups.</li>
 <li><b>Google Analytics</b> — aggregate site-traffic analytics.</li>
 </ul>
 <p>We do not share your information with any other third party for their own marketing purposes. We may disclose information if required to by law, or to protect the rights, property, or safety of Flow, our users, or the public.</p>
 
-<h2>5. Cookies</h2>
+<h2>5. Flow Trial (the Chrome extension)</h2>
+<p>Flow Trial runs in your browser on Gmail. What it does with your mail is the part most worth being precise about, so this section describes it in full.</p>
+<ul>
+<li><b>What it reads.</b> When you open an email in Gmail, the extension reads that message's visible text, subject, and sender in order to decide whether it records a decision worth logging.</li>
+<li><b>Where that decision is made.</b> On your device, and only on your device. The code that scores a message performs no network requests of any kind — no email text is transmitted anywhere in order to reach that judgment. This is an architectural property of the extension, not a policy promise.</li>
+<li><b>What leaves your device, and only when you ask.</b> Nothing is written anywhere unless you click the Do It button on a specific message. When you do, Flow sends to the system <i>you</i> connected — Notion, HubSpot, Salesforce, Slack, or Monday.com — a short summary label, the sender's name and email address, any amount or date it extracted, and a single quoted sentence from the message (up to 1,800 characters). That data goes directly from your browser to that provider. It does not pass through us and we do not receive a copy.</li>
+<li><b>Connection credentials.</b> Authorising a connector stores an access token in your browser's local extension storage on your own machine. We never receive or store these tokens. The one exception is the moment of authorisation itself: the provider's one-time authorisation code is exchanged for a token through our server, because that exchange requires an application secret that cannot safely be shipped inside an extension. We do not retain the code or the resulting token.</li>
+<li><b>What stays local.</b> Your chosen connector and line of work, the activity log of what Flow noticed and wrote, and the sensitivity calibration all live in extension storage on your device. None of it is sent to us. Uninstalling the extension deletes all of it.</li>
+<li><b>What we do not do.</b> We do not read your mailbox, do not receive your email content, do not sell any of it, and do not use any of it to train AI models — ours or anyone else's.</li>
+</ul>
+<p>Flow Trial is intended for general business use. It is a separate product from Flow, it is not designed for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page.</p>
+
+<h2>6. Enterprise enquiries</h2>
+<p>If you submit the form on our <a href="/contact.html">Contact</a> page, we collect what you enter there — your email address and, where you provide them, your name, organisation, role, approximate number of seats, preferred deployment model, timeline, and message. We use it to answer your enquiry and to keep a record of the conversation. It is stored with Supabase and notified to us by email through Resend.</p>
+
+<h2>7. Cookies</h2>
 <p>Google Analytics sets standard analytics cookies to distinguish returning visitors and measure site usage in aggregate. You can block or clear these at any time through your browser settings without affecting your ability to use the site or join the waitlist.</p>
 
-<h2>6. Data Retention</h2>
-<p>We keep waitlist submissions for as long as your signup is active, and for a reasonable period afterward for our own records, unless you ask us to delete it sooner (see Section 8).</p>
+<h2>8. Data Retention</h2>
+<p>We keep waitlist submissions and enterprise enquiries for as long as the signup or conversation is active, and for a reasonable period afterward for our own records, unless you ask us to delete them sooner (see Section 10). Data held inside the Flow Trial extension lives on your own device and is removed when you uninstall it.</p>
 
-<h2>7. International Transfers</h2>
+<h2>9. International Transfers</h2>
 <p>Our service providers may process data in the United States and other countries. Where required, we rely on those providers' own standard contractual safeguards for cross-border transfers.</p>
 
-<h2>8. Your Rights</h2>
-<p>Depending on where you live, you may have the right to access, correct, export, or delete the personal information we hold about you, and to withdraw consent to future emails at any time (every email we send includes a way to opt out). To exercise any of these rights, email us at <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a> and we'll act on your request promptly.</p>
+<h2>10. Your Rights</h2>
+<p>Depending on where you live, you may have the right to access, correct, export, or delete the personal information we hold about you, and to withdraw consent to future emails at any time. Our emails are transactional — a confirmation link, the Playbook you asked for, and install instructions — rather than a marketing newsletter, so they do not carry an unsubscribe footer; to stop hearing from us, or to exercise any of these rights, email us at <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a> and we'll act on your request promptly.</p>
 
-<h2>9. Children's Privacy</h2>
+<h2>11. Children's Privacy</h2>
 <p>Flow is a business-to-business product. It is not directed at, and we do not knowingly collect information from, anyone under 16 years old.</p>
 
-<h2>10. Changes to This Policy</h2>
+<h2>12. Changes to This Policy</h2>
 <p>We may update this policy as the product evolves. We'll update the "Last updated" date above when we do; material changes will be reflected here before they take effect.</p>
 
-<h2>11. Contact</h2>
+<h2>13. Contact</h2>
 <p>Questions about this policy or your data? Email <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
 
     </article>

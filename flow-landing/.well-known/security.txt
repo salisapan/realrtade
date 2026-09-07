@@ -1,0 +1,9 @@
+# Flow — theflow-ai.com
+# RFC 9116. security.html publishes a disclosure policy; this is the
+# machine-readable pointer to it that researchers and scanners look for first.
+
+Contact: mailto:hello@theflow-ai.com
+Expires: 2027-09-07T00:00:00.000Z
+Preferred-Languages: en, he
+Canonical: https://theflow-ai.com/.well-known/security.txt
+Policy: https://theflow-ai.com/security.html
