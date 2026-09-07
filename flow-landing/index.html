@@ -1286,8 +1286,29 @@ Best,
     raf=requestAnimationFrame(draw);
   }
   readNetColors();
-  if(!rm){ initNet(); draw(); addEventListener('resize',function(){ cancelAnimationFrame(raf); initNet(); draw(); }); } else { size(); }
-  document.addEventListener('visibilitychange',function(){ if(document.hidden){ cancelAnimationFrame(raf); } else if(!rm){ cancelAnimationFrame(raf); draw(); } });
+  if(!rm){
+    // Deferred rather than started synchronously during page parse: this is a
+    // purely decorative, aria-hidden background layer, and running its
+    // per-frame O(n^2) point-distance pass as part of the page's initial
+    // script execution added directly to Total Blocking Time on first
+    // load — exactly the window Core Web Vitals penalizes, and on mobile
+    // (where Lighthouse measures it) nothing else on this page gates the
+    // network behind IntersectionObserver the way the terrain and Action
+    // Graph canvases already are. Nothing about the visual result changes;
+    // it only stops competing with the page becoming interactive. The
+    // canvas is transparent until this runs, over the hero's own
+    // background color, so the delay is not visible.
+    // netStarted guards against a real race the deferral introduces: pts is
+    // undefined until startNet actually runs, so a visibilitychange (tab
+    // switched away and back quickly) landing inside that idle/timeout
+    // window must not call draw() against an uninitialized point set.
+    var netStarted=false;
+    var startNet=function(){ netStarted=true; initNet(); draw(); };
+    if('requestIdleCallback' in window) requestIdleCallback(startNet,{timeout:1500});
+    else setTimeout(startNet,200);
+    addEventListener('resize',function(){ if(!netStarted)return; if(raf)cancelAnimationFrame(raf); initNet(); draw(); });
+  } else { size(); }
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ if(raf)cancelAnimationFrame(raf); } else if(!rm && netStarted){ if(raf)cancelAnimationFrame(raf); draw(); } });
 
   /* ---------- Action Graph: scroll-driven canvas (chaos -> ordered knowledge graph).
      Deliberately NOT a <video>: on iOS a scrubbed video never paints a frame while
