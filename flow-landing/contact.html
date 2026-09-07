@@ -95,6 +95,43 @@ footer.site a{color:var(--muted)}
 .pagenav a{color:var(--muted); margin-inline-end:16px}
 .note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
 
+/* enterprise enquiry form — the qualification questions are the point. A buyer
+   who tells us seats and deployment model up front gets a real answer in the
+   first reply instead of a discovery call, which is the whole promise below. */
+.lead-form{background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:26px 24px; margin:26px 0 10px; font-family:var(--sans)}
+.lf-grid{display:grid; gap:16px}
+@media (min-width:620px){ .lf-grid.two{grid-template-columns:1fr 1fr} }
+.lf-field{display:flex; flex-direction:column; gap:6px}
+.lf-field label{font-size:.82rem; font-weight:700; color:var(--txt-hi); letter-spacing:.01em}
+.lf-field .opt{font-weight:400; color:var(--muted)}
+.lf-field input,.lf-field select,.lf-field textarea{
+  font-family:var(--sans); font-size:.95rem; color:var(--txt-hi);
+  background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:11px 13px; width:100%;
+  transition:border-color .15s, box-shadow .15s;
+}
+.lf-field textarea{resize:vertical; min-height:104px; line-height:1.55}
+.lf-field input:focus,.lf-field select:focus,.lf-field textarea:focus{
+  outline:none; border-color:var(--cat); box-shadow:0 0 0 3px rgba(26,78,245,.16);
+}
+.lf-field input::placeholder,.lf-field textarea::placeholder{color:var(--muted)}
+.lf-actions{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:22px}
+.lf-submit{
+  font-family:var(--sans); font-weight:700; font-size:.95rem; color:#fff; background:var(--cat);
+  border:0; border-radius:999px; padding:13px 30px; cursor:pointer; transition:filter .15s, transform .15s;
+}
+.lf-submit:hover:not(:disabled){filter:brightness(1.08); transform:translateY(-1px)}
+.lf-submit:disabled{opacity:.6; cursor:default; transform:none}
+.lf-fine{font-size:.82rem; color:var(--muted); margin:0}
+.lf-msg{margin:16px 0 0; font-size:.92rem; line-height:1.55}
+.lf-msg.err{color:#C0392B}
+:root[data-theme="dark"] .lf-msg.err{color:#FF8A80}
+.lf-msg.ok{color:var(--cat); font-weight:600}
+.lf-hp{position:absolute; left:-9999px; width:1px; height:1px; opacity:0; pointer-events:none}
+.contact-alt{display:grid; gap:14px; margin:30px 0 0}
+@media (min-width:620px){ .contact-alt{grid-template-columns:1fr 1fr} }
+.contact-alt p{margin:0; font-size:.94rem; color:var(--muted)}
+.contact-alt b{display:block; font-family:var(--sans); font-size:.76rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--cat); margin-bottom:4px}
+
 .menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
 .menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
 .menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
@@ -146,34 +183,83 @@ footer.site a{color:var(--muted)}
     <h1 class="title">Talk to us.</h1>
     
     <article>
-<p class="lead">Flow is in pre-release. The fastest way to reach us is email &mdash; a person reads every message.</p>
+<p class="lead">Tell us how you would deploy Flow and we will come back with a real number and the architecture detail that matters for your environment &mdash; not a discovery call.</p>
 
-<div class="cards two">
-  <div class="card">
-    <h3>General &amp; Early Access</h3>
-    <p><a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a><br>Questions about the product, timelines, or joining the waitlist.</p>
+<form class="lead-form" id="leadForm" novalidate>
+  <input type="text" id="lfWebsite" name="website" class="lf-hp" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+  <div class="lf-grid two">
+    <div class="lf-field">
+      <label for="lfName">Name</label>
+      <input type="text" id="lfName" autocomplete="name" placeholder="Your name">
+    </div>
+    <div class="lf-field">
+      <label for="lfEmail">Work email</label>
+      <input type="email" id="lfEmail" autocomplete="email" inputmode="email" placeholder="you@yourfirm.com" required aria-describedby="lfEmailNote">
+    </div>
+    <div class="lf-field">
+      <label for="lfCompany">Organisation</label>
+      <input type="text" id="lfCompany" autocomplete="organization" placeholder="Firm or company name">
+    </div>
+    <div class="lf-field">
+      <label for="lfRole">Role <span class="opt">(optional)</span></label>
+      <input type="text" id="lfRole" autocomplete="organization-title" placeholder="e.g. General Counsel, IT Director">
+    </div>
+    <div class="lf-field">
+      <label for="lfSeats">How many people would use it?</label>
+      <select id="lfSeats">
+        <option value="">Select&hellip;</option>
+        <option value="1-10">1&ndash;10</option>
+        <option value="11-25">11&ndash;25</option>
+        <option value="26-50">26&ndash;50</option>
+        <option value="51-200">51&ndash;200</option>
+        <option value="200+">200+</option>
+      </select>
+    </div>
+    <div class="lf-field">
+      <label for="lfDeployment">Where should it run?</label>
+      <select id="lfDeployment">
+        <option value="">Select&hellip;</option>
+        <option value="masked-cloud">Your masked secure cloud</option>
+        <option value="flow-edge">Our own infrastructure (Flow-Edge)</option>
+        <option value="not-sure">Not sure yet</option>
+      </select>
+    </div>
+    <div class="lf-field">
+      <label for="lfTimeline">Timeline</label>
+      <select id="lfTimeline">
+        <option value="">Select&hellip;</option>
+        <option value="now">Actively evaluating now</option>
+        <option value="this-quarter">This quarter</option>
+        <option value="this-year">This year</option>
+        <option value="exploring">Just exploring</option>
+      </select>
+    </div>
   </div>
-  <div class="card">
-    <h3>Security &amp; Compliance Review</h3>
-    <p><a href="mailto:hello@theflow-ai.com?subject=Security%20review">hello@theflow-ai.com</a><br>Architecture questions, security questionnaires, and deployment-model review. Start with the <a href="/security.html">security page</a>.</p>
+
+  <div class="lf-field" style="margin-top:16px">
+    <label for="lfMessage">What are you trying to solve? <span class="opt">(optional)</span></label>
+    <textarea id="lfMessage" placeholder="If a compliance framework applies to you &mdash; HIPAA, SOC 2, GDPR, FedRAMP, NERC CIP, 21 CFR Part 11 &mdash; name it here and we will lead with the architecture detail relevant to it."></textarea>
   </div>
-  <div class="card">
-    <h3>Privacy &amp; Data Requests</h3>
-    <p><a href="mailto:hello@theflow-ai.com?subject=Privacy%20request">hello@theflow-ai.com</a><br>Access, correction, export, or deletion of your personal data &mdash; see the <a href="/privacy.html">Privacy Policy</a>.</p>
+
+  <div class="lf-actions">
+    <button type="submit" class="lf-submit" id="lfSubmit">Request pricing</button>
+    <p class="lf-fine" id="lfEmailNote">A person reads every message. We reply within two business days.</p>
   </div>
-  <div class="card">
-    <h3>Partnerships &amp; Press</h3>
-    <p><a href="mailto:hello@theflow-ai.com?subject=Partnership">hello@theflow-ai.com</a><br>Integrations, resellers, and media enquiries.</p>
-  </div>
+  <p class="lf-msg" id="lfMsg" role="status" aria-live="polite" hidden></p>
+</form>
+
+<div class="contact-alt">
+  <p><b>Privacy &amp; data requests</b><a href="mailto:hello@theflow-ai.com?subject=Privacy%20request">hello@theflow-ai.com</a> &mdash; access, correction, export or deletion. See the <a href="/privacy.html">Privacy Policy</a>.</p>
+  <p><b>Partnerships &amp; press</b><a href="mailto:hello@theflow-ai.com?subject=Partnership">hello@theflow-ai.com</a> &mdash; integrations, resellers, and media enquiries.</p>
 </div>
 
-<h2>What to expect</h2>
-<p>We aim to reply to every message within two business days. If you are evaluating Flow for a regulated environment, tell us in your first message which framework applies to you &mdash; HIPAA, SOC 2, GDPR, FedRAMP, NERC CIP, 21 CFR Part 11, or another &mdash; and we will lead with the architecture detail relevant to it instead of a generic overview.</p>
-
+<h2>Just want to try it?</h2>
+<p>Flow Trial is the free Chrome extension for everyday business use &mdash; no sales conversation, no card. It is a separate product from the deployments described above, and it is not intended for sensitive or regulated data.</p>
 <div class="cta">
-  <h2>Not ready to email?</h2>
-  <p>Join the waitlist and we will reach out when early access opens.</p>
-  <a class="doit" href="/#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Join the Waitlist</a>
+  <h2>Flow Trial &mdash; free</h2>
+  <p>Install it, connect one system, and see what it catches in your own inbox.</p>
+  <a class="doit" href="/trial.html" data-ga="contact_trial"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Flow Trial</a>
 </div>
     </article>
   </div>
@@ -209,6 +295,83 @@ footer.site a{color:var(--muted)}
   mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
   mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
+})();
+</script>
+<script>
+// Enterprise enquiry submit. The previous version of this page was four
+// mailto: links, which on a managed corporate desktop frequently open nothing
+// at all — and even when they work, they produce an unqualified, untracked,
+// unattributed lead. Everything here exists to avoid losing the enquiry.
+(function () {
+  var form = document.getElementById('leadForm');
+  if (!form) return;
+  var btn = document.getElementById('lfSubmit');
+  var msg = document.getElementById('lfMsg');
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  function say(text, kind) {
+    msg.textContent = text;
+    msg.className = 'lf-msg ' + kind;
+    msg.hidden = false;
+  }
+  function val(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var email = val('lfEmail');
+    if (!EMAIL_RE.test(email)) {
+      say('Please enter a valid work email so we can reply.', 'err');
+      document.getElementById('lfEmail').focus();
+      return;
+    }
+
+    btn.disabled = true;
+    var original = btn.textContent;
+    btn.textContent = 'Sending…';
+    msg.hidden = true;
+
+    var payload = {
+      email: email,
+      name: val('lfName'),
+      company: val('lfCompany'),
+      role: val('lfRole'),
+      seats: val('lfSeats'),
+      deployment: val('lfDeployment'),
+      timeline: val('lfTimeline'),
+      message: val('lfMessage'),
+      website: val('lfWebsite'),
+      source: 'contact',
+      lang: document.documentElement.lang === 'he' ? 'he' : 'en'
+    };
+
+    try {
+      var res = await fetch('/.netlify/functions/submit-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json().catch(function () { return {}; });
+      if (res.ok && data.ok) {
+        form.querySelectorAll('input, select, textarea, button').forEach(function (el) { el.disabled = true; });
+        say('Thank you — that is with us. We will reply within two business days.', 'ok');
+        if (typeof gtag === 'function') {
+          gtag('event', 'lead_submit', {
+            seats: payload.seats || 'unspecified',
+            deployment: payload.deployment || 'unspecified',
+            timeline: payload.timeline || 'unspecified'
+          });
+        }
+        return;
+      }
+      // Never strand the enquiry: if the endpoint is unreachable or refuses,
+      // the visitor still gets a working way to reach a human.
+      say((data && data.error) || 'Something went wrong. Please email hello@theflow-ai.com and we will pick it up there.', 'err');
+    } catch (err) {
+      say('We could not reach the server. Please email hello@theflow-ai.com and we will pick it up there.', 'err');
+    }
+    btn.disabled = false;
+    btn.textContent = original;
+  });
 })();
 </script>
 <script src="/assets/flow-premium.js" defer></script>
