@@ -3,27 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Why Flow exists: an AI workflow engine built for organizations that cannot send raw sensitive data to a third-party model.">
+<meta name="description" content="AI automation for insurance carriers and agencies: claims and underwriting workflows with masked or fully local deployment, rate-filing-aware records and human review gates.">
 <meta name="theme-color" content="#07090F">
-<link rel="canonical" href="https://theflow-ai.com/about.html">
+<link rel="canonical" href="https://theflow-ai.com/solutions/insurance.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<title>About — Flow</title>
+<title>AI Workflow Automation for Insurance — Flow</title>
 <meta property="og:type" content="website">
-<meta property="og:title" content="About — Flow">
-<meta property="og:description" content="Why Flow exists: an AI workflow engine built for organizations that cannot send raw sensitive data to a third-party model.">
-<meta property="og:url" content="https://theflow-ai.com/about.html">
+<meta property="og:title" content="AI Automation for Insurance Carriers — Flow">
+<meta property="og:description" content="AI automation for insurance carriers and agencies: claims and underwriting workflows with masked or fully local deployment, rate-filing-aware records and human review gates.">
+<meta property="og:url" content="https://theflow-ai.com/solutions/insurance.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="About — Flow">
-<meta name="twitter:description" content="Why Flow exists: an AI workflow engine built for organizations that cannot send raw sensitive data to a third-party model.">
+<meta name="twitter:title" content="AI Automation for Insurance Carriers — Flow">
+<meta name="twitter:description" content="AI automation for insurance carriers and agencies: claims and underwriting workflows with masked or fully local deployment, rate-filing-aware records and human review gates.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"About","item":"https://theflow-ai.com/about.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Insurance","item":"https://theflow-ai.com/solutions/insurance.html"}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,440;9..144,560;9..144,680&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
@@ -142,40 +142,36 @@ footer.site a{color:var(--muted)}
 </div>
 <main id="main">
   <div class="wrap">
-    <span class="eyebrow">About</span>
-    <h1 class="title">Why Flow exists.</h1>
+    <span class="eyebrow">Solutions</span>
+    <h1 class="title">AI automation for insurance carriers.</h1>
     
     <article>
-<p class="lead">Most AI automation assumes it may read everything. In regulated work, that assumption is the entire problem.</p>
+<p class="lead">Claims and underwriting decisions carry two obligations at once: move fast enough to serve the policyholder, and be able to justify every input afterwards. Flow is built so automation does not cost you the second one.</p>
 
-<h2>The problem we started from</h2>
-<p>A law firm, a hospital, a bank, and a utility all have the same complaint about AI tooling: the demo is impressive, and the deployment is impossible. The blocker is rarely capability. It is that the workflow requires handing privileged, protected, or export-controlled material to a system whose data handling cannot be fully accounted for &mdash; and the person signing off on that has personal exposure if it goes wrong.</p>
-<p>So the work stays manual. Not because automation would not help, but because no one can defend the deployment.</p>
+<h2>The constraint</h2>
+<p>Insurance automation is judged by a different standard than most. A claims decision has to be defensible to a regulator and to the insured; an underwriting input has to be actuarially justified, not merely applied consistently. Rate filings, market-conduct exams, and unfair-discrimination rules all assume someone can reconstruct why a specific decision came out the way it did &mdash; and "the model produced this" is not an answer that survives that examination. Meanwhile claims files, medical records attached to them, and applicant data are exactly the material carriers cannot casually hand to a third-party service.</p>
 
-<h2>What we built instead</h2>
-<p>Flow starts from the deployment constraint rather than treating it as a later integration problem:</p>
+<h2>How Flow addresses it</h2>
 <ul>
-<li><b>Where processing happens is a choice, not a default.</b> Run Flow in a masked secure cloud, or entirely inside your own infrastructure with Flow-Edge. The second option exists because for some organizations it is the only option.</li>
-<li><b>Sensitive fields are masked before processing</b>, not filtered out of logs afterward.</li>
-<li><b>Every action is logged</b> in an append-only record, because "we think it did the right thing" is not an answer to an auditor.</li>
-<li><b>High-risk actions wait for a human.</b> Autonomy is bounded by policy you set.</li>
+<li><b>Deployment that fits the data.</b> Run Flow in a masked secure cloud tenant, or entirely inside your own infrastructure with Flow-Edge when claims files and applicant data cannot leave the building.</li>
+<li><b>Reconstructable decisions.</b> An append-only record of what was reviewed, what was proposed, who approved it, and what executed &mdash; the evidence a market-conduct exam or a rate filing actually asks for.</li>
+<li><b>Human gates on the calls that matter.</b> Adverse decisions and edge cases surface for an adjuster or underwriter rather than executing silently.</li>
+<li><b>Inputs you can name.</b> Deterministic execution over a defined set of inputs, so a proxy-discrimination question has a factual answer rather than an inference about model behaviour.</li>
 </ul>
-<p>The technical detail is on the <a href="/security.html">security page</a>.</p>
 
-<h2>How we write</h2>
-<p>We publish our research openly &mdash; <a href="/blog/">thirty articles</a> on deploying AI under HIPAA, GDPR, FCRA, 21 CFR Part 11, NERC CIP, CCPA, export controls, and the professional-responsibility rules that govern legal work. Much of it explains where automation is a bad idea, including for us. We would rather be useful to someone who does not buy from us than be persuasive to someone who should not have bought.</p>
-
-<h2>Where we are</h2>
-<p>Flow is in pre-release and working with a small number of early design partners in regulated industries. If your workflows are blocked by exactly the constraint above, that is the conversation we want to have.</p>
-
-<!-- TODO (owner): add the team section here — founders' names, backgrounds, and a company photo.
-     B2B buyers in regulated industries check for this before a first call; the page is
-     noticeably weaker without it. Nothing was invented here on purpose. -->
+<h2>Research on insurance deployment</h2>
+<ul class="readlist">
+<li><a href="/blog/insurance-claims-ai-automation.html">AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</a></li>
+<li><a href="/blog/insurance-underwriting-ai-rate-filing.html">AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard</a></li>
+<li><a href="/blog/auditability-by-design-ai-systems.html">Auditability by Design: Logging, Provenance, and Human Oversight</a></li>
+<li><a href="/blog/ai-model-drift-monitoring.html">Model Drift: Why a Validated AI System Doesn't Stay Validated on Its Own</a></li>
+<li><a href="/blog/what-is-data-masking-technical-guide.html">What Is Data Masking? A Technical Guide to De-Identifying Data</a></li>
+</ul>
 
 <div class="cta">
-  <h2>Work in a regulated environment?</h2>
-  <p>Tell us what is blocking your team, and we will tell you honestly whether Flow solves it.</p>
-  <a class="doit" href="/contact.html"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get in Touch</a>
+  <h2>Automation an examiner can follow</h2>
+  <p>See how the decision record and approval gates actually work.</p>
+  <a class="doit" href="/security.html" data-ga="solutions_security"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Read the Security Page</a>
 </div>
     </article>
   </div>
