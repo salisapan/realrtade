@@ -109,6 +109,39 @@ function factLines(p) {
   return out;
 }
 
+// chrome.identity.launchWebAuthFlow already limits the callback to this
+// extension's own redirect URL, but that alone doesn't tie a specific
+// callback to the specific request that opened it. A stale authorization
+// code sitting in browser history, or a redirect crafted by anything other
+// than the provider's real consent screen, would otherwise be indistinguishable
+// from a legitimate one. The unpredictable value below has to round-trip
+// unchanged for the callback to be trusted — the standard OAuth defense for
+// exactly this gap (RFC 6749 §10.12), and previously missing on all four of
+// these connectors.
+function randomOAuthState() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Runs one OAuth authorization-code handshake and returns the verified code.
+// Centralized so the state round-trip is identical across all four OAuth
+// connectors instead of being copy-pasted (and easy to silently omit) four
+// separate times.
+async function runOAuthFlow(authUrlBase, providerName) {
+  const state = randomOAuthState();
+  const resultUrl = await chrome.identity.launchWebAuthFlow({
+    url: authUrlBase + '&state=' + encodeURIComponent(state),
+    interactive: true
+  });
+  const params = new URL(resultUrl).searchParams;
+  if (params.get('state') !== state) {
+    throw new Error(providerName + ' authorization could not be verified. Please try connecting again.');
+  }
+  const code = params.get('code');
+  if (!code) throw new Error(providerName + ' did not return an authorization code.');
+  return code;
+}
+
 /* ----------------------------------------------------------------- HubSpot */
 
 async function getHubspotAuth() {
@@ -150,9 +183,7 @@ async function connectHubspot() {
     '&redirect_uri=' + encodeURIComponent(redirectUri) +
     '&scope=' + encodeURIComponent(HUBSPOT_SCOPES);
 
-  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
-  const code = new URL(resultUrl).searchParams.get('code');
-  if (!code) throw new Error('HubSpot did not return an authorization code.');
+  const code = await runOAuthFlow(authUrl, 'HubSpot');
 
   const res = await fetch(EXCHANGE_URL, {
     method: 'POST',
@@ -276,9 +307,7 @@ async function connectSalesforce() {
     '&redirect_uri=' + encodeURIComponent(redirectUri) +
     '&scope=' + encodeURIComponent(SALESFORCE_SCOPES);
 
-  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
-  const code = new URL(resultUrl).searchParams.get('code');
-  if (!code) throw new Error('Salesforce did not return an authorization code.');
+  const code = await runOAuthFlow(authUrl, 'Salesforce');
 
   const res = await fetch(SF_EXCHANGE_URL, {
     method: 'POST',
@@ -410,9 +439,7 @@ async function connectSlack(channel) {
     '&redirect_uri=' + encodeURIComponent(redirectUri) +
     '&scope=' + encodeURIComponent(SLACK_SCOPES);
 
-  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
-  const code = new URL(resultUrl).searchParams.get('code');
-  if (!code) throw new Error('Slack did not return an authorization code.');
+  const code = await runOAuthFlow(authUrl, 'Slack');
 
   const res = await fetch(SLACK_EXCHANGE_URL, {
     method: 'POST',
@@ -497,10 +524,12 @@ async function connectMonday(boardId) {
     MONDAY_AUTH_BASE +
     '?client_id=' + encodeURIComponent(MONDAY_CLIENT_ID) +
     '&redirect_uri=' + encodeURIComponent(redirectUri);
+  // Monday.com's OAuth scopes are configured on the app itself in the developer
+  // console rather than requested via URL parameter (unlike HubSpot/Salesforce/
+  // Slack above) — deliberately not adding a &scope= here, since guessing at
+  // one would misrepresent what this connector actually requests.
 
-  const resultUrl = await chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true });
-  const code = new URL(resultUrl).searchParams.get('code');
-  if (!code) throw new Error('Monday.com did not return an authorization code.');
+  const code = await runOAuthFlow(authUrl, 'Monday.com');
 
   const res = await fetch(MONDAY_EXCHANGE_URL, {
     method: 'POST',
