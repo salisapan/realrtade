@@ -35,6 +35,18 @@ function errorPage(message) {
   );
 }
 
+// Netlify's log retention keeps whatever these print, and the raw address
+// isn't needed for what these lines are actually for — spotting a pattern
+// or diagnosing a specific rejection. Masking keeps the domain, which is
+// the part worth seeing, without a subprocessor holding full addresses in
+// plaintext log storage.
+function maskEmail(value) {
+  const s = String(value || '');
+  const at = s.indexOf('@');
+  if (at < 1) return '(invalid)';
+  return s.slice(0, Math.min(2, at)) + '***@' + s.slice(at + 1);
+}
+
 exports.handler = async function (event) {
   const reqId = crypto.randomBytes(4).toString('hex');
   const log = (msg, extra) => console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : '');
@@ -49,7 +61,7 @@ exports.handler = async function (event) {
   const invalid = !secret || !email || !exp || !sig || !EMAIL_RE.test(email) || Date.now() > Number(exp) || !verify(email, exp, sig, secret);
 
   if (invalid) {
-    logErr('rejected: invalid or expired download token', { email, hasSecret: !!secret });
+    logErr('rejected: invalid or expired download token', { email: maskEmail(email), hasSecret: !!secret });
     return {
       statusCode: 400,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -60,7 +72,7 @@ exports.handler = async function (event) {
   try {
     const zipPath = path.join(__dirname, 'flow-trial-extension.zip');
     const bytes = fs.readFileSync(zipPath);
-    log('serving zip', { email, bytes: bytes.length });
+    log('serving zip', { email: maskEmail(email), bytes: bytes.length });
     return {
       statusCode: 200,
       headers: {

@@ -178,6 +178,19 @@ function verify(email, exp, sig, secret) {
   return crypto.timingSafeEqual(a, b);
 }
 
+// Netlify's log retention keeps whatever these print, and the raw address
+// isn't needed for what these lines are actually for — spotting a pattern
+// (the same domain hammering this endpoint) or diagnosing a specific
+// rejection. Masking keeps the domain, which is the part worth seeing, and
+// enough of the local part to eyeball "same address twice" without a
+// subprocessor holding full email addresses in plaintext log storage.
+function maskEmail(value) {
+  var s = String(value || '');
+  var at = s.indexOf('@');
+  if (at < 1) return '(invalid)';
+  return s.slice(0, Math.min(2, at)) + '***@' + s.slice(at + 1);
+}
+
 exports.handler = async function (event) {
   var reqId = crypto.randomBytes(4).toString('hex');
   var log = function (msg, extra) { console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : ''); };
@@ -194,12 +207,12 @@ exports.handler = async function (event) {
   var invalid = !secret || !email || !exp || !sig || !EMAIL_RE.test(email) || Date.now() > Number(exp) || !verify(email, exp, sig, secret);
 
   if (invalid) {
-    logErr('rejected: invalid or expired token', { email: email, hasSecret: !!secret });
+    logErr('rejected: invalid or expired token', { email: maskEmail(email), hasSecret: !!secret });
     return { statusCode: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, false, kind) };
   }
 
   var followUpFn = kind === 'trial' ? 'send-trial-access' : 'send-playbook';
-  log('token verified, triggering follow-up send', { email: email, kind: kind, followUpFn: followUpFn });
+  log('token verified, triggering follow-up send', { email: maskEmail(email), kind: kind, followUpFn: followUpFn });
 
   var downloadUrl;
   if (kind === 'trial') {
@@ -236,7 +249,7 @@ exports.handler = async function (event) {
     );
     var claimed = claim.ok ? await claim.json() : null;
     alreadyConfirmed = Array.isArray(claimed) && claimed.length === 0;
-    if (alreadyConfirmed) log('already confirmed — showing the page without re-sending', { email: email });
+    if (alreadyConfirmed) log('already confirmed — showing the page without re-sending', { email: maskEmail(email) });
   } catch (err) {
     // If the claim cannot be recorded we still send, because a signup that
     // silently receives nothing is a worse failure than a duplicate email.

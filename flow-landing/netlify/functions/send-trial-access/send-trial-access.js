@@ -143,6 +143,18 @@ async function sendEmail(apiKey, opts) {
   return { ok: res.ok, status: res.status, text: text };
 }
 
+// Netlify's log retention keeps whatever these print, and the raw address
+// isn't needed for what these lines are actually for — spotting a pattern
+// or diagnosing a specific rejection. Masking keeps the domain, which is
+// the part worth seeing, without a subprocessor holding full addresses in
+// plaintext log storage.
+function maskEmail(value) {
+  var s = String(value || '');
+  var at = s.indexOf('@');
+  if (at < 1) return '(invalid)';
+  return s.slice(0, Math.min(2, at)) + '***@' + s.slice(at + 1);
+}
+
 exports.handler = async function (event) {
   var reqId = crypto.randomBytes(4).toString('hex');
   var log = function (msg, extra) { console.log(LOG_PREFIX, '[' + reqId + ']', msg, extra !== undefined ? extra : ''); };
@@ -164,7 +176,7 @@ exports.handler = async function (event) {
   var downloadUrl = String(payload.downloadUrl || '').trim();
 
   if (!EMAIL_RE.test(email)) {
-    logErr('rejected: invalid email', email);
+    logErr('rejected: invalid email', maskEmail(email));
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid email' }) };
   }
   if (!downloadUrl) {
@@ -178,7 +190,7 @@ exports.handler = async function (event) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Confirmation service not configured' }) };
   }
   if (!verifyDownloadUrl(downloadUrl, email, verifySecret)) {
-    logErr('rejected: downloadUrl is not a genuine signed download link for this email', { email: email });
+    logErr('rejected: downloadUrl is not a genuine signed download link for this email', { email: maskEmail(email) });
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid downloadUrl' }) };
   }
 
@@ -200,7 +212,7 @@ exports.handler = async function (event) {
       logErr('Resend API rejected the trial-access send', { status: result.status, response: result.text });
       return { statusCode: 502, body: JSON.stringify({ error: 'Failed to send install instructions' }) };
     }
-    log('trial access email sent', { to: email });
+    log('trial access email sent', { to: maskEmail(email) });
 
     try {
       var ownerResult = await sendEmail(apiKey, {
