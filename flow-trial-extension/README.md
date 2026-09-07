@@ -1,8 +1,12 @@
 # Glance
 
-A Chrome extension that watches Gmail passively and, when an email actually
-decides something, puts one `Do It` button next to it that writes the record
-for you. No chat, no prompts, no if-this-then-that rules.
+Glance turns decisions made in your inbox into records in the systems you
+already use — automatically, with no data entry, no rules, no chat. Today
+it ships as a Chrome extension that watches Gmail passively and, when an
+email actually decides something, puts one `Do It` button next to it that
+writes the record for you. The judgment engine itself knows nothing about
+Gmail — it scores plain text — so Gmail is the first surface, not the
+architecture's ceiling (see "What is still deliberately narrow" below).
 
 Glance is a separate product from Flow (theflow-ai.com's enterprise workflow
 engine for organizations with sensitive or regulated data) — not a stripped
