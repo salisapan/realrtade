@@ -115,12 +115,7 @@ footer.site a{color:var(--muted)}
 }
 .lf-field input::placeholder,.lf-field textarea::placeholder{color:var(--muted)}
 .lf-actions{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:22px}
-.lf-submit{
-  font-family:var(--sans); font-weight:700; font-size:.95rem; color:#fff; background:var(--cat);
-  border:0; border-radius:999px; padding:13px 30px; cursor:pointer; transition:filter .15s, transform .15s;
-}
-.lf-submit:hover:not(:disabled){filter:brightness(1.08); transform:translateY(-1px)}
-.lf-submit:disabled{opacity:.6; cursor:default; transform:none}
+.lf-actions .doit:disabled{opacity:.6; cursor:default; transform:none}
 .lf-fine{font-size:.82rem; color:var(--muted); margin:0}
 .lf-msg{margin:16px 0 0; font-size:.92rem; line-height:1.55}
 .lf-msg.err{color:#C0392B}
@@ -242,7 +237,7 @@ footer.site a{color:var(--muted)}
   </div>
 
   <div class="lf-actions">
-    <button type="submit" class="lf-submit" id="lfSubmit">Request pricing</button>
+    <span class="magnetic"><button type="submit" class="doit" id="lfSubmit"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="lfSubmitLabel">Do It</span></button></span>
     <p class="lf-fine" id="lfEmailNote">A person reads every message. We reply within two business days.</p>
   </div>
   <p class="lf-msg" id="lfMsg" role="status" aria-live="polite" hidden></p>
@@ -305,6 +300,7 @@ footer.site a{color:var(--muted)}
   var form = document.getElementById('leadForm');
   if (!form) return;
   var btn = document.getElementById('lfSubmit');
+  var btnLabel = document.getElementById('lfSubmitLabel');
   var msg = document.getElementById('lfMsg');
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -325,8 +321,8 @@ footer.site a{color:var(--muted)}
     }
 
     btn.disabled = true;
-    var original = btn.textContent;
-    btn.textContent = 'Sending…';
+    var original = btnLabel.textContent;
+    btnLabel.textContent = 'Sending…';
     msg.hidden = true;
 
     var payload = {
@@ -369,7 +365,7 @@ footer.site a{color:var(--muted)}
       say('We could not reach the server. Please email hello@theflow-ai.com and we will pick it up there.', 'err');
     }
     btn.disabled = false;
-    btn.textContent = original;
+    btnLabel.textContent = original;
   });
 })();
 </script>
