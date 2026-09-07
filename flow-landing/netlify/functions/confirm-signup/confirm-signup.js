@@ -166,7 +166,7 @@ async function checkDomainCluster(email, log, logErr) {
   var apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
 
-  var url = SB_URL + '/rest/v1/waitlist?select=id&confirmed_at=not.is.null&source=eq.trial-extension&email=ilike.*%40' + encodeURIComponent(domain);
+  var url = SB_URL + '/rest/v1/waitlist?select=id&confirmed_at=not.is.null&source=in.(trial-extension,pricing-pro)&email=ilike.*%40' + encodeURIComponent(domain);
   var res = await fetch(url, { headers: { apikey: SB_SERVICE_KEY, Authorization: 'Bearer ' + SB_SERVICE_KEY } });
   if (!res.ok) { logErr('domain cluster count query failed', res.status); return; }
   var rows = await res.json();
@@ -296,8 +296,10 @@ exports.handler = async function (event) {
   // This heuristic exists to catch bottom-up Glance adoption inside a company
   // (see checkDomainCluster's own comment) — it has nothing to say about the
   // Flow enterprise waitlist, whose confirmations are already direct sales
-  // leads with no clustering heuristic needed.
-  if (kind === 'trial') {
+  // leads with no clustering heuristic needed. Pro-tier interest counts too:
+  // someone willing to pay for Glance Pro is an equally (if not more) warm
+  // signal than a free Glance install, so it's counted in the same cluster.
+  if (kind === 'trial' || kind === 'pro') {
     try {
       await checkDomainCluster(email, log, logErr);
     } catch (err) {
