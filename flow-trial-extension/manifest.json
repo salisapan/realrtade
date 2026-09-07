@@ -51,6 +51,7 @@
     "https://api.notion.com/*",
     "https://*.salesforce.com/*",
     "https://slack.com/*",
-    "https://api.monday.com/*"
+    "https://api.monday.com/*",
+    "https://theflow-ai.com/*"
   ]
 }
