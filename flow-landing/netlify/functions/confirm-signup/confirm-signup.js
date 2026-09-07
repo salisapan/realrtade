@@ -2,6 +2,7 @@ const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SITE_URL = 'https://theflow-ai.com';
+const GA_ID = 'G-ESYDFQYCDV';
 const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 
@@ -92,7 +93,7 @@ function page(lang, ok, kind, downloadUrl) {
     : '<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="' + iconColor + '" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v5M12 16h.01"/></svg>';
   var downloadLabel = isHe ? 'הורדת התוסף' : 'Download the extension';
   var downloadBtn = ok && kind === 'trial' && downloadUrl
-    ? '<a href="' + downloadUrl + '" style="display:inline-block; background:#1A4EF5; color:#fff; text-decoration:none; font-weight:700; padding:13px 28px; border-radius:999px; margin-bottom:14px;">' + downloadLabel + '</a><br>'
+    ? '<a href="' + downloadUrl + '" id="dl" style="display:inline-block; background:#1A4EF5; color:#fff; text-decoration:none; font-weight:700; padding:13px 28px; border-radius:999px; margin-bottom:14px;">' + downloadLabel + '</a><br>'
     : '';
 
   return (
@@ -105,11 +106,24 @@ function page(lang, ok, kind, downloadUrl) {
     '.card h1{font-size:1.5rem; margin:20px 0 12px}' +
     '.card p{color:#AEB9D6; line-height:1.6; margin:0 0 28px}' +
     '.card a.home{display:inline-block; color:#8891A4; text-decoration:none; font-weight:600; font-size:.9rem}' +
-    '</style></head><body>' +
+    '</style>' +
+    // This page sits between "confirmed my email" and "downloaded the
+    // extension" — the last step of the acquisition funnel and, until now, the
+    // only one with no analytics on it at all. Without this, confirmations and
+    // downloads could not be told apart, so the biggest drop-off in the funnel
+    // was invisible.
+    '<script async src="https://www.googletagmanager.com/gtag/js?id=' + GA_ID + '"></script>' +
+    '<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}' +
+    "gtag('js',new Date());gtag('config','" + GA_ID + "',{anonymize_ip:true});" +
+    "gtag('event','" + (ok ? 'confirm_success' : 'confirm_invalid') + "',{kind:'" + kind + "'});</script>" +
+    '</head><body>' +
     '<div class="card">' + icon + '<h1>' + title + '</h1><p>' + body + '</p>' +
     downloadBtn +
     '<a class="home" href="' + SITE_URL + '/">' + c.home + '</a>' +
-    '</div></body></html>'
+    '</div>' +
+    "<script>var d=document.getElementById('dl');" +
+    "if(d)d.addEventListener('click',function(){gtag('event','download_start',{kind:'" + kind + "'});});</script>" +
+    '</body></html>'
   );
 }
 

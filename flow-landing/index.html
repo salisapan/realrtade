@@ -85,7 +85,7 @@
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
       </button>
-      <span class="magnetic nav-cta"><button class="doit sm" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></button></span>
+      <span class="magnetic nav-cta"><a class="doit sm" href="/contact.html" data-ga="nav_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></a></span>
       <button class="icon-btn hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <svg viewBox="0 0 24 24"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg>
       </button>
@@ -112,7 +112,7 @@
       <a href="/terms.html" data-i18n="nav.terms">Terms</a>
     </div>
   </nav>
-  <span class="magnetic"><button class="doit" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></button></span>
+  <span class="magnetic"><a class="doit" href="/contact.html" data-ga="mobilenav_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></a></span>
 </div>
 
 <main id="top">
@@ -298,7 +298,7 @@ Best,
             <p data-i18n="legal.end.line2">Deed updated. Ledger recalculated. Client package dispatched.</p>
             <p class="final" data-i18n="legal.end.line3">And your firm's multi-million dollar transaction data? It never left your local machine.</p>
           </div>
-          <span class="magnetic"><button class="doit" id="ldCta" type="button" data-scroll="#waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.end.cta">Get the Automation Guide &amp; Join Waitlist</span></button></span>
+          <span class="magnetic"><a class="doit" id="ldCta" href="/contact.html" data-ga="legal_demo_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.end.cta">Talk to Us About Your Firm</span></a></span>
         </div>
 
       </div>
@@ -546,9 +546,20 @@ Best,
     <div class="wrap">
       <div class="cta-box">
         <img class="logo reveal in" src="/logo.png" width="880" height="388" alt="Flow" loading="lazy" decoding="async">
-        <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">EARLY ACCESS</span>
+        <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">GET STARTED</span>
         <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
-        <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Join the waitlist for early access to Flow. Experience the future of autonomous, secure workflow automation — deployed your way.</p>
+        <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Two ways in. Tell us how you would deploy Flow and we will come back with a real number — or install Flow Trial free and watch it work on your own inbox first.</p>
+        <div class="cta-paths reveal in" data-d="2">
+          <a class="cta-path" href="/contact.html" data-ga="close_enterprise">
+            <b data-i18n="wl.path1.t">Talk to us about Flow</b>
+            <span data-i18n="wl.path1.s">Masked secure cloud or your own infrastructure. Priced per seat, quoted to your deployment.</span>
+          </a>
+          <a class="cta-path" href="/trial.html" data-ga="close_trial">
+            <b data-i18n="wl.path2.t">Get Flow Trial — free</b>
+            <span data-i18n="wl.path2.s">A Chrome extension for everyday business use. No card, no sales conversation.</span>
+          </a>
+        </div>
+        <p class="wl-alt reveal in" data-d="3" data-i18n="wl.alt">Not ready for either? Take the Hybrid Automation Playbook instead.</p>
         <div class="wait-wrap reveal" data-d="3" id="waitWrap" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:16px">
           <form class="wait-form" id="waitForm" novalidate>
             <input type="text" id="waitCompany" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
@@ -559,13 +570,13 @@ Best,
                 <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
               </span>
             </div>
-            <span class="magnetic"><button class="doit" type="submit" id="waitBtn" aria-label="Request Access"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.submit">Join Waitlist</span><span class="btn-spin" aria-hidden="true"></span></button></span>
+            <span class="magnetic"><button class="doit" type="submit" id="waitBtn" aria-label="Send me the Playbook"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.submit">Send Me the Playbook</span><span class="btn-spin" aria-hidden="true"></span></button></span>
           </form>
-          <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">You're on the list. We'll be in touch.</span></div>
+          <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">Check your inbox — confirm your email and the Playbook is on its way.</span></div>
           <div class="wait-confirm-note" id="waitConfirmNote"><span data-i18n="wl.confirm.note">Check your inbox to confirm your email — that's how we'll send your Playbook.</span></div>
           <div class="wait-msg" id="waitMsg" role="status" aria-live="polite"></div>
           <div class="wait-enrich" id="waitEnrich">
-            <p class="wait-enrich-note" data-i18n="wl.enrich.note">One last step — tell us about your team.</p>
+            <p class="wait-enrich-note" data-i18n="wl.enrich.note">Optional — tell us about your team so we can send you what is actually relevant.</p>
             <form class="wait-enrich-form" id="waitEnrichForm" novalidate>
               <input type="text" id="waitOrg" name="org" autocomplete="organization" data-i18n-ph="wl.enrich.company" placeholder="Company">
               <input type="text" id="waitRole" name="role" autocomplete="organization-title" data-i18n-ph="wl.enrich.role" placeholder="Role">
@@ -644,7 +655,7 @@ Best,
     'hero.cta1':{en:'Talk to Us',he:'דברו איתנו'},
     'hero.cta3':{en:'See how it works',he:'איך זה עובד'},
     'nav.cta':{en:'Do It',he:'עשו את זה'},
-    'wl.submit':{en:'Join Waitlist',he:'להצטרפות לרשימה'},
+    'wl.submit':{en:'Send Me the Playbook',he:'שלחו לי את ה-Playbook'},
     'hero.cta2':{en:'Try Flow Trial — Free',he:'נסו את Flow Trial — חינם'},
     'hero.foot':{en:'Cloud or fully local — your data, your rules.',he:'בענן או מקומי לחלוטין — המידע שלכם, החוקים שלכם.'},
     'challenge.eyebrow':{en:'THE CHALLENGE',he:'THE CHALLENGE'},
@@ -749,15 +760,20 @@ Best,
     'win.f1':{en:'$48,200',he:'₪48,200'},
     'win.f2':{en:'•••• 4821',he:'•••• 4821'},
     'win.f3':{en:'Cohen Ltd.',he:'כהן בע"מ'},
-    'wl.eyebrow':{en:'EARLY ACCESS',he:'EARLY ACCESS'},
+    'wl.eyebrow':{en:'GET STARTED',he:'איך מתחילים'},
+    'wl.path1.t':{en:'Talk to us about Flow',he:'דברו איתנו על Flow'},
+    'wl.path1.s':{en:'Masked secure cloud or your own infrastructure. Priced per seat, quoted to your deployment.',he:'ענן מאובטח וממוסך או התשתית שלכם. תמחור לפי משתמש, בהצעה שמותאמת לפריסה שלכם.'},
+    'wl.path2.t':{en:'Get Flow Trial — free',he:'קבלו את Flow Trial — חינם'},
+    'wl.path2.s':{en:'A Chrome extension for everyday business use. No card, no sales conversation.',he:'תוסף Chrome לעבודה היומיומית. בלי כרטיס אשראי, בלי שיחת מכירה.'},
+    'wl.alt':{en:'Not ready for either? Take the Hybrid Automation Playbook instead.',he:'לא בשלים לאף אחד מהם? קחו במקום את ה-Hybrid Automation Playbook.'},
     'wl.title':{en:'Ready to Reclaim Your Workflows?',he:'מוכנים להשיב לעצמכם את תהליכי העבודה?'},
-    'wl.lead':{en:'Join the waitlist for early access to Flow. Experience the future of autonomous, secure workflow automation — deployed your way.',he:'הצטרפו לרשימת ההמתנה לגישה מוקדמת ל-Flow. חוו את עתיד האוטומציה — אוטונומית, מאובטחת, ופרוסה בדרך שלכם.'},
+    'wl.lead':{en:'Two ways in. Tell us how you would deploy Flow and we will come back with a real number — or install Flow Trial free and watch it work on your own inbox first.',he:'שתי דרכים להתחיל. ספרו לנו איך הייתם פורסים את Flow ונחזור עם מספר אמיתי — או התקינו את Flow Trial בחינם ותראו אותו עובד על תיבת הדואר שלכם.'},
     'wl.ph':{en:'Enter your work email',he:'כתובת האימייל הארגוני שלכם'},
-    'wl.success':{en:"You're on the list. We'll be in touch.",he:'אתם ברשימה. ניצור קשר.'},
+    'wl.success':{en:"Check your inbox — confirm your email and the Playbook is on its way.",he:'בדקו את תיבת הדואר — אשרו את הכתובת וה-Playbook בדרך אליכם.'},
     'wl.confirm.note':{en:"Check your inbox to confirm your email — that's how we'll send your Playbook.",he:'בדקו את תיבת הדוא"ל שלכם לאישור הכתובת — כך נשלח לכם את ה-Playbook.'},
     'wl.fine':{en:'No spam. Your details stay with you — exactly like the product works.',he:'ללא ספאם. הפרטים נשמרים אצלכם — בדיוק כמו שהמוצר עובד.'},
     'wl.err':{en:"That email doesn't look right. Please check it.",he:'כתובת האימייל לא נראית תקינה. בדקו שוב.'},
-    'wl.enrich.note':{en:"You're on the list. Optional — tell us about your team to help us tailor early access.",he:'נרשמתם בהצלחה. אופציונלי — ספרו לנו על הצוות שלכם כדי שנוכל להתאים את הגישה המוקדמת.'},
+    'wl.enrich.note':{en:"Optional — tell us about your team so we can send you what is actually relevant.",he:'נרשמתם בהצלחה. אופציונלי — ספרו לנו על הצוות שלכם כדי שנוכל להתאים את הגישה המוקדמת.'},
     'wl.enrich.company':{en:'Company',he:'שם החברה'},
     'wl.enrich.role':{en:'Role',he:'תפקיד'},
     'wl.enrich.website':{en:'Company website',he:'אתר החברה'},
@@ -827,7 +843,7 @@ Best,
     'legal.end.line1':{en:'3 clicks for full compliance. 0 clicks for manual data entry.',he:'3 קליקים לעמידה מלאה ברגולציה. 0 קליקים להזנת נתונים ידנית.'},
     'legal.end.line2':{en:'Deed updated. Ledger recalculated. Client package dispatched.',he:'שטר ההעברה עודכן. הספר חושב מחדש. חבילת הלקוח נשלחה.'},
     'legal.end.line3':{en:"And your firm's multi-million dollar transaction data? It never left your local machine.",he:'ונתוני העסקה רבת מיליוני הדולרים של המשרד שלכם? הם מעולם לא עזבו את המכשיר המקומי שלכם.'},
-    'legal.end.cta':{en:'Get the Automation Guide &amp; Join Waitlist',he:'קבלו את מדריך האוטומציה והצטרפו לרשימת ההמתנה'}
+    'legal.end.cta':{en:'Talk to Us About Your Firm',he:'דברו איתנו על המשרד שלכם'}
   };
   var YEAR=new Date().getFullYear();
   var curLang=root.getAttribute('lang')||'en';
@@ -1674,6 +1690,24 @@ Best,
   /* init */
   applyLang(curLang);
   document.querySelector('.grid-scan[data-anim]') && document.querySelector('.grid-scan[data-anim]').classList.add('anim');
+})();
+</script>
+
+<script>
+/* Funnel analytics. The homepage is the one page that does not load
+   assets/flow-premium.js — it carries its own richer animation code — so the
+   shared data-ga tracker there never ran on the single most important page on
+   the site. This is the same delegation, inline. */
+(function () {
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-ga]') : null;
+    if (!el || typeof window.gtag !== 'function') return;
+    window.gtag('event', 'cta_click', {
+      cta: el.getAttribute('data-ga'),
+      page: location.pathname,
+      destination: el.getAttribute('href') || ''
+    });
+  }, { passive: true });
 })();
 </script>
 

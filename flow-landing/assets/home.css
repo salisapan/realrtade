@@ -649,6 +649,30 @@ canvas.terrain-canvas.show{opacity:1}
 @keyframes slideInLeft{from{opacity:0; transform:translateX(-30px)}to{opacity:1; transform:translateX(0)}}
 @keyframes slideInRight{from{opacity:0; transform:translateX(30px)}to{opacity:1; transform:translateX(0)}}
 .wait-msg.err{color:#ff7a55}
+/* The two real ways in, side by side. Neither is a step on a ladder: Flow Trial
+   and Flow are separate products for separate audiences, so they get equal
+   visual weight and their own sentence rather than a tier comparison. */
+.cta-paths{display:grid; gap:14px; width:100%; max-width:720px; margin:6px 0 22px; text-align:start}
+@media (min-width:640px){ .cta-paths{grid-template-columns:1fr 1fr} }
+.cta-path{
+  display:flex; flex-direction:column; gap:6px; padding:18px 20px; border-radius:16px;
+  border:1px solid var(--line); background:rgba(255,255,255,.03); text-decoration:none;
+  transition:border-color .2s, transform .2s, background .2s;
+}
+.cta-path:hover{border-color:var(--cat); transform:translateY(-2px); background:rgba(26,78,245,.06)}
+.cta-path:focus-visible{outline:2px solid var(--cat); outline-offset:3px}
+.cta-path b{font-size:1rem; font-weight:700; color:var(--txt-hi)}
+.cta-path span{font-size:.88rem; line-height:1.5; color:var(--muted)}
+.wl-alt{font-size:.9rem; color:var(--muted); margin:0 0 14px; text-align:center}
+/* A quiet scroll cue, not a third button competing with the two real paths. */
+.hero-scroll{
+  display:inline-flex; align-items:center; gap:7px; margin-top:22px; padding:6px 2px;
+  background:none; border:0; cursor:pointer; font-family:inherit; font-size:.9rem;
+  color:var(--muted); transition:color .2s;
+}
+.hero-scroll::after{content:''; width:8px; height:8px; border-inline-end:1.5px solid currentColor; border-block-end:1.5px solid currentColor; transform:rotate(45deg) translateY(-2px)}
+.hero-scroll:hover{color:var(--txt-hi)}
+.hero-scroll:focus-visible{outline:2px solid var(--cat); outline-offset:3px; border-radius:4px}
 .cta-fine{color:var(--muted); font-size:.86rem; display:flex; align-items:center; gap:9px; flex-wrap:wrap; justify-content:center; margin-top:4px}
 .cta-fine svg{width:15px; height:15px; stroke:var(--accent-2); fill:none; stroke-width:1.6}
 .success-mark{display:none; align-items:center; gap:12px; color:var(--accent-2); font-family:var(--disp); font-weight:700; font-size:1.2rem}

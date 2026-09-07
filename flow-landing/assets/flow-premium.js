@@ -122,3 +122,46 @@
   // The theme toggle swaps the palette tokens; the canvas has to follow.
   new MutationObserver(colors).observe(root, { attributes: true, attributeFilter: ['data-theme'] });
 })();
+
+/* ------------------------------------------------------ funnel analytics */
+// Before this, GA4 was loaded on all 43 pages but only three custom events
+// existed site-wide — so the funnel was measurable up to the email box and
+// completely dark after it. There was no way to answer which page produced a
+// lead, or which of the two products a visitor chose.
+//
+// Rather than hand-wiring a listener per button, anything carrying data-ga
+// reports itself. Adding a tracked CTA is then a markup attribute, which is
+// what keeps instrumentation from rotting the moment someone adds a button.
+(function () {
+  function send(name, params) {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params || {});
+  }
+
+  document.addEventListener('click', function (e) {
+    var el = e.target && e.target.closest ? e.target.closest('[data-ga]') : null;
+    if (!el) return;
+    send('cta_click', {
+      cta: el.getAttribute('data-ga'),
+      page: location.pathname,
+      // Which product the click was heading for. The two are separate products,
+      // so blending their conversion numbers would hide which one is working.
+      destination: el.getAttribute('href') || ''
+    });
+  }, { passive: true });
+
+  // Reaching the pricing table is a real intent signal and was previously
+  // invisible: pricing.html fired no events at all.
+  var tiers = document.querySelector('.tiers, .tier-solo');
+  if (tiers && 'IntersectionObserver' in window) {
+    var seen = false;
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (!entry.isIntersecting || seen) return;
+        seen = true;
+        send('pricing_view', { page: location.pathname });
+        io.disconnect();
+      });
+    }, { threshold: 0.3 });
+    io.observe(tiers);
+  }
+})();
