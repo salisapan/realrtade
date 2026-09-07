@@ -110,7 +110,15 @@ const FlowExtract = (() => {
       const target = DAYS.indexOf(m[1].toLowerCase());
       const d = new Date(now);
       let delta = (target - d.getDay() + 7) % 7;
-      if (delta === 0 || /next\s/i.test(m[0])) delta = delta || 7;
+      // "next Friday" has to land at least a week further out than plain
+      // "Friday" — otherwise the word "next" is captured by the regex but
+      // has no effect on the computed date, and a sender who explicitly
+      // said "next Friday" to mean the Friday after the closest one gets
+      // logged with a date up to a week too early. The same-weekday case
+      // (delta === 0, "by Friday" said on a Friday) already rolls forward
+      // a full week regardless of "next", so it needs no separate bump.
+      if (delta === 0) delta = 7;
+      else if (/next\s/i.test(m[0])) delta += 7;
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }
