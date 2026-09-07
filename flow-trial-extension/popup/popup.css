@@ -38,8 +38,13 @@ body{
 
 .hdr{display:flex; align-items:center; gap:9px; padding:16px 16px 12px}
 .hdr .mark{
+  position:relative;
   width:9px; height:9px; border-radius:50%; background:var(--accent); flex:none;
   box-shadow:0 0 0 4px var(--accent-wash), 0 0 10px var(--glow);
+}
+.hdr .mark::after{
+  content:''; position:absolute; inset:-6px; border-radius:50%;
+  border:1px solid color-mix(in srgb, var(--accent) 42%, transparent);
 }
 .hdr h1{font-size:1.02rem; margin:0; font-weight:800; letter-spacing:-.01em}
 .ver{
@@ -123,18 +128,36 @@ main{padding:16px}
 .opt .name{font-size:.86rem; font-weight:600; display:block}
 .opt .kind{font-size:.72rem; color:var(--ink-3); display:block}
 
-/* ---- buttons ---- */
+/* ---- buttons ----
+   Same shell/ring/shine family as the marketing site's Do It button — a
+   glass ring inset from the edge (::before) and a diagonal shine that
+   sweeps across on hover (::after) — built with pseudo-elements instead
+   of the site's three <span>s so the popup markup stays untouched. */
 .primary{
   all:unset; display:block; text-align:center; width:100%;
+  position:relative; isolation:isolate; overflow:hidden;
   background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white 8%), var(--accent));
   color:#fff; font-family:inherit; font-weight:700; font-size:.9rem; border-radius:999px;
-  padding:12px; cursor:pointer; box-shadow:0 8px 20px -10px var(--glow);
-  transition:filter .2s, transform .15s, box-shadow .2s;
+  padding:12px; cursor:pointer;
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.4), inset 0 -10px 18px rgba(0,0,0,.14), 0 10px 24px -10px var(--glow);
+  transition:filter .2s, transform .18s, box-shadow .22s;
+}
+.primary::before{
+  content:''; position:absolute; inset:3px; border-radius:999px; z-index:1; pointer-events:none;
+  border:1px solid rgba(255,255,255,.32);
+}
+.primary::after{
+  content:''; position:absolute; inset-block:-60%; inline-size:36%; inset-inline-start:-50%; z-index:1; pointer-events:none;
+  background:linear-gradient(105deg, transparent, rgba(255,255,255,.55), transparent);
+  transform:skewX(-18deg);
 }
 .primary.sm{margin-top:10px; padding:9px; font-size:.82rem}
-.primary:hover{filter:brightness(1.08); transform:translateY(-1px); box-shadow:0 12px 24px -10px var(--glow)}
+.primary:hover{filter:brightness(1.06); transform:translateY(-1px); box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5), inset 0 -8px 16px rgba(0,0,0,.1), 0 14px 30px -8px var(--glow)}
+.primary:hover::after{animation:g-sweep .6s cubic-bezier(.3,.6,.2,1) forwards}
 .primary:active{transform:translateY(0)}
 .primary:disabled{opacity:.55; cursor:default; transform:none; box-shadow:none}
+
+@keyframes g-sweep{to{inset-inline-start:130%}}
 .ghost{
   all:unset; display:inline-block; text-align:center; cursor:pointer; margin-top:10px;
   font-family:inherit; font-weight:600; font-size:.8rem; color:var(--ink-2);
