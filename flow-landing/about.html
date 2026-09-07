@@ -95,15 +95,31 @@ footer.site a{color:var(--muted)}
 .pagenav a{color:var(--muted); margin-inline-end:16px}
 .note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
 
-.team-grid{display:grid; gap:20px; margin:26px 0 32px}
-@media (min-width:640px){ .team-grid{grid-template-columns:1fr 1fr} }
-.team-card{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px 22px; font-family:var(--sans)}
-.team-photo{width:88px; height:88px; border-radius:50%; object-fit:cover; display:block; margin-bottom:14px; border:1px solid var(--line)}
-.team-name{font-family:var(--disp); font-weight:560; font-size:1.2rem; color:var(--txt-hi); margin:0 0 2px}
-.team-role{font-size:.76rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--cat); margin:0 0 14px}
-.team-facts{list-style:none; margin:0; padding:0; font-size:.92rem; color:var(--txt); line-height:1.5}
-.team-facts li{position:relative; padding-inline-start:16px; margin-bottom:8px}
-.team-facts li::before{content:'\2013'; position:absolute; inset-inline-start:0; color:var(--muted)}
+.founders{display:flex; flex-direction:column; margin:28px 0 34px; border-radius:22px; overflow:hidden; border:1px solid var(--line); background:var(--bg2); box-shadow:0 30px 60px -35px rgba(10,20,50,.35)}
+:root[data-theme="light"] .founders{box-shadow:0 30px 60px -35px rgba(20,44,100,.18)}
+.founder{position:relative; display:grid; grid-template-columns:112px 1fr; gap:28px; padding:34px 30px; font-family:var(--sans); isolation:isolate; transition:background .25s}
+.founder + .founder{border-top:1px solid var(--line)}
+.founder::before{content:''; position:absolute; inset:0; z-index:-1; opacity:0; background:radial-gradient(720px 260px at 0% 0%, rgba(26,78,245,.10), transparent 65%); transition:opacity .35s}
+.founder:hover::before{opacity:1}
+.founder:hover{background:rgba(26,78,245,.03)}
+.founder-visual{position:relative; width:96px; height:96px; flex:none}
+.founder-orbit{position:absolute; inset:-16px; border-radius:50%; border:1px solid rgba(26,78,245,.28); opacity:.7}
+.founder-orbit::after{content:''; position:absolute; inset:-8px; border-radius:50%; background:radial-gradient(circle, rgba(26,78,245,.24), transparent 72%); filter:blur(3px)}
+.founder-index{position:absolute; top:-6px; left:-6px; z-index:2; font-family:var(--sans); font-size:.62rem; font-weight:800; letter-spacing:.06em; color:var(--muted); background:var(--bg); border:1px solid var(--line); border-radius:999px; width:24px; height:24px; display:grid; place-items:center}
+.founder-photo{position:relative; z-index:1; width:96px; height:96px; border-radius:50%; object-fit:cover; display:block; box-shadow:0 0 0 4px var(--bg)}
+.founder-name{font-family:var(--disp); font-weight:560; font-size:1.34rem; color:var(--txt-hi); margin:0 0 3px; letter-spacing:-.01em}
+.founder-role{font-size:.74rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 16px; display:flex; align-items:center; gap:10px}
+.founder-role::after{content:''; height:1px; flex:1; background:linear-gradient(90deg, var(--line), transparent)}
+.founder-facts{list-style:none; margin:0; padding:0; font-size:.93rem; color:var(--txt); line-height:1.6; display:grid; gap:9px}
+.founder-facts li{position:relative; padding-inline-start:18px}
+.founder-facts li::before{content:''; position:absolute; inset-inline-start:1px; top:.6em; width:5px; height:5px; border-radius:50%; background:var(--cat)}
+@media (max-width:560px){
+  .founder{grid-template-columns:1fr; text-align:center; padding:30px 22px}
+  .founder-visual{margin:0 auto}
+  .founder-role{justify-content:center}
+  .founder-role::after{display:none}
+  .founder-facts{text-align:start}
+}
 
 .menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
 .menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
@@ -179,28 +195,40 @@ footer.site a{color:var(--muted)}
 <p>Flow is in pre-release and working with a small number of early design partners in regulated industries. If your workflows are blocked by exactly the constraint above, that is the conversation we want to have.</p>
 
 <h2>The founding team</h2>
-<div class="team-grid">
-  <div class="team-card">
-    <img class="team-photo" src="/founder-sali.webp" width="88" height="88" alt="Sali Sapan" loading="lazy" decoding="async">
-    <p class="team-name">Sali Sapan</p>
-    <p class="team-role">CEO &amp; Co-Founder</p>
-    <ul class="team-facts">
-      <li>LL.B. and B.A. in Government, Strategy &amp; Political Science, Reichman University; M.Sc. in Data Science &amp; Machine Learning, Bar-Ilan University</li>
-      <li>Reserve officer, elite IDF special forces unit</li>
-      <li>Attorney at Fischer Behar Chen (FBC), one of Israel's leading law firms</li>
-      <li>Entrepreneur with prior ventures in hightech and real estate</li>
-    </ul>
+<div class="founders">
+  <div class="founder">
+    <div class="founder-visual">
+      <span class="founder-orbit" aria-hidden="true"></span>
+      <span class="founder-index" aria-hidden="true">01</span>
+      <img class="founder-photo" src="/founder-sali.webp" width="96" height="96" alt="Sali Sapan" loading="lazy" decoding="async">
+    </div>
+    <div class="founder-body">
+      <p class="founder-name">Sali Sapan</p>
+      <p class="founder-role">CEO &amp; Co-Founder</p>
+      <ul class="founder-facts">
+        <li>LL.B. and B.A. in Government, Strategy &amp; Political Science, Reichman University; M.Sc. in Data Science &amp; Machine Learning, Bar-Ilan University</li>
+        <li>Reserve officer, elite IDF special forces unit</li>
+        <li>Attorney at Fischer Behar Chen (FBC), one of Israel's leading law firms</li>
+        <li>Entrepreneur with prior ventures in hightech and real estate</li>
+      </ul>
+    </div>
   </div>
-  <div class="team-card">
-    <img class="team-photo" src="/founder-tomer.webp" width="88" height="88" alt="Tomer Steinmetz" loading="lazy" decoding="async">
-    <p class="team-name">Tomer Steinmetz</p>
-    <p class="team-role">CTO &amp; Co-Founder</p>
-    <ul class="team-facts">
-      <li>B.Sc. in Computer Science, Reichman University</li>
-      <li>AI Engineer at Amazon, building and shipping applied AI systems at scale</li>
-      <li>Previously Team Lead at Hypernative, a cybersecurity and Web3 threat-prevention startup</li>
-      <li>3+ years as a backend engineer at Skai and CorrActions, shipping large-scale, Kafka-based data infrastructure</li>
-    </ul>
+  <div class="founder">
+    <div class="founder-visual">
+      <span class="founder-orbit" aria-hidden="true"></span>
+      <span class="founder-index" aria-hidden="true">02</span>
+      <img class="founder-photo" src="/founder-tomer.webp" width="96" height="96" alt="Tomer Steinmetz" loading="lazy" decoding="async">
+    </div>
+    <div class="founder-body">
+      <p class="founder-name">Tomer Steinmetz</p>
+      <p class="founder-role">CTO &amp; Co-Founder</p>
+      <ul class="founder-facts">
+        <li>B.Sc. in Computer Science, Reichman University</li>
+        <li>AI Engineer at Amazon, building and shipping applied AI systems at scale</li>
+        <li>Previously Team Lead at Hypernative, a cybersecurity and Web3 threat-prevention startup</li>
+        <li>3+ years as a backend engineer at Skai and CorrActions, shipping large-scale, Kafka-based data infrastructure</li>
+      </ul>
+    </div>
   </div>
 </div>
 
