@@ -79,6 +79,22 @@ const COPY = {
       errBody: 'קישור האישור פג תוקף או שאינו תקין. בקשו גישה מחדש בעמוד Glance.',
     },
   },
+  pro: {
+    en: {
+      title: 'You’re confirmed',
+      body: 'Thanks for confirming your email. We’ll let you know the moment Glance Pro is ready.',
+      home: 'Back to theflow-ai.com',
+      errTitle: 'This link isn’t valid',
+      errBody: 'This confirmation link is expired or invalid. Please sign up again on the Pricing page.',
+    },
+    he: {
+      title: 'האימייל אושר',
+      body: 'תודה שאישרתם את כתובת המייל. נעדכן אתכם ברגע שGlance Pro יהיה מוכן.',
+      home: 'חזרה ל-theflow-ai.com',
+      errTitle: 'הקישור אינו תקין',
+      errBody: 'קישור האישור פג תוקף או שאינו תקין. הירשמו שוב בעמוד התמחור.',
+    },
+  },
 };
 
 function page(lang, ok, kind, downloadUrl) {
@@ -96,7 +112,7 @@ function page(lang, ok, kind, downloadUrl) {
     ? '<a href="' + downloadUrl + '" id="dl" style="display:inline-block; background:#1A4EF5; color:#fff; text-decoration:none; font-weight:700; padding:13px 28px; border-radius:999px; margin-bottom:14px;">' + downloadLabel + '</a><br>'
     : '';
 
-  var brand = kind === 'trial' ? 'Glance' : 'Flow';
+  var brand = (kind === 'trial' || kind === 'pro') ? 'Glance' : 'Flow';
 
   return (
     '<!doctype html><html lang="' + lang + '" dir="' + dir + '"><head><meta charset="utf-8">' +
@@ -203,7 +219,7 @@ exports.handler = async function (event) {
   var exp = String(q.exp || '').trim();
   var sig = String(q.sig || '').trim();
   var lang = q.lang === 'he' ? 'he' : 'en';
-  var kind = q.kind === 'trial' ? 'trial' : 'playbook';
+  var kind = (q.kind === 'trial' || q.kind === 'pro') ? q.kind : 'playbook';
 
   var secret = process.env.EMAIL_VERIFY_SECRET;
   var invalid = !secret || !email || !exp || !sig || !EMAIL_RE.test(email) || Date.now() > Number(exp) || !verify(email, exp, sig, secret);
@@ -213,8 +229,11 @@ exports.handler = async function (event) {
     return { statusCode: 400, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, false, kind) };
   }
 
-  var followUpFn = kind === 'trial' ? 'send-trial-access' : 'send-playbook';
-  log('token verified, triggering follow-up send', { email: maskEmail(email), kind: kind, followUpFn: followUpFn });
+  // 'pro' has nothing to fulfil yet — Glance Pro isn't built (see
+  // docs/product-architecture.md §2.4) — so confirming just records interest;
+  // there is no follow-up function to trigger until a real Pro flow exists.
+  var followUpFn = kind === 'trial' ? 'send-trial-access' : kind === 'pro' ? null : 'send-playbook';
+  log('token verified', { email: maskEmail(email), kind: kind, followUpFn: followUpFn });
 
   var downloadUrl;
   if (kind === 'trial') {
@@ -258,7 +277,7 @@ exports.handler = async function (event) {
     logErr('failed to claim waitlist row (will send anyway)', String(err));
   }
 
-  if (!alreadyConfirmed) {
+  if (!alreadyConfirmed && followUpFn) {
     try {
       var authExp = Date.now() + INTERNAL_AUTH_TTL_MS;
       var authSig = signInternalAuth(email, authExp, secret);

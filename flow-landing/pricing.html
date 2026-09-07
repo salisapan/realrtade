@@ -116,11 +116,12 @@ footer.site a{color:var(--muted)}
 .tier-price .amt{font-size:1.85rem; font-weight:800; color:var(--txt-hi)}
 .tier-price .period{font-size:.82rem; color:var(--muted); padding-bottom:2px}
 .tier-note{position:relative; font-size:.76rem; color:var(--muted); margin:0 0 16px}
-.tier-cta{position:relative; display:block; text-align:center; font-weight:700; font-size:.9rem; text-decoration:none; border-radius:999px; padding:12px}
-.tier-cta.primary{background:var(--cat); color:#fff !important}
-.tier-cta.primary:hover{filter:brightness(1.08)}
-.tier-cta.ghost{border:1px solid var(--line); background:var(--bg); color:var(--txt-hi) !important}
-.tier-cta.ghost:hover{border-color:var(--cat); color:var(--cat) !important}
+.tier-notify{display:flex; flex-direction:column; gap:8px; position:relative}
+.tier-notify input[type=email]{width:100%; box-sizing:border-box; padding:11px 14px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--txt-hi); font-family:var(--sans); font-size:.88rem}
+.tier-notify input[type=email]:focus{outline:none; border-color:var(--cat)}
+.tier-notify-status{font-size:.78rem; margin:2px 0 0; text-align:center; min-height:1.1em}
+.tier-notify-status.ok{color:var(--cat)}
+.tier-notify-status.err{color:#C0392B}
 .tier-body{padding:18px 14px 6px; flex:1; display:flex; flex-direction:column}
 .tier-list{list-style:none; margin:0; padding:0; flex:1; font-size:.9rem}
 .tier-list li{position:relative; padding-inline-start:22px; margin-bottom:10px; color:var(--txt); line-height:1.45}
@@ -199,7 +200,7 @@ footer.site a{color:var(--muted)}
       <div class="tier-plan"><h3 class="tier-name">Free</h3><span class="tier-badge">Just you</span></div>
       <p class="tier-price"><span class="amt">$0</span></p>
       <p class="tier-note">Forever, no card required</p>
-      <a class="tier-cta ghost" href="/trial.html" data-ga="pricing_free">Get Glance</a>
+      <span class="magnetic"><a class="doit ghost sm" href="/trial.html" data-ga="pricing_free"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Glance</a></span>
     </div>
     <div class="tier-body">
       <ul class="tier-list">
@@ -215,7 +216,12 @@ footer.site a{color:var(--muted)}
       <div class="tier-plan"><h3 class="tier-name">Pro</h3><span class="tier-badge">Small team (2&ndash;10)</span></div>
       <p class="tier-price"><span class="amt">$14</span><span class="period">/user/mo</span></p>
       <p class="tier-note">$11/user/mo billed annually</p>
-      <a class="tier-cta primary" href="mailto:hello@theflow-ai.com?subject=Glance%20Pro" data-ga="pricing_pro">Notify Me</a>
+      <form class="tier-notify" id="proNotifyForm" novalidate>
+        <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+        <input type="email" id="proEmail" placeholder="you@company.com" required autocomplete="email" aria-label="Work email">
+        <span class="magnetic"><button type="submit" class="doit sm" id="proNotifyBtn" data-ga="pricing_pro"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="proNotifyLabel">Notify Me</span></button></span>
+        <p class="tier-notify-status" id="proNotifyStatus" role="status" aria-live="polite"></p>
+      </form>
     </div>
     <div class="tier-body">
       <ul class="tier-list">
@@ -241,7 +247,7 @@ footer.site a{color:var(--muted)}
       <div class="tier-plan"><h3 class="tier-name">Enterprise</h3><span class="tier-badge">Whole department</span></div>
       <p class="tier-price"><span class="amt">$80</span><span class="period">/user/mo</span></p>
       <p class="tier-note">Billed annually, per seat &mdash; plus a one-time setup fee scoped to your deployment</p>
-      <a class="tier-cta ghost" href="/contact.html" data-ga="pricing_enterprise">Request Pricing</a>
+      <span class="magnetic"><a class="doit ghost sm" href="/contact.html" data-ga="pricing_enterprise"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Do It</a></span>
     </div>
     <div class="tier-body">
       <ul class="tier-list">
@@ -282,7 +288,7 @@ footer.site a{color:var(--muted)}
 <div class="cta">
   <h2>Ready to talk Enterprise?</h2>
   <p>Tell us your deployment model and rough scope, and we will come back with a range.</p>
-  <a class="doit" href="/contact.html" data-ga="pricing_bottom_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Request Pricing</a>
+  <span class="magnetic"><a class="doit" href="/contact.html" data-ga="pricing_bottom_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Do It</a></span>
 </div>
     </article>
   </div>
@@ -296,6 +302,42 @@ footer.site a{color:var(--muted)}
   </div>
 </footer>
 <script>
+(function(){
+  var SB_URL='https://zjquktirlrhbqcnkfaok.supabase.co';
+  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqcXVrdGlybHJoYnFjbmtmYW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MjIzNTAsImV4cCI6MjEwNDI5ODM1MH0.JxOiqHGNsZRZM_2aON1nspKhK_xpriW_q4FY11dxLPo';
+  var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  var form=document.getElementById('proNotifyForm');
+  if(!form) return;
+  var email=document.getElementById('proEmail'), btn=document.getElementById('proNotifyBtn'), label=document.getElementById('proNotifyLabel'), status=document.getElementById('proNotifyStatus'), honey=form.querySelector('.hp');
+
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    if(honey && honey.value){ status.className='tier-notify-status ok'; status.textContent='Thanks!'; return; }
+    var v=(email.value||'').trim();
+    if(!EMAIL_RE.test(v)){
+      status.className='tier-notify-status err'; status.textContent='Enter a valid email address.'; email.focus(); return;
+    }
+    btn.disabled=true; label.textContent='Sending…';
+    status.className=''; status.textContent='';
+
+    function done(ok){
+      btn.disabled=false; label.textContent='Notify Me';
+      status.className='tier-notify-status ' + (ok?'ok':'err');
+      status.textContent = ok
+        ? 'Check your inbox to confirm — we’ll email you when Pro launches.'
+        : 'Something went wrong. Please try again in a moment.';
+    }
+
+    fetch(SB_URL+'/rest/v1/waitlist',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({email:v,lang:'en',source:'pricing-pro',created_at:new Date().toISOString()})})
+      .catch(function(){}); // best-effort; never blocks the confirmation email
+
+    fetch('/.netlify/functions/send-confirmation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v,lang:'en',kind:'pro'})})
+      .then(function(r){ done(r.ok); })
+      .catch(function(){ done(false); });
+
+    if(typeof gtag==='function') gtag('event','pricing_pro_notify_submit');
+  });
+})();
 
 (function(){
   var tb = document.getElementById('themeBtn');

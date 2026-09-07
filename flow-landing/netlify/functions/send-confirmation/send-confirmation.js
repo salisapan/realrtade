@@ -9,7 +9,7 @@ const LOGO_URL_GLANCE = 'https://theflow-ai.com/glance-logo.png';
 const MARK_URL_GLANCE = 'https://theflow-ai.com/glance-mark.png';
 const SITE_URL = 'https://theflow-ai.com';
 
-function fromFor(kind) { return kind === 'trial' ? FROM_GLANCE : FROM_FLOW; }
+function fromFor(kind) { return (kind === 'trial' || kind === 'pro') ? FROM_GLANCE : FROM_FLOW; }
 const TOKEN_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 const LOG_PREFIX = '[send-confirmation]';
 
@@ -51,6 +51,10 @@ const SUBJECT = {
     en: 'Confirm your email for Glance early access',
     he: 'אשרו את כתובת המייל לגישה מוקדמת ל-Glance',
   },
+  pro: {
+    en: 'Confirm your email — we’ll notify you when Glance Pro launches',
+    he: 'אשרו את כתובת המייל — נעדכן אתכם כשGlance Pro ישוק',
+  },
 };
 
 function sign(email, exp, secret) {
@@ -62,23 +66,28 @@ function htmlBody(lang, confirmUrl, kind) {
   var dir = isHe ? 'rtl' : 'ltr';
   var align = isHe ? 'right' : 'left';
 
+  var isGlanceBrand = kind === 'trial' || kind === 'pro';
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
     ? (kind === 'trial'
         ? 'תודה שביקשתם גישה מוקדמת ל-Glance. כדי לוודא שזו הכתובת שלכם ולשלוח לכם את הוראות ההתקנה, לחצו על הכפתור למטה לאישור.'
+        : kind === 'pro'
+        ? 'תודה על ההתעניינות ב-Glance Pro. כדי לוודא שזו הכתובת שלכם ולעדכן אתכם ברגע שPro ישוק, לחצו על הכפתור למטה לאישור.'
         : 'תודה שהצטרפתם לרשימת ההמתנה של Flow. כדי לוודא שזו הכתובת שלכם ולשלוח לכם את The Hybrid Automation Playbook, לחצו על הכפתור למטה לאישור.')
     : (kind === 'trial'
         ? "Thanks for requesting early access to Glance. To confirm this is really your inbox and send you install instructions, please click the button below."
+        : kind === 'pro'
+        ? "Thanks for your interest in Glance Pro. To confirm this is really your inbox and let us know where to reach you when Pro launches, please click the button below."
         : "Thanks for joining the Flow waitlist. To confirm this is really your inbox and send you The Hybrid Automation Playbook, please click the button below.");
   var ctaLabel = isHe ? 'אישור כתובת המייל' : 'Confirm My Email';
   var ctaFine = isHe ? 'לחצו למטה לאישור.' : 'Click below to confirm.';
   var expiry = isHe ? 'הקישור בתוקף ל-72 שעות.' : 'This link is valid for 72 hours.';
-  var brand = kind === 'trial' ? 'Glance' : 'Flow';
-  var sigTeam = kind === 'trial' ? 'GLANCE TEAM' : 'FLOW TEAM';
+  var brand = isGlanceBrand ? 'Glance' : 'Flow';
+  var sigTeam = isGlanceBrand ? 'GLANCE TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
-  var headerLogoUrl = kind === 'trial' ? LOGO_URL_GLANCE : LOGO_URL_FLOW;
-  var footerMarkUrl = kind === 'trial' ? MARK_URL_GLANCE : LOGO_URL_FLOW;
-  var footerMarkWidth = kind === 'trial' ? '20' : '28';
+  var headerLogoUrl = isGlanceBrand ? LOGO_URL_GLANCE : LOGO_URL_FLOW;
+  var footerMarkUrl = isGlanceBrand ? MARK_URL_GLANCE : LOGO_URL_FLOW;
+  var footerMarkWidth = isGlanceBrand ? '20' : '28';
 
   var content = (
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; background:#ffffff;">' +
@@ -173,7 +182,7 @@ exports.handler = async function (event) {
 
   var email = String(payload.email || '').trim();
   var lang = payload.lang === 'he' ? 'he' : 'en';
-  var kind = payload.kind === 'trial' ? 'trial' : 'playbook';
+  var kind = (payload.kind === 'trial' || payload.kind === 'pro') ? payload.kind : 'playbook';
   var honey = String(payload.company || '').trim();
 
   if (honey) {
@@ -223,7 +232,7 @@ exports.handler = async function (event) {
     log('confirmation email sent', { to: maskEmail(email), kind: kind });
 
     try {
-      var ownerSubjectPrefix = kind === 'trial' ? 'New Glance signup (pending confirmation): ' : 'New Flow waitlist signup (pending confirmation): ';
+      var ownerSubjectPrefix = kind === 'trial' ? 'New Glance signup (pending confirmation): ' : kind === 'pro' ? 'New Glance Pro interest (pending confirmation): ' : 'New Flow waitlist signup (pending confirmation): ';
       var ownerResult = await sendEmail(apiKey, {
         from: fromFor(kind),
         to: [OWNER_EMAIL],
