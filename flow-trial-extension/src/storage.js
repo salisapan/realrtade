@@ -27,18 +27,50 @@ const FlowStorage = (() => {
     return new Promise((resolve) => chrome.storage.local.set(patch, resolve));
   }
 
-  async function appendLog(entry) {
+  // chrome.storage.local has no atomic read-modify-write, and appendLog,
+  // markSeen, and calibrate are all read-then-write. Two calls to the SAME
+  // one of these — e.g. a debounced scan appending a 'shown' entry for one
+  // message while the user's own click on a different, still-visible chip
+  // appends a 'clicked' entry — can both read the old array before either
+  // writes back, so whichever set() lands second silently overwrites the
+  // first caller's change instead of building on it. Serializing each of
+  // these three through its own queue means only one call to that function
+  // is ever "between" its get() and its set() at a time.
+  //
+  // A patch to a *different* top-level key (e.g. calibrate's `calibration`
+  // vs appendLog's `log`) doesn't need this: chrome.storage.local.set only
+  // touches the keys named in its patch, so concurrent writes to different
+  // keys never collide — only same-key, same-function concurrency does.
+  //
+  // This only serializes calls made from within one script's own execution
+  // context. It does not protect against two Gmail tabs open at once, each
+  // running an independent copy of this file against the same underlying
+  // storage — that cross-tab race is real but far narrower (it needs
+  // near-simultaneous activity in two tabs) and closing it fully would mean
+  // routing every write through the single background service worker
+  // instead of writing directly from content scripts, a larger change left
+  // for a follow-up.
+  function serialize(fn) {
+    let queue = Promise.resolve();
+    return (...args) => {
+      const run = queue.then(() => fn(...args));
+      queue = run.catch(() => {}); // one failure must not wedge later calls
+      return run;
+    };
+  }
+
+  const appendLog = serialize(async function appendLog(entry) {
     const state = await get();
     const log = [{ ts: Date.now(), ...entry }, ...state.log].slice(0, 200);
     await set({ log });
     return log;
-  }
+  });
 
-  async function markSeen(messageId) {
+  const markSeen = serialize(async function markSeen(messageId) {
     const state = await get();
     if (state.seenMessageIds.includes(messageId)) return;
     await set({ seenMessageIds: [messageId, ...state.seenMessageIds].slice(0, 500) });
-  }
+  });
 
   async function wasSeen(messageId) {
     const state = await get();
@@ -77,7 +109,7 @@ const FlowStorage = (() => {
   // reads this, and folding it in here keeps the stored value from drifting.
   const HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
 
-  async function calibrate(kind) {
+  const calibrate = serialize(async function calibrate(kind) {
     const state = await get();
     const c = state.calibration || { clicks: 0, dismissals: 0, ts: 0 };
     const now = Date.now();
@@ -91,7 +123,7 @@ const FlowStorage = (() => {
     };
     await set({ calibration: next });
     return next;
-  }
+  });
 
   return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, calibrate, DEFAULTS };
 })();
