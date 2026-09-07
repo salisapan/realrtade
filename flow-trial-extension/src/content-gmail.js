@@ -13,15 +13,30 @@
 (function flowGmailWatcher() {
   let state = null;
   let watching = false;
+  let observer = null;
 
   async function init() {
     state = await FlowStorage.get();
-    if (!state.onboarded) return; // no chips until something is actually connected
+    // Disconnecting a connector in the popup flips onboarded back to false
+    // and fires the onChanged listener below, which calls init() again —
+    // this is the only place that transition is handled, so it has to
+    // actually tear the observer down, not just decline to start a new one.
+    // Without this, the observer created by observe() below keeps running
+    // forever: watching never goes back to false, so scanReadingPane's own
+    // guard never trips, and Flow keeps injecting chips whose "Do It" click
+    // is now guaranteed to fail (state.connectorId is null once disconnected).
+    if (!state.onboarded) { stopWatching(); return; }
     if (!watching) { watching = true; observe(); }
   }
 
+  function stopWatching() {
+    if (observer) { observer.disconnect(); observer = null; }
+    watching = false;
+  }
+
   function observe() {
-    new MutationObserver(debounce(scanReadingPane, 400)).observe(document.body, { childList: true, subtree: true });
+    observer = new MutationObserver(debounce(scanReadingPane, 400));
+    observer.observe(document.body, { childList: true, subtree: true });
     scanReadingPane();
   }
 
