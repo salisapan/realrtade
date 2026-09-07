@@ -2,13 +2,13 @@
 <html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
-<title>Flow Trial</title>
+<title>Glance</title>
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header class="hdr">
     <span class="mark" aria-hidden="true"></span>
-    <h1>Flow</h1>
+    <h1>Glance</h1>
     <span class="ver" id="statusPill">Not connected</span>
   </header>
 
@@ -20,8 +20,8 @@
   <main>
     <section data-panel="setup" class="panel active">
       <div class="block">
-        <p class="label">Where should Flow write?</p>
-        <p class="hint">A permission, not a rule. Flow only ever adds a record — and every write can be undone.</p>
+        <p class="label">Where should Glance write?</p>
+        <p class="hint">A permission, not a rule. Glance only ever adds a record — and every write can be undone.</p>
         <div id="connector-list" class="conn-list"></div>
       </div>
 
@@ -32,15 +32,15 @@
       </div>
 
       <button id="save" class="primary">Save &amp; start</button>
-      <p id="saved-note" class="saved-note" hidden>Saved. Open an email in Gmail — Flow will stay quiet until one matters.</p>
+      <p id="saved-note" class="saved-note" hidden>Saved. Open an email in Gmail — Glance will stay quiet until one matters.</p>
 
       <div class="block recipe-block">
         <p class="label">Share this setup</p>
-        <p class="hint">A .flow file carries only the domain and connector you picked — never a token, never anything Flow has written.</p>
+        <p class="hint">A .glance file carries only the domain and connector you picked — never a token, never anything Glance has written.</p>
         <div class="recipe-row">
           <button id="recipeExport" type="button" class="ghost sm">Export recipe</button>
           <label for="recipeImport" class="ghost sm">Import recipe</label>
-          <input id="recipeImport" type="file" accept=".flow,application/json" hidden>
+          <input id="recipeImport" type="file" accept=".glance,application/json" hidden>
         </div>
         <p id="recipeNote" class="saved-note" hidden></p>
       </div>
@@ -57,12 +57,12 @@
         <span class="sense-note" id="senseNote"></span>
       </div>
       <div id="log-list" class="log-list"></div>
-      <p id="log-empty" class="hint" hidden>Nothing yet. Flow only speaks up when an email actually decides something — silence is the normal state.</p>
+      <p id="log-empty" class="hint" hidden>Nothing yet. Glance only speaks up when an email actually decides something — silence is the normal state.</p>
 
       <div class="referral" id="referral" hidden>
         <button type="button" class="referral-x" id="referralDismiss" aria-label="Dismiss">&times;</button>
         <p class="referral-txt">Someone else on your team probably has this exact problem.</p>
-        <button type="button" class="ghost sm" id="referralCopy">Copy a link to Flow Trial</button>
+        <button type="button" class="ghost sm" id="referralCopy">Copy a link to Glance</button>
       </div>
     </section>
   </main>

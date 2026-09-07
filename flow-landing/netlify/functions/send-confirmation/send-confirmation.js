@@ -1,10 +1,15 @@
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM = 'Flow <hello@theflow-ai.com>';
+const FROM_FLOW = 'Flow <hello@theflow-ai.com>';
+const FROM_GLANCE = 'Glance <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
-const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
+const LOGO_URL_FLOW = 'https://theflow-ai.com/email-logo.png';
+const LOGO_URL_GLANCE = 'https://theflow-ai.com/glance-logo.png';
+const MARK_URL_GLANCE = 'https://theflow-ai.com/glance-mark.png';
 const SITE_URL = 'https://theflow-ai.com';
+
+function fromFor(kind) { return kind === 'trial' ? FROM_GLANCE : FROM_FLOW; }
 const TOKEN_TTL_MS = 72 * 60 * 60 * 1000; // 72 hours
 const LOG_PREFIX = '[send-confirmation]';
 
@@ -43,8 +48,8 @@ const SUBJECT = {
     he: 'אשרו את כתובת המייל כדי לקבל את ה-Playbook של Flow',
   },
   trial: {
-    en: 'Confirm your email for Flow Trial early access',
-    he: 'אשרו את כתובת המייל לגישה מוקדמת ל-Flow Trial',
+    en: 'Confirm your email for Glance early access',
+    he: 'אשרו את כתובת המייל לגישה מוקדמת ל-Glance',
   },
 };
 
@@ -60,20 +65,24 @@ function htmlBody(lang, confirmUrl, kind) {
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
     ? (kind === 'trial'
-        ? 'תודה שביקשתם גישה מוקדמת ל-Flow Trial. כדי לוודא שזו הכתובת שלכם ולשלוח לכם את הוראות ההתקנה, לחצו על הכפתור למטה לאישור.'
+        ? 'תודה שביקשתם גישה מוקדמת ל-Glance. כדי לוודא שזו הכתובת שלכם ולשלוח לכם את הוראות ההתקנה, לחצו על הכפתור למטה לאישור.'
         : 'תודה שהצטרפתם לרשימת ההמתנה של Flow. כדי לוודא שזו הכתובת שלכם ולשלוח לכם את The Hybrid Automation Playbook, לחצו על הכפתור למטה לאישור.')
     : (kind === 'trial'
-        ? "Thanks for requesting early access to Flow Trial. To confirm this is really your inbox and send you install instructions, please click the button below."
+        ? "Thanks for requesting early access to Glance. To confirm this is really your inbox and send you install instructions, please click the button below."
         : "Thanks for joining the Flow waitlist. To confirm this is really your inbox and send you The Hybrid Automation Playbook, please click the button below.");
   var ctaLabel = isHe ? 'אישור כתובת המייל' : 'Confirm My Email';
   var ctaFine = isHe ? 'לחצו למטה לאישור.' : 'Click below to confirm.';
   var expiry = isHe ? 'הקישור בתוקף ל-72 שעות.' : 'This link is valid for 72 hours.';
-  var sigTeam = 'FLOW TEAM';
+  var brand = kind === 'trial' ? 'Glance' : 'Flow';
+  var sigTeam = kind === 'trial' ? 'GLANCE TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
+  var headerLogoUrl = kind === 'trial' ? LOGO_URL_GLANCE : LOGO_URL_FLOW;
+  var footerMarkUrl = kind === 'trial' ? MARK_URL_GLANCE : LOGO_URL_FLOW;
+  var footerMarkWidth = kind === 'trial' ? '20' : '28';
 
   var content = (
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; background:#ffffff;">' +
-    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
+    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + headerLogoUrl + '" alt="' + brand + '" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="color:#232B44; font-size:15px; line-height:1.65;">' +
     '<p style="margin:0 0 14px">' + greeting + '</p>' +
     '<p style="margin:0 0 14px">' + intro + '</p>' +
@@ -84,7 +93,7 @@ function htmlBody(lang, confirmUrl, kind) {
     '</td></tr>' +
     '<tr><td align="center" style="color:#8891A4; font-size:12px; padding-top:14px;">' + expiry + '</td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px; margin-top:18px;">' +
-    '<img src="' + LOGO_URL + '" alt="Flow" width="28" style="display:block; width:28px; height:auto; margin-bottom:8px;">' +
+    '<img src="' + footerMarkUrl + '" alt="' + brand + '" width="' + footerMarkWidth + '" style="display:block; width:' + footerMarkWidth + 'px; height:auto; margin-bottom:8px;">' +
     '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
     '</td></tr>' +
     '</table>'
@@ -94,7 +103,7 @@ function htmlBody(lang, confirmUrl, kind) {
     '<!DOCTYPE html><html dir="' + dir + '"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">' +
-    '<title>Flow</title></head>' +
+    '<title>' + brand + '</title></head>' +
     '<body style="margin:0; padding:0; background:#ffffff;">' +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="background:#ffffff;"><tr><td align="center" style="padding:32px 20px;">' +
     content +
@@ -118,7 +127,7 @@ function ownerNotificationHtml(email, lang, kind) {
     .join('');
   return (
     '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
-    '<p>New Flow ' + (kind === 'trial' ? 'Trial' : 'waitlist') + ' signup (pending confirmation):</p>' +
+    '<p>New ' + (kind === 'trial' ? 'Glance' : 'Flow waitlist') + ' signup (pending confirmation):</p>' +
     '<table role="presentation" cellpadding="0" cellspacing="0">' + rowsHtml + '</table>' +
     '</div>'
   );
@@ -201,7 +210,7 @@ exports.handler = async function (event) {
 
   try {
     var result = await sendEmail(apiKey, {
-      from: FROM,
+      from: fromFor(kind),
       to: [email],
       subject: SUBJECT[kind][lang],
       html: htmlBody(lang, confirmUrl, kind),
@@ -214,9 +223,9 @@ exports.handler = async function (event) {
     log('confirmation email sent', { to: maskEmail(email), kind: kind });
 
     try {
-      var ownerSubjectPrefix = kind === 'trial' ? 'New Flow Trial signup (pending confirmation): ' : 'New Flow waitlist signup (pending confirmation): ';
+      var ownerSubjectPrefix = kind === 'trial' ? 'New Glance signup (pending confirmation): ' : 'New Flow waitlist signup (pending confirmation): ';
       var ownerResult = await sendEmail(apiKey, {
-        from: FROM,
+        from: fromFor(kind),
         to: [OWNER_EMAIL],
         subject: ownerSubjectPrefix + email,
         html: ownerNotificationHtml(email, lang, kind),

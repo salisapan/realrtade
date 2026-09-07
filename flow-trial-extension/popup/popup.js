@@ -1,5 +1,5 @@
 // The popup is the only configuration surface, and it is deliberately two
-// questions long: where may Flow write, and what kind of work is this. There is
+// questions long: where may Glance write, and what kind of work is this. There is
 // no rule builder here and there never will be — that is the product boundary.
 
 (async function popupInit() {
@@ -157,7 +157,7 @@
       const connected = Object.keys(status || {}).filter((k) => status[k].connected);
       const note = document.getElementById('saved-note');
       if (!connected.length) {
-        note.textContent = 'Connect a system above first — Flow has nowhere to write yet.';
+        note.textContent = 'Connect a system above first — Glance has nowhere to write yet.';
         note.hidden = false;
         return;
       }
@@ -167,15 +167,15 @@
         connectorId: connected.includes(state.connectorId) ? state.connectorId : connected[0]
       });
       state = await FlowStorage.get();
-      note.textContent = 'Saved. Open an email in Gmail — Flow will stay quiet until one matters.';
+      note.textContent = 'Saved. Open an email in Gmail — Glance will stay quiet until one matters.';
       note.hidden = false;
     });
   }
 
   /* --------------------------------------------------------------- recipe */
-  // A recipe is a shareable "how someone else set Flow up" — literally just
+  // A recipe is a shareable "how someone else set Glance up" — literally just
   // the two picks on this screen. It never carries a token, a log entry, or
-  // anything Flow wrote, so passing a .flow file around is as safe as
+  // anything Glance wrote, so passing a .glance file around is as safe as
   // describing your setup in a Slack message.
 
   function noteRecipe(text, ok) {
@@ -200,10 +200,10 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'flow-recipe-' + domain.id + (connector ? '-' + connector.id : '') + '.flow';
+      a.download = 'glance-recipe-' + domain.id + (connector ? '-' + connector.id : '') + '.glance';
       a.click();
       URL.revokeObjectURL(url);
-      noteRecipe('Recipe exported. Anyone can drop this file into their own Flow to match your setup.', true);
+      noteRecipe('Recipe exported. Anyone can drop this file into their own Glance to match your setup.', true);
     });
 
     document.getElementById('recipeImport').addEventListener('change', async (e) => {
@@ -214,14 +214,14 @@
       try {
         parsed = JSON.parse(await file.text());
       } catch (err) {
-        noteRecipe('That file isn’t a valid Flow recipe.', false);
+        noteRecipe('That file isn’t a valid Glance recipe.', false);
         return;
       }
       // Only ever read two known string fields off the parsed JSON — never
       // trust or store anything else a file could contain.
       const validDomain = FLOW_DOMAINS.find((d) => d.id === parsed.domainId);
       if (!validDomain) {
-        noteRecipe('That file isn’t a valid Flow recipe.', false);
+        noteRecipe('That file isn’t a valid Glance recipe.', false);
         return;
       }
       await FlowStorage.set({ domainId: validDomain.id });
@@ -291,7 +291,7 @@
   }
 
   // Earns its place after real usage rather than nagging on first open —
-  // three real writes is evidence Flow is actually working for this person,
+  // three real writes is evidence Glance is actually working for this person,
   // which is the only moment "tell a teammate" is credible instead of noise.
   // Dismissing it is permanent; it never reappears once the user has said no.
   function renderReferral(s) {

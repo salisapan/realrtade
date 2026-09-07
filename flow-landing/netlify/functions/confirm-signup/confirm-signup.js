@@ -3,11 +3,11 @@ const crypto = require('crypto');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SITE_URL = 'https://theflow-ai.com';
 const GA_ID = 'G-ESYDFQYCDV';
-const FROM = 'Flow <hello@theflow-ai.com>';
+const FROM_GLANCE = 'Glance <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 
 // Bottom-up adoption inside a company with sensitive data is a good thing
-// happening in the wrong product — Flow Trial is explicitly the general,
+// happening in the wrong product — Glance is explicitly the general,
 // non-sensitive-data tier (see docs/product-architecture.md). Rather than
 // build a whole separate distribution channel to chase that signal, this
 // just tells sales when it's already happening: several confirmed signups
@@ -66,17 +66,17 @@ const COPY = {
   trial: {
     en: {
       title: 'You’re confirmed',
-      body: 'Thanks for confirming your email. Install instructions for Flow Trial are on their way to your inbox.',
+      body: 'Thanks for confirming your email. Install instructions for Glance are on their way to your inbox.',
       home: 'Back to theflow-ai.com',
       errTitle: 'This link isn’t valid',
-      errBody: 'This confirmation link is expired or invalid. Please request access again on the Flow Trial page.',
+      errBody: 'This confirmation link is expired or invalid. Please request access again on the Glance page.',
     },
     he: {
       title: 'האימייל אושר',
-      body: 'תודה שאישרתם את כתובת המייל. הוראות ההתקנה של Flow Trial בדרך אליכם.',
+      body: 'תודה שאישרתם את כתובת המייל. הוראות ההתקנה של Glance בדרך אליכם.',
       home: 'חזרה ל-theflow-ai.com',
       errTitle: 'הקישור אינו תקין',
-      errBody: 'קישור האישור פג תוקף או שאינו תקין. בקשו גישה מחדש בעמוד Flow Trial.',
+      errBody: 'קישור האישור פג תוקף או שאינו תקין. בקשו גישה מחדש בעמוד Glance.',
     },
   },
 };
@@ -96,9 +96,11 @@ function page(lang, ok, kind, downloadUrl) {
     ? '<a href="' + downloadUrl + '" id="dl" style="display:inline-block; background:#1A4EF5; color:#fff; text-decoration:none; font-weight:700; padding:13px 28px; border-radius:999px; margin-bottom:14px;">' + downloadLabel + '</a><br>'
     : '';
 
+  var brand = kind === 'trial' ? 'Glance' : 'Flow';
+
   return (
     '<!doctype html><html lang="' + lang + '" dir="' + dir + '"><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Flow</title>' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + brand + '</title>' +
     '<meta name="robots" content="noindex">' +
     '<style>' +
     "body{margin:0; background:#07090F; color:#EEF2F9; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px}" +
@@ -148,7 +150,7 @@ async function checkDomainCluster(email, log, logErr) {
   var apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return;
 
-  var url = SB_URL + '/rest/v1/waitlist?select=id&confirmed_at=not.is.null&email=ilike.*%40' + encodeURIComponent(domain);
+  var url = SB_URL + '/rest/v1/waitlist?select=id&confirmed_at=not.is.null&source=eq.trial-extension&email=ilike.*%40' + encodeURIComponent(domain);
   var res = await fetch(url, { headers: { apikey: SB_SERVICE_KEY, Authorization: 'Bearer ' + SB_SERVICE_KEY } });
   if (!res.ok) { logErr('domain cluster count query failed', res.status); return; }
   var rows = await res.json();
@@ -158,13 +160,13 @@ async function checkDomainCluster(email, log, logErr) {
   log('domain cluster threshold reached', { domain: domain, count: count });
   var html =
     '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
-    '<p><b>' + count + '</b> confirmed Flow Trial signups now share the domain <b>' + domain + '</b>.</p>' +
-    '<p>Might be worth a warm Enterprise outreach — this usually means a team is already using Flow Trial inside an organization.</p>' +
+    '<p><b>' + count + '</b> confirmed Glance signups now share the domain <b>' + domain + '</b>.</p>' +
+    '<p>Might be worth a warm Enterprise outreach — this usually means a team is already using Glance inside an organization.</p>' +
     '</div>';
   var result = await sendEmail(apiKey, {
-    from: FROM,
+    from: FROM_GLANCE,
     to: [OWNER_EMAIL],
-    subject: count + ' Flow Trial signups from ' + domain,
+    subject: count + ' Glance signups from ' + domain,
     html: html,
   });
   if (!result.ok) logErr('domain cluster alert send failed', { status: result.status, response: result.text });
@@ -272,10 +274,16 @@ exports.handler = async function (event) {
     }
   }
 
-  try {
-    await checkDomainCluster(email, log, logErr);
-  } catch (err) {
-    logErr('domain cluster check failed (non-fatal)', String(err));
+  // This heuristic exists to catch bottom-up Glance adoption inside a company
+  // (see checkDomainCluster's own comment) — it has nothing to say about the
+  // Flow enterprise waitlist, whose confirmations are already direct sales
+  // leads with no clustering heuristic needed.
+  if (kind === 'trial') {
+    try {
+      await checkDomainCluster(email, log, logErr);
+    } catch (err) {
+      logErr('domain cluster check failed (non-fatal)', String(err));
+    }
   }
 
   return { statusCode: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' }, body: page(lang, true, kind, downloadUrl) };

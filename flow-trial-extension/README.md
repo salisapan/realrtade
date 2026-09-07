@@ -1,9 +1,14 @@
-# Flow Trial
+# Glance
 
-The free, lean version of Flow: a Chrome extension that watches Gmail
-passively and, when an email actually decides something, puts one `Do It`
-button next to it that writes the record for you. No chat, no prompts, no
-if-this-then-that rules.
+A Chrome extension that watches Gmail passively and, when an email actually
+decides something, puts one `Do It` button next to it that writes the record
+for you. No chat, no prompts, no if-this-then-that rules.
+
+Glance is a separate product from Flow (theflow-ai.com's enterprise workflow
+engine for organizations with sensitive or regulated data) — not a stripped
+tier of it. Glance is general-purpose, free-to-start, and makes no security
+or compliance claims; see `docs/product-architecture.md` in the main repo for
+the full split.
 
 ## What actually works today
 
@@ -12,8 +17,7 @@ weighted, named signals — a currency figure, a commitment verb, a dated
 obligation, a direct request, a stated loss — against negative ones like an
 automated sender or mailing-list boilerplate. It speaks only above a threshold
 that moves as you click and dismiss. No email text is sent anywhere to reach
-this decision, which is what lets the trial hold the same local-first line as
-the full product.
+this decision.
 
 **Facts are extracted, not just detected.** `src/extract.js` pulls the amount
 (with currency, `k`/`m` suffixes, and a refusal to treat a bare number or a
@@ -39,7 +43,7 @@ deletes anything that was already there.
 1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) →
    **New integration** → give it a name → copy the **Internal Integration
    Token**.
-2. Open the Notion database you want Flow to write to as a full page, click
+2. Open the Notion database you want Glance to write to as a full page, click
    **⋯ › Connections › Connect to**, and pick your integration. Without this
    step Notion returns 404 and the popup will tell you exactly that.
 3. Copy that database's URL from the address bar.
@@ -47,7 +51,7 @@ deletes anything that was already there.
    credential is verified against the real API before it is stored, so a typo
    surfaces immediately rather than at the first click in Gmail.
 
-Any column layout works. Flow fills a `title` property with the action, and
+Any column layout works. Glance fills a `title` property with the action, and
 matches by name and type for the rest — a `number` column called Amount, a
 `date` column called Due date, an `email` column called Contact, a `url`
 column called Source. Anything it cannot map still reaches the page body, so
@@ -124,7 +128,7 @@ Until step 4 is done the popup shows Salesforce as *Needs setup*.
    issued this way doesn't expire unless you separately opt this app into
    Slack's token-rotation beta, which it does not use.
 6. In the popup, after connecting, paste the **Channel ID** of the channel
-   Flow should post to (open the channel in Slack → **View channel
+   Glance should post to (open the channel in Slack → **View channel
    details** → the ID is at the bottom). The bot only needs to be invited to
    a private channel; `chat:write.public` lets it post to public ones
    without an invite.
@@ -148,7 +152,7 @@ Until step 4 is done the popup shows Slack as *Needs setup*.
    Those back `netlify/functions/monday-oauth-exchange` and
    `monday-oauth-refresh` — the only two places the secret is ever used.
    **The secret must never appear in this repository or in the extension.**
-6. In the popup, after connecting, paste the **Board ID** Flow should write
+6. In the popup, after connecting, paste the **Board ID** Glance should write
    to (open the board — it's the number in the URL after `/boards/`).
 
 Until step 4 is done the popup shows Monday.com as *Needs setup*.
@@ -180,7 +184,7 @@ popup/                 the only configuration surface — two questions long
 - **Gmail only.** The judgment engine takes plain text and knows nothing about
   Gmail; adding a second source surface is a content script, not a rewrite.
 - **The scorer is not a language model.** It is a transparent, explainable
-  weighting, which is why the popup can show why Flow spoke. A model would
+  weighting, which is why the popup can show why Glance spoke. A model would
   catch phrasings this misses; it would also need email text to leave the
   device, which is the trade this build declines to make.
 - **Not on the Chrome Web Store.** Store submission needs a completed data-use

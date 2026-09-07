@@ -1,9 +1,10 @@
 const crypto = require('crypto');
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const FROM = 'Flow <hello@theflow-ai.com>';
+const FROM = 'Glance <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
-const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
+const LOGO_URL = 'https://theflow-ai.com/glance-logo.png';
+const MARK_URL = 'https://theflow-ai.com/glance-mark.png';
 const INSTALL_PAGE_URL = 'https://theflow-ai.com/trial.html#install';
 const SITE_URL = 'https://theflow-ai.com';
 const DOWNLOAD_PATH = '/.netlify/functions/download-trial-zip';
@@ -42,8 +43,8 @@ function verifyDownloadUrl(downloadUrl, email, secret) {
 }
 
 const SUBJECT = {
-  en: 'Your Flow Trial install instructions',
-  he: 'הוראות ההתקנה של Flow Trial',
+  en: 'Your Glance install instructions',
+  he: 'הוראות ההתקנה של Glance',
 };
 
 function htmlBody(lang, downloadUrl) {
@@ -53,8 +54,8 @@ function htmlBody(lang, downloadUrl) {
 
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
-    ? 'תודה שביקשתם גישה מוקדמת ל-Flow Trial. ההתקנה לוקחת פחות מדקה &mdash; פשוט עקבו אחר הצעדים למטה.'
-    : "Thanks for requesting early access to Flow Trial. Installing it takes under a minute — just follow the steps below.";
+    ? 'תודה שביקשתם גישה מוקדמת ל-Glance. ההתקנה לוקחת פחות מדקה &mdash; פשוט עקבו אחר הצעדים למטה.'
+    : "Thanks for requesting early access to Glance. Installing it takes under a minute — just follow the steps below.";
   var steps = isHe
     ? [
         'הורידו את קובץ ה-ZIP וחלצו אותו לתיקייה.',
@@ -77,12 +78,12 @@ function htmlBody(lang, downloadUrl) {
     .join('');
   var moreLabel = isHe ? 'הוראות מלאות בעמוד' : 'Full instructions on the page';
   var ctaLabel = isHe ? 'הורדת קובץ ההתקנה' : 'Download the install file';
-  var sigTeam = 'FLOW TEAM';
+  var sigTeam = 'GLANCE TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
 
   var content = (
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; background:#ffffff;">' +
-    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
+    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Glance" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="color:#232B44; font-size:15px; line-height:1.65;">' +
     '<p style="margin:0 0 14px">' + greeting + '</p>' +
     '<p style="margin:0 0 18px">' + intro + '</p>' +
@@ -95,7 +96,7 @@ function htmlBody(lang, downloadUrl) {
     '</td></tr>' +
     '<tr><td align="center" style="padding-top:10px; font-size:13px;"><a href="' + INSTALL_PAGE_URL + '" style="color:#455073;">' + moreLabel + '</a></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px; margin-top:18px;">' +
-    '<img src="' + LOGO_URL + '" alt="Flow" width="28" style="display:block; width:28px; height:auto; margin-bottom:8px;">' +
+    '<img src="' + MARK_URL + '" alt="Glance" width="20" style="display:block; width:20px; height:auto; margin-bottom:8px;">' +
     '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
     '</td></tr>' +
     '</table>'
@@ -105,7 +106,7 @@ function htmlBody(lang, downloadUrl) {
     '<!DOCTYPE html><html dir="' + dir + '"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">' +
-    '<title>Flow</title></head>' +
+    '<title>Glance</title></head>' +
     '<body style="margin:0; padding:0; background:#ffffff;">' +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="background:#ffffff;"><tr><td align="center" style="padding:32px 20px;">' +
     content +
@@ -127,7 +128,7 @@ function ownerNotificationHtml(email, lang) {
     .join('');
   return (
     '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
-    '<p>Flow Trial install instructions sent:</p>' +
+    '<p>Glance install instructions sent:</p>' +
     '<table role="presentation" cellpadding="0" cellspacing="0">' + rowsHtml + '</table>' +
     '</div>'
   );
@@ -218,7 +219,7 @@ exports.handler = async function (event) {
       var ownerResult = await sendEmail(apiKey, {
         from: FROM,
         to: [OWNER_EMAIL],
-        subject: 'Flow Trial install instructions sent: ' + email,
+        subject: 'Glance install instructions sent: ' + email,
         html: ownerNotificationHtml(email, lang),
       });
       if (!ownerResult.ok) {

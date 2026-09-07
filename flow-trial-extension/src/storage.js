@@ -1,4 +1,4 @@
-// Thin wrapper around chrome.storage.local. Everything Flow Trial persists —
+// Thin wrapper around chrome.storage.local. Everything Glance persists —
 // what you connected, what it noticed, and how loud it should be — lives here,
 // on the device. Nothing in this file sends anything anywhere.
 

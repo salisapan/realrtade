@@ -1,4 +1,4 @@
-// Serves the Flow Trial extension zip — but only to someone holding a
+// Serves the Glance extension zip — but only to someone holding a
 // signed, time-limited download token minted by confirm-signup.js after a
 // real double opt-in confirmation. The zip itself is bundled inside this
 // function's own directory (not under the site's public static root), so
@@ -25,7 +25,7 @@ function verify(email, exp, sig, secret) {
 function errorPage(message) {
   return (
     '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Flow</title>' +
+    '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Glance</title>' +
     '<meta name="robots" content="noindex">' +
     '<style>body{margin:0;background:#07090F;color:#EEF2F9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}' +
     '.card{max-width:420px}.card h1{font-size:1.4rem;margin:0 0 12px}.card p{color:#AEB9D6;line-height:1.6;margin:0 0 24px}' +

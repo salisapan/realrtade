@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Flow's Privacy Policy — what the website and waitlist collect, what the Flow Trial Chrome extension reads and what stays on your device, and your rights.">
+<meta name="description" content="Flow's Privacy Policy — what the website and waitlist collect, what the Glance Chrome extension reads and what stays on your device, and your rights.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -101,7 +101,7 @@ footer.site a{color:var(--muted)}
   </div>
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/trial.html">Flow Trial</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
   <div class="mobile-nav-group"><span class="mobile-nav-group-label">Solutions</span><a href="/solutions/legal.html">Legal</a><a href="/solutions/healthcare.html">Healthcare</a><a href="/solutions/financial-services.html">Financial Services</a><a href="/solutions/insurance.html">Insurance</a></div>
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
   <a class="doit" href="/contact.html" data-ga="nav_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Do It</a>
@@ -113,9 +113,9 @@ footer.site a{color:var(--muted)}
     <div class="updated">Last updated: September 6, 2026</div>
     <article>
 
-<p>This Privacy Policy explains what information Flow ("Flow", "we", "us") collects when you visit theflow-ai.com, join our early-access waitlist, or install the Flow Trial Chrome extension — how it's used, and the choices you have. Flow is currently in pre-release, early-access status; this policy will be expanded as the product moves toward general availability.</p>
+<p>This Privacy Policy explains what information Flow ("Flow", "we", "us") collects when you visit theflow-ai.com, join our early-access waitlist, or install the Glance Chrome extension — how it's used, and the choices you have. Flow is currently in pre-release, early-access status; this policy will be expanded as the product moves toward general availability.</p>
 
-<p>Two things are covered here, and they are separate products. <b>Flow Trial</b> is the free Chrome extension described in Section 5 — it is intended for general business use, not for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page. <b>Flow</b> (the core product) is deployed for an organization under its own agreement, in a masked cloud tenant or on the customer's own infrastructure, and its data handling is governed by that agreement rather than by this policy.</p>
+<p>Two things are covered here, and they are separate products. <b>Glance</b> is the free Chrome extension described in Section 5 — it is intended for general business use, not for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page. <b>Flow</b> (the core product) is deployed for an organization under its own agreement, in a masked cloud tenant or on the customer's own infrastructure, and its data handling is governed by that agreement rather than by this policy.</p>
 
 <h2>1. Information We Collect</h2>
 <p>We collect information you provide directly, and a small amount of information automatically.</p>
@@ -148,17 +148,17 @@ footer.site a{color:var(--muted)}
 </ul>
 <p>We do not share your information with any other third party for their own marketing purposes. We may disclose information if required to by law, or to protect the rights, property, or safety of Flow, our users, or the public.</p>
 
-<h2>5. Flow Trial (the Chrome extension)</h2>
-<p>Flow Trial runs in your browser on Gmail. What it does with your mail is the part most worth being precise about, so this section describes it in full.</p>
+<h2>5. Glance (the Chrome extension)</h2>
+<p>Glance runs in your browser on Gmail. What it does with your mail is the part most worth being precise about, so this section describes it in full.</p>
 <ul>
 <li><b>What it reads.</b> When you open an email in Gmail, the extension reads that message's visible text, subject, and sender in order to decide whether it records a decision worth logging.</li>
 <li><b>Where that decision is made.</b> On your device, and only on your device. The code that scores a message performs no network requests of any kind — no email text is transmitted anywhere in order to reach that judgment. This is an architectural property of the extension, not a policy promise.</li>
-<li><b>What leaves your device, and only when you ask.</b> Nothing is written anywhere unless you click the Do It button on a specific message. When you do, Flow sends to the system <i>you</i> connected — Notion, HubSpot, Salesforce, Slack, or Monday.com — a short summary label, the sender's name and email address, any amount or date it extracted, and a single quoted sentence from the message (up to 1,800 characters). That data goes directly from your browser to that provider. It does not pass through us and we do not receive a copy.</li>
+<li><b>What leaves your device, and only when you ask.</b> Nothing is written anywhere unless you click the Do It button on a specific message. When you do, Glance sends to the system <i>you</i> connected — Notion, HubSpot, Salesforce, Slack, or Monday.com — a short summary label, the sender's name and email address, any amount or date it extracted, and a single quoted sentence from the message (up to 1,800 characters). That data goes directly from your browser to that provider. It does not pass through us and we do not receive a copy.</li>
 <li><b>Connection credentials.</b> Authorising a connector stores an access token in your browser's local extension storage on your own machine. We never receive or store these tokens. The one exception is the moment of authorisation itself: the provider's one-time authorisation code is exchanged for a token through our server, because that exchange requires an application secret that cannot safely be shipped inside an extension. We do not retain the code or the resulting token.</li>
-<li><b>What stays local.</b> Your chosen connector and line of work, the activity log of what Flow noticed and wrote, and the sensitivity calibration all live in extension storage on your device. None of it is sent to us. Uninstalling the extension deletes all of it.</li>
+<li><b>What stays local.</b> Your chosen connector and line of work, the activity log of what Glance noticed and wrote, and the sensitivity calibration all live in extension storage on your device. None of it is sent to us. Uninstalling the extension deletes all of it.</li>
 <li><b>What we do not do.</b> We do not read your mailbox, do not receive your email content, do not sell any of it, and do not use any of it to train AI models — ours or anyone else's.</li>
 </ul>
-<p>Flow Trial is intended for general business use. It is a separate product from Flow, it is not designed for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page.</p>
+<p>Glance is intended for general business use. It is a separate product from Flow, it is not designed for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page.</p>
 
 <h2>6. Enterprise enquiries</h2>
 <p>If you submit the form on our <a href="/contact.html">Contact</a> page, we collect what you enter there — your email address and, where you provide them, your name, organisation, role, approximate number of seats, preferred deployment model, timeline, and message. We use it to answer your enquiry and to keep a record of the conversation. It is stored with Supabase and notified to us by email through Resend.</p>
@@ -167,7 +167,7 @@ footer.site a{color:var(--muted)}
 <p>Google Analytics sets standard analytics cookies to distinguish returning visitors and measure site usage in aggregate. You can block or clear these at any time through your browser settings without affecting your ability to use the site or join the waitlist.</p>
 
 <h2>8. Data Retention</h2>
-<p>We keep waitlist submissions and enterprise enquiries for as long as the signup or conversation is active, and for a reasonable period afterward for our own records, unless you ask us to delete them sooner (see Section 10). Data held inside the Flow Trial extension lives on your own device and is removed when you uninstall it.</p>
+<p>We keep waitlist submissions and enterprise enquiries for as long as the signup or conversation is active, and for a reasonable period afterward for our own records, unless you ask us to delete them sooner (see Section 10). Data held inside the Glance extension lives on your own device and is removed when you uninstall it.</p>
 
 <h2>9. International Transfers</h2>
 <p>Our service providers may process data in the United States and other countries. Where required, we rely on those providers' own standard contractual safeguards for cross-border transfers.</p>

@@ -2,7 +2,7 @@
 //
 // It runs entirely on the device. No email text leaves the machine to reach this
 // decision — that is a deliberate architectural choice, not a limitation of the
-// trial, and it is what lets Flow Trial hold the same local-first line as the
+// trial, and it is what lets Glance hold the same local-first line as the
 // full product.
 //
 // It is not a keyword match. Each signal carries a weight and a reason; the

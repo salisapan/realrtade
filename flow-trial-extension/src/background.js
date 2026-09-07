@@ -84,7 +84,7 @@ const NOTION_VERSION = '2022-06-28';
 // person it would actually help, at the moment they're already looking at
 // proof it works.
 const ATTRIBUTION_URL = 'https://theflow-ai.com/trial.html?ref=note';
-const ATTRIBUTION_TEXT = 'Logged by Flow — theflow-ai.com/trial';
+const ATTRIBUTION_TEXT = 'Logged by Glance — theflow-ai.com/trial';
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
@@ -230,7 +230,7 @@ function hubspotNoteBody(p) {
     rows ? '<ul>' + rows + '</ul>' : '',
     p.facts && p.facts.quote ? '<blockquote>' + esc(p.facts.quote) + '</blockquote>' : '',
     p.threadUrl ? '<p><a href="' + esc(p.threadUrl) + '">Open the original email in Gmail</a></p>' : '',
-    '<p><i>Logged by <a href="' + ATTRIBUTION_URL + '">Flow</a> — one click, from the message itself.</i></p>'
+    '<p><i>Logged by <a href="' + ATTRIBUTION_URL + '">Glance</a> — one click, from the message itself.</i></p>'
   ].filter(Boolean).join('');
 }
 
@@ -429,7 +429,7 @@ async function connectSlack(channel) {
   }
   const channelId = String(channel || '').trim();
   if (!channelId) {
-    throw new Error('Paste the channel ID Flow should post to — open the channel in Slack, "View channel details", it’s at the bottom.');
+    throw new Error('Paste the channel ID Glance should post to — open the channel in Slack, "View channel details", it’s at the bottom.');
   }
 
   const redirectUri = chrome.identity.getRedirectURL();
@@ -460,7 +460,7 @@ function slackMessageText(p) {
   const parts = ['*' + p.label + '*'].concat(lines);
   if (p.facts && p.facts.quote) parts.push('> ' + p.facts.quote);
   if (p.threadUrl) parts.push('<' + p.threadUrl + '|Open the original email in Gmail>');
-  parts.push('_<' + ATTRIBUTION_URL + '|Logged by Flow> — one click, from the message itself._');
+  parts.push('_<' + ATTRIBUTION_URL + '|Logged by Glance> — one click, from the message itself._');
   return parts.join('\n');
 }
 
@@ -516,7 +516,7 @@ async function connectMonday(boardId) {
   }
   const board = String(boardId || '').trim();
   if (!board) {
-    throw new Error('Paste the board ID Flow should write to — open the board in Monday.com, it’s the number in the URL after /boards/.');
+    throw new Error('Paste the board ID Glance should write to — open the board in Monday.com, it’s the number in the URL after /boards/.');
   }
 
   const redirectUri = chrome.identity.getRedirectURL();
