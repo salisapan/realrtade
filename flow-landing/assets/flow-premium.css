@@ -108,9 +108,10 @@ header.site nav a:hover::after{transform:scaleX(1); transform-origin:0 50%}
   letter-spacing:.12em; text-transform:uppercase; color:var(--accent-2,#3B74FF); margin-block-end:6px;
 }
 .mobile-nav-group a{font-size:1.05rem !important; font-weight:600 !important; padding:6px 16px !important}
-.mobile-nav-legal{display:flex; gap:18px; margin-block-start:6px}
-.mobile-nav-legal a{font-size:.78rem !important; font-weight:500 !important; color:var(--p-line-hi,#7E889C) !important; padding:4px 8px !important}
-.mobile-nav .doit{margin-block-start:16px}
+/* Privacy/Terms render like every other top-level menu link now — previously
+   singled out with a smaller, dimmer, side-by-side treatment that read as
+   inconsistent with the rest of the menu. */
+.mobile-nav-legal{display:flex; flex-direction:column; align-items:center; gap:2px; margin-block-start:6px}
 
 /* --- type ----------------------------------------------------------------- */
 h1.title{
@@ -156,7 +157,11 @@ article::before{
   inset-inline:-12vw; inset-block-start:-6vw; height:60vw; max-height:640px;
   background:radial-gradient(640px 420px at 18% 0%, var(--p-amb1), transparent 62%);
 }
-article>p:first-of-type::first-letter{
+/* Drop cap is a blog-post convention, not a generic <article> style — scoping
+   it to article.post keeps it off contact/about/security/pricing/solutions
+   pages, which also wrap their body copy in a bare <article> for the other
+   shared article styling (heading marker, link underline, ambient glow). */
+article.post>p:first-of-type::first-letter{
   background-image:linear-gradient(180deg, var(--cat,var(--accent-2,#3B74FF)) 40%, color-mix(in srgb, var(--cat,#3B74FF) 55%, transparent));
   -webkit-background-clip:text; background-clip:text; color:transparent !important;
   filter:drop-shadow(0 2px 16px var(--p-glow));
