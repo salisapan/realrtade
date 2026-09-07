@@ -10,11 +10,20 @@
 // expire on its own unless the app owner has explicitly turned on token
 // rotation (Slack's opt-in "token rotation" beta) — which this app does not
 // use, so there is nothing to refresh.
+// The sideload/dev extension ID (fixed by manifest.json's "key" field) stays
+// allowed by default. A Chrome Web Store listing gets its own ID assigned on
+// first upload -- unpredictable in advance, and the manifest "key" field must
+// be removed for that first upload anyway -- so once that ID exists it goes
+// here via an env var rather than a code change: set EXTRA_EXTENSION_IDS to a
+// comma-separated list (e.g. the real Web Store ID) in Netlify's environment
+// variables and both distribution channels work without redeploying.
 const EXTENSION_ID = 'dnjhplgmnkabbjogfpbhofjedlkehkai';
-const ALLOWED_REDIRECTS = [
-  'https://' + EXTENSION_ID + '.chromiumapp.org/',
-  'https://' + EXTENSION_ID + '.chromiumapp.org',
-];
+const EXTRA_EXTENSION_IDS = String(process.env.EXTRA_EXTENSION_IDS || '')
+  .split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+const ALLOWED_EXTENSION_IDS = [EXTENSION_ID].concat(EXTRA_EXTENSION_IDS);
+const ALLOWED_REDIRECTS = ALLOWED_EXTENSION_IDS.reduce(function (acc, id) {
+  return acc.concat(['https://' + id + '.chromiumapp.org/', 'https://' + id + '.chromiumapp.org']);
+}, []);
 const LOG_PREFIX = '[slack-oauth-exchange]';
 
 exports.handler = async function (event) {
