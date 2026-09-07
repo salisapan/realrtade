@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="What actually changes under the hood when an AI workflow runs entirely on an organization's own infrastructure — model deployment, network isolation, and the operational tradeoffs involved.">
+<meta name="description" content="What actually changes under the hood when an AI workflow runs entirely on an organization's own infrastructure.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="Inside a Fully Local AI Deployment: The Technical Architecture Behind On-Premises Inference — Flow">
 <meta name="twitter:description" content="What actually changes under the hood when an AI workflow runs entirely on an organization's own infrastructure — model deployment, network isolation, and the operational tradeoffs involved.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>Inside a Fully Local AI Deployment: The Technical Architecture Behind On-Premises Inference — Flow</title>
+<title>On-Premises AI Inference: Architecture Guide &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -187,7 +187,7 @@ footer.site a{color:var(--muted)}
     <div class="meta"><span class="dot"></span>Flow Research · 15 min read</div>
     <article>
 
-<p>Earlier in this series, the choice between cloud and fully local AI deployment was examined primarily as a regulatory and risk-management decision — what data classification favors which model, what a threat model implies about the appropriate architecture. This piece stays underneath that layer entirely, at the level of what actually changes technically when an organization commits to running AI inference entirely on its own infrastructure, because the operational realities of that choice shape whether it is actually achievable for a given organization at all, independent of whether it is desirable in the abstract.</p>
+<p>Earlier in this series, the choice between cloud and fully local AI deployment was examined primarily as a regulatory and risk-management decision — what data classification favors which model, what a threat model implies about the appropriate architecture. This piece stays underneath that layer entirely, at the level of what actually changes technically when an organization commits to running AI inference entirely on its <a href="/security.html">own infrastructure</a>, because the operational realities of that choice shape whether it is actually achievable for a given organization at all, independent of whether it is desirable in the abstract.</p>
 
 <h2>1. Model Deployment Without a Cloud Provider's Infrastructure</h2>
 <p>A cloud AI service abstracts away an enormous amount of infrastructure complexity — GPU provisioning, load balancing across many concurrent requests, automatic scaling as demand fluctuates through the day, redundancy across failure domains — behind a single API endpoint the customer never has to think about or maintain. A fully local deployment reintroduces all of that complexity as something the organization itself must own directly: provisioning appropriate compute hardware, typically GPU-accelerated for any model of meaningful capability, sized correctly for the organization's actual peak concurrent usage rather than the elastic, on-demand capacity a cloud provider can offer to smooth over demand spikes the organization would otherwise have to provision hardware for permanently.</p>
@@ -202,7 +202,7 @@ footer.site a{color:var(--muted)}
 <p>The appropriate point on this spectrum depends on the actual threat model, not a general, unexamined preference for "more local is always better" as a matter of principle. A fully air-gapped deployment forgoes automatic security patching entirely, meaning the organization takes on direct, ongoing responsibility for tracking newly disclosed vulnerabilities and manually applying updates on its own schedule — a real, sustained operational burden that needs to be weighed honestly against the isolation benefit it provides, rather than assumed to be a strictly superior posture in every case. Organizations should be explicit, in their own architecture documentation, about exactly where on this spectrum their deployment actually sits, rather than using "on-premises" as a single undifferentiated label that obscures a real and consequential distinction an auditor or a security review will eventually need answered precisely.</p>
 
 <h2>4. What Stays the Same: The Masking Layer</h2>
-<p>A common misconception is that a fully local deployment eliminates the need for a data-masking layer, on the theory that if nothing leaves the organization's network, masking serves no further purpose worth the engineering investment. This misunderstands what masking actually protects against in a more complete threat model. Even within a fully local deployment, internal access controls matter — not every employee or system component needs access to every piece of unmasked sensitive data, and a masking layer that scopes access appropriately within the local environment remains a meaningful, load-bearing control against internal threats, misconfigured access permissions, and the kind of lateral movement an attacker who has already breached the network perimeter would attempt next, once inside.</p>
+<p>A common misconception is that a fully local deployment eliminates the need for a data-<a href="/blog/what-is-data-masking-technical-guide.html">masking</a> layer, on the theory that if nothing leaves the organization's network, masking serves no further purpose worth the engineering investment. This misunderstands what masking actually protects against in a more complete threat model. Even within a fully local deployment, internal access controls matter — not every employee or system component needs access to every piece of unmasked sensitive data, and a masking layer that scopes access appropriately within the local environment remains a meaningful, load-bearing control against internal threats, misconfigured access permissions, and the kind of lateral movement an attacker who has already breached the network perimeter would attempt next, once inside.</p>
 <p>The masking layer's purpose genuinely shifts, in a fully local deployment, from primarily addressing third-party exposure — the concern that dominates a cloud deployment's threat model — to primarily addressing internal least-privilege access, a different threat with a different attacker profile, but a genuinely important one that organizations dropping masking entirely upon moving to a local deployment are giving up for no corresponding security benefit, simply because the specific threat masking was originally introduced to address happened to disappear when the third party did.</p>
 
 <h2>5. Latency, Throughput, and the Capacity-Planning Problem</h2>

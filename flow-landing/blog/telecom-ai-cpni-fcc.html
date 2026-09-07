@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Automating customer service and network operations for carriers means working inside one of the oldest, strictest customer-data statutes in U.S. law — a framework for doing it correctly.">
+<meta name="description" content="CPNI sits under one of the oldest and strictest customer-data statutes in US law. What it and FCC enforcement mean for AI workflow automation in telecom.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement — Flow">
 <meta name="twitter:description" content="Automating customer service and network operations for carriers means working inside one of the oldest, strictest customer-data statutes in U.S. law — a framework for doing it correctly.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>AI and Customer Data in Telecom: CPNI Rules and FCC Enforcement — Flow</title>
+<title>Telecom AI and CPNI: FCC Rules Explained &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -199,7 +199,7 @@ footer.site a{color:var(--muted)}
 
 <h2>3. Breach Notification Obligations</h2>
 <p>The FCC's data breach notification rules require carriers to notify affected customers and, in many cases, federal law enforcement, following a breach involving CPNI, on a defined and fairly tight timeline. An AI workflow tool that creates a new pathway for CPNI to be accessed, stored, or transmitted — a summarization tool that retains call-record excerpts, a training pipeline that inadvertently incorporates customer data — expands the carrier's breach-notification exposure surface, because a compromise of that tool now potentially triggers the same notification obligations as a compromise of the carrier's core billing systems.</p>
-<p>Carriers evaluating an AI vendor should ask directly whether the vendor's own infrastructure would itself become a reportable breach surface under these rules if compromised, and should not assume the answer is favorable simply because the vendor's product is marketed as a general productivity tool rather than as telecom-specific infrastructure.</p>
+<p>Carriers evaluating an AI vendor should ask directly whether the vendor's <a href="/security.html">own infrastructure</a> would itself become a reportable breach surface under these rules if compromised, and should not assume the answer is favorable simply because the vendor's product is marketed as a general productivity tool rather than as telecom-specific infrastructure.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
 <p>A masked secure-cloud deployment, stripping call-record and account-identifying details before any AI processing occurs, substantially narrows the CPNI exposure of high-volume, lower-sensitivity workflows — general customer-service triage that does not require access to detailed call records. A fully on-premises deployment is the more defensible posture for workflows that genuinely require access to raw CPNI — billing dispute resolution, network troubleshooting that references specific call or usage patterns — because it keeps that sensitive category of data inside infrastructure the carrier already operates under its existing CPNI compliance program, rather than extending that program's boundary to cover a new third-party vendor.</p>

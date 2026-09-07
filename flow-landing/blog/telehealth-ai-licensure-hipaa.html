@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Telehealth's regulatory flexibility expanded and then partially contracted after the public health emergency ended — a framework for automating virtual-care workflows amid that shifting ground.">
+<meta name="description" content="Telehealth's regulatory flexibility expanded and then partially contracted after the public health emergency ended.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="AI Automation in Telehealth: Cross-State Licensure, HIPAA, and the Post-Emergency Landscape — Flow">
 <meta name="twitter:description" content="Telehealth's regulatory flexibility expanded and then partially contracted after the public health emergency ended — a framework for automating virtual-care workflows amid that shifting ground.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>AI Automation in Telehealth: Cross-State Licensure, HIPAA, and the Post-Emergency Landscape — Flow</title>
+<title>Telehealth AI: HIPAA and State Licensure &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -194,7 +194,7 @@ footer.site a{color:var(--muted)}
 
 <h2>1. HIPAA's Application to Virtual Care</h2>
 <p>HIPAA's core obligations, examined earlier in this series, apply to telehealth exactly as they apply to in-person care — the Privacy Rule, the Security Rule, and the business-associate framework do not distinguish between PHI generated in an exam room and PHI generated over a video call. What changed temporarily, during the public health emergency, was the Office for Civil Rights' enforcement discretion regarding the specific video platforms providers could use, a flexibility that has since been wound down, meaning providers who built telehealth workflows around consumer-grade video tools during the emergency period need to have since migrated to platforms with genuine HIPAA-compliant business-associate agreements, not merely continued using whatever they adopted under temporary flexibility.</p>
-<p>An AI tool integrated into a telehealth visit — generating a visit summary, assisting with documentation in real time — inherits the same business-associate analysis as any other HIPAA-adjacent vendor discussed in this series, with one additional wrinkle specific to telehealth: the tool may need to process audio or video content directly, a data type most general HIPAA compliance discussions focus on less than text-based records, and one that carries its own distinct technical challenges for masking and de-identification.</p>
+<p>An AI tool integrated into a telehealth visit — generating a visit summary, assisting with documentation in real time — inherits the same business-associate analysis as any other HIPAA-adjacent vendor discussed in this series, with one additional wrinkle specific to telehealth: the tool may need to process audio or video content directly, a data type most general HIPAA compliance discussions focus on less than text-based records, and one that carries its own distinct technical challenges for <a href="/blog/what-is-data-masking-technical-guide.html">masking</a> and de-identification.</p>
 
 <h2>2. Cross-State Licensure and the Interstate Medical Licensure Compact</h2>
 <p>A physician providing telehealth care generally must be licensed in the state where the patient is physically located at the time of the visit, not merely the state where the physician practices — a rule that predates telehealth but that telehealth's inherently cross-border nature makes far more operationally significant than it was when nearly all care was delivered in person. The Interstate Medical Licensure Compact streamlines this process for participating states, allowing an eligible physician to obtain licenses in multiple compact states more efficiently than applying to each independently, but it does not eliminate the underlying requirement, and coverage varies meaningfully by state.</p>
@@ -205,7 +205,7 @@ footer.site a{color:var(--muted)}
 <p>This is a case where the underlying automation logic itself needs a periodic-review mechanism baked in — not merely at deployment, but on an ongoing basis, given how frequently the DEA's own posture on this specific question has continued to shift, making it one of the least stable single points of compliance risk across the entire regulated-industries landscape this series has examined.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>A fully on-premises or edge deployment for the clinical documentation and visit-summary components of telehealth automation keeps PHI, including audio and video content, inside the practice's own infrastructure, avoiding the business-associate analysis that a third-party cloud AI service handling live clinical video would otherwise require. A masked secure-cloud deployment remains appropriate for administrative workflows that do not touch clinical content directly — appointment reminders, general practice correspondence, billing inquiries that have already had identifying clinical detail stripped.</p>
+<p>A fully <a href="/security.html">on-premises</a> or edge deployment for the clinical documentation and visit-summary components of telehealth automation keeps PHI, including audio and video content, inside the practice's own infrastructure, avoiding the business-associate analysis that a third-party cloud AI service handling live clinical video would otherwise require. A masked secure-cloud deployment remains appropriate for administrative workflows that do not touch clinical content directly — appointment reminders, general practice correspondence, billing inquiries that have already had identifying clinical detail stripped.</p>
 <p>Given the audio and video data types specific to telehealth, practices should confirm that whatever masking or de-identification approach they rely on for a cloud-adjacent workflow actually works on the modality involved — text-based de-identification techniques do not automatically transfer to audio or video content, and a vendor's general claims about de-identification capability should be verified specifically against the media type the telehealth workflow actually produces.</p>
 
 <h2>5. Building for a Landscape That Is Still Changing</h2>

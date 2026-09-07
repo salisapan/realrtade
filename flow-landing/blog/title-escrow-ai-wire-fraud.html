@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard — Flow">
 <meta name="twitter:description" content="Automating closing-file review and escrow correspondence sits directly on top of wire instructions — a framework for doing it without widening the fraud surface.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>AI Automation in Title and Escrow: Wire Fraud Exposure and the Nonpublic Information Standard — Flow</title>
+<title>AI in Title and Escrow: Wire Fraud Risk &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -205,7 +205,7 @@ footer.site a{color:var(--muted)}
 <p>This is a useful illustration of a broader point that recurs throughout this series: a tool being generally capable is not the same as a tool being fit for a specific regulated purpose. An AI assistant that writes excellent, natural-sounding correspondence in the abstract may nonetheless be poorly suited to title and escrow correspondence specifically, unless it has been deliberately constrained against the industry's own particular compliance tripwires.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>Masking account numbers, wire details, and personal identifiers before any cloud processing occurs — or eliminating the third party from the closing-file workflow entirely through a fully local deployment — narrows the wire-fraud attack surface and the NPI exposure simultaneously, rather than requiring two separate mitigation programs bolted onto the same workflow at additional cost and additional complexity. This is one of the clearer cases across this entire series where a single architectural decision serves two genuinely distinct regulatory and security concerns at once, because both the fraud threat and the NPI-handling obligation trace back to the same underlying question: who, and what systems, actually have access to the sensitive fields in a closing file, and for how long.</p>
+<p><a href="/blog/what-is-data-masking-technical-guide.html">Masking</a> account numbers, wire details, and personal identifiers before any cloud processing occurs — or eliminating the third party from the closing-file workflow entirely through a fully local deployment — narrows the wire-fraud attack surface and the NPI exposure simultaneously, rather than requiring two separate mitigation programs bolted onto the same workflow at additional cost and additional complexity. This is one of the clearer cases across this entire series where a single architectural decision serves two genuinely distinct regulatory and security concerns at once, because both the fraud threat and the NPI-handling obligation trace back to the same underlying question: who, and what systems, actually have access to the sensitive fields in a closing file, and for how long.</p>
 <p>A fully local deployment for the closing-file workflow specifically has an additional, less obvious benefit in this context: it reduces the number of distinct systems a criminal would need to compromise, or a phishing attempt would need to successfully impersonate, in order to insert fraudulent wire instructions into the process undetected. Fewer systems in the chain is not merely a compliance simplification — it is a direct reduction in the practical attack surface that business-email-compromise schemes exploit.</p>
 
 <h2>5. What "Deliberately Designed Against This Threat" Actually Looks Like</h2>

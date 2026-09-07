@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="Deploying AI Automation in Government: Meeting the Federal Procurement Security Bar — Flow">
 <meta name="twitter:description" content="Why unauthorized commercial AI tools cannot lawfully process federal data, and how FedRAMP, CMMC, and CUI rules should shape deployment architecture.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>Deploying AI Automation in Government: Meeting the Federal Procurement Security Bar — Flow</title>
+<title>FedRAMP and CMMC for AI Automation &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -202,7 +202,7 @@ footer.site a{color:var(--muted)}
 <p>This creates a genuine tension for contracting officers under deadline pressure: the AI vendor selling the workflow tool is very unlikely to describe itself, in its own marketing, as a subcontractor subject to DFARS flow-down clauses, and its standard commercial terms are usually written for an ordinary SaaS customer, not for a defense-contract subcontractor. Closing that gap — getting the vendor to actually accept flow-down obligations in writing, or confirming through independent means that the vendor already holds the relevant certifications — is unglamorous, time-consuming diligence work, and it is also the work that actually determines whether the contractor is exposed.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>A fully on-premises or edge deployment — processing entirely inside the agency's or contractor's own accredited enclave — keeps CUI from ever crossing into a cloud boundary in the first place, which is very often a more tractable path in practice than pursuing FedRAMP authorization for a given workflow tool, particularly for a smaller contractor without the resources to sponsor or wait out a full authorization process. If the data never leaves the accredited enclave, the FedRAMP cloud-authorization question and much of the CMMC boundary-expansion problem simply do not arise for that specific workflow, because there is no cloud service in the data path to authorize.</p>
+<p>A fully <a href="/security.html">on-premises</a> or edge deployment — processing entirely inside the agency's or contractor's own accredited enclave — keeps CUI from ever crossing into a cloud boundary in the first place, which is very often a more tractable path in practice than pursuing FedRAMP authorization for a given workflow tool, particularly for a smaller contractor without the resources to sponsor or wait out a full authorization process. If the data never leaves the accredited enclave, the FedRAMP cloud-authorization question and much of the CMMC boundary-expansion problem simply do not arise for that specific workflow, because there is no cloud service in the data path to authorize.</p>
 <p>A masked secure-cloud model remains entirely appropriate for genuinely non-sensitive, non-CUI administrative workloads — routine public-facing correspondence, unclassified scheduling, general research assistance that never touches contract-specific technical or program data. But the classification decision separating these two categories has to be made deliberately, documented in writing, and revisited as workflows evolve, not assumed once at the start of a project and left unexamined as the tool's usage quietly expands into adjacent, more sensitive territory over the following year.</p>
 
 <h2>5. The Audit Conversation, in Practice</h2>

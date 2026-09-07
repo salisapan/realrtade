@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing — Flow">
 <meta name="twitter:description" content="Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing — Flow</title>
+<title>AI and Export Controls in Manufacturing &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -202,7 +202,7 @@ footer.site a{color:var(--muted)}
 <p>This tends to catch smaller suppliers by surprise more than larger primes, precisely because smaller suppliers are less likely to have a dedicated compliance function tracking which of their customer contracts carry CUI flow-down language buried in the terms and conditions. A supplier making a component that ends up, several tiers removed, in a piece of defense equipment may not think of itself as part of the defense industrial base at all — and yet the flow-down clause in its purchase order says otherwise, and that clause governs regardless of the supplier's own self-perception.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>A fully on-premises or edge deployment keeps technical data inside the facility's own network boundary entirely, which avoids the export-jurisdiction question at the architecture level rather than attempting to manage it after the fact through downstream access controls, employee attestations, and periodic monitoring that depends on catching a violation after it has already occurred. If the data never leaves the facility's network, and the processing infrastructure is staffed and physically located entirely within the United States, the "deemed export through cloud access" problem simply does not have the opportunity to arise for that workflow.</p>
+<p>A fully <a href="/security.html">on-premises</a> or edge deployment keeps technical data inside the facility's own network boundary entirely, which avoids the export-jurisdiction question at the architecture level rather than attempting to manage it after the fact through downstream access controls, employee attestations, and periodic monitoring that depends on catching a violation after it has already occurred. If the data never leaves the facility's network, and the processing infrastructure is staffed and physically located entirely within the United States, the "deemed export through cloud access" problem simply does not have the opportunity to arise for that workflow.</p>
 <p>For non-controlled, lower-sensitivity workflows — general supplier correspondence that contains no technical specifications, non-technical scheduling, routine administrative communication — a masked secure-cloud deployment remains entirely appropriate and considerably faster and cheaper to stand up than building or expanding local infrastructure for every use case. The discipline required is not "avoid the cloud everywhere," which would sacrifice real efficiency gains for no corresponding benefit on genuinely non-sensitive workflows — it is classifying each workflow's data honestly before choosing its deployment path, and being willing to revisit that classification as a workflow's scope expands.</p>
 
 <h2>5. Building the Classification Habit on the Factory Floor</h2>

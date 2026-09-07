@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="A practical threat-modeling framework for the attack class specific to AI workflow tools — where it differs from conventional application security, and what actually mitigates it.">
+<meta name="description" content="A practical threat-modeling framework for the attack class specific to AI workflow tools — where it differs from conventional application security.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation — Flow">
 <meta name="twitter:description" content="A practical threat-modeling framework for the attack class specific to AI workflow tools — where it differs from conventional application security, and what actually mitigates it.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation — Flow</title>
+<title>Prompt Injection: Threat Modeling AI Workflows &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -194,7 +194,7 @@ footer.site a{color:var(--muted)}
 <p>This is why the OWASP Top 10 for LLM Applications lists prompt injection as its first and most prominent risk category: it is not an edge case or an unusually sophisticated attack requiring rare expertise — it is close to the default behavior of the underlying technology, absent specific, deliberate mitigation, and it can be attempted by an attacker with no access to the system's code, infrastructure, or credentials at all, merely the ability to get content in front of the system that a legitimate user will ask it to process.</p>
 
 <h2>2. Data Exfiltration as the Consequence That Matters Most</h2>
-<p>Prompt injection is a mechanism, not an end in itself, and the consequence that should drive an organization's threat-modeling priority is data exfiltration — an injected instruction that causes the AI system to reveal information it had access to but should not have disclosed, whether by including sensitive content in a response sent to an unauthorized party, or by embedding data in an output in a form designed to be extracted later, such as encoding it into a URL the system is tricked into generating. This is precisely why the deployment-model discussions throughout this series matter directly to prompt-injection risk, not merely to conventional data-protection risk: a successful injection attack against a system with access to unmasked, highly sensitive data has a materially worse worst-case outcome than the identical attack against a system whose access was already limited by masking or architectural isolation.</p>
+<p>Prompt injection is a mechanism, not an end in itself, and the consequence that should drive an organization's threat-modeling priority is data exfiltration — an injected instruction that causes the AI system to reveal information it had access to but should not have disclosed, whether by including sensitive content in a response sent to an unauthorized party, or by embedding data in an output in a form designed to be extracted later, such as encoding it into a URL the system is tricked into generating. This is precisely why the deployment-model discussions throughout this series matter directly to prompt-injection risk, not merely to conventional data-protection risk: a successful injection attack against a system with access to unmasked, highly sensitive data has a materially worse worst-case outcome than the identical attack against a system whose access was already limited by <a href="/blog/what-is-data-masking-technical-guide.html">masking</a> or architectural isolation.</p>
 <p>MITRE's ATLAS framework — the Adversarial Threat Landscape for Artificial-Intelligence Systems, maintained in the same spirit as MITRE's better-known ATT&CK framework for conventional cybersecurity — catalogues this and related attack patterns systematically, giving security teams a structured vocabulary for reasoning about AI-specific threats rather than having to invent the taxonomy from scratch for each new deployment.</p>
 
 <h2>3. Why Perfect Prevention Is Not Currently Achievable</h2>

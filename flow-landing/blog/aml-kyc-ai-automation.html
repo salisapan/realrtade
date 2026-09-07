@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Customer due diligence and suspicious activity monitoring are exactly the workflows AI is best suited to accelerate — and exactly where a regulator's tolerance for error is lowest.">
+<meta name="description" content="Customer due diligence and suspicious activity monitoring are exactly the workflows AI is best suited to accelerate.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="Automating AML and KYC: AI Workflow Design Under the Bank Secrecy Act — Flow">
 <meta name="twitter:description" content="Customer due diligence and suspicious activity monitoring are exactly the workflows AI is best suited to accelerate — and exactly where a regulator's tolerance for error is lowest.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>Automating AML and KYC: AI Workflow Design Under the Bank Secrecy Act — Flow</title>
+<title>AI for AML and KYC Under the Bank Secrecy Act &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -205,8 +205,8 @@ footer.site a{color:var(--muted)}
 <p>This argues for treating the identity-verification step of any AI-assisted onboarding workflow as maximally conservative, biased toward escalating ambiguous cases to human review rather than optimizing purely for onboarding speed, because the downstream cost of a CIP failure compounds in a way that a delayed onboarding decision simply does not.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>A masked secure-cloud deployment can appropriately handle high-volume, lower-sensitivity aspects of AML automation — general pattern-matching across large transaction datasets where individually identifying detail can be tokenized without degrading the pattern-detection value. The specific investigation and suspicious-activity-report drafting stage, where an actual human determination is being documented and where the underlying customer and transaction detail is at its most sensitive, is better served by a fully on-premises deployment, keeping that especially sensitive investigative work entirely within the institution's own controlled environment.</p>
-<p>This split mirrors a pattern established earlier in this series for financial services generally: high-volume triage favors cloud-scale processing with masking; the specific, sensitive, judgment-laden final step favors full localization, and the line between the two should be drawn deliberately rather than defaulting the entire pipeline to whichever deployment model was easiest to stand up first.</p>
+<p>A masked secure-cloud deployment can appropriately handle high-volume, lower-sensitivity aspects of AML automation — general pattern-matching across large transaction datasets where individually identifying detail can be tokenized without degrading the pattern-detection value. The specific investigation and suspicious-activity-report drafting stage, where an actual human determination is being documented and where the underlying customer and transaction detail is at its most sensitive, is better served by a fully <a href="/security.html">on-premises</a> deployment, keeping that especially sensitive investigative work entirely within the institution's own controlled environment.</p>
+<p>This split mirrors a pattern established earlier in this series for financial services generally: high-volume triage favors cloud-scale processing with <a href="/blog/what-is-data-masking-technical-guide.html">masking</a>; the specific, sensitive, judgment-laden final step favors full localization, and the line between the two should be drawn deliberately rather than defaulting the entire pipeline to whichever deployment model was easiest to stand up first.</p>
 
 <h2>5. The Human Judgment Requirement, Made Concrete</h2>
 <p>It is worth being specific about what "a documented human decision point" actually means in practice for a suspicious activity report, because the abstraction can otherwise slide into a checkbox exercise. It means an investigator with actual access to the underlying transaction detail and the AI system's flagged reasoning, who reviews that reasoning critically rather than rubber-stamping it, and whose own analysis — not merely their signature — is captured as part of the institutional record supporting the filing decision. An AI system that produces a recommendation an investigator approves without meaningful review has not satisfied the BSA framework's expectation of institutional judgment; it has merely added a human signature to what is, in substance, an automated determination.</p>

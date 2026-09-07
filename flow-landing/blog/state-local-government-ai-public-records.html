@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Government automation faces a distinct constraint federal and private-sector deployments do not: the same records public-records law makes disclosable are often what the system needs protected.">
+<meta name="description" content="Public-records law makes disclosable the very records agencies most want to automate. How AI workflow tools change what a body must produce on request.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="AI in State and Local Government: Public Records Law and the Transparency Paradox — Flow">
 <meta name="twitter:description" content="Government automation faces a distinct constraint federal and private-sector deployments do not: the same records public-records law makes disclosable are often what the system needs protected.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>AI in State and Local Government: Public Records Law and the Transparency Paradox — Flow</title>
+<title>AI and Public Records Law in Government &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -190,7 +190,7 @@ footer.site a{color:var(--muted)}
 <p>State and local governments carry the same records-processing burden examined in the federal-procurement piece earlier in this series — permitting, benefits administration, case management, public correspondence — without the FedRAMP and CMMC scaffolding that shapes federal deployment decisions. What they carry instead is a distinct, in some ways more immediate constraint: public records law, built on a transparency principle that predates AI by generations, and that creates a genuine tension with the confidentiality practices an AI deployment might otherwise adopt by default.</p>
 
 <h2>1. The Transparency Paradox</h2>
-<p>Every state maintains some form of public records or freedom-of-information statute, generally presuming that government records are disclosable to any requester absent a specific statutory exemption. This is, for most purposes, a healthy and important democratic principle. It creates a specific paradox for AI deployment: the very system logs, decision records, and audit trails that this series has repeatedly recommended building — precisely to satisfy the fairness, auditability, and human-oversight expectations examined across every other industry — are themselves government records, and absent a specific exemption, may be subject to disclosure to any member of the public who requests them, including a requester with adversarial intent toward the system's security.</p>
+<p>Every state maintains some form of public records or freedom-of-information statute, generally presuming that government records are disclosable to any requester absent a specific statutory exemption. This is, for most purposes, a healthy and important democratic principle. It creates a specific paradox for AI deployment: the very system logs, decision records, and audit trails that this series has repeatedly recommended building — precisely to satisfy the fairness, <a href="/blog/auditability-by-design-ai-systems.html">auditability</a>, and human-oversight expectations examined across every other industry — are themselves government records, and absent a specific exemption, may be subject to disclosure to any member of the public who requests them, including a requester with adversarial intent toward the system's security.</p>
 <p>This does not argue against building those records — the alternative, an unauditable government AI system, is considerably worse from both an accountability and a legal standpoint. It argues for building the records with public-records law in mind from the outset: understanding which categories of logged detail carry legitimate security-sensitive exemptions (system configuration detail that could be exploited if disclosed) and which categories are exactly what transparency principles are meant to expose (the reasoning behind a specific benefits denial), rather than treating all system documentation as uniformly public or uniformly protected.</p>
 
 <h2>2. Algorithmic Transparency Requirements, Layered on Top</h2>
@@ -202,7 +202,7 @@ footer.site a{color:var(--muted)}
 <p>This is a useful lens for state and local agencies specifically because it reframes AI governance not as a new, separate compliance burden layered onto existing public-accountability obligations, but as an extension of an accountability structure the agency already has, applied to a new category of tool.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>A fully on-premises or edge deployment for case-management and benefits-administration workflows keeps sensitive constituent data — the kind that public-records law's exemptions are specifically designed to protect, such as personal financial or medical detail submitted in a benefits application — inside the agency's own controlled infrastructure, simplifying both the security posture and the exemption analysis for records requests touching that underlying constituent data. A masked secure-cloud deployment remains appropriate for genuinely public-facing, lower-sensitivity administrative workflows — general correspondence, public meeting scheduling — where speed and cost efficiency matter more than the confidentiality concerns that dominate benefits and case-management work.</p>
+<p>A fully <a href="/security.html">on-premises</a> or edge deployment for case-management and benefits-administration workflows keeps sensitive constituent data — the kind that public-records law's exemptions are specifically designed to protect, such as personal financial or medical detail submitted in a benefits application — inside the agency's own controlled infrastructure, simplifying both the security posture and the exemption analysis for records requests touching that underlying constituent data. A masked secure-cloud deployment remains appropriate for genuinely public-facing, lower-sensitivity administrative workflows — general correspondence, public meeting scheduling — where speed and cost efficiency matter more than the confidentiality concerns that dominate benefits and case-management work.</p>
 <p>The exemption analysis itself benefits from this architectural clarity: an agency that can point to a clear, documented boundary between what a system logs for internal auditability and what constituent data it processes is far better positioned to respond quickly and defensibly to a public records request than one whose AI deployment commingled sensitive constituent data with general system logs in a way that makes redaction and exemption review slower and more error-prone.</p>
 
 <h2>5. Public Trust as the Underlying Currency</h2>

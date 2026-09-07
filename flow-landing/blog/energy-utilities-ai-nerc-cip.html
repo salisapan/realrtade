@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Why the bulk electric system's own cybersecurity standards constrain where AI workflow tools can be deployed, and how to automate operations documentation without crossing the line.">
+<meta name="description" content="Why the bulk electric system's own cybersecurity standards constrain where AI workflow tools can run, and how to automate without crossing the CIP line.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="AI Workflow Automation in Critical Infrastructure: NERC CIP and the Limits of Cloud Processing — Flow">
 <meta name="twitter:description" content="Why the bulk electric system's own cybersecurity standards constrain where AI workflow tools can be deployed, and how to automate operations documentation without crossing the line.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>AI Workflow Automation in Critical Infrastructure: NERC CIP and the Limits of Cloud Processing — Flow</title>
+<title>NERC CIP and AI: What Is Allowed in the Cloud &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -202,12 +202,12 @@ footer.site a{color:var(--muted)}
 <p>The practical upshot is that a utility's AI governance program should be built with an eye toward this broader federal posture, not merely the specific enforceable CIP standards, because the standards themselves tend to evolve in the direction CISA's guidance has already signaled, and building ahead of that curve is considerably cheaper than retrofitting after a standard changes.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>A fully on-premises or edge deployment, kept entirely within the utility's own network boundary and ideally segmented in a way that mirrors the existing OT/IT separation, is the clear choice for any workflow that touches grid-topology or operational-technology-adjacent data, because it avoids the question of whether a cloud vendor's infrastructure and personnel meet the bulk electric system's own security expectations at all. A masked secure-cloud deployment remains reasonable for genuinely IT-side administrative workloads — customer correspondence, general regulatory filing drafts with no operational detail — where the efficiency gain of cloud processing is real and the data sensitivity is genuinely lower.</p>
+<p>A fully <a href="/security.html">on-premises</a> or edge deployment, kept entirely within the utility's own network boundary and ideally segmented in a way that mirrors the existing OT/IT separation, is the clear choice for any workflow that touches grid-topology or operational-technology-adjacent data, because it avoids the question of whether a cloud vendor's infrastructure and personnel meet the bulk electric system's own security expectations at all. A masked secure-cloud deployment remains reasonable for genuinely IT-side administrative workloads — customer correspondence, general regulatory filing drafts with no operational detail — where the efficiency gain of cloud processing is real and the data sensitivity is genuinely lower.</p>
 <p>The discipline that makes this work in practice is treating the IT/OT data classification as a formal, documented step in onboarding any new AI tool, rather than an informal judgment call left to whichever team happens to be piloting the tool — precisely because the consequences of misclassification here are more severe than in almost any other industry this series has examined.</p>
 
 <h2>5. Incident Reporting as a Design Constraint</h2>
 <p>NERC CIP's incident-reporting requirements mean a utility must be able to determine, quickly and accurately, whether an AI tool's malfunction or compromise constitutes a reportable cyber security incident under the standards — a determination that depends entirely on having clear visibility into what the tool actually touched and how. A workflow tool deployed without clear data-flow documentation makes this determination slower and less confident exactly when speed and confidence matter most, in the early hours of a potential incident when the reporting clock is already running.</p>
-<p>This is, again, the auditability principle recurring in a sector-specific form: a utility that can immediately answer "did this tool touch CIP-scoped data" has a fundamentally different, faster incident-response posture than one that must investigate the question from scratch before it can even begin the reporting process the standards require.</p>
+<p>This is, again, the <a href="/blog/auditability-by-design-ai-systems.html">auditability</a> principle recurring in a sector-specific form: a utility that can immediately answer "did this tool touch CIP-scoped data" has a fundamentally different, faster incident-response posture than one that must investigate the question from scratch before it can even begin the reporting process the standards require.</p>
 
 <h2>6. Conclusion</h2>
 <p>For utilities, the AI deployment-model decision carries a stakes level most other industries in this series do not share: the consequence of getting it wrong is not merely regulatory penalty or reputational harm, but a genuine contribution to critical-infrastructure risk. An architecture that keeps OT-adjacent workflows fully local, classifies data deliberately before deployment rather than after an incident forces the question, and preserves the auditability NERC CIP's incident-reporting regime depends on, is what allows a utility to capture AI automation's real efficiency gains on the IT side of the business without compromising the reliability obligation that defines the other half of it.</p>

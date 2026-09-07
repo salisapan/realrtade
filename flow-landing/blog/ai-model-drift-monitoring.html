@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="A workflow AI system that was accurate at launch can degrade silently as the underlying data changes — the monitoring architecture that catches drift before an outcome does.">
+<meta name="description" content="A workflow AI system accurate at launch can degrade silently as its data changes. How to detect drift, and what re-validation actually requires of you.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="Model Drift: Why a Validated AI System Doesn't Stay Validated on Its Own — Flow">
 <meta name="twitter:description" content="A workflow AI system that was accurate at launch can degrade silently as the underlying data changes — the monitoring architecture that catches drift before an outcome does.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>Model Drift: Why a Validated AI System Doesn't Stay Validated on Its Own — Flow</title>
+<title>AI Model Drift: Monitoring a Validated System &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -200,7 +200,7 @@ footer.site a{color:var(--muted)}
 
 <h2>3. Statistical Methods for Detecting Drift</h2>
 <p>Detecting drift rigorously, rather than relying on vague impressions that "something seems off lately," calls for actual statistical methodology, and the field has developed several well-established techniques worth naming specifically. The Kolmogorov-Smirnov test compares the distribution of a given input feature in current production data against its distribution in the original validation baseline, producing a quantitative measure of how far the two distributions have diverged, rather than a subjective impression. The Population Stability Index, widely used in credit-risk modeling for exactly this purpose long before "AI drift" became a common phrase, provides a related, similarly quantitative measure specifically calibrated to flag when a shift has become large enough to warrant genuine concern rather than dismissal as routine, expected statistical noise.</p>
-<p>Applying these techniques requires tracking distributional statistics on key input features continuously over time — critically, not the sensitive content of any individual input, entirely consistent with the masking and privacy principles examined at length throughout this series, but the aggregate statistical shape of the overall input population, which can be monitored meaningfully without exposing or retaining any individual sensitive record at all. A well-designed drift-monitoring system is, in this specific and important sense, itself an exercise in the same privacy-preserving aggregate-statistics discipline examined in this series' article on differential privacy — learning something true and useful about the population's shifting shape without learning, retaining, or needing to retain anything about any specific individual within it.</p>
+<p>Applying these techniques requires tracking distributional statistics on key input features continuously over time — critically, not the sensitive content of any individual input, entirely consistent with the <a href="/blog/what-is-data-masking-technical-guide.html">masking</a> and privacy principles examined at length throughout this series, but the aggregate statistical shape of the overall input population, which can be monitored meaningfully without exposing or retaining any individual sensitive record at all. A well-designed drift-monitoring system is, in this specific and important sense, itself an exercise in the same privacy-preserving aggregate-statistics discipline examined in this series' article on differential privacy — learning something true and useful about the population's shifting shape without learning, retaining, or needing to retain anything about any specific individual within it.</p>
 
 <h2>4. Building an Actual Monitoring Architecture</h2>
 <p>Detecting drift in production requires infrastructure most organizations do not build by default, and building it after the fact, once a drift-related incident has already occurred, is a considerably harder and more expensive undertaking than building it proactively from the outset. This typically means continuous, automated statistical comparison of live input data against the original validation baseline using the techniques described above, flagging meaningful divergence before it has a chance to translate into a measurable, real-world accuracy decline that actually affects a decision.</p>

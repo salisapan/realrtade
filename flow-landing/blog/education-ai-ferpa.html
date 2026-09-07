@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="School and university back-office automation touches some of the most protected records in U.S. privacy law — a framework for deploying it without creating new FERPA exposure.">
+<meta name="description" content="School and university back-office automation touches student education records. What FERPA requires of an AI workflow tool, and how deployment choice changes it.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -22,7 +22,7 @@
 <meta name="twitter:title" content="AI Automation in Education Administration: FERPA and Student Data Governance — Flow">
 <meta name="twitter:description" content="School and university back-office automation touches some of the most protected records in U.S. privacy law — a framework for deploying it without creating new FERPA exposure.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<title>AI Automation in Education Administration: FERPA and Student Data Governance — Flow</title>
+<title>FERPA and AI: Student Data Rules for Schools &mdash; Flow</title>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -202,7 +202,7 @@ footer.site a{color:var(--muted)}
 <p>Institutions should treat a vendor's silence or vagueness about these state-specific obligations as a meaningful gap, not a minor administrative detail, because the institution's own reputational and, in some cases, contractual exposure follows from selecting a vendor that has not actually built for this layer of the compliance stack.</p>
 
 <h2>4. Architecture as the Practical Answer</h2>
-<p>A fully on-premises or edge deployment, keeping education records inside the institution's own infrastructure entirely, sidesteps much of the vendor-control analysis above, because there is no third-party vendor in the data path receiving education records at all for that specific workflow — the school-official exception's requirements simply do not need to be satisfied for data that never left the institution's own systems. A masked secure-cloud deployment remains appropriate for genuinely non-education-record workloads — general facilities scheduling, non-student-specific administrative correspondence — where FERPA's specific protections do not attach in the first place.</p>
+<p>A fully <a href="/security.html">on-premises</a> or edge deployment, keeping education records inside the institution's own infrastructure entirely, sidesteps much of the vendor-control analysis above, because there is no third-party vendor in the data path receiving education records at all for that specific workflow — the school-official exception's requirements simply do not need to be satisfied for data that never left the institution's own systems. A masked secure-cloud deployment remains appropriate for genuinely non-education-record workloads — general facilities scheduling, non-student-specific administrative correspondence — where FERPA's specific protections do not attach in the first place.</p>
 <p>The classification discipline that makes this work is distinguishing, deliberately and in writing, between workflows that touch education records under FERPA's definition and those that do not, because the two categories warrant genuinely different deployment postures, and treating every administrative workflow identically — either over-restricting the non-sensitive ones or under-restricting the sensitive ones — serves the institution poorly in either direction.</p>
 
 <h2>5. Parents, Students, and the Right of Access</h2>
