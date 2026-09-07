@@ -210,29 +210,53 @@ exports.handler = async function (event) {
       '&exp=' + downloadExp + '&sig=' + encodeURIComponent(downloadSig);
   }
 
-  try {
-    var authExp = Date.now() + INTERNAL_AUTH_TTL_MS;
-    var authSig = signInternalAuth(email, authExp, secret);
-    var followUpBody = { email: email, lang: lang, authExp: authExp, authSig: authSig };
-    if (downloadUrl) followUpBody.downloadUrl = downloadUrl;
-    await fetch(SITE_URL + '/.netlify/functions/' + followUpFn, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(followUpBody),
-    });
-  } catch (err) {
-    logErr('failed to trigger ' + followUpFn + ' (customer will still see success page)', String(err));
-  }
-
+  // A confirmation link is a plain GET that stays valid for 72 hours, and
+  // nothing marked it used. So every reload re-sent the email, and — worse —
+  // corporate mail scanners that prefetch links would confirm the address and
+  // fire the send before the recipient ever clicked, which defeats the whole
+  // point of the double opt-in this flow exists to provide.
+  //
+  // Marking the row confirmed FIRST, and only sending when this request is the
+  // one that actually changed it, makes the send happen exactly once. The
+  // filter requires confirmed_at to still be null, so two concurrent requests
+  // cannot both match — Postgres serialises them and the loser updates nothing.
+  var alreadyConfirmed = false;
   try {
     if (!SB_SERVICE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY not configured');
-    await fetch(SB_URL + '/rest/v1/waitlist?email=eq.' + encodeURIComponent(email), {
-      method: 'PATCH',
-      headers: { apikey: SB_SERVICE_KEY, Authorization: 'Bearer ' + SB_SERVICE_KEY, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ confirmed_at: new Date().toISOString() }),
-    });
+    var claim = await fetch(
+      SB_URL + '/rest/v1/waitlist?email=eq.' + encodeURIComponent(email) + '&confirmed_at=is.null',
+      {
+        method: 'PATCH',
+        headers: {
+          apikey: SB_SERVICE_KEY, Authorization: 'Bearer ' + SB_SERVICE_KEY,
+          'Content-Type': 'application/json', Prefer: 'return=representation',
+        },
+        body: JSON.stringify({ confirmed_at: new Date().toISOString() }),
+      }
+    );
+    var claimed = claim.ok ? await claim.json() : null;
+    alreadyConfirmed = Array.isArray(claimed) && claimed.length === 0;
+    if (alreadyConfirmed) log('already confirmed — showing the page without re-sending', { email: email });
   } catch (err) {
-    logErr('failed to mark waitlist row confirmed (customer will still see success page)', String(err));
+    // If the claim cannot be recorded we still send, because a signup that
+    // silently receives nothing is a worse failure than a duplicate email.
+    logErr('failed to claim waitlist row (will send anyway)', String(err));
+  }
+
+  if (!alreadyConfirmed) {
+    try {
+      var authExp = Date.now() + INTERNAL_AUTH_TTL_MS;
+      var authSig = signInternalAuth(email, authExp, secret);
+      var followUpBody = { email: email, lang: lang, authExp: authExp, authSig: authSig };
+      if (downloadUrl) followUpBody.downloadUrl = downloadUrl;
+      await fetch(SITE_URL + '/.netlify/functions/' + followUpFn, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(followUpBody),
+      });
+    } catch (err) {
+      logErr('failed to trigger ' + followUpFn + ' (customer will still see success page)', String(err));
+    }
   }
 
   try {
