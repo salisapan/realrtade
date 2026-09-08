@@ -34,7 +34,10 @@
 :root{
   --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F3F6FC; --surface-3:#EAEFFA;
   --ink:#0B0F1A; --ink-2:#454E63; --ink-3:#7B8398;
-  --line:#E4E8F1; --line-2:#D2D9E8;
+  /* translucent blue-mix borders, not flat opaque hex — same recipe as
+     home.css's light-theme --line/--line-hi, reused verbatim so this page's
+     borders read as sitting on the surface rather than drawn flat on top. */
+  --line:rgba(20,44,100,.11); --line-2:rgba(20,44,100,.20);
   --accent:#1A4EF5; --accent-ink:#0F37C6; --accent-wash:#EAF0FF;
   --ok:#166B44; --ok-wash:#E3F3EA;
   --warn:#8A5A00; --warn-wash:#FBF1DD;
@@ -42,13 +45,33 @@
   --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace;
-  --shadow:0 1px 2px rgba(11,15,26,.04), 0 16px 32px -20px rgba(11,15,26,.16);
-  --shadow-lg:0 2px 4px rgba(11,15,26,.05), 0 28px 56px -24px rgba(11,15,26,.28);
+  /* blue-tinted, not flat neutral-gray — same family as home.css's light-theme
+     --card-shadow (rgba(28,64,150,...)). Dark theme keeps a flat black shadow
+     below, on purpose: home.css itself only tints the light theme this way. */
+  --shadow:0 1px 2px rgba(28,64,150,.06), 0 16px 32px -20px rgba(28,64,150,.22);
+  --shadow-lg:0 2px 4px rgba(28,64,150,.08), 0 28px 56px -24px rgba(28,64,150,.34);
   /* the same premium surface language as theflow-ai.com's homepage — reused, not reinvented */
   --glow:rgba(26,78,245,.30); --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72);
   --glass-border:rgba(40,70,150,.3); --glass-gloss:rgba(255,255,255,.95); --doit-text:#123ccb; --ring:#2f5bd8;
   --net:52,104,230; --net-line:40,100,255; --net-a:.6;
   --hero-glow1:rgba(52,124,255,.18); --hero-glow2:rgba(90,158,255,.13);
+}
+/* Shared, tier-agnostic tokens — spacing scale + fluid type scale. Both
+   themes draw from the same values; only color/shadow tokens are themed.
+   The type scale is copied verbatim from home.css's --step-* tokens so
+   headings on this page share the homepage's proportions instead of using
+   ad hoc fixed rem sizes. The spacing scale rationalizes what were 12+
+   independently-invented pixel values (18/22/24/26/28/30/32/34/36/42/56/
+   64/68/76) scattered across every card/section on this page. */
+:root{
+  --space-1:16px; --space-2:20px; --space-3:24px; --space-4:28px;
+  --space-5:32px; --space-6:40px; --space-7:56px; --space-8:76px;
+  --step--1:clamp(.78rem,.74rem + .2vw,.88rem);
+  --step-0:clamp(1rem,.95rem + .25vw,1.1rem);
+  --step-1:clamp(1.18rem,1.08rem + .5vw,1.45rem);
+  --step-2:clamp(1.5rem,1.3rem + 1vw,2.1rem);
+  --step-3:clamp(2rem,1.55rem + 2.1vw,3.3rem);
+  --step-4:clamp(2.6rem,1.8rem + 3.7vw,5.2rem);
 }
 :root[data-theme="dark"]{
   --bg:#07090F; --surface:#10141D; --surface-2:#141924; --surface-3:#1A2130;
@@ -100,14 +123,24 @@ a{color:var(--accent-ink)}
 b,strong{color:var(--ink)}
 
 /* ---------------- hero ---------------- */
-.hero{padding:64px 0 8px; position:relative}
+/* Scoped to :not(.hero-banner): this page's hero markup always carries both
+   classes, and .hero-banner's own padding rule below wins the cascade by
+   declaration order regardless — leaving this unscoped left a second,
+   silently-overridden padding value sitting on the same selector, which
+   reads as a live bug the next time either rule is touched in isolation. */
+.hero:not(.hero-banner){padding:64px 0 8px}
+.hero{position:relative}
 .hero:not(.hero-banner)::before{content:''; position:absolute; top:-120px; left:-160px; width:560px; height:560px; background:radial-gradient(circle, var(--hero-glow1), transparent 65%); pointer-events:none; z-index:-1}
 .hero:not(.hero-banner)::after{content:''; position:absolute; top:60px; left:280px; width:420px; height:420px; background:radial-gradient(circle, var(--hero-glow2), transparent 70%); pointer-events:none; z-index:-1}
 .eyebrow{font-family:var(--mono); font-size:.76rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:8px}
 .eyebrow::before{content:'';width:7px; height:7px; border-radius:50%; background:var(--accent)}
-h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,3.15rem); line-height:1.08; letter-spacing:-.02em; color:var(--ink); margin:16px 0 18px; max-width:19ch}
+/* Sized specifically for this headline's length, not the shared --step-4
+   token (home.css's --step-4 targets a one-line homepage headline roughly
+   half this length — reusing it here would either wrap this copy into too
+   many short lines or blow past a readable line count entirely). */
+h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(1.9rem,3.4vw,2.65rem); line-height:1.15; letter-spacing:-.02em; color:var(--ink); margin:16px 0 18px; max-width:34ch}
 .lead{font-size:1.2rem; line-height:1.6; color:var(--ink-2); margin:0 0 26px; max-width:52ch}
-.hero-cta{position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:28px}
+.hero-cta{position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:var(--space-4)}
 /* a soft floor of light under the primary CTA — the button already glows on
    its own border/ring, but this wider, lower-intensity bloom is what makes
    it read as a light source sitting slightly in front of the page rather
@@ -137,7 +170,7 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 /* hero-banner: full-bleed centered layout — badge, headline, dual CTA, connector strip.
    The site's real header/hamburger nav above this is untouched; only the content
    below it takes the banner treatment. */
-.hero-banner{padding:76px 0 8px; text-align:center}
+.hero-banner{padding:var(--space-8) 0 8px; text-align:center}
 .hero-banner::before{content:''; position:absolute; top:-160px; left:50%; transform:translateX(-50%); width:900px; height:560px; background:radial-gradient(ellipse at center, var(--hero-glow1), transparent 68%); pointer-events:none; z-index:-1}
 .hero-banner .eyebrow{display:none}
 /* Full-bleed background layer: .hero-banner itself must stay transparent, or
@@ -182,7 +215,7 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 @media (prefers-reduced-motion:reduce){ .hb-partner{opacity:.7; transform:none; transition:none} }
 .hb-partner svg{width:19px; height:19px; flex:none}
 .hb-partner span{font-family:var(--sans); font-weight:600; font-size:.85rem; white-space:nowrap}
-@media (max-width:640px){ .hero-banner{padding:56px 0 4px} .hb-partner-row{gap:18px 22px} }
+@media (max-width:640px){ .hero-banner{padding:var(--space-7) 0 4px} .hb-partner-row{gap:18px 22px} }
 
 .btn{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:14px 26px; border-radius:11px; border:0; cursor:pointer; box-shadow:0 10px 24px -12px rgba(26,78,245,.55); transition:transform .12s,box-shadow .12s,filter .12s}
 .btn:hover{filter:brightness(1.07); transform:translateY(-1px)}
@@ -206,7 +239,7 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 @media (prefers-reduced-motion:reduce){ .doit,.doit *{transition:none!important; animation:none!important} }
 
 /* ---------------- specimen (moved up, primary proof) ---------------- */
-.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:26px 28px; margin:8px 0 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
+.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:var(--space-4); margin:8px 0 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
 /* a one-shot glow on first scroll into view — foreshadows this card being
    the one that's actually interactive below, not decoration for its own
    sake. Fires once via IntersectionObserver, see the script near the other
@@ -219,6 +252,23 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 .specimen.reveal-in{animation:specimen-reveal 1.1s cubic-bezier(.2,.7,.3,1) both}
 @media (prefers-reduced-motion:reduce){ .specimen.reveal-in{animation:none} }
 .specimen .tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 16px}
+/* ties this card to the picker further down the page (#flexible) without
+   reordering either section — the specimen still proves the product works
+   before asking for any setup, this just makes the relationship legible. */
+.specimen-config{font-size:.82rem; color:var(--ink-3); margin:-8px 0 18px}
+.specimen-config b{color:var(--ink-2); font-weight:600}
+.specimen-config a{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid transparent; transition:border-color .15s}
+.specimen-config a:hover{border-color:var(--line-2)}
+/* small stage markers for the three-part input -> decision -> output flow;
+   .record already has its own heading (record-head) for stage 3, so only
+   stages 1 and 2 need one added here. */
+.stage-label{font-family:var(--mono); font-size:.7rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); margin:0 0 8px}
+/* a plain text link, matching .hero-secondary's own "not a second boxed
+   button" rule — lets a first-time visitor see the silent-by-default state
+   without having to guess a vague sentence to type themselves. Hidden
+   whenever the specimen is already showing that state. */
+.specimen-quiet-demo{display:inline-flex; font-size:.85rem; margin:0 0 12px}
+.specimen-quiet-demo[hidden]{display:none}
 .mail{border-inline-start:3px solid var(--line-2); padding-inline-start:14px; margin-bottom:18px}
 .mail b{display:block; font-size:1rem; color:var(--ink); margin-bottom:3px; font-weight:700}
 .mail span{font-size:.88rem; color:var(--ink-3)}
@@ -271,9 +321,21 @@ p{margin:0 0 15px}
 .jumpnav a:hover{border-color:var(--accent); color:var(--accent-ink)}
 
 /* is / isn't */
-.cards{display:grid; gap:18px}
+.cards{display:grid; gap:var(--space-2)}
 @media (min-width:720px){ .cards.two{grid-template-columns:1fr 1fr} }
-.card{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:16px; padding:24px 26px; box-shadow:var(--shadow)}
+/* shared glass-card recipe: one definition of the gradient+border every
+   card-style component on this page uses, so each one below only overrides
+   the 1-2 properties that actually differ (radius/padding/shadow-tier)
+   instead of redeclaring the full rule seven times. .specimen and .cta-box
+   are deliberate exceptions — .specimen layers an extra accent-tinted
+   shadow on top of --shadow-lg, .cta-box uses a diagonal gradient fill
+   entirely of its own — so both stay separate rather than being forced
+   into this shape. */
+.card,.stepcard,.choicepanel,.faq details,.formcard,.installbox{
+  background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot));
+  border:1px solid var(--glass-border);
+}
+.card{border-radius:16px; padding:var(--space-3) var(--space-4); box-shadow:var(--shadow)}
 .card h3{font-family:var(--mono); font-size:.74rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); margin:0 0 14px; display:flex; align-items:center; gap:8px}
 .card.is h3{color:var(--ok)}
 .card.isnt h3{color:var(--ink-3)}
@@ -283,18 +345,18 @@ p{margin:0 0 15px}
 .card.isnt li::before{content:'✕'; position:absolute; inset-inline-start:0; color:var(--ink-3); font-weight:700}
 
 /* how it works — 2x2 modern grid, not a text timeline */
-.stepgrid{display:grid; gap:16px; grid-template-columns:1fr}
+.stepgrid{display:grid; gap:var(--space-1); grid-template-columns:1fr}
 @media (min-width:640px){ .stepgrid{grid-template-columns:1fr 1fr} }
-.stepcard{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow); position:relative; transition:transform .2s,box-shadow .2s}
+.stepcard{border-radius:16px; padding:var(--space-3); box-shadow:var(--shadow); position:relative; transition:transform .2s,box-shadow .2s}
 .stepcard:hover{transform:translateY(-2px); box-shadow:var(--shadow-lg)}
 .stepcard .num{width:34px; height:34px; border-radius:10px; background:var(--accent-wash); color:var(--accent-ink); font-family:var(--mono); font-weight:700; font-size:.95rem; display:flex; align-items:center; justify-content:center; margin-bottom:14px}
 .stepcard h4{margin:0 0 6px; font-size:1.04rem; font-weight:700; color:var(--ink)}
 .stepcard p{margin:0; font-size:.94rem; color:var(--ink-3); line-height:1.55}
 
 /* flexibility: two-column choice panel */
-.choicegrid{display:grid; gap:18px}
+.choicegrid{display:grid; gap:var(--space-2)}
 @media (min-width:720px){ .choicegrid{grid-template-columns:1fr 1fr} }
-.choicepanel{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:16px; padding:22px 24px; box-shadow:var(--shadow); transition:transform .2s,box-shadow .2s}
+.choicepanel{border-radius:16px; padding:var(--space-3); box-shadow:var(--shadow); transition:transform .2s,box-shadow .2s}
 .choicepanel:hover{transform:translateY(-2px); box-shadow:var(--shadow-lg)}
 .choicepanel h4{margin:0 0 4px; font-size:1rem; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:10px}
 .choicepanel .sub{font-size:.87rem; color:var(--ink-3); margin:0 0 16px}
@@ -359,16 +421,12 @@ p{margin:0 0 15px}
 .pill:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
 
 .cta-wrap{display:flex; justify-content:center; margin-top:30px}
-/* small monogram badge inside the hero's "Set Up My Glance" button, styled
-   to match the Glance mark (dot + glow ring) rather than a generic circle */
-.gc-badge-inline{position:relative; flex:none; width:22px; height:22px; border-radius:50%; background:var(--doit-text); color:var(--navy,#07090F); display:grid; place-items:center; font-family:var(--disp); font-weight:800; font-size:.78rem; margin-inline-end:2px}
-.gc-badge-inline::after{content:''; position:absolute; inset:-4px; border-radius:50%; border:1.4px solid color-mix(in srgb, var(--ring) 55%, transparent)}
 
 /* data cards reuse .card two */
 
 /* faq */
 .faq{display:flex; flex-direction:column; gap:10px}
-.faq details{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:14px; padding:2px 22px; box-shadow:var(--shadow)}
+.faq details{border-radius:14px; padding:2px var(--space-3); box-shadow:var(--shadow)}
 .magnetic{display:inline-flex}
 .faq summary{font-family:var(--sans); font-weight:700; font-size:1rem; color:var(--ink); padding:18px 0; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center; gap:14px}
 .faq summary::-webkit-details-marker{display:none}
@@ -382,7 +440,7 @@ p{margin:0 0 15px}
 .band::before{content:''; position:absolute; top:-140px; right:8%; width:480px; height:480px; background:radial-gradient(circle, var(--hero-glow1), transparent 68%); pointer-events:none}
 
 /* signup */
-.formcard{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:20px; padding:34px; box-shadow:var(--shadow-lg); max-width:600px}
+.formcard{border-radius:20px; padding:var(--space-5); box-shadow:var(--shadow-lg); max-width:600px}
 .formcard .row{display:flex; gap:10px; flex-wrap:wrap}
 .formcard input[type=email]{flex:1; min-width:220px; font-family:var(--sans); font-size:1.02rem; padding:14px 16px; border-radius:11px; border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink)}
 .formcard input[type=email]:focus{outline:2px solid var(--accent); outline-offset:1px; background:var(--surface)}
@@ -398,7 +456,7 @@ p{margin:0 0 15px}
 .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
 
 /* install — horizontal wizard */
-.installbox{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:20px; padding:30px 32px; box-shadow:var(--shadow-lg)}
+.installbox{border-radius:20px; padding:var(--space-4) var(--space-5); box-shadow:var(--shadow-lg)}
 .wizard{display:grid; gap:18px; margin:0 0 26px; grid-template-columns:1fr}
 @media (min-width:820px){ .wizard{grid-template-columns:repeat(5,1fr)} }
 .wstep{display:flex; flex-direction:column; gap:8px}
@@ -406,7 +464,7 @@ p{margin:0 0 15px}
 .wstep p{margin:0; font-size:.9rem; color:var(--ink-2); line-height:1.5}
 
 /* final cta */
-.cta-box{position:relative; z-index:1; padding:36px 32px; background:linear-gradient(135deg, var(--accent-wash), var(--glass-bot) 70%); border:1px solid var(--glass-border); border-radius:20px; text-align:center; box-shadow:0 20px 50px -20px var(--glow), var(--shadow)}
+.cta-box{position:relative; z-index:1; padding:var(--space-6) var(--space-5); background:linear-gradient(135deg, var(--accent-wash), var(--glass-bot) 70%); border:1px solid var(--glass-border); border-radius:20px; text-align:center; box-shadow:0 20px 50px -20px var(--glow), var(--shadow)}
 .cta-box h2{margin:0 0 10px; font-size:1.5rem}
 .cta-box p{margin:0 0 22px; color:var(--ink-2); max-width:48ch; margin-inline:auto}
 
@@ -481,10 +539,10 @@ footer.site a{color:var(--ink-3)}
       <div class="hb-bg" aria-hidden="true">
         <canvas id="heroStreak"></canvas>
       </div>
-      <h1 class="title">You choose the system. Glance decides what's worth writing to it.</h1>
-      <p class="lead"><b>Connect Notion, HubSpot, Salesforce, Slack, or Monday.com</b> &mdash; whichever you already use. Glance then watches the Gmail message you have open, and when something real gets decided &mdash; a price agreed, a deadline set, a deal lost &mdash; one click writes the amount, the date and the sentence that decided it straight into the system you picked.</p>
+      <h1 class="title">The moment an intention takes shape &mdash; a decision, a commitment, a request &mdash; Glance notices, and makes sure it's never just lost in an inbox.</h1>
+      <p class="lead">No dashboards to check, no fields to fill in. When something real is decided, promised, or asked for in the email you're reading, Glance writes it straight into <b>Notion, HubSpot, Salesforce, Slack, or Monday.com</b> &mdash; one click, always reversible.</p>
       <div class="hero-cta">
-        <span class="magnetic"><a class="doit glance" href="#flexible"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="gc-badge-inline" aria-hidden="true">G</span>Set Up My Glance</a></span>
+        <span class="magnetic"><a class="doit glance" href="#flexible"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Set Up My Glance</a></span>
         <a class="hero-secondary" href="#proof">See a real example<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></a>
       </div>
       <div class="status-row" id="statusRow">
@@ -506,16 +564,20 @@ footer.site a{color:var(--ink-3)}
     </div>
 
     <div class="specimen" id="proof">
-      <p class="tag">One email. One click. One record. <span class="live-badge">Live — really running</span></p>
+      <p class="tag">One email. One click. One record. <span class="live-badge">Live — runs the real judgment engine, right in your browser</span></p>
+      <p class="specimen-config">Showing: <b id="demoState">Example</b> &middot; configured for <b id="demoConfigConnector">Notion</b> &middot; <b id="demoConfigDomain">Sales &amp; business development</b> — <a href="#flexible">change it below ↓</a></p>
+      <p class="stage-label">1 &middot; The email arrives</p>
       <div class="mail">
         <b id="demoSubject">Re: Office Lease — Meridian Tower, 14th Floor</b>
         <span><span id="demoSender">Dana Cole</span> &middot; <span id="demoTime">9:41&nbsp;AM</span> &middot; “<span id="demoBody">We’re good at $3,900/mo for the 14th floor, signing Monday.</span>”</span>
       </div>
+      <p class="stage-label">2 &middot; Glance's decision</p>
       <span class="chip" id="demoChip"><span id="demoChipInner">Do It: Log $3,900 confirmed, Sep&nbsp;7 <span class="target">&middot; Notion</span></span></span>
       <p class="specimen-quiet" id="demoQuiet" hidden>Glance would stay quiet here — nothing definite enough to log yet.</p>
+      <a href="#" id="demoQuietDemo" class="hero-secondary specimen-quiet-demo">See what "quiet" looks like →</a>
       <p class="specimen-arrow" aria-hidden="true">↓</p>
       <div class="record" id="demoRecord">
-        <p class="record-head">What actually gets written</p>
+        <p class="record-head">3 &middot; What actually gets written</p>
         <dl>
           <div data-field="title"><dt>Title</dt><dd>Log $3,900 confirmed, Sep&nbsp;7</dd></div>
           <div data-field="amount"><dt>Amount</dt><dd>$3,900</dd></div>
@@ -934,6 +996,10 @@ footer.site a{color:var(--ink-3)}
 
   var LOG_LABEL={ sales:'Deal log', legal:'Matter log', finance:'Invoice log', ops:'Task log', support:'Ticket log', hr:'Candidate log' };
 
+  // Short, human name for each canned example, purely so "Reset to example"
+  // can say which example it means instead of leaving that ambiguous.
+  var EXAMPLE_NAME={ sales:'Meridian Tower', legal:'the NDA', finance:'the invoice', ops:'the migration', support:'the renewal', hr:'the offer' };
+
   // One canned example per domain — real business-email text, verified
   // against the actual engine (see flow-trial-extension/test/judgment-corpus.cjs)
   // to fire with a sane, domain-specific label. The visible mail preview
@@ -958,6 +1024,11 @@ footer.site a{color:var(--ink-3)}
   var mailEl=proof ? proof.querySelector('.mail') : null;
   var demoChip=document.getElementById('demoChip'), demoChipInner=document.getElementById('demoChipInner'), demoQuiet=document.getElementById('demoQuiet'), demoRecord=document.getElementById('demoRecord'), demoWhy=document.getElementById('demoWhy');
   var demoNoteTarget=document.getElementById('demoNoteTarget'), demoNoteLabel=document.getElementById('demoNoteLabel');
+  var demoState=document.getElementById('demoState'), demoConfigConnector=document.getElementById('demoConfigConnector'), demoConfigDomain=document.getElementById('demoConfigDomain'), demoQuietDemo=document.getElementById('demoQuietDemo');
+  // Looked up here (not just where the free-text block is wired further
+  // down) so renderSpecimen()'s initial call, which runs before that block,
+  // can already set this link's text on first paint.
+  var demoReset=document.getElementById('demoReset');
   var haveEngine=typeof FlowJudgment!=='undefined' && typeof FlowExtract!=='undefined';
 
   function fieldDD(name){
@@ -982,9 +1053,11 @@ footer.site a{color:var(--ink-3)}
       if(demoChip) demoChip.hidden=true;
       if(demoRecord) demoRecord.hidden=true;
       if(demoQuiet) demoQuiet.hidden=false;
+      if(demoQuietDemo) demoQuietDemo.hidden=true;
       return;
     }
     if(demoQuiet) demoQuiet.hidden=true;
+    if(demoQuietDemo) demoQuietDemo.hidden=false;
     if(demoChip) demoChip.hidden=false;
     if(demoRecord) demoRecord.hidden=false;
 
@@ -1031,6 +1104,13 @@ footer.site a{color:var(--ink-3)}
     if(demoSender) demoSender.textContent=ex.sender;
     if(demoTime) demoTime.innerHTML=ex.time;
     if(demoBody) demoBody.textContent=ex.body;
+
+    // Presentation only — ties this card to the picker below it and names
+    // which example "Reset" returns to; none of this touches judgment.
+    if(demoState) demoState.textContent='Example';
+    if(demoConfigConnector) demoConfigConnector.textContent=connector;
+    if(demoConfigDomain) demoConfigDomain.textContent=domainLabel;
+    if(demoReset) demoReset.textContent='Reset to the '+(EXAMPLE_NAME[domainId]||'example')+' example';
 
     var result=FlowJudgment.evaluate(ex.body, domainId, { subject:ex.subject, senderEmail:ex.senderEmail, now:new Date() });
     renderResult(result, 'canned', connector);
@@ -1089,6 +1169,7 @@ footer.site a{color:var(--ink-3)}
         renderSpecimen();
         return;
       }
+      if(demoState) demoState.textContent='Your text';
       if(demoStatus){ demoStatus.textContent='Reading…'; demoStatus.classList.remove('fired'); }
       debounceTimer=setTimeout(function(){
         var domainLabel=currentLabel(domGroup,'data-domain');
@@ -1116,6 +1197,20 @@ footer.site a{color:var(--ink-3)}
       if(demoStatus){ demoStatus.textContent=''; demoStatus.classList.remove('fired'); }
       demoReset.hidden=true;
       renderSpecimen();
+    });
+  }
+  // "See what quiet looks like" — pre-fills the same free-text box with a
+  // known-vague line and fires the exact input event the handler above
+  // already listens for, so this reuses evaluate() as-is rather than adding
+  // a second code path. The string is deliberately a pure pleasantry with no
+  // money/date/commitment signal, the same shape as the corpus's own
+  // "pure pleasantry" case (judgment-corpus.cjs), so it reliably stays quiet.
+  if(demoQuietDemo && demoInput){
+    demoQuietDemo.addEventListener('click', function(ev){
+      ev.preventDefault();
+      demoInput.value="Thanks, talk soon.";
+      demoInput.dispatchEvent(new Event('input', { bubbles:true }));
+      demoInput.focus();
     });
   }
 })();
