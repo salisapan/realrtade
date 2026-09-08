@@ -107,7 +107,14 @@ b,strong{color:var(--ink)}
 .eyebrow::before{content:'';width:7px; height:7px; border-radius:50%; background:var(--accent)}
 h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,3.15rem); line-height:1.08; letter-spacing:-.02em; color:var(--ink); margin:16px 0 18px; max-width:19ch}
 .lead{font-size:1.2rem; line-height:1.6; color:var(--ink-2); margin:0 0 26px; max-width:52ch}
-.hero-cta{display:flex; flex-wrap:wrap; gap:12px; margin-bottom:28px}
+.hero-cta{display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:28px}
+/* secondary hero action — a plain text link with an icon, deliberately not a
+   second boxed button: Do It stays the one visually "loud" CTA the site's
+   design principles require, this is just a lower-emphasis way down to the
+   proof section for anyone not ready to commit yet. */
+.hero-secondary{display:inline-flex; align-items:center; gap:7px; font-family:var(--sans); font-weight:600; font-size:.95rem; color:var(--ink-2); text-decoration:none; padding:8px 4px; border-bottom:1px solid transparent; transition:color .15s,border-color .15s}
+.hero-secondary svg{width:15px; height:15px; flex:none}
+.hero-secondary:hover{color:var(--ink); border-color:var(--line-2)}
 .status-row{display:flex; flex-wrap:wrap; gap:8px; font-family:var(--mono); font-size:.74rem}
 .status-row span{background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:5px 10px; color:var(--ink-3)}
 
@@ -401,6 +408,7 @@ footer.site a{color:var(--ink-3)}
       <p class="lead"><b>Connect Notion, HubSpot, Salesforce, Slack, or Monday.com</b> &mdash; whichever you already use. Glance then watches the Gmail message you have open, and when something real gets decided &mdash; a price agreed, a deadline set, a deal lost &mdash; one click writes the amount, the date and the sentence that decided it straight into the system you picked.</p>
       <div class="hero-cta">
         <span class="magnetic"><a class="doit glance" href="#flexible"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="gc-badge-inline" aria-hidden="true">G</span>Set Up My Glance</a></span>
+        <a class="hero-secondary" href="#proof">See a real example<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></a>
       </div>
       <div class="status-row">
         <span>Free, no card</span>
