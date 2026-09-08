@@ -191,9 +191,38 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 .mail span{font-size:.88rem; color:var(--ink-3)}
 .chip{display:inline-flex; align-items:center; gap:9px; font-family:var(--disp); font-weight:700; font-size:.92rem; color:var(--doit-text); text-shadow:0 1px 8px var(--glow); border-radius:10px; padding:11px 16px; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 26%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 12px 30px -12px var(--glow); animation:chip-pulse 3.2s ease-in-out infinite}
 .chip .target{font-family:var(--mono); font-weight:400; opacity:.75; font-size:.8rem; text-shadow:none}
+/* .chip's own display:inline-flex is an author style, so it overrides the
+   browser's default [hidden]{display:none} — the demo needs to actually
+   hide the chip when a below-threshold result comes back, not just carry
+   the attribute uselessly. */
+.chip[hidden]{display:none}
 @keyframes chip-pulse{ 0%,100%{ box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 12px 30px -12px var(--glow); } 50%{ box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 16px 38px -10px var(--glow); } }
 @media (prefers-reduced-motion:reduce){ .chip{animation:none} }
 .specimen .note{font-size:.86rem; color:var(--ink-3); margin:16px 0 0; line-height:1.55}
+.specimen .tag{display:flex; align-items:center; gap:9px; flex-wrap:wrap}
+/* a small, honest marker that this card is not a screenshot — it's computed
+   live, right now, by the real engine. Reuses --ok (the same green used for
+   "It is" checkmarks elsewhere) so it reads as a status, not a promo badge. */
+.live-badge{display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-size:.66rem; font-weight:600; letter-spacing:.06em; text-transform:none; color:var(--ok); background:var(--ok-wash); border-radius:999px; padding:3px 9px}
+.live-badge::before{content:''; width:6px; height:6px; border-radius:50%; background:var(--ok); animation:live-blink 2.4s ease-in-out infinite}
+@keyframes live-blink{ 0%,100%{opacity:1} 50%{opacity:.35} }
+@media (prefers-reduced-motion:reduce){ .live-badge::before{animation:none} }
+.specimen-quiet{font-size:.92rem; color:var(--ink-3); font-style:italic; margin:0 0 12px; padding:12px 14px; background:var(--surface-2); border:1px dashed var(--line-2); border-radius:10px}
+/* free-text demo box — deliberately plain, not a second glass card: it's a
+   control inside the existing specimen, not a competing component */
+.demo-try{margin-top:22px; padding-top:18px; border-top:1px solid var(--line)}
+.demo-try label{display:block; font-size:.82rem; color:var(--ink-3); margin-bottom:8px; line-height:1.4}
+.demo-try textarea{width:100%; resize:vertical; min-height:52px; font-family:var(--sans); font-size:.92rem; color:var(--ink); background:var(--surface-2); border:1px solid var(--line-2); border-radius:10px; padding:10px 12px; transition:border-color .15s}
+.demo-try textarea:focus-visible{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
+.demo-try-row{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; min-height:20px}
+.demo-status{margin:0; font-size:.82rem; color:var(--ink-3)}
+.demo-status.fired{color:var(--ok)}
+.demo-reset{font-size:.82rem; padding:2px 0; white-space:nowrap}
+/* .hero-secondary sets display:inline-flex, which — being an author style —
+   overrides the browser's own [hidden]{display:none} default. Any element
+   reusing that class while relying on the hidden attribute needs it stated
+   explicitly back. */
+.demo-reset[hidden]{display:none}
 
 /* ---------------- section rhythm ---------------- */
 section{padding:0 0 68px}
@@ -252,6 +281,7 @@ p{margin:0 0 15px}
 .record-head{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px}
 .record dl{margin:0; display:grid; gap:8px}
 .record dl > div{display:grid; grid-template-columns:78px 1fr; gap:12px; align-items:start}
+.record dl > div[hidden]{display:none}
 .record dt{font-family:var(--mono); font-size:.72rem; color:var(--ink-3); padding-top:2px}
 .record dd{margin:0; font-size:.92rem; color:var(--ink); line-height:1.55}
 .record .dim{color:var(--ink-3)}
@@ -443,25 +473,36 @@ footer.site a{color:var(--ink-3)}
     </div>
 
     <div class="specimen" id="proof">
-      <p class="tag">One email. One click. One record.</p>
+      <p class="tag">One email. One click. One record. <span class="live-badge">Live — really running</span></p>
       <div class="mail">
-        <b>Re: Office Lease — Meridian Tower, 14th Floor</b>
-        <span>Dana Cole &middot; 9:41&nbsp;AM &middot; “We’re good at $3,900/mo for the 14th floor, signing Monday.”</span>
+        <b id="demoSubject">Re: Office Lease — Meridian Tower, 14th Floor</b>
+        <span><span id="demoSender">Dana Cole</span> &middot; <span id="demoTime">9:41&nbsp;AM</span> &middot; “<span id="demoBody">We’re good at $3,900/mo for the 14th floor, signing Monday.</span>”</span>
       </div>
-      <span class="chip">Do It: Log $3,900 confirmed, Sep&nbsp;7 <span class="target">&middot; Notion</span></span>
+      <span class="chip" id="demoChip"><span id="demoChipInner">Do It: Log $3,900 confirmed, Sep&nbsp;7 <span class="target">&middot; Notion</span></span></span>
+      <p class="specimen-quiet" id="demoQuiet" hidden>Glance would stay quiet here — nothing definite enough to log yet.</p>
       <p class="specimen-arrow" aria-hidden="true">↓</p>
-      <div class="record">
+      <div class="record" id="demoRecord">
         <p class="record-head">What actually gets written</p>
         <dl>
-          <div><dt>Title</dt><dd>Log $3,900 confirmed, Sep&nbsp;7</dd></div>
-          <div><dt>Amount</dt><dd>$3,900</dd></div>
-          <div><dt>Date</dt><dd>Sep&nbsp;7 <span class="dim">(2026-09-07)</span></dd></div>
-          <div><dt>From</dt><dd>Dana Cole &lt;dana@meridian.com&gt;</dd></div>
-          <div><dt>Quote</dt><dd>“We’re good at $3,900/mo for the 14th floor, signing Monday.”</dd></div>
-          <div><dt>Source</dt><dd><span class="dim">A link back to the original email in Gmail</span></dd></div>
+          <div data-field="title"><dt>Title</dt><dd>Log $3,900 confirmed, Sep&nbsp;7</dd></div>
+          <div data-field="amount"><dt>Amount</dt><dd>$3,900</dd></div>
+          <div data-field="date"><dt>Date</dt><dd>Sep&nbsp;7 <span class="dim">(2026-09-07)</span></dd></div>
+          <div data-field="from"><dt>From</dt><dd>Dana Cole &lt;dana@meridian.com&gt;</dd></div>
+          <div data-field="quote"><dt>Quote</dt><dd>“We’re good at $3,900/mo for the 14th floor, signing Monday.”</dd></div>
+          <div data-field="why" hidden><dt>Why</dt><dd id="demoWhy"></dd></div>
+          <div data-field="source"><dt>Source</dt><dd><span class="dim">A link back to the original email in Gmail</span></dd></div>
         </dl>
       </div>
-      <p class="note">Then the button turns into a receipt — <b>Logged to Notion &middot; Deal log</b>, with <b>View</b> and <b>Undo</b> beside it. Nothing is written that you cannot take back in one click.</p>
+      <p class="note" id="demoNote">Then the button turns into a receipt — <b>Logged to <span id="demoNoteTarget">Notion</span> &middot; <span id="demoNoteLabel">Deal log</span></b>, with <b>View</b> and <b>Undo</b> beside it. Nothing is written that you cannot take back in one click.</p>
+
+      <div class="demo-try">
+        <label for="demoInput">Or try it on your own line — this really runs the judgment engine, right here in your browser</label>
+        <textarea id="demoInput" rows="2" placeholder="e.g. &quot;Approved, go ahead — we'll sign by Friday.&quot;"></textarea>
+        <div class="demo-try-row">
+          <p id="demoStatus" class="demo-status" aria-live="polite"></p>
+          <a href="#" id="demoReset" class="hero-secondary demo-reset" hidden>Reset to example</a>
+        </div>
+      </div>
     </div>
 
     <nav class="jumpnav narrow" aria-label="On this page">
@@ -697,6 +738,7 @@ footer.site a{color:var(--ink-3)}
     &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
   </div>
 </footer>
+<script src="/assets/glance-engine.js"></script>
 <script>
 (function(){
   var tb = document.getElementById('themeBtn');
@@ -797,7 +839,7 @@ footer.site a{color:var(--ink-3)}
     'Recruiting & hiring': 'hiring signals — an offer made, a start date set, a candidate lost'
   };
 
-  var WRITE_TARGET={ 'Notion':'your database', 'Slack':'the channel', 'Monday.com':'the board' };
+  var WRITE_TARGET={ 'Notion':'your database', 'HubSpot':'the matching contact', 'Salesforce':'the matching record', 'Slack':'the channel', 'Monday.com':'the board' };
 
   var SENSITIVITY_PHRASE={
     'Only the sure things': 'starting cautious, so only the clearest cases get a button',
@@ -841,12 +883,133 @@ footer.site a{color:var(--ink-3)}
     if(typeof gtag==='function') gtag('event','picker_select',{connector:connector, domain:domain, team_size:team, sensitivity:sensitivity, setup_mode:setup});
   }
 
+  // ---------------------------------------------------------------------
+  // Live demo: .specimen#proof actually runs the real judgment engine
+  // (glance-engine.js, loaded above — the same domains.js/extract.js/
+  // judgment.js the extension itself runs). Every result rendered below is
+  // a genuine FlowJudgment.evaluate() call, not scripted copy.
+  // ---------------------------------------------------------------------
+
+  var LABEL_TO_DOMAIN_ID={
+    'Sales & business development': 'sales',
+    'Legal & deal coordination': 'legal',
+    'Finance & billing': 'finance',
+    'Operations & admin': 'ops',
+    'Customer success & support': 'support',
+    'Recruiting & hiring': 'hr'
+  };
+
+  var LOG_LABEL={ sales:'Deal log', legal:'Matter log', finance:'Invoice log', ops:'Task log', support:'Ticket log', hr:'Candidate log' };
+
+  // One canned example per domain — real business-email text, verified
+  // against the actual engine (see flow-trial-extension/test/judgment-corpus.cjs)
+  // to fire with a sane, domain-specific label. The visible mail preview
+  // shows this exact body text; nothing is scored that isn't also shown.
+  var CANNED_EXAMPLES={
+    sales:{ subject:'Re: Office Lease — Meridian Tower, 14th Floor', sender:'Dana Cole', senderEmail:'dana@meridian.com', time:'9:41&nbsp;AM',
+      body:"Following up on the lease contract renewal. We're good at $3,900/mo for the 14th floor, signing Monday." },
+    legal:{ subject:'NDA — Acme Corp', sender:'Alex Rivera', senderEmail:'alex@acmecorp.com', time:'11:14&nbsp;AM',
+      body:'The NDA is fully executed — countersigned copy attached, effective September 7.' },
+    finance:{ subject:'Invoice INV-2041', sender:'Priya Shah', senderEmail:'priya@vendorco.com', time:'2:05&nbsp;PM',
+      body:'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.' },
+    ops:{ subject:'Re: migration plan', sender:'Marcus Webb', senderEmail:'marcus@acme.com', time:'8:52&nbsp;AM',
+      body:"Approved — go ahead and start the onboarding request whenever your team is ready." },
+    support:{ subject:'Re: account renewal', sender:'Sam Okafor', senderEmail:'sam@clientco.com', time:'4:30&nbsp;PM',
+      body:'Confirming the renewal is agreed at $18,000 for the year, effective September 7.' },
+    hr:{ subject:'Re: Offer — Senior Backend Engineer', sender:'Jordan Lee', senderEmail:'jordan.lee@gmail.com', time:'6:18&nbsp;PM',
+      body:'I am delighted to accept the offer letter. My salary expectation of $120,000 is confirmed and I can start on March 3, 2027.' }
+  };
+
+  var proof=document.getElementById('proof');
+  var demoSubject=document.getElementById('demoSubject'), demoSender=document.getElementById('demoSender'), demoTime=document.getElementById('demoTime'), demoBody=document.getElementById('demoBody');
+  var mailEl=proof ? proof.querySelector('.mail') : null;
+  var demoChip=document.getElementById('demoChip'), demoChipInner=document.getElementById('demoChipInner'), demoQuiet=document.getElementById('demoQuiet'), demoRecord=document.getElementById('demoRecord'), demoWhy=document.getElementById('demoWhy');
+  var demoNoteTarget=document.getElementById('demoNoteTarget'), demoNoteLabel=document.getElementById('demoNoteLabel');
+  var haveEngine=typeof FlowJudgment!=='undefined' && typeof FlowExtract!=='undefined';
+
+  function fieldDD(name){
+    if(!demoRecord) return null;
+    var row=demoRecord.querySelector('[data-field="'+name+'"]');
+    return row ? { row:row, dd:row.querySelector('dd') } : null;
+  }
+  function setField(name, html){
+    var f=fieldDD(name);
+    if(!f) return;
+    if(html==null){ f.row.hidden=true; return; }
+    f.row.hidden=false;
+    f.dd.innerHTML=html;
+  }
+
+  // Renders one evaluate() result into the specimen. `mode` is 'canned'
+  // (a picker-driven worked example — From/Source stay as illustrative
+  // copy) or 'custom' (visitor-typed text — no real sender, no real email,
+  // so those rows are honestly relabelled instead of reusing canned copy).
+  function renderResult(result, mode, connector){
+    if(!result){
+      if(demoChip) demoChip.hidden=true;
+      if(demoRecord) demoRecord.hidden=true;
+      if(demoQuiet) demoQuiet.hidden=false;
+      return;
+    }
+    if(demoQuiet) demoQuiet.hidden=true;
+    if(demoChip) demoChip.hidden=false;
+    if(demoRecord) demoRecord.hidden=false;
+
+    var target=connector||'Notion';
+    if(demoChipInner) demoChipInner.innerHTML='Do It: '+result.label+' <span class="target">&middot; '+target+'</span>';
+
+    setField('title', result.label);
+    setField('amount', result.facts.moneyText || null);
+    setField('date', result.facts.dateText ? (result.facts.dateText+(result.facts.date&&result.facts.date.iso ? ' <span class="dim">('+result.facts.date.iso+')</span>' : '')) : null);
+    setField('quote', result.facts.quote ? ('“'+result.facts.quote+'”') : null);
+
+    if(mode==='custom'){
+      setField('from', null);
+      setField('source', '<span class="dim">Not a real email — this is the text you typed, judged live</span>');
+    } else {
+      var ex=CANNED_EXAMPLES[result.domain];
+      setField('from', ex ? (ex.sender+' &lt;'+ex.senderEmail+'&gt;') : null);
+      setField('source', '<span class="dim">A link back to the original email in Gmail</span>');
+    }
+
+    if(demoWhy){
+      var top=result.signals.filter(function(s){ return s.weight>0; }).sort(function(a,b){ return b.weight-a.weight; }).slice(0,3);
+      if(top.length){ demoWhy.closest('[data-field]').hidden=false; demoWhy.textContent=top.map(function(s){ return s.why; }).join(' · '); }
+      else { demoWhy.closest('[data-field]').hidden=true; }
+    }
+
+    if(demoNoteTarget) demoNoteTarget.textContent=target;
+    if(demoNoteLabel) demoNoteLabel.textContent=LOG_LABEL[result.domain]||'Activity log';
+  }
+
+  // Re-runs the currently selected canned example through the real engine
+  // and renders it — called on picker change and once on page load, so the
+  // demo is live from first paint, not just after interaction.
+  function renderSpecimen(){
+    if(!haveEngine || !proof) return;
+    var domainLabel=currentLabel(domGroup,'data-domain');
+    var domainId=LABEL_TO_DOMAIN_ID[domainLabel]||'sales';
+    var connector=currentLabel(connGroup,'data-connector')||'Notion';
+    var ex=CANNED_EXAMPLES[domainId];
+    if(!ex) return;
+
+    if(mailEl) mailEl.hidden=false;
+    if(demoSubject) demoSubject.textContent=ex.subject;
+    if(demoSender) demoSender.textContent=ex.sender;
+    if(demoTime) demoTime.innerHTML=ex.time;
+    if(demoBody) demoBody.textContent=ex.body;
+
+    var result=FlowJudgment.evaluate(ex.body, domainId, { subject:ex.subject, senderEmail:ex.senderEmail, now:new Date() });
+    renderResult(result, 'canned', connector);
+  }
+
   [connGroup, domGroup, teamGroup, sensGroup, setupGroup].filter(Boolean).forEach(function(group){
     group.addEventListener('click', function(ev){
       var btn=ev.target.closest('[role="radio"]');
       if(!btn || btn.disabled) return;
       selectIn(group, btn);
       updateSummary();
+      if(group===connGroup || group===domGroup) renderSpecimen();
       btn.focus();
     });
 
@@ -869,9 +1032,59 @@ footer.site a{color:var(--ink-3)}
       ev.preventDefault();
       selectIn(group, next);
       updateSummary();
+      if(group===connGroup || group===domGroup) renderSpecimen();
       next.focus();
     });
   });
+
+  renderSpecimen();
+
+  // ---------------------------------------------------------------------
+  // Free-text box: run the real engine on whatever the visitor types, live.
+  // No network call anywhere in this path — FlowJudgment/FlowExtract are
+  // synchronous, zero-I/O functions (verified by reading their source).
+  // ---------------------------------------------------------------------
+  var demoInput=document.getElementById('demoInput'), demoStatus=document.getElementById('demoStatus'), demoReset=document.getElementById('demoReset');
+  if(demoInput && haveEngine){
+    var debounceTimer=null, lastFiredBucket=null;
+    demoInput.addEventListener('input', function(){
+      clearTimeout(debounceTimer);
+      var val=demoInput.value;
+      if(demoReset) demoReset.hidden=(val.trim().length===0);
+      if(!val.trim()){
+        if(demoStatus){ demoStatus.textContent=''; demoStatus.classList.remove('fired'); }
+        renderSpecimen();
+        return;
+      }
+      if(demoStatus){ demoStatus.textContent='Reading…'; demoStatus.classList.remove('fired'); }
+      debounceTimer=setTimeout(function(){
+        var domainLabel=currentLabel(domGroup,'data-domain');
+        var domainId=LABEL_TO_DOMAIN_ID[domainLabel]||'sales';
+        var connector=currentLabel(connGroup,'data-connector')||'Notion';
+        if(mailEl) mailEl.hidden=true;
+        var result=FlowJudgment.evaluate(val, domainId, { now:new Date() });
+        renderResult(result, 'custom', connector);
+        var bucket=result ? (result.score>=70?'high':'medium') : 'silent';
+        if(demoStatus){
+          demoStatus.textContent=result ? 'Glance would speak up here.' : 'Glance would stay quiet — ran locally, nothing sent anywhere.';
+          demoStatus.classList.toggle('fired', !!result);
+        }
+        if(bucket!==lastFiredBucket && typeof gtag==='function'){
+          gtag('event','demo_run',{domain:domainId, fired:!!result, score_bucket:bucket});
+        }
+        lastFiredBucket=bucket;
+      }, 350);
+    });
+  }
+  if(demoReset){
+    demoReset.addEventListener('click', function(ev){
+      ev.preventDefault();
+      if(demoInput) demoInput.value='';
+      if(demoStatus){ demoStatus.textContent=''; demoStatus.classList.remove('fired'); }
+      demoReset.hidden=true;
+      renderSpecimen();
+    });
+  }
 })();
 
 /* Magnetic hover: Do It buttons drift slightly toward the pointer. */

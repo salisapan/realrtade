@@ -55,6 +55,14 @@ const CASES = [
     subject: 'Re: March statement',
     text: 'The invoice amount does not match what we agreed. There is a discrepancy of $1,200 on the March statement — we were double-charged.' },
 
+  { name: 'NDA executed with effective date', domain: 'legal', fire: true,
+    subject: 'NDA — Acme Corp',
+    text: 'The NDA is fully executed — countersigned copy attached, effective September 7.' },
+
+  { name: 'renewal agreed with value and date', domain: 'support', fire: true,
+    subject: 'Re: account renewal',
+    text: 'Confirming the renewal is agreed at $18,000 for the year, effective September 7.' },
+
   // ---- noise that must stay quiet ----
   { name: 'cold sales pitch with a price', domain: 'sales', fire: false,
     subject: 'Quick question for you',
