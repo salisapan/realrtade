@@ -107,7 +107,13 @@ b,strong{color:var(--ink)}
 .eyebrow::before{content:'';width:7px; height:7px; border-radius:50%; background:var(--accent)}
 h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,3.15rem); line-height:1.08; letter-spacing:-.02em; color:var(--ink); margin:16px 0 18px; max-width:19ch}
 .lead{font-size:1.2rem; line-height:1.6; color:var(--ink-2); margin:0 0 26px; max-width:52ch}
-.hero-cta{display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:28px}
+.hero-cta{position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:28px}
+/* a soft floor of light under the primary CTA — the button already glows on
+   its own border/ring, but this wider, lower-intensity bloom is what makes
+   it read as a light source sitting slightly in front of the page rather
+   than a flat element pasted on top of it. */
+.hero-cta::before{content:''; position:absolute; left:16%; right:16%; top:-14px; bottom:-14px; z-index:-1; background:radial-gradient(ellipse 60% 100% at 20% 50%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 72%); filter:blur(6px); pointer-events:none}
+:root[data-theme="light"] .hero-cta::before{opacity:.5}
 /* secondary hero action — a plain text link with an icon, deliberately not a
    second boxed button: Do It stays the one visually "loud" CTA the site's
    design principles require, this is just a lower-emphasis way down to the
@@ -130,8 +136,16 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
    bug that made the streak only visible at the far left/right edges. */
 .hb-bg{position:absolute; z-index:-1; overflow:hidden; pointer-events:none; top:0; bottom:0; left:50%; width:100vw; transform:translateX(-50%); background:var(--bg)}
 #heroStreak{position:absolute; inset:0; width:100%; height:100%; display:block}
-.hb-bg::after{content:''; position:absolute; inset:0; background:radial-gradient(ellipse 115% 130% at 50% 40%, transparent 70%, var(--bg) 100%)}
+.hb-bg::after{content:''; position:absolute; inset:0; background:radial-gradient(ellipse 115% 130% at 50% 40%, transparent 65%, var(--bg) 100%)}
+/* film-grain texture — a single inlined feTurbulence SVG, tiled and set to
+   low opacity with a blend mode, rather than a flat gradient: it's what
+   keeps a large dark surface from reading as a plain solid-color rectangle
+   at typical viewing distance. Same technique real "AI frontier" product
+   sites use under their hero gradients. */
+.hb-bg::before{content:''; position:absolute; inset:0; opacity:.05; mix-blend-mode:overlay; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+:root[data-theme="light"] .hb-bg::before{opacity:.035}
 .hero-banner .title,.hero-banner .lead b{color:var(--ink)}
+:root:not([data-theme="light"]) .hero-banner .title{text-shadow:0 0 42px rgba(80,140,255,.28), 0 2px 20px rgba(2,6,16,.55)}
 .hero-banner .lead{color:var(--ink-2)}
 .hb-badge{position:relative; display:inline-flex; align-items:center; gap:9px; background:linear-gradient(180deg, rgba(255,255,255,.1), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:6px 16px 6px 6px; margin-bottom:22px; font-family:var(--mono); font-size:.78rem; color:rgba(255,255,255,.82); box-shadow:0 0 0 1px rgba(91,140,255,.14) inset, 0 8px 20px -12px rgba(59,116,255,.45)}
 .hb-badge b{background:var(--accent); color:#fff; font-family:var(--sans); font-weight:700; font-size:.66rem; text-transform:uppercase; letter-spacing:.04em; border-radius:999px; padding:4px 11px}
@@ -170,7 +184,7 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 @media (prefers-reduced-motion:reduce){ .doit,.doit *{transition:none!important; animation:none!important} }
 
 /* ---------------- specimen (moved up, primary proof) ---------------- */
-.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:26px 28px; margin:8px 0 64px; box-shadow:var(--shadow-lg); max-width:640px}
+.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:26px 28px; margin:8px 0 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
 .specimen .tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 16px}
 .mail{border-inline-start:3px solid var(--line-2); padding-inline-start:14px; margin-bottom:18px}
 .mail b{display:block; font-size:1rem; color:var(--ink); margin-bottom:3px; font-weight:700}
@@ -920,7 +934,6 @@ footer.site a{color:var(--ink-3)}
     // shallow bow around mid-width (behind/near the headline, same as the
     // reference), then falls away to a glow in the bottom-right corner.
     var p0=[-w*0.05, h*0.09], c1=[w*0.30, h*0.02], c2=[w*0.62, h*0.30], p1=[w*1.03, h*0.92];
-    var sunCenter=[w*0.94, h*0.9];
 
     function bez(t){
       var mt=1-t;
@@ -929,6 +942,13 @@ footer.site a{color:var(--ink-3)}
         mt*mt*mt*p0[1] + 3*mt*mt*t*c1[1] + 3*mt*t*t*c2[1] + t*t*t*p1[1]
       ];
     }
+    // The sun sits on the arc itself (t=.9), not at the path's literal end
+    // point p1 — p1 is deliberately off-canvas (x > w) so the line reads as
+    // continuing past the frame, but that also means a glow centered on it
+    // would have most of its own radius clipped by the edge and barely
+    // show at all. t=.9 is the last point on the curve still comfortably
+    // inside the visible canvas.
+    var sunCenter=bez(.9);
     // Find the path-length fraction t whose x matches a given screen x
     // (the curve is monotonic in x, so a short bisection is enough).
     function tAtX(targetX){
@@ -970,11 +990,12 @@ footer.site a{color:var(--ink-3)}
     }
     grad.addColorStop(1,'rgba(59,116,255,0)');
 
-    function strokePath(lineWidth, blur){
+    function strokePath(lineWidth, blur, alpha){
       ctx.save();
       ctx.lineCap='round';
       ctx.strokeStyle=grad;
       ctx.lineWidth=lineWidth;
+      if(alpha!=null) ctx.globalAlpha=alpha;
       if(blur){ ctx.shadowColor=glow; ctx.shadowBlur=blur; }
       ctx.beginPath();
       ctx.moveTo(p0[0],p0[1]);
@@ -983,22 +1004,44 @@ footer.site a{color:var(--ink-3)}
       ctx.restore();
     }
 
-    // A soft "sun" bloom where the arc dives off the bottom-right corner —
-    // the reference this was modeled on ends its beam the same way, at a
-    // glowing planet-edge rather than just an open line end.
+    // A "sun" with real structure — a wide ambient bloom, a mid ring, and a
+    // small hot core — rather than one flat radial blur, which read as an
+    // undefined smudge. Built from three concentric layers instead of one
+    // gradient with in-between stops, so each ring's falloff is sharp
+    // enough to actually register as a ring instead of blending away.
     function drawSun(){
-      var r=h*0.5;
-      var sunGrad=ctx.createRadialGradient(sunCenter[0],sunCenter[1],0,sunCenter[0],sunCenter[1],r);
-      sunGrad.addColorStop(0, isLight ? 'rgba(26,78,245,.55)' : 'rgba(196,218,255,.65)');
-      sunGrad.addColorStop(.18, glow);
-      sunGrad.addColorStop(1,'rgba(59,116,255,0)');
       ctx.save();
-      ctx.fillStyle=sunGrad;
+      var far=h*0.42;
+      var farGrad=ctx.createRadialGradient(sunCenter[0],sunCenter[1],0,sunCenter[0],sunCenter[1],far);
+      farGrad.addColorStop(0, glow);
+      farGrad.addColorStop(1,'rgba(59,116,255,0)');
+      ctx.fillStyle=farGrad;
+      ctx.fillRect(0,0,w,h);
+
+      var mid=h*0.16;
+      var midGrad=ctx.createRadialGradient(sunCenter[0],sunCenter[1],0,sunCenter[0],sunCenter[1],mid);
+      midGrad.addColorStop(0, isLight ? 'rgba(26,78,245,.75)' : 'rgba(196,218,255,.85)');
+      midGrad.addColorStop(1,'rgba(59,116,255,0)');
+      ctx.fillStyle=midGrad;
+      ctx.fillRect(0,0,w,h);
+
+      var core=h*0.05;
+      var coreGrad=ctx.createRadialGradient(sunCenter[0],sunCenter[1],0,sunCenter[0],sunCenter[1],core);
+      coreGrad.addColorStop(0, isLight ? 'rgba(15,55,198,1)' : 'rgba(255,255,255,.95)');
+      coreGrad.addColorStop(1,'rgba(59,116,255,0)');
+      ctx.fillStyle=coreGrad;
       ctx.fillRect(0,0,w,h);
       ctx.restore();
     }
 
     drawSun();
+    // A second, much fainter pass of the same arc, offset slightly toward
+    // the corner it curves into — a subtle depth cue, like a cast shadow
+    // for the light itself, rather than one flat single-plane line.
+    ctx.save();
+    ctx.translate(w*0.012, h*0.014);
+    strokePath(isLight ? Math.max(8,h*0.012) : Math.max(10,h*0.016), isLight ? 20 : 40, .22);
+    ctx.restore();
     strokePath(isLight ? Math.max(10,h*0.016) : Math.max(14,h*0.024), isLight ? 30 : 56);   // wide soft bloom
     strokePath(Math.max(6,h*0.01), isLight ? 12 : 24);     // mid glow
     strokePath(Math.max(2,h*0.003), 0);                     // crisp bright core
