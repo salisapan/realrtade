@@ -864,32 +864,28 @@ footer.site a{color:var(--ink-3)}
   });
 })();
 
-/* hero background streak: a comet-like glowing arc across the hero, drawn on
-   canvas rather than SVG — canvas gradients and shadowBlur work in real pixel
-   coordinates, so the shape renders exactly as designed regardless of
-   viewport size, instead of fighting viewBox/preserveAspectRatio scaling and
-   objectBoundingBox gradient math the way an SVG version did.
+/* hero background streak: modeled directly on the reference image supplied
+   for this component (a single comet-like arc from the top-left corner,
+   easing through a shallow dip, falling to a glowing "sun" tucked into the
+   bottom-right corner) — drawn on canvas rather than as a background image,
+   since there's no equivalent blue photographic/illustrated asset to use in
+   its place, and canvas gradients render at exact pixel coordinates
+   regardless of viewport size.
 
-   The path is two cubic Bézier segments joined at a point J, not one smooth
-   curve corner-to-corner: segment A skims flat along the very top of the
-   section for its entire width, then segment B carries that same flat
-   trajectory a little further past J — past the right edge of the centered
-   text column — before bending down into a soft "sun" glow in the
-   bottom-right corner. A single diagonal from corner to corner would
-   necessarily cross the vertical middle where the centered title/lead/CTA
-   sit, so fixing that meant controlling exactly where the bend happens, not
-   just softening it. The two segments' control handles on either side of J
-   are mirrored (b1 = 2J - a2) so the tangent direction is continuous through
-   the joint — an early version used two independent quadratics here and the
-   mismatched tangents produced a visible kink/elbow right where the curve
-   should read as one flowing line. The peak highlight color is also a
-   saturated ice-blue rather than near-white, so even where the glow's soft
-   falloff does reach text, it can't optically merge with white headline text
-   the way a true white core would. */
+   It's one continuous cubic Bézier now, not a routed-around-the-text path —
+   in the reference itself, the arc's dip genuinely does pass near/behind the
+   headline; what keeps it legible there isn't avoidance, it's that the
+   gradient's brightest (near-peak) stops sit before and after that crossing,
+   not during it. rangeToStop() below places the two peak highlights at fixed
+   fractions of the *actual on-screen* headline position rather than fixed
+   fractions of the path, so the brightness dip tracks the text if the
+   headline ever reflows (extra CTA, longer copy, a wider/narrower viewport)
+   instead of silently drifting back onto it. */
 (function(){
   var canvas=document.getElementById('heroStreak');
   if(!canvas) return;
   var ctx=canvas.getContext('2d');
+  var titleEl=document.querySelector('.hero-banner .title');
 
   function draw(){
     var w=canvas.clientWidth, h=canvas.clientHeight;
@@ -905,24 +901,65 @@ footer.site a{color:var(--ink-3)}
     // white would vanish (or, on dark theme, risk merging with white text).
     var peak = isLight ? 'rgba(15,55,198,1)' : 'rgba(196,218,255,1)';
     var glow = isLight ? 'rgba(26,78,245,.85)' : 'rgba(59,116,255,.95)';
+    // A saturated line reads as a soft ambient glow against dark theme's
+    // near-black background, but the same color against light theme's white
+    // background looks like a hard stripe cutting through black text — so the
+    // stretch that has to cross behind the headline is muted much further in
+    // light theme specifically, not just stepped down from peak to glow.
+    var textGlow = isLight ? 'rgba(59,116,255,.28)' : glow;
 
-    // Two cubic segments sharing joint J, with the outgoing handle at J
-    // (b1) mirrored from the incoming handle (a2) — the standard "smooth
-    // anchor" trick vector tools use so two curves meet without a kink.
-    // Segment A skims flat along the top; segment B carries that same
-    // flat trajectory a little further past J before bending down into
-    // the corner, instead of snapping into a new direction at the joint.
-    var s0=[-w*0.08, h*0.09], a1=[w*0.12, h*0.02], a2=[w*0.63, h*0.025];
-    var J=[w*0.855, h*0.048];
-    var b1=[2*J[0]-a2[0], 2*J[1]-a2[1]], b2=[w*1.02, h*0.34], p1=[w*0.96, h*0.9];
-    var sunCenter=[w*0.9, h*0.86];
+    // One easing arc: starts near the top-left corner, dips through a
+    // shallow bow around mid-width (behind/near the headline, same as the
+    // reference), then falls away to a glow in the bottom-right corner.
+    var p0=[-w*0.05, h*0.09], c1=[w*0.30, h*0.02], c2=[w*0.62, h*0.30], p1=[w*1.03, h*0.92];
+    var sunCenter=[w*0.94, h*0.9];
 
-    var grad=ctx.createLinearGradient(s0[0],s0[1],p1[0],p1[1]);
+    function bez(t){
+      var mt=1-t;
+      return [
+        mt*mt*mt*p0[0] + 3*mt*mt*t*c1[0] + 3*mt*t*t*c2[0] + t*t*t*p1[0],
+        mt*mt*mt*p0[1] + 3*mt*mt*t*c1[1] + 3*mt*t*t*c2[1] + t*t*t*p1[1]
+      ];
+    }
+    // Find the path-length fraction t whose x matches a given screen x
+    // (the curve is monotonic in x, so a short bisection is enough).
+    function tAtX(targetX){
+      var lo=0, hi=1;
+      for(var i=0;i<20;i++){ var mid=(lo+hi)/2; if(bez(mid)[0]<targetX) lo=mid; else hi=mid; }
+      return (lo+hi)/2;
+    }
+
+    var grad=ctx.createLinearGradient(p0[0],p0[1],p1[0],p1[1]);
     grad.addColorStop(0,'rgba(59,116,255,0)');
-    grad.addColorStop(.30,glow);
-    grad.addColorStop(.52,peak);
-    grad.addColorStop(.7,glow);
-    grad.addColorStop(.88,peak);
+    if(titleEl){
+      // The near-white peak stops sit with a clear buffer *outside* the
+      // headline's actual left/right edges (in canvas-local coordinates) —
+      // not touching them — so the brightest part of the beam never sits
+      // adjacent to the text. Everything spanning the text itself, however
+      // wide that turns out to be at this viewport size, stays at the
+      // dimmer "glow" color the whole way across, no ramp-up in the middle.
+      var canvasRect=canvas.getBoundingClientRect();
+      var tr=titleEl.getBoundingClientRect();
+      var tBefore=tAtX(tr.left - canvasRect.left);
+      var tAfter=tAtX(tr.right - canvasRect.left);
+      var earlyPeak=Math.max(.08, tBefore-.16);
+      var latePeak=Math.min(.92, tAfter+.16);
+      if(latePeak > earlyPeak+.1){
+        grad.addColorStop(Math.max(0,earlyPeak-.1), glow);
+        grad.addColorStop(earlyPeak, peak);
+        grad.addColorStop(Math.min(earlyPeak+.08,tBefore), textGlow);
+        grad.addColorStop(Math.max(tAfter,tBefore), textGlow);
+        grad.addColorStop(Math.max(latePeak-.08,tAfter), glow);
+        grad.addColorStop(latePeak, peak);
+        grad.addColorStop(Math.min(1,latePeak+.1), glow);
+      } else {
+        grad.addColorStop(.5, peak);
+      }
+    } else {
+      grad.addColorStop(.3, glow);
+      grad.addColorStop(.5, peak);
+      grad.addColorStop(.7, glow);
+    }
     grad.addColorStop(1,'rgba(59,116,255,0)');
 
     function strokePath(lineWidth, blur){
@@ -932,9 +969,8 @@ footer.site a{color:var(--ink-3)}
       ctx.lineWidth=lineWidth;
       if(blur){ ctx.shadowColor=glow; ctx.shadowBlur=blur; }
       ctx.beginPath();
-      ctx.moveTo(s0[0],s0[1]);
-      ctx.bezierCurveTo(a1[0],a1[1],a2[0],a2[1],J[0],J[1]);
-      ctx.bezierCurveTo(b1[0],b1[1],b2[0],b2[1],p1[0],p1[1]);
+      ctx.moveTo(p0[0],p0[1]);
+      ctx.bezierCurveTo(c1[0],c1[1],c2[0],c2[1],p1[0],p1[1]);
       ctx.stroke();
       ctx.restore();
     }
@@ -955,8 +991,8 @@ footer.site a{color:var(--ink-3)}
     }
 
     drawSun();
-    strokePath(Math.max(14,h*0.024), isLight ? 34 : 56);   // wide soft bloom
-    strokePath(Math.max(6,h*0.01), isLight ? 14 : 24);     // mid glow
+    strokePath(isLight ? Math.max(10,h*0.016) : Math.max(14,h*0.024), isLight ? 30 : 56);   // wide soft bloom
+    strokePath(Math.max(6,h*0.01), isLight ? 12 : 24);     // mid glow
     strokePath(Math.max(2,h*0.003), 0);                     // crisp bright core
   }
 
