@@ -136,7 +136,7 @@ function ownerNotificationHtml(email, lang, kind) {
     .join('');
   return (
     '<div style="font-family:Arial,Helvetica,sans-serif; font-size:14px; color:#232B44;">' +
-    '<p>New ' + (kind === 'trial' ? 'Glance' : 'Flow waitlist') + ' signup (pending confirmation):</p>' +
+    '<p>New ' + (kind === 'trial' ? 'Glance' : kind === 'pro' ? 'Glance Pro' : 'Flow waitlist') + ' signup (pending confirmation):</p>' +
     '<table role="presentation" cellpadding="0" cellspacing="0">' + rowsHtml + '</table>' +
     '</div>'
   );
