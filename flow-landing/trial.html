@@ -122,7 +122,17 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 .hero-secondary svg{width:15px; height:15px; flex:none}
 .hero-secondary:hover{color:var(--ink); border-color:var(--line-2)}
 .status-row{display:flex; flex-wrap:wrap; gap:8px; font-family:var(--mono); font-size:.74rem}
-.status-row span{background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:5px 10px; color:var(--ink-3)}
+.status-row span{display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:5px 10px; color:var(--ink-3)}
+/* checkmarks draw in once, on first scroll into view — ties the motion to
+   the four trust claims actually being "checked off", not decoration. */
+.status-row .check{width:12px; height:12px; flex:none; color:var(--ok); stroke-dasharray:24; stroke-dashoffset:24}
+.status-row.in .check{animation:check-draw .5s ease forwards}
+.status-row.in span:nth-child(1) .check{animation-delay:0ms}
+.status-row.in span:nth-child(2) .check{animation-delay:90ms}
+.status-row.in span:nth-child(3) .check{animation-delay:180ms}
+.status-row.in span:nth-child(4) .check{animation-delay:270ms}
+@keyframes check-draw{ to{ stroke-dashoffset:0 } }
+@media (prefers-reduced-motion:reduce){ .status-row .check{stroke-dashoffset:0; animation:none} }
 
 /* hero-banner: full-bleed centered layout — badge, headline, dual CTA, connector strip.
    The site's real header/hamburger nav above this is untouched; only the content
@@ -142,8 +152,9 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
    keeps a large dark surface from reading as a plain solid-color rectangle
    at typical viewing distance. Same technique real "AI frontier" product
    sites use under their hero gradients. */
-.hb-bg::before{content:''; position:absolute; inset:0; opacity:.05; mix-blend-mode:overlay; pointer-events:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.hb-bg::before{content:''; position:absolute; inset:0; opacity:.05; mix-blend-mode:overlay; pointer-events:none; transition:opacity .25s ease; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 :root[data-theme="light"] .hb-bg::before{opacity:.035}
+@media (prefers-reduced-motion:reduce){ .hb-bg::before{transition:none} }
 .hero-banner .title,.hero-banner .lead b{color:var(--ink)}
 :root:not([data-theme="light"]) .hero-banner .title{text-shadow:0 0 42px rgba(80,140,255,.28), 0 2px 20px rgba(2,6,16,.55)}
 .hero-banner .lead{color:var(--ink-2)}
@@ -156,8 +167,19 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 .hb-partners{margin:42px 0 0}
 .hb-partners p{font-family:var(--mono); font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); margin:0 0 18px}
 .hb-partner-row{display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:30px}
-.hb-partner{display:inline-flex; align-items:center; gap:7px; color:var(--ink-3); opacity:.7; transition:opacity .2s,color .2s,transform .2s; text-decoration:none}
+.hb-partner{display:inline-flex; align-items:center; gap:7px; color:var(--ink-3); opacity:0; transform:translateY(6px); transition:opacity .2s,color .2s,transform .2s; text-decoration:none}
 .hb-partner:hover{opacity:1; color:var(--accent); transform:translateY(-1px)}
+/* staggered reveal on first scroll into view — small polish moment right
+   before the setup wizard. Falls back to fully visible if JS/IO never
+   fires (no-JS, or the section is already on screen at load), so this is
+   additive polish, never a required step to see the logos. */
+.hb-partner-row.in .hb-partner{opacity:.7; transform:translateY(0); transition:opacity .5s ease, transform .5s ease, color .2s, transform .2s}
+.hb-partner-row.in .hb-partner:nth-child(1){transition-delay:0ms}
+.hb-partner-row.in .hb-partner:nth-child(2){transition-delay:60ms}
+.hb-partner-row.in .hb-partner:nth-child(3){transition-delay:120ms}
+.hb-partner-row.in .hb-partner:nth-child(4){transition-delay:180ms}
+.hb-partner-row.in .hb-partner:nth-child(5){transition-delay:240ms}
+@media (prefers-reduced-motion:reduce){ .hb-partner{opacity:.7; transform:none; transition:none} }
 .hb-partner svg{width:19px; height:19px; flex:none}
 .hb-partner span{font-family:var(--sans); font-weight:600; font-size:.85rem; white-space:nowrap}
 @media (max-width:640px){ .hero-banner{padding:56px 0 4px} .hb-partner-row{gap:18px 22px} }
@@ -185,6 +207,17 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2.3rem,4.6vw,
 
 /* ---------------- specimen (moved up, primary proof) ---------------- */
 .specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:26px 28px; margin:8px 0 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
+/* a one-shot glow on first scroll into view — foreshadows this card being
+   the one that's actually interactive below, not decoration for its own
+   sake. Fires once via IntersectionObserver, see the script near the other
+   reveal-on-scroll logic. */
+@keyframes specimen-reveal{
+  0%{box-shadow:var(--shadow-lg), 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);}
+  35%{box-shadow:var(--shadow-lg), 0 0 46px 6px color-mix(in srgb, var(--accent) 45%, transparent);}
+  100%{box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent);}
+}
+.specimen.reveal-in{animation:specimen-reveal 1.1s cubic-bezier(.2,.7,.3,1) both}
+@media (prefers-reduced-motion:reduce){ .specimen.reveal-in{animation:none} }
 .specimen .tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 16px}
 .mail{border-inline-start:3px solid var(--line-2); padding-inline-start:14px; margin-bottom:18px}
 .mail b{display:block; font-size:1rem; color:var(--ink); margin-bottom:3px; font-weight:700}
@@ -454,11 +487,11 @@ footer.site a{color:var(--ink-3)}
         <span class="magnetic"><a class="doit glance" href="#flexible"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="gc-badge-inline" aria-hidden="true">G</span>Set Up My Glance</a></span>
         <a class="hero-secondary" href="#proof">See a real example<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></a>
       </div>
-      <div class="status-row">
-        <span>Free, no card</span>
-        <span>Setup is a few clicks</span>
-        <span>Judgment stays on your device</span>
-        <span>Undo on every write</span>
+      <div class="status-row" id="statusRow">
+        <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 7"/></svg>Free, no card</span>
+        <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 7"/></svg>Setup is a few clicks</span>
+        <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 7"/></svg>Judgment stays on your device</span>
+        <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 7"/></svg>Undo on every write</span>
       </div>
       <div class="hb-partners">
         <p>Works with the systems your team already uses</p>
@@ -1299,6 +1332,24 @@ footer.site a{color:var(--ink-3)}
     if(document.hidden){ if(raf){ cancelAnimationFrame(raf); raf=null; } }
     else if(el.getBoundingClientRect().top<innerHeight && !raf){ raf=requestAnimationFrame(tick); }
   });
+})();
+
+/* one-shot scroll-in reveals: the specimen glow, the trust-badge checkmarks,
+   and the staggered partner logos. Each just adds a class the CSS above
+   animates from, then unobserves — no ongoing cost after the first reveal.
+   Falls back to already-visible (no animation) if IntersectionObserver
+   isn't available, rather than leaving anything permanently hidden. */
+(function(){
+  var targets=[document.getElementById('proof'), document.getElementById('statusRow'), document.querySelector('.hb-partner-row')].filter(Boolean);
+  if(!targets.length) return;
+  function reveal(el){ el.classList.add(el.id==='proof' ? 'reveal-in' : 'in'); }
+  if(!('IntersectionObserver' in window)){ targets.forEach(reveal); return; }
+  var io=new IntersectionObserver(function(es, obs){
+    es.forEach(function(e){
+      if(e.isIntersecting){ reveal(e.target); obs.unobserve(e.target); }
+    });
+  }, { threshold:.2 });
+  targets.forEach(function(t){ io.observe(t); });
 })();
 </script>
 <script>
