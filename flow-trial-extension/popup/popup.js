@@ -119,6 +119,7 @@
       const res = await send(msg);
       if (res && res.ok) {
         await FlowStorage.set({ connectorId: c.id });
+        chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {
         btn.disabled = false; btn.textContent = 'Connect ' + c.label;
@@ -309,7 +310,12 @@
     document.getElementById('referralCopy').addEventListener('click', async () => {
       const btn = document.getElementById('referralCopy');
       try {
-        await navigator.clipboard.writeText('https://theflow-ai.com/trial.html?ref=share');
+        // The install id doubles as the referral code — it's already a
+        // random, non-identifying local value (see storage.js), so reusing
+        // it here means a share can actually be attributed back to this
+        // install without adding a second identifier to track.
+        const code = await FlowStorage.getInstallId();
+        await navigator.clipboard.writeText('https://theflow-ai.com/trial.html?ref=' + code);
         const original = btn.textContent;
         btn.textContent = 'Copied';
         setTimeout(() => { btn.textContent = original; }, 1800);

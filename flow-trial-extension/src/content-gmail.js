@@ -149,6 +149,7 @@
     // for others. Only record it the first time.
     if (!alreadyLoggedShown) {
       FlowStorage.appendLog({ kind: 'shown', label: result.label, messageId, score: result.score, signals: result.signals });
+      chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_shown', params: { domain: state.domainId } });
     }
   }
 
@@ -231,6 +232,7 @@
     setChipState(chip, 'flow-chip-pending', 'Working…');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.result.label, messageId: ctx.messageId, score: ctx.result.score });
     FlowStorage.calibrate('click');
+    chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
     chrome.runtime.sendMessage({
       type: 'flow:execute-action',
@@ -248,6 +250,7 @@
       if (response.ok) {
         showReceipt(host, ctx, response);
         FlowStorage.appendLog({ kind: 'written', label: ctx.result.label, messageId: ctx.messageId, where: response.where, url: response.url, ref: response.ref, connectorId: state.connectorId });
+        chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, connector: state.connectorId } });
         return;
       }
       if (response.reason === 'connector-not-live') setChipState(chip, 'flow-chip-warn', 'That connector isn’t wired up yet.');
@@ -261,6 +264,7 @@
     host.remove();
     FlowStorage.appendLog({ kind: 'dismissed', label: ctx.result.label, messageId: ctx.messageId, score: ctx.result.score });
     FlowStorage.calibrate('dismiss');
+    chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
   }
 
   chrome.storage.onChanged.addListener((changes) => {

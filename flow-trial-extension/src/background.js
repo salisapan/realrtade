@@ -847,4 +847,37 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (!undoer) return reply(sendResponse, Promise.resolve({ ok: false }));
     return reply(sendResponse, undoer(msg.ref));
   }
+
+  // Fire-and-forget: telemetry is never allowed to affect what the caller
+  // does next, so this always resolves { ok: true } even if the relay call
+  // itself fails. See track-event.js for what does and does not leave the
+  // device — never email content, sender identity, or extracted facts.
+  if (msg.type === 'flow:track') {
+    return reply(sendResponse, trackEvent(msg.event, msg.params).then(() => ({ ok: true })).catch(() => ({ ok: true })));
+  }
 });
+
+// Mirrors storage.js's getInstallId rather than importing it — background.js
+// has never loaded storage.js (it talks to chrome.storage.local directly
+// throughout this file, same as every other auth blob above), and this way
+// the service worker gains no new cross-file dependency for one field.
+async function getInstallId() {
+  const { installId } = await chrome.storage.local.get('installId');
+  if (installId) return installId;
+  const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/-/g, '').slice(0, 12);
+  await chrome.storage.local.set({ installId: id });
+  return id;
+}
+
+async function trackEvent(name, params) {
+  try {
+    const installId = await getInstallId();
+    await fetch('https://theflow-ai.com/.netlify/functions/track-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ installId, event: name, params: params || {} })
+    });
+  } catch (e) {
+    // non-fatal — see comment above
+  }
+}

@@ -743,7 +743,15 @@ footer.site a{color:var(--ink-3)}
         : 'Something went wrong. Please try again in a moment.';
     }
 
-    fetch(SB_URL+'/rest/v1/waitlist',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({email:v,lang:'en',source:'trial-extension',created_at:new Date().toISOString()})})
+    // ref_code (nullable) carries the referring install's id when this visit
+    // came from the popup's "copy a link" button — see popup.js. Kept out of
+    // `source`, which the domain-cluster sales-lead heuristic in
+    // confirm-signup.js matches on exactly; folding the code in there would
+    // silently break that match for every referred signup.
+    var refCode=new URLSearchParams(location.search).get('ref');
+    var waitlistBody={email:v,lang:'en',source:'trial-extension',created_at:new Date().toISOString()};
+    if(refCode) waitlistBody.ref_code=refCode.slice(0,32);
+    fetch(SB_URL+'/rest/v1/waitlist',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(waitlistBody)})
       .catch(function(){}); // best-effort; never blocks the confirmation email
 
     fetch('/.netlify/functions/send-confirmation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v,lang:'en',kind:'trial'})})

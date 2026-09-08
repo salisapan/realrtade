@@ -16,7 +16,14 @@ const FlowStorage = (() => {
     // Whether the one-time "share with a teammate" prompt in the Activity
     // tab has been dismissed. It earns its place after real usage (see
     // popup.js renderReferral) and, once dismissed, never comes back.
-    referralDismissed: false
+    referralDismissed: false,
+    // A random per-install identifier — never an email, never tied to a
+    // Google/workspace identity. It exists for two things only: telling one
+    // install's anonymous usage events apart from another's in aggregate
+    // product analytics, and doubling as the referral code in the "copy a
+    // link" flow so a share can actually be attributed. Generated once,
+    // reused forever; see getInstallId below.
+    installId: null
   };
 
   function get() {
@@ -125,7 +132,15 @@ const FlowStorage = (() => {
     return next;
   });
 
-  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, calibrate, DEFAULTS };
+  const getInstallId = serialize(async function getInstallId() {
+    const state = await get();
+    if (state.installId) return state.installId;
+    const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/-/g, '').slice(0, 12);
+    await set({ installId: id });
+    return id;
+  });
+
+  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, calibrate, getInstallId, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };
