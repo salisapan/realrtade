@@ -864,11 +864,25 @@ footer.site a{color:var(--ink-3)}
   });
 })();
 
-/* hero background streak: a single glowing curved arc across the hero, drawn
-   on canvas rather than SVG — canvas gradients and shadowBlur work in real
-   pixel coordinates, so the shape renders exactly as designed regardless of
+/* hero background streak: a comet-like glowing arc across the hero, drawn on
+   canvas rather than SVG — canvas gradients and shadowBlur work in real pixel
+   coordinates, so the shape renders exactly as designed regardless of
    viewport size, instead of fighting viewBox/preserveAspectRatio scaling and
-   objectBoundingBox gradient math the way an SVG version did. */
+   objectBoundingBox gradient math the way an SVG version did.
+
+   The path is two joined quadratic segments, not one smooth curve, and that's
+   deliberate: segment 1 skims flat along the very top of the section (y stays
+   under ~9% of the hero height) for its entire width, then segment 2 breaks
+   downward only once it's past the right edge of the centered text column
+   (~85% width) and dives into a soft "sun" glow in the bottom-right corner.
+   Earlier this crossed a single diagonal straight through the headline —
+   any smooth single-curve path from corner to corner necessarily passes
+   through the vertical middle where the centered title/lead/CTA sit, so
+   fixing that meant controlling exactly where the bend happens, not just
+   softening it. The peak highlight color is also a saturated ice-blue
+   rather than near-white, so even where the glow's soft falloff does reach
+   text, it can't optically merge with white headline text the way a true
+   white core would. */
 (function(){
   var canvas=document.getElementById('heroStreak');
   if(!canvas) return;
@@ -883,36 +897,60 @@ footer.site a{color:var(--ink-3)}
     ctx.clearRect(0,0,w,h);
 
     var isLight = document.documentElement.getAttribute('data-theme') === 'light';
-    // Light theme sits on a white hero, so the mid-stop highlight has to stay
-    // a saturated blue rather than the near-white peak dark theme uses — white
-    // on white would just vanish.
-    var peak = isLight ? 'rgba(15,55,198,1)' : 'rgba(234,241,255,1)';
+    // Light theme sits on a white hero, so the peak has to stay a saturated
+    // blue rather than the ice-blue-white dark theme uses — anything close to
+    // white would vanish (or, on dark theme, risk merging with white text).
+    var peak = isLight ? 'rgba(15,55,198,1)' : 'rgba(196,218,255,1)';
     var glow = isLight ? 'rgba(26,78,245,.85)' : 'rgba(59,116,255,.95)';
 
-    var p0=[-w*0.06, h*0.82], c1=[w*0.44, h*0.10], p1=[w*1.06, h*0.02];
-    var grad=ctx.createLinearGradient(p0[0],p0[1],p1[0],p1[1]);
+    // Segment 1: flat skim along the top, left edge to just past the text
+    // column's right edge. Segment 2: the dive, from there to a glow orb
+    // tucked into the bottom-right corner.
+    var s0=[-w*0.08, h*0.065], sc=[w*0.44, h*0.015], s1=[w*0.88, h*0.05];
+    var dc=[w*1.02, h*0.12], p1=[w*0.97, h*0.9];
+    var sunCenter=[w*0.93, h*0.87];
+
+    var grad=ctx.createLinearGradient(s0[0],s0[1],p1[0],p1[1]);
     grad.addColorStop(0,'rgba(59,116,255,0)');
-    grad.addColorStop(.38,glow);
-    grad.addColorStop(.55,peak);
-    grad.addColorStop(.74,glow);
+    grad.addColorStop(.30,glow);
+    grad.addColorStop(.52,peak);
+    grad.addColorStop(.7,glow);
+    grad.addColorStop(.88,peak);
     grad.addColorStop(1,'rgba(59,116,255,0)');
 
-    function strokeCurve(lineWidth, blur){
+    function strokePath(lineWidth, blur){
       ctx.save();
       ctx.lineCap='round';
       ctx.strokeStyle=grad;
       ctx.lineWidth=lineWidth;
       if(blur){ ctx.shadowColor=glow; ctx.shadowBlur=blur; }
       ctx.beginPath();
-      ctx.moveTo(p0[0],p0[1]);
-      ctx.quadraticCurveTo(c1[0],c1[1],p1[0],p1[1]);
+      ctx.moveTo(s0[0],s0[1]);
+      ctx.quadraticCurveTo(sc[0],sc[1],s1[0],s1[1]);
+      ctx.quadraticCurveTo(dc[0],dc[1],p1[0],p1[1]);
       ctx.stroke();
       ctx.restore();
     }
 
-    strokeCurve(Math.max(16,h*0.03), isLight ? 40 : 70);   // wide soft bloom
-    strokeCurve(Math.max(7,h*0.012), isLight ? 16 : 28);   // mid glow
-    strokeCurve(Math.max(2,h*0.0035), 0);   // crisp bright core
+    // A soft "sun" bloom where the arc dives off the bottom-right corner —
+    // the reference this was modeled on ends its beam the same way, at a
+    // glowing planet-edge rather than just an open line end.
+    function drawSun(){
+      var r=h*0.5;
+      var sunGrad=ctx.createRadialGradient(sunCenter[0],sunCenter[1],0,sunCenter[0],sunCenter[1],r);
+      sunGrad.addColorStop(0, isLight ? 'rgba(26,78,245,.55)' : 'rgba(196,218,255,.65)');
+      sunGrad.addColorStop(.18, glow);
+      sunGrad.addColorStop(1,'rgba(59,116,255,0)');
+      ctx.save();
+      ctx.fillStyle=sunGrad;
+      ctx.fillRect(0,0,w,h);
+      ctx.restore();
+    }
+
+    drawSun();
+    strokePath(Math.max(14,h*0.024), isLight ? 34 : 56);   // wide soft bloom
+    strokePath(Math.max(6,h*0.01), isLight ? 14 : 24);     // mid glow
+    strokePath(Math.max(2,h*0.003), 0);                     // crisp bright core
   }
 
   draw();
