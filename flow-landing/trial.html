@@ -870,19 +870,22 @@ footer.site a{color:var(--ink-3)}
    viewport size, instead of fighting viewBox/preserveAspectRatio scaling and
    objectBoundingBox gradient math the way an SVG version did.
 
-   The path is two joined quadratic segments, not one smooth curve, and that's
-   deliberate: segment 1 skims flat along the very top of the section (y stays
-   under ~9% of the hero height) for its entire width, then segment 2 breaks
-   downward only once it's past the right edge of the centered text column
-   (~85% width) and dives into a soft "sun" glow in the bottom-right corner.
-   Earlier this crossed a single diagonal straight through the headline —
-   any smooth single-curve path from corner to corner necessarily passes
-   through the vertical middle where the centered title/lead/CTA sit, so
-   fixing that meant controlling exactly where the bend happens, not just
-   softening it. The peak highlight color is also a saturated ice-blue
-   rather than near-white, so even where the glow's soft falloff does reach
-   text, it can't optically merge with white headline text the way a true
-   white core would. */
+   The path is two cubic Bézier segments joined at a point J, not one smooth
+   curve corner-to-corner: segment A skims flat along the very top of the
+   section for its entire width, then segment B carries that same flat
+   trajectory a little further past J — past the right edge of the centered
+   text column — before bending down into a soft "sun" glow in the
+   bottom-right corner. A single diagonal from corner to corner would
+   necessarily cross the vertical middle where the centered title/lead/CTA
+   sit, so fixing that meant controlling exactly where the bend happens, not
+   just softening it. The two segments' control handles on either side of J
+   are mirrored (b1 = 2J - a2) so the tangent direction is continuous through
+   the joint — an early version used two independent quadratics here and the
+   mismatched tangents produced a visible kink/elbow right where the curve
+   should read as one flowing line. The peak highlight color is also a
+   saturated ice-blue rather than near-white, so even where the glow's soft
+   falloff does reach text, it can't optically merge with white headline text
+   the way a true white core would. */
 (function(){
   var canvas=document.getElementById('heroStreak');
   if(!canvas) return;
@@ -903,12 +906,16 @@ footer.site a{color:var(--ink-3)}
     var peak = isLight ? 'rgba(15,55,198,1)' : 'rgba(196,218,255,1)';
     var glow = isLight ? 'rgba(26,78,245,.85)' : 'rgba(59,116,255,.95)';
 
-    // Segment 1: flat skim along the top, left edge to just past the text
-    // column's right edge. Segment 2: the dive, from there to a glow orb
-    // tucked into the bottom-right corner.
-    var s0=[-w*0.08, h*0.065], sc=[w*0.44, h*0.015], s1=[w*0.88, h*0.05];
-    var dc=[w*1.02, h*0.12], p1=[w*0.97, h*0.9];
-    var sunCenter=[w*0.93, h*0.87];
+    // Two cubic segments sharing joint J, with the outgoing handle at J
+    // (b1) mirrored from the incoming handle (a2) — the standard "smooth
+    // anchor" trick vector tools use so two curves meet without a kink.
+    // Segment A skims flat along the top; segment B carries that same
+    // flat trajectory a little further past J before bending down into
+    // the corner, instead of snapping into a new direction at the joint.
+    var s0=[-w*0.08, h*0.09], a1=[w*0.12, h*0.02], a2=[w*0.63, h*0.025];
+    var J=[w*0.855, h*0.048];
+    var b1=[2*J[0]-a2[0], 2*J[1]-a2[1]], b2=[w*1.02, h*0.34], p1=[w*0.96, h*0.9];
+    var sunCenter=[w*0.9, h*0.86];
 
     var grad=ctx.createLinearGradient(s0[0],s0[1],p1[0],p1[1]);
     grad.addColorStop(0,'rgba(59,116,255,0)');
@@ -926,8 +933,8 @@ footer.site a{color:var(--ink-3)}
       if(blur){ ctx.shadowColor=glow; ctx.shadowBlur=blur; }
       ctx.beginPath();
       ctx.moveTo(s0[0],s0[1]);
-      ctx.quadraticCurveTo(sc[0],sc[1],s1[0],s1[1]);
-      ctx.quadraticCurveTo(dc[0],dc[1],p1[0],p1[1]);
+      ctx.bezierCurveTo(a1[0],a1[1],a2[0],a2[1],J[0],J[1]);
+      ctx.bezierCurveTo(b1[0],b1[1],b2[0],b2[1],p1[0],p1[1]);
       ctx.stroke();
       ctx.restore();
     }
