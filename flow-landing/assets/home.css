@@ -144,9 +144,6 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .mobile-menu nav{display:flex; flex-direction:column; align-items:center; gap:8px; flex:none}
 .mobile-menu a{font-family:var(--disp); font-weight:600; font-size:1.5rem; color:var(--txt-hi); padding:8px 14px; transition:color .2s}
 .mobile-menu a:hover{color:var(--accent-2)}
-.mobile-menu-group{display:flex; flex-direction:column; align-items:center; gap:2px; margin-block-start:8px; padding-block-start:12px; border-block-start:1px solid var(--line)}
-.mobile-menu-group-label{font-family:var(--mono,ui-monospace,monospace); font-size:.66rem; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-2); margin-block-end:4px}
-.mobile-menu-group a{font-size:1.02rem; font-weight:600; padding:5px 14px}
 /* Privacy/Terms render like every other top-level menu link — previously
    singled out with a smaller, dimmer, side-by-side treatment. */
 .mobile-menu-legal{display:flex; flex-direction:column; align-items:center; gap:2px; margin-block-start:4px}
