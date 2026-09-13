@@ -6,7 +6,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
-const DOIT_BUTTON_URL = 'https://theflow-ai.com/email-doit-button.png';
 const LOG_PREFIX = '[send-playbook]';
 
 // This function is only ever meant to be called by confirm-signup.js right
@@ -41,12 +40,20 @@ const SUBJECT = {
   he: 'בואו נבנה את תוכנית הפריסה שלכם (+ ה-Playbook)',
 };
 
-function ctaButton(altLabel) {
+// A real HTML button, not the image this used to be. An <a> wrapping an
+// <img> depends on the image actually loading — most mail clients block
+// remote images by default, and a blocked image can render as an
+// unclickable placeholder in some engines (notably Outlook's Word-based
+// renderer) rather than a working link. Solid background + inline styles
+// is the same "bulletproof button" pattern already used successfully by
+// send-confirmation.js's own CTA, styled here to match the site's Do It
+// button (solid accent fill, bold white label, pill radius, a lighter
+// border standing in for the ring layer CSS can't reproduce in email).
+function ctaButton(label) {
   return (
     '<tr><td align="center" style="padding:28px 0 10px">' +
-    '<a href="' + CTA_URL + '" style="display:inline-block;">' +
-    '<img src="' + DOIT_BUTTON_URL + '" alt="' + altLabel + '" width="220" style="display:block; width:220px; height:auto;">' +
-    '</a></td></tr>'
+    '<a href="' + CTA_URL + '" style="display:inline-block; background:#1A4EF5; color:#ffffff; text-decoration:none; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:16px; padding:15px 34px; border-radius:999px; border:1px solid #6E9BFF;">' + label + '</a>' +
+    '</td></tr>'
   );
 }
 
