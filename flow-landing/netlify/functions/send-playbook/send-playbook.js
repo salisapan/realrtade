@@ -6,11 +6,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
-// A real screenshot of the site's actual Do It button (dark theme, hero
-// size), captured with its own glow bleeding into a matching dark backdrop
-// — the glassmorphism/ring effect genuinely can't be reproduced in email
-// HTML, so this is the button itself, not an approximation of it.
-const DOIT_BUTTON_URL = 'https://theflow-ai.com/email-doit-button.png';
 const LOG_PREFIX = '[send-playbook]';
 
 // This function is only ever meant to be called by confirm-signup.js right
@@ -45,26 +40,23 @@ const SUBJECT = {
   he: 'בואו נבנה את תוכנית הפריסה שלכם (+ ה-Playbook)',
 };
 
-// The button is genuinely the site's Do It button — a screenshot of it,
-// not a coded recreation — because the real one's glassmorphism (a
-// translucent shell blending with whatever's behind it, plus an inset
-// glowing ring) has no email-safe equivalent; two prior attempts to
-// rebuild it in CSS both landed close but not actually matching.
+// A real HTML/CSS button, not an image — a screenshot always shows its
+// rectangular crop edge against the email's plain background (visible as
+// a "cut" line around the pill), which reads as fake precisely because
+// it's real pixels of a page that no longer surrounds it. A coded button
+// never has that seam.
 //
-// What went wrong the first time this was an image: the <img> had a
-// `width` attribute but no `height`, so a client that ignores the CSS
-// `height:auto` (Outlook's Word-based renderer does) could collapse the
-// placeholder to near-zero height before the image loads, or fail to
-// reserve click-target space at all if images are blocked. Both width
-// and height are set explicitly below so the clickable area is always
-// correctly sized, image loaded or not, and `border="0"` avoids Outlook
-// drawing its own default border around a linked image.
+// Colors are pulled directly from the site's own light-theme tokens
+// (home.css's :root[data-theme="light"] block for --accent, --ring,
+// --doit-text, --glass-*), not invented — the light theme's shell tints
+// are already near-white, so unlike the dark theme's transparency (which
+// only makes sense blended against a dark page) they hold up correctly
+// composited against the email's white background.
 function ctaButton(label) {
   return (
     '<tr><td align="center" style="padding:28px 0 10px">' +
-    '<a href="' + CTA_URL + '" style="display:inline-block; line-height:0;">' +
-    '<img src="' + DOIT_BUTTON_URL + '" width="260" height="168" alt="' + label + '" border="0" style="display:block; width:260px; height:168px;">' +
-    '</a></td></tr>'
+    '<a href="' + CTA_URL + '" style="display:inline-block; background:linear-gradient(180deg,#ffffff 0%,#dde9fb 100%); background-color:#ffffff; color:#123ccb; text-decoration:none; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:16px; padding:18px 40px; border-radius:999px; border:2px solid #2f5bd8; box-shadow:0 0 0 1px rgba(40,70,150,.22), 0 10px 24px -10px rgba(26,78,245,.4), 0 0 14px rgba(26,78,245,.16);">' + label + '</a>' +
+    '</td></tr>'
   );
 }
 
