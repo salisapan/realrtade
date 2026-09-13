@@ -23,6 +23,34 @@ const LOG_PREFIX = '[submit-waitlist]';
 
 const LIMITS = { email: 200, company: 160, role: 120, website: 200 };
 
+// 'update' used to be authorized by knowing the email address alone — anyone
+// who already knows (or guesses) a prospect's email could POST an update and
+// overwrite their company/role/website with junk, with nothing binding the
+// two steps of this one lead together. 'create' now hands back a short-lived
+// signed token the browser must echo back on 'update'. Reuses the same
+// internal-auth secret send-playbook/confirm-signup already rely on, but
+// with its own domain-separation prefix ('waitlist-update|') so a token
+// minted here can't be replayed against that other, differently-scoped use
+// of the same secret. 15 minutes comfortably covers the time a real visitor
+// takes to fill in three more fields on the same page load — this is not a
+// server-to-server call like send-playbook's, so it doesn't need to be as
+// short-lived as that one's 5 minutes.
+const UPDATE_TOKEN_TTL_MS = 15 * 60 * 1000;
+
+function signUpdateToken(email, exp, secret) {
+  return crypto.createHmac('sha256', secret).update('waitlist-update|' + email + '|' + exp).digest('base64url');
+}
+
+function verifyUpdateToken(email, exp, sig, secret) {
+  if (!exp || !sig) return false;
+  if (Date.now() > Number(exp)) return false;
+  const expected = signUpdateToken(email, exp, secret);
+  const a = Buffer.from(expected);
+  const b = Buffer.from(String(sig));
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 // In-memory, per-container rate limiting — a speed bump against a scripted
 // flood, not a durable guarantee. Matches the pattern already used by
 // submit-lead and send-confirmation.
@@ -93,11 +121,25 @@ exports.handler = async function (event) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Signup is not configured. Please email hello@theflow-ai.com.' }) };
   }
 
+  const verifySecret = process.env.EMAIL_VERIFY_SECRET;
+  if (!verifySecret) {
+    logErr('EMAIL_VERIFY_SECRET not configured — cannot bind the update step to this signup');
+    return { statusCode: 500, body: JSON.stringify({ error: 'Signup is not configured. Please email hello@theflow-ai.com.' }) };
+  }
+
   if (action === 'create') {
+    // Minted before the honeypot branches so both exits below hand back an
+    // identical-shaped response — a bot probing for a tell between "trapped"
+    // and "stored" gets none. A token issued off the honeypot path just never
+    // matches a real row on 'update' (falls into the existing 404 branch),
+    // same as it would for any other email that never actually got created.
+    const authExp = Date.now() + UPDATE_TOKEN_TTL_MS;
+    const authSig = signUpdateToken(email, authExp, verifySecret);
+
     // Honeypot: a real visitor never fills the hidden trap field on the form.
     if (clean(payload.hp, 200)) {
       log('honeypot tripped — accepting without storing');
-      return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+      return { statusCode: 200, body: JSON.stringify({ ok: true, authExp, authSig }) };
     }
 
     const source = clean(payload.source, 60) || 'flow-landing';
@@ -135,12 +177,24 @@ exports.handler = async function (event) {
       body: JSON.stringify({ email, lang }),
     }).catch((err) => logErr('send-confirmation trigger failed (non-fatal)', String(err)));
 
-    return { statusCode: 200, body: JSON.stringify({ ok: true }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: true, authExp, authSig }) };
   }
 
   // action === 'update': the mandatory second step. A deployment lead with no
   // role or company is not sales-ready, so all three fields are required —
   // this is not the optional "tell us more" step it used to be.
+  //
+  // Authorized only by knowing the email used to be enough to reach this
+  // branch — anyone who already had a prospect's address could overwrite
+  // their company/role/website with junk. This now also requires the
+  // short-lived token 'create' handed back for this exact email, so the two
+  // steps of one lead are cryptographically bound together instead of
+  // trusting the address alone.
+  if (!verifyUpdateToken(email, payload.authExp, payload.authSig, verifySecret)) {
+    logErr('update rejected — missing/invalid/expired token', { email: maskEmail(email) });
+    return { statusCode: 401, body: JSON.stringify({ error: 'Your session expired. Please re-enter your email above.' }) };
+  }
+
   const company = clean(payload.company, LIMITS.company);
   const role = clean(payload.role, LIMITS.role);
   const website = clean(payload.website, LIMITS.website);

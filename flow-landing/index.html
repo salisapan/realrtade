@@ -1170,6 +1170,10 @@ Best,
   var form=document.getElementById('waitForm'), email=document.getElementById('waitEmail'), msg=document.getElementById('waitMsg'), wrap=document.getElementById('waitWrap'), btn=document.getElementById('waitBtn'), honey=document.getElementById('waitCompany');
   var emailField=email.closest('.field');
   var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // Signed token submit-waitlist hands back on 'create', echoed on 'update' so
+  // that step is cryptographically bound to this email instead of reachable
+  // by knowing the address alone.
+  var waitAuth=null;
   function saveLocal(v){ try{ var l=JSON.parse(localStorage.getItem('flow_waitlist')||'[]'); if(l.indexOf(v)===-1)l.push(v); localStorage.setItem('flow_waitlist',JSON.stringify(l)); }catch(e){} }
   /* ---------- validity breathing pulse — fires only on the invalid→valid transition ---------- */
   var wasValid=false;
@@ -1223,8 +1227,15 @@ Best,
     if(!EMAIL_RE.test(v)){ msg.classList.add('err'); msg.textContent=I18N['wl.err'][curLang]; email.focus(); return; }
     msg.classList.remove('err'); msg.textContent='';
     btn.disabled=true; btn.classList.add('loading'); btn.style.pointerEvents='none';
-    function proceed(){
+    function proceed(auth){
       saveLocal(v);
+      // submit-waitlist hands back a short-lived signed token binding this
+      // email to the 'create' step; the enrichment form below must echo it
+      // back on 'update' so that step can no longer be reached by knowing the
+      // email address alone. No token (e.g. the offline/CSP fallback path)
+      // just means the update call below will fail server-side same as an
+      // expired one — it does not skip the enrichment step.
+      waitAuth = auth || null;
       btn.classList.remove('loading'); btn.disabled=false; btn.style.pointerEvents='';
       wrap.classList.add('step2');
       if(orgInput) orgInput.focus();
@@ -1239,7 +1250,7 @@ Best,
     // real rejection (bad table, RLS) surfaces as an error instead of the old
     // client-side anon-key call, which reported success either way.
     fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',email:v,lang:curLang,source:'flow-landing',hp:honey?honey.value:''})})
-      .then(function(r){ return r.ok ? proceed() : fail(); })
+      .then(function(r){ if(!r.ok) return fail(); return r.json().catch(function(){ return {}; }).then(proceed); })
       .catch(function(){ proceed(); });     // offline / CSP → localStorage keeps the signup, retry later
   });
 
@@ -1272,7 +1283,7 @@ Best,
       }
       var v=(email.value||'').trim();
       if(!v || !EMAIL_RE.test(v) || typeof fetch!=='function'){ fail(); return; }
-      fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',email:v,company:org,role:role,website:website})})
+      fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',email:v,company:org,role:role,website:website,authExp:waitAuth&&waitAuth.authExp,authSig:waitAuth&&waitAuth.authSig})})
         .then(function(r){ return r.ok ? finish() : fail(); })
         .catch(fail);
     });

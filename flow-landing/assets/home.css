@@ -655,8 +655,13 @@ canvas.terrain-canvas.show{opacity:1}
 @keyframes slideInRight{from{opacity:0; transform:translateX(30px)}to{opacity:1; transform:translateX(0)}}
 .wait-msg.err{color:#ff7a55}
 /* The two real ways in, side by side. Neither is a step on a ladder: Flow and
-   Glance are separate products for separate audiences, so they get equal
-   visual weight and their own card rather than a tier comparison. */
+   Glance are separate products for separate audiences, so each gets its own
+   full card rather than being crammed into a tier comparison. Their *visual
+   weight* is deliberately not equal — the Flow card holds the actual lead
+   form and reads heavier, the Glance card is a single-line link — because
+   Flow is the more foundational product this page leads with (see
+   docs/design-principles.md, "the more foundational one leads"), not because
+   of an oversight. */
 .cta-paths{display:grid; gap:18px; width:100%; max-width:760px; margin:6px 0 22px; text-align:start; align-items:start}
 @media (min-width:760px){ .cta-paths{grid-template-columns:1fr 1fr} }
 .cta-path{
