@@ -239,7 +239,7 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(1.9rem,3.4vw,
 @media (prefers-reduced-motion:reduce){ .doit,.doit *{transition:none!important; animation:none!important} }
 
 /* ---------------- specimen (moved up, primary proof) ---------------- */
-.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:var(--space-4); margin:8px 0 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
+.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:var(--space-4); margin:8px auto 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
 /* a one-shot glow on first scroll into view — foreshadows this card being
    the one that's actually interactive below, not decoration for its own
    sake. Fires once via IntersectionObserver, see the script near the other
