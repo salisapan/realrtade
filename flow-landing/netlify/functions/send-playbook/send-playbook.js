@@ -6,6 +6,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
+// A real screenshot of the site's actual Do It button (dark theme, hero
+// size), captured with its own glow bleeding into a matching dark backdrop
+// — the glassmorphism/ring effect genuinely can't be reproduced in email
+// HTML, so this is the button itself, not an approximation of it.
+const DOIT_BUTTON_URL = 'https://theflow-ai.com/email-doit-button.png';
 const LOG_PREFIX = '[send-playbook]';
 
 // This function is only ever meant to be called by confirm-signup.js right
@@ -40,26 +45,26 @@ const SUBJECT = {
   he: 'בואו נבנה את תוכנית הפריסה שלכם (+ ה-Playbook)',
 };
 
-// A real HTML button, not the image this used to be. An <a> wrapping an
-// <img> depends on the image actually loading — most mail clients block
-// remote images by default, and a blocked image can render as an
-// unclickable placeholder in some engines (notably Outlook's Word-based
-// renderer) rather than a working link.
+// The button is genuinely the site's Do It button — a screenshot of it,
+// not a coded recreation — because the real one's glassmorphism (a
+// translucent shell blending with whatever's behind it, plus an inset
+// glowing ring) has no email-safe equivalent; two prior attempts to
+// rebuild it in CSS both landed close but not actually matching.
 //
-// This reproduces the site's actual Do It button look, not a generic flat
-// pill: on the page it's a dark glass shell with an inset glowing blue
-// ring and an outer glow (.doit .shell / .doit .ring in home.css). Email
-// clients can't do backdrop blur or absolutely-positioned pseudo-layers,
-// so the same look is approximated with a dark gradient fill, a solid
-// blue ring border, and box-shadow standing in for the ring's glow —
-// degrading gracefully to a plain dark pill with a blue outline on
-// clients that ignore gradients/shadows (e.g. Outlook desktop), rather
-// than becoming a generic solid-blue button everywhere.
+// What went wrong the first time this was an image: the <img> had a
+// `width` attribute but no `height`, so a client that ignores the CSS
+// `height:auto` (Outlook's Word-based renderer does) could collapse the
+// placeholder to near-zero height before the image loads, or fail to
+// reserve click-target space at all if images are blocked. Both width
+// and height are set explicitly below so the clickable area is always
+// correctly sized, image loaded or not, and `border="0"` avoids Outlook
+// drawing its own default border around a linked image.
 function ctaButton(label) {
   return (
     '<tr><td align="center" style="padding:28px 0 10px">' +
-    '<a href="' + CTA_URL + '" style="display:inline-block; background:linear-gradient(180deg,#1B2340 0%,#0A0E1F 100%); background-color:#0F1730; color:#ffffff; text-decoration:none; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:16px; padding:17px 40px; border-radius:999px; border:2px solid #3B74FF; box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 0 18px rgba(59,116,255,.55), 0 10px 24px -8px rgba(26,78,245,.5); text-shadow:0 1px 8px rgba(59,116,255,.65);">' + label + '</a>' +
-    '</td></tr>'
+    '<a href="' + CTA_URL + '" style="display:inline-block; line-height:0;">' +
+    '<img src="' + DOIT_BUTTON_URL + '" width="260" height="168" alt="' + label + '" border="0" style="display:block; width:260px; height:168px;">' +
+    '</a></td></tr>'
   );
 }
 
