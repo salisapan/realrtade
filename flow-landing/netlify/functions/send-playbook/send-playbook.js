@@ -44,15 +44,21 @@ const SUBJECT = {
 // <img> depends on the image actually loading — most mail clients block
 // remote images by default, and a blocked image can render as an
 // unclickable placeholder in some engines (notably Outlook's Word-based
-// renderer) rather than a working link. Solid background + inline styles
-// is the same "bulletproof button" pattern already used successfully by
-// send-confirmation.js's own CTA, styled here to match the site's Do It
-// button (solid accent fill, bold white label, pill radius, a lighter
-// border standing in for the ring layer CSS can't reproduce in email).
+// renderer) rather than a working link.
+//
+// This reproduces the site's actual Do It button look, not a generic flat
+// pill: on the page it's a dark glass shell with an inset glowing blue
+// ring and an outer glow (.doit .shell / .doit .ring in home.css). Email
+// clients can't do backdrop blur or absolutely-positioned pseudo-layers,
+// so the same look is approximated with a dark gradient fill, a solid
+// blue ring border, and box-shadow standing in for the ring's glow —
+// degrading gracefully to a plain dark pill with a blue outline on
+// clients that ignore gradients/shadows (e.g. Outlook desktop), rather
+// than becoming a generic solid-blue button everywhere.
 function ctaButton(label) {
   return (
     '<tr><td align="center" style="padding:28px 0 10px">' +
-    '<a href="' + CTA_URL + '" style="display:inline-block; background:#1A4EF5; color:#ffffff; text-decoration:none; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:16px; padding:15px 34px; border-radius:999px; border:1px solid #6E9BFF;">' + label + '</a>' +
+    '<a href="' + CTA_URL + '" style="display:inline-block; background:linear-gradient(180deg,#1B2340 0%,#0A0E1F 100%); background-color:#0F1730; color:#ffffff; text-decoration:none; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:16px; padding:17px 40px; border-radius:999px; border:2px solid #3B74FF; box-shadow:0 0 0 1px rgba(255,255,255,.08) inset, 0 0 18px rgba(59,116,255,.55), 0 10px 24px -8px rgba(26,78,245,.5); text-shadow:0 1px 8px rgba(59,116,255,.65);">' + label + '</a>' +
     '</td></tr>'
   );
 }
