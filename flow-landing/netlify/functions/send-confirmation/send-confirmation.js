@@ -86,12 +86,20 @@ function htmlBody(lang, confirmUrl, kind) {
   var sigTeam = isGlanceBrand ? 'GLANCE TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
   var headerLogoUrl = isGlanceBrand ? LOGO_URL_GLANCE : LOGO_URL_FLOW;
+  // Both logo assets are wider than tall but at different ratios (Flow's
+  // wordmark 240x105, Glance's 729x173), so a fixed width alone leaves the
+  // wrong height for one brand — computed per-brand so neither <img> is
+  // missing a height attribute (a client that ignores CSS height:auto can
+  // collapse the placeholder to zero height while the image loads or is
+  // blocked, same failure this fixed on the send-playbook button).
+  var headerLogoHeight = isGlanceBrand ? '28' : '53';
   var footerMarkUrl = isGlanceBrand ? MARK_URL_GLANCE : LOGO_URL_FLOW;
   var footerMarkWidth = isGlanceBrand ? '20' : '28';
+  var footerMarkHeight = isGlanceBrand ? '20' : '12';
 
   var content = (
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; background:#ffffff;">' +
-    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + headerLogoUrl + '" alt="' + brand + '" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
+    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + headerLogoUrl + '" alt="' + brand + '" width="120" height="' + headerLogoHeight + '" style="display:block; width:120px; height:' + headerLogoHeight + 'px;"></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="color:#232B44; font-size:15px; line-height:1.65;">' +
     '<p style="margin:0 0 14px">' + greeting + '</p>' +
     '<p style="margin:0 0 14px">' + intro + '</p>' +
@@ -102,7 +110,7 @@ function htmlBody(lang, confirmUrl, kind) {
     '</td></tr>' +
     '<tr><td align="center" style="color:#8891A4; font-size:12px; padding-top:14px;">' + expiry + '</td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px; margin-top:18px;">' +
-    '<img src="' + footerMarkUrl + '" alt="' + brand + '" width="' + footerMarkWidth + '" style="display:block; width:' + footerMarkWidth + 'px; height:auto; margin-bottom:8px;">' +
+    '<img src="' + footerMarkUrl + '" alt="' + brand + '" width="' + footerMarkWidth + '" height="' + footerMarkHeight + '" style="display:block; width:' + footerMarkWidth + 'px; height:' + footerMarkHeight + 'px; margin-bottom:8px;">' +
     '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
     '</td></tr>' +
     '</table>'

@@ -89,7 +89,7 @@ function htmlBody(lang) {
 
   var content = (
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; background:#ffffff;">' +
-    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
+    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" height="53" style="display:block; width:120px; height:53px;"></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="color:#232B44; font-size:15px; line-height:1.65;">' +
     '<p style="margin:0 0 14px">' + greeting + '</p>' +
     '<p style="margin:0 0 14px">' + intro + '</p>' +
@@ -98,7 +98,7 @@ function htmlBody(lang) {
     '<tr><td dir="' + dir + '" align="center" style="color:#455073; font-size:13px; padding-top:8px;">' + ctaFine + '</td></tr>' +
     ctaButton(ctaLabel) +
     '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px;">' +
-    '<img src="' + LOGO_URL + '" alt="Flow" width="28" style="display:block; width:28px; height:auto; margin-bottom:8px;">' +
+    '<img src="' + LOGO_URL + '" alt="Flow" width="28" height="12" style="display:block; width:28px; height:12px; margin-bottom:8px;">' +
     '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
     '</td></tr>' +
     '</table>'
