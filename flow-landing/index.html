@@ -77,9 +77,11 @@
       <span class="desc" data-i18n="nav.desc">Cognitive Workflow Engine</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
+      <a href="#top" data-i18n="nav.home">Home</a>
       <a href="/trial.html" data-i18n="nav.trial">Glance</a>
       <a href="/security.html" data-i18n="nav.security">Security</a>
       <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
+      <a href="/solutions/" data-i18n="nav.solutions">Solutions</a>
       <a href="/about.html" data-i18n="nav.about">About</a>
       <a href="/blog/" data-i18n="nav.blog">Insights</a>
       <a href="/contact.html" data-i18n="nav.contact">Contact</a>
@@ -99,19 +101,14 @@
 
 <div class="mobile-menu" id="mobileMenu" hidden>
   <nav aria-label="Mobile">
+    <a href="#top" data-i18n="nav.home">Home</a>
     <a href="/trial.html" data-i18n="nav.trial">Glance</a>
     <a href="/security.html" data-i18n="nav.security">Security</a>
     <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
+    <a href="/solutions/" data-i18n="nav.solutions">Solutions</a>
     <a href="/about.html" data-i18n="nav.about">About</a>
     <a href="/blog/" data-i18n="nav.blog">Insights</a>
     <a href="/contact.html" data-i18n="nav.contact">Contact</a>
-    <div class="mobile-menu-group">
-      <span class="mobile-menu-group-label">Solutions</span>
-      <a href="/solutions/legal.html">Legal</a>
-      <a href="/solutions/healthcare.html">Healthcare</a>
-      <a href="/solutions/financial-services.html">Financial Services</a>
-      <a href="/solutions/insurance.html">Insurance</a>
-    </div>
     <div class="mobile-menu-legal">
       <a href="/privacy.html" data-i18n="nav.privacy">Privacy</a>
       <a href="/terms.html" data-i18n="nav.terms">Terms</a>
@@ -556,37 +553,41 @@ Best,
         <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">GET STARTED</span>
         <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
         <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Two ways in. Tell us how you would deploy Flow and we will come back with a real number — or install Glance free and watch it work on your own inbox first.</p>
-        <div class="cta-paths single reveal in" data-d="2">
-          <a class="cta-path" href="/trial.html" data-ga="close_trial">
+        <div class="cta-paths reveal in" data-d="2">
+          <div class="cta-path cta-path-form">
+            <b data-i18n="wl.path1.t">Deploy Flow in your organization</b>
+            <span data-i18n="wl.path1.s">Tell us your work email, role, and company — we'll come back with a real deployment plan, a number, and a call to get it running.</span>
+            <div class="wait-wrap" id="waitWrap">
+              <form class="wait-form" id="waitForm" novalidate>
+                <input type="text" id="waitCompany" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+                <div class="field">
+                  <input type="email" id="waitEmail" inputmode="email" autocomplete="email" data-i18n-ph="wl.ph" placeholder="Enter your work email" aria-label="Work email" required>
+                  <span class="field-icon" aria-hidden="true">
+                    <svg class="icon-envelope" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+                    <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                  </span>
+                </div>
+                <span class="magnetic"><button class="doit" type="submit" id="waitBtn" aria-label="Get my deployment plan"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.submit">Get My Deployment Plan</span><span class="btn-spin" aria-hidden="true"></span></button></span>
+              </form>
+              <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">Check your inbox to confirm your email — we'll follow up with your deployment plan, a call to get started, and the Playbook.</span></div>
+              <div class="wait-confirm-note" id="waitConfirmNote"><span data-i18n="wl.confirm.note">Check your inbox to confirm your email — that's how we'll reach you about your deployment plan.</span></div>
+              <div class="wait-msg" id="waitMsg" role="status" aria-live="polite"></div>
+              <div class="wait-enrich" id="waitEnrich">
+                <p class="wait-enrich-note" data-i18n="wl.enrich.note">Required — we need your role and company to build a real deployment plan and set up your call.</p>
+                <form class="wait-enrich-form" id="waitEnrichForm" novalidate>
+                  <input type="text" id="waitOrg" name="org" autocomplete="organization" data-i18n-ph="wl.enrich.company" placeholder="Company" required>
+                  <input type="text" id="waitRole" name="role" autocomplete="organization-title" data-i18n-ph="wl.enrich.role" placeholder="Role" required>
+                  <input type="url" id="waitWebsite" name="website" autocomplete="url" inputmode="url" class="ltr" data-i18n-ph="wl.enrich.website" placeholder="Company website" required>
+                  <span class="magnetic"><button class="doit sm" type="submit" id="waitEnrichBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.enrich.btn">Request My Plan</span><span class="btn-spin" aria-hidden="true"></span></button></span>
+                </form>
+              </div>
+            </div>
+          </div>
+          <a class="cta-path cta-path-link" href="/trial.html" data-ga="close_trial">
             <b data-i18n="wl.path2.t">Get Glance — free</b>
             <span data-i18n="wl.path2.s">A Chrome extension for everyday business use. No card, no sales conversation.</span>
+            <span class="cta-path-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
           </a>
-        </div>
-        <p class="wl-alt reveal in" data-d="3" data-i18n="wl.alt">Deploying Flow across your organization instead? Enter your email and we'll send you the Hybrid Automation Playbook.</p>
-        <div class="wait-wrap reveal" data-d="3" id="waitWrap" style="width:100%; display:flex; flex-direction:column; align-items:center; gap:16px">
-          <form class="wait-form" id="waitForm" novalidate>
-            <input type="text" id="waitCompany" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
-            <div class="field">
-              <input type="email" id="waitEmail" inputmode="email" autocomplete="email" data-i18n-ph="wl.ph" placeholder="Enter your work email" aria-label="Work email" required>
-              <span class="field-icon" aria-hidden="true">
-                <svg class="icon-envelope" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
-                <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-              </span>
-            </div>
-            <span class="magnetic"><button class="doit" type="submit" id="waitBtn" aria-label="Send me the Playbook"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.submit">Send Me the Playbook</span><span class="btn-spin" aria-hidden="true"></span></button></span>
-          </form>
-          <div class="success-mark" id="successMark"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span data-i18n="wl.success">Check your inbox — confirm your email and the Playbook is on its way.</span></div>
-          <div class="wait-confirm-note" id="waitConfirmNote"><span data-i18n="wl.confirm.note">Check your inbox to confirm your email — that's how we'll send your Playbook.</span></div>
-          <div class="wait-msg" id="waitMsg" role="status" aria-live="polite"></div>
-          <div class="wait-enrich" id="waitEnrich">
-            <p class="wait-enrich-note" data-i18n="wl.enrich.note">Optional — tell us about your team so we can send you what is actually relevant.</p>
-            <form class="wait-enrich-form" id="waitEnrichForm" novalidate>
-              <input type="text" id="waitOrg" name="org" autocomplete="organization" data-i18n-ph="wl.enrich.company" placeholder="Company">
-              <input type="text" id="waitRole" name="role" autocomplete="organization-title" data-i18n-ph="wl.enrich.role" placeholder="Role">
-              <input type="url" id="waitWebsite" name="website" autocomplete="url" inputmode="url" class="ltr" data-i18n-ph="wl.enrich.website" placeholder="Company website">
-              <span class="magnetic"><button class="doit sm" type="submit" id="waitEnrichBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span class="btn-label" data-i18n="wl.enrich.btn">Send</span><span class="btn-spin" aria-hidden="true"></span></button></span>
-            </form>
-          </div>
         </div>
         <div class="cta-fine reveal" data-d="3"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span data-i18n="wl.fine">No spam. Your details stay with you — exactly like the product works.</span></div>
       </div>
@@ -628,6 +629,8 @@ Best,
   /* ---------- i18n ---------- */
   var I18N={
     'nav.desc':{en:'Cognitive Workflow Engine',he:'מנוע תהליכי עבודה קוגניטיבי'},
+    'nav.home':{en:'Home',he:'בית'},
+    'nav.solutions':{en:'Solutions',he:'פתרונות'},
     'nav.challenge':{en:'Challenge',he:'האתגר'},
     'nav.architecture':{en:'Architecture',he:'ארכיטקטורה'},
     'nav.security':{en:'Security',he:'אבטחה'},
@@ -658,7 +661,7 @@ Best,
     'hero.cta1':{en:'Do It',he:'עשו את זה'},
     'hero.cta3':{en:'See how it works',he:'איך זה עובד'},
     'nav.cta':{en:'Do It',he:'עשו את זה'},
-    'wl.submit':{en:'Send Me the Playbook',he:'שלחו לי את ה-Playbook'},
+    'wl.submit':{en:'Get My Deployment Plan',he:'קבלו תוכנית פריסה'},
     'hero.cta2':{en:'Try Glance — Free',he:'נסו את Glance — חינם'},
     'hero.glance.b':{en:'Just want to see it work today?',he:'רק רוצים לראות את זה עובד כבר היום?'},
     'hero.glance.p':{en:'Glance is a free Chrome extension — install it in a minute and watch it read your own Gmail before you talk to us about Flow.',he:'Glance הוא תוסף Chrome חינמי — התקינו אותו תוך דקה ותראו אותו קורא את ה-Gmail שלכם, עוד לפני שדיברתם איתנו על Flow.'},
@@ -766,21 +769,24 @@ Best,
     'win.f2':{en:'•••• 4821',he:'•••• 4821'},
     'win.f3':{en:'Cohen Ltd.',he:'כהן בע"מ'},
     'wl.eyebrow':{en:'GET STARTED',he:'איך מתחילים'},
+    'wl.path1.t':{en:'Deploy Flow in your organization',he:'פרסו את Flow בארגון שלכם'},
+    'wl.path1.s':{en:"Tell us your work email, role, and company — we'll come back with a real deployment plan, a number, and a call to get it running.",he:'השאירו את האימייל, התפקיד והחברה — נחזור עם תוכנית פריסה אמיתית, מספר, ושיחה להתחלת העבודה.'},
     'wl.path2.t':{en:'Get Glance — free',he:'קבלו את Glance — חינם'},
     'wl.path2.s':{en:'A Chrome extension for everyday business use. No card, no sales conversation.',he:'תוסף Chrome לעבודה היומיומית. בלי כרטיס אשראי, בלי שיחת מכירה.'},
-    'wl.alt':{en:"Deploying Flow across your organization instead? Enter your email and we'll send you the Hybrid Automation Playbook.",he:'רוצים לפרוס את Flow בארגון שלכם? הזינו את המייל ונשלח לכם את ה-Hybrid Automation Playbook.'},
     'wl.title':{en:'Ready to Reclaim Your Workflows?',he:'מוכנים להשיב לעצמכם את תהליכי העבודה?'},
     'wl.lead':{en:'Two ways in. Tell us how you would deploy Flow and we will come back with a real number — or install Glance free and watch it work on your own inbox first.',he:'שתי דרכים להתחיל. ספרו לנו איך הייתם פורסים את Flow ונחזור עם מספר אמיתי — או התקינו את Glance בחינם ותראו אותו עובד על תיבת הדואר שלכם.'},
     'wl.ph':{en:'Enter your work email',he:'כתובת האימייל הארגוני שלכם'},
-    'wl.success':{en:"Check your inbox — confirm your email and the Playbook is on its way.",he:'בדקו את תיבת הדואר — אשרו את הכתובת וה-Playbook בדרך אליכם.'},
-    'wl.confirm.note':{en:"Check your inbox to confirm your email — that's how we'll send your Playbook.",he:'בדקו את תיבת הדוא"ל שלכם לאישור הכתובת — כך נשלח לכם את ה-Playbook.'},
+    'wl.success':{en:"Check your inbox to confirm your email — we'll follow up with your deployment plan, a call to get started, and the Playbook.",he:'בדקו את תיבת הדואר לאישור הכתובת — נחזור עם תוכנית הפריסה, שיחת התחלה, וה-Playbook.'},
+    'wl.confirm.note':{en:"Check your inbox to confirm your email — that's how we'll reach you about your deployment plan.",he:'בדקו את תיבת הדוא"ל שלכם לאישור הכתובת — כך ניצור איתכם קשר בנוגע לתוכנית הפריסה.'},
     'wl.fine':{en:'No spam. Your details stay with you — exactly like the product works.',he:'ללא ספאם. הפרטים נשמרים אצלכם — בדיוק כמו שהמוצר עובד.'},
     'wl.err':{en:"That email doesn't look right. Please check it.",he:'כתובת האימייל לא נראית תקינה. בדקו שוב.'},
-    'wl.enrich.note':{en:"Optional — tell us about your team so we can send you what is actually relevant.",he:'נרשמתם בהצלחה. אופציונלי — ספרו לנו על הצוות שלכם כדי שנוכל להתאים את הגישה המוקדמת.'},
+    'wl.enrich.note':{en:"Required — we need your role and company to build a real deployment plan and set up your call.",he:'חובה — אנחנו צריכים את התפקיד והחברה שלכם כדי לבנות תוכנית פריסה אמיתית ולקבוע שיחה.'},
     'wl.enrich.company':{en:'Company',he:'שם החברה'},
     'wl.enrich.role':{en:'Role',he:'תפקיד'},
     'wl.enrich.website':{en:'Company website',he:'אתר החברה'},
-    'wl.enrich.btn':{en:'Send',he:'שלח'},
+    'wl.enrich.btn':{en:'Request My Plan',he:'בקשו תוכנית'},
+    'wl.enrich.err':{en:'Company, role, and website are all required — this is how we build your deployment plan.',he:'חברה, תפקיד ואתר — כולם שדות חובה. כך נבנה עבורכם את תוכנית הפריסה.'},
+    'wl.submit.err':{en:'We could not save that. Please try again or email hello@theflow-ai.com.',he:'לא הצלחנו לשמור זאת. נסו שוב או שלחו מייל ל-hello@theflow-ai.com.'},
     'foot.features':{en:'Features',he:'יכולות'},
     'foot.copy':{en:'© %Y% Flow — Cognitive Workflow Engine. All rights reserved.',he:'© %Y% Flow — מנוע תהליכי עבודה קוגניטיבי. כל הזכויות שמורות.'},
     'foot.privacy':{en:'Privacy',he:'פרטיות'},
@@ -1160,9 +1166,7 @@ Best,
     startAutoplay();
   })();
 
-  /* ---------- waitlist (Supabase REST + graceful localStorage fallback) ---------- */
-  var SB_URL='https://zjquktirlrhbqcnkfaok.supabase.co';
-  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqcXVrdGlybHJoYnFjbmtmYW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MjIzNTAsImV4cCI6MjEwNDI5ODM1MH0.JxOiqHGNsZRZM_2aON1nspKhK_xpriW_q4FY11dxLPo';
+  /* ---------- waitlist (server-side write via submit-waitlist, graceful localStorage fallback) ---------- */
   var form=document.getElementById('waitForm'), email=document.getElementById('waitEmail'), msg=document.getElementById('waitMsg'), wrap=document.getElementById('waitWrap'), btn=document.getElementById('waitBtn'), honey=document.getElementById('waitCompany');
   var emailField=email.closest('.field');
   var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -1226,12 +1230,17 @@ Best,
       if(orgInput) orgInput.focus();
       if(typeof gtag==='function') gtag('event','waitlist_email_submit');
     }
+    function fail(){
+      btn.classList.remove('loading'); btn.disabled=false; btn.style.pointerEvents='';
+      msg.classList.add('err'); msg.textContent=I18N['wl.submit.err'][curLang];
+    }
     if(typeof fetch!=='function'){ proceed(); return; }
-    fetch(SB_URL+'/rest/v1/waitlist',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({email:v,lang:curLang,source:'flow-landing',created_at:new Date().toISOString()})})
-      .then(function(r){ proceed(); })      // table live → stored server-side
-      .catch(function(){ proceed(); });     // offline / CSP / no table → localStorage keeps the signup
-    // fire-and-forget: emails a confirmation link (double opt-in); the Playbook PDF is sent only after the link is clicked
-    fetch('/.netlify/functions/send-confirmation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v,lang:curLang})}).catch(function(){});
+    // Written server-side (submit-waitlist) with the service-role key, so a
+    // real rejection (bad table, RLS) surfaces as an error instead of the old
+    // client-side anon-key call, which reported success either way.
+    fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',email:v,lang:curLang,source:'flow-landing',hp:honey?honey.value:''})})
+      .then(function(r){ return r.ok ? proceed() : fail(); })
+      .catch(function(){ proceed(); });     // offline / CSP → localStorage keeps the signup, retry later
   });
 
   /* ---------- required post-signup step: company + role + website (mandatory before completion) ---------- */
@@ -1239,11 +1248,16 @@ Best,
   if(enrichForm){
     enrichForm.addEventListener('submit',function(ev){
       ev.preventDefault();
-      // Optional step: signup already succeeded on the first form (email
-      // saved, confirmation mail sent). Any subset of these three fields is
-      // accepted -- there is nothing left here that should block completion.
+      // Mandatory step: a deployment lead with no role or company is not
+      // sales-ready, so all three fields must be filled before this can
+      // complete — this is deliberately not a skippable "tell us more" step.
       var org=(orgInput.value||'').trim(), role=(roleInput.value||'').trim(), website=(websiteInput.value||'').trim();
       msg.classList.remove('err'); msg.textContent='';
+      if(!org || !role || !website){
+        msg.classList.add('err'); msg.textContent=I18N['wl.enrich.err'][curLang];
+        (!org?orgInput:!role?roleInput:websiteInput).focus();
+        return;
+      }
       enrichBtn.disabled=true; enrichBtn.classList.add('loading'); enrichBtn.style.pointerEvents='none';
       function finish(){
         var rect=enrichBtn.getBoundingClientRect();
@@ -1252,12 +1266,15 @@ Best,
         fireConfetti(rect);
         if(typeof gtag==='function') gtag('event','waitlist_signup_complete',{value:1});
       }
+      function fail(){
+        enrichBtn.classList.remove('loading'); enrichBtn.disabled=false; enrichBtn.style.pointerEvents='';
+        msg.classList.add('err'); msg.textContent=I18N['wl.submit.err'][curLang];
+      }
       var v=(email.value||'').trim();
-      if(!org && !role && !website){ finish(); return; } // nothing to save -- skip straight to done
-      if(!v || !EMAIL_RE.test(v) || typeof fetch!=='function'){ finish(); return; }
-      fetch(SB_URL+'/rest/v1/waitlist?email=eq.'+encodeURIComponent(v),{method:'PATCH',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({company:org,role:role,website:website})})
-        .then(finish)
-        .catch(finish);
+      if(!v || !EMAIL_RE.test(v) || typeof fetch!=='function'){ fail(); return; }
+      fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'update',email:v,company:org,role:role,website:website})})
+        .then(function(r){ return r.ok ? finish() : fail(); })
+        .catch(fail);
     });
   }
 
@@ -1338,28 +1355,34 @@ Best,
        structure is never viewed flat-on, and scrolling visibly turns it
        rather than only revealing it. Perspective divide handles size/depth;
        a painter's-algorithm sort keeps near nodes correctly over far ones. */
-    var NODES=[], EDGES=[], CLUSTERS=6, RING=18;
+    /* Cone-of-knowledge lattice: a single apex (the senior expert's judgment)
+       radiating down through widening rings to a broad base (the whole team).
+       Meridian edges are the radial lines from apex to rim; ring edges are the
+       latitude lines crossing them — together they read as a glowing conical
+       mesh rather than the earlier hub-and-spoke cluster. */
+    var NODES=[], EDGES=[], RINGS=6, COLS=16;
     (function build(){
-      var r=rng(20260905), hubs=[];
-      NODES.push({ox:0,oy:0,oz:0,rad:10,kind:'core',d:0});
-      for(var i=0;i<CLUSTERS;i++){
-        var a=-Math.PI/2+i*(Math.PI*2/CLUSTERS), hi=NODES.length;
-        hubs.push(hi);
-        /* a wavy elevation per hub — coplanar hubs would look flat even in 3D */
-        var elev=Math.sin(i*1.7+.6)*.15, hx=Math.cos(a)*.30, hz=Math.sin(a)*.30;
-        NODES.push({ox:hx,oy:elev,oz:hz,rad:6,kind:'hub',d:.05+i*.016});
-        EDGES.push({a:0,b:hi,d:.09+i*.018,w:1.6,spine:true});
-        var leaves=5+Math.floor(r()*4);
-        for(var j=0;j<leaves;j++){
-          var la=a+(r()-.5)*1.25, lr=.10+r()*.09, li=NODES.length;
-          NODES.push({ox:hx+Math.cos(la)*lr,oy:elev+(r()-.5)*.13,oz:hz+Math.sin(la)*lr,rad:2.6+r()*1.8,kind:'leaf',d:.17+r()*.15});
-          EDGES.push({a:hi,b:li,d:.22+r()*.17,w:.95});
+      var r=rng(20260905);
+      NODES.push({ox:0,oy:-.60,oz:0,rad:9,kind:'core',d:0});
+      var rowStart=[];
+      for(var k=1;k<RINGS;k++){
+        rowStart.push(NODES.length);
+        var t=k/(RINGS-1), y=-.60+t*1.18, rad=t*.56, twist=k*.11;
+        var kind = k===RINGS-1 ? 'team' : k===1 ? 'hub' : 'leaf';
+        var nodeRad = k===RINGS-1 ? 5 : k===1 ? 6 : 3+(RINGS-1-k)*.4;
+        for(var i=0;i<COLS;i++){
+          var a=-Math.PI/2+twist+i*(Math.PI*2/COLS), jit=(r()-.5)*.02;
+          NODES.push({ox:Math.cos(a)*rad,oy:y+jit,oz:Math.sin(a)*rad,rad:nodeRad,kind:kind,d:t*.62});
         }
       }
-      for(var k=0;k<RING;k++){
-        var ra=-Math.PI/2+k*(Math.PI*2/RING)+.12, ri=NODES.length, telev=Math.sin(k*.9)*.22;
-        NODES.push({ox:Math.cos(ra)*.52,oy:telev,oz:Math.sin(ra)*.52,rad:4.4,kind:'team',d:.38+k*.0085});
-        EDGES.push({a:hubs[k%CLUSTERS],b:ri,d:.44+k*.0095,w:1.1,beam:true});
+      for(var i=0;i<COLS;i++) EDGES.push({a:0,b:rowStart[0]+i,d:.08,w:1.5,spine:true});
+      for(var k=0;k<rowStart.length-1;k++){
+        var d=.10+k*.10;
+        for(var i=0;i<COLS;i++) EDGES.push({a:rowStart[k]+i,b:rowStart[k+1]+i,d:d,w:1.15,spine:k<2});
+      }
+      for(var k=0;k<rowStart.length;k++){
+        var d2=.16+k*.10;
+        for(var i=0;i<COLS;i++) EDGES.push({a:rowStart[k]+i,b:rowStart[k]+((i+1)%COLS),d:d2,w:.9,beam:k===rowStart.length-1});
       }
       for(var n=0;n<NODES.length;n++){
         var q=NODES[n];

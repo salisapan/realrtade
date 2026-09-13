@@ -37,8 +37,8 @@ function verifyInternalAuth(email, authExp, authSig, secret) {
 const CTA_URL = 'https://theflow-ai.com/contact.html';
 
 const SUBJECT = {
-  en: 'Your Hybrid Automation Playbook',
-  he: 'The Hybrid Automation Playbook — המדריך שלכם',
+  en: "Let's scope your Flow deployment (+ the Playbook)",
+  he: 'בואו נבנה את תוכנית הפריסה שלכם (+ ה-Playbook)',
 };
 
 function ctaButton(altLabel) {
@@ -57,15 +57,15 @@ function htmlBody(lang) {
 
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
-    ? 'תודה שהצטרפתם לרשימת ההמתנה של Flow. כבר ראיתם את הדמו המשפטי החי באתר — מצורף כאן הסיפור המלא: <b>The Hybrid Automation Playbook</b>, על איך תעשיות מוסדרות מבטלות הזנת נתונים ידנית, ללא סיכון רגולטורי.'
-    : "Thanks for joining the Flow waitlist. You've already seen the Legal Demo live on the site — attached is the full story: <b>The Hybrid Automation Playbook</b>, on exactly how regulated industries eliminate manual data entry with zero compliance risk.";
+    ? 'תודה שהשארתם לנו פרטים על הארגון שלכם. זה בדיוק מה שאנחנו צריכים כדי לבנות תוכנית פריסה אמיתית של Flow אצלכם — לא הצעה גנרית, אלא מיפוי של המודל המדויק (ענן מאובטח, או Flow-Edge / Flow-OnPrem) ומספר אמיתי לצעד הבא.'
+    : "Thanks for telling us about your organization. That's exactly what we need to put together a real Flow deployment plan — not a generic pitch, but a mapping of the exact model (Secure Cloud, or Flow-Edge / Flow-OnPrem) and a real number for the next step.";
   var pitch = isHe
-    ? 'הדרך הכי מהירה לראות את זה עובד על הנתונים שלכם היא לספר לנו על תצורת הפריסה שלכם. נמפה את המודל המדויק — ענן מאובטח, או Flow-Edge / Flow-OnPrem — ונחזור עם תשובה אמיתית, לא שיחת מכירות גנרית.'
-    : "The fastest way to see this running on your own data is to tell us your deployment details. We'll map your exact model — Secure Cloud, or Flow-Edge / Flow-OnPrem — and reply with a real answer, not a generic sales call.";
+    ? 'בדרך לכך, מצורף גם <b>The Hybrid Automation Playbook</b> — הסיפור המלא על איך תעשיות מוסדרות מבטלות הזנת נתונים ידנית, ללא סיכון רגולטורי. אבל הצעד הבא האמיתי הוא לקבוע זמן קצר לדבר על הפריסה אצלכם.'
+    : "Along the way, attached is <b>The Hybrid Automation Playbook</b> — the full story on how regulated industries eliminate manual data entry with zero compliance risk. But the real next step is a short conversation about deploying it at your organization.";
   var ctaLabel = isHe ? 'עשו את זה' : 'Do It';
   var ctaFine = isHe
-    ? 'לחצו למטה כדי לספר לנו על הסביבה שלכם.'
-    : "Click below to tell us about your environment.";
+    ? 'לחצו למטה כדי לקבוע את שיחת הפריסה.'
+    : "Click below to set up your deployment conversation.";
   var sigTeam = isHe ? 'FLOW TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
 

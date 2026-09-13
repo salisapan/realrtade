@@ -529,7 +529,7 @@ footer.site a{color:var(--ink-3)}
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
   <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
-  <div class="mobile-nav-group"><span class="mobile-nav-group-label">Solutions</span><a href="/solutions/legal.html">Legal</a><a href="/solutions/healthcare.html">Healthcare</a><a href="/solutions/financial-services.html">Financial Services</a><a href="/solutions/insurance.html">Insurance</a></div>
+  <a href="/solutions/">Solutions</a>
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">
@@ -1271,10 +1271,11 @@ footer.site a{color:var(--ink-3)}
     // light theme specifically, not just stepped down from peak to glow.
     var textGlow = isLight ? 'rgba(59,116,255,.28)' : glow;
 
-    // One easing arc: starts near the top-left corner, dips through a
-    // shallow bow around mid-width (behind/near the headline, same as the
-    // reference), then falls away to a glow in the bottom-right corner.
-    var p0=[-w*0.05, h*0.09], c1=[w*0.30, h*0.02], c2=[w*0.62, h*0.30], p1=[w*1.03, h*0.92];
+    // One easing arc, mirrored left-to-right: it bleeds off both edges at the
+    // same height and rises through a shallow bow above the headline, so the
+    // glow reads as centered over the hero rather than a one-sided diagonal
+    // beam pulling all the visual weight into a single corner.
+    var p0=[-w*0.05, h*0.30], c1=[w*0.28, h*0.00], c2=[w*0.72, h*0.00], p1=[w*1.05, h*0.30];
 
     function bez(t){
       var mt=1-t;
@@ -1283,13 +1284,10 @@ footer.site a{color:var(--ink-3)}
         mt*mt*mt*p0[1] + 3*mt*mt*t*c1[1] + 3*mt*t*t*c2[1] + t*t*t*p1[1]
       ];
     }
-    // The sun sits on the arc itself (t=.9), not at the path's literal end
-    // point p1 — p1 is deliberately off-canvas (x > w) so the line reads as
-    // continuing past the frame, but that also means a glow centered on it
-    // would have most of its own radius clipped by the edge and barely
-    // show at all. t=.9 is the last point on the curve still comfortably
-    // inside the visible canvas.
-    var sunCenter=bez(.9);
+    // The sun sits at the arc's midpoint (t=.5) — the top of the bow, centered
+    // over the hero — rather than biased toward either edge, so the brightest
+    // point is a shared focal point instead of favoring one corner.
+    var sunCenter=bez(.5);
     // Find the path-length fraction t whose x matches a given screen x
     // (the curve is monotonic in x, so a short bisection is enough).
     function tAtX(targetX){

@@ -3,27 +3,27 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="AI automation for banks and insurers: masked or fully local deployment, model governance, audit evidence, and fair-lending-aware review gates.">
+<meta name="description" content="How Flow deploys inside regulated industries — legal, healthcare, financial services, and insurance — with masked cloud or fully local Flow-Edge deployment.">
 <meta name="theme-color" content="#07090F">
-<link rel="canonical" href="https://theflow-ai.com/solutions/financial-services.html">
+<link rel="canonical" href="https://theflow-ai.com/solutions/">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
 <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/site.webmanifest">
-<title>AI Workflow Automation for Financial Services — Flow</title>
+<title>Solutions by Industry — Flow</title>
 <meta property="og:type" content="website">
-<meta property="og:title" content="AI Workflow Automation for Financial Services — Flow">
-<meta property="og:description" content="AI automation for banks, insurers, and financial institutions: masked or fully local deployment, model governance, audit evidence, and fair-lending-aware review gates.">
-<meta property="og:url" content="https://theflow-ai.com/solutions/financial-services.html">
+<meta property="og:title" content="Solutions by Industry — Flow">
+<meta property="og:description" content="How Flow deploys inside regulated industries — legal, healthcare, financial services, and insurance — with masked cloud or fully local Flow-Edge deployment.">
+<meta property="og:url" content="https://theflow-ai.com/solutions/">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AI Workflow Automation for Financial Services — Flow">
-<meta name="twitter:description" content="AI automation for banks, insurers, and financial institutions: masked or fully local deployment, model governance, audit evidence, and fair-lending-aware review gates.">
+<meta name="twitter:title" content="Solutions by Industry — Flow">
+<meta name="twitter:description" content="How Flow deploys inside regulated industries — legal, healthcare, financial services, and insurance — with masked cloud or fully local Flow-Edge deployment.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Financial Services","item":"https://theflow-ai.com/solutions/financial-services.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://theflow-ai.com/solutions/"}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -42,9 +42,6 @@
   --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
 }
 *{box-sizing:border-box}
-/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
-   container, which iOS Safari mis-composites under pinch-zoom (the page can go
-   blank). clip contains decorative overflow without that side effect. */
 html,body{overflow-x:clip}
 @supports not (overflow-x:clip){html,body{overflow-x:hidden}}
 html{scroll-behavior:smooth}
@@ -66,34 +63,21 @@ header.site nav a:hover{color:#fff}
 main{padding:56px 0 20px}
 .eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
 h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
-.updated{font-family:var(--sans); color:var(--muted); font-size:.86rem; margin-bottom:38px; padding-bottom:26px; border-bottom:1px solid var(--line)}
-article p{margin:0 0 18px}
-article h2{font-family:var(--disp); font-weight:700; font-size:1.34rem; line-height:1.3; color:var(--txt-hi); margin:42px 0 14px; padding-inline-start:14px; border-inline-start:3px solid var(--cat)}
-article ul,article ol{margin:0 0 18px; padding-inline-start:26px}
-article li{margin-bottom:8px}
-article a{color:var(--accent-2)}
 footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
 footer.site a{color:var(--muted)}
 
 .skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 .lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
-.cards{display:grid; gap:16px; margin:26px 0 32px}
-@media (min-width:640px){ .cards.two{grid-template-columns:1fr 1fr} }
-.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px}
-.card h3{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--cat); margin:0 0 8px}
-.card p{margin:0; font-size:1rem}
-.cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
-.cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
-.cta p{margin:0 0 18px; color:var(--muted)}
-.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
-.btn:hover{filter:brightness(1.1)}
-.readlist{list-style:none; padding:0; margin:0}
-.readlist li{margin-bottom:12px}
-.readlist a{font-family:var(--sans); font-weight:600}
+.solutions-grid{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .solutions-grid{grid-template-columns:1fr 1fr} }
+.solution-card{display:flex; flex-direction:column; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px 26px; text-decoration:none; transition:border-color .2s, transform .2s, box-shadow .2s}
+.solution-card:hover{border-color:var(--cat); transform:translateY(-3px); box-shadow:0 18px 40px -26px rgba(26,78,245,.4)}
+.solution-card h2{font-family:var(--disp); font-weight:700; font-size:1.2rem; color:var(--txt-hi); margin:0}
+.solution-card p{margin:0; color:var(--muted); font-size:.96rem; line-height:1.55}
+.solution-card .go{font-family:var(--sans); font-weight:700; font-size:.86rem; color:var(--accent-2); margin-top:4px}
 .pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
 .pagenav a{color:var(--muted); margin-inline-end:16px}
-.note{font-size:.94rem; color:var(--muted); border-inline-start:3px solid var(--line); padding-inline-start:14px; margin:22px 0}
 
 .menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
 .menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
@@ -126,7 +110,6 @@ footer.site a{color:var(--muted)}
       <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
         <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
       </button>
-      
       <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
@@ -142,37 +125,31 @@ footer.site a{color:var(--muted)}
 <main id="main">
   <div class="wrap">
     <span class="eyebrow">Solutions</span>
-    <h1 class="title">AI automation for financial services.</h1>
-    
-    <article>
-<p class="lead">In financial services the question is never only "is the data safe." It is whether you can evidence, to an examiner, how an automated decision was reached.</p>
+    <h1 class="title">Built for regulated industries.</h1>
+    <p class="lead">Flow deploys differently depending on what your data actually is and what your industry requires. Pick your industry to see the specific constraint and how Flow addresses it.</p>
 
-<h2>The constraint</h2>
-<p>AML and KYC review, claims handling, underwriting support, and customer correspondence are all heavily automatable and heavily supervised. The obstacles are model governance expectations, fair-lending and proxy-discrimination exposure, the Bank Secrecy Act's documentation demands, and data-handling requirements that make routing customer records through an opaque third party a non-starter.</p>
-
-<h2>How Flow addresses it</h2>
-<ul>
-<li><b>Deployment on your terms.</b> Masked secure cloud, or fully local with Flow-Edge for institutions whose policy requires it.</li>
-<li><b>Evidence by default.</b> An append-only record of inputs, proposals, approvals, and executions &mdash; built for examination rather than reconstructed for it.</li>
-<li><b>Human approval on consequential decisions.</b> Adverse-action-adjacent outcomes route to a person.</li>
-<li><b>Drift monitoring matters.</b> A validated system does not stay validated on its own; we treat ongoing monitoring as part of the deployment, not an afterthought.</li>
-</ul>
-
-<h2>Research on financial services deployment</h2>
-<ul class="readlist">
-<li><a href="/blog/aml-kyc-ai-automation.html">Automating AML and KYC: AI Workflow Design Under the Bank Secrecy Act</a></li>
-<li><a href="/blog/financial-services-data-masking-ai.html">Automated Data Masking and AI Governance in Regulated Financial Institutions</a></li>
-<li><a href="/blog/insurance-underwriting-ai-rate-filing.html">AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard</a></li>
-<li><a href="/blog/insurance-claims-ai-automation.html">AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight</a></li>
-<li><a href="/blog/ai-model-drift-monitoring.html">Model Drift: Why a Validated AI System Doesn't Stay Validated on Its Own</a></li>
-</ul>
-
-<div class="cta">
-  <h2>Preparing for a model governance review?</h2>
-  <p>The architecture and audit design are documented in full.</p>
-  <a class="doit" href="/security.html" data-ga="solutions_security"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Read the Security Page</a>
-</div>
-    </article>
+    <div class="solutions-grid">
+      <a class="solution-card" href="/solutions/legal.html">
+        <h2>Legal</h2>
+        <p>Privilege-safe deployment, defensible e-discovery workflows, audit trails, and human review gates.</p>
+        <span class="go">Read more →</span>
+      </a>
+      <a class="solution-card" href="/solutions/healthcare.html">
+        <h2>Healthcare</h2>
+        <p>HIPAA-aligned automation with masked PHI, local deployment options, and clinician-in-the-loop approval.</p>
+        <span class="go">Read more →</span>
+      </a>
+      <a class="solution-card" href="/solutions/financial-services.html">
+        <h2>Financial Services</h2>
+        <p>Automation for regulated financial workflows — reconciliation, reporting, and compliance-grade audit trails.</p>
+        <span class="go">Read more →</span>
+      </a>
+      <a class="solution-card" href="/solutions/insurance.html">
+        <h2>Insurance</h2>
+        <p>Claims and underwriting workflows automated with masked data and a defensible decision record.</p>
+        <span class="go">Read more →</span>
+      </a>
+    </div>
   </div>
 </main>
 <footer class="site">

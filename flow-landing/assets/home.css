@@ -657,23 +657,31 @@ canvas.terrain-canvas.show{opacity:1}
 @keyframes slideInLeft{from{opacity:0; transform:translateX(-30px)}to{opacity:1; transform:translateX(0)}}
 @keyframes slideInRight{from{opacity:0; transform:translateX(30px)}to{opacity:1; transform:translateX(0)}}
 .wait-msg.err{color:#ff7a55}
-/* The two real ways in, side by side. Neither is a step on a ladder: Flow Trial
-   and Flow are separate products for separate audiences, so they get equal
-   visual weight and their own sentence rather than a tier comparison. */
-.cta-paths{display:grid; gap:14px; width:100%; max-width:720px; margin:6px 0 22px; text-align:start}
-@media (min-width:640px){ .cta-paths{grid-template-columns:1fr 1fr} }
-.cta-paths.single{max-width:380px; margin-inline:auto}
-@media (min-width:640px){ .cta-paths.single{grid-template-columns:1fr} }
+/* The two real ways in, side by side. Neither is a step on a ladder: Flow and
+   Glance are separate products for separate audiences, so they get equal
+   visual weight and their own card rather than a tier comparison. */
+.cta-paths{display:grid; gap:18px; width:100%; max-width:760px; margin:6px 0 22px; text-align:start; align-items:start}
+@media (min-width:760px){ .cta-paths{grid-template-columns:1fr 1fr} }
 .cta-path{
-  display:flex; flex-direction:column; gap:6px; padding:18px 20px; border-radius:16px;
-  border:1px solid var(--line); background:rgba(255,255,255,.03); text-decoration:none;
-  transition:border-color .2s, transform .2s, background .2s;
+  display:flex; flex-direction:column; gap:8px; padding:24px 26px; border-radius:20px;
+  border:1px solid var(--line); background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
+  box-shadow:0 1px 2px rgba(0,0,0,.08), 0 18px 40px -26px rgba(26,78,245,.4);
+  text-decoration:none; transition:border-color .25s, transform .25s, background .25s, box-shadow .25s;
 }
-.cta-path:hover{border-color:var(--cat); transform:translateY(-2px); background:rgba(26,78,245,.06)}
+.cta-path:hover{border-color:var(--cat); transform:translateY(-3px); background:linear-gradient(160deg, rgba(26,78,245,.09), rgba(26,78,245,.02)); box-shadow:0 1px 2px rgba(0,0,0,.1), 0 26px 52px -26px rgba(26,78,245,.55)}
 .cta-path:focus-visible{outline:2px solid var(--cat); outline-offset:3px}
-.cta-path b{font-size:1rem; font-weight:700; color:var(--txt-hi)}
-.cta-path span{font-size:.88rem; line-height:1.5; color:var(--muted)}
-.wl-alt{font-size:.9rem; color:var(--muted); margin:0 0 14px; text-align:center}
+.cta-path b{font-size:1.05rem; font-weight:700; color:var(--txt-hi)}
+.cta-path span{font-size:.88rem; line-height:1.55; color:var(--muted)}
+.cta-path-form{cursor:default}
+.cta-path-form:hover{transform:none; border-color:var(--line); background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); box-shadow:0 1px 2px rgba(0,0,0,.08), 0 18px 40px -26px rgba(26,78,245,.4)}
+.cta-path-form .wait-wrap{width:100%; display:flex; flex-direction:column; align-items:stretch; gap:14px; margin-top:8px}
+.cta-path-form .wait-form{justify-content:flex-start; max-width:none}
+.cta-path-form .wait-msg{text-align:start}
+.cta-path-link{justify-content:center; position:relative}
+.cta-path-arrow{display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; border-radius:50%; border:1px solid var(--line); color:var(--muted); margin-top:6px; transition:border-color .25s, color .25s, transform .25s}
+.cta-path-arrow svg{width:15px; height:15px}
+.cta-path-link:hover .cta-path-arrow{border-color:var(--cat); color:var(--cat); transform:translateX(3px)}
+@media (max-width:759px){ .cta-path-link{align-items:flex-start} .cta-path-arrow{display:none} }
 /* A quiet scroll cue, not a third button competing with the two real paths. */
 .hero-scroll{
   display:inline-flex; align-items:center; gap:7px; margin-top:22px; padding:6px 2px;
