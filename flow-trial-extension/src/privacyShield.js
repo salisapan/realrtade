@@ -44,6 +44,30 @@ const FlowPrivacyShield = (() => {
     'gi'
   );
 
+  // An email address almost always carries two of the exact things this file
+  // exists to hide in one string: the local-part is frequently a real name
+  // (john.doe@...), and the domain is frequently the real company
+  // (...@acmecorp.com). Masked as its own category — not left for
+  // NAME_PATTERN/COMPANY_PATTERN to catch pieces of — because those both
+  // require whitespace between words and never match across the dots/@ in
+  // an address, so without this pattern an email address passed through
+  // completely unmasked.
+  const EMAIL_PATTERN = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+
+  // Deliberately conservative: requires the area-code/exchange/line grouped
+  // with a visible separator (dash, dot, space) or parens, optionally
+  // preceded by a country code. A bare unformatted 10-digit run is NOT
+  // matched on purpose — invoice numbers, PO numbers, and other business IDs
+  // in this exact domain's emails are routinely 10 digits with no
+  // separators, and a real phone number in business correspondence is
+  // almost always written with one.
+  // \b sits after the optional country-code/paren prefix, not before it: a
+  // leading \b would only hold at a word/non-word transition, and "(" or
+  // "+" preceded by whitespace is non-word-to-non-word — no transition — so
+  // the match could never start early enough to consume them, leaking a
+  // stray "(" or "+" next to an otherwise-fully-masked number.
+  const PHONE_PATTERN = /(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g;
+
   // A firm/company suffix is the anchor: without one, "capitalized word
   // sequence" catches far too much ordinary text (sentence starts, product
   // names) to be usable. This under-catches unnamed/informally-referenced
@@ -171,6 +195,26 @@ const FlowPrivacyShield = (() => {
     const tokenMap = {}; // token -> original raw text
     let working = list.slice();
 
+    // Emails and phone numbers first: both are unambiguously anchored (an
+    // '@'-domain, a specific digit grouping) so there's no risk of a later,
+    // broader pass like NAME_PATTERN mis-splitting a piece of one — and
+    // masking them first means later passes never see that text at all.
+    let emailN = 0;
+    const emailSeen = new Map();
+    working = working.map((w) => maskCategory(w, EMAIL_PATTERN, (raw) => {
+      const token = '[EMAIL_' + (++emailN) + ']';
+      tokenMap[token] = raw;
+      return token;
+    }, emailSeen));
+
+    let phoneN = 0;
+    const phoneSeen = new Map();
+    working = working.map((w) => maskCategory(w, PHONE_PATTERN, (raw) => {
+      const token = '[PHONE_' + (++phoneN) + ']';
+      tokenMap[token] = raw;
+      return token;
+    }, phoneSeen));
+
     let dateN = 0;
     const dateSeen = new Map();
     for (const pattern of DATE_PATTERNS) {
@@ -230,9 +274,9 @@ const FlowPrivacyShield = (() => {
     }, nameSeen, trimNameEdges));
 
     const counts = {
-      dates: dateN, money: moneyN, lawFirms: lawFirmN, companies: companyN,
+      emails: emailN, phones: phoneN, dates: dateN, money: moneyN, lawFirms: lawFirmN, companies: companyN,
       names: nameN, opposing: opposingN,
-      total: dateN + moneyN + lawFirmN + companyN + nameN + opposingN
+      total: emailN + phoneN + dateN + moneyN + lawFirmN + companyN + nameN + opposingN
     };
 
     return { maskedTexts: working, tokenMap, counts };

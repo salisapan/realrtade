@@ -113,20 +113,23 @@ async function callClaude(system, userText, maxTokens) {
 const DRAFT_SYSTEM_EN =
   'You draft professional email replies for enterprise, legal, and insurance ' +
   'correspondence. You will be given an email thread where sensitive entities ' +
-  '(names, companies, monetary amounts, dates) have already been replaced with ' +
-  'placeholder tokens like [CLIENT_NAME_1], [COMPANY_A], [CURRENCY_VAL_1], [DATE_1]. ' +
+  '(names, companies, monetary amounts, dates, email addresses, phone numbers) have ' +
+  'already been replaced with placeholder tokens like [CLIENT_NAME_1], [COMPANY_A], ' +
+  '[CURRENCY_VAL_1], [DATE_1], [EMAIL_1], [PHONE_1]. ' +
   'Write a reply to the most recent message, using those exact placeholder tokens ' +
-  'wherever the real entity would appear — never invent a name, amount, or date; ' +
+  'wherever the real entity would appear — never invent a name, amount, date, email ' +
+  'address, or phone number; ' +
   'only ever reuse the tokens you were given. Match the register and phrasing of the ' +
   'thread. Output only the reply body text, no subject line, no signature block, no ' +
   'commentary about what you did.';
 
 const DRAFT_SYSTEM_HE =
   'אתה מנסח תשובות מקצועיות למיילים בתחומי עסקים, משפט וביטוח. תקבל שרשור מייל שבו ' +
-  'ישויות רגישות (שמות, חברות, סכומי כסף, תאריכים) כבר הוחלפו באסימונים כמו ' +
-  '[CLIENT_NAME_1], [COMPANY_A], [CURRENCY_VAL_1], [DATE_1]. כתוב תשובה להודעה ' +
+  'ישויות רגישות (שמות, חברות, סכומי כסף, תאריכים, כתובות מייל, מספרי טלפון) כבר הוחלפו ' +
+  'באסימונים כמו [CLIENT_NAME_1], [COMPANY_A], [CURRENCY_VAL_1], [DATE_1], [EMAIL_1], ' +
+  '[PHONE_1]. כתוב תשובה להודעה ' +
   'האחרונה תוך שימוש באותם אסימונים בדיוק במקום שבו הייתה מופיעה הישות האמיתית — לעולם ' +
-  'אל תמציא שם, סכום או תאריך; השתמש רק באסימונים שקיבלת. התאם את הרישום והניסוח ' +
+  'אל תמציא שם, סכום, תאריך, כתובת מייל או מספר טלפון; השתמש רק באסימונים שקיבלת. התאם את הרישום והניסוח ' +
   'לשרשור. פלט רק את גוף התשובה, בלי כותרת נושא, בלי חתימה, בלי הערות על מה שעשית.';
 
 async function draftReply(payload) {
@@ -152,7 +155,7 @@ const SUMMARY_SYSTEM =
   'You triage business documents (contracts, invoices, agreements) so someone can ' +
   'decide whether to open the full attachment. You will be given text already ' +
   'extracted from one document, with sensitive entities replaced by placeholder ' +
-  'tokens like [CLIENT_NAME_1], [COMPANY_A], [CURRENCY_VAL_1], [DATE_1]. Respond with ' +
+  'tokens like [CLIENT_NAME_1], [COMPANY_A], [CURRENCY_VAL_1], [DATE_1], [EMAIL_1], [PHONE_1]. Respond with ' +
   'ONLY a JSON object, no other text, shaped exactly like: ' +
   '{"summary": "one sentence, e.g. \'Updated Lease Agreement – Opposing counsel deleted the indemnification clause.\'", ' +
   '"entities": {"counterparty": "...", "effectiveDate": "...", "financialValue": "...", "governingLaw": "..."}}. ' +

@@ -46,9 +46,11 @@ deletes anything that was already there.
 
 Every message the sidebar or the chip ever reads is masked on-device first.
 `src/privacyShield.js` finds every name, company, law firm, monetary amount,
-and date in a message and replaces each with a placeholder token
+date, email address, and phone number in a message and replaces each with a
+placeholder token
 (`[CLIENT_NAME_1]`, `[COMPANY_A]`, `[LAW_FIRM_B]`, `[OPPOSING_COUNSEL_1]`,
-`[CURRENCY_VAL_1]`, `[DATE_1]`) before anything downstream sees it. A green
+`[CURRENCY_VAL_1]`, `[DATE_1]`, `[EMAIL_1]`, `[PHONE_1]`) before anything
+downstream sees it. A green
 **Local Privacy Shield Active** badge sits at the top of the sidebar for
 exactly this reason — hover it for the same claim in one sentence.
 
@@ -62,7 +64,7 @@ distinction matters:
 - **Draft-It (below) and the attachment X-ray (below) are opt-in tools that
   do call a real language model** — `netlify/functions/glance-assist/glance-assist.js`,
   which calls the Anthropic API. They only ever receive the *masked* text:
-  the placeholder tokens, never the real names/amounts/dates. The
+  the placeholder tokens, never the real names/amounts/dates/emails/phones. The
   token↔real-value map is built and kept in this tab and is never sent
   anywhere; the model is instructed to reuse tokens verbatim, and the real
   values are substituted back in locally, after the round trip, by
@@ -264,7 +266,7 @@ src/judgment.js        weighted on-device scorer + adaptive threshold
 src/domains.js         per-field vocabulary and phrasing — never rules
 src/connectors.js      catalog: what each destination is and how it authenticates
 src/storage.js         chrome.storage wrapper; log and calibration
-src/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates before anything leaves the device
+src/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates/emails/phones before anything leaves the device
 src/sidebar.js         the injected sidebar pane: badge, Draft-It, Next-Step, attachment hover card
 src/sidebar.css        sidebar/floating-card styles (CSS logical properties, RTL/LTR safe)
 src/docwriter.js       generates a real .docx locally, no library (Feature 4 Path B)

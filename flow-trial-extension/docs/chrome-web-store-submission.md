@@ -59,15 +59,16 @@ Every write is additive only — nothing existing is ever edited or deleted
 LOCAL PRIVACY SHIELD
 Before any text reaches a write path or an AI-assisted feature (see below),
 Glance's on-device Privacy Shield finds every name, company, monetary
-amount, and date in the message and replaces each with a placeholder token.
+amount, date, email address, and phone number in the message and replaces
+each with a placeholder token.
 A visible badge in the sidebar confirms this is active — it isn't a policy
 promise, it's what the code does before anything is sent anywhere.
 
 DRAFT-IT (opt-in)
 Click Draft-It in the sidebar and Glance drafts a reply to the open thread,
 matched to whether the thread is in English or Hebrew. Only masked
-placeholder text — never a real name, company, amount, or date — is sent
-to generate the draft; the real values are substituted back in on your
+placeholder text — never a real name, company, amount, date, email
+address, or phone number — is sent to generate the draft; the real values are substituted back in on your
 device before you see it. Insert it directly into Gmail's reply box, or
 ask for a redraft.
 

@@ -779,7 +779,8 @@ async function notionUndo(ref) {
 // — every write path above is a structured API call, never a model call.
 // content-gmail.js/sidebar.js only ever call FlowPrivacyShield.mask() BEFORE
 // handing text to these two functions, so nothing that reaches
-// glance-assist.js is a real name, company, amount, or date — see
+// glance-assist.js is a real name, company, amount, date, email, or phone
+// number — see
 // src/privacyShield.js and netlify/functions/glance-assist/glance-assist.js
 // for the two ends of that contract. This file is just the relay: content
 // scripts can't call a third-party API directly (no CORS grant, and no
