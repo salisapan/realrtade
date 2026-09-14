@@ -1,0 +1,223 @@
+/* Injected sidebar pane + floating attachment card. Same isolation approach as
+   chip.css: namespaced under .flow-sb-*, sized/spaced with CSS logical
+   properties (inset-inline-*, margin-inline-*, text-align: start/end) rather
+   than left/right, so a host whose own `dir` is "rtl" (a Hebrew draft, a
+   Hebrew attachment summary) never breaks the layout — only the content
+   direction flips, not this file. */
+
+.flow-sb-host {
+  all: initial;
+  position: fixed;
+  inset-block-start: 96px;
+  inset-inline-end: 18px;
+  z-index: 2147483000;
+  width: 320px;
+  max-width: calc(100vw - 36px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-family: 'Assistant', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* ---- Feature 1: Privacy Shield badge ------------------------------------ */
+
+.flow-sb-badge {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-end;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(180deg, #0F6640, #0B4F32);
+  color: #DFF3E8;
+  border-radius: 999px;
+  padding: 7px 12px 7px 10px;
+  font-weight: 700;
+  font-size: 11.5px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(15,102,64,.7);
+  cursor: default;
+}
+.flow-sb-shield-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: #38D98A;
+  stroke: #38D98A;
+}
+.flow-sb-badge-label { white-space: nowrap; }
+
+.flow-sb-tooltip {
+  all: initial;
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  width: 240px;
+  background: #10141F;
+  color: #C9D0DE;
+  font-family: inherit;
+  font-size: 11.5px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px -10px rgba(0,0,0,.6);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 140ms ease, transform 140ms ease, visibility 140ms;
+  pointer-events: none;
+}
+.flow-sb-badge:hover .flow-sb-tooltip,
+.flow-sb-badge:focus-within .flow-sb-tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* ---- shared section chrome ---------------------------------------------- */
+
+.flow-sb-section {
+  background: #10141F;
+  border: 1px solid rgba(150,166,204,.16);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 16px 40px -26px rgba(0,0,0,.7);
+}
+.flow-sb-section-head {
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #8891A4;
+  margin-block-end: 10px;
+}
+.flow-sb-muted { color: #8891A4; font-size: 12.5px; }
+.flow-sb-error { color: #FF8A80; font-size: 12.5px; margin-block-end: 8px; }
+
+.flow-sb-btn {
+  all: initial;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #C9D0DE;
+  background: rgba(150,166,204,.12);
+  border: 1px solid rgba(150,166,204,.24);
+  border-radius: 9px;
+  padding: 8px 14px;
+  cursor: pointer;
+  text-align: center;
+}
+.flow-sb-btn:hover { background: rgba(150,166,204,.2); }
+.flow-sb-btn:focus-visible { outline: 2px solid #93B3FF; outline-offset: 1px; }
+
+.flow-sb-btn-primary {
+  background: linear-gradient(180deg, #2E63FF, #1A4EF5);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 0 rgba(255,255,255,.22) inset, 0 8px 20px -10px rgba(26,78,245,.8);
+}
+.flow-sb-btn-primary:hover { filter: brightness(1.07); background: linear-gradient(180deg, #2E63FF, #1A4EF5); }
+.flow-sb-btn-wide { display: flex; width: 100%; white-space: normal; line-height: 1.3; padding-block: 11px; }
+
+/* ---- Feature 2: Draft-It -------------------------------------------------- */
+
+.flow-sb-draft-text {
+  background: rgba(150,166,204,.08);
+  border: 1px solid rgba(150,166,204,.16);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: #C9D0DE;
+  font-size: 12.5px;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow-y: auto;
+  margin-block-end: 10px;
+  text-align: start;
+}
+.flow-sb-draft-actions { display: flex; gap: 8px; }
+.flow-sb-draft-actions .flow-sb-btn { flex: 1; }
+
+/* ---- Feature 4: Next-Step CRM + doc orchestrator -------------------------- */
+
+.flow-sb-receipt {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: #DFF3E8;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.flow-sb-receipt-label { flex: 1 1 auto; min-width: 0; }
+.flow-sb-link {
+  all: initial;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #93B3FF;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(147,179,255,.3);
+}
+.flow-sb-link:hover { background: rgba(147,179,255,.12); }
+
+.flow-sb-upsell {
+  margin-block-start: 14px;
+  padding-block-start: 14px;
+  border-block-start: 1px dashed rgba(150,166,204,.24);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: start;
+}
+.flow-sb-upsell-text { margin: 0; color: #C9D0DE; font-size: 12px; line-height: 1.55; }
+.flow-sb-upsell .flow-sb-btn-primary { align-self: flex-start; text-decoration: none; padding-inline: 16px; }
+
+/* ---- Feature 3: floating attachment X-ray card ---------------------------- */
+
+.flow-sb-floatcard {
+  all: initial;
+  position: fixed;
+  z-index: 2147483001;
+  width: 280px;
+  max-width: calc(100vw - 24px);
+  background: #10141F;
+  color: #C9D0DE;
+  border: 1px solid rgba(150,166,204,.2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-family: 'Assistant', system-ui, -apple-system, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.5;
+  box-shadow: 0 20px 50px -16px rgba(0,0,0,.75);
+  text-align: start;
+}
+.flow-sb-floatcard-summary {
+  font-weight: 700;
+  color: #EEF2F9;
+  margin-block-end: 10px;
+}
+.flow-sb-entity-table { display: grid; gap: 6px; }
+.flow-sb-entity-row {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  border-block-start: 1px solid rgba(150,166,204,.14);
+  padding-block-start: 6px;
+}
+.flow-sb-entity-row:first-child { border-block-start: 0; padding-block-start: 0; }
+.flow-sb-entity-key { color: #8891A4; flex: none; }
+.flow-sb-entity-val { color: #EEF2F9; text-align: end; overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+  .flow-sb-host { inset-inline-end: 10px; inset-block-start: 76px; width: 270px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-sb-tooltip { transition: none; }
+}
