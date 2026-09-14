@@ -285,6 +285,23 @@ kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); bord
 .ev.quiet .ev-write{background:var(--surface-2); border-color:var(--line); color:var(--ink-3)}
 .ev.quiet .ev-write b{color:var(--ink-2)}
 
+/* opt-in contribution to /almost-missed.html — only ever the headline
+   above (amount + date, engine-generated), never the quote in .ev-quote */
+.ev-contribute{margin-top:10px; padding-top:12px; border-top:1px dashed var(--line-2)}
+.ev-contribute-row{display:flex; align-items:flex-start; gap:9px}
+.ev-contribute-row input[type=checkbox]{margin-top:3px; flex:none; width:16px; height:16px; accent-color:var(--accent)}
+.ev-contribute-row label{font-size:.84rem; color:var(--ink-3); line-height:1.5; cursor:pointer}
+.ev-contribute-row label b{color:var(--ink-2)}
+.ev-contribute-action{display:flex; align-items:center; gap:10px; margin-top:9px; min-height:32px}
+.ev-contribute-action[hidden]{display:none}
+.ev-contribute-btn{font-family:var(--sans); font-size:.82rem; font-weight:600; color:var(--accent-ink); background:var(--accent-wash); border:1px solid color-mix(in srgb,var(--accent) 30%,transparent); border-radius:8px; padding:7px 13px; cursor:pointer; transition:border-color .15s}
+.ev-contribute-btn:hover{border-color:var(--accent)}
+.ev-contribute-btn:disabled{cursor:default; opacity:.6}
+.ev-contribute-status{font-size:.82rem; color:var(--ink-3)}
+.ev-contribute-status.ok{color:var(--ok)}
+.ev-contribute-status.err{color:#C0392B}
+:root[data-theme="dark"] .ev-contribute-status.err{color:#FF8A80}
+
 /* ---------------- share card ---------------- */
 .share{margin-top:var(--space-6); border:1px solid var(--line-2); border-radius:18px; background:var(--surface); box-shadow:var(--shadow-lg); overflow:hidden}
 .share[hidden]{display:none}
@@ -411,6 +428,7 @@ kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); bord
         </dl>
         <div class="ledger-foot">
           <span class="magnetic"><a class="doit" href="/trial.html" data-ga="scan_install_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Catch these automatically</a></span>
+          <a class="linkbtn" href="/almost-missed.html" data-ga="scan_gallery_link" style="text-align:center; text-decoration:none; display:inline-block">See what others found &rarr;</a>
           <button type="button" class="linkbtn" id="clearBtn">Clear this scan</button>
         </div>
       </aside>
@@ -656,7 +674,7 @@ kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); bord
     return d;
   }
 
-  function buildCard(analysis, sourceText){
+  function buildCard(analysis, sourceText, cardIndex){
     var card=el('article','ev '+(analysis.caught?'caught':'quiet'));
     if(!reduceMotion) card.classList.add('ev-enter');
 
@@ -737,8 +755,76 @@ kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); bord
     }
     body.appendChild(write);
 
+    /* opt-in: contribute this catch's headline (amount/date, engine-
+       generated) to the public gallery at /almost-missed.html. Never
+       offered for a quiet result — there is nothing to contribute. Never
+       sends f.quote, sourceText, or anything else pasted into the page. */
+    if(analysis.caught && analysis.domain){
+      body.appendChild(buildContribute(analysis, cardIndex));
+    }
+
     card.appendChild(body);
     return card;
+  }
+
+  function buildContribute(analysis, cardIndex){
+    var wrap=el('div','ev-contribute');
+    var row=el('div','ev-contribute-row');
+    var cb=document.createElement('input');
+    cb.type='checkbox';
+    var cbId='contrib-'+cardIndex;
+    cb.id=cbId;
+    row.appendChild(cb);
+    var label=document.createElement('label');
+    label.setAttribute('for', cbId);
+    label.appendChild(document.createTextNode('Contribute this catch — '));
+    label.appendChild(el('b',null,'anonymously'));
+    label.appendChild(document.createTextNode(' — to the public gallery. Only the category and the numbers above, never this quote or anything else you pasted.'));
+    row.appendChild(label);
+    wrap.appendChild(row);
+
+    var action=el('div','ev-contribute-action');
+    action.hidden=true;
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.className='ev-contribute-btn';
+    btn.textContent='Contribute';
+    action.appendChild(btn);
+    var status=el('span','ev-contribute-status');
+    action.appendChild(status);
+    wrap.appendChild(action);
+
+    cb.addEventListener('change', function(){ action.hidden=!cb.checked; });
+
+    btn.addEventListener('click', function(){
+      btn.disabled=true; cb.disabled=true;
+      status.className='ev-contribute-status';
+      status.textContent='Sending…';
+      var f=analysis.facts||{};
+      fetch('/.netlify/functions/submit-catch',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          domainId: analysis.domain.id,
+          headline: analysis.label,
+          score: analysis.score,
+          hasMoney: !!(f.money && f.money.value),
+          hasDate: !!f.date
+        })
+      }).then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+        .then(function(){
+          status.className='ev-contribute-status ok';
+          status.textContent='Thanks — pending review before it appears.';
+          if(typeof gtag==='function') gtag('event','inbox_scan_contribute',{ domain:analysis.domain.id });
+        })
+        .catch(function(){
+          status.className='ev-contribute-status err';
+          status.textContent='Could not send that. Please try again.';
+          btn.disabled=false; cb.disabled=false;
+        });
+    });
+
+    return wrap;
   }
 
   /* ---------- ledger ---------- */
@@ -805,7 +891,7 @@ kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); bord
     setTimeout(function(){
       scanBtn.disabled=false; scanBtnLabel.textContent='Scan another email';
       resultsWrap.hidden=false;
-      var card=buildCard(analysis, trimmed);
+      var card=buildCard(analysis, trimmed, state.scanned);
       evidence.insertBefore(card, evidence.firstChild);
       renderLedger();
       drawShareCard();
