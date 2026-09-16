@@ -1,55 +1,113 @@
 /* Injected into Gmail. Everything is namespaced under .flow-* because Gmail's
    own class names are obfuscated and change without notice, and `all: initial`
-   on the host stops Gmail's cascade from reaching in. */
+   on the host stops Gmail's cascade from reaching in.
+
+   Idle state is a two-part card: a Hebrew sentence describing what Flow found
+   (.flow-chip-text) plus a "Do It" button built from the exact shell/ring/shine
+   recipe as the marketing site's canonical .doit component (flow-premium.css)
+   — same three-layer construction (gradient shell, glowing ring, diagonal
+   shine sweep on hover), same light-theme token values, just namespaced and
+   inlined here since this stylesheet has no access to the site's CSS custom
+   properties. The button's own label stays "Do It" in English on purpose —
+   that's the one piece of vocabulary this product doesn't localize — while
+   the sentence explaining what it's about to do is real Hebrew, generated
+   from the same facts (amount, date) the record itself will carry.
+
+   Pending/warn/error/done states replace the button's children entirely
+   (see setChipState/showReceipt in content-gmail.js) rather than keeping the
+   shell/ring/shine — those are brief, secondary states, not the moment this
+   needs to look premium, so they keep the simpler flat-color treatment this
+   file always had. */
 
 .flow-chip-host {
   all: initial;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   font-family: 'Assistant', system-ui, -apple-system, sans-serif;
-  direction: ltr;
-  margin: 8px 0;
-}
-
-.flow-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  background: linear-gradient(180deg, #2E63FF, #1A4EF5);
-  color: #fff;
-  border: 0;
-  border-radius: 9px;
-  padding: 9px 14px;
-  font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
-  line-height: 1.15;
-  cursor: pointer;
-  box-shadow: 0 1px 0 rgba(255,255,255,.22) inset, 0 8px 20px -10px rgba(26,78,245,.8);
+  margin: 10px 0;
+  padding: 10px 12px 10px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(240,244,253,.9));
+  border: 1px solid rgba(40,70,150,.16);
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 10px 26px -16px rgba(20,40,100,.35);
   animation: flow-chip-in 180ms ease-out;
 }
 
-.flow-chip:hover { filter: brightness(1.07); }
-.flow-chip:focus-visible { outline: 2px solid #93B3FF; outline-offset: 2px; }
-
-.flow-chip .flow-chip-label { white-space: nowrap; }
-.flow-chip .flow-chip-target {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-weight: 400;
-  font-size: 11.5px;
-  opacity: .78;
-  border-left: 1px solid rgba(255,255,255,.28);
-  padding-left: 9px;
+.flow-chip-text {
+  all: unset;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  color: #16214a;
 }
+
+/* ---- the Do It button: same shell/ring/shine family as the site's .doit,
+   "glance" weight (thinner ring, shorter glow, quicker hover) ------------- */
+.flow-chip {
+  all: initial;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 20px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .2s cubic-bezier(.2,.8,.2,1);
+}
+.flow-chip .shell {
+  position: absolute; inset: 0; border-radius: inherit; z-index: -2;
+  background: linear-gradient(180deg, rgba(255,255,255,.95) 0%, transparent 24%),
+              linear-gradient(180deg, rgba(255,255,255,.97), rgba(219,230,250,.72));
+  border: 1px solid rgba(40,70,150,.3);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.95), inset 0 -9px 20px rgba(14,32,80,.12),
+              0 10px 30px -10px rgba(59,116,255,.3);
+  transition: box-shadow .22s;
+}
+.flow-chip .ring {
+  position: absolute; inset: 4px; border-radius: 999px; z-index: -1;
+  border: 1.5px solid #2f5bd8;
+  box-shadow: 0 0 8px rgba(59,116,255,.3), inset 0 0 0 1px rgba(255,255,255,.24),
+              inset 0 0 7px rgba(47,91,216,.38);
+  transition: box-shadow .22s, border-color .22s;
+}
+.flow-chip .shine { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; z-index: -1 }
+.flow-chip .shine::before {
+  content: ''; position: absolute; inset-block: -40%; inline-size: 40%; inset-inline-start: -60%;
+  background: linear-gradient(105deg, transparent, rgba(255,255,255,.5), transparent);
+  transform: skewX(-18deg);
+}
+.flow-chip-do-label {
+  position: relative; z-index: 1;
+  font-weight: 800; font-size: 13.5px; letter-spacing: -.01em;
+  color: #123ccb; white-space: nowrap;
+}
+.flow-chip:hover { transform: translateY(-1.5px) scale(1.025) }
+.flow-chip:hover .shell {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -8px 18px rgba(14,32,80,.12),
+              0 14px 36px -8px rgba(59,116,255,.3);
+}
+.flow-chip:hover .ring { box-shadow: 0 0 14px rgba(59,116,255,.3), inset 0 0 10px rgba(59,116,255,.3) }
+.flow-chip:hover .shine::before { animation: flow-chip-sweep .6s cubic-bezier(.3,.6,.2,1) forwards }
+.flow-chip:active { transform: translateY(0) scale(.99) }
+.flow-chip:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 3px }
+@keyframes flow-chip-sweep { to { inset-inline-start: 130% } }
 
 /* Sits outside the chip on Gmail's own background, so it must not be white. */
 .flow-chip-dismiss {
   all: initial;
+  flex: none;
   font-family: inherit;
   cursor: pointer;
   color: #8A93A6;
-  font-size: 17px;
+  font-size: 16px;
   line-height: 1;
   padding: 4px 6px;
   border-radius: 6px;
@@ -57,9 +115,19 @@
 .flow-chip-dismiss:hover { color: #3F4757; background: rgba(0,0,0,.05); }
 .flow-chip-dismiss:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
 
-.flow-chip.flow-chip-pending { background: #545D72; cursor: default; box-shadow: none; }
-.flow-chip.flow-chip-warn    { background: #8A5A00; cursor: default; box-shadow: none; }
-.flow-chip.flow-chip-error   { background: #A32F22; cursor: default; box-shadow: none; }
+/* ---- non-idle states: setChipState()/showReceipt() replace the button's
+   children entirely, so these never coexist with the shell/ring/shine above —
+   same flat treatment this file has always used for them. ------------------ */
+.flow-chip-label { all: unset; font-family: inherit; font-size: 13.5px; font-weight: 700; line-height: 1.15; white-space: nowrap; color: #fff }
+
+.flow-chip.flow-chip-pending,
+.flow-chip.flow-chip-warn,
+.flow-chip.flow-chip-error {
+  padding: 9px 14px; cursor: default; box-shadow: none;
+}
+.flow-chip.flow-chip-pending { background: #545D72; }
+.flow-chip.flow-chip-warn    { background: #8A5A00; }
+.flow-chip.flow-chip-error   { background: #A32F22; }
 
 /* The receipt state: what was written, where, and how to take it back. */
 .flow-chip.flow-chip-done {
@@ -67,6 +135,7 @@
   cursor: default;
   box-shadow: 0 1px 0 rgba(255,255,255,.18) inset;
   padding: 8px 10px 8px 14px;
+  border-radius: 12px;
 }
 .flow-chip-actions { display: inline-flex; align-items: center; gap: 4px; }
 .flow-chip-link {
@@ -91,5 +160,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .flow-chip { animation: none; }
+  .flow-chip-host { animation: none; }
+  .flow-chip:hover { transform: none; }
 }

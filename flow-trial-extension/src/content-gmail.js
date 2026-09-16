@@ -212,26 +212,48 @@
     return n;
   }
 
+  // The Hebrew sentence that sits next to the "Do It" button, explaining what
+  // Flow found — generated from the same facts (amount, date) the record
+  // itself will carry, not a translation of ctx.result.label (which stays
+  // English; it's the Notion/Slack/etc. page title, not UI copy). "Do It"
+  // itself is deliberately left untranslated in the button — see chip.css's
+  // header comment.
+  function heLead(result, connLabel) {
+    const f = (result && result.facts) || {};
+    let what;
+    if (f.lost) what = 'לתעד שהעסקה לא יוצאת לפועל';
+    else if (f.moneyText && f.dateText) what = 'לתעד ' + f.moneyText + ', ' + f.dateText;
+    else if (f.moneyText) what = 'לתעד סכום של ' + f.moneyText;
+    else if (f.dateText) what = 'לתעד תאריך ' + f.dateText;
+    else what = 'לתעד את ההחלטה הזו';
+    return 'Flow זיהה: ' + what + (connLabel ? ' ב-' + connLabel : '') + '?';
+  }
+
   function injectChip(messageNode, ctx) {
     if (messageNode.querySelector('.flow-chip-host')) return;
 
     const host = el('div', 'flow-chip-host');
-    const chip = el('button', 'flow-chip');
-    chip.type = 'button';
-    chip.appendChild(el('span', 'flow-chip-label', 'Do It: ' + ctx.result.label));
+    host.setAttribute('dir', 'rtl');
 
     const conn = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
-    if (conn) chip.appendChild(el('span', 'flow-chip-target', conn.label));
+    host.appendChild(el('p', 'flow-chip-text', heLead(ctx.result, conn ? conn.label : null)));
+
+    const chip = el('button', 'flow-chip');
+    chip.type = 'button';
+    chip.setAttribute('dir', 'ltr');
+    chip.appendChild(el('span', 'shell'));
+    chip.appendChild(el('span', 'ring'));
+    chip.appendChild(el('span', 'shine'));
+    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.addEventListener('click', () => onDoIt(host, chip, ctx));
+    host.appendChild(chip);
 
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
     dismiss.setAttribute('aria-label', 'Dismiss');
-
-    chip.addEventListener('click', () => onDoIt(host, chip, ctx));
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, ctx); });
-
-    host.appendChild(chip);
     host.appendChild(dismiss);
+
     messageNode.insertBefore(host, messageNode.firstChild);
   }
 
@@ -245,6 +267,7 @@
   // writes to your CRM and then says nothing is a tool nobody trusts twice.
   function showReceipt(host, ctx, res) {
     const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
     done.appendChild(el('span', 'flow-chip-label', 'Logged to ' + res.where + ' · ' + res.target));
 
     const actions = el('span', 'flow-chip-actions');
