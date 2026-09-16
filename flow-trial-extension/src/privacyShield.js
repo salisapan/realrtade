@@ -37,10 +37,15 @@ const FlowPrivacyShield = (() => {
   // The optional k/m multiplier suffix is grouped with its own leading space
   // so an amount with no suffix ("$45,000 (forty-five...") doesn't consume
   // and swallow the space before whatever follows it in the sentence.
+  // Both alternatives accept CURRENCY_SYMBOLS as well as CURRENCY_CODES —
+  // Hebrew business writing conventionally puts ₪ AFTER the number
+  // ("3,850 ₪"), not before it the way "$3,850" does, so the post-number
+  // alternative needs the bare symbol as a first-class case too, matching
+  // the same fix already made to extract.js's MONEY_RE.
   const MONEY_PATTERN = new RegExp(
     '(?:(?:' + CURRENCY_SYMBOLS + '|' + CURRENCY_CODES + ')\\s?)' +
     '\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?(?:\\s?(?:k|m))?' +
-    '|\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?(?:\\s?(?:k|m))?\\s?(?:' + CURRENCY_CODES + ')',
+    '|\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?(?:\\s?(?:k|m))?\\s?(?:' + CURRENCY_CODES + '|' + CURRENCY_SYMBOLS + ')',
     'gi'
   );
 
@@ -96,6 +101,36 @@ const FlowPrivacyShield = (() => {
   // word that wasn't sensitive costs nothing; an unmasked word that was
   // costs everything.
   const NAME_PATTERN = new RegExp('\\b(' + NAME_RUN + ')\\b', 'g');
+
+  // Hebrew has no case — every letter has exactly one form — so CAP_WORD's
+  // "starts with an uppercase letter" signal, which everything above is
+  // built on, has no Hebrew equivalent. Without it, NAME_PATTERN/
+  // COMPANY_PATTERN never match a single Hebrew character (confirmed: their
+  // patterns are anchored on [A-Z]), so a Hebrew name or company name
+  // passed through this file completely unmasked. Fixed the same way real
+  // Hebrew business correspondence marks these things instead: a company by
+  // its near-universal Israeli suffix ("בע\"מ" — Ltd.), a person's name by
+  // the words right after a salutation ("שלום", "היי", "לכבוד") or right
+  // after a sign-off ("בברכה", "בכבוד רב", "תודה רבה"). Lookaround (not a
+  // captured prefix/suffix like trimNameEdges) keeps the trigger word itself
+  // out of the match, so "שלום דנה" masks only "דנה" — same effect as the
+  // English pattern leaving "Dear" untouched.
+  //
+  // Deliberately no \b anywhere in these four patterns: JS's \b is defined
+  // only against ASCII \w ([A-Za-z0-9_]), so a \b placed anywhere adjacent
+  // to Hebrew text sits between two non-\w characters — never a boundary —
+  // and silently never matches. Same failure shape already fixed twice
+  // elsewhere this session (extract.js's Hebrew weekday pattern, the phone
+  // pattern above); \s and literal trigger words are the delimiters here
+  // instead.
+  const HE_WORD = '[\\u05D0-\\u05EA]+(?:["\\u05F4\\u05F3][\\u05D0-\\u05EA]+)?';
+  const HE_NAME_RUN = '(?:' + HE_WORD + '\\s+){0,2}' + HE_WORD;
+  const HE_COMPANY_SUFFIX = '(?:בע"מ|בע\\u05F4מ|בעמ)';
+  const HE_COMPANY_PATTERN = new RegExp(HE_NAME_RUN + '(?=\\s+' + HE_COMPANY_SUFFIX + ')', 'g');
+  const HE_SALUTATION = '(?:שלום|היי|לכבוד)';
+  const HE_NAME_AFTER_SALUTATION = new RegExp('(?<=' + HE_SALUTATION + '[,:]?\\s)' + HE_NAME_RUN, 'g');
+  const HE_SIGNOFF = '(?:בברכה|בכבוד רב|תודה רבה|תודה ובברכה)';
+  const HE_NAME_AFTER_SIGNOFF = new RegExp('(?<=' + HE_SIGNOFF + ',?\\s*\\n+\\s*)' + HE_NAME_RUN, 'g');
 
   // Salutation/closing words that commonly precede or follow a real name
   // ("Dear John Smith,", "John Smith\nBest regards") are capitalized
@@ -263,6 +298,14 @@ const FlowPrivacyShield = (() => {
       tokenMap[token] = raw;
       return token;
     }, companySeen));
+    // Hebrew company suffix ("בע\"מ") — same companyN/companySeen counter
+    // and seen-map as above so a company mentioned once in English and
+    // once in Hebrew phrasing within the same thread still gets one token.
+    working = working.map((w) => maskCategory(w, HE_COMPANY_PATTERN, (raw) => {
+      const token = '[COMPANY_' + letterIndex(companyN++) + ']';
+      tokenMap[token] = raw;
+      return token;
+    }, companySeen));
 
     let nameN = 0;
     const nameSeen = new Map();
@@ -272,6 +315,20 @@ const FlowPrivacyShield = (() => {
       tokenMap[token] = raw;
       return token;
     }, nameSeen, trimNameEdges));
+    // Hebrew names — no opposing-counsel routing here (that concept, and
+    // its trigger phrases, is English-only in this file; a documented scope
+    // cut, not an oversight) — same nameN/nameSeen as the English pass so
+    // numbering stays continuous.
+    working = working.map((w) => maskCategory(w, HE_NAME_AFTER_SALUTATION, (raw) => {
+      const token = '[CLIENT_NAME_' + (++nameN) + ']';
+      tokenMap[token] = raw;
+      return token;
+    }, nameSeen));
+    working = working.map((w) => maskCategory(w, HE_NAME_AFTER_SIGNOFF, (raw) => {
+      const token = '[CLIENT_NAME_' + (++nameN) + ']';
+      tokenMap[token] = raw;
+      return token;
+    }, nameSeen));
 
     const counts = {
       emails: emailN, phones: phoneN, dates: dateN, money: moneyN, lawFirms: lawFirmN, companies: companyN,
