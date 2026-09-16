@@ -173,7 +173,12 @@
     // why "seen" alone used to make a rebuilt node's chip unrecoverable.
     if (await FlowStorage.hasTerminalOutcome(messageId)) return;
 
-    const text = (message.innerText || '').trim();
+    // ?. rather than a bare .innerText — Gmail can detach or replace this
+    // exact node between the synchronous work above and this line (the
+    // awaits above this point yield back to the event loop), and a crash
+    // here would violate this file's own "never crash, just stop showing
+    // the chip" contract from the header comment.
+    const text = (message?.innerText || '').trim();
     if (text.length < 20) return; // still rendering
 
     // Captured before markSeen flips it, so it still answers "is this the
@@ -211,7 +216,7 @@
   }
 
   function hashNode(node) {
-    const s = (node.innerText || '').slice(0, 120);
+    const s = (node?.innerText || '').slice(0, 120);
     let h = 0;
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
     return 'h' + h;
@@ -361,7 +366,7 @@
   /* ------------------------------------------------------- Feature 2: Draft-It */
 
   function messageBodyText(node) {
-    return (node.innerText || '').trim();
+    return (node?.innerText || '').trim();
   }
 
   // Current message first, then up to 3 prior messages walking backward
