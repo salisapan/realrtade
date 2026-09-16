@@ -268,6 +268,9 @@
   function showReceipt(host, ctx, res) {
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
+    const icon = el('span', 'flow-chip-done-icon', '✓');
+    icon.setAttribute('aria-hidden', 'true');
+    done.appendChild(icon);
     done.appendChild(el('span', 'flow-chip-label', 'Logged to ' + res.where + ' · ' + res.target));
 
     const actions = el('span', 'flow-chip-actions');
