@@ -20,6 +20,9 @@
 
 const FlowSidebar = (() => {
   const HOST_ID = 'flow-sidebar-host';
+  // Off until the upsell has a calmer placement — see the comment at its
+  // one call site below for why it's paused rather than deleted.
+  const UPSELL_ENABLED = false;
   let host = null;
   let els = {};
 
@@ -199,20 +202,28 @@ const FlowSidebar = (() => {
       }
       els.nextStepSection.appendChild(receipt);
 
-      // The Flow upsell — see Feature 4 §3. Appears only once the loop has
-      // actually completed (CRM write verified + document handed to the
-      // browser's download flow), never speculatively.
-      const upsell = el('div', 'flow-sb-upsell');
-      upsell.setAttribute('dir', isRTLText(opts.upsellLocale) ? 'rtl' : 'ltr');
-      upsell.appendChild(el('p', 'flow-sb-upsell-text',
-        'Glance successfully updated ' + (opts.where || 'your CRM') + ' and generated your next-step document in 1 click! ' +
-        'Want this entire loop automated in the background across your desktop legacy apps without clicking “Do It” every time?'));
-      const apply = el('a', 'flow-sb-btn flow-sb-btn-primary', 'Apply for Flow Pilot Program');
-      apply.href = 'https://theflow-ai.com/contact.html?ref=glance_nextstep_upsell';
-      apply.target = '_blank';
-      apply.rel = 'noopener';
-      upsell.appendChild(apply);
-      els.nextStepSection.appendChild(upsell);
+      // The Flow upsell (Feature 4 §3) is disabled for now — see
+      // UPSELL_ENABLED below. Firing a sales pitch in the same breath as
+      // "here's your record" contradicts the product's own quiet-by-design
+      // promise (docs/product-architecture.md §1.7: "not a notifier — going
+      // quiet is the system working correctly") and reads as a bait-and-
+      // switch the moment someone is watching the success state, not
+      // reading the popup later. Revisit with a calmer placement (the
+      // popup's own activity log, not an inline pitch after every write)
+      // before turning this back on.
+      if (UPSELL_ENABLED) {
+        const upsell = el('div', 'flow-sb-upsell');
+        upsell.setAttribute('dir', isRTLText(opts.upsellLocale) ? 'rtl' : 'ltr');
+        upsell.appendChild(el('p', 'flow-sb-upsell-text',
+          'Glance successfully updated ' + (opts.where || 'your CRM') + ' and generated your next-step document in 1 click! ' +
+          'Want this entire loop automated in the background across your desktop legacy apps without clicking “Do It” every time?'));
+        const apply = el('a', 'flow-sb-btn flow-sb-btn-primary', 'Apply for Flow Pilot Program');
+        apply.href = 'https://theflow-ai.com/contact.html?ref=glance_nextstep_upsell';
+        apply.target = '_blank';
+        apply.rel = 'noopener';
+        upsell.appendChild(apply);
+        els.nextStepSection.appendChild(upsell);
+      }
     }
   }
 
