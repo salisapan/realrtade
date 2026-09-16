@@ -1,0 +1,111 @@
+/* Shared stylesheet for the 30 individual blog article pages.
+   Apple product-page treatment: monochrome tokens, -apple-system font
+   stack, flattened panels/borders, whitespace-based hierarchy — matching
+   the redesign already shipped to blog/index.html.
+
+   Loaded AFTER /assets/flow-premium.css. flow-premium.css already owns
+   (via !important or later-in-cascade equal-specificity rules): header.site
+   background/border, h1.title color+letter-spacing (gradient-clip text),
+   .eyebrow color, article h2 accent marker (::before), article blockquote
+   box/border/background, article>p:first-of-type::first-letter (drop cap,
+   scoped to article.post), and the .doit button in its entirety. This file
+   does not re-declare those properties — doing so here, after
+   flow-premium.css, would silently un-do that unification. It only
+   supplies the tokens those rules read (--accent/--accent-2/--muted/
+   --txt-hi/--line/--panel) plus the properties flow-premium.css does not
+   touch (sizing, spacing, font stack, and the article-only selectors it
+   never targets: .meta, .refs, .related, .cta p/.sol-link, #progress,
+   .ish-title/.ish-lead). */
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F5F7; --panel:#F5F5F7; --line:rgba(0,0,0,.08);
+  --txt:#424245; --txt-hi:#1D1D1F; --muted:#6E6E73; --accent:#0071E3; --accent-2:#0077ED;
+  --navy:#07090F;
+  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Helvetica Neue',Arial,sans-serif;
+  --disp:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Arial,sans-serif;
+  --serif:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#000000; --bg2:#000000; --panel:#1D1D1F; --line:rgba(255,255,255,.14);
+  --txt:#A1A1A6; --txt-hi:#F5F5F7; --muted:#86868B; --accent:#2997FF; --accent-2:#5AB2FF;
+}
+*{box-sizing:border-box}
+/* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
+   container, which iOS Safari mis-composites under pinch-zoom (the page can go
+   blank). clip contains decorative overflow without that side effect. */
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.7; font-size:1.13rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:700px; margin:0 auto; padding:0 24px}
+#progress{position:fixed; top:0; left:0; height:3px; width:0%; background:var(--accent); z-index:50; transition:width .1s linear}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+header.site nav a.hi{color:#EEF2F9}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:clamp(48px,7vw,72px) 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase}
+h1.title{font-family:var(--disp); font-weight:600; font-size:clamp(2.1rem,4.4vw,3.2rem); line-height:1.12; margin:16px 0 20px}
+.meta{font-family:var(--sans); display:flex; align-items:center; gap:9px; color:var(--muted); font-size:.86rem; margin-bottom:clamp(32px,5vw,44px); padding-bottom:24px; border-bottom:1px solid var(--line)}
+.meta .dot{width:5px; height:5px; border-radius:50%; background:var(--muted); flex:none}
+article p{margin:0 0 22px}
+article>p:first-of-type{font-family:var(--serif); font-size:1.24rem; line-height:1.6; color:var(--txt-hi)}
+/* article h2's own accent border was dropped — flow-premium.css already
+   draws a glow marker via ::before at the same inset; the padding-inline-start
+   below is kept so that marker still has room to sit in. */
+article h2{font-family:var(--disp); font-weight:600; font-size:clamp(1.3rem,2.4vw,1.6rem); line-height:1.3; color:var(--txt-hi); margin:52px 0 16px; padding-inline-start:16px}
+article blockquote{color:var(--muted); font-style:italic; font-size:1.08rem}
+.refs{margin-top:56px; padding-top:28px; border-top:1px solid var(--line); font-family:var(--sans)}
+.refs h2{font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:0 0 18px}
+.refs ol{margin:0; padding-inline-start:0; list-style:none; counter-reset:refs; color:var(--muted); font-size:.9rem; line-height:1.6}
+.refs li{counter-increment:refs; margin-bottom:12px; padding-inline-start:26px; position:relative}
+.refs li::before{content:counter(refs); position:absolute; inset-inline-start:0; top:.1em; font-weight:600; color:var(--muted); font-size:.8rem}
+.cta p{margin:0 0 24px; color:var(--txt-hi); font-size:1.05rem; font-weight:400; line-height:1.5}
+.cta .sol-link{display:block; margin-top:16px; font-size:.92rem; color:var(--muted)}
+.cta .sol-link a{color:var(--accent); font-weight:400; text-decoration:none}
+.cta .sol-link a:hover{text-decoration:underline}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+.related{margin-top:56px; padding-top:28px; border-top:1px solid var(--line); font-family:var(--sans)}
+.related h2{font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin:0 0 18px}
+.related-list{display:grid; gap:14px}
+.related-list a{display:block; padding:16px 18px; background:var(--panel); border:0; border-radius:12px; text-decoration:none; transition:opacity .2s,transform .2s}
+.related-list a:hover{opacity:.72; transform:translateY(-2px)}
+.related-list .rcat{font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--muted)}
+.related-list .rtitle{display:block; margin-top:4px; font-family:var(--disp); font-weight:600; font-size:1.02rem; color:var(--txt-hi); line-height:1.35}
+.ish-hero{position:relative; height:min(84vh,760px); min-height:460px; overflow:hidden; background:var(--navy); container-type:inline-size}
+@media (max-width:640px){ .ish-hero{height:64vh; min-height:420px} }
+.ish-scene{position:absolute; inset:0; perspective:30cqw; perspective-origin:50% 55%}
+.ish-space{position:absolute; inset:0; transform-style:preserve-3d}
+.ish-card{position:absolute; left:50%; top:55%; width:18cqw; height:25cqw; margin:-12.5cqw 0 0 -9cqw; border-radius:0.4cqw; overflow:hidden; backface-visibility:hidden; display:block; box-shadow:0 10px 30px -6px rgba(0,0,0,.5); animation-duration:18s; animation-timing-function:linear; animation-iteration-count:infinite}
+.ish-card img{width:100%; height:100%; object-fit:cover; display:block}
+.ish-card.ish-r{animation-name:ish-right}
+.ish-card.ish-l{animation-name:ish-left}
+.ish-tab-hidden .ish-card{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){ .ish-space{position:static; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px; height:100%; padding:24px; overflow:auto} .ish-card{position:static; margin:0; width:96px; height:132px; animation:none; transform:none!important} }
+.ish-scrim{position:absolute; inset:0; background:radial-gradient(ellipse 62% 58% at 50% 55%,var(--navy) 0%,rgba(7,9,15,.62) 42%,transparent 76%); pointer-events:none; z-index:1}
+.ish-overlay{position:relative; z-index:2; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 24px; pointer-events:none}
+.ish-title{font-family:var(--disp); font-weight:600; font-size:clamp(2.1rem,5.2vw,3.6rem); line-height:1.08; letter-spacing:-.02em; color:#F5F5F7; margin:16px 0 18px; max-width:20ch}
+.ish-lead{font-family:var(--serif); font-weight:400; font-size:1.2rem; line-height:1.55; color:#A1A1A6; max-width:52ch; margin:0}
+@keyframes ish-right{0.00%{transform:translate3d(-11.00cqw,0,-258.46cqw) rotateY(-6.00deg)}4.17%{transform:translate3d(-3.79cqw,0,-225.92cqw) rotateY(-6.92deg)}8.33%{transform:translate3d(2.73cqw,0,-197.04cqw) rotateY(-7.83deg)}12.50%{transform:translate3d(8.60cqw,0,-171.43cqw) rotateY(-8.75deg)}16.67%{transform:translate3d(13.87cqw,0,-148.70cqw) rotateY(-9.67deg)}20.83%{transform:translate3d(18.56cqw,0,-128.54cqw) rotateY(-10.58deg)}25.00%{transform:translate3d(22.72cqw,0,-110.65cqw) rotateY(-11.50deg)}29.17%{transform:translate3d(26.37cqw,0,-94.78cqw) rotateY(-12.42deg)}33.33%{transform:translate3d(29.57cqw,0,-80.70cqw) rotateY(-13.33deg)}37.50%{transform:translate3d(32.34cqw,0,-68.21cqw) rotateY(-14.25deg)}41.67%{transform:translate3d(34.71cqw,0,-57.13cqw) rotateY(-15.17deg)}45.83%{transform:translate3d(36.73cqw,0,-47.30cqw) rotateY(-16.08deg)}50.00%{transform:translate3d(38.42cqw,0,-38.58cqw) rotateY(-17.00deg)}54.17%{transform:translate3d(39.81cqw,0,-30.84cqw) rotateY(-17.92deg)}58.33%{transform:translate3d(40.94cqw,0,-23.98cqw) rotateY(-18.83deg)}62.50%{transform:translate3d(41.84cqw,0,-17.89cqw) rotateY(-19.75deg)}66.67%{transform:translate3d(42.53cqw,0,-12.48cqw) rotateY(-20.67deg)}70.83%{transform:translate3d(43.06cqw,0,-7.69cqw) rotateY(-21.58deg)}75.00%{transform:translate3d(43.43cqw,0,-3.44cqw) rotateY(-22.50deg)}79.17%{transform:translate3d(43.69cqw,0,0.33cqw) rotateY(-23.42deg)}83.33%{transform:translate3d(43.85cqw,0,3.68cqw) rotateY(-24.33deg)}87.50%{transform:translate3d(43.94cqw,0,6.65cqw) rotateY(-25.25deg)}91.67%{transform:translate3d(43.98cqw,0,9.28cqw) rotateY(-26.17deg)}95.83%{transform:translate3d(44.00cqw,0,11.62cqw) rotateY(-27.08deg)}100.00%{transform:translate3d(44.00cqw,0,13.70cqw) rotateY(-28.00deg)}}
+@keyframes ish-left{0.00%{transform:translate3d(11.00cqw,0,-258.46cqw) rotateY(6.00deg)}4.17%{transform:translate3d(3.79cqw,0,-225.92cqw) rotateY(6.92deg)}8.33%{transform:translate3d(-2.73cqw,0,-197.04cqw) rotateY(7.83deg)}12.50%{transform:translate3d(-8.60cqw,0,-171.43cqw) rotateY(8.75deg)}16.67%{transform:translate3d(-13.87cqw,0,-148.70cqw) rotateY(9.67deg)}20.83%{transform:translate3d(-18.56cqw,0,-128.54cqw) rotateY(10.58deg)}25.00%{transform:translate3d(-22.72cqw,0,-110.65cqw) rotateY(11.50deg)}29.17%{transform:translate3d(-26.37cqw,0,-94.78cqw) rotateY(12.42deg)}33.33%{transform:translate3d(-29.57cqw,0,-80.70cqw) rotateY(13.33deg)}37.50%{transform:translate3d(-32.34cqw,0,-68.21cqw) rotateY(14.25deg)}41.67%{transform:translate3d(-34.71cqw,0,-57.13cqw) rotateY(15.17deg)}45.83%{transform:translate3d(-36.73cqw,0,-47.30cqw) rotateY(16.08deg)}50.00%{transform:translate3d(-38.42cqw,0,-38.58cqw) rotateY(17.00deg)}54.17%{transform:translate3d(-39.81cqw,0,-30.84cqw) rotateY(17.92deg)}58.33%{transform:translate3d(-40.94cqw,0,-23.98cqw) rotateY(18.83deg)}62.50%{transform:translate3d(-41.84cqw,0,-17.89cqw) rotateY(19.75deg)}66.67%{transform:translate3d(-42.53cqw,0,-12.48cqw) rotateY(20.67deg)}70.83%{transform:translate3d(-43.06cqw,0,-7.69cqw) rotateY(21.58deg)}75.00%{transform:translate3d(-43.43cqw,0,-3.44cqw) rotateY(22.50deg)}79.17%{transform:translate3d(-43.69cqw,0,0.33cqw) rotateY(23.42deg)}83.33%{transform:translate3d(-43.85cqw,0,3.68cqw) rotateY(24.33deg)}87.50%{transform:translate3d(-43.94cqw,0,6.65cqw) rotateY(25.25deg)}91.67%{transform:translate3d(-43.98cqw,0,9.28cqw) rotateY(26.17deg)}95.83%{transform:translate3d(-44.00cqw,0,11.62cqw) rotateY(27.08deg)}100.00%{transform:translate3d(-44.00cqw,0,13.70cqw) rotateY(28.00deg)}}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--accent,#0071E3); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans,sans-serif); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--accent))}

@@ -25,7 +25,7 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Glance","item":"https://theflow-ai.com/trial.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Glance","url":"https://theflow-ai.com/trial.html","description":"A free browser extension that reads the open email, recognises when something has actually been decided, and writes the record into Notion or a connected CRM in one click. Judgment runs on the device.","applicationCategory":"BusinessApplication","operatingSystem":"Chrome","offers":{"@type":"Offer","price":"0","priceCurrency":"USD","url":"https://theflow-ai.com/trial.html"}}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does clicking Do It really change anything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It creates a real record in the system you connected — a page in your Notion database, or a Note on the matching HubSpot Contact — with the amount, the date, the sender, the quoted sentence and a link back to the email. Every write comes with an Undo, and undoing it removes the record."}}, {"@type": "Question", "name": "How does it decide when to speak?", "acceptedAnswer": {"@type": "Answer", "text": "It scores the open message for real signals — a currency figure, a commitment, a deadline, a stated loss — and stays quiet on things like price lists or automated mail. It speaks only above a confidence threshold, and that threshold adjusts as you click and dismiss. All of it runs on your device."}}, {"@type": "Question", "name": "What do I have to configure?", "acceptedAnswer": {"@type": "Answer", "text": "Two things, once: where Glance may write, and what kind of work you do. No trigger screen, no field mapping, no rule syntax."}}, {"@type": "Question", "name": "Is my email sent to a server?", "acceptedAnswer": {"@type": "Answer", "text": "Not to decide. That scoring happens on your machine. The only outbound call goes to the system you connected, and only when you click Do It."}}, {"@type": "Question", "name": "What if my Notion database has different columns?", "acceptedAnswer": {"@type": "Answer", "text": "Glance adapts. It fills the title, then matches the rest by name and type — an Amount column, a Due date column, an email column, and so on. Anything it can't map still goes into the page body, so nothing gets dropped."}}, {"@type": "Question", "name": "What happens if I ignore a suggestion?", "acceptedAnswer": {"@type": "Answer", "text": "It disappears and Glance won't ask about that message again. Both clicking and dismissing quietly tune how confident it needs to be before speaking up next time."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "Confirm your email, download the file, and load it into Chrome — under a minute. The install steps below walk through exactly what to click."}}, {"@type": "Question", "name": "Can I remove my data?", "acceptedAnswer": {"@type": "Answer", "text": "Uninstalling the extension deletes everything it stored on your machine. To remove your email from our list, contact hello@theflow-ai.com."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Does clicking Do It really change anything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. It creates a real record in the system you connected — a page in your Notion database, or a Note on the matching HubSpot Contact — with the amount, the date, the sender, the quoted sentence and a link back to the email. Every write comes with an Undo, and undoing it removes the record."}}, {"@type": "Question", "name": "How does it decide when to speak?", "acceptedAnswer": {"@type": "Answer", "text": "It scores the open message for real signals — a currency figure, a commitment, a deadline, a stated loss — and stays quiet on things like price lists or automated mail. It speaks only above a confidence threshold, and that threshold adjusts as you click and dismiss. All of it runs on your device."}}, {"@type": "Question", "name": "What do I have to configure?", "acceptedAnswer": {"@type": "Answer", "text": "Two things, once: where Glance may write, and what kind of work you do. No trigger screen, no field mapping, no rule syntax."}}, {"@type": "Question", "name": "Is my email sent to a server?", "acceptedAnswer": {"@type": "Answer", "text": "Not to decide. That scoring happens on your machine. The only outbound calls are when you click Do It (writes to the system you connected) or use Draft-It or the attachment summary — two opt-in tools that send masked placeholder text only, never a real name, amount, date, email address, or phone number."}}, {"@type": "Question", "name": "What if my Notion database has different columns?", "acceptedAnswer": {"@type": "Answer", "text": "Glance adapts. It fills the title, then matches the rest by name and type — an Amount column, a Due date column, an email column, and so on. Anything it can't map still goes into the page body, so nothing gets dropped."}}, {"@type": "Question", "name": "What happens if I ignore a suggestion?", "acceptedAnswer": {"@type": "Answer", "text": "It disappears and Glance won't ask about that message again. Both clicking and dismissing quietly tune how confident it needs to be before speaking up next time."}}, {"@type": "Question", "name": "How do I install it?", "acceptedAnswer": {"@type": "Answer", "text": "Confirm your email, download the file, and load it into Chrome — under a minute. The install steps below walk through exactly what to click."}}, {"@type": "Question", "name": "Can I remove my data?", "acceptedAnswer": {"@type": "Answer", "text": "Uninstalling the extension deletes everything it stored on your machine. To remove your email from our list, contact hello@theflow-ai.com."}}]}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -239,7 +239,7 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(1.9rem,3.4vw,
 @media (prefers-reduced-motion:reduce){ .doit,.doit *{transition:none!important; animation:none!important} }
 
 /* ---------------- specimen (moved up, primary proof) ---------------- */
-.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:var(--space-4); margin:8px 0 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
+.specimen{background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 20%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); border-radius:18px; padding:var(--space-4); margin:8px auto 64px; box-shadow:var(--shadow-lg), 0 30px 70px -30px color-mix(in srgb, var(--accent) 35%, transparent); max-width:640px}
 /* a one-shot glow on first scroll into view — foreshadows this card being
    the one that's actually interactive below, not decoration for its own
    sake. Fires once via IntersectionObserver, see the script near the other
@@ -252,61 +252,8 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(1.9rem,3.4vw,
 .specimen.reveal-in{animation:specimen-reveal 1.1s cubic-bezier(.2,.7,.3,1) both}
 @media (prefers-reduced-motion:reduce){ .specimen.reveal-in{animation:none} }
 .specimen .tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 16px}
-/* ties this card to the picker further down the page (#flexible) without
-   reordering either section — the specimen still proves the product works
-   before asking for any setup, this just makes the relationship legible. */
-.specimen-config{font-size:.82rem; color:var(--ink-3); margin:-8px 0 18px}
-.specimen-config b{color:var(--ink-2); font-weight:600}
-.specimen-config a{color:var(--accent-ink); text-decoration:none; border-bottom:1px solid transparent; transition:border-color .15s}
-.specimen-config a:hover{border-color:var(--line-2)}
-/* small stage markers for the three-part input -> decision -> output flow;
-   .record already has its own heading (record-head) for stage 3, so only
-   stages 1 and 2 need one added here. */
-.stage-label{font-family:var(--mono); font-size:.7rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); margin:0 0 8px}
-/* a plain text link, matching .hero-secondary's own "not a second boxed
-   button" rule — lets a first-time visitor see the silent-by-default state
-   without having to guess a vague sentence to type themselves. Hidden
-   whenever the specimen is already showing that state. */
-.specimen-quiet-demo{display:inline-flex; font-size:.85rem; margin:0 0 12px}
-.specimen-quiet-demo[hidden]{display:none}
-.mail{border-inline-start:3px solid var(--line-2); padding-inline-start:14px; margin-bottom:18px}
-.mail b{display:block; font-size:1rem; color:var(--ink); margin-bottom:3px; font-weight:700}
-.mail span{font-size:.88rem; color:var(--ink-3)}
-.chip{display:inline-flex; align-items:center; gap:9px; font-family:var(--disp); font-weight:700; font-size:.92rem; color:var(--doit-text); text-shadow:0 1px 8px var(--glow); border-radius:10px; padding:11px 16px; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 26%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 12px 30px -12px var(--glow); animation:chip-pulse 3.2s ease-in-out infinite}
-.chip .target{font-family:var(--mono); font-weight:400; opacity:.75; font-size:.8rem; text-shadow:none}
-/* .chip's own display:inline-flex is an author style, so it overrides the
-   browser's default [hidden]{display:none} — the demo needs to actually
-   hide the chip when a below-threshold result comes back, not just carry
-   the attribute uselessly. */
-.chip[hidden]{display:none}
-@keyframes chip-pulse{ 0%,100%{ box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 12px 30px -12px var(--glow); } 50%{ box-shadow:inset 0 1.5px 0 var(--glass-gloss), 0 16px 38px -10px var(--glow); } }
-@media (prefers-reduced-motion:reduce){ .chip{animation:none} }
-.specimen .note{font-size:.86rem; color:var(--ink-3); margin:16px 0 0; line-height:1.55}
-.specimen .tag{display:flex; align-items:center; gap:9px; flex-wrap:wrap}
-/* a small, honest marker that this card is not a screenshot — it's computed
-   live, right now, by the real engine. Reuses --ok (the same green used for
-   "It is" checkmarks elsewhere) so it reads as a status, not a promo badge. */
-.live-badge{display:inline-flex; align-items:center; gap:5px; font-family:var(--mono); font-size:.66rem; font-weight:600; letter-spacing:.06em; text-transform:none; color:var(--ok); background:var(--ok-wash); border-radius:999px; padding:3px 9px}
-.live-badge::before{content:''; width:6px; height:6px; border-radius:50%; background:var(--ok); animation:live-blink 2.4s ease-in-out infinite}
-@keyframes live-blink{ 0%,100%{opacity:1} 50%{opacity:.35} }
-@media (prefers-reduced-motion:reduce){ .live-badge::before{animation:none} }
-.specimen-quiet{font-size:.92rem; color:var(--ink-3); font-style:italic; margin:0 0 12px; padding:12px 14px; background:var(--surface-2); border:1px dashed var(--line-2); border-radius:10px}
-/* free-text demo box — deliberately plain, not a second glass card: it's a
-   control inside the existing specimen, not a competing component */
-.demo-try{margin-top:22px; padding-top:18px; border-top:1px solid var(--line)}
-.demo-try label{display:block; font-size:.82rem; color:var(--ink-3); margin-bottom:8px; line-height:1.4}
-.demo-try textarea{width:100%; resize:vertical; min-height:52px; font-family:var(--sans); font-size:.92rem; color:var(--ink); background:var(--surface-2); border:1px solid var(--line-2); border-radius:10px; padding:10px 12px; transition:border-color .15s}
-.demo-try textarea:focus-visible{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent)}
-.demo-try-row{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; min-height:20px}
-.demo-status{margin:0; font-size:.82rem; color:var(--ink-3)}
-.demo-status.fired{color:var(--ok)}
-.demo-reset{font-size:.82rem; padding:2px 0; white-space:nowrap}
-/* .hero-secondary sets display:inline-flex, which — being an author style —
-   overrides the browser's own [hidden]{display:none} default. Any element
-   reusing that class while relying on the hidden attribute needs it stated
-   explicitly back. */
-.demo-reset[hidden]{display:none}
-
+.proof-lead{font-size:1.05rem; color:var(--ink-2); line-height:1.6; margin:0 0 var(--space-3); max-width:46ch}
+.proof-fine{font-size:.84rem; color:var(--ink-3); margin:14px 0 0}
 /* ---------------- section rhythm ---------------- */
 section{padding:0 0 68px}
 .sec-head{margin:0 0 32px; max-width:640px}
@@ -369,18 +316,6 @@ p{margin:0 0 15px}
 .qnum{flex:none; width:26px; height:26px; border-radius:8px; background:var(--accent-wash); color:var(--accent-ink); font-family:var(--mono); font-weight:700; font-size:.82rem; display:inline-flex; align-items:center; justify-content:center}
 .qnum.inline{margin-inline-end:8px}
 
-/* the written record — the strongest proof on the page is showing the actual
-   fields that land in someone's database, not describing them */
-.specimen-arrow{text-align:center; color:var(--ink-3); font-size:1.2rem; margin:14px 0 12px; line-height:1}
-.record{border:1px solid var(--line-2); border-radius:14px; background:var(--surface-2); padding:16px 18px}
-.record-head{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px}
-.record dl{margin:0; display:grid; gap:8px}
-.record dl > div{display:grid; grid-template-columns:78px 1fr; gap:12px; align-items:start}
-.record dl > div[hidden]{display:none}
-.record dt{font-family:var(--mono); font-size:.72rem; color:var(--ink-3); padding-top:2px}
-.record dd{margin:0; font-size:.92rem; color:var(--ink); line-height:1.55}
-.record .dim{color:var(--ink-3)}
-@media (max-width:520px){ .record dl > div{grid-template-columns:1fr; gap:2px} .record dt{padding-top:0} }
 .mockrow .badge.live{background:var(--accent-wash); color:var(--accent)}
 
 /* mocklist — a faithful stand-in for the real extension popup UI */
@@ -528,8 +463,8 @@ footer.site a{color:var(--ink-3)}
   </div>
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
-  <div class="mobile-nav-group"><span class="mobile-nav-group-label">Solutions</span><a href="/solutions/legal.html">Legal</a><a href="/solutions/healthcare.html">Healthcare</a><a href="/solutions/financial-services.html">Financial Services</a><a href="/solutions/insurance.html">Insurance</a></div>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/solutions/">Solutions</a>
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">
@@ -543,7 +478,7 @@ footer.site a{color:var(--ink-3)}
       <p class="lead">No dashboards to check, no fields to fill in. When something real is decided, promised, or asked for in the email you're reading, Glance writes it straight into <b>Notion, HubSpot, Salesforce, Slack, or Monday.com</b> &mdash; one click, always reversible.</p>
       <div class="hero-cta">
         <span class="magnetic"><a class="doit glance" href="#flexible"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Set Up My Glance</a></span>
-        <a class="hero-secondary" href="#proof">See a real example<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></a>
+        <a class="hero-secondary" href="#proof">Prove it to yourself<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg></a>
       </div>
       <div class="status-row" id="statusRow">
         <span><svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5 5L20 7"/></svg>Free, no card</span>
@@ -564,40 +499,10 @@ footer.site a{color:var(--ink-3)}
     </div>
 
     <div class="specimen" id="proof">
-      <p class="tag">One email. One click. One record. <span class="live-badge">Live — runs the real judgment engine, right in your browser</span></p>
-      <p class="specimen-config">Showing: <b id="demoState">Example</b> &middot; configured for <b id="demoConfigConnector">Notion</b> &middot; <b id="demoConfigDomain">Sales &amp; business development</b> — <a href="#flexible">change it below ↓</a></p>
-      <p class="stage-label">1 &middot; The email arrives</p>
-      <div class="mail">
-        <b id="demoSubject">Re: Office Lease — Meridian Tower, 14th Floor</b>
-        <span><span id="demoSender">Dana Cole</span> &middot; <span id="demoTime">9:41&nbsp;AM</span> &middot; “<span id="demoBody">We’re good at $3,900/mo for the 14th floor, signing Monday.</span>”</span>
-      </div>
-      <p class="stage-label">2 &middot; Glance's decision</p>
-      <span class="chip" id="demoChip"><span id="demoChipInner">Do It: Log $3,900 confirmed, Sep&nbsp;7 <span class="target">&middot; Notion</span></span></span>
-      <p class="specimen-quiet" id="demoQuiet" hidden>Glance would stay quiet here — nothing definite enough to log yet.</p>
-      <a href="#" id="demoQuietDemo" class="hero-secondary specimen-quiet-demo">See what "quiet" looks like →</a>
-      <p class="specimen-arrow" aria-hidden="true">↓</p>
-      <div class="record" id="demoRecord">
-        <p class="record-head">3 &middot; What actually gets written</p>
-        <dl>
-          <div data-field="title"><dt>Title</dt><dd>Log $3,900 confirmed, Sep&nbsp;7</dd></div>
-          <div data-field="amount"><dt>Amount</dt><dd>$3,900</dd></div>
-          <div data-field="date"><dt>Date</dt><dd>Sep&nbsp;7 <span class="dim">(2026-09-07)</span></dd></div>
-          <div data-field="from"><dt>From</dt><dd>Dana Cole &lt;dana@meridian.com&gt;</dd></div>
-          <div data-field="quote"><dt>Quote</dt><dd>“We’re good at $3,900/mo for the 14th floor, signing Monday.”</dd></div>
-          <div data-field="why" hidden><dt>Why</dt><dd id="demoWhy"></dd></div>
-          <div data-field="source"><dt>Source</dt><dd><span class="dim">A link back to the original email in Gmail</span></dd></div>
-        </dl>
-      </div>
-      <p class="note" id="demoNote">Then the button turns into a receipt — <b>Logged to <span id="demoNoteTarget">Notion</span> &middot; <span id="demoNoteLabel">Deal log</span></b>, with <b>View</b> and <b>Undo</b> beside it. Nothing is written that you cannot take back in one click.</p>
-
-      <div class="demo-try">
-        <label for="demoInput">Or try it on your own line — this really runs the judgment engine, right here in your browser</label>
-        <textarea id="demoInput" rows="2" placeholder="e.g. &quot;Approved, go ahead — we'll sign by Friday.&quot;"></textarea>
-        <div class="demo-try-row">
-          <p id="demoStatus" class="demo-status" aria-live="polite"></p>
-          <a href="#" id="demoReset" class="hero-secondary demo-reset" hidden>Reset to example</a>
-        </div>
-      </div>
+      <p class="tag">One email. One click. One record.</p>
+      <p class="proof-lead">Don't take our word for it. Paste an email you actually received and watch the real judgment engine — the exact code the extension runs — read it, live, in under a second.</p>
+      <span class="magnetic"><a class="doit glance" href="/missed-deadline.html" data-ga="trial_proof_to_inbox_scan"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Scan a real email &rarr;</span></a></span>
+      <p class="proof-fine">Free. Opens in this tab. Runs entirely in your browser — nothing you paste is uploaded, logged, or stored.</p>
     </div>
 
     <nav class="jumpnav narrow" aria-label="On this page">
@@ -793,7 +698,7 @@ footer.site a{color:var(--ink-3)}
         </details>
         <details>
           <summary>Is my email sent to a server?</summary>
-          <p>Not to decide. That scoring happens on your machine. The only outbound call goes to the system you connected, and only when you click Do It.</p>
+          <p>Not to decide. That scoring happens on your machine. The only outbound calls are when you click Do It (writes to the system you connected) or use Draft-It or the attachment summary — two opt-in tools that send masked placeholder text only, never a real name, amount, date, email address, or phone number.</p>
         </details>
         <details>
           <summary>What if my Notion database has different columns?</summary>
@@ -833,7 +738,6 @@ footer.site a{color:var(--ink-3)}
     &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
   </div>
 </footer>
-<script src="/assets/glance-engine.js"></script>
 <script>
 (function(){
   var tb = document.getElementById('themeBtn');
@@ -978,151 +882,12 @@ footer.site a{color:var(--ink-3)}
     if(typeof gtag==='function') gtag('event','picker_select',{connector:connector, domain:domain, team_size:team, sensitivity:sensitivity, setup_mode:setup});
   }
 
-  // ---------------------------------------------------------------------
-  // Live demo: .specimen#proof actually runs the real judgment engine
-  // (glance-engine.js, loaded above — the same domains.js/extract.js/
-  // judgment.js the extension itself runs). Every result rendered below is
-  // a genuine FlowJudgment.evaluate() call, not scripted copy.
-  // ---------------------------------------------------------------------
-
-  var LABEL_TO_DOMAIN_ID={
-    'Sales & business development': 'sales',
-    'Legal & deal coordination': 'legal',
-    'Finance & billing': 'finance',
-    'Operations & admin': 'ops',
-    'Customer success & support': 'support',
-    'Recruiting & hiring': 'hr'
-  };
-
-  var LOG_LABEL={ sales:'Deal log', legal:'Matter log', finance:'Invoice log', ops:'Task log', support:'Ticket log', hr:'Candidate log' };
-
-  // Short, human name for each canned example, purely so "Reset to example"
-  // can say which example it means instead of leaving that ambiguous.
-  var EXAMPLE_NAME={ sales:'Meridian Tower', legal:'the NDA', finance:'the invoice', ops:'the migration', support:'the renewal', hr:'the offer' };
-
-  // One canned example per domain — real business-email text, verified
-  // against the actual engine (see flow-trial-extension/test/judgment-corpus.cjs)
-  // to fire with a sane, domain-specific label. The visible mail preview
-  // shows this exact body text; nothing is scored that isn't also shown.
-  var CANNED_EXAMPLES={
-    sales:{ subject:'Re: Office Lease — Meridian Tower, 14th Floor', sender:'Dana Cole', senderEmail:'dana@meridian.com', time:'9:41&nbsp;AM',
-      body:"Following up on the lease contract renewal. We're good at $3,900/mo for the 14th floor, signing Monday." },
-    legal:{ subject:'NDA — Acme Corp', sender:'Alex Rivera', senderEmail:'alex@acmecorp.com', time:'11:14&nbsp;AM',
-      body:'The NDA is fully executed — countersigned copy attached, effective September 7.' },
-    finance:{ subject:'Invoice INV-2041', sender:'Priya Shah', senderEmail:'priya@vendorco.com', time:'2:05&nbsp;PM',
-      body:'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.' },
-    ops:{ subject:'Re: migration plan', sender:'Marcus Webb', senderEmail:'marcus@acme.com', time:'8:52&nbsp;AM',
-      body:"Approved — go ahead and start the onboarding request whenever your team is ready." },
-    support:{ subject:'Re: account renewal', sender:'Sam Okafor', senderEmail:'sam@clientco.com', time:'4:30&nbsp;PM',
-      body:'Confirming the renewal is agreed at $18,000 for the year, effective September 7.' },
-    hr:{ subject:'Re: Offer — Senior Backend Engineer', sender:'Jordan Lee', senderEmail:'jordan.lee@gmail.com', time:'6:18&nbsp;PM',
-      body:'I am delighted to accept the offer letter. My salary expectation of $120,000 is confirmed and I can start on March 3, 2027.' }
-  };
-
-  var proof=document.getElementById('proof');
-  var demoSubject=document.getElementById('demoSubject'), demoSender=document.getElementById('demoSender'), demoTime=document.getElementById('demoTime'), demoBody=document.getElementById('demoBody');
-  var mailEl=proof ? proof.querySelector('.mail') : null;
-  var demoChip=document.getElementById('demoChip'), demoChipInner=document.getElementById('demoChipInner'), demoQuiet=document.getElementById('demoQuiet'), demoRecord=document.getElementById('demoRecord'), demoWhy=document.getElementById('demoWhy');
-  var demoNoteTarget=document.getElementById('demoNoteTarget'), demoNoteLabel=document.getElementById('demoNoteLabel');
-  var demoState=document.getElementById('demoState'), demoConfigConnector=document.getElementById('demoConfigConnector'), demoConfigDomain=document.getElementById('demoConfigDomain'), demoQuietDemo=document.getElementById('demoQuietDemo');
-  // Looked up here (not just where the free-text block is wired further
-  // down) so renderSpecimen()'s initial call, which runs before that block,
-  // can already set this link's text on first paint.
-  var demoReset=document.getElementById('demoReset');
-  var haveEngine=typeof FlowJudgment!=='undefined' && typeof FlowExtract!=='undefined';
-
-  function fieldDD(name){
-    if(!demoRecord) return null;
-    var row=demoRecord.querySelector('[data-field="'+name+'"]');
-    return row ? { row:row, dd:row.querySelector('dd') } : null;
-  }
-  function setField(name, html){
-    var f=fieldDD(name);
-    if(!f) return;
-    if(html==null){ f.row.hidden=true; return; }
-    f.row.hidden=false;
-    f.dd.innerHTML=html;
-  }
-
-  // Renders one evaluate() result into the specimen. `mode` is 'canned'
-  // (a picker-driven worked example — From/Source stay as illustrative
-  // copy) or 'custom' (visitor-typed text — no real sender, no real email,
-  // so those rows are honestly relabelled instead of reusing canned copy).
-  function renderResult(result, mode, connector){
-    if(!result){
-      if(demoChip) demoChip.hidden=true;
-      if(demoRecord) demoRecord.hidden=true;
-      if(demoQuiet) demoQuiet.hidden=false;
-      if(demoQuietDemo) demoQuietDemo.hidden=true;
-      return;
-    }
-    if(demoQuiet) demoQuiet.hidden=true;
-    if(demoQuietDemo) demoQuietDemo.hidden=false;
-    if(demoChip) demoChip.hidden=false;
-    if(demoRecord) demoRecord.hidden=false;
-
-    var target=connector||'Notion';
-    if(demoChipInner) demoChipInner.innerHTML='Do It: '+result.label+' <span class="target">&middot; '+target+'</span>';
-
-    setField('title', result.label);
-    setField('amount', result.facts.moneyText || null);
-    setField('date', result.facts.dateText ? (result.facts.dateText+(result.facts.date&&result.facts.date.iso ? ' <span class="dim">('+result.facts.date.iso+')</span>' : '')) : null);
-    setField('quote', result.facts.quote ? ('“'+result.facts.quote+'”') : null);
-
-    if(mode==='custom'){
-      setField('from', null);
-      setField('source', '<span class="dim">Not a real email — this is the text you typed, judged live</span>');
-    } else {
-      var ex=CANNED_EXAMPLES[result.domain];
-      setField('from', ex ? (ex.sender+' &lt;'+ex.senderEmail+'&gt;') : null);
-      setField('source', '<span class="dim">A link back to the original email in Gmail</span>');
-    }
-
-    if(demoWhy){
-      var top=result.signals.filter(function(s){ return s.weight>0; }).sort(function(a,b){ return b.weight-a.weight; }).slice(0,3);
-      if(top.length){ demoWhy.closest('[data-field]').hidden=false; demoWhy.textContent=top.map(function(s){ return s.why; }).join(' · '); }
-      else { demoWhy.closest('[data-field]').hidden=true; }
-    }
-
-    if(demoNoteTarget) demoNoteTarget.textContent=target;
-    if(demoNoteLabel) demoNoteLabel.textContent=LOG_LABEL[result.domain]||'Activity log';
-  }
-
-  // Re-runs the currently selected canned example through the real engine
-  // and renders it — called on picker change and once on page load, so the
-  // demo is live from first paint, not just after interaction.
-  function renderSpecimen(){
-    if(!haveEngine || !proof) return;
-    var domainLabel=currentLabel(domGroup,'data-domain');
-    var domainId=LABEL_TO_DOMAIN_ID[domainLabel]||'sales';
-    var connector=currentLabel(connGroup,'data-connector')||'Notion';
-    var ex=CANNED_EXAMPLES[domainId];
-    if(!ex) return;
-
-    if(mailEl) mailEl.hidden=false;
-    if(demoSubject) demoSubject.textContent=ex.subject;
-    if(demoSender) demoSender.textContent=ex.sender;
-    if(demoTime) demoTime.innerHTML=ex.time;
-    if(demoBody) demoBody.textContent=ex.body;
-
-    // Presentation only — ties this card to the picker below it and names
-    // which example "Reset" returns to; none of this touches judgment.
-    if(demoState) demoState.textContent='Example';
-    if(demoConfigConnector) demoConfigConnector.textContent=connector;
-    if(demoConfigDomain) demoConfigDomain.textContent=domainLabel;
-    if(demoReset) demoReset.textContent='Reset to the '+(EXAMPLE_NAME[domainId]||'example')+' example';
-
-    var result=FlowJudgment.evaluate(ex.body, domainId, { subject:ex.subject, senderEmail:ex.senderEmail, now:new Date() });
-    renderResult(result, 'canned', connector);
-  }
-
   [connGroup, domGroup, teamGroup, sensGroup, setupGroup].filter(Boolean).forEach(function(group){
     group.addEventListener('click', function(ev){
       var btn=ev.target.closest('[role="radio"]');
       if(!btn || btn.disabled) return;
       selectIn(group, btn);
       updateSummary();
-      if(group===connGroup || group===domGroup) renderSpecimen();
       btn.focus();
     });
 
@@ -1145,74 +910,9 @@ footer.site a{color:var(--ink-3)}
       ev.preventDefault();
       selectIn(group, next);
       updateSummary();
-      if(group===connGroup || group===domGroup) renderSpecimen();
       next.focus();
     });
   });
-
-  renderSpecimen();
-
-  // ---------------------------------------------------------------------
-  // Free-text box: run the real engine on whatever the visitor types, live.
-  // No network call anywhere in this path — FlowJudgment/FlowExtract are
-  // synchronous, zero-I/O functions (verified by reading their source).
-  // ---------------------------------------------------------------------
-  var demoInput=document.getElementById('demoInput'), demoStatus=document.getElementById('demoStatus'), demoReset=document.getElementById('demoReset');
-  if(demoInput && haveEngine){
-    var debounceTimer=null, lastFiredBucket=null;
-    demoInput.addEventListener('input', function(){
-      clearTimeout(debounceTimer);
-      var val=demoInput.value;
-      if(demoReset) demoReset.hidden=(val.trim().length===0);
-      if(!val.trim()){
-        if(demoStatus){ demoStatus.textContent=''; demoStatus.classList.remove('fired'); }
-        renderSpecimen();
-        return;
-      }
-      if(demoState) demoState.textContent='Your text';
-      if(demoStatus){ demoStatus.textContent='Reading…'; demoStatus.classList.remove('fired'); }
-      debounceTimer=setTimeout(function(){
-        var domainLabel=currentLabel(domGroup,'data-domain');
-        var domainId=LABEL_TO_DOMAIN_ID[domainLabel]||'sales';
-        var connector=currentLabel(connGroup,'data-connector')||'Notion';
-        if(mailEl) mailEl.hidden=true;
-        var result=FlowJudgment.evaluate(val, domainId, { now:new Date() });
-        renderResult(result, 'custom', connector);
-        var bucket=result ? (result.score>=70?'high':'medium') : 'silent';
-        if(demoStatus){
-          demoStatus.textContent=result ? 'Glance would speak up here.' : 'Glance would stay quiet — ran locally, nothing sent anywhere.';
-          demoStatus.classList.toggle('fired', !!result);
-        }
-        if(bucket!==lastFiredBucket && typeof gtag==='function'){
-          gtag('event','demo_run',{domain:domainId, fired:!!result, score_bucket:bucket});
-        }
-        lastFiredBucket=bucket;
-      }, 350);
-    });
-  }
-  if(demoReset){
-    demoReset.addEventListener('click', function(ev){
-      ev.preventDefault();
-      if(demoInput) demoInput.value='';
-      if(demoStatus){ demoStatus.textContent=''; demoStatus.classList.remove('fired'); }
-      demoReset.hidden=true;
-      renderSpecimen();
-    });
-  }
-  // "See what quiet looks like" — pre-fills the same free-text box with a
-  // known-vague line and fires the exact input event the handler above
-  // already listens for, so this reuses evaluate() as-is rather than adding
-  // a second code path. The string is deliberately a pure pleasantry with no
-  // money/date/commitment signal, the same shape as the corpus's own
-  // "pure pleasantry" case (judgment-corpus.cjs), so it reliably stays quiet.
-  if(demoQuietDemo && demoInput){
-    demoQuietDemo.addEventListener('click', function(ev){
-      ev.preventDefault();
-      demoInput.value="Thanks, talk soon.";
-      demoInput.dispatchEvent(new Event('input', { bubbles:true }));
-      demoInput.focus();
-    });
-  }
 })();
 
 /* Magnetic hover: Do It buttons drift slightly toward the pointer. */
@@ -1271,10 +971,11 @@ footer.site a{color:var(--ink-3)}
     // light theme specifically, not just stepped down from peak to glow.
     var textGlow = isLight ? 'rgba(59,116,255,.28)' : glow;
 
-    // One easing arc: starts near the top-left corner, dips through a
-    // shallow bow around mid-width (behind/near the headline, same as the
-    // reference), then falls away to a glow in the bottom-right corner.
-    var p0=[-w*0.05, h*0.09], c1=[w*0.30, h*0.02], c2=[w*0.62, h*0.30], p1=[w*1.03, h*0.92];
+    // One easing arc, mirrored left-to-right: it bleeds off both edges at the
+    // same height and rises through a shallow bow above the headline, so the
+    // glow reads as centered over the hero rather than a one-sided diagonal
+    // beam pulling all the visual weight into a single corner.
+    var p0=[-w*0.05, h*0.30], c1=[w*0.28, h*0.00], c2=[w*0.72, h*0.00], p1=[w*1.05, h*0.30];
 
     function bez(t){
       var mt=1-t;
@@ -1283,13 +984,10 @@ footer.site a{color:var(--ink-3)}
         mt*mt*mt*p0[1] + 3*mt*mt*t*c1[1] + 3*mt*t*t*c2[1] + t*t*t*p1[1]
       ];
     }
-    // The sun sits on the arc itself (t=.9), not at the path's literal end
-    // point p1 — p1 is deliberately off-canvas (x > w) so the line reads as
-    // continuing past the frame, but that also means a glow centered on it
-    // would have most of its own radius clipped by the edge and barely
-    // show at all. t=.9 is the last point on the curve still comfortably
-    // inside the visible canvas.
-    var sunCenter=bez(.9);
+    // The sun sits at the arc's midpoint (t=.5) — the top of the bow, centered
+    // over the hero — rather than biased toward either edge, so the brightest
+    // point is a shared focal point instead of favoring one corner.
+    var sunCenter=bez(.5);
     // Find the path-length fraction t whose x matches a given screen x
     // (the curve is monotonic in x, so a short bisection is enough).
     function tAtX(targetX){

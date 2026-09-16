@@ -122,6 +122,7 @@ footer.site a{color:var(--muted)}
 .tier-notify-status{font-size:.78rem; margin:2px 0 0; text-align:center; min-height:1.1em}
 .tier-notify-status.ok{color:var(--cat)}
 .tier-notify-status.err{color:#C0392B}
+:root[data-theme="dark"] .tier-notify-status.err{color:#FF8A80}
 .tier-body{padding:18px 14px 6px; flex:1; display:flex; flex-direction:column}
 .tier-list{list-style:none; margin:0; padding:0; flex:1; font-size:.9rem}
 .tier-list li{position:relative; padding-inline-start:22px; margin-bottom:10px; color:var(--txt); line-height:1.45}
@@ -129,8 +130,6 @@ footer.site a{color:var(--muted)}
 .cta{margin:40px 0 10px; padding:26px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; text-align:center}
 .cta h2{border:0; padding:0; margin:0 0 10px; font-size:1.3rem}
 .cta p{margin:0 0 18px; color:var(--muted)}
-.btn{display:inline-block; background:var(--cat); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:13px 30px; border-radius:999px}
-.btn:hover{filter:brightness(1.1)}
 .readlist{list-style:none; padding:0; margin:0}
 .readlist li{margin-bottom:12px}
 .readlist a{font-family:var(--sans); font-weight:600}
@@ -178,8 +177,8 @@ footer.site a{color:var(--muted)}
   </div>
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
-  <div class="mobile-nav-group"><span class="mobile-nav-group-label">Solutions</span><a href="/solutions/legal.html">Legal</a><a href="/solutions/healthcare.html">Healthcare</a><a href="/solutions/financial-services.html">Financial Services</a><a href="/solutions/insurance.html">Insurance</a></div>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/solutions/">Solutions</a>
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">

@@ -99,15 +99,6 @@ header.site nav a:hover::after{transform:scaleX(1); transform-origin:0 50%}
 }
 .mobile-nav a{transition:color .2s, transform .2s var(--p-ease)}
 .mobile-nav a:hover, .mobile-nav a:focus-visible{transform:translateY(-1px)}
-.mobile-nav-group{
-  width:100%; max-width:280px; display:flex; flex-direction:column; align-items:center; gap:2px;
-  margin-block-start:10px; padding-block-start:14px; border-block-start:1px solid var(--p-line);
-}
-.mobile-nav-group-label{
-  font-family:var(--mono,ui-monospace,monospace); font-size:.68rem; font-weight:600;
-  letter-spacing:.12em; text-transform:uppercase; color:var(--accent-2,#3B74FF); margin-block-end:6px;
-}
-.mobile-nav-group a{font-size:1.05rem !important; font-weight:600 !important; padding:6px 16px !important}
 /* Privacy/Terms render like every other top-level menu link now — previously
    singled out with a smaller, dimmer, side-by-side treatment that read as
    inconsistent with the rest of the menu. */

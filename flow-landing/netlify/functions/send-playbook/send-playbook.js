@@ -6,7 +6,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FROM = 'Flow <hello@theflow-ai.com>';
 const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 const LOGO_URL = 'https://theflow-ai.com/email-logo.png';
-const DOIT_BUTTON_URL = 'https://theflow-ai.com/email-doit-button.png';
 const LOG_PREFIX = '[send-playbook]';
 
 // This function is only ever meant to be called by confirm-signup.js right
@@ -37,16 +36,27 @@ function verifyInternalAuth(email, authExp, authSig, secret) {
 const CTA_URL = 'https://theflow-ai.com/contact.html';
 
 const SUBJECT = {
-  en: 'Your Hybrid Automation Playbook',
-  he: 'The Hybrid Automation Playbook — המדריך שלכם',
+  en: "Let's scope your Flow deployment (+ the Playbook)",
+  he: 'בואו נבנה את תוכנית הפריסה שלכם (+ ה-Playbook)',
 };
 
-function ctaButton(altLabel) {
+// A real HTML/CSS button, not an image — a screenshot always shows its
+// rectangular crop edge against the email's plain background (visible as
+// a "cut" line around the pill), which reads as fake precisely because
+// it's real pixels of a page that no longer surrounds it. A coded button
+// never has that seam.
+//
+// Colors are pulled directly from the site's own light-theme tokens
+// (home.css's :root[data-theme="light"] block for --accent, --ring,
+// --doit-text, --glass-*), not invented — the light theme's shell tints
+// are already near-white, so unlike the dark theme's transparency (which
+// only makes sense blended against a dark page) they hold up correctly
+// composited against the email's white background.
+function ctaButton(label) {
   return (
     '<tr><td align="center" style="padding:28px 0 10px">' +
-    '<a href="' + CTA_URL + '" style="display:inline-block;">' +
-    '<img src="' + DOIT_BUTTON_URL + '" alt="' + altLabel + '" width="220" style="display:block; width:220px; height:auto;">' +
-    '</a></td></tr>'
+    '<a href="' + CTA_URL + '" style="display:inline-block; background:linear-gradient(180deg,#ffffff 0%,#dde9fb 100%); background-color:#ffffff; color:#123ccb; text-decoration:none; font-family:Arial,Helvetica,sans-serif; font-weight:bold; font-size:16px; padding:18px 40px; border-radius:999px; border:2px solid #2f5bd8; box-shadow:0 0 0 1px rgba(40,70,150,.22), 0 10px 24px -10px rgba(26,78,245,.4), 0 0 14px rgba(26,78,245,.16);">' + label + '</a>' +
+    '</td></tr>'
   );
 }
 
@@ -57,21 +67,21 @@ function htmlBody(lang) {
 
   var greeting = isHe ? 'שלום,' : 'Hi,';
   var intro = isHe
-    ? 'תודה שהצטרפתם לרשימת ההמתנה של Flow. כבר ראיתם את הדמו המשפטי החי באתר — מצורף כאן הסיפור המלא: <b>The Hybrid Automation Playbook</b>, על איך תעשיות מוסדרות מבטלות הזנת נתונים ידנית, ללא סיכון רגולטורי.'
-    : "Thanks for joining the Flow waitlist. You've already seen the Legal Demo live on the site — attached is the full story: <b>The Hybrid Automation Playbook</b>, on exactly how regulated industries eliminate manual data entry with zero compliance risk.";
+    ? 'תודה שהשארתם לנו פרטים על הארגון שלכם. זה בדיוק מה שאנחנו צריכים כדי לבנות תוכנית פריסה אמיתית של Flow אצלכם — לא הצעה גנרית, אלא מיפוי של המודל המדויק (ענן מאובטח, או Flow-Edge / Flow-OnPrem) ומספר אמיתי לצעד הבא.'
+    : "Thanks for telling us about your organization. That's exactly what we need to put together a real Flow deployment plan — not a generic pitch, but a mapping of the exact model (Secure Cloud, or Flow-Edge / Flow-OnPrem) and a real number for the next step.";
   var pitch = isHe
-    ? 'הדרך הכי מהירה לראות את זה עובד על הנתונים שלכם היא לספר לנו על תצורת הפריסה שלכם. נמפה את המודל המדויק — ענן מאובטח, או Flow-Edge / Flow-OnPrem — ונחזור עם תשובה אמיתית, לא שיחת מכירות גנרית.'
-    : "The fastest way to see this running on your own data is to tell us your deployment details. We'll map your exact model — Secure Cloud, or Flow-Edge / Flow-OnPrem — and reply with a real answer, not a generic sales call.";
+    ? 'בדרך לכך, מצורף גם <b>The Hybrid Automation Playbook</b> — הסיפור המלא על איך תעשיות מוסדרות מבטלות הזנת נתונים ידנית, ללא סיכון רגולטורי. אבל הצעד הבא האמיתי הוא לקבוע זמן קצר לדבר על הפריסה אצלכם.'
+    : "Along the way, attached is <b>The Hybrid Automation Playbook</b> — the full story on how regulated industries eliminate manual data entry with zero compliance risk. But the real next step is a short conversation about deploying it at your organization.";
   var ctaLabel = isHe ? 'עשו את זה' : 'Do It';
   var ctaFine = isHe
-    ? 'לחצו למטה כדי לספר לנו על הסביבה שלכם.'
-    : "Click below to tell us about your environment.";
+    ? 'לחצו למטה כדי לקבוע את שיחת הפריסה.'
+    : "Click below to set up your deployment conversation.";
   var sigTeam = isHe ? 'FLOW TEAM' : 'FLOW TEAM';
   var sigTagline = isHe ? 'ביצוע אוטונומי. בתנאים שלכם.' : 'Autonomous Execution. Deployed On Your Terms.';
 
   var content = (
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:540px; margin:0 auto; font-family:Arial,Helvetica,sans-serif; background:#ffffff;">' +
-    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" style="display:block; width:120px; height:auto;"></td></tr>' +
+    '<tr><td align="' + align + '" style="padding-bottom:22px;"><img src="' + LOGO_URL + '" alt="Flow" width="120" height="53" style="display:block; width:120px; height:53px;"></td></tr>' +
     '<tr><td dir="' + dir + '" align="' + align + '" style="color:#232B44; font-size:15px; line-height:1.65;">' +
     '<p style="margin:0 0 14px">' + greeting + '</p>' +
     '<p style="margin:0 0 14px">' + intro + '</p>' +
@@ -80,7 +90,7 @@ function htmlBody(lang) {
     '<tr><td dir="' + dir + '" align="center" style="color:#455073; font-size:13px; padding-top:8px;">' + ctaFine + '</td></tr>' +
     ctaButton(ctaLabel) +
     '<tr><td dir="' + dir + '" align="' + align + '" style="border-top:1px solid #e3e8f3; padding-top:18px;">' +
-    '<img src="' + LOGO_URL + '" alt="Flow" width="28" style="display:block; width:28px; height:auto; margin-bottom:8px;">' +
+    '<img src="' + LOGO_URL + '" alt="Flow" width="28" height="12" style="display:block; width:28px; height:12px; margin-bottom:8px;">' +
     '<div style="font-family:Arial,Helvetica,sans-serif; color:#232B44; font-size:13px; line-height:1.5; letter-spacing:.04em;"><b>' + sigTeam + '</b><br><span style="color:#455073; letter-spacing:normal;">' + sigTagline + '</span></div>' +
     '</td></tr>' +
     '</table>'

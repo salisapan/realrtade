@@ -19,21 +19,21 @@
 <meta property="og:url" content="https://theflow-ai.com/blog/">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <title>Flow Insights — Research on Regulated AI Deployment</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#FFFFFF; --panel:#F9FAFC; --line:rgba(20,44,100,.12);
-  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF; --navy:#07090F;
-  --hero-a:rgba(26,78,245,.55); --hero-b:rgba(26,78,245,.22); --hero-bg:#FBFCFF;
-  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  /* Apple's own monochrome system: pure white, near-black text, two grays,
+     one accent blue — no per-category colors, no tinted panels. */
+  --bg:#FFFFFF; --panel:#F5F5F7; --line:rgba(0,0,0,.08);
+  --txt:#424245; --txt-hi:#1D1D1F; --muted:#6E6E73; --accent:#0071E3; --accent-2:#0077ED; --navy:#07090F;
+  --hero-a:rgba(0,113,227,.45); --hero-b:rgba(0,113,227,.18); --hero-bg:#FBFCFF;
+  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Helvetica Neue',Arial,sans-serif;
+  --disp:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Arial,sans-serif;
+  --serif:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
 }
 :root[data-theme="dark"]{
-  --bg:#07090F; --panel:#0E1322; --line:rgba(150,166,204,.16);
-  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
-  --hero-a:rgba(59,116,255,.35); --hero-b:rgba(59,116,255,.12); --hero-bg:#0A0E18;
+  --bg:#000000; --panel:#1D1D1F; --line:rgba(255,255,255,.14);
+  --txt:#A1A1A6; --txt-hi:#F5F5F7; --muted:#86868B; --accent:#2997FF; --accent-2:#5AB2FF;
+  --hero-a:rgba(41,151,255,.35); --hero-b:rgba(41,151,255,.14); --hero-bg:#000000;
 }
 *{box-sizing:border-box}
 /* clip, not hidden: overflow-x:hidden on the root turns <html> into a scroll
@@ -41,7 +41,7 @@
    blank). clip contains decorative overflow without that side effect. */
 html,body{overflow-x:clip}
 @supports not (overflow-x:clip){html,body{overflow-x:hidden}}
-body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--sans); transition:background .3s,color .3s}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--sans); transition:background .3s,color .3s; -webkit-font-smoothing:antialiased}
 .wrap{max-width:980px; margin:0 auto; padding:0 24px}
 header.site{background:var(--navy); padding:14px 0}
 header.site .wrap{display:flex; align-items:center; justify-content:space-between}
@@ -57,32 +57,40 @@ header.site nav a.hi{color:#EEF2F9}
 .theme-btn .sun{display:none}
 :root[data-theme="light"] .theme-btn .sun{display:block}
 :root[data-theme="light"] .theme-btn .moon{display:none}
-main{padding:64px 0 40px}
-h1{font-family:var(--disp); font-weight:700; letter-spacing:-.01em; font-size:2.6rem; color:var(--txt-hi); margin:10px 0 12px}
-.lead{font-family:var(--serif); color:var(--muted); font-size:1.14rem; line-height:1.6; max-width:640px; margin:0}
+/* Room to breathe: sections that used to sit close together now get generous
+   vertical air, scaling up on larger viewports rather than staying fixed. */
+main{padding:clamp(56px,9vw,112px) 0 clamp(48px,7vw,88px)}
+h1{font-family:var(--disp); font-weight:600; letter-spacing:-.022em; line-height:1.07; font-size:clamp(2.4rem,5.2vw,3.8rem); color:var(--txt-hi); margin:14px 0 20px}
+.lead{font-family:var(--serif); font-weight:400; color:var(--muted); font-size:clamp(1.15rem,1.6vw,1.4rem); line-height:1.55; max-width:640px; margin:0}
 
-.featured{display:block; margin-bottom:44px; border:1px solid var(--line); border-radius:20px; text-decoration:none; color:inherit; background:var(--panel); overflow:hidden}
-.featured-img{display:block; height:180px; border-bottom:3px solid var(--fcat, var(--accent))}
-.featured-img svg{height:180px}
+/* Featured story: no card chrome at all — a big flat image and text with
+   space around it, the way Apple's own "featured story" blocks work. */
+.featured{display:block; margin-bottom:clamp(56px,7vw,96px); text-decoration:none; color:inherit; background:none; border:0}
+.featured-img{display:block; height:min(46vw,340px); border-radius:20px; overflow:hidden}
+.featured-img svg{height:100%}
 .featured-img img{width:100%; height:100%; object-fit:cover; display:block}
-.featured-body{display:block; padding:32px 40px 36px}
-.featured .cat{font-size:.76rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--fcat, var(--accent))}
-.featured h2{font-family:var(--disp); font-weight:700; font-size:1.9rem; line-height:1.25; color:var(--txt-hi); margin:14px 0 12px; max-width:26ch}
-.featured p{font-family:var(--serif); color:var(--muted); margin:0; font-size:1.06rem; line-height:1.6; max-width:60ch}
-.featured .read{display:inline-block; margin-top:18px; font-weight:700; color:var(--fcat, var(--accent)); font-size:.92rem}
+.featured-body{display:block; padding:clamp(24px,4vw,40px) 4px 0}
+.featured .cat{font-size:.78rem; font-weight:600; letter-spacing:.02em; color:var(--muted)}
+.featured h2{font-family:var(--disp); font-weight:600; letter-spacing:-.015em; font-size:clamp(1.6rem,3vw,2.3rem); line-height:1.15; color:var(--txt-hi); margin:12px 0 14px; max-width:26ch}
+.featured p{font-family:var(--serif); color:var(--muted); margin:0; font-size:1.16rem; line-height:1.6; max-width:62ch}
+.featured .read{display:inline-block; margin-top:20px; font-weight:400; color:var(--accent); font-size:1.02rem}
 .featured:hover .read{text-decoration:underline}
 
-.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:16px; overflow:hidden}
-.post{display:block; text-decoration:none; color:inherit; background:var(--bg); transition:background .2s}
-.post:hover{background:var(--panel)}
-.post-img{display:block; height:100px; border-top:3px solid var(--pcat, var(--accent))}
-.post-img svg{height:100px}
+/* Article grid: the old version packed every card into a 1px hairline
+   lattice (background-color showing through 1px gaps) with a colored top
+   stripe per post — replaced with plain flat cards, one shared accent
+   color, and whitespace doing the separating instead of borders. */
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:44px 32px}
+.post{display:block; text-decoration:none; color:inherit; transition:opacity .2s}
+.post:hover{opacity:.72}
+.post-img{display:block; height:160px; border-radius:16px; overflow:hidden}
+.post-img svg{height:160px}
 .post-img img{width:100%; height:100%; object-fit:cover; display:block}
-.post-body{display:block; padding:20px 22px 24px}
-.post .cat{font-size:.72rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--pcat, var(--accent))}
-.post h3{font-family:var(--disp); font-weight:700; font-size:1.14rem; line-height:1.32; color:var(--txt-hi); margin:9px 0 8px}
-.post p{color:var(--muted); margin:0; font-size:.9rem; line-height:1.55}
-footer.site{padding:30px 0 60px; text-align:center; color:var(--muted); font-size:.86rem; border-top:1px solid var(--line); margin-top:20px}
+.post-body{display:block; padding:16px 2px 0}
+.post .cat{font-size:.74rem; font-weight:600; letter-spacing:.02em; color:var(--muted)}
+.post h3{font-family:var(--disp); font-weight:600; letter-spacing:-.008em; font-size:1.05rem; line-height:1.3; color:var(--txt-hi); margin:8px 0 8px}
+.post p{color:var(--muted); margin:0; font-size:.92rem; line-height:1.55}
+footer.site{padding:36px 0 60px; text-align:center; color:var(--muted); font-size:.86rem; border-top:1px solid var(--line); margin-top:20px}
 footer.site a{color:var(--muted)}
 .ish-hero{position:relative; height:min(84vh,760px); min-height:460px; overflow:hidden; background:var(--navy); container-type:inline-size}
 @media (max-width:640px){ .ish-hero{height:64vh; min-height:420px} }
@@ -96,8 +104,8 @@ footer.site a{color:var(--muted)}
 @media (prefers-reduced-motion:reduce){ .ish-space{position:static; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px; height:100%; padding:24px; overflow:auto} .ish-card{position:static; margin:0; width:96px; height:132px; animation:none; transform:none!important} }
 .ish-scrim{position:absolute; inset:0; background:radial-gradient(ellipse 62% 58% at 50% 55%,var(--navy) 0%,rgba(7,9,15,.62) 42%,transparent 76%); pointer-events:none; z-index:1}
 .ish-overlay{position:relative; z-index:2; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 24px; pointer-events:none}
-.ish-title{font-family:var(--disp); font-weight:700; font-size:clamp(1.9rem,4.6vw,3.1rem); line-height:1.14; letter-spacing:-.01em; color:#EEF2F9; margin:14px 0 16px; max-width:22ch}
-.ish-lead{font-family:var(--serif); font-size:1.08rem; line-height:1.6; color:#AEB9D6; max-width:56ch; margin:0}
+.ish-title{font-family:var(--disp); font-weight:600; font-size:clamp(2.1rem,5.2vw,3.6rem); line-height:1.08; letter-spacing:-.02em; color:#F5F5F7; margin:16px 0 18px; max-width:20ch}
+.ish-lead{font-family:var(--serif); font-weight:400; font-size:1.2rem; line-height:1.55; color:#A1A1A6; max-width:52ch; margin:0}
 @keyframes ish-right{0.00%{transform:translate3d(-11.00cqw,0,-258.46cqw) rotateY(-6.00deg)}4.17%{transform:translate3d(-3.79cqw,0,-225.92cqw) rotateY(-6.92deg)}8.33%{transform:translate3d(2.73cqw,0,-197.04cqw) rotateY(-7.83deg)}12.50%{transform:translate3d(8.60cqw,0,-171.43cqw) rotateY(-8.75deg)}16.67%{transform:translate3d(13.87cqw,0,-148.70cqw) rotateY(-9.67deg)}20.83%{transform:translate3d(18.56cqw,0,-128.54cqw) rotateY(-10.58deg)}25.00%{transform:translate3d(22.72cqw,0,-110.65cqw) rotateY(-11.50deg)}29.17%{transform:translate3d(26.37cqw,0,-94.78cqw) rotateY(-12.42deg)}33.33%{transform:translate3d(29.57cqw,0,-80.70cqw) rotateY(-13.33deg)}37.50%{transform:translate3d(32.34cqw,0,-68.21cqw) rotateY(-14.25deg)}41.67%{transform:translate3d(34.71cqw,0,-57.13cqw) rotateY(-15.17deg)}45.83%{transform:translate3d(36.73cqw,0,-47.30cqw) rotateY(-16.08deg)}50.00%{transform:translate3d(38.42cqw,0,-38.58cqw) rotateY(-17.00deg)}54.17%{transform:translate3d(39.81cqw,0,-30.84cqw) rotateY(-17.92deg)}58.33%{transform:translate3d(40.94cqw,0,-23.98cqw) rotateY(-18.83deg)}62.50%{transform:translate3d(41.84cqw,0,-17.89cqw) rotateY(-19.75deg)}66.67%{transform:translate3d(42.53cqw,0,-12.48cqw) rotateY(-20.67deg)}70.83%{transform:translate3d(43.06cqw,0,-7.69cqw) rotateY(-21.58deg)}75.00%{transform:translate3d(43.43cqw,0,-3.44cqw) rotateY(-22.50deg)}79.17%{transform:translate3d(43.69cqw,0,0.33cqw) rotateY(-23.42deg)}83.33%{transform:translate3d(43.85cqw,0,3.68cqw) rotateY(-24.33deg)}87.50%{transform:translate3d(43.94cqw,0,6.65cqw) rotateY(-25.25deg)}91.67%{transform:translate3d(43.98cqw,0,9.28cqw) rotateY(-26.17deg)}95.83%{transform:translate3d(44.00cqw,0,11.62cqw) rotateY(-27.08deg)}100.00%{transform:translate3d(44.00cqw,0,13.70cqw) rotateY(-28.00deg)}}@keyframes ish-left{0.00%{transform:translate3d(11.00cqw,0,-258.46cqw) rotateY(6.00deg)}4.17%{transform:translate3d(3.79cqw,0,-225.92cqw) rotateY(6.92deg)}8.33%{transform:translate3d(-2.73cqw,0,-197.04cqw) rotateY(7.83deg)}12.50%{transform:translate3d(-8.60cqw,0,-171.43cqw) rotateY(8.75deg)}16.67%{transform:translate3d(-13.87cqw,0,-148.70cqw) rotateY(9.67deg)}20.83%{transform:translate3d(-18.56cqw,0,-128.54cqw) rotateY(10.58deg)}25.00%{transform:translate3d(-22.72cqw,0,-110.65cqw) rotateY(11.50deg)}29.17%{transform:translate3d(-26.37cqw,0,-94.78cqw) rotateY(12.42deg)}33.33%{transform:translate3d(-29.57cqw,0,-80.70cqw) rotateY(13.33deg)}37.50%{transform:translate3d(-32.34cqw,0,-68.21cqw) rotateY(14.25deg)}41.67%{transform:translate3d(-34.71cqw,0,-57.13cqw) rotateY(15.17deg)}45.83%{transform:translate3d(-36.73cqw,0,-47.30cqw) rotateY(16.08deg)}50.00%{transform:translate3d(-38.42cqw,0,-38.58cqw) rotateY(17.00deg)}54.17%{transform:translate3d(-39.81cqw,0,-30.84cqw) rotateY(17.92deg)}58.33%{transform:translate3d(-40.94cqw,0,-23.98cqw) rotateY(18.83deg)}62.50%{transform:translate3d(-41.84cqw,0,-17.89cqw) rotateY(19.75deg)}66.67%{transform:translate3d(-42.53cqw,0,-12.48cqw) rotateY(20.67deg)}70.83%{transform:translate3d(-43.06cqw,0,-7.69cqw) rotateY(21.58deg)}75.00%{transform:translate3d(-43.43cqw,0,-3.44cqw) rotateY(22.50deg)}79.17%{transform:translate3d(-43.69cqw,0,0.33cqw) rotateY(23.42deg)}83.33%{transform:translate3d(-43.85cqw,0,3.68cqw) rotateY(24.33deg)}87.50%{transform:translate3d(-43.94cqw,0,6.65cqw) rotateY(25.25deg)}91.67%{transform:translate3d(-43.98cqw,0,9.28cqw) rotateY(26.17deg)}95.83%{transform:translate3d(-44.00cqw,0,11.62cqw) rotateY(27.08deg)}100.00%{transform:translate3d(-44.00cqw,0,13.70cqw) rotateY(28.00deg)}}.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat,#1A4EF5); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans,sans-serif); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 
@@ -109,8 +117,10 @@ footer.site a{color:var(--muted)}
 .mobile-nav[hidden]{display:none}
 .mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
 .mobile-nav a:hover{color:var(--accent-2,var(--cat))}
-.cta{margin:44px 0 10px; padding:38px 28px; background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--cat,var(--accent)); border-radius:16px; text-align:center; font-family:var(--sans)}
-.cta p{margin:0 0 22px; color:var(--txt-hi); font-size:1.02rem}
+/* Flat panel, no colored top stripe — the .doit button itself (site-wide
+   CTA, untouched here) already carries the accent. */
+.cta{margin:clamp(56px,7vw,96px) 0 10px; padding:clamp(40px,5vw,56px) 32px; background:var(--panel); border:0; border-radius:20px; text-align:center; font-family:var(--sans)}
+.cta p{margin:0 0 24px; color:var(--txt-hi); font-size:1.1rem; font-weight:400; line-height:1.5; max-width:52ch; margin-inline:auto}
 </style>
 <link rel="stylesheet" href="/assets/flow-premium.css">
 <script>
@@ -146,14 +156,14 @@ footer.site a{color:var(--muted)}
   </div>
 </header>
 <div class="mobile-nav" id="mobileNav" hidden>
-  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
-  <div class="mobile-nav-group"><span class="mobile-nav-group-label">Solutions</span><a href="/solutions/legal.html">Legal</a><a href="/solutions/healthcare.html">Healthcare</a><a href="/solutions/financial-services.html">Financial Services</a><a href="/solutions/insurance.html">Insurance</a></div>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/solutions/">Solutions</a>
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <div class="ish-hero"><div class="ish-scene"><div class="ish-space"><a class="ish-card ish-r" href="/blog/hr-hiring-ai-bias-fcra.html" style="animation-delay:0.000s" aria-label="AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook"><picture><source srcset="/blog/img/hr-hiring-ai-bias-fcra.webp" type="image/webp"><img src="/blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/hr-hiring-ai-bias-fcra.html" style="animation-delay:0.000s" aria-label="AI in Hiring Workflows: FCRA, Algorithmic Bias Audits, and the Growing State Rulebook"><picture><source srcset="/blog/img/hr-hiring-ai-bias-fcra.webp" type="image/webp"><img src="/blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/human-in-the-loop-ai-system-design.html" style="animation-delay:-2.000s" aria-label="Designing Human-in-the-Loop Systems People Actually Use"><picture><source srcset="/blog/img/human-in-the-loop-ai-system-design.webp" type="image/webp"><img src="/blog/img/human-in-the-loop-ai-system-design.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/human-in-the-loop-ai-system-design.html" style="animation-delay:-2.000s" aria-label="Designing Human-in-the-Loop Systems People Actually Use"><picture><source srcset="/blog/img/human-in-the-loop-ai-system-design.webp" type="image/webp"><img src="/blog/img/human-in-the-loop-ai-system-design.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/insurance-claims-ai-automation.html" style="animation-delay:-4.000s" aria-label="AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight"><picture><source srcset="/blog/img/insurance-claims-ai-automation.webp" type="image/webp"><img src="/blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/insurance-claims-ai-automation.html" style="animation-delay:-4.000s" aria-label="AI-Driven Claims Automation: Efficiency, Fairness, and Regulatory Oversight"><picture><source srcset="/blog/img/insurance-claims-ai-automation.webp" type="image/webp"><img src="/blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/insurance-underwriting-ai-rate-filing.html" style="animation-delay:-6.000s" aria-label="AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard"><picture><source srcset="/blog/img/insurance-underwriting-ai-rate-filing.webp" type="image/webp"><img src="/blog/img/insurance-underwriting-ai-rate-filing.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/insurance-underwriting-ai-rate-filing.html" style="animation-delay:-6.000s" aria-label="AI in Insurance Underwriting: Rate Filing, Proxy Discrimination, and the Actuarial Justification Standard"><picture><source srcset="/blog/img/insurance-underwriting-ai-rate-filing.webp" type="image/webp"><img src="/blog/img/insurance-underwriting-ai-rate-filing.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/legal-ai-workflow-automation.html" style="animation-delay:-8.000s" aria-label="Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility"><picture><source srcset="/blog/img/legal-ai-workflow-automation.webp" type="image/webp"><img src="/blog/img/legal-ai-workflow-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/legal-ai-workflow-automation.html" style="animation-delay:-8.000s" aria-label="Algorithmic Legal Workflows: Automation Within the Boundaries of Professional Responsibility"><picture><source srcset="/blog/img/legal-ai-workflow-automation.webp" type="image/webp"><img src="/blog/img/legal-ai-workflow-automation.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/manufacturing-ai-export-controls.html" style="animation-delay:-10.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="/blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="/blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/manufacturing-ai-export-controls.html" style="animation-delay:-10.000s" aria-label="AI Workflow Automation in Manufacturing: Export Controls and the Boundaries of Cloud Processing"><picture><source srcset="/blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="/blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-12.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html" style="animation-delay:-12.000s" aria-label="AI Automation in Life Sciences: GxP Validation and 21 CFR Part 11 Electronic Records"><picture><source srcset="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-14.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="/blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="/blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/prompt-injection-ai-threat-modeling.html" style="animation-delay:-14.000s" aria-label="Prompt Injection and Data Exfiltration: Threat Modeling AI Workflow Automation"><picture><source srcset="/blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="/blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-r" href="/blog/retail-ecommerce-ai-ccpa-cpra.html" style="animation-delay:-16.000s" aria-label="AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook"><picture><source srcset="/blog/img/retail-ecommerce-ai-ccpa-cpra.webp" type="image/webp"><img src="/blog/img/retail-ecommerce-ai-ccpa-cpra.jpg" alt="" loading="lazy"></picture></a><a class="ish-card ish-l" href="/blog/retail-ecommerce-ai-ccpa-cpra.html" style="animation-delay:-16.000s" aria-label="AI Automation in Retail: CCPA/CPRA and the New Consumer Data Rulebook"><picture><source srcset="/blog/img/retail-ecommerce-ai-ccpa-cpra.webp" type="image/webp"><img src="/blog/img/retail-ecommerce-ai-ccpa-cpra.jpg" alt="" loading="lazy"></picture></a></div></div><div class="ish-scrim"></div><div class="ish-overlay"><span class="eyebrow">FLOW INSIGHTS</span><h1 class="ish-title">Research on Regulated AI Deployment</h1><p class="ish-lead">Where compliance, architecture, and efficiency meet — across law, healthcare, finance, insurance, government, and beyond.</p></div></div>
 <main id="main">
   <div class="wrap">
-    <a class="featured" style="--fcat:#1A4EF5" href="/blog/legal-ai-workflow-automation.html">
+    <a class="featured" href="/blog/legal-ai-workflow-automation.html">
       <span class="featured-img"><picture><source srcset="/blog/img/legal-ai-workflow-automation.webp" type="image/webp"><img src="/blog/img/legal-ai-workflow-automation.jpg" alt="" loading="lazy"></picture></span>
       <span class="featured-body">
         <span class="cat">Legal</span>
@@ -163,7 +173,7 @@ footer.site a{color:var(--muted)}
       </span>
     </a>
     <div class="grid">
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/hipaa-compliant-ai-automation.html">
+      <a class="post" href="/blog/hipaa-compliant-ai-automation.html">
         <span class="post-img"><picture><source srcset="/blog/img/hipaa-compliant-ai-automation.webp" type="image/webp"><img src="/blog/img/hipaa-compliant-ai-automation.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Healthcare</span>
@@ -171,7 +181,7 @@ footer.site a{color:var(--muted)}
           <p>How chart summarization, intake, and clinical workflow automation can be deployed without creating new HIPAA exposure — a technical and regulatory framework.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/financial-services-data-masking-ai.html">
+      <a class="post" href="/blog/financial-services-data-masking-ai.html">
         <span class="post-img"><picture><source srcset="/blog/img/financial-services-data-masking-ai.webp" type="image/webp"><img src="/blog/img/financial-services-data-masking-ai.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Financial Services</span>
@@ -179,7 +189,7 @@ footer.site a{color:var(--muted)}
           <p>A governance framework for deploying AI automation on customer financial data under GLBA, model-risk-management guidance, and DORA.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/insurance-claims-ai-automation.html">
+      <a class="post" href="/blog/insurance-claims-ai-automation.html">
         <span class="post-img"><picture><source srcset="/blog/img/insurance-claims-ai-automation.webp" type="image/webp"><img src="/blog/img/insurance-claims-ai-automation.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Insurance</span>
@@ -187,7 +197,7 @@ footer.site a{color:var(--muted)}
           <p>How insurers can automate claims triage and underwriting workflows while satisfying emerging AI-specific fairness and disclosure regulation.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/edge-vs-cloud-ai-architecture.html">
+      <a class="post" href="/blog/edge-vs-cloud-ai-architecture.html">
         <span class="post-img"><picture><source srcset="/blog/img/edge-vs-cloud-ai-architecture.webp" type="image/webp"><img src="/blog/img/edge-vs-cloud-ai-architecture.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Architecture & Security</span>
@@ -195,7 +205,7 @@ footer.site a{color:var(--muted)}
           <p>A standards-based framework for choosing between masked-cloud and fully local AI deployment based on the actual threat model of a workload.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/government-ai-automation-fedramp-cmmc.html">
+      <a class="post" href="/blog/government-ai-automation-fedramp-cmmc.html">
         <span class="post-img"><picture><source srcset="/blog/img/government-ai-automation-fedramp-cmmc.webp" type="image/webp"><img src="/blog/img/government-ai-automation-fedramp-cmmc.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Government & Public Sector</span>
@@ -203,7 +213,7 @@ footer.site a{color:var(--muted)}
           <p>Why unauthorized commercial AI tools cannot lawfully process federal data, and how FedRAMP, CMMC, and CUI rules should shape deployment architecture.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/manufacturing-ai-export-controls.html">
+      <a class="post" href="/blog/manufacturing-ai-export-controls.html">
         <span class="post-img"><picture><source srcset="/blog/img/manufacturing-ai-export-controls.webp" type="image/webp"><img src="/blog/img/manufacturing-ai-export-controls.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Manufacturing & Supply Chain</span>
@@ -211,7 +221,7 @@ footer.site a{color:var(--muted)}
           <p>Why routing engineering and technical data through general-purpose cloud AI can itself raise export-control exposure, and how deployment architecture manages it.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/title-escrow-ai-wire-fraud.html">
+      <a class="post" href="/blog/title-escrow-ai-wire-fraud.html">
         <span class="post-img"><picture><source srcset="/blog/img/title-escrow-ai-wire-fraud.webp" type="image/webp"><img src="/blog/img/title-escrow-ai-wire-fraud.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Real Estate & Title</span>
@@ -219,7 +229,7 @@ footer.site a{color:var(--muted)}
           <p>Automating closing-file review and escrow correspondence sits directly on top of wire instructions — a framework for doing it without widening the fraud surface.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/hr-hiring-ai-bias-fcra.html">
+      <a class="post" href="/blog/hr-hiring-ai-bias-fcra.html">
         <span class="post-img"><picture><source srcset="/blog/img/hr-hiring-ai-bias-fcra.webp" type="image/webp"><img src="/blog/img/hr-hiring-ai-bias-fcra.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">HR & People Operations</span>
@@ -227,7 +237,7 @@ footer.site a{color:var(--muted)}
           <p>Resume screening and background-check-adjacent automation now sit under a fast-expanding set of federal and state obligations — a framework for deploying it defensibly.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/auditability-by-design-ai-systems.html">
+      <a class="post" href="/blog/auditability-by-design-ai-systems.html">
         <span class="post-img"><picture><source srcset="/blog/img/auditability-by-design-ai-systems.webp" type="image/webp"><img src="/blog/img/auditability-by-design-ai-systems.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Architecture & Security</span>
@@ -235,7 +245,7 @@ footer.site a{color:var(--muted)}
           <p>A concrete engineering framework for building the record-keeping and human-oversight controls that every regulatory regime discussed above ultimately requires.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html">
+      <a class="post" href="/blog/pharma-life-sciences-ai-21-cfr-part-11.html">
         <span class="post-img"><picture><source srcset="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.webp" type="image/webp"><img src="/blog/img/pharma-life-sciences-ai-21-cfr-part-11.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Pharma & Life Sciences</span>
@@ -243,7 +253,7 @@ footer.site a{color:var(--muted)}
           <p>Deploying AI workflow automation across regulated drug and device documentation without breaking the validation and electronic-records standard the industry runs on.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/retail-ecommerce-ai-ccpa-cpra.html">
+      <a class="post" href="/blog/retail-ecommerce-ai-ccpa-cpra.html">
         <span class="post-img"><picture><source srcset="/blog/img/retail-ecommerce-ai-ccpa-cpra.webp" type="image/webp"><img src="/blog/img/retail-ecommerce-ai-ccpa-cpra.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Retail & E-Commerce</span>
@@ -251,7 +261,7 @@ footer.site a{color:var(--muted)}
           <p>Customer service, personalization, and returns automation now sit under an expanding set of state consumer-privacy statutes — a framework for deploying it without creating new exposure.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/energy-utilities-ai-nerc-cip.html">
+      <a class="post" href="/blog/energy-utilities-ai-nerc-cip.html">
         <span class="post-img"><picture><source srcset="/blog/img/energy-utilities-ai-nerc-cip.webp" type="image/webp"><img src="/blog/img/energy-utilities-ai-nerc-cip.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Energy & Utilities</span>
@@ -259,7 +269,7 @@ footer.site a{color:var(--muted)}
           <p>Why the bulk electric system's own cybersecurity standards constrain where AI workflow tools can be deployed, and how to automate operations documentation without crossing the line.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/telecom-ai-cpni-fcc.html">
+      <a class="post" href="/blog/telecom-ai-cpni-fcc.html">
         <span class="post-img"><picture><source srcset="/blog/img/telecom-ai-cpni-fcc.webp" type="image/webp"><img src="/blog/img/telecom-ai-cpni-fcc.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Telecommunications</span>
@@ -267,7 +277,7 @@ footer.site a{color:var(--muted)}
           <p>Automating customer service and network operations for carriers means working inside one of the oldest, strictest customer-data statutes in U.S. law — a framework for doing it correctly.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/education-ai-ferpa.html">
+      <a class="post" href="/blog/education-ai-ferpa.html">
         <span class="post-img"><picture><source srcset="/blog/img/education-ai-ferpa.webp" type="image/webp"><img src="/blog/img/education-ai-ferpa.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Education</span>
@@ -275,7 +285,7 @@ footer.site a{color:var(--muted)}
           <p>School and university back-office automation touches some of the most protected records in U.S. privacy law — a framework for deploying it without creating new FERPA exposure.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/customs-trade-compliance-ai.html">
+      <a class="post" href="/blog/customs-trade-compliance-ai.html">
         <span class="post-img"><picture><source srcset="/blog/img/customs-trade-compliance-ai.webp" type="image/webp"><img src="/blog/img/customs-trade-compliance-ai.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Trade & Customs Compliance</span>
@@ -283,7 +293,7 @@ footer.site a{color:var(--muted)}
           <p>Automating customs documentation and denied-party screening touches supply-chain security programs with their own audit expectations — a framework for doing it defensibly.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/ediscovery-tar-generative-ai.html">
+      <a class="post" href="/blog/ediscovery-tar-generative-ai.html">
         <span class="post-img"><picture><source srcset="/blog/img/ediscovery-tar-generative-ai.webp" type="image/webp"><img src="/blog/img/ediscovery-tar-generative-ai.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Legal</span>
@@ -291,7 +301,7 @@ footer.site a{color:var(--muted)}
           <p>Predictive coding earned judicial acceptance a decade ago on a defensibility record generative AI has not yet built — a framework for using new tools without losing that ground.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/telehealth-ai-licensure-hipaa.html">
+      <a class="post" href="/blog/telehealth-ai-licensure-hipaa.html">
         <span class="post-img"><picture><source srcset="/blog/img/telehealth-ai-licensure-hipaa.webp" type="image/webp"><img src="/blog/img/telehealth-ai-licensure-hipaa.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Healthcare</span>
@@ -299,7 +309,7 @@ footer.site a{color:var(--muted)}
           <p>Telehealth's regulatory flexibility expanded and then partially contracted after the public health emergency ended — a framework for automating virtual-care workflows amid that shifting ground.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/aml-kyc-ai-automation.html">
+      <a class="post" href="/blog/aml-kyc-ai-automation.html">
         <span class="post-img"><picture><source srcset="/blog/img/aml-kyc-ai-automation.webp" type="image/webp"><img src="/blog/img/aml-kyc-ai-automation.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Financial Services</span>
@@ -307,7 +317,7 @@ footer.site a{color:var(--muted)}
           <p>Customer due diligence and suspicious activity monitoring are exactly the workflows AI is best suited to accelerate — and exactly where a regulator's tolerance for error is lowest.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/insurance-underwriting-ai-rate-filing.html">
+      <a class="post" href="/blog/insurance-underwriting-ai-rate-filing.html">
         <span class="post-img"><picture><source srcset="/blog/img/insurance-underwriting-ai-rate-filing.webp" type="image/webp"><img src="/blog/img/insurance-underwriting-ai-rate-filing.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Insurance</span>
@@ -315,7 +325,7 @@ footer.site a{color:var(--muted)}
           <p>Underwriting automation faces a different regulatory test than claims automation — every input has to be actuarially justified, not merely fairly applied.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/state-local-government-ai-public-records.html">
+      <a class="post" href="/blog/state-local-government-ai-public-records.html">
         <span class="post-img"><picture><source srcset="/blog/img/state-local-government-ai-public-records.webp" type="image/webp"><img src="/blog/img/state-local-government-ai-public-records.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">State & Local Government</span>
@@ -323,7 +333,7 @@ footer.site a{color:var(--muted)}
           <p>Government automation faces a distinct constraint federal and private-sector deployments do not: the same records public-records law makes disclosable are often what the system needs protected.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/prompt-injection-ai-threat-modeling.html">
+      <a class="post" href="/blog/prompt-injection-ai-threat-modeling.html">
         <span class="post-img"><picture><source srcset="/blog/img/prompt-injection-ai-threat-modeling.webp" type="image/webp"><img src="/blog/img/prompt-injection-ai-threat-modeling.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Architecture & Security</span>
@@ -331,7 +341,7 @@ footer.site a{color:var(--muted)}
           <p>A practical threat-modeling framework for the attack class specific to AI workflow tools — where it differs from conventional application security, and what actually mitigates it.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/what-is-data-masking-technical-guide.html">
+      <a class="post" href="/blog/what-is-data-masking-technical-guide.html">
         <span class="post-img"><picture><source srcset="/blog/img/what-is-data-masking-technical-guide.webp" type="image/webp"><img src="/blog/img/what-is-data-masking-technical-guide.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Data Security</span>
@@ -339,7 +349,7 @@ footer.site a{color:var(--muted)}
           <p>Static masking, tokenization, format-preserving encryption, k-anonymity, differential privacy — the actual mechanics behind 'masked before it reaches a model,' explained precisely.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/action-graph-institutional-knowledge.html">
+      <a class="post" href="/blog/action-graph-institutional-knowledge.html">
         <span class="post-img"><picture><source srcset="/blog/img/action-graph-institutional-knowledge.webp" type="image/webp"><img src="/blog/img/action-graph-institutional-knowledge.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Product Architecture</span>
@@ -347,7 +357,7 @@ footer.site a{color:var(--muted)}
           <p>What a workflow knowledge graph actually is, how it differs from a training dataset, and why capturing patterns rather than content is the architectural choice that makes this safe.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/ai-workflow-encryption-storage-architecture.html">
+      <a class="post" href="/blog/ai-workflow-encryption-storage-architecture.html">
         <span class="post-img"><picture><source srcset="/blog/img/ai-workflow-encryption-storage-architecture.webp" type="image/webp"><img src="/blog/img/ai-workflow-encryption-storage-architecture.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Data Security</span>
@@ -355,7 +365,7 @@ footer.site a{color:var(--muted)}
           <p>Encryption at rest, encryption in transit, key management, and the specific architectural choices that determine what a breach of the infrastructure could actually expose.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/zero-retention-ai-architecture.html">
+      <a class="post" href="/blog/zero-retention-ai-architecture.html">
         <span class="post-img"><picture><source srcset="/blog/img/zero-retention-ai-architecture.webp" type="image/webp"><img src="/blog/img/zero-retention-ai-architecture.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">Data Security</span>
@@ -363,7 +373,7 @@ footer.site a{color:var(--muted)}
           <p>Zero-retention is a specific, checkable architectural property, not a marketing adjective — how it works, what it doesn't cover, and the questions that separate a real implementation from a claim.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/edge-ai-inference-architecture-technical.html">
+      <a class="post" href="/blog/edge-ai-inference-architecture-technical.html">
         <span class="post-img"><picture><source srcset="/blog/img/edge-ai-inference-architecture-technical.webp" type="image/webp"><img src="/blog/img/edge-ai-inference-architecture-technical.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">AI Infrastructure</span>
@@ -371,7 +381,7 @@ footer.site a{color:var(--muted)}
           <p>What actually changes under the hood when an AI workflow runs entirely on an organization's own infrastructure — model deployment, network isolation, and the operational tradeoffs involved.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/human-in-the-loop-ai-system-design.html">
+      <a class="post" href="/blog/human-in-the-loop-ai-system-design.html">
         <span class="post-img"><picture><source srcset="/blog/img/human-in-the-loop-ai-system-design.webp" type="image/webp"><img src="/blog/img/human-in-the-loop-ai-system-design.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">AI Architecture</span>
@@ -379,7 +389,7 @@ footer.site a{color:var(--muted)}
           <p>Most 'human oversight' features are technically present and practically ignored — the interaction-design principles that determine whether a review step gets exercised or rubber-stamped.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/ai-model-drift-monitoring.html">
+      <a class="post" href="/blog/ai-model-drift-monitoring.html">
         <span class="post-img"><picture><source srcset="/blog/img/ai-model-drift-monitoring.webp" type="image/webp"><img src="/blog/img/ai-model-drift-monitoring.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">AI Infrastructure</span>
@@ -387,7 +397,7 @@ footer.site a{color:var(--muted)}
           <p>A workflow AI system that was accurate at launch can degrade silently as the underlying data changes — the monitoring architecture that catches drift before an outcome does.</p>
         </span>
       </a>
-      <a class="post" style="--pcat:#1A4EF5" href="/blog/ai-observability-tracing-debugging.html">
+      <a class="post" href="/blog/ai-observability-tracing-debugging.html">
         <span class="post-img"><picture><source srcset="/blog/img/ai-observability-tracing-debugging.webp" type="image/webp"><img src="/blog/img/ai-observability-tracing-debugging.jpg" alt="" loading="lazy"></picture></span>
         <span class="post-body">
           <span class="cat">AI Architecture</span>

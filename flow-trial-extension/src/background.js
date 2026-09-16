@@ -772,6 +772,53 @@ async function notionUndo(ref) {
   return { ok: res.ok };
 }
 
+/* ------------------------------------------------------------- glance-assist */
+//
+// Feature 2 (Draft-It) and Feature 3 (attachment X-ray) both need real
+// language generation, which the rest of this file's connectors never have
+// — every write path above is a structured API call, never a model call.
+// content-gmail.js/sidebar.js only ever call FlowPrivacyShield.mask() BEFORE
+// handing text to these two functions, so nothing that reaches
+// glance-assist.js is a real name, company, amount, date, email, or phone
+// number — see
+// src/privacyShield.js and netlify/functions/glance-assist/glance-assist.js
+// for the two ends of that contract. This file is just the relay: content
+// scripts can't call a third-party API directly (no CORS grant, and no
+// place to keep this off the page's own origin), so, same as every other
+// connector above, the actual fetch happens here in the service worker.
+
+const GLANCE_ASSIST_URL = 'https://theflow-ai.com/.netlify/functions/glance-assist';
+
+async function callGlanceAssist(body) {
+  const res = await fetch(GLANCE_ASSIST_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    const message = (data && data.error) || ('Request failed (' + res.status + ')');
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
+// payload: { lang: 'en'|'he', entries: [{ position, maskedBody }] } — all
+// already masked by the caller; see glance-assist.js's draftReply().
+async function draftReplyViaBackend(payload) {
+  const data = await callGlanceAssist({ action: 'draft-reply', lang: payload.lang, entries: payload.entries });
+  return { ok: true, draftText: data.draftText };
+}
+
+// payload: { maskedText } — already masked by the caller; see
+// glance-assist.js's summarizeAttachment().
+async function summarizeAttachmentViaBackend(payload) {
+  const data = await callGlanceAssist({ action: 'summarize-attachment', maskedText: payload.maskedText });
+  return { ok: true, summary: data.summary, entities: data.entities };
+}
+
 /* ---------------------------------------------------------------- dispatch */
 
 const WRITERS = { hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite };
@@ -846,6 +893,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const undoer = UNDOERS[msg.connectorId];
     if (!undoer) return reply(sendResponse, Promise.resolve({ ok: false }));
     return reply(sendResponse, undoer(msg.ref));
+  }
+
+  if (msg.type === 'flow:draft-reply') {
+    return reply(sendResponse, draftReplyViaBackend(msg.payload || {}));
+  }
+
+  if (msg.type === 'flow:summarize-attachment') {
+    return reply(sendResponse, summarizeAttachmentViaBackend(msg.payload || {}));
   }
 
   // Fire-and-forget: telemetry is never allowed to affect what the caller

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="How Flow deploys inside regulated industries — legal, healthcare, financial services, and insurance — with masked cloud or fully local Flow-Edge deployment.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/solutions/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>Solutions by Industry — Flow</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Solutions by Industry — Flow">
+<meta property="og:description" content="How Flow deploys inside regulated industries — legal, healthcare, financial services, and insurance — with masked cloud or fully local Flow-Edge deployment.">
+<meta property="og:url" content="https://theflow-ai.com/solutions/">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Solutions by Industry — Flow">
+<meta name="twitter:description" content="How Flow deploys inside regulated industries — legal, healthcare, financial services, and insurance — with masked cloud or fully local Flow-Edge deployment.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://theflow-ai.com/solutions/"}]}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --navy:#07090F; --cat:#1A4EF5;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
+  --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
+}
+*{box-sizing:border-box}
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--txt); font-family:var(--serif); line-height:1.75; font-size:1.06rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s}
+.wrap{max-width:760px; margin:0 auto; padding:0 24px}
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--cat)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1000px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center}
+header.site nav a{color:#AEB9D6; text-decoration:none; font-family:var(--sans); font-size:.92rem; font-weight:600; margin-inline-start:24px}
+header.site nav a:hover{color:#fff}
+.theme-btn{margin-inline-start:20px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+main{padding:56px 0 20px}
+.eyebrow{font-family:var(--sans); font-size:.78rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--cat)}
+h1.title{font-family:var(--disp); font-weight:700; font-size:2.3rem; line-height:1.2; letter-spacing:-.01em; color:var(--txt-hi); margin:14px 0 8px}
+footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
+footer.site a{color:var(--muted)}
+
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+.lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
+.solutions-grid{display:grid; gap:16px; margin:26px 0 32px}
+@media (min-width:640px){ .solutions-grid{grid-template-columns:1fr 1fr} }
+.solution-card{display:flex; flex-direction:column; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px 26px; text-decoration:none; transition:border-color .2s, transform .2s, box-shadow .2s}
+.solution-card:hover{border-color:var(--cat); transform:translateY(-3px); box-shadow:0 18px 40px -26px rgba(26,78,245,.4)}
+.solution-card h2{font-family:var(--disp); font-weight:700; font-size:1.2rem; color:var(--txt-hi); margin:0}
+.solution-card p{margin:0; color:var(--muted); font-size:.96rem; line-height:1.55}
+.solution-card .go{font-family:var(--sans); font-weight:700; font-size:.86rem; color:var(--accent-2); margin-top:4px}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--muted)}
+.pagenav a{color:var(--muted); margin-inline-end:16px}
+
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+</style>
+<link rel="stylesheet" href="/assets/flow-premium.css">
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
+</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
+    <nav>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+      </button>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<div class="mobile-nav" id="mobileNav" hidden>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/solutions/">Solutions</a>
+  <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+</div>
+<main id="main">
+  <div class="wrap">
+    <span class="eyebrow">Solutions</span>
+    <h1 class="title">Built for regulated industries.</h1>
+    <p class="lead">Flow deploys differently depending on what your data actually is and what your industry requires. Pick your industry to see the specific constraint and how Flow addresses it.</p>
+
+    <div class="solutions-grid">
+      <a class="solution-card" href="/solutions/legal.html">
+        <h2>Legal</h2>
+        <p>Privilege-safe deployment, defensible e-discovery workflows, audit trails, and human review gates.</p>
+        <span class="go">Read more →</span>
+      </a>
+      <a class="solution-card" href="/solutions/healthcare.html">
+        <h2>Healthcare</h2>
+        <p>HIPAA-aligned automation with masked PHI, local deployment options, and clinician-in-the-loop approval.</p>
+        <span class="go">Read more →</span>
+      </a>
+      <a class="solution-card" href="/solutions/financial-services.html">
+        <h2>Financial Services</h2>
+        <p>Automation for regulated financial workflows — reconciliation, reporting, and compliance-grade audit trails.</p>
+        <span class="go">Read more →</span>
+      </a>
+      <a class="solution-card" href="/solutions/insurance.html">
+        <h2>Insurance</h2>
+        <p>Claims and underwriting workflows automated with masked data and a defensible decision record.</p>
+        <span class="go">Read more →</span>
+      </a>
+    </div>
+  </div>
+</main>
+<footer class="site">
+  <div class="wrap">
+    <div class="pagenav">
+      <a href="/about.html">About</a><a href="/security.html">Security</a><a href="/trial.html">Glance</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a><a href="/blog/">Insights</a>
+    </div>
+    &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
+  </div>
+</footer>
+<script>
+
+(function(){
+  var tb = document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'light';
+    var next = cur === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+  });
+})();
+
+</script>
+<script>
+(function(){
+  var mb=document.getElementById('menuBtn'), mn=document.getElementById('mobileNav');
+  if(!mb||!mn) return;
+  function close(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); setTimeout(function(){ mn.hidden=true; },250); }
+  function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
+  mb.addEventListener('click',function(){ mn.hidden ? open() : close(); });
+  mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape' && !mn.hidden) close(); });
+})();
+</script>
+<script src="/assets/flow-premium.js" defer></script>
+</body>
+</html>

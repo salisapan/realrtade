@@ -3,7 +3,7 @@
 //   flow-trial-extension/src/extract.js
 //   flow-trial-extension/src/judgment.js
 // Regenerate with: scripts/build-glance-engine.sh
-// Last synced: 2026-09-08
+// Last synced: 2026-09-14
 //
 // This is the exact client-side judgment engine the Glance extension
 // runs — concatenated as-is (no edits) so the live demo on trial.html
@@ -451,6 +451,35 @@ const FlowJudgment = (() => {
     return 'Log this decision';
   }
 
+  // Builds the same `facts` shape evaluate() computes internally — without
+  // running the result through scoring or the chip's own threshold. Feature
+  // 4's Next-Step orchestrator needs "what does this message state" even for
+  // a message that never cleared the chip's threshold: a user who explicitly
+  // clicked "Do It: Log & Generate Next Step Document" on their own open
+  // email isn't asking the judgment engine for permission first, the way the
+  // passive chip does. Reuses the exact same private regexes and helpers
+  // evaluate() itself uses, so the two never compute a different answer for
+  // the same text.
+  function factsOnly(text, ctx) {
+    ctx = ctx || {};
+    text = newContent(text);
+    const raw = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
+    const facts = {
+      money: raw.money,
+      moneyText: raw.moneyText,
+      date: raw.date,
+      dateText: humanDate(raw.date),
+      automated: raw.automated,
+      wordCount: raw.wordCount,
+      isReply: /^re:/i.test(ctx.subject || ''),
+      lost: LOST.test(text),
+      executed: EXECUTED.test(text),
+      dispute: DISPUTE.test(text)
+    };
+    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT, LOST, EXECUTED, DISPUTE, OBLIGATION, HANDOFF]);
+    return facts;
+  }
+
   function evaluate(text, domainId, ctx) {
     ctx = ctx || {};
     const domain = FLOW_DOMAINS.find((d) => d.id === domainId) || FLOW_DOMAINS[0];
@@ -488,7 +517,7 @@ const FlowJudgment = (() => {
     };
   }
 
-  return { evaluate, thresholdFrom, BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD };
+  return { evaluate, factsOnly, neutralTitle, thresholdFrom, BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowJudgment };

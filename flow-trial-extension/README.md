@@ -42,6 +42,79 @@ carried the decision. That is what makes the written record worth having.
 Every path is additive only: it creates one new record and never edits or
 deletes anything that was already there.
 
+## Local Privacy Shield, and where masked text is allowed to go
+
+Every message the sidebar or the chip ever reads is masked on-device first.
+`src/privacyShield.js` finds every name, company, law firm, monetary amount,
+date, email address, and phone number in a message and replaces each with a
+placeholder token
+(`[CLIENT_NAME_1]`, `[COMPANY_A]`, `[LAW_FIRM_B]`, `[OPPOSING_COUNSEL_1]`,
+`[CURRENCY_VAL_1]`, `[DATE_1]`, `[EMAIL_1]`, `[PHONE_1]`) before anything
+downstream sees it. A green
+**Local Privacy Shield Active** badge sits at the top of the sidebar for
+exactly this reason — hover it for the same claim in one sentence.
+
+Two different things happen to that masked text after masking, and the
+distinction matters:
+
+- **The passive chip and judgment engine never send anything anywhere.**
+  `src/judgment.js` and `src/extract.js` score plain text entirely on this
+  device — see "What is still deliberately narrow" below. This has not
+  changed.
+- **Draft-It (below) and the attachment X-ray (below) are opt-in tools that
+  do call a real language model** — `netlify/functions/glance-assist/glance-assist.js`,
+  which calls the Anthropic API. They only ever receive the *masked* text:
+  the placeholder tokens, never the real names/amounts/dates/emails/phones. The
+  token↔real-value map is built and kept in this tab and is never sent
+  anywhere; the model is instructed to reuse tokens verbatim, and the real
+  values are substituted back in locally, after the round trip, by
+  `FlowPrivacyShield.unmask()`. Anthropic is the only third party either
+  feature's masked text ever reaches.
+
+## Draft-It (Feature 2)
+
+Click **Draft-It** in the sidebar while a thread is open. Glance harvests the
+open message plus up to 3 prior messages in the same thread, masks all of them
+together (as one batch, so the same client named across two messages gets the
+same token rather than two independent — and potentially colliding — ones),
+sends the masked text to `glance-assist.js`, and shows the drafted reply
+(English or Hebrew, matched to the thread) with **Insert into Reply** and
+**Redraft** buttons. Insert writes the unmasked draft directly into Gmail's own
+reply compose box.
+
+## Attachment X-ray (Feature 3)
+
+Hover a `.docx` attachment chip on an open message and a floating card
+appears with a one-line summary and an entity table (Counterparty, Effective
+Date, Financial Value, Governing Law). `src/docreader.js` reads the `.docx`
+entirely on-device (it's a ZIP of a few XML parts — the same insight
+`src/docwriter.js` uses in the write direction), the extracted text is masked,
+and only the masked text goes to `glance-assist.js` for summarization.
+
+**PDF is not supported yet** — the hover card shows "Preview isn't available
+for this file type yet" for PDFs and any other file type. Real PDF text
+extraction (compressed content streams, font encoding tables) is a
+library-sized undertaking, not something to bolt on unreliably alongside a
+hand-rolled `.docx` reader; see `src/docreader.js`'s header comment.
+
+## Next-Step CRM & Document Orchestrator (Feature 4)
+
+The sidebar's **Do It: Log to [Connector] & Generate Next Step Document**
+button runs both halves of "what happens after this decision" from one click:
+
+- **Path A** logs to whichever connector is already connected (Notion,
+  HubSpot, Salesforce, Slack, or Monday.com) — the exact same write path and
+  `Undo` the chip itself uses, so the two never disagree about what a write
+  looked like.
+- **Path B** generates a real, Word-openable `.docx` locally (no server call,
+  no library — `src/docwriter.js`) from the same extracted facts Path A just
+  wrote, and downloads it.
+
+Once both complete, the sidebar shows a receipt (where it logged to, a link,
+Undo) and a one-time invitation to the Flow Pilot Program — Glance's own
+upsell path into the full Flow product, shown only after the loop has
+genuinely completed once, never speculatively.
+
 ## Set up Notion (works immediately, no server, no app review)
 
 1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) →
@@ -169,6 +242,21 @@ Until step 4 is done the popup shows Monday.com as *Needs setup*.
    start**.
 4. Open Gmail. Most messages produce nothing — that is the product working.
 
+## Set up Draft-It / Attachment X-ray (needs the site owner)
+
+Both features share one Netlify function and one environment variable:
+
+1. In the Netlify project, set `ANTHROPIC_API_KEY` to a real Anthropic API
+   key. `netlify/functions/glance-assist/glance-assist.js` is the only file
+   that reads it, and it is never sent to, or readable from, the extension.
+2. That's it — no extension-side configuration, no OAuth, no new
+   `host_permissions` (the function lives on `theflow-ai.com`, already
+   covered by the extension's existing host permission for the other five
+   connectors' Netlify functions).
+
+Until step 1 is done, Draft-It and the attachment X-ray show "This feature is
+not configured yet" rather than failing silently or half-completing a request.
+
 ## Layout
 
 ```
@@ -178,18 +266,28 @@ src/judgment.js        weighted on-device scorer + adaptive threshold
 src/domains.js         per-field vocabulary and phrasing — never rules
 src/connectors.js      catalog: what each destination is and how it authenticates
 src/storage.js         chrome.storage wrapper; log and calibration
-src/content-gmail.js   Gmail watcher, the chip, and the receipt after a write
-src/background.js      credentials and the five write paths, plus undo
+src/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates/emails/phones before anything leaves the device
+src/sidebar.js         the injected sidebar pane: badge, Draft-It, Next-Step, attachment hover card
+src/sidebar.css        sidebar/floating-card styles (CSS logical properties, RTL/LTR safe)
+src/docwriter.js       generates a real .docx locally, no library (Feature 4 Path B)
+src/docreader.js       reads a .docx locally, no library (Feature 3's attachment text extraction)
+src/content-gmail.js   Gmail watcher, the chip, the sidebar wiring, and the receipt after a write
+src/background.js      credentials, the five write paths, undo, and the glance-assist relay
 popup/                 the only configuration surface — two questions long
+netlify/functions/glance-assist/  masked-only backend proxy to a real LLM, for Draft-It + attachment X-ray
 ```
 
 ## What is still deliberately narrow
 
 - **Gmail only.** The judgment engine takes plain text and knows nothing about
   Gmail; adding a second source surface is a content script, not a rewrite.
-- **The scorer is not a language model.** It is a transparent, explainable
-  weighting, which is why the popup can show why Glance spoke. A model would
-  catch phrasings this misses; it would also need email text to leave the
-  device, which is the trade this build declines to make.
+- **The passive judgment engine is not a language model, and sends nothing
+  anywhere.** `src/judgment.js`'s scorer is a transparent, explainable
+  weighting, which is why the popup can show why Glance spoke — this has not
+  changed. Draft-It and the attachment X-ray are separate, opt-in tools that
+  do call a real model with masked-only text; see "Local Privacy Shield,
+  and where masked text is allowed to go" above for exactly where the line is.
+- **PDF attachments aren't previewable yet.** Only `.docx` is read today —
+  see "Attachment X-ray" above.
 - **Not on the Chrome Web Store.** Store submission needs a completed data-use
   disclosure; until then, Load unpacked.

@@ -1,6 +1,7 @@
 // Relays anonymous, aggregate Glance product-usage events (chip shown,
-// clicked, dismissed; a write completed; a connector configured) to GA4 via
-// the Measurement Protocol. This is the only visibility the product has into
+// clicked, dismissed; a write completed; a connector configured; Draft-It
+// used; an attachment summarized) to GA4 via the Measurement Protocol. This
+// is the only visibility the product has into
 // whether an install ever sees real usage after the popup is closed — see
 // docs/product-architecture.md and the Value Hypothesis discussion this
 // exists to answer.
@@ -27,7 +28,9 @@ const ALLOWED_EVENTS = new Set([
   'chip_clicked',
   'write_completed',
   'chip_dismissed',
-  'connector_configured'
+  'connector_configured',
+  'draft_generated',
+  'attachment_summarized'
 ]);
 const ALLOWED_PARAM_KEYS = new Set(['domain', 'connector']);
 

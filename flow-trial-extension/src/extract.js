@@ -11,6 +11,10 @@
 const FlowExtract = (() => {
   const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
   const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  // Same Sunday-first order as DAYS above, so both arrays line up 1:1 with
+  // JS's own Date.getDay() (0 = Sunday) and the two "by/on <weekday>" blocks
+  // in parseDate() below can share identical delta math.
+  const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 
   const CURRENCY = {
     '$': 'USD', 'us$': 'USD', 'usd': 'USD',
@@ -22,11 +26,15 @@ const FlowExtract = (() => {
   };
 
   // Symbol/code before the number, or code after it. Optional k/m suffix.
+  // The post-group also accepts a bare symbol (₪/$/€/£) — Hebrew business
+  // writing conventionally puts ₪ AFTER the number ("15,000 ₪"), not before
+  // it the way "$15,000" does, so a post-only symbol had to be a first-class
+  // case here rather than assumed to always be a 3-letter code like "NIS".
   const MONEY_RE = new RegExp(
     '(?:(\\$|€|£|₪|₹|US\\$|C\\$|A\\$|USD|EUR|GBP|NIS|ILS|INR|CAD|AUD)\\s?)?' +
     '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)' +
-    '\\s?(k|m)?' +
-    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels))?',
+    '\\s?(k|m|אלף|מיליון)?' +
+    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels|\\$|€|£|₪|שקל(?:ים)?))?',
     'gi'
   );
 
@@ -38,7 +46,7 @@ const FlowExtract = (() => {
       const [raw, pre, digits, mult, post] = m;
       const code = CURRENCY[(pre || '').toLowerCase()] || CURRENCY[(post || '').toLowerCase().slice(0, 3)] ||
                    (/dollars/i.test(post || '') ? 'USD' : /euros/i.test(post || '') ? 'EUR' :
-                    /pounds/i.test(post || '') ? 'GBP' : /shekels/i.test(post || '') ? 'ILS' : null);
+                    /pounds/i.test(post || '') ? 'GBP' : /shekels|שקל/i.test(post || '') ? 'ILS' : null);
       // A bare number with no currency marker is not money — it's a floor number,
       // a version, a headcount. Refusing those is most of what keeps this honest.
       if (!code) continue;
@@ -119,6 +127,29 @@ const FlowExtract = (() => {
       // a full week regardless of "next", so it needs no separate bump.
       if (delta === 0) delta = 7;
       else if (/next\s/i.test(m[0])) delta += 7;
+      d.setDate(d.getDate() + delta);
+      return { raw: m[0], iso: iso(d) };
+    }
+
+    // Hebrew equivalent of the "by/on <weekday>" block above — "עד יום שני"
+    // (by Monday), "ביום רביעי" (on Wednesday), "לא יאוחר מיום חמישי" (no
+    // later than Thursday). Requires the same scheduling-word guard so a
+    // signature reading "יום נעים" ("have a nice day") is never mistaken
+    // for a deadline.
+    //
+    // Deliberately no trailing \b: JS's \b is defined only against ASCII
+    // \w ([A-Za-z0-9_]), so a \b placed right after a Hebrew word sits
+    // between two non-\w characters — never a boundary — and the whole
+    // match silently never fires. Same failure shape as the PHONE_PATTERN
+    // fix earlier in privacyShield.js: a boundary that can only ever hold
+    // next to ASCII text is not a boundary at all next to Hebrew.
+    m = text.match(new RegExp('(?:עד|ב-?|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')'));
+    if (m) {
+      const target = DAYS_HE.indexOf(m[1]);
+      const d = new Date(now);
+      let delta = (target - d.getDay() + 7) % 7;
+      if (delta === 0) delta = 7;
+      else if (/הבא\s*$/.test(m[0])) delta += 7;
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }

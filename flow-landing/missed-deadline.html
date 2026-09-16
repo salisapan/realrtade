@@ -1,0 +1,1121 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
+<meta name="description" content="Paste an email you actually received and see, in under a second, exactly what Glance would have caught in it — the amount, the deadline, the sentence that committed you. Runs entirely in your browser. Nothing is sent anywhere.">
+<meta name="theme-color" content="#07090F">
+<link rel="canonical" href="https://theflow-ai.com/missed-deadline.html">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<title>Inbox Scan — What Your Email Decided and Nobody Wrote Down</title>
+<meta property="og:type" content="website">
+<meta property="og:title" content="Inbox Scan — What Your Email Decided and Nobody Wrote Down">
+<meta property="og:description" content="Paste an email you actually received. See exactly what Glance would have caught in it — the amount, the deadline, the sentence that committed you. Runs entirely in your browser.">
+<meta property="og:url" content="https://theflow-ai.com/missed-deadline.html">
+<meta property="og:image" content="https://theflow-ai.com/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Inbox Scan — What Your Email Decided and Nobody Wrote Down">
+<meta name="twitter:description" content="Paste an email you actually received. See exactly what Glance would have caught in it. Runs entirely in your browser — nothing is sent anywhere.">
+<meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Glance","item":"https://theflow-ai.com/trial.html"},{"@type":"ListItem","position":3,"name":"Inbox Scan","item":"https://theflow-ai.com/missed-deadline.html"}]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Inbox Scan by Glance","url":"https://theflow-ai.com/missed-deadline.html","applicationCategory":"BusinessApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","description":"A free browser-only tool that runs the Glance judgment engine on an email you paste, showing which decisions it would have caught and filed. The analysis runs entirely on the visitor's device; no email text is transmitted.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ================================================================
+   Tokens — copied verbatim from trial.html so this page's surfaces,
+   borders and shadows are numerically identical to its closest
+   sibling rather than merely similar. (The site-wide consolidation of
+   the four independent token systems is tracked separately; adding a
+   fifth *divergent* set here would make that worse, copying the exact
+   values does not.)
+   ================================================================ */
+:root{
+  --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F3F6FC; --surface-3:#EAEFFA;
+  --ink:#0B0F1A; --ink-2:#454E63; --ink-3:#7B8398;
+  --line:rgba(20,44,100,.11); --line-2:rgba(20,44,100,.20);
+  --accent:#1A4EF5; --accent-ink:#0F37C6; --accent-wash:#EAF0FF;
+  --ok:#166B44; --ok-wash:#E3F3EA;
+  --warn:#8A5A00; --warn-wash:#FBF1DD;
+  --navy:#07090F;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(28,64,150,.06), 0 16px 32px -20px rgba(28,64,150,.22);
+  --shadow-lg:0 2px 4px rgba(28,64,150,.08), 0 28px 56px -24px rgba(28,64,150,.34);
+  --glow:rgba(26,78,245,.30); --glass-top:rgba(255,255,255,.97); --glass-bot:rgba(219,230,250,.72);
+  --glass-border:rgba(40,70,150,.3); --glass-gloss:rgba(255,255,255,.95); --doit-text:#123ccb; --ring:#2f5bd8;
+  --net:52,104,230; --net-line:40,100,255; --net-a:.6;
+  --hero-glow1:rgba(52,124,255,.18); --hero-glow2:rgba(90,158,255,.13);
+}
+:root{
+  --space-1:16px; --space-2:20px; --space-3:24px; --space-4:28px;
+  --space-5:32px; --space-6:40px; --space-7:56px; --space-8:76px;
+  --step--1:clamp(.78rem,.74rem + .2vw,.88rem);
+  --step-0:clamp(1rem,.95rem + .25vw,1.1rem);
+  --step-1:clamp(1.18rem,1.08rem + .5vw,1.45rem);
+  --step-2:clamp(1.5rem,1.3rem + 1vw,2.1rem);
+  --step-3:clamp(2rem,1.55rem + 2.1vw,3.3rem);
+  --step-4:clamp(2.6rem,1.8rem + 3.7vw,5.2rem);
+}
+:root[data-theme="dark"]{
+  --bg:#07090F; --surface:#10141D; --surface-2:#141924; --surface-3:#1A2130;
+  --ink:#EEF2F9; --ink-2:#AEB9D6; --ink-3:#7A879F;
+  --line:#212A3B; --line-2:#2C3852;
+  --accent:#3B74FF; --accent-ink:#93B3FF; --accent-wash:#111C3A;
+  --ok:#5FD39B; --ok-wash:#0F2019;
+  --warn:#F0B65B; --warn-wash:#221A0C;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 32px -20px rgba(0,0,0,.7);
+  --shadow-lg:0 2px 4px rgba(0,0,0,.5), 0 28px 56px -24px rgba(0,0,0,.85);
+  --glow:rgba(59,116,255,.5); --glass-top:rgba(228,236,250,.2); --glass-bot:rgba(9,13,24,.34);
+  --glass-border:rgba(228,236,250,.3); --glass-gloss:rgba(255,255,255,.55); --doit-text:#e6efff; --ring:#5b8cff;
+  --net:150,170,220; --net-line:59,116,255; --net-a:.5;
+  --hero-glow1:rgba(59,116,255,.18); --hero-glow2:rgba(59,116,255,.10);
+}
+
+*{box-sizing:border-box}
+html,body{overflow-x:clip}
+@supports not (overflow-x:clip){html,body{overflow-x:hidden}}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--bg); color:var(--ink-2); font-family:var(--sans); line-height:1.6; font-size:1rem; -webkit-font-smoothing:antialiased; transition:background .3s,color .3s; position:relative}
+#bgcanvas{position:fixed; inset:0; width:100%; height:100%; z-index:0; opacity:.55; pointer-events:none}
+:root[data-theme="light"] #bgcanvas{opacity:.85}
+header.site,main,footer.site{position:relative; z-index:1}
+.wrap{max-width:1040px; margin:0 auto; padding:0 24px}
+
+/* ---------------- shared site chrome ---------------- */
+header.site{background:var(--navy); padding:14px 0; position:sticky; top:0; z-index:40; border-bottom:3px solid var(--accent)}
+header.site .wrap{display:flex; align-items:center; justify-content:space-between; max-width:1120px}
+.brand{display:flex; align-items:center}
+.brand img{height:26px; width:auto; display:block}
+header.site nav{display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:2px 0}
+.menu-btn{width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; margin-inline-end:14px; flex:none}
+.menu-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.menu-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8}
+.theme-btn{margin-inline-start:16px; width:34px; height:34px; border-radius:10px; border:1px solid rgba(255,255,255,.18); background:transparent; color:#EEF2F9; cursor:pointer; display:grid; place-items:center; transition:border-color .2s,background .2s; flex:none}
+.theme-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.theme-btn svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.7}
+.theme-btn .sun{display:none}
+:root[data-theme="light"] .theme-btn .sun{display:block}
+:root[data-theme="light"] .theme-btn .moon{display:none}
+.mobile-nav{position:fixed; inset:0; z-index:50; background:var(--navy); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; opacity:0; transition:opacity .25s}
+.mobile-nav.open{opacity:1}
+.mobile-nav[hidden]{display:none}
+.mobile-nav a{font-family:var(--disp); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
+.mobile-nav a:hover{color:#6E9BFF}
+.mobile-nav-legal{margin-top:12px; display:flex; gap:18px}
+.mobile-nav-legal a{font-size:.95rem; font-weight:600; color:#7A879F}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--accent); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link:focus{left:0}
+footer.site{padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--ink-3); font-size:.86rem; border-top:1px solid var(--line); margin-top:var(--space-8)}
+footer.site a{color:var(--ink-3)}
+.pagenav{margin-top:8px; font-family:var(--sans); font-size:.88rem; color:var(--ink-3)}
+.pagenav a{color:var(--ink-3); margin-inline-end:16px}
+a{color:var(--accent-ink)}
+b,strong{color:var(--ink)}
+
+/* ---------------- canonical Do It CTA (principle 1) ---------------- */
+.magnetic{display:inline-flex}
+.doit{--pad-y:16px; --pad-x:32px; position:relative; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; text-decoration:none; -webkit-tap-highlight-color:transparent; font-family:var(--disp); font-weight:700; font-size:1.05rem; color:var(--doit-text); text-shadow:0 1px 10px var(--glow); transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.doit .shell{position:absolute; inset:0; border-radius:inherit; z-index:-2; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); box-shadow:inset 0 1.5px 0 var(--glass-gloss), inset 0 -12px 26px rgba(14,32,80,.24), 0 16px 46px -10px var(--glow); transition:box-shadow .3s}
+.doit .ring{position:absolute; inset:6px; border-radius:999px; z-index:-1; border:2px solid var(--ring); box-shadow:0 0 12px var(--glow), inset 0 0 0 1px rgba(255,255,255,.22), inset 0 0 11px color-mix(in srgb,var(--ring) 42%,transparent); transition:box-shadow .3s, border-color .3s}
+.doit .shine{position:absolute; inset:0; border-radius:inherit; overflow:hidden; z-index:-1}
+.doit .shine::before{content:""; position:absolute; inset-block:-40%; inline-size:40%; inset-inline-start:-60%; background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent); transform:skewX(-18deg)}
+.doit:hover{transform:translateY(-2px) scale(1.03)}
+.doit:hover .shell{box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -10px 22px rgba(14,32,80,.4), 0 20px 60px -8px var(--glow)}
+.doit:hover .ring{border-color:var(--accent-ink); box-shadow:0 0 22px var(--glow), inset 0 0 16px var(--glow)}
+.doit:hover .shine::before{animation:sweep .85s cubic-bezier(.3,.6,.2,1) forwards}
+.doit:active{transform:translateY(0) scale(.99)}
+.doit:disabled{cursor:default; opacity:.75; pointer-events:none}
+.doit:focus-visible{outline:3px solid var(--accent-ink); outline-offset:4px}
+@keyframes sweep{ to{ transform:translateX(260%) skewX(-18deg); } }
+@media (prefers-reduced-motion:reduce){ .doit,.doit *{transition:none!important; animation:none!important} }
+
+/* ---------------- hero ---------------- */
+.hero{position:relative; padding:56px 0 var(--space-5)}
+.hero::before{content:''; position:absolute; top:-140px; left:-180px; width:600px; height:600px; background:radial-gradient(circle, var(--hero-glow1), transparent 65%); pointer-events:none; z-index:-1}
+.hero::after{content:''; position:absolute; top:40px; right:-120px; width:460px; height:460px; background:radial-gradient(circle, var(--hero-glow2), transparent 70%); pointer-events:none; z-index:-1}
+.eyebrow{font-family:var(--mono); font-size:.76rem; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); display:flex; align-items:center; gap:8px; margin:0}
+.eyebrow::before{content:''; width:7px; height:7px; border-radius:50%; background:var(--accent); flex:none}
+h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(2rem,1.4rem + 2.9vw,3.4rem); line-height:1.1; letter-spacing:-.025em; color:var(--ink); margin:18px 0 18px; max-width:19ch}
+h1.title em{font-style:normal; color:var(--accent-ink)}
+.lead{font-size:clamp(1.05rem,1rem + .35vw,1.22rem); line-height:1.6; color:var(--ink-2); margin:0; max-width:58ch}
+/* Two columns once there is room for them: at desktop width a single 19ch
+   headline column leaves the right half of the hero visibly empty, which
+   reads as a layout fault rather than as restraint. Baseline-aligning the
+   lead against the bottom of the headline makes the pairing deliberate. */
+@media (min-width:920px){
+  .hero-inner{display:grid; grid-template-columns:1.2fr .95fr; gap:var(--space-6); align-items:end}
+  h1.title{margin-bottom:0; max-width:16ch}
+  /* The headline is two sentences that answer each other; letting the second
+     one start mid-line ("week. Your CRM") buries the turn. Breaking on the
+     sentence boundary is the whole rhetorical structure of the line. */
+  h1.title em{display:block}
+  .lead{padding-bottom:7px; max-width:44ch}
+}
+
+/* ---------------- the scanner ---------------- */
+/* Deliberately not another rounded "card in a grid": the intake slab is
+   squarer, heavier and flush against a labelled header strip, so it reads
+   as an instrument you feed something into rather than one more content
+   box on a marketing page. */
+.scanner{margin-top:var(--space-6); border:1px solid var(--line-2); border-radius:18px; background:var(--surface); box-shadow:var(--shadow-lg); overflow:hidden; position:relative}
+.scanner-head{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; padding:13px var(--space-3); background:var(--surface-2); border-bottom:1px solid var(--line)}
+.scanner-head h2{margin:0; font-family:var(--mono); font-size:.74rem; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-3); display:flex; align-items:center; gap:9px}
+.live-dot{width:7px; height:7px; border-radius:50%; background:var(--ok); box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent); animation:live-blink 2.4s ease-in-out infinite; flex:none}
+@keyframes live-blink{ 0%,100%{opacity:1} 50%{opacity:.35} }
+.wire{display:inline-flex; align-items:center; gap:7px; font-family:var(--mono); font-size:.72rem; font-weight:500; color:var(--ok); background:var(--ok-wash); border:1px solid color-mix(in srgb,var(--ok) 30%,transparent); border-radius:999px; padding:5px 11px; white-space:nowrap}
+.wire svg{width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:2; flex:none}
+.scanner-body{padding:var(--space-3)}
+.scanner-body label.field-label{display:block; font-size:.92rem; font-weight:600; color:var(--ink); margin-bottom:9px}
+.scanner-body .hint{font-size:.86rem; color:var(--ink-3); margin:0 0 14px; line-height:1.5}
+#pasteBox{width:100%; resize:vertical; min-height:150px; font-family:var(--sans); font-size:1rem; line-height:1.6; color:var(--ink); background:var(--surface-2); border:1px solid var(--line-2); border-radius:12px; padding:15px 16px; transition:border-color .15s,box-shadow .15s}
+#pasteBox::placeholder{color:var(--ink-3)}
+#pasteBox:focus-visible{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.scan-row{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-top:16px}
+.kbd-hint{font-size:.82rem; color:var(--ink-3); margin:0}
+kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); border:1px solid var(--line-2); border-bottom-width:2px; border-radius:5px; padding:1px 5px; color:var(--ink-2)}
+.scan-err{margin:12px 0 0; font-size:.88rem; color:var(--warn); font-weight:600}
+.scan-err[hidden]{display:none}
+
+/* sample chips — an escape hatch out of the blank-textarea stare */
+.samples{margin-top:var(--space-3); padding-top:var(--space-2); border-top:1px dashed var(--line-2)}
+.samples p{margin:0 0 10px; font-size:.85rem; color:var(--ink-3)}
+.sample-list{display:flex; flex-wrap:wrap; gap:8px}
+.sample{font-family:var(--sans); font-size:.85rem; font-weight:600; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line-2); border-radius:999px; padding:7px 14px; cursor:pointer; transition:border-color .15s,color .15s,background .15s; display:inline-flex; align-items:center; gap:7px}
+.sample:hover{border-color:var(--accent); color:var(--ink); background:var(--accent-wash)}
+.sample:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.sample .dot{width:6px; height:6px; border-radius:50%; background:var(--accent); flex:none}
+
+/* scan sweep — a single honest pass, not a fake progress bar. The engine
+   really does finish in a few ms; this only makes that visible. */
+.sweep{position:absolute; inset:0; pointer-events:none; overflow:hidden; opacity:0; border-radius:inherit}
+.scanner.scanning .sweep{opacity:1}
+.sweep::after{content:''; position:absolute; left:0; right:0; height:130px; top:-130px; background:linear-gradient(180deg, transparent, color-mix(in srgb,var(--accent) 26%,transparent), transparent)}
+.scanner.scanning .sweep::after{animation:sweep-down .62s cubic-bezier(.4,0,.3,1)}
+@keyframes sweep-down{ from{transform:translateY(0)} to{transform:translateY(calc(100% + 260px))} }
+@media (prefers-reduced-motion:reduce){ .scanner.scanning .sweep{opacity:0} .scanner.scanning .sweep::after{animation:none} }
+
+/* ---------------- results layout ---------------- */
+.results-wrap{margin-top:var(--space-6); display:grid; gap:var(--space-4); grid-template-columns:1fr}
+@media (min-width:900px){
+  .results-wrap{grid-template-columns:300px 1fr; align-items:start}
+  .ledger{position:sticky; top:104px}
+}
+.results-wrap[hidden]{display:none}
+
+/* the ledger — numbers are the product here, so they get display weight,
+   monospace tabular figures and their own surface, not a bullet list. */
+.ledger{border:1px solid var(--line-2); border-radius:16px; background:var(--surface); box-shadow:var(--shadow); overflow:hidden}
+.ledger-head{padding:12px var(--space-3); background:var(--surface-2); border-bottom:1px solid var(--line); font-family:var(--mono); font-size:.72rem; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-3)}
+.ledger-body{padding:var(--space-3); display:grid; gap:var(--space-2)}
+.stat{display:grid; gap:2px}
+.stat dt{font-size:.8rem; color:var(--ink-3); font-weight:600; letter-spacing:.02em}
+.stat dd{margin:0; font-family:var(--disp); font-weight:800; font-size:2rem; line-height:1.05; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+.stat.accent dd{color:var(--accent-ink)}
+.stat.money dd{font-size:1.75rem}
+/* An em dash set at 1.75rem display weight reads as a stray rule rather than
+   as "no figure yet" — the empty state gets its own smaller, dimmer
+   treatment so a scan that found no money never looks like a broken row. */
+.stat dd.empty{font-size:1.05rem; font-weight:600; color:var(--ink-3); font-family:var(--sans); padding-block:9px}
+.ledger-foot{padding:13px var(--space-3); border-top:1px solid var(--line); background:var(--surface-2); display:grid; gap:9px}
+.ledger-foot .doit{--pad-y:12px; --pad-x:20px; font-size:.92rem; width:100%}
+.linkbtn{font-family:var(--sans); font-size:.85rem; font-weight:600; color:var(--ink-2); background:transparent; border:1px solid var(--line-2); border-radius:9px; padding:9px 12px; cursor:pointer; transition:border-color .15s,color .15s; width:100%}
+.linkbtn:hover{border-color:var(--accent); color:var(--ink)}
+.linkbtn:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.linkbtn[hidden]{display:none}
+
+/* ---------------- evidence cards ---------------- */
+.evidence{display:grid; gap:var(--space-3)}
+.ev{border:1px solid var(--line-2); border-radius:16px; background:var(--surface); box-shadow:var(--shadow); overflow:hidden; position:relative}
+.ev.caught{border-color:color-mix(in srgb,var(--ok) 42%,var(--line-2))}
+.ev-enter{animation:ev-in .42s cubic-bezier(.2,.8,.2,1) both}
+@keyframes ev-in{ from{opacity:0; transform:translateY(14px) scale(.985)} to{opacity:1; transform:none} }
+@media (prefers-reduced-motion:reduce){ .ev-enter{animation:none} }
+
+.ev-head{display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:15px var(--space-3); border-bottom:1px solid var(--line); background:var(--surface-2)}
+.ev-verdict{font-family:var(--mono); font-size:.7rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; border-radius:6px; padding:6px 10px; white-space:nowrap; flex:none}
+.ev.caught .ev-verdict{color:var(--ok); background:var(--ok-wash); border:1px solid color-mix(in srgb,var(--ok) 38%,transparent)}
+.ev.quiet .ev-verdict{color:var(--ink-3); background:var(--surface-3); border:1px solid var(--line-2)}
+.ev-title{margin:0; font-family:var(--sans); font-weight:800; font-size:1.12rem; line-height:1.35; color:var(--ink); letter-spacing:-.01em}
+.ev-sub{margin:4px 0 0; font-size:.84rem; color:var(--ink-3)}
+.ev-body{padding:var(--space-3)}
+
+/* the quoted sentence — the single most convincing element on the card, so
+   it gets a rule, a larger size and real breathing room instead of being a
+   row in a table. */
+.ev-quote{margin:0 0 var(--space-3); padding-inline-start:16px; border-inline-start:3px solid var(--accent); font-size:1.02rem; line-height:1.55; color:var(--ink); font-style:normal}
+.ev-quote::before{content:'“'}
+.ev-quote::after{content:'”'}
+
+.facts{display:flex; flex-wrap:wrap; gap:10px; margin:0 0 var(--space-3)}
+.fact{display:inline-grid; gap:2px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:8px 13px; min-width:0}
+.fact dt{font-family:var(--mono); font-size:.66rem; font-weight:600; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3)}
+.fact dd{margin:0; font-family:var(--mono); font-size:.98rem; font-weight:600; color:var(--ink); font-variant-numeric:tabular-nums; overflow-wrap:anywhere}
+.fact.hero-fact{background:var(--accent-wash); border-color:color-mix(in srgb,var(--accent) 34%,transparent)}
+.fact.hero-fact dd{color:var(--accent-ink)}
+
+/* signal bars — the explainability payload. This is the part no competitor
+   can show, so it is drawn as real data, with the engine's own weights. */
+.signals{margin:0; padding-top:var(--space-2); border-top:1px solid var(--line)}
+.signals-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap}
+.signals-head h4{margin:0; font-family:var(--mono); font-size:.68rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+.score-line{font-family:var(--mono); font-size:.78rem; color:var(--ink-3); font-variant-numeric:tabular-nums}
+.score-line b{color:var(--ink); font-weight:600}
+.sig{display:grid; grid-template-columns:1fr auto; gap:4px 12px; align-items:center; margin-bottom:9px}
+.sig-why{font-size:.9rem; color:var(--ink-2); line-height:1.4; min-width:0}
+.sig-w{font-family:var(--mono); font-size:.82rem; font-weight:600; color:var(--ink-3); font-variant-numeric:tabular-nums; text-align:end}
+.sig.pos .sig-w{color:var(--ok)}
+.sig.neg .sig-w{color:var(--warn)}
+.sig-track{grid-column:1 / -1; height:4px; border-radius:999px; background:var(--surface-3); overflow:hidden}
+.sig-fill{display:block; height:100%; border-radius:inherit; width:0; transform-origin:left; background:var(--ok); transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.sig.neg .sig-fill{background:var(--warn)}
+@media (prefers-reduced-motion:reduce){ .sig-fill{transition:none} }
+
+/* the "would have written" strip closes the loop from judgment to record */
+.ev-write{margin-top:var(--space-3); padding:13px 15px; border-radius:11px; background:var(--accent-wash); border:1px solid color-mix(in srgb,var(--accent) 26%,transparent); font-size:.9rem; color:var(--ink-2); line-height:1.5}
+.ev-write b{color:var(--accent-ink)}
+.ev.quiet .ev-write{background:var(--surface-2); border-color:var(--line); color:var(--ink-3)}
+.ev.quiet .ev-write b{color:var(--ink-2)}
+
+/* opt-in contribution to /almost-missed.html — only ever the headline
+   above (amount + date, engine-generated), never the quote in .ev-quote */
+.ev-contribute{margin-top:10px; padding-top:12px; border-top:1px dashed var(--line-2)}
+.ev-contribute-row{display:flex; align-items:flex-start; gap:9px}
+.ev-contribute-row input[type=checkbox]{margin-top:3px; flex:none; width:16px; height:16px; accent-color:var(--accent)}
+.ev-contribute-row label{font-size:.84rem; color:var(--ink-3); line-height:1.5; cursor:pointer}
+.ev-contribute-row label b{color:var(--ink-2)}
+.ev-contribute-action{display:flex; align-items:center; gap:10px; margin-top:9px; min-height:32px}
+.ev-contribute-action[hidden]{display:none}
+.ev-contribute-btn{font-family:var(--sans); font-size:.82rem; font-weight:600; color:var(--accent-ink); background:var(--accent-wash); border:1px solid color-mix(in srgb,var(--accent) 30%,transparent); border-radius:8px; padding:7px 13px; cursor:pointer; transition:border-color .15s}
+.ev-contribute-btn:hover{border-color:var(--accent)}
+.ev-contribute-btn:disabled{cursor:default; opacity:.6}
+.ev-contribute-status{font-size:.82rem; color:var(--ink-3)}
+.ev-contribute-status.ok{color:var(--ok)}
+.ev-contribute-status.err{color:#C0392B}
+:root[data-theme="dark"] .ev-contribute-status.err{color:#FF8A80}
+
+/* ---------------- share card ---------------- */
+.share{margin-top:var(--space-6); border:1px solid var(--line-2); border-radius:18px; background:var(--surface); box-shadow:var(--shadow-lg); overflow:hidden}
+.share[hidden]{display:none}
+.share-head{padding:13px var(--space-3); background:var(--surface-2); border-bottom:1px solid var(--line); font-family:var(--mono); font-size:.74rem; font-weight:600; letter-spacing:.11em; text-transform:uppercase; color:var(--ink-3)}
+.share-body{padding:var(--space-3); display:grid; gap:var(--space-3)}
+@media (min-width:760px){ .share-body{grid-template-columns:1.35fr 1fr; align-items:center} }
+#shareCanvas{width:100%; height:auto; display:block; border-radius:12px; border:1px solid var(--line); background:var(--navy)}
+.share-copy h3{margin:0 0 8px; font-family:var(--sans); font-weight:800; font-size:1.25rem; color:var(--ink); letter-spacing:-.01em}
+.share-copy p{margin:0 0 16px; font-size:.95rem; color:var(--ink-2); line-height:1.55}
+.share-actions{display:flex; flex-direction:column; gap:9px}
+.share-actions .doit{--pad-y:13px; --pad-x:22px; font-size:.98rem}
+.copy-ok{font-size:.84rem; color:var(--ok); font-weight:600; margin:0; min-height:1.2em}
+
+/* ---------------- explainer + closing CTA ---------------- */
+.sectionhead{margin-top:var(--space-8)}
+.sectionhead h2{font-family:var(--sans); font-weight:800; font-size:var(--step-2); line-height:1.2; color:var(--ink); margin:12px 0 10px; letter-spacing:-.015em; scroll-margin-top:88px}
+.sectionhead p{margin:0; font-size:1.02rem; color:var(--ink-2); max-width:60ch; line-height:1.6}
+.how{display:grid; gap:var(--space-3); margin-top:var(--space-5)}
+@media (min-width:760px){ .how{grid-template-columns:repeat(3,1fr)} }
+.how article{border:1px solid var(--line); border-radius:14px; background:var(--surface); padding:var(--space-3); box-shadow:var(--shadow)}
+.how h3{margin:0 0 9px; font-family:var(--mono); font-size:.72rem; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--accent)}
+.how p{margin:0; font-size:.95rem; color:var(--ink-2); line-height:1.6}
+.how b{color:var(--ink)}
+
+.closing{margin-top:var(--space-8); border:1px solid var(--line-2); border-radius:20px; background:var(--surface); box-shadow:var(--shadow-lg); padding:var(--space-6) var(--space-5); text-align:center; position:relative; overflow:hidden}
+.closing::before{content:''; position:absolute; inset-inline:0; top:-60%; height:180%; background:radial-gradient(ellipse 50% 40% at 50% 40%, var(--hero-glow1), transparent 70%); pointer-events:none}
+.closing > *{position:relative}
+.closing h2{margin:0 0 12px; font-family:var(--sans); font-weight:800; font-size:var(--step-2); line-height:1.2; color:var(--ink); letter-spacing:-.015em}
+.closing p{margin:0 auto var(--space-4); max-width:52ch; font-size:1.02rem; color:var(--ink-2); line-height:1.6}
+.closing .fineprint{margin:16px auto 0; font-size:.85rem; color:var(--ink-3); max-width:46ch}
+
+@media (max-width:560px){
+  .scanner-head{padding-inline:var(--space-2)}
+  .scanner-body,.ev-head,.ev-body,.ledger-body,.share-body{padding-inline:var(--space-2)}
+  .closing{padding:var(--space-5) var(--space-3)}
+  .stat dd{font-size:1.8rem}
+  /* Side by side, the verdict badge squeezes the title into a three-word
+     column on a narrow phone. Stacking puts the verdict first — which is
+     also the thing being read first — and gives the title the full width. */
+  .ev-head{flex-direction:column; align-items:flex-start; gap:10px}
+  .ev-verdict{order:-1}
+}
+</style>
+<script>
+(function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
+</script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+</script>
+</head>
+<body>
+<canvas id="bgcanvas" aria-hidden="true"></canvas>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
+    <nav>
+      <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
+      </button>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
+        <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+      </button>
+    </nav>
+  </div>
+</header>
+<div class="mobile-nav" id="mobileNav" hidden>
+  <a href="/">Home</a><a href="/trial.html">Glance</a><a href="/missed-deadline.html">Inbox Scan</a><a href="/security.html">Security</a><a href="/pricing.html">Pricing</a><a href="/about.html">About</a><a href="/blog/">Insights</a><a href="/contact.html">Contact</a>
+  <a href="/solutions/">Solutions</a>
+  <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
+</div>
+
+<main id="main">
+  <div class="wrap">
+
+    <section class="hero" aria-labelledby="h1">
+      <p class="eyebrow">Free &middot; nothing to install &middot; runs in this tab</p>
+      <div class="hero-inner">
+        <h1 class="title" id="h1">Your inbox made decisions this week. <em>Your CRM never heard about them.</em></h1>
+        <p class="lead">Paste an email you actually received. In a fraction of a second — entirely inside this browser tab — see exactly what Glance would have caught in it: the amount, the deadline, the sentence that committed you, and the record it would have filed.</p>
+      </div>
+    </section>
+
+    <section class="scanner" id="scanner" aria-labelledby="scanner-h">
+      <div class="sweep" aria-hidden="true"></div>
+      <div class="scanner-head">
+        <h2 id="scanner-h"><span class="live-dot" aria-hidden="true"></span>Inbox scan</h2>
+        <span class="wire" id="wireReadout">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M8.5 12.2l2.4 2.4 5.6-6"/></svg>
+          <span>Your text sent to a server: <b>0 bytes</b></span>
+        </span>
+      </div>
+      <div class="scanner-body">
+        <label class="field-label" for="pasteBox">Paste one email — the body text is enough</label>
+        <p class="hint">Real ones work best. The judgment engine below is the exact one the Glance extension runs; it never leaves this page, and nothing you paste is uploaded, logged or stored. Close the tab and it's gone.</p>
+        <textarea id="pasteBox" rows="6" spellcheck="false" placeholder="e.g. &quot;Approved — go ahead and sign. We're good at $3,900/mo for the 14th floor, signing Monday.&quot;"></textarea>
+        <div class="scan-row">
+          <span class="magnetic"><button type="button" class="doit" id="scanBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="scanBtnLabel">Scan this email</span></button></span>
+          <p class="kbd-hint"><kbd>&#8984;</kbd>&#8202;/&#8202;<kbd>Ctrl</kbd> + <kbd>Enter</kbd> to scan</p>
+        </div>
+        <p class="scan-err" id="scanErr" role="alert" hidden></p>
+
+        <div class="samples">
+          <p>No email handy? Scan a real-world one:</p>
+          <div class="sample-list" id="sampleList"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="results-wrap" id="resultsWrap" hidden>
+      <aside class="ledger" aria-labelledby="ledger-h">
+        <div class="ledger-head" id="ledger-h">What your inbox decided</div>
+        <dl class="ledger-body">
+          <div class="stat accent"><dt>Decisions found</dt><dd id="statCaught">0</dd></div>
+          <div class="stat money"><dt>Value on the table</dt><dd id="statValue" class="empty">No figure stated</dd></div>
+          <div class="stat"><dt>Dated commitments</dt><dd id="statDates">0</dd></div>
+          <div class="stat"><dt>Emails scanned</dt><dd id="statScanned">0</dd></div>
+        </dl>
+        <div class="ledger-foot">
+          <span class="magnetic"><a class="doit" href="/trial.html" data-ga="scan_install_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Catch these automatically</a></span>
+          <a class="linkbtn" href="/almost-missed.html" data-ga="scan_gallery_link" style="text-align:center; text-decoration:none; display:inline-block">See what others found &rarr;</a>
+          <button type="button" class="linkbtn" id="clearBtn">Clear this scan</button>
+        </div>
+      </aside>
+
+      <section class="evidence" id="evidence" aria-live="polite" aria-label="Scan results"></section>
+    </div>
+
+    <section class="share" id="share" hidden aria-labelledby="share-h">
+      <div class="share-head" id="share-h">Your scorecard</div>
+      <div class="share-body">
+        <canvas id="shareCanvas" width="1200" height="630" role="img" aria-label="A shareable scorecard summarising this inbox scan"></canvas>
+        <div class="share-copy">
+          <h3>Show someone what their inbox is losing.</h3>
+          <p>The card is generated here, from this scan only. It carries the numbers — never the text of anything you pasted.</p>
+          <div class="share-actions">
+            <span class="magnetic"><button type="button" class="doit" id="downloadBtn"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Download the card</button></span>
+            <button type="button" class="linkbtn" id="copyBtn">Copy a post to go with it</button>
+            <p class="copy-ok" id="copyOk" role="status"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sectionhead" aria-labelledby="how-h">
+      <p class="eyebrow">What just happened</p>
+      <h2 id="how-h">No model read your email. A scorer did — and it can show its work.</h2>
+      <p>Every verdict above came from named signals with fixed weights, added up and compared against one threshold. That's why each card can tell you <em>why</em>, line by line, instead of asking you to trust a black box.</p>
+      <div class="how">
+        <article>
+          <h3>01 &middot; Signals, not keywords</h3>
+          <p>A currency figure is worth <b>34</b>. An outright authorisation, <b>42</b>. A dated obligation, <b>26</b>. Mailing-list boilerplate subtracts <b>45</b>. The sum is the score you saw.</p>
+        </article>
+        <article>
+          <h3>02 &middot; One moving threshold</h3>
+          <p>A fresh install speaks at <b>50</b>. In the extension that number moves as you click and dismiss — so it gets quieter or sharper for you, without a settings screen.</p>
+        </article>
+        <article>
+          <h3>03 &middot; On your device</h3>
+          <p>The scorer is plain pattern work — <b>no network call, no model</b>. That's why this page could run it with nothing to install, and why the extension can promise the same thing inside Gmail.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="closing" aria-labelledby="cta-h">
+      <h2 id="cta-h">That was one email. Your inbox does this every day.</h2>
+      <p>Glance sits quietly in Gmail and only speaks when something is actually decided — then writes it to Notion, HubSpot, Salesforce, Slack or Monday.com in one click, always reversible.</p>
+      <span class="magnetic"><a class="doit" href="/trial.html" data-ga="scan_closing_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Glance &mdash; free</a></span>
+      <p class="fineprint">Free to start. No credit card. Judgment stays on your machine, exactly as it did on this page.</p>
+    </section>
+
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="pagenav">
+      <a href="/about.html">About</a><a href="/security.html">Security</a><a href="/trial.html">Glance</a><a href="/pricing.html">Pricing</a><a href="/contact.html">Contact</a><a href="/blog/">Insights</a>
+    </div>
+    &copy; 2026 Flow. <a href="/">theflow-ai.com</a> &middot; <a href="/privacy.html">Privacy</a> &middot; <a href="/terms.html">Terms</a> &middot; <a href="/blog/rss.xml">RSS</a>
+  </div>
+</footer>
+
+<script src="/assets/glance-engine.js"></script>
+<script>
+/* ---------- theme toggle (shared with every other page) ---------- */
+(function(){
+  var tb=document.getElementById('themeBtn');
+  tb.addEventListener('click', function(){
+    var cur=document.documentElement.getAttribute('data-theme')||'light';
+    var next=cur==='light'?'dark':'light';
+    document.documentElement.setAttribute('data-theme', next);
+    try{localStorage.setItem('flow_theme', next);}catch(e){}
+    if(typeof readNetColors==='function') readNetColors();
+    if(typeof window.__redrawShareCard==='function') window.__redrawShareCard();
+  });
+})();
+
+/* ---------- mobile menu (shared) ---------- */
+(function(){
+  var mb=document.getElementById('menuBtn'), mn=document.getElementById('mobileNav');
+  if(!mb||!mn) return;
+  function close(){ mn.classList.remove('open'); mb.setAttribute('aria-expanded','false'); setTimeout(function(){ mn.hidden=true; },250); }
+  function open(){ mn.hidden=false; requestAnimationFrame(function(){ mn.classList.add('open'); }); mb.setAttribute('aria-expanded','true'); }
+  mb.addEventListener('click',function(){ mn.hidden?open():close(); });
+  mn.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', close); });
+  mn.addEventListener('click',function(e){ if(e.target===mn) close(); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape'&&!mn.hidden) close(); });
+})();
+
+/* ---------- ambient particle network (shared component) ---------- */
+(function(){
+  var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var c=document.getElementById('bgcanvas'); if(!c) return;
+  var x=c.getContext('2d'), W,H,pts,raf,NET='150,170,220',NL='59,116,255',NA=.5;
+  var root=document.documentElement;
+  window.readNetColors=function(){
+    var cs=getComputedStyle(root);
+    NET=(cs.getPropertyValue('--net')||'150,170,220').trim();
+    NL=(cs.getPropertyValue('--net-line')||'59,116,255').trim();
+    NA=parseFloat(cs.getPropertyValue('--net-a'))||.5;
+  };
+  function size(){ W=c.width=innerWidth*devicePixelRatio; H=c.height=innerHeight*devicePixelRatio; }
+  function initNet(){ size(); var n=Math.min(60,Math.floor(innerWidth/26)); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*devicePixelRatio,vy:(Math.random()-.5)*.14*devicePixelRatio}); }
+  function draw(){
+    x.clearRect(0,0,W,H);
+    for(var i=0;i<pts.length;i++){
+      var p=pts[i]; p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
+      for(var j=i+1;j<pts.length;j++){ var q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=dx*dx+dy*dy,R=140*devicePixelRatio; if(d<R*R){ var a=(1-Math.sqrt(d)/R)*.2; x.strokeStyle='rgba('+NL+','+a+')'; x.lineWidth=1*devicePixelRatio; x.beginPath(); x.moveTo(p.x,p.y); x.lineTo(q.x,q.y); x.stroke(); } }
+      x.fillStyle='rgba('+NET+','+NA+')'; x.beginPath(); x.arc(p.x,p.y,1.3*devicePixelRatio,0,6.283); x.fill();
+    }
+    raf=requestAnimationFrame(draw);
+  }
+  readNetColors();
+  if(!rm){ initNet(); draw(); addEventListener('resize',function(){ cancelAnimationFrame(raf); initNet(); draw(); }); } else { size(); }
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ cancelAnimationFrame(raf); } else if(!rm){ cancelAnimationFrame(raf); draw(); } });
+})();
+
+/* ---------- magnetic hover on Do It buttons (shared) ---------- */
+(function(){
+  var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fine=matchMedia('(pointer: fine)').matches;
+  if(!fine||rm) return;
+  document.querySelectorAll('.magnetic').forEach(function(w){
+    var btn=w.querySelector('.doit'); if(!btn) return;
+    w.addEventListener('pointermove',function(ev){ var r=w.getBoundingClientRect(); var x=(ev.clientX-r.left-r.width/2)/r.width, y=(ev.clientY-r.top-r.height/2)/r.height; btn.style.transform='translate('+(x*10)+'px,'+(y*8)+'px)'; });
+    w.addEventListener('pointerleave',function(){ btn.style.transform=''; });
+  });
+})();
+
+/* ================================================================
+   The scan itself.
+   Everything below runs against glance-engine.js — the mirrored,
+   unmodified copy of the extension's own domains.js + extract.js +
+   judgment.js. No re-implementation, no scripted results: what this
+   page prints is what the product would do.
+   ================================================================ */
+(function(){
+  var haveEngine = typeof FlowJudgment!=='undefined' && typeof FLOW_DOMAINS!=='undefined';
+
+  var pasteBox=document.getElementById('pasteBox');
+  var scanBtn=document.getElementById('scanBtn'), scanBtnLabel=document.getElementById('scanBtnLabel');
+  var scanner=document.getElementById('scanner'), scanErr=document.getElementById('scanErr');
+  var resultsWrap=document.getElementById('resultsWrap'), evidence=document.getElementById('evidence');
+  var shareSec=document.getElementById('share'), clearBtn=document.getElementById('clearBtn');
+  var statCaught=document.getElementById('statCaught'), statValue=document.getElementById('statValue');
+  var statDates=document.getElementById('statDates'), statScanned=document.getElementById('statScanned');
+  var reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if(!haveEngine){
+    // The page is useless without the engine, and a broken-looking input is
+    // worse than an honest one — say so rather than leaving a dead button.
+    scanErr.hidden=false;
+    scanErr.textContent='The judgment engine could not load in this browser, so the scan is unavailable. Everything else on this page still works.';
+    scanBtn.disabled=true;
+    return;
+  }
+
+  /* Real messages, each chosen because it exercises a different path through
+     the scorer — including one that deliberately produces silence, because a
+     tool that fires on everything is the thing this product is against. */
+  var SAMPLES=[
+    { name:'Executed agreement',
+      text:"Counsel — the Meridian lease amendment is fully executed. Both sides countersigned this morning. Consideration stays at $250,000, and the amended commencement date is March 14, 2026. Please calendar the estoppel deadline." },
+    { name:'Lost deal',
+      text:"Hi — after reviewing internally we've decided to go with another vendor for this cycle. Not moving forward with the pilot. Appreciate all the time your team put in." },
+    { name:'Billing dispute',
+      text:"The March invoice doesn't match what we agreed. You billed $18,400 but the approved amount was $12,000. Please issue a corrected invoice before April 2, 2026 — we can't release payment until the discrepancy is resolved." },
+    { name:'Offer approved',
+      text:"Approved — let's extend the offer to Priya. Base salary $128,000, start date April 6, 2026. Please send the offer letter and kick off the background check." },
+    { name:'Churn risk',
+      text:"This is our third escalation on this ticket. We are seriously considering cancelling the subscription if this isn't resolved by Friday. Please issue a refund if you can't fix it in time." },
+    { name:'Quiet: a cold pitch',
+      text:"Hi there! Hope this email finds you well. Our pricing starts at $99/mo and I'd love to book a quick demo this week. Let me know what time works! Unsubscribe here." }
+  ];
+
+  var state={ scanned:0, caught:0, valueTotal:0, valueCurrency:null, dates:0 };
+
+  /* ---------- engine helpers ---------- */
+
+  // evaluate() returns null below the threshold and therefore tells us
+  // nothing about *how* close a quiet message came. Probing at the engine's
+  // own floor (MIN_THRESHOLD, reached by handing thresholdFrom a large click
+  // count) gets the real score back for anything scoring 38 or more, which is
+  // then compared against BASE_THRESHOLD — what a fresh install actually
+  // uses — to decide caught vs quiet. Nothing here overrides the product's
+  // judgment; it only makes the number visible.
+  var PROBE={ calibration:{ clicks:9999 } };
+  var LIVE_THRESHOLD=FlowJudgment.BASE_THRESHOLD;
+  var FLOOR=FlowJudgment.MIN_THRESHOLD;
+
+  function entityHits(domain, text){
+    try{ return (text.match(new RegExp(domain.entityWords.source,'gi'))||[]).length; }
+    catch(e){ return 0; }
+  }
+
+  // Which line of work this message belongs to, decided by the engine rather
+  // than by asking the visitor first (one less thing between them and the
+  // answer). Highest score wins; ties go to the domain whose vocabulary the
+  // message actually uses more, so an invoice dispute lands in Finance
+  // instead of whichever profile happens to sit first in the array.
+  function bestDomain(text){
+    var best=null, bestDom=null, bestHits=-1;
+    for(var i=0;i<FLOW_DOMAINS.length;i++){
+      var d=FLOW_DOMAINS[i];
+      var r=FlowJudgment.evaluate(text, d.id, PROBE);
+      if(!r) continue;
+      var hits=entityHits(d, text);
+      if(!best || r.score>best.score || (r.score===best.score && hits>bestHits)){ best=r; bestDom=d; bestHits=hits; }
+    }
+    return { result:best, domain:bestDom };
+  }
+
+  function analyze(text){
+    var picked=bestDomain(text);
+    if(picked.result){
+      return {
+        caught: picked.result.score >= LIVE_THRESHOLD,
+        score: picked.result.score,
+        label: picked.result.label,
+        domain: picked.domain,
+        facts: picked.result.facts,
+        signals: picked.result.signals
+      };
+    }
+    // Scored below the engine's own floor — no score to report, but the
+    // extraction still ran, so we can still show what it did and didn't find.
+    return { caught:false, score:null, label:null, domain:null, facts:FlowJudgment.factsOnly(text,{}), signals:[] };
+  }
+
+  /* ---------- DOM helpers (textContent only — never innerHTML with
+     anything derived from what a visitor pasted) ---------- */
+  function el(tag, cls, text){
+    var n=document.createElement(tag);
+    if(cls) n.className=cls;
+    if(text!=null) n.textContent=text;
+    return n;
+  }
+  function fact(label, value, isHero){
+    var d=el('div','fact'+(isHero?' hero-fact':''));
+    d.appendChild(el('dt',null,label));
+    d.appendChild(el('dd',null,value));
+    return d;
+  }
+
+  function buildCard(analysis, sourceText, cardIndex){
+    var card=el('article','ev '+(analysis.caught?'caught':'quiet'));
+    if(!reduceMotion) card.classList.add('ev-enter');
+
+    /* head: verdict + what would have been filed */
+    var head=el('div','ev-head');
+    var titles=el('div');
+    titles.appendChild(el('h3','ev-title', analysis.caught ? analysis.label : 'Nothing definite enough to log'));
+    var sub = analysis.caught
+      ? (analysis.domain ? 'Read as ' + analysis.domain.label.toLowerCase() : '')
+      : 'Glance would have stayed silent here';
+    if(sub) titles.appendChild(el('p','ev-sub', sub));
+    head.appendChild(titles);
+    head.appendChild(el('span','ev-verdict', analysis.caught ? 'Would have filed' : 'Stayed quiet'));
+    card.appendChild(head);
+
+    var body=el('div','ev-body');
+
+    /* the decisive sentence, when there is one */
+    var f=analysis.facts||{};
+    if(f.quote) body.appendChild(el('p','ev-quote', f.quote));
+
+    /* extracted facts */
+    var facts=el('div','facts');
+    var any=false;
+    if(f.moneyText){ facts.appendChild(fact('Amount', f.moneyText, true)); any=true; }
+    if(f.dateText){ facts.appendChild(fact('Date', f.dateText, true)); any=true; }
+    if(f.date && f.date.iso && f.date.iso!==f.dateText){ facts.appendChild(fact('Normalised', f.date.iso)); any=true; }
+    facts.appendChild(fact('Score', analysis.score==null ? 'under '+FLOOR : String(analysis.score)));
+    facts.appendChild(fact('Speaks at', String(LIVE_THRESHOLD)));
+    if(f.wordCount) facts.appendChild(fact('Words', String(f.wordCount)));
+    body.appendChild(facts);
+
+    /* signals — the explainability payload */
+    if(analysis.signals && analysis.signals.length){
+      var sig=el('div','signals');
+      var sh=el('div','signals-head');
+      sh.appendChild(el('h4',null,'Why'));
+      var sl=el('p','score-line');
+      sl.appendChild(document.createTextNode('total '));
+      var b=el('b',null,String(analysis.score));
+      sl.appendChild(b);
+      sl.appendChild(document.createTextNode(' vs threshold '+LIVE_THRESHOLD));
+      sh.appendChild(sl);
+      sig.appendChild(sh);
+
+      var maxW=0;
+      analysis.signals.forEach(function(s){ maxW=Math.max(maxW, Math.abs(s.weight)); });
+
+      analysis.signals.forEach(function(s, i){
+        var row=el('div','sig '+(s.weight>0?'pos':'neg'));
+        row.appendChild(el('span','sig-why', s.why));
+        row.appendChild(el('span','sig-w', (s.weight>0?'+':'')+s.weight));
+        var track=el('span','sig-track');
+        var fill=el('span','sig-fill');
+        track.appendChild(fill);
+        row.appendChild(track);
+        sig.appendChild(row);
+        var pct=maxW ? Math.round(Math.abs(s.weight)/maxW*100) : 0;
+        if(reduceMotion){ fill.style.width=pct+'%'; }
+        else { setTimeout(function(){ fill.style.width=pct+'%'; }, 90+i*70); }
+      });
+      body.appendChild(sig);
+    } else if(!analysis.caught){
+      var none=el('p','sig-why','No signal in this message cleared the engine’s floor of '+FLOOR+' — no figure committed to, no dated obligation, nothing decided.');
+      body.appendChild(none);
+    }
+
+    /* the record it would have written */
+    var write=el('div','ev-write');
+    if(analysis.caught){
+      write.appendChild(document.createTextNode('One click would file '));
+      write.appendChild(el('b',null,analysis.label));
+      write.appendChild(document.createTextNode(' into your Notion database or CRM — with the amount, the date, that quoted sentence and a link back to the email. Undo removes it.'));
+    } else {
+      write.appendChild(document.createTextNode('No button, no notification, no record. '));
+      write.appendChild(el('b',null,'Silence is the default'));
+      write.appendChild(document.createTextNode(' — the chip only ever appears when something was genuinely decided.'));
+    }
+    body.appendChild(write);
+
+    /* opt-in: contribute this catch's headline (amount/date, engine-
+       generated) to the public gallery at /almost-missed.html. Never
+       offered for a quiet result — there is nothing to contribute. Never
+       sends f.quote, sourceText, or anything else pasted into the page. */
+    if(analysis.caught && analysis.domain){
+      body.appendChild(buildContribute(analysis, cardIndex));
+    }
+
+    card.appendChild(body);
+    return card;
+  }
+
+  function buildContribute(analysis, cardIndex){
+    var wrap=el('div','ev-contribute');
+    var row=el('div','ev-contribute-row');
+    var cb=document.createElement('input');
+    cb.type='checkbox';
+    var cbId='contrib-'+cardIndex;
+    cb.id=cbId;
+    row.appendChild(cb);
+    var label=document.createElement('label');
+    label.setAttribute('for', cbId);
+    label.appendChild(document.createTextNode('Contribute this catch — '));
+    label.appendChild(el('b',null,'anonymously'));
+    label.appendChild(document.createTextNode(' — to the public gallery. Only the category and the numbers above, never this quote or anything else you pasted.'));
+    row.appendChild(label);
+    wrap.appendChild(row);
+
+    var action=el('div','ev-contribute-action');
+    action.hidden=true;
+    var btn=document.createElement('button');
+    btn.type='button';
+    btn.className='ev-contribute-btn';
+    btn.textContent='Contribute';
+    action.appendChild(btn);
+    var status=el('span','ev-contribute-status');
+    action.appendChild(status);
+    wrap.appendChild(action);
+
+    cb.addEventListener('change', function(){ action.hidden=!cb.checked; });
+
+    btn.addEventListener('click', function(){
+      btn.disabled=true; cb.disabled=true;
+      status.className='ev-contribute-status';
+      status.textContent='Sending…';
+      var f=analysis.facts||{};
+      fetch('/.netlify/functions/submit-catch',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          domainId: analysis.domain.id,
+          headline: analysis.label,
+          score: analysis.score,
+          hasMoney: !!(f.money && f.money.value),
+          hasDate: !!f.date
+        })
+      }).then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+        .then(function(){
+          status.className='ev-contribute-status ok';
+          status.textContent='Thanks — pending review before it appears.';
+          if(typeof gtag==='function') gtag('event','inbox_scan_contribute',{ domain:analysis.domain.id });
+        })
+        .catch(function(){
+          status.className='ev-contribute-status err';
+          status.textContent='Could not send that. Please try again.';
+          btn.disabled=false; cb.disabled=false;
+        });
+    });
+
+    return wrap;
+  }
+
+  /* ---------- ledger ---------- */
+  function countUp(node, to, suffixFmt){
+    var from=parseFloat(String(node.dataset.v||'0'))||0;
+    node.dataset.v=String(to);
+    if(reduceMotion || from===to){ node.textContent=suffixFmt(to); return; }
+    var start=performance.now(), dur=520;
+    function step(t){
+      var p=Math.min(1,(t-start)/dur);
+      var eased=1-Math.pow(1-p,3);
+      node.textContent=suffixFmt(from+(to-from)*eased);
+      if(p<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function intFmt(v){ return String(Math.round(v)); }
+  function moneyFmt(v){
+    if(!state.valueCurrency) return 'No figure stated';
+    try{
+      return new Intl.NumberFormat('en-US',{style:'currency',currency:state.valueCurrency,maximumFractionDigits:0}).format(Math.round(v));
+    }catch(e){ return Math.round(v).toLocaleString('en-US'); }
+  }
+  function renderLedger(){
+    countUp(statCaught, state.caught, intFmt);
+    countUp(statDates, state.dates, intFmt);
+    countUp(statScanned, state.scanned, intFmt);
+    countUp(statValue, state.valueTotal, moneyFmt);
+    statValue.classList.toggle('empty', !state.valueCurrency);
+  }
+
+  /* ---------- the scan ---------- */
+  function runScan(text, sourceName){
+    scanErr.hidden=true;
+    var trimmed=(text||'').trim();
+    if(trimmed.length<12){
+      scanErr.hidden=false;
+      scanErr.textContent='Paste a little more — a line or two of the actual email is enough.';
+      pasteBox.focus();
+      return;
+    }
+
+    var analysis=analyze(trimmed);
+
+    state.scanned++;
+    if(analysis.caught) state.caught++;
+    var f=analysis.facts||{};
+    if(analysis.caught && f.money && f.money.value){
+      // Only ever sums figures in one currency. Mixing a euro figure into a
+      // dollar total would produce a confident, wrong number on the
+      // scorecard — the exact failure the extractor itself refuses to make.
+      if(!state.valueCurrency) state.valueCurrency=f.money.currency;
+      if(state.valueCurrency===f.money.currency) state.valueTotal+=f.money.value;
+    }
+    if(analysis.caught && f.dateText) state.dates++;
+
+    if(!reduceMotion){
+      scanner.classList.add('scanning');
+      setTimeout(function(){ scanner.classList.remove('scanning'); }, 640);
+    }
+
+    var delay=reduceMotion?0:380;
+    scanBtn.disabled=true; scanBtnLabel.textContent='Scanning…';
+    setTimeout(function(){
+      scanBtn.disabled=false; scanBtnLabel.textContent='Scan another email';
+      resultsWrap.hidden=false;
+      var card=buildCard(analysis, trimmed, state.scanned);
+      evidence.insertBefore(card, evidence.firstChild);
+      renderLedger();
+      drawShareCard();
+      shareSec.hidden=false;
+      pasteBox.value='';
+      if(state.scanned===1){
+        // First result is the whole point of the page — put it on screen
+        // rather than leaving it below the fold under the scanner.
+        try{ resultsWrap.scrollIntoView({behavior:reduceMotion?'auto':'smooth', block:'start'}); }catch(e){}
+      }
+      if(typeof gtag==='function'){
+        gtag('event','inbox_scan_run',{ caught:analysis.caught, score:analysis.score==null?0:analysis.score, source:sourceName||'pasted', scan_index:state.scanned });
+      }
+    }, delay);
+  }
+
+  scanBtn.addEventListener('click', function(){ runScan(pasteBox.value); });
+  pasteBox.addEventListener('keydown', function(ev){
+    if((ev.metaKey||ev.ctrlKey) && ev.key==='Enter'){ ev.preventDefault(); runScan(pasteBox.value); }
+  });
+
+  clearBtn.addEventListener('click', function(){
+    state={ scanned:0, caught:0, valueTotal:0, valueCurrency:null, dates:0 };
+    evidence.replaceChildren();
+    [statCaught,statValue,statDates,statScanned].forEach(function(n){ n.dataset.v='0'; });
+    statCaught.textContent='0'; statDates.textContent='0'; statScanned.textContent='0';
+    statValue.textContent='No figure stated'; statValue.classList.add('empty');
+    resultsWrap.hidden=true; shareSec.hidden=true;
+    scanBtnLabel.textContent='Scan this email';
+    pasteBox.focus();
+  });
+
+  /* ---------- samples ---------- */
+  (function(){
+    var list=document.getElementById('sampleList');
+    SAMPLES.forEach(function(s){
+      var b=el('button','sample');
+      b.type='button';
+      b.appendChild(el('span','dot'));
+      b.appendChild(document.createTextNode(s.name));
+      b.addEventListener('click', function(){
+        pasteBox.value=s.text;
+        runScan(s.text, s.name);
+        if(typeof gtag==='function') gtag('event','inbox_scan_sample',{ sample:s.name });
+      });
+      list.appendChild(b);
+    });
+  })();
+
+  /* ================================================================
+     Share card — drawn here, from this scan's numbers only. The text of
+     anything pasted never reaches the canvas, so the card can be posted
+     publicly without leaking the email it came from.
+     ================================================================ */
+  var canvas=document.getElementById('shareCanvas'), cx=canvas.getContext('2d');
+
+  function roundRect(c,x,y,w,h,r){
+    c.beginPath();
+    c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
+    c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
+  }
+
+  // Steps a font size down until the string fits the width it has been given.
+  // Canvas does no wrapping and no ellipsis of its own, so a headline whose
+  // length depends on the visitor's own numbers ("12 decisions my inbox
+  // made") will otherwise run straight off the edge of the card they are
+  // about to post publicly. Measured rather than guessed, because the real
+  // webfont's metrics differ from the fallback's.
+  function fitFont(c, text, maxWidth, weight, family, startPx, minPx){
+    var size=startPx;
+    for(;;){
+      c.font=weight+' '+size+'px '+family;
+      if(size<=minPx || c.measureText(text).width<=maxWidth) break;
+      size-=2;
+    }
+    return size;
+  }
+
+  function drawShareCard(){
+    var W=canvas.width, H=canvas.height;
+    var INK='#EEF2F9', DIM='#8895B4', ACCENT='#6E9BFF', OK='#5FD39B';
+
+    cx.clearRect(0,0,W,H);
+    cx.fillStyle='#07090F'; cx.fillRect(0,0,W,H);
+
+    // atmosphere: the same blue bloom the site uses, not a stock gradient
+    var g=cx.createRadialGradient(W*0.16,H*0.1,0,W*0.16,H*0.1,W*0.72);
+    g.addColorStop(0,'rgba(59,116,255,.30)'); g.addColorStop(1,'rgba(59,116,255,0)');
+    cx.fillStyle=g; cx.fillRect(0,0,W,H);
+    var g2=cx.createRadialGradient(W*0.95,H*0.95,0,W*0.95,H*0.95,W*0.5);
+    g2.addColorStop(0,'rgba(95,211,155,.16)'); g2.addColorStop(1,'rgba(95,211,155,0)');
+    cx.fillStyle=g2; cx.fillRect(0,0,W,H);
+
+    // hairline grid, low opacity — texture, not decoration
+    cx.strokeStyle='rgba(150,170,220,.055)'; cx.lineWidth=1;
+    for(var gx=0; gx<W; gx+=60){ cx.beginPath(); cx.moveTo(gx+.5,0); cx.lineTo(gx+.5,H); cx.stroke(); }
+    for(var gy=0; gy<H; gy+=60){ cx.beginPath(); cx.moveTo(0,gy+.5); cx.lineTo(W,gy+.5); cx.stroke(); }
+
+    cx.strokeStyle='rgba(59,116,255,.55)'; cx.lineWidth=4;
+    cx.beginPath(); cx.moveTo(0,2); cx.lineTo(W,2); cx.stroke();
+
+    var PAD=72;
+
+    // eyebrow
+    cx.fillStyle=ACCENT;
+    cx.font='600 22px "JetBrains Mono", ui-monospace, monospace';
+    cx.textBaseline='alphabetic';
+    cx.fillText('INBOX SCAN', PAD, PAD+22);
+
+    // headline — the finding, stated plainly
+    var inner=W-PAD*2;
+    cx.fillStyle=INK;
+    var headline = state.caught===0
+      ? 'Nothing slipped through.'
+      : state.caught===1
+        ? '1 decision my inbox made'
+        : state.caught+' decisions my inbox made';
+    fitFont(cx, headline, inner, '800', 'Rubik, system-ui, sans-serif', 76, 40);
+    cx.fillText(headline, PAD, PAD+124);
+
+    cx.fillStyle=DIM;
+    var sub = state.caught===0
+      ? 'Out of '+state.scanned+' scanned — Glance stayed quiet on all of them.'
+      : '…and never wrote down.';
+    fitFont(cx, sub, inner, '500', 'Assistant, system-ui, sans-serif', 34, 22);
+    cx.fillText(sub, PAD, PAD+180);
+
+    // stat blocks
+    var stats=[
+      // Same reasoning as the ledger's own empty state: a bare em dash set at
+      // display weight reads as a stray rule, so "none stated" is spelled out
+      // in a smaller face instead.
+      state.valueCurrency
+        ? { k:'Value on the table', v:moneyFmt(state.valueTotal), c:OK, big:true }
+        : { k:'Value on the table', v:'None stated', c:DIM, big:false },
+      { k:'Dated commitments', v:String(state.dates), c:INK, big:true },
+      { k:'Emails scanned', v:String(state.scanned), c:INK, big:true }
+    ];
+    var bx=PAD, by=H-PAD-186, bw=(W-PAD*2-40)/3, bh=136, boxPad=26;
+    stats.forEach(function(s,i){
+      var x=bx+i*(bw+20);
+      cx.fillStyle='rgba(20,25,36,.72)';
+      roundRect(cx,x,by,bw,bh,18); cx.fill();
+      cx.strokeStyle='rgba(150,170,220,.16)'; cx.lineWidth=1.5;
+      roundRect(cx,x+.75,by+.75,bw-1.5,bh-1.5,18); cx.stroke();
+
+      var room=bw-boxPad*2;
+      cx.fillStyle=DIM;
+      fitFont(cx, s.k.toUpperCase(), room, '600', '"JetBrains Mono", ui-monospace, monospace', 19, 13);
+      cx.fillText(s.k.toUpperCase(), x+boxPad, by+44);
+
+      cx.fillStyle=s.c;
+      // A seven-figure total is wider than its box at the headline size, and
+      // canvas will happily draw it straight through the border — so the
+      // value is fitted to the space it actually has.
+      if(s.big) fitFont(cx, s.v, room, '800', 'Rubik, system-ui, sans-serif', 50, 26);
+      else fitFont(cx, s.v, room, '600', 'Assistant, system-ui, sans-serif', 28, 18);
+      cx.fillText(s.v, x+boxPad, by+106);
+    });
+
+    // Footer: the URL is the only part that has to survive, so it is measured
+    // and placed first, and the left-hand line is only drawn in the space
+    // actually left over. Drawing both from fixed positions let them collide
+    // in the middle of the card — on the one asset of this page that is meant
+    // to be posted in public.
+    var FOOT=H-PAD+8, GAP=28;
+    cx.fillStyle=ACCENT;
+    cx.font='700 25px Assistant, system-ui, sans-serif';
+    var url='theflow-ai.com/missed-deadline';
+    var urlW=cx.measureText(url).width;
+    cx.fillText(url, W-PAD-urlW, FOOT);
+
+    cx.fillStyle=DIM;
+    var room=inner-urlW-GAP;
+    var notes=['Scanned on my own machine — nothing uploaded.','Scanned on my own machine.','Nothing uploaded.'];
+    for(var ni=0; ni<notes.length; ni++){
+      cx.font='500 25px Assistant, system-ui, sans-serif';
+      if(cx.measureText(notes[ni]).width<=room){ cx.fillText(notes[ni], PAD, FOOT); break; }
+    }
+  }
+  window.__redrawShareCard=drawShareCard;
+
+  // Wait for the webfonts before the first draw, otherwise the card renders
+  // once in a fallback face and only corrects itself on the next scan.
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(function(){ if(state.scanned) drawShareCard(); }); }
+
+  document.getElementById('downloadBtn').addEventListener('click', function(){
+    drawShareCard();
+    canvas.toBlob(function(blob){
+      if(!blob) return;
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a');
+      a.href=url; a.download='inbox-scan-'+new Date().toISOString().slice(0,10)+'.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+      if(typeof gtag==='function') gtag('event','inbox_scan_card_download',{ caught:state.caught, scanned:state.scanned });
+    }, 'image/png');
+  });
+
+  var copyBtn=document.getElementById('copyBtn'), copyOk=document.getElementById('copyOk');
+  copyBtn.addEventListener('click', function(){
+    var line = state.caught===0
+      ? 'I ran '+state.scanned+' of my emails through a tool that flags decisions my inbox made. It stayed quiet on all of them — which is exactly what a tool like this should do most of the time.'
+      : 'I ran '+state.scanned+' of my emails through a tool that flags the decisions my inbox made. It found '+state.caught+
+        (state.caught===1?' I had never written down':' I had never written down')+
+        (state.valueCurrency?' — '+moneyFmt(state.valueTotal)+' worth':'')+'. Runs entirely in the browser, nothing uploaded:';
+    var text=line+'\nhttps://theflow-ai.com/missed-deadline.html';
+    function done(ok){
+      copyOk.textContent = ok ? 'Copied — paste it with the card.' : 'Couldn’t copy automatically. Select the card and post it with your own words.';
+      setTimeout(function(){ copyOk.textContent=''; }, 4000);
+      if(ok && typeof gtag==='function') gtag('event','inbox_scan_copy_post');
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(false); });
+    } else { done(false); }
+  });
+
+  /* GA4 on the two install CTAs, same convention as the rest of the site */
+  document.querySelectorAll('[data-ga]').forEach(function(a){
+    a.addEventListener('click', function(){
+      if(typeof gtag==='function') gtag('event', a.getAttribute('data-ga'), { scanned:state.scanned, caught:state.caught });
+    });
+  });
+})();
+</script>
+</body>
+</html>

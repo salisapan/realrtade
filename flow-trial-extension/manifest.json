@@ -33,10 +33,15 @@
         "src/extract.js",
         "src/judgment.js",
         "src/storage.js",
+        "src/privacyShield.js",
+        "src/docwriter.js",
+        "src/docreader.js",
+        "src/sidebar.js",
         "src/content-gmail.js"
       ],
       "css": [
-        "src/chip.css"
+        "src/chip.css",
+        "src/sidebar.css"
       ],
       "run_at": "document_idle"
     }

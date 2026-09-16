@@ -15,8 +15,11 @@ const FLOW_DOMAINS = [
     id: 'sales',
     label: 'Sales & business development',
     entity: 'Deal / client',
-    // Nouns that mean "this message is about the object of my work".
-    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr|msa|sow|statement of work)\b/i,
+    // Nouns that mean "this message is about the object of my work". The
+    // Hebrew half has no \b wrapper for the same reason judgment.js's Hebrew
+    // signals don't: \b only fires around [A-Za-z0-9_], so it's a silent
+    // no-op — never a match — against Hebrew letters.
+    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr|msa|sow|statement of work)\b|(עסקה|הצעת מחיר|חוזה|הזמנה|מנוי|חידוש|הסכם)/i,
     title(facts) {
       if (facts.lost) return 'Log lost deal';
       if (facts.moneyText && facts.date) return 'Log ' + facts.moneyText + ' confirmed, ' + facts.dateText;
