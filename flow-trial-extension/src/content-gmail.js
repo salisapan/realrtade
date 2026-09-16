@@ -193,7 +193,12 @@
 
     injectChip(message, {
       messageId, result, sender, subject,
-      threadUrl: threadUrl(legacyId)
+      threadUrl: threadUrl(legacyId),
+      // Snapshotted now, not re-read from the DOM at click time — by the
+      // time "Do It" is clicked the chip's own ctx has no live node
+      // reference to this message (only messageId/result/sender/subject),
+      // and Gmail may have long since rebuilt or removed it anyway.
+      bodyText: text
     });
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
     // not a rare edge case — logging 'shown' again every time would fill the
@@ -325,8 +330,11 @@
         // Only used, on the background-script side, to test a destination
         // select column's own option names against the message — never sent
         // to any third party as free text (Notion API calls get discrete
-        // property values, not this string; see notionProperties()).
-        bodyText: messageBodyText(ctx.message).slice(0, 20000)
+        // property values, not this string; see notionProperties()). Read
+        // from ctx.bodyText — the snapshot injectChip() took at scan time,
+        // not the live DOM: this ctx never carried a `message` node
+        // reference (only messageId/result/sender/subject/threadUrl).
+        bodyText: (ctx.bodyText || '').slice(0, 20000)
       }
     }, (response) => {
       if (!response) { setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'); return; }
