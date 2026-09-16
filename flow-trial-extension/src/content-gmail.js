@@ -35,7 +35,9 @@
     // is now guaranteed to fail (state.connectorId is null once disconnected).
     if (!state.onboarded) { stopWatching(); return; }
     if (!watching) { watching = true; observe(); }
-    mountSidebar();
+    // mountSidebar() is off — see the note at wireAttachmentHoverCards()'s
+    // call site in scanReadingPane() for why the whole sidebar surface
+    // (badge, Draft-It, attachment X-ray) is cut, not just styled.
   }
 
   function stopWatching() {
@@ -146,7 +148,14 @@
       messageId: legacyId || hashNode(message),
       threadUrl: threadUrl(legacyId)
     };
-    wireAttachmentHoverCards(message);
+    // wireAttachmentHoverCards(message) is off — Draft-It and the attachment
+    // X-ray both depend on the same glance-assist backend call, and that call
+    // isn't reliably configured yet ("This feature is not configured yet"
+    // reaching the card in practice). Cutting the whole sidebar surface
+    // (badge, Draft-It, this hover card) rather than shipping a feature that
+    // errors on click — the chip's own write is the one path proven to work
+    // end to end. Re-enable both this call and mountSidebar() in init() once
+    // glance-assist is confirmed working.
 
     // A live chip already sitting in this exact node means there is nothing
     // to do — this is the fast path that avoids re-running judgment on every
