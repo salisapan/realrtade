@@ -49,6 +49,19 @@ const FlowJudgment = (() => {
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|incorrect (?:amount|invoice)|dispute)\b/i;
 
+  // Hebrew twins of the seven signals above. No \b word-boundary wrapper here
+  // — \b is defined against [A-Za-z0-9_], so it never fires around Hebrew
+  // letters and would silently turn every one of these into a dead pattern.
+  // Same phrases, same intent, just the vocabulary an Israeli business inbox
+  // actually uses instead of "we're good at" / "approved" / "no longer interested".
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?)/;
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור)/;
+  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא)/;
+  const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם)/;
+  const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל)/;
+  const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב)/;
+
   const MARKETING = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|webinar|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;
   const CALENDAR_NOISE = /\b(has (?:accepted|declined|tentatively accepted) (?:this|your) invitation|invitation from google calendar|added to your calendar)\b/i;
   // The fingerprint of a cold pitch. Without this, "our pricing starts at $99/mo,
@@ -99,13 +112,13 @@ const FlowJudgment = (() => {
     if (CALENDAR_NOISE.test(text)) add('calendar', -35, 'Calendar notification boilerplate');
     if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
-    const commitStrong = COMMIT_STRONG.test(text);
-    const commit = commitStrong || COMMIT.test(text);
-    const lost = LOST.test(text);
-    const executed = EXECUTED.test(text);
-    const obligation = OBLIGATION.test(text);
-    const handoff = HANDOFF.test(text);
-    const dispute = DISPUTE.test(text);
+    const commitStrong = COMMIT_STRONG.test(text) || COMMIT_STRONG_HE.test(text);
+    const commit = commitStrong || COMMIT.test(text) || COMMIT_HE.test(text);
+    const lost = LOST.test(text) || LOST_HE.test(text);
+    const executed = EXECUTED.test(text) || EXECUTED_HE.test(text);
+    const obligation = OBLIGATION.test(text) || OBLIGATION_HE.test(text);
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text);
+    const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
     if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
@@ -202,11 +215,11 @@ const FlowJudgment = (() => {
       automated: raw.automated,
       wordCount: raw.wordCount,
       isReply: /^re:/i.test(ctx.subject || ''),
-      lost: LOST.test(text),
-      executed: EXECUTED.test(text),
-      dispute: DISPUTE.test(text)
+      lost: LOST.test(text) || LOST_HE.test(text),
+      executed: EXECUTED.test(text) || EXECUTED_HE.test(text),
+      dispute: DISPUTE.test(text) || DISPUTE_HE.test(text)
     };
-    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT, LOST, EXECUTED, DISPUTE, OBLIGATION, HANDOFF]);
+    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT_STRONG_HE, COMMIT, COMMIT_HE, LOST, LOST_HE, EXECUTED, EXECUTED_HE, DISPUTE, DISPUTE_HE, OBLIGATION, OBLIGATION_HE, HANDOFF, HANDOFF_HE]);
     return facts;
   }
 
@@ -235,7 +248,7 @@ const FlowJudgment = (() => {
     const threshold = thresholdFrom(ctx.calibration, ctx.now);
     if (s.total < threshold) return null;
 
-    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT, LOST, EXECUTED, DISPUTE, OBLIGATION, HANDOFF]);
+    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT_STRONG_HE, COMMIT, COMMIT_HE, LOST, LOST_HE, EXECUTED, EXECUTED_HE, DISPUTE, DISPUTE_HE, OBLIGATION, OBLIGATION_HE, HANDOFF, HANDOFF_HE]);
 
     return {
       score: s.total,
