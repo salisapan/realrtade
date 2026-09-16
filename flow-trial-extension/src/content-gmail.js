@@ -54,8 +54,6 @@
     if (typeof FlowSidebar === 'undefined') return; // degrade silently, same policy as the chip system below
     FlowSidebar.mount();
     FlowSidebar.renderDraft('idle', { onDraft: handleDraftIt });
-    const conn = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
-    FlowSidebar.renderNextStep('idle', { connectorLabel: (conn && conn.label) || 'your CRM', onRun: handleNextStep });
   }
 
   function observe() {
@@ -314,7 +312,12 @@
         senderEmail: ctx.sender.email,
         senderName: ctx.sender.name,
         subject: ctx.subject,
-        threadUrl: ctx.threadUrl
+        threadUrl: ctx.threadUrl,
+        // Only used, on the background-script side, to test a destination
+        // select column's own option names against the message — never sent
+        // to any third party as free text (Notion API calls get discrete
+        // property values, not this string; see notionProperties()).
+        bodyText: messageBodyText(ctx.message).slice(0, 20000)
       }
     }, (response) => {
       if (!response) { setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'); return; }
@@ -505,120 +508,6 @@
     } catch (err) {
       FlowSidebar.showFloatingCard(rect, { state: 'error', message: 'Couldn’t read this attachment.' });
     }
-  }
-
-  /* --------------------------------------------- Feature 4: Next-Step orchestrator */
-
-  function downloadBlob(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  }
-
-  // Which docwriter template best matches what was just decided — reusing
-  // the SAME facts Path A's CRM write already used, so the two halves of one
-  // "Do It" click can never disagree about what happened.
-  function docKindFor(facts) {
-    if (facts && facts.executed) return 'contract-mod';
-    if (facts && (facts.moneyText || facts.dateText)) return 'confirmation-memo';
-    return 'receipt';
-  }
-
-  async function handleNextStep() {
-    if (typeof FlowSidebar === 'undefined') return;
-    if (!currentContext || !currentContext.message) {
-      FlowSidebar.renderNextStep('error', { message: 'Open an email first.', onRun: handleNextStep });
-      return;
-    }
-
-    const conn = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
-    const connectorLabel = (conn && conn.label) || 'your CRM';
-    const ctx = currentContext;
-    const text = messageBodyText(ctx.message);
-    if (text.length < 20) {
-      FlowSidebar.renderNextStep('error', { message: 'Still rendering — try again in a moment.', onRun: handleNextStep });
-      return;
-    }
-
-    FlowSidebar.renderNextStep('working');
-
-    // Next-Step is a deliberate click, not the passive chip — it runs on
-    // whatever the open message states even if that never cleared the
-    // chip's own judgment threshold. See judgment.js's factsOnly() for why
-    // that's a separate, additive entry point rather than a change to
-    // evaluate()'s own threshold behavior.
-    const facts = FlowJudgment.factsOnly(text, { senderEmail: ctx.sender.email, subject: ctx.subject });
-    const domain = FLOW_DOMAINS.find((d) => d.id === state.domainId) || FLOW_DOMAINS[0];
-    const label = domain.entityWords.test(text) ? domain.title(facts) : FlowJudgment.neutralTitle(facts);
-
-    let crmResult;
-    try {
-      crmResult = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-          type: 'flow:execute-action',
-          payload: {
-            connectorId: state.connectorId, label, facts,
-            senderEmail: ctx.sender.email, senderName: ctx.sender.name,
-            subject: ctx.subject, threadUrl: ctx.threadUrl
-          }
-        }, (response) => resolve(response || { ok: false, reason: 'error' }));
-      });
-    } catch (err) {
-      crmResult = { ok: false, reason: 'error', error: String((err && err.message) || err) };
-    }
-
-    if (!crmResult.ok) {
-      const message =
-        crmResult.reason === 'not-connected' ? 'Connect a system in the Glance popup first.' :
-        crmResult.reason === 'no-matching-contact' ? 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.' :
-        crmResult.reason === 'connector-not-live' ? 'That connector isn’t wired up yet.' :
-        crmResult.error || 'Something went wrong.';
-      FlowSidebar.renderNextStep('error', { message, onRun: handleNextStep });
-      return;
-    }
-
-    // Path B: the local document, from the SAME facts Path A's write just
-    // used. A failure here is a lesser failure than the CRM write itself —
-    // the write already succeeded and cannot be silently rolled back just
-    // because the second, independent half of the click didn't complete —
-    // so it's swallowed rather than surfaced as the whole action failing.
-    try {
-      const docCtx = {
-        label, facts, senderName: ctx.sender.name, senderEmail: ctx.sender.email,
-        subject: ctx.subject, threadUrl: ctx.threadUrl, connectorLabel, where: crmResult.where
-      };
-      const kind = docKindFor(facts);
-      downloadBlob(FlowDocWriter.generate(kind, docCtx), FlowDocWriter.suggestedFilename(kind, docCtx));
-    } catch (err) {
-      // Non-fatal — see comment above.
-    }
-
-    FlowStorage.appendLog({ kind: 'written', label, messageId: ctx.messageId, where: crmResult.where, url: crmResult.url, ref: crmResult.ref, connectorId: state.connectorId });
-    chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, connector: state.connectorId } });
-
-    FlowSidebar.renderNextStep('done', {
-      // upsellLocale deliberately omitted: the upsell copy in sidebar.js is
-      // fixed English text, not translated per-thread, so there is nothing
-      // to detect direction from yet — isRTLText(undefined) correctly
-      // defaults to 'ltr' rather than flipping to rtl for a Hebrew subject
-      // line and misaligning that English copy.
-      where: crmResult.where, url: crmResult.url,
-      onUndo: crmResult.ref ? () => {
-        FlowSidebar.renderNextStep('working');
-        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: state.connectorId, ref: crmResult.ref }, (r) => {
-          if (r && r.ok) {
-            FlowStorage.appendLog({ kind: 'undone', label, messageId: ctx.messageId });
-            FlowSidebar.renderNextStep('idle', { connectorLabel, onRun: handleNextStep });
-          } else {
-            FlowSidebar.renderNextStep('error', { message: 'Undo failed. Try again from ' + crmResult.where + ' directly.', onRun: handleNextStep });
-          }
-        });
-      } : null
-    });
   }
 
   chrome.storage.onChanged.addListener((changes) => {

@@ -662,8 +662,17 @@ function notionProperties(schema, p) {
     return null;
   };
 
+  // The generated label ("Log ₪3,850 confirmed, Sep 22") is a task description,
+  // not an identity — on its own in the title column it reads as a cryptic
+  // system string. Leading with who the record is about (when Gmail gave us a
+  // name) makes the row recognizable at a glance; the label still follows, so
+  // no information is lost, only reordered.
   const titleName = Object.entries(schema || {}).find(([, d]) => d.type === 'title');
-  if (titleName) props[titleName[0]] = { title: [{ text: { content: p.label.slice(0, 200) } }] };
+  if (titleName) {
+    const identity = (p.senderName || '').trim();
+    const content = identity ? identity + ' — ' + p.label : p.label;
+    props[titleName[0]] = { title: [{ text: { content: content.slice(0, 200) } }] };
+  }
 
   const amount = byType('number', ['amount', 'value', 'total', 'price', 'sum']);
   if (amount && f.money) props[amount] = { number: f.money.value };
@@ -682,6 +691,21 @@ function notionProperties(schema, p) {
   const person = byType('rich_text', ['from', 'sender', 'contact', 'who']);
   if (person && (p.senderName || p.senderEmail)) {
     props[person] = { rich_text: [{ text: { content: (p.senderName || p.senderEmail).slice(0, 200) } }] };
+  }
+
+  // Any select column is, by definition, a closed vocabulary the user already
+  // typed out themselves (insurer names, product lines, ticket categories,
+  // whatever). Rather than hardcoding a domain's worth of keyword lists here,
+  // check the column's own configured option names against the source text —
+  // this is what actually let "הראל" and "רכב" land in their select columns
+  // instead of sitting unpopulated next to a title nobody could read.
+  if (p.bodyText) {
+    for (const [name, def] of Object.entries(schema || {})) {
+      if (def.type !== 'select' || props[name]) continue;
+      const options = (def.select && def.select.options) || [];
+      const hit = options.find((o) => o.name && p.bodyText.includes(o.name));
+      if (hit) props[name] = { select: { name: hit.name } };
+    }
   }
 
   return props;
