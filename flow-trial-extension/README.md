@@ -115,6 +115,137 @@ Undo) and a one-time invitation to the Flow Pilot Program — Glance's own
 upsell path into the full Flow product, shown only after the loop has
 genuinely completed once, never speculatively.
 
+## Set up Google (Tasks, Calendar, Gmail Drafts, Drive Picker) (needs the site owner)
+
+Google is the default connector — Calendar, Gmail Drafts, and Google Tasks
+all share one OAuth grant via `chrome.identity.getAuthToken` (Chrome's own
+native Google account chooser, not `launchWebAuthFlow` like the four
+connectors below). That means **no redirect URL, no client secret, and no
+Netlify environment variable** — the entire flow is client-side. The Drive
+picker needs one extra, unrelated credential: a plain API key (not OAuth)
+that authenticates Google's picker *widget*, separate from the OAuth token
+that authenticates *file access*.
+
+### 1. Create or pick a Google Cloud project
+
+[console.cloud.google.com](https://console.cloud.google.com) → project
+picker (top left) → **New Project** (or reuse an existing one). Everything
+below happens inside this one project.
+
+### 2. Enable the APIs
+
+**APIs & Services → Library**, enable all five — a missing one fails at
+the first real API call with a 403 ("API not enabled"), not at OAuth time,
+which is the single most common way this gets half-configured:
+
+- Google Calendar API
+- Gmail API
+- Google Tasks API
+- Google Drive API
+- Google Picker API
+
+### 3. Configure the OAuth consent screen
+
+**APIs & Services → OAuth consent screen.**
+
+1. User type: **External** (or **Internal** if this is a Google Workspace
+   account and you only ever intend to test with accounts on that
+   workspace).
+2. Fill in app name, support email, developer contact email. Nothing else
+   here is required to start testing.
+3. Leave **Publishing status** as **Testing** for now — this is what lets
+   you skip Google's verification review entirely while testing on real
+   accounts (see Test users, step 7).
+
+### 4. Create the OAuth Client ID (type: Chrome Extension)
+
+**APIs & Services → Credentials → Create Credentials → OAuth client ID.**
+
+1. Application type: **Chrome extension** (not "Web application" — that's
+   the type the other four connectors below effectively use via their
+   redirect-URL flow; Google's flow is a different, extension-native type).
+2. **Item ID / Application ID**: paste the extension's own ID —
+   ```
+   dnjhplgmnkabbjogfpbhofjedlkehkai
+   ```
+   This is the same ID already baked into the `chromiumapp.org` redirect
+   URLs for HubSpot/Salesforce/Slack/Monday.com below, derived from the
+   `key` pinned in `manifest.json`. It stays stable across reloads — don't
+   regenerate that key without updating it everywhere it's registered,
+   here included.
+3. Create it, then copy the generated **Client ID**
+   (`....apps.googleusercontent.com`). There is no client secret for this
+   application type — Chrome itself is the OAuth client, so there's nothing
+   to keep server-side.
+4. Paste that Client ID into `manifest.json`'s `oauth2.client_id`, replacing
+   the `YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com` placeholder.
+
+### 5. Create the Picker API key
+
+**APIs & Services → Credentials → Create Credentials → API key.**
+
+1. Create the key, then click **Edit** on it immediately (an unrestricted
+   key left as-is is a real, avoidable exposure).
+2. **Application restrictions → HTTP referrers (web sites)** → add:
+   ```
+   chrome-extension://dnjhplgmnkabbjogfpbhofjedlkehkai/*
+   ```
+3. **API restrictions → Restrict key** → select **Google Picker API** only
+   (it doesn't need Drive/Calendar/Gmail/Tasks API access — those calls all
+   go through the OAuth token from step 4, never this key).
+4. Paste the key into `picker/picker.js`'s `GOOGLE_PICKER_API_KEY` constant,
+   replacing the `YOUR_GOOGLE_PICKER_API_KEY` placeholder.
+
+### 6. Confirm the scopes match
+
+`manifest.json`'s `oauth2.scopes` should already list all four (this ships
+in the repo — nothing to add here unless it's been edited):
+
+```
+https://www.googleapis.com/auth/tasks
+https://www.googleapis.com/auth/calendar.events
+https://www.googleapis.com/auth/gmail.compose
+https://www.googleapis.com/auth/drive.file
+```
+
+`drive.file` is the narrow, per-file scope — it only ever grants access to
+a file the user explicitly opens through the picker, never blanket Drive
+access. There is nothing to add on the consent screen's own Scopes step for
+Testing-mode use; that step only matters once you move toward verification
+for production (see Common pitfalls).
+
+### 7. Add yourself as a test user
+
+**OAuth consent screen → Audience/Test users → Add users** → add the exact
+Google account you'll sign into during manual testing. While the app is in
+**Testing** status (step 3), only accounts explicitly listed here can
+complete the OAuth grant — everyone else sees Google's "app hasn't
+completed verification" blocking screen, not a partial failure.
+
+### Common pitfalls
+
+- **API not enabled ≠ scope not granted.** A 403 from Calendar/Gmail/Tasks/
+  Drive after a successful sign-in almost always means step 2 was skipped
+  for that specific API, not a scopes or Client ID problem.
+- **Wrong OAuth client type.** "Web application" and "Chrome extension" are
+  different Client ID formats; `chrome.identity.getAuthToken` only works
+  with the Chrome extension type from step 4.
+- **Forgetting the test user.** The single most common "it just won't sign
+  in" report while in Testing status — the fix is step 7, not the Client ID.
+- **Regenerating `manifest.json`'s `key`.** This changes the extension ID,
+  which silently invalidates the Item ID in step 4, the Picker key
+  restriction in step 5, and all four `chromiumapp.org` redirect URLs below.
+  Don't touch it once any of these are registered.
+- **Picker API key with no restrictions, or restricted to the wrong
+  referrer.** Either leaves it wide open or failing every request;
+  the exact pattern in step 5's referrer field matters (trailing `/*`
+  included).
+- **Production / many real users, later:** `gmail.compose`, `calendar.events`,
+  and `tasks` are all Google "sensitive" scopes — fine for Testing and up to
+  100 test users with zero review, but a real public launch beyond that
+  eventually needs Google's verification process. Not a blocker for the
+  manual testing this checklist exists for.
+
 ## Set up Notion (works immediately, no server, no app review)
 
 1. Go to [notion.so/my-integrations](https://www.notion.so/my-integrations) →
