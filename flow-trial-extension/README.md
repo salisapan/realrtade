@@ -29,6 +29,27 @@ percentage as money), the date (resolving weekday references and month names,
 and refusing to normalise a genuinely ambiguous `3/4`), and the sentence that
 carried the decision. That is what makes the written record worth having.
 
+**`Do It` closes one named process, not a pile of independent actions.**
+`src/actions.js` maps each of the five classified intent types onto exactly
+one process — Schedule & Confirm, Schedule It, Reply & Track, Follow
+Through, or Log It — never a loose action list. Each process names an
+*anchor* step (the concrete evidence it exists on — the calendar entry for
+a schedule process, the draft for a reply) that can never be dropped or
+reordered; the chip's lead sentence and post-write receipt both frame this
+as one outcome closing ("Scheduling this and setting a reminder to
+prepare." → "Closed — scheduled, with a reminder set."), not a set of
+options. Clicking `Do It` runs the process's steps in order and reports
+progress as each one closes; a single `Undo all` reverts the whole chain in
+reverse order, stopping immediately if any one step can't be undone rather
+than leaving the account guessing what did and didn't revert.
+
+`src/execution-memory.js` is a small local (`chrome.storage.local`) event
+log of what this account actually does with each process — which
+non-anchor steps it keeps, strips off before confirming, or undoes after
+the fact. `actions.js` reads it to order those steps by how often this
+account has kept them, and to stop proposing a step it has net-rejected
+across a real sample size. Nothing in this log ever leaves the device.
+
 **Five real write paths, all undoable.**
 
 | Connector | Auth | What one click does |
@@ -397,6 +418,7 @@ src/judgment.js        weighted on-device scorer + adaptive threshold
 src/domains.js         per-field vocabulary and phrasing — never rules
 src/connectors.js      catalog: what each destination is and how it authenticates
 src/storage.js         chrome.storage wrapper; log and calibration
+src/execution-memory.js  local event log of what a user keeps/strips/undoes per named process — biases future step order and drops a net-rejected step (see "What actually works today")
 src/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates/emails/phones before anything leaves the device
 src/sidebar.js         the injected sidebar pane: badge, Draft-It, Next-Step, attachment hover card
 src/sidebar.css        sidebar/floating-card styles (CSS logical properties, RTL/LTR safe)
