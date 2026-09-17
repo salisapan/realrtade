@@ -162,6 +162,46 @@ const FlowExtract = (() => {
     return null;
   }
 
+  // Only a time the message states next to an explicit time marker ("at 3pm",
+  // "בשעה 15:00") — a bare "15:00" or "3" floating in text is as likely to be
+  // a flight number, a room, or a price as a meeting time, and guessing here
+  // would be the same mistake parseDate() above already refuses to make for
+  // an ambiguous year.
+  function parseTime(text) {
+    let m;
+
+    m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+    if (m) {
+      let h = +m[1];
+      const min = m[2] ? +m[2] : 0;
+      const ap = (m[3] || '').toLowerCase();
+      if (ap === 'pm' && h < 12) h += 12;
+      if (ap === 'am' && h === 12) h = 0;
+      if (h > 23 || min > 59) return null;
+      return { raw: m[0], hour: h, minute: min };
+    }
+
+    // בשעה/בשעות is an unambiguous "at the hour of" marker — unlike a bare
+    // "ב-" prefix (used elsewhere for "on <weekday>"), it is never a room
+    // number, a page reference, or anything else. Deliberately no trailing
+    // \b for the same reason parseDate()'s Hebrew weekday block has none:
+    // \b never fires next to Hebrew letters.
+    m = text.match(/(?:בשעה|בשעות)\s*(\d{1,2})(?::(\d{2}))?/);
+    if (m) {
+      const h = +m[1];
+      const min = m[2] ? +m[2] : 0;
+      if (h > 23 || min > 59) return null;
+      return { raw: m[0], hour: h, minute: min };
+    }
+
+    return null;
+  }
+
+  function fmtTime(t) {
+    if (!t) return null;
+    return String(t.hour).padStart(2, '0') + ':' + String(t.minute).padStart(2, '0');
+  }
+
   // The sentence a human would quote if asked "what did this email decide?".
   function decisiveSentence(text, patterns) {
     const sentences = text.split(/(?<=[.!?])\s+|\n+/).map((s) => s.trim()).filter((s) => s.length > 12 && s.length < 320);
@@ -181,16 +221,19 @@ const FlowExtract = (() => {
 
   function extract(text, ctx) {
     const money = parseMoney(text);
+    const time = parseTime(text);
     return {
       money,
       moneyText: fmtMoney(money),
       date: parseDate(text, ctx && ctx.now),
+      time,
+      timeText: fmtTime(time),
       automated: senderIsAutomated(ctx && ctx.senderEmail, text),
       wordCount: (text.match(/\S+/g) || []).length
     };
   }
 
-  return { extract, parseMoney, parseDate, fmtMoney, decisiveSentence, senderIsAutomated };
+  return { extract, parseMoney, parseDate, parseTime, fmtMoney, fmtTime, decisiveSentence, senderIsAutomated };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExtract };

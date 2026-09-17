@@ -266,7 +266,16 @@ const FlowJudgment = (() => {
     };
   }
 
-  return { evaluate, factsOnly, neutralTitle, thresholdFrom, BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD };
+  // score, newContent, and the HANDOFF pair are exposed for intent.js: the
+  // classifier reuses this exact scorer and this exact "is this a request"
+  // pattern (same signals, same weights, same tuning against
+  // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
+  // drifting copy of the same judgment.
+  return {
+    evaluate, factsOnly, neutralTitle, thresholdFrom, score, newContent,
+    HANDOFF, HANDOFF_HE,
+    BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowJudgment };

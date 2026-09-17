@@ -32,6 +32,7 @@
         "src/connectors.js",
         "src/extract.js",
         "src/judgment.js",
+        "src/intent.js",
         "src/storage.js",
         "src/privacyShield.js",
         "src/docwriter.js",
