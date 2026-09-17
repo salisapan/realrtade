@@ -2,11 +2,23 @@
 // credentials, talking to third-party APIs, and performing the one write per
 // click that this product exists for.
 //
-// Five connectors are wired up here.
+// Six connectors are wired up here, but only two are meant to be on the
+// onboarding path for the MVP: Google Tasks (the default — sign in with the
+// Google account already open, zero setup) and Notion (a fallback for anyone
+// who'd rather have a database row than a task). HubSpot, Salesforce, Slack,
+// and Monday.com are kept working but no longer promoted — they solve a
+// team's CRM-hygiene problem, which is a real but different product from
+// "don't let this personal commitment slip." Re-promote them once Google
+// Tasks + Notion have proven the core loop, not before.
 //
-//   Notion works today. It authenticates with an internal integration token the
-//   user creates themselves, so there is no app registration, no review queue and
-//   no server-side secret anywhere in the path.
+//   Google Tasks authenticates via chrome.identity.getAuthToken — Chrome's own
+//   Google account chooser, driven by an OAuth Client ID registered for this
+//   extension. No server-side exchange, no Client Secret, because Chrome
+//   itself is the OAuth client.
+//
+//   Notion authenticates with an internal integration token the user creates
+//   themselves, so there is no app registration, no review queue and no
+//   server-side secret anywhere in the path.
 //
 //   HubSpot, Salesforce, Slack and Monday.com all use OAuth, which requires a
 //   registered app whose Client Secret must never ship inside an extension.
@@ -73,6 +85,16 @@ const MONDAY_REFRESH_URL = 'https://theflow-ai.com/.netlify/functions/monday-oau
 // ever changes, note creation fails loudly with a 4xx rather than silently
 // writing to the wrong place.
 const NOTE_TO_CONTACT_ASSOCIATION_TYPE_ID = 202;
+
+// TODO(owner): create an OAuth Client ID in Google Cloud Console (APIs &
+// Services > Credentials > Create Credentials > OAuth client ID > Chrome
+// Extension, using this extension's ID — computable from the "key" field
+// above) and paste it into manifest.json's oauth2.client_id, replacing this
+// same placeholder string. Until then Google Tasks reports itself
+// unconfigured, same policy as the four OAuth connectors above.
+const GOOGLE_TASKS_CLIENT_ID_PLACEHOLDER = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
+const GOOGLE_TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
+const GLANCE_TASK_LIST_TITLE = 'Glance';
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -605,6 +627,151 @@ async function mondayUndo(ref) {
   }
 }
 
+/* ------------------------------------------------------------ Google Tasks */
+//
+// The MVP write path: no token to paste, no vendor app to authorize —
+// chrome.identity.getAuthToken drives Chrome's own Google account chooser
+// against the OAuth Client ID registered in manifest.json's oauth2 key. The
+// only thing this needs from the account owner is that one Client ID, not a
+// server-side exchange or a Client Secret at all, because Chrome itself is
+// the OAuth client here rather than a page Flow has to build.
+
+function googleTasksConfigured() {
+  const oauth2 = chrome.runtime.getManifest().oauth2;
+  return Boolean(oauth2 && oauth2.client_id && oauth2.client_id !== GOOGLE_TASKS_CLIENT_ID_PLACEHOLDER);
+}
+
+// Callback-based even inside an MV3 service worker — there is no Promise
+// form of this specific identity method.
+function getGoogleAuthToken(interactive) {
+  return new Promise((resolve, reject) => {
+    chrome.identity.getAuthToken({ interactive: Boolean(interactive) }, (token) => {
+      if (chrome.runtime.lastError || !token) {
+        reject(new Error((chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Google sign-in was closed or denied.'));
+        return;
+      }
+      resolve(token);
+    });
+  });
+}
+
+function removeCachedGoogleAuthToken(token) {
+  return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
+}
+
+async function googleTasksAuthedFetch(path, options) {
+  const token = await getGoogleAuthToken(true);
+  const res = await fetch(GOOGLE_TASKS_API + path, Object.assign({}, options, {
+    headers: Object.assign({ Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, (options && options.headers) || {})
+  }));
+  if (res.status !== 401) return res;
+  // A cached token can go stale (revoked access from the Google Account
+  // permissions page, expired) without Chrome knowing yet — evict it and
+  // request a fresh one once before surfacing the failure, the same
+  // "refresh once, then fail loudly" shape every OAuth connector above uses.
+  await removeCachedGoogleAuthToken(token);
+  const freshToken = await getGoogleAuthToken(true);
+  return fetch(GOOGLE_TASKS_API + path, Object.assign({}, options, {
+    headers: Object.assign({ Authorization: 'Bearer ' + freshToken, 'Content-Type': 'application/json' }, (options && options.headers) || {})
+  }));
+}
+
+async function getGoogleTasksAuth() {
+  const { googleTasksAuth } = await chrome.storage.local.get('googleTasksAuth');
+  return googleTasksAuth || null;
+}
+
+// Every write lands in the same list, found by title rather than an id
+// stashed only in local storage — reinstalling the extension (which clears
+// chrome.storage.local) still finds the same "Glance" list next time
+// instead of creating a second one.
+async function findOrCreateGlanceTaskList() {
+  const listRes = await googleTasksAuthedFetch('/users/@me/lists?maxResults=100');
+  if (!listRes.ok) throw new Error('Could not read your Google Task lists (' + listRes.status + ').');
+  const lists = (await listRes.json()).items || [];
+  const existing = lists.find((l) => l.title === GLANCE_TASK_LIST_TITLE);
+  if (existing) return existing.id;
+
+  const createRes = await googleTasksAuthedFetch('/users/@me/lists', {
+    method: 'POST',
+    body: JSON.stringify({ title: GLANCE_TASK_LIST_TITLE })
+  });
+  if (!createRes.ok) throw new Error('Could not create a Glance list in Google Tasks (' + createRes.status + ').');
+  return (await createRes.json()).id;
+}
+
+async function connectGoogleTasks() {
+  if (!googleTasksConfigured()) {
+    throw new Error('Google Tasks isn’t configured on this build yet. Notion works today — connect that instead.');
+  }
+  // interactive:true is the one moment Chrome may show the account chooser
+  // or consent screen; every later call in this file passes interactive:true
+  // too, but resolves instantly from Chrome's own cache once granted.
+  await getGoogleAuthToken(true);
+  const taskListId = await findOrCreateGlanceTaskList();
+  await chrome.storage.local.set({ googleTasksAuth: { taskListId } });
+  return true;
+}
+
+function googleTaskTitle(p) {
+  const identity = (p.senderName || '').trim();
+  return identity ? identity + ' — ' + p.label : p.label;
+}
+
+function googleTaskDue(f) {
+  if (!f || !f.date || !f.date.iso) return null;
+  // The Tasks API requires a full RFC3339 timestamp on `due` but only ever
+  // displays and sorts by the date portion — midnight UTC keeps the date
+  // from shifting a day either direction regardless of the signed-in
+  // account's own timezone setting.
+  return f.date.iso + 'T00:00:00.000Z';
+}
+
+async function googleTasksWrite(p) {
+  const auth = await getGoogleTasksAuth();
+  if (!auth) return { ok: false, reason: 'not-connected' };
+
+  const f = p.facts || {};
+  const notesLines = factLines(p);
+  if (p.threadUrl) notesLines.push(['Open in Gmail', p.threadUrl]);
+  const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n');
+
+  const body = { title: googleTaskTitle(p).slice(0, 1024), notes: notes.slice(0, 8192) };
+  const due = googleTaskDue(f);
+  if (due) body.due = due;
+
+  const res = await googleTasksAuthedFetch('/lists/' + encodeURIComponent(auth.taskListId) + '/tasks', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  if (!res.ok) {
+    let detail = '';
+    try { detail = ((await res.json()).error || {}).message || ''; } catch (e) { /* body already consumed or not JSON */ }
+    throw new Error('Google Tasks write failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
+  }
+  const task = await res.json();
+  return {
+    ok: true,
+    where: 'Google Tasks',
+    target: GLANCE_TASK_LIST_TITLE + ' list',
+    ref: { taskListId: auth.taskListId, taskId: task.id },
+    url: 'https://tasks.google.com/embed/list/' + encodeURIComponent(auth.taskListId) + '?pli=1'
+  };
+}
+
+async function googleTasksUndo(ref) {
+  const auth = await getGoogleTasksAuth();
+  if (!ref || !ref.taskId) return { ok: false };
+  const listId = ref.taskListId || (auth && auth.taskListId);
+  if (!listId) return { ok: false };
+  const res = await googleTasksAuthedFetch(
+    '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId),
+    { method: 'DELETE' }
+  );
+  return { ok: res.ok || res.status === 404 };
+}
+
 /* ------------------------------------------------------------------ Notion */
 
 async function getNotionAuth() {
@@ -845,8 +1012,8 @@ async function summarizeAttachmentViaBackend(payload) {
 
 /* ---------------------------------------------------------------- dispatch */
 
-const WRITERS = { hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite };
-const UNDOERS = { hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo };
+const WRITERS = { hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite, googleTasks: googleTasksWrite };
+const UNDOERS = { hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo, googleTasks: googleTasksUndo };
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
@@ -854,7 +1021,13 @@ async function connectorStatus() {
   const sf = await getSalesforceAuth();
   const sl = await getSlackAuth();
   const md = await getMondayAuth();
+  const gt = await getGoogleTasksAuth();
   return {
+    googleTasks: {
+      connected: Boolean(gt),
+      configured: googleTasksConfigured(),
+      detail: gt ? GLANCE_TASK_LIST_TITLE + ' list' : null
+    },
     hubspot: {
       connected: Boolean(hs),
       configured: Boolean(HUBSPOT_CLIENT_ID && HUBSPOT_CLIENT_ID !== 'YOUR_HUBSPOT_CLIENT_ID')
@@ -890,6 +1063,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.type === 'flow:connector-status') return reply(sendResponse, connectorStatus());
 
   if (msg.type === 'flow:connect') {
+    if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks().then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));
@@ -900,11 +1074,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === 'flow:disconnect') {
     const STORAGE_KEYS = {
-      hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth'
+      hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',
+      googleTasks: 'googleTasksAuth'
     };
     const key = STORAGE_KEYS[msg.connectorId] || null;
     if (!key) return reply(sendResponse, Promise.resolve({ ok: false }));
-    return reply(sendResponse, chrome.storage.local.remove(key).then(() => ({ ok: true })));
+    // Google Tasks also evicts Chrome's own cached token, not just Flow's
+    // local record of which list to write to — otherwise "Disconnect" then
+    // "Connect" again silently reuses the same grant instead of giving the
+    // user a real chance to pick a different Google account.
+    const extra = msg.connectorId === 'googleTasks'
+      ? getGoogleAuthToken(false).then(removeCachedGoogleAuthToken).catch(() => {})
+      : Promise.resolve();
+    return reply(sendResponse, extra.then(() => chrome.storage.local.remove(key)).then(() => ({ ok: true })));
   }
 
   if (msg.type === 'flow:execute-action') {

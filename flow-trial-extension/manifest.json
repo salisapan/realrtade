@@ -57,6 +57,13 @@
     "https://*.salesforce.com/*",
     "https://slack.com/*",
     "https://api.monday.com/*",
+    "https://tasks.googleapis.com/*",
     "https://theflow-ai.com/*"
-  ]
+  ],
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/tasks"
+    ]
+  }
 }

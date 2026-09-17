@@ -10,8 +10,22 @@
 //             app, so it is gated on the owner configuring a Client ID)
 //   'token' — the user pastes a credential they create themselves in ~30 seconds,
 //             which is why Notion works today with no app review and no server.
+//   'google' — chrome.identity.getAuthToken against the Google account the user
+//              is already signed into — the account chooser Chrome itself
+//              renders, not a redirect Flow has to build a page for. Still
+//              gated on the owner registering an OAuth Client ID (manifest.json
+//              oauth2.client_id), same as an 'oauth' connector, but with no
+//              server-side exchange or Client Secret to hold at all.
 
 const FLOW_CONNECTORS = [
+  {
+    id: 'googleTasks',
+    label: 'Google Tasks',
+    kind: 'Personal to-do',
+    status: 'live',
+    auth: 'google',
+    note: 'Creates a task — with the amount, the date, and a link back to the email — in a "Glance" list in the Google account you’re already signed into. No token to create, no app to authorize separately: one native Google sign-in.'
+  },
   {
     id: 'notion',
     label: 'Notion',
