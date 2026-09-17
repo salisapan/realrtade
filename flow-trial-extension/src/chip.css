@@ -32,6 +32,7 @@
 .flow-chip-host {
   all: initial;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -46,13 +47,62 @@
 
 .flow-chip-text {
   all: unset;
-  flex: 1 1 auto;
+  flex: 1 1 100%;
   min-width: 0;
   font-size: 13.5px;
   font-weight: 700;
   line-height: 1.45;
   color: #16214a;
 }
+
+/* ---- action pills: up to 5 proposed actions, each removable with a small
+   × before Do It is clicked. Sits between the lead sentence and the Do It
+   button — its own wrapped row, not a second decision surface. Removing a
+   pill just shrinks the row; the Do It button itself is never disabled,
+   even with zero pills left (see onDoIt's own empty-list handling). ------ */
+.flow-chip-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.flow-chip-action-pill {
+  all: initial;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1;
+  color: #16214a;
+  padding: 5px 6px 5px 10px;
+  border-radius: 999px;
+  background: rgba(40,70,150,.08);
+  border: 1px solid rgba(40,70,150,.18);
+  white-space: nowrap;
+}
+.flow-chip-action-pill-label {
+  all: unset;
+  font-family: inherit;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flow-chip-action-pill-x {
+  all: initial;
+  font-family: inherit;
+  cursor: pointer;
+  color: #5B6478;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 50%;
+}
+.flow-chip-action-pill-x:hover { color: #A32F22; background: rgba(163,47,34,.1); }
+.flow-chip-action-pill-x:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
 
 /* ---- the Do It button: same shell/ring/shine family as the site's .doit,
    "glance" weight (thinner ring, shorter glow, quicker hover) ------------- */
@@ -184,6 +234,18 @@
 }
 .flow-chip-link:hover { background: rgba(15,102,64,.14); border-color: rgba(15,102,64,.5); }
 .flow-chip-link:focus-visible { outline: 2px solid #0F6640; outline-offset: 1px; }
+
+/* Appended to a multi-action receipt only when at least one of the actions
+   in the group didn't complete — the receipt still shows what DID succeed
+   rather than hiding a partial result behind a single pass/fail state. */
+.flow-chip-partial-note {
+  all: unset;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A5A00;
+  margin-inline-start: 6px;
+}
 
 @keyframes flow-chip-in {
   from { opacity: 0; transform: translateY(-4px); }

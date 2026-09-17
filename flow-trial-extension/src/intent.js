@@ -81,6 +81,28 @@ const FlowIntent = (() => {
   // request and the quoted sentence could disagree.
   const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE];
 
+  // A short English label for the write paths that still expect one (Google
+  // Tasks title, Notion title, popup activity log) — kept alongside the full
+  // quoted `entities.what` rather than replacing it, so nothing downstream
+  // that read ctx.result.label before this change has to change.
+  function shortLabel(type, facts, enrichedFacts) {
+    // extract.js's own `facts` never carries a human date string (only
+    // judgment.js's private humanDate() computes one, for its own
+    // evaluate()/factsOnly() callers) — humanDateFallback() is this file's
+    // equivalent, already used by humanWhen() above.
+    const dateText = facts.date ? humanDateFallback(facts.date) : null;
+    if (type === TYPES.SCHEDULED_EVENT) {
+      return 'Meeting' + (dateText ? ' ' + dateText : '') + (facts.timeText ? ' ' + facts.timeText : '');
+    }
+    if (type === TYPES.COMMITMENT_OF_READER) {
+      return 'Your commitment' + (dateText ? ', due ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
+    }
+    if (type === TYPES.REQUEST) {
+      return 'Reply requested' + (dateText ? ' by ' + dateText : '') + (facts.moneyText ? ', ' + facts.moneyText : '');
+    }
+    return FlowJudgment.neutralTitle(enrichedFacts); // DECISION_TO_LOG and FOLLOW_UP
+  }
+
   function classify(text, ctx) {
     ctx = ctx || {};
     text = FlowJudgment.newContent(text);
@@ -89,35 +111,51 @@ const FlowIntent = (() => {
     const facts = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
     const s = FlowJudgment.score(text, domain, facts);
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
+    const enrichedFacts = Object.assign({}, facts, { lost: s.flags.lost, executed: s.flags.executed, dispute: s.flags.dispute });
 
     const who = ctx.senderName || ctx.senderEmail || null;
     const amount = facts.moneyText || null;
 
-    // --- 1. SCHEDULED_EVENT: hard gate, not score-based. All three or none. ---
     const hasMeetingNoun = MEETING_NOUN.test(text) || MEETING_NOUN_HE.test(text);
-    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time) {
-      return {
-        type: TYPES.SCHEDULED_EVENT,
-        confidence: 'high',
-        entities: {
-          who, amount,
-          what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
-          when: humanWhen(facts.date, facts.time),
-          dateIso: facts.date.iso,
-          hour: facts.time.hour,
-          minute: facts.time.minute
-        },
-        facts
-      };
+    // A resolved date or a resolved money figure — "something concrete
+    // enough to actually act on" — is half the evidence bar for
+    // COMMITMENT_OF_READER and REQUEST below. Neither a bare "could you
+    // send that?" nor a bare "you agreed to help" should speak up on the
+    // phrase alone; that's exactly the false-positive shape the scorer's
+    // own money-alone penalty already refuses ("A figure alone, with
+    // nothing decided").
+    const hasConcreteAnchor = Boolean(facts.money) || Boolean(facts.date && facts.date.iso);
+    const isReaderCommit = READER_COMMIT.test(text) || READER_COMMIT_HE.test(text);
+
+    // Every raw signal, independent of which type ends up winning — the
+    // decision layer (actions.js) reads this to notice a message is
+    // multi-actionable (a meeting invite that ALSO asks for confirmation is
+    // still an EVENT here, but actions.js can still see signals.handoff and
+    // propose a reply draft alongside the calendar event).
+    const signals = {
+      hasMeetingNoun, hasConcreteAnchor, isReaderCommit,
+      handoff: s.flags.handoff,
+      hasDate: Boolean(facts.date && facts.date.iso),
+      hasTime: Boolean(facts.time),
+      hasMoney: Boolean(facts.money),
+      score: s.total, threshold
+    };
+
+    function finish(type, confidence, entities) {
+      return { type, confidence, entities, label: shortLabel(type, facts, enrichedFacts), signals, facts };
     }
 
-    // A resolved date or a resolved money figure — "something concrete
-    // enough to actually act on" — is the second half of the evidence bar
-    // for both types below. Neither a bare "could you send that?" nor a
-    // bare "you agreed to help" should speak up on the phrase alone; that's
-    // exactly the false-positive shape the old scorer's own money-alone
-    // penalty already refuses ("A figure alone, with nothing decided").
-    const hasConcreteAnchor = Boolean(facts.money) || Boolean(facts.date && facts.date.iso);
+    // --- 1. SCHEDULED_EVENT: hard gate, not score-based. All three or none. ---
+    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time) {
+      return finish(TYPES.SCHEDULED_EVENT, 'high', {
+        who, amount,
+        what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date.iso,
+        hour: facts.time.hour,
+        minute: facts.time.minute
+      });
+    }
 
     // --- 2. COMMITMENT_OF_READER: hard gate (regex + a concrete anchor). ---
     //        Deliberately NOT gated on the generic scorer threshold — that bar
@@ -125,19 +163,13 @@ const FlowIntent = (() => {
     //        across every kind of message, and a reader-commitment reminder
     //        with a real deadline attached is already unambiguous evidence on
     //        its own, the same way a meeting noun + date + time is above.
-    const isReaderCommit = READER_COMMIT.test(text) || READER_COMMIT_HE.test(text);
     if (isReaderCommit && hasConcreteAnchor) {
-      return {
-        type: TYPES.COMMITMENT_OF_READER,
-        confidence: 'high',
-        entities: {
-          who, amount,
-          what: whatText(text, [READER_COMMIT, READER_COMMIT_HE]) || FlowJudgment.neutralTitle(Object.assign({}, facts, { lost: s.flags.lost, executed: s.flags.executed, dispute: s.flags.dispute })),
-          when: humanWhen(facts.date, facts.time),
-          dateIso: facts.date && facts.date.iso
-        },
-        facts
-      };
+      return finish(TYPES.COMMITMENT_OF_READER, 'high', {
+        who, amount,
+        what: whatText(text, [READER_COMMIT, READER_COMMIT_HE]) || shortLabel(TYPES.COMMITMENT_OF_READER, facts, enrichedFacts),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      });
     }
 
     // --- 3. REQUEST: an ask directed at the reader (same hard-gate shape). ---
@@ -145,17 +177,12 @@ const FlowIntent = (() => {
     //        test, already computed above — reused rather than re-imported,
     //        so there is exactly one place that pattern is defined.
     if (s.flags.handoff && hasConcreteAnchor) {
-      return {
-        type: TYPES.REQUEST,
-        confidence: 'medium',
-        entities: {
-          who, amount,
-          what: whatText(text, REQUEST_PATTERNS) || FlowJudgment.neutralTitle(Object.assign({}, facts, { lost: s.flags.lost, executed: s.flags.executed, dispute: s.flags.dispute })),
-          when: humanWhen(facts.date, facts.time),
-          dateIso: facts.date && facts.date.iso
-        },
-        facts
-      };
+      return finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: whatText(text, REQUEST_PATTERNS) || shortLabel(TYPES.REQUEST, facts, enrichedFacts),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      });
     }
 
     // Everything below this point is the old, proven "should Glance speak up
@@ -163,39 +190,28 @@ const FlowIntent = (() => {
     // test/judgment-corpus.cjs) for the two categories that don't have as
     // clean an independent evidentiary shape as the three hard-gated types
     // above.
-    if (s.total < threshold) return { type: null, facts };
+    if (s.total < threshold) return { type: null, signals, facts };
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (s.flags.commit || s.flags.lost || s.flags.executed || s.flags.dispute) {
-      const enrichedFacts = Object.assign({}, facts, { lost: s.flags.lost, executed: s.flags.executed, dispute: s.flags.dispute });
-      return {
-        type: TYPES.DECISION_TO_LOG,
-        confidence: 'high',
-        entities: {
-          who, amount,
-          what: whatText(text, [/\b(agreed|approved|confirmed|executed|declin(?:e|ed|ing))\b/i, /(סוכם|אישרנו|מאשרים|נחתם)/]) ||
-            FlowJudgment.neutralTitle(enrichedFacts),
-          when: humanWhen(facts.date, facts.time),
-          dateIso: facts.date && facts.date.iso
-        },
-        facts
-      };
+      return finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: whatText(text, [/\b(agreed|approved|confirmed|executed|declin(?:e|ed|ing))\b/i, /(סוכם|אישרנו|מאשרים|נחתם)/]) ||
+          shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      });
     }
 
     // --- 5. FOLLOW_UP: cleared the bar (a dated obligation, usually) but ---
     //        doesn't fit a sharper category — the safe catch-all rather than
     //        silently dropping something the proven scorer already vouched for.
-    return {
-      type: TYPES.FOLLOW_UP,
-      confidence: 'low',
-      entities: {
-        who, amount,
-        what: FlowJudgment.neutralTitle(Object.assign({}, facts, { lost: s.flags.lost, executed: s.flags.executed, dispute: s.flags.dispute })),
-        when: humanWhen(facts.date, facts.time),
-        dateIso: facts.date && facts.date.iso
-      },
-      facts
-    };
+    return finish(TYPES.FOLLOW_UP, 'low', {
+      who, amount,
+      what: shortLabel(TYPES.FOLLOW_UP, facts, enrichedFacts),
+      when: humanWhen(facts.date, facts.time),
+      dateIso: facts.date && facts.date.iso
+    });
   }
 
   return { TYPES, classify };

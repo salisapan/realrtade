@@ -33,6 +33,7 @@
         "src/extract.js",
         "src/judgment.js",
         "src/intent.js",
+        "src/actions.js",
         "src/storage.js",
         "src/privacyShield.js",
         "src/docwriter.js",
@@ -59,12 +60,16 @@
     "https://slack.com/*",
     "https://api.monday.com/*",
     "https://tasks.googleapis.com/*",
+    "https://www.googleapis.com/calendar/*",
+    "https://gmail.googleapis.com/*",
     "https://theflow-ai.com/*"
   ],
   "oauth2": {
     "client_id": "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
     "scopes": [
-      "https://www.googleapis.com/auth/tasks"
+      "https://www.googleapis.com/auth/tasks",
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/gmail.compose"
     ]
   }
 }

@@ -189,20 +189,34 @@
     state = await FlowStorage.get();
     const sender = extractSender(message);
     const subject = currentSubject();
-    const result = FlowJudgment.evaluate(text, state.domainId, {
+
+    // Classification (intent.js) -> Decision (actions.js) -> Execution
+    // (background.js's writer functions, dispatched by action.kind). This
+    // file only ever sits at the two ends of that chain: it hands intent.js
+    // the raw text, hands actions.js the classified Intent, and later hands
+    // background.js one action at a time — it never re-derives what "this
+    // is a request" or "this should become a Calendar event" means.
+    const intent = FlowIntent.classify(text, {
       senderEmail: sender.email,
-      subject,
+      senderName: sender.name,
       calibration: state.calibration
     });
-    if (!result) return;
+    if (!intent.type) return;
+
+    const attachment = firstRealAttachment(message);
+    const actions = FlowActions.planFor(intent, {
+      threadUrl: threadUrl(legacyId),
+      hasThreadAttachment: Boolean(attachment)
+    });
+    if (!actions.length) return; // defensive only — Google Tasks is always offered as the fallback
 
     injectChip(message, {
-      messageId, result, sender, subject,
+      messageId, intent, actions, sender, subject, attachment,
       threadUrl: threadUrl(legacyId),
       // Snapshotted now, not re-read from the DOM at click time — by the
       // time "Do It" is clicked the chip's own ctx has no live node
-      // reference to this message (only messageId/result/sender/subject),
-      // and Gmail may have long since rebuilt or removed it anyway.
+      // reference to this message, and Gmail may have long since rebuilt or
+      // removed it anyway.
       bodyText: text
     });
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
@@ -210,7 +224,7 @@
     // 200-entry cap with duplicates for one message and evict real history
     // for others. Only record it the first time.
     if (!alreadyLoggedShown) {
-      FlowStorage.appendLog({ kind: 'shown', label: result.label, messageId, score: result.score, signals: result.signals });
+      FlowStorage.appendLog({ kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals });
       chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_shown', params: { domain: state.domainId } });
     }
   }
@@ -229,21 +243,29 @@
     return n;
   }
 
-  // The Hebrew sentence that sits next to the "Do It" button, explaining what
-  // Flow found — generated from the same facts (amount, date) the record
-  // itself will carry, not a translation of ctx.result.label (which stays
-  // English; it's the Notion/Slack/etc. page title, not UI copy). "Do It"
-  // itself is deliberately left untranslated in the button — see chip.css's
-  // header comment.
-  function heLead(result, connLabel) {
-    const f = (result && result.facts) || {};
-    let what;
-    if (f.lost) what = 'לתעד שהעסקה לא יוצאת לפועל';
-    else if (f.moneyText && f.dateText) what = 'לתעד ' + f.moneyText + ', ' + f.dateText;
-    else if (f.moneyText) what = 'לתעד סכום של ' + f.moneyText;
-    else if (f.dateText) what = 'לתעד תאריך ' + f.dateText;
-    else what = 'לתעד את ההחלטה הזו';
-    return 'Flow זיהה: ' + what + (connLabel ? ' ב-' + connLabel : '') + '?';
+  // The Hebrew sentence that sits above the action pills, explaining what
+  // Flow found — generated from intent.entities, the same who/what/when/
+  // amount fields every one of the 5 intent.js types normalizes onto,
+  // rather than a translation of intent.label (which stays English; that's
+  // the Task/Calendar/Draft title, not UI copy). "Do It" itself is
+  // deliberately left untranslated in the button — see chip.css's header
+  // comment.
+  function heLead(intent) {
+    const e = intent.entities || {};
+    const when = e.when ? ', ' + e.when : '';
+    const amount = e.amount ? ', ' + e.amount : '';
+    switch (intent.type) {
+      case FlowIntent.TYPES.SCHEDULED_EVENT:
+        return 'Flow זיהה פגישה' + when + '?';
+      case FlowIntent.TYPES.COMMITMENT_OF_READER:
+        return 'Flow זיהה שהתחייבת למשהו' + when + amount + '?';
+      case FlowIntent.TYPES.REQUEST:
+        return 'Flow זיהה בקשה שמחכה לתשובה' + when + '?';
+      case FlowIntent.TYPES.FOLLOW_UP:
+        return 'Flow זיהה שיש כאן משהו להמשיך איתו' + when + '?';
+      default: // DECISION_TO_LOG
+        return 'Flow זיהה החלטה שכדאי לתעד' + amount + when + '?';
+    }
   }
 
   function injectChip(messageNode, ctx) {
@@ -251,9 +273,36 @@
 
     const host = el('div', 'flow-chip-host');
     host.setAttribute('dir', 'rtl');
+    host.appendChild(el('p', 'flow-chip-text', heLead(ctx.intent)));
 
-    const conn = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
-    host.appendChild(el('p', 'flow-chip-text', heLead(ctx.result, conn ? conn.label : null)));
+    // The proposed action list, each removable with its own × before Do It
+    // is clicked — "up to 5 actions... a small X to remove before
+    // confirming, only remaining actions execute." liveActions is the
+    // mutable working copy Do It actually reads; ctx.actions (what
+    // actions.js proposed) is left untouched so a re-scan of this same
+    // message always starts from the full proposal again.
+    const liveActions = ctx.actions.slice();
+    const pillRow = el('div', 'flow-chip-actions-row');
+    pillRow.setAttribute('dir', 'ltr');
+    for (const action of ctx.actions) {
+      const pill = el('span', 'flow-chip-action-pill');
+      pill.appendChild(el('span', 'flow-chip-action-pill-label', action.label));
+      const x = el('button', 'flow-chip-action-pill-x', '×');
+      x.type = 'button';
+      x.setAttribute('aria-label', 'Remove: ' + action.label);
+      x.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = liveActions.indexOf(action);
+        if (idx >= 0) liveActions.splice(idx, 1);
+        pill.remove();
+        // Zero actions left is a valid state, not a disabled one — Do It
+        // still responds (as a dismiss; see onDoIt) rather than the button
+        // going dead with no explanation.
+      });
+      pill.appendChild(x);
+      pillRow.appendChild(pill);
+    }
+    host.appendChild(pillRow);
 
     const chip = el('button', 'flow-chip');
     chip.type = 'button';
@@ -262,7 +311,7 @@
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
     chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
-    chip.addEventListener('click', () => onDoIt(host, chip, ctx));
+    chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveActions));
     host.appendChild(chip);
 
     const dismiss = el('button', 'flow-chip-dismiss', '×');
@@ -279,86 +328,188 @@
     chip.replaceChildren(el('span', 'flow-chip-label', text));
   }
 
-  // After a successful write the chip stops being a button and becomes a receipt:
-  // what was written, where, a link to it, and a way to take it back. A tool that
-  // writes to your CRM and then says nothing is a tool nobody trusts twice.
-  function showReceipt(host, ctx, res) {
+  function reasonMessage(response, ctx) {
+    if (!response) return 'Something went wrong. Try again.';
+    if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
+    if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
+    if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
+    return response.error || 'Couldn’t complete that action.';
+  }
+
+  // btoa(String.fromCharCode(...bytes)) blows the call stack on anything but
+  // small files — chunking keeps this working for a real attachment's size.
+  function arrayBufferToBase64(buf) {
+    const bytes = new Uint8Array(buf);
+    const CHUNK = 0x8000;
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(binary);
+  }
+
+  // Best-effort, same policy as background.js's own findThreadId and
+  // oversized-attachment handling: a failed fetch here means the draft is
+  // still created, just without the attachment — never a failed action.
+  async function fetchAttachmentBase64(meta) {
+    try {
+      const res = await fetch(meta.url, { credentials: 'include' });
+      if (!res.ok) return null;
+      const buf = await res.arrayBuffer();
+      return { filename: meta.filename, mimeType: meta.mimeType, base64: arrayBufferToBase64(buf) };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function firstRealAttachment(messageNode) {
+    const chips = findAttachmentChips(messageNode);
+    if (!chips.length) return null;
+    return parseDownloadUrl(chips[0].getAttribute('download_url'));
+  }
+
+  // Only the content script has credentials:'include' access to Gmail's own
+  // attachment URLs, so fetching the bytes has to happen here, not in
+  // background.js — everything else about the shape background.js's
+  // gmailDraftWrite(p) expects is assembled below, per action.kind.
+  async function buildActionPayload(action, ctx) {
+    const base = { connectorId: action.kind, threadUrl: ctx.threadUrl };
+
+    if (action.kind === 'calendar') {
+      return Object.assign(base, { params: action.params });
+    }
+
+    if (action.kind === 'gmailDraft') {
+      const payload = Object.assign(base, {
+        params: action.params,
+        senderEmail: ctx.sender.email,
+        senderName: ctx.sender.name,
+        subject: ctx.subject
+      });
+      if (action.params.includeAttachment && ctx.attachment) {
+        const fetched = await fetchAttachmentBase64(ctx.attachment);
+        if (fetched) payload.attachment = fetched;
+      }
+      return payload;
+    }
+
+    // googleTask — background.js's existing googleTasksWrite(p) predates
+    // actions.js and still expects the old top-level shape (label/facts),
+    // not params. Reusing it unmodified rather than reshaping a write path
+    // that already works.
+    return Object.assign(base, {
+      label: action.params.title || action.label,
+      facts: ctx.intent.facts,
+      senderName: ctx.sender.name,
+      senderEmail: ctx.sender.email,
+      subject: ctx.subject,
+      // Same non-third-party use as the old single-action flow: only ever
+      // read locally in background.js to match a Notion select column's own
+      // option names, never sent anywhere as free text by this action kind.
+      bodyText: (ctx.bodyText || '').slice(0, 20000)
+    });
+  }
+
+  function sendExecuteAction(payload) {
+    return new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:execute-action', payload }, resolve));
+  }
+
+  // Sequential, not parallel — keeps per-action error handling simple, keeps
+  // the receipt's action order predictable, and avoids bursting multiple
+  // simultaneous token requests at chrome.identity for what is, in the
+  // common case, 1-3 actions completing in well under a second combined.
+  async function runActionsSequentially(actions, ctx) {
+    const results = [];
+    for (const action of actions) {
+      const payload = await buildActionPayload(action, ctx);
+      const response = await sendExecuteAction(payload);
+      results.push({ action, response });
+    }
+    return results;
+  }
+
+  // The chip's receipt for a group of 1-5 actions: what succeeded, a link
+  // per successful write that has one, and a single "Undo all" that reverses
+  // every successful write in the group together — "Undo for every executed
+  // action or group of actions." A write that failed silently contributes
+  // nothing to undo; it was never done.
+  function showMultiActionReceipt(host, chip, ctx, results) {
+    const succeeded = results.filter((r) => r.response && r.response.ok);
+
+    if (!succeeded.length) {
+      setChipState(chip, 'flow-chip-error', reasonMessage(results[0] && results[0].response, ctx));
+      return;
+    }
+
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-label', 'Logged to ' + res.where + ' · ' + res.target));
 
-    const actions = el('span', 'flow-chip-actions');
-    if (res.url) {
-      const view = el('a', 'flow-chip-link', 'View');
-      view.href = res.url; view.target = '_blank'; view.rel = 'noopener';
-      actions.appendChild(view);
+    const summaryText = succeeded.length === 1
+      ? 'Logged to ' + succeeded[0].response.where + ' · ' + succeeded[0].response.target
+      : succeeded.length + ' actions completed: ' + succeeded.map((r) => r.response.where).join(', ');
+    done.appendChild(el('span', 'flow-chip-label', summaryText));
+
+    const actionsRow = el('span', 'flow-chip-actions');
+    for (const r of succeeded) {
+      if (!r.response.url) continue;
+      const view = el('a', 'flow-chip-link', succeeded.length > 1 ? 'View ' + r.response.where : 'View');
+      view.href = r.response.url; view.target = '_blank'; view.rel = 'noopener';
+      actionsRow.appendChild(view);
     }
-    const undo = el('button', 'flow-chip-link', 'Undo');
+
+    const undo = el('button', 'flow-chip-link', succeeded.length > 1 ? 'Undo all' : 'Undo');
     undo.type = 'button';
     undo.addEventListener('click', () => {
       undo.textContent = 'Undoing…';
-      chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: ctx.connectorId, ref: res.ref }, (r) => {
-        if (r && r.ok) {
+      undo.disabled = true;
+      Promise.all(succeeded.map((r) => new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: r.action.kind, ref: r.response.ref }, resolve);
+      }))).then((undoResults) => {
+        if (undoResults.every((u) => u && u.ok)) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
-          FlowStorage.appendLog({ kind: 'undone', label: ctx.result.label, messageId: ctx.messageId });
+          FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId });
         } else {
-          undo.textContent = 'Undo failed';
+          undo.textContent = 'Some actions couldn’t be undone';
+          undo.disabled = false;
         }
       });
     });
-    actions.appendChild(undo);
-    done.appendChild(actions);
+    actionsRow.appendChild(undo);
+    done.appendChild(actionsRow);
+
+    if (results.length > succeeded.length) {
+      done.appendChild(el('span', 'flow-chip-partial-note', '(' + (results.length - succeeded.length) + ' of ' + results.length + ' didn’t complete)'));
+    }
 
     host.replaceChildren(done);
+
+    for (const r of succeeded) {
+      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind });
+    }
+    chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
   }
 
-  function onDoIt(host, chip, ctx) {
-    ctx.connectorId = state.connectorId;
+  function onDoIt(host, chip, ctx, liveActions) {
+    // Every pill removed is a deliberate "do nothing" — the same outcome as
+    // dismissing the chip, not a disabled button with no explanation.
+    if (!liveActions.length) { onDismiss(host, ctx); return; }
+
     setChipState(chip, 'flow-chip-pending', 'Working…');
-    FlowStorage.appendLog({ kind: 'clicked', label: ctx.result.label, messageId: ctx.messageId, score: ctx.result.score });
+    FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
     FlowStorage.calibrate('click');
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
-    chrome.runtime.sendMessage({
-      type: 'flow:execute-action',
-      payload: {
-        connectorId: state.connectorId,
-        label: ctx.result.label,
-        facts: ctx.result.facts,
-        senderEmail: ctx.sender.email,
-        senderName: ctx.sender.name,
-        subject: ctx.subject,
-        threadUrl: ctx.threadUrl,
-        // Only used, on the background-script side, to test a destination
-        // select column's own option names against the message — never sent
-        // to any third party as free text (Notion API calls get discrete
-        // property values, not this string; see notionProperties()). Read
-        // from ctx.bodyText — the snapshot injectChip() took at scan time,
-        // not the live DOM: this ctx never carried a `message` node
-        // reference (only messageId/result/sender/subject/threadUrl).
-        bodyText: (ctx.bodyText || '').slice(0, 20000)
-      }
-    }, (response) => {
-      if (!response) { setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'); return; }
-      if (response.ok) {
-        showReceipt(host, ctx, response);
-        FlowStorage.appendLog({ kind: 'written', label: ctx.result.label, messageId: ctx.messageId, where: response.where, url: response.url, ref: response.ref, connectorId: state.connectorId });
-        chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, connector: state.connectorId } });
-        return;
-      }
-      if (response.reason === 'connector-not-live') setChipState(chip, 'flow-chip-warn', 'That connector isn’t wired up yet.');
-      else if (response.reason === 'not-connected') setChipState(chip, 'flow-chip-warn', 'Connect a system in the Glance popup first.');
-      else if (response.reason === 'no-matching-contact') setChipState(chip, 'flow-chip-warn', 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.');
-      else setChipState(chip, 'flow-chip-error', response.error || 'Couldn’t complete that action.');
-    });
+    runActionsSequentially(liveActions, ctx)
+      .then((results) => showMultiActionReceipt(host, chip, ctx, results))
+      .catch(() => setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'));
   }
 
   function onDismiss(host, ctx) {
     host.remove();
-    FlowStorage.appendLog({ kind: 'dismissed', label: ctx.result.label, messageId: ctx.messageId, score: ctx.result.score });
+    FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
     FlowStorage.calibrate('dismiss');
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
   }

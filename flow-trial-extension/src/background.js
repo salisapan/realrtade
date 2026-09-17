@@ -95,6 +95,12 @@ const NOTE_TO_CONTACT_ASSOCIATION_TYPE_ID = 202;
 const GOOGLE_TASKS_CLIENT_ID_PLACEHOLDER = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
 const GOOGLE_TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
 const GLANCE_TASK_LIST_TITLE = 'Glance';
+// Calendar and Gmail share the exact same OAuth grant as Tasks — one
+// chrome.identity token, requested with all three scopes from
+// manifest.json's oauth2.scopes at once — so there is one "connect Google"
+// step for the whole execution layer, not three.
+const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
+const GOOGLE_GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -120,12 +126,31 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
+// judgment.js's evaluate()/factsOnly() both compute a human-readable
+// f.dateText onto the facts object they return (via a private humanDate()
+// helper) — but intent.js's `facts` is extract.js's raw output re-exposed
+// as-is, which never carries that field. Rather than require every future
+// caller to remember to pre-populate dateText, factLines() falls back to
+// computing the same "Mon D" / "Mon D, YYYY" shape itself. This duplicates
+// intent.js's own humanDateFallback() — same justification intent.js gives
+// for duplicating judgment.js's private humanDate(): kept in sync by being
+// this small.
+function humanDateFallback(date) {
+  if (!date || !date.iso) return date ? date.raw : null;
+  const parts = date.iso.split('-');
+  const dt = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const sameYear = dt.getFullYear() === new Date().getFullYear();
+  return months[dt.getMonth()] + ' ' + dt.getDate() + (sameYear ? '' : ' ' + dt.getFullYear());
+}
+
 // The lines a human would want to see on the record six months from now.
 function factLines(p) {
   const f = p.facts || {};
   const out = [];
   if (f.moneyText) out.push(['Amount', f.moneyText]);
-  if (f.dateText) out.push(['Date', f.dateText + (f.date && f.date.iso && f.date.iso !== f.dateText ? ' (' + f.date.iso + ')' : '')]);
+  const dateText = f.dateText || humanDateFallback(f.date);
+  if (dateText) out.push(['Date', dateText + (f.date && f.date.iso && f.date.iso !== dateText ? ' (' + f.date.iso + ')' : '')]);
   if (p.senderName || p.senderEmail) out.push(['From', [p.senderName, p.senderEmail && '<' + p.senderEmail + '>'].filter(Boolean).join(' ')]);
   if (p.subject) out.push(['Subject', p.subject]);
   return out;
@@ -659,11 +684,16 @@ function removeCachedGoogleAuthToken(token) {
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 
-async function googleTasksAuthedFetch(path, options) {
+// Base-URL-parameterized so Calendar and Gmail can reuse the exact same
+// token-fetch-and-401-retry logic instead of each writer function
+// duplicating it — this is what Google Tasks' own authed fetch became once
+// two more Google APIs needed the identical dance.
+async function googleAuthedFetch(baseUrl, path, options) {
   const token = await getGoogleAuthToken(true);
-  const res = await fetch(GOOGLE_TASKS_API + path, Object.assign({}, options, {
-    headers: Object.assign({ Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, (options && options.headers) || {})
+  const doFetch = (t) => fetch(baseUrl + path, Object.assign({}, options, {
+    headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
+  const res = await doFetch(token);
   if (res.status !== 401) return res;
   // A cached token can go stale (revoked access from the Google Account
   // permissions page, expired) without Chrome knowing yet — evict it and
@@ -671,14 +701,28 @@ async function googleTasksAuthedFetch(path, options) {
   // "refresh once, then fail loudly" shape every OAuth connector above uses.
   await removeCachedGoogleAuthToken(token);
   const freshToken = await getGoogleAuthToken(true);
-  return fetch(GOOGLE_TASKS_API + path, Object.assign({}, options, {
-    headers: Object.assign({ Authorization: 'Bearer ' + freshToken, 'Content-Type': 'application/json' }, (options && options.headers) || {})
-  }));
+  return doFetch(freshToken);
+}
+
+function googleTasksAuthedFetch(path, options) {
+  return googleAuthedFetch(GOOGLE_TASKS_API, path, options);
 }
 
 async function getGoogleTasksAuth() {
   const { googleTasksAuth } = await chrome.storage.local.get('googleTasksAuth');
   return googleTasksAuth || null;
+}
+
+// Calendar and Gmail Draft have no connect-time bookkeeping of their own —
+// they piggyback on whatever Google Tasks' own connect step already
+// recorded, since a single chrome.identity grant covers all three scopes.
+// "Is Google connected" and "is Google Tasks connected" are the same
+// question in this MVP (Google Tasks is the one onboarding step that asks
+// for the grant at all — see popup.js's connector filter), so this
+// deliberately reads the same storage record rather than inventing a
+// second, parallel "connected" flag that could drift out of sync with it.
+async function googleConnected() {
+  return Boolean(await getGoogleTasksAuth());
 }
 
 // Every write lands in the same list, found by title rather than an id
@@ -769,6 +813,278 @@ async function googleTasksUndo(ref) {
     '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId),
     { method: 'DELETE' }
   );
+  return { ok: res.ok || res.status === 404 };
+}
+
+/* --------------------------------------------------------------- Calendar */
+//
+// The top of the execution priority the spec calls for: a SCHEDULED_EVENT
+// classification (intent.js) already required a meeting noun + a resolved
+// date + a resolved time together before it was ever offered as an action
+// (see actions.js) — there is nothing further to validate here beyond the
+// fields actually being present.
+
+function localTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch (e) {
+    return 'UTC';
+  }
+}
+
+// No duration is ever stated in an email the way a date or time is, so
+// there is nothing to extract — 30 minutes is a plain, documented default
+// rather than a guess dressed up as a fact, and the event's own real time
+// (not its length) is what actually matters for "don't miss this".
+const CALENDAR_DEFAULT_DURATION_MIN = 30;
+
+function calendarDateTime(dateIso, hour, minute, addMinutes) {
+  const [y, m, d] = dateIso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d, hour, minute + (addMinutes || 0));
+  const pad = (n) => String(n).padStart(2, '0');
+  return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()) +
+    'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) + ':00';
+}
+
+async function googleCalendarWrite(p) {
+  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const params = p.params || {};
+  if (!params.dateIso || params.hour == null || params.minute == null) {
+    return { ok: false, reason: 'error', error: 'Missing a date and time for this event.' };
+  }
+
+  const timeZone = localTimeZone();
+  const descriptionLines = [];
+  if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);
+  descriptionLines.push(ATTRIBUTION_TEXT + ' — ' + ATTRIBUTION_URL);
+
+  const body = {
+    summary: String(params.title || 'Meeting').slice(0, 200),
+    description: descriptionLines.join('\n'),
+    start: { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute), timeZone },
+    end: { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone }
+  };
+
+  const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events', {
+    method: 'POST',
+    body: JSON.stringify(body)
+  });
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  if (!res.ok) {
+    let detail = '';
+    try { detail = ((await res.json()).error || {}).message || ''; } catch (e) { /* body already consumed or not JSON */ }
+    throw new Error('Calendar event creation failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
+  }
+  const event = await res.json();
+  return {
+    ok: true,
+    where: 'Google Calendar',
+    target: 'your calendar',
+    ref: { eventId: event.id },
+    // htmlLink is a real field the Calendar API documents and always
+    // returns on a created event — unlike the Gmail draft link below, this
+    // one is safe to hand straight to the user.
+    url: event.htmlLink || null
+  };
+}
+
+async function googleCalendarUndo(ref) {
+  if (!ref || !ref.eventId) return { ok: false };
+  const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events/' + encodeURIComponent(ref.eventId), {
+    method: 'DELETE'
+  });
+  // 410 Gone is Calendar's own "already deleted" — as final as a 404 anywhere else.
+  return { ok: res.ok || res.status === 404 || res.status === 410 };
+}
+
+/* ------------------------------------------------------------- Gmail Draft */
+//
+// Second in the execution priority: a real draft sitting in Gmail, not a
+// task that says "reply to this." Deliberately a lightweight, editable
+// skeleton — not an AI-generated reply. That's a different feature
+// (glance-assist's Draft-It, see the header comment further down this
+// file) with a different backend dependency; this path never calls out to
+// anything, so it works the moment Google is connected, same as Calendar
+// and Tasks.
+//
+// No "Logged by Glance" footer here, unlike every other write path in this
+// file. Every other connector writes to something only the user's own team
+// sees (a CRM note, a Slack channel, a Notion page) — a fair, quiet place
+// for one attribution line. A Gmail draft is addressed to the sender and
+// will very likely be sent to them close to as-is; putting vendor
+// attribution into outbound correspondence with someone else's actual
+// client is a different thing entirely, and not a call this file gets to
+// make on the user's behalf.
+
+function base64UrlEncode(str) {
+  const b64 = btoa(unescape(encodeURIComponent(str)));
+  return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// RFC 2045 caps an encoded body line at 76 characters. Most servers tolerate
+// longer lines, but there's no reason to rely on that tolerance when the fix
+// is one regex.
+function chunk76(b64) {
+  return (b64.match(/.{1,76}/g) || []).join('\r\n');
+}
+
+// RFC 2047 encoded-word — only applied when the value actually contains
+// something outside ASCII (a Hebrew subject line, a display name with
+// diacritics). A raw UTF-8 byte in a header is invalid and Gmail's API
+// rejects the whole message rather than mangling it.
+function mimeHeader(name, value) {
+  if (/^[\x00-\x7F]*$/.test(value)) return name + ': ' + value;
+  return name + ': =?UTF-8?B?' + btoa(unescape(encodeURIComponent(value))) + '?=';
+}
+
+function toHeaderValue(email, name) {
+  const trimmed = (name || '').trim().replace(/"/g, '');
+  if (!trimmed) return email;
+  if (/^[\x00-\x7F]*$/.test(trimmed)) return '"' + trimmed + '" <' + email + '>';
+  return '=?UTF-8?B?' + btoa(unescape(encodeURIComponent(trimmed))) + '?= <' + email + '>';
+}
+
+function draftSubject(p) {
+  const base = (p.subject || '').trim();
+  const params = p.params || {};
+  if (!base) return 'Re: ' + String(params.what || 'your message').slice(0, 100);
+  return /^re:/i.test(base) ? base : 'Re: ' + base;
+}
+
+function draftGreeting(senderName) {
+  const name = (senderName || '').trim();
+  // Correspondence in this product's actual use (Hebrew and English SMB
+  // email) is almost always first-name-only — the full display name Gmail
+  // hands back can carry a title or a company suffix that would read oddly
+  // as a greeting.
+  const first = name ? name.split(/\s+/)[0] : '';
+  return first ? 'Hi ' + first + ',' : 'Hi,';
+}
+
+function draftBodyText(p) {
+  const params = p.params || {};
+  const lines = [draftGreeting(p.senderName), ''];
+  if (params.what && params.when) lines.push('Following up on: ' + params.what + ' (' + params.when + ')');
+  else if (params.what) lines.push('Following up on: ' + params.what);
+  else lines.push('Following up on your message below.');
+  lines.push('', '[Write your reply here]');
+  return lines.join('\n');
+}
+
+// opts: { to, subject, body, attachment: {filename, mimeType, base64} | null }
+function buildMimeMessage(opts) {
+  const headers = [
+    mimeHeader('To', opts.to),
+    mimeHeader('Subject', opts.subject),
+    'MIME-Version: 1.0'
+  ];
+
+  if (!opts.attachment) {
+    headers.push('Content-Type: text/plain; charset="UTF-8"');
+    headers.push('Content-Transfer-Encoding: base64');
+    return headers.join('\r\n') + '\r\n\r\n' + chunk76(btoa(unescape(encodeURIComponent(opts.body))));
+  }
+
+  const boundary = 'flow_' + Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('');
+  headers.push('Content-Type: multipart/mixed; boundary="' + boundary + '"');
+  const parts = [
+    '--' + boundary,
+    'Content-Type: text/plain; charset="UTF-8"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    chunk76(btoa(unescape(encodeURIComponent(opts.body)))),
+    '--' + boundary,
+    'Content-Type: ' + (opts.attachment.mimeType || 'application/octet-stream'),
+    'Content-Disposition: attachment; filename="' + String(opts.attachment.filename || 'attachment').replace(/"/g, '') + '"',
+    'Content-Transfer-Encoding: base64',
+    '',
+    chunk76(opts.attachment.base64),
+    '--' + boundary + '--'
+  ];
+  return headers.join('\r\n') + '\r\n\r\n' + parts.join('\r\n');
+}
+
+// Best-effort: finds the Gmail thread this reply belongs to so the draft
+// appears inline in the conversation instead of floating on its own.
+// Never blocks the write on failing — a standalone draft the user still has
+// to attach to the right thread manually is a worse outcome than not
+// offering a draft at all, but a strictly better one than failing the
+// whole action because a search query came back empty.
+async function findThreadId(senderEmail, subject) {
+  if (!senderEmail) return null;
+  try {
+    const q = 'from:' + senderEmail + (subject ? ' subject:"' + subject.replace(/"/g, '') + '"' : '');
+    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q));
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.threads && data.threads[0] && data.threads[0].id) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Raw byte estimate from the base64 length (4/3 inflation) rather than
+// trusting a size the content script reported — comfortably under both
+// Gmail's own 25MB compose limit and chrome.runtime.sendMessage's own
+// ceiling once base64-encoded.
+const GMAIL_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+
+async function gmailDraftWrite(p) {
+  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
+
+  const params = p.params || {};
+  let attachment = null;
+  if (params.includeAttachment && p.attachment && p.attachment.base64) {
+    const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
+    // Oversized attachments degrade to a plain draft rather than failing the
+    // whole action — the same "still useful, just not everything asked for"
+    // shape as findThreadId() above.
+    if (approxBytes <= GMAIL_ATTACHMENT_MAX_BYTES) {
+      attachment = { filename: p.attachment.filename, mimeType: p.attachment.mimeType, base64: p.attachment.base64 };
+    }
+  }
+
+  const threadId = await findThreadId(p.senderEmail, p.subject);
+  const raw = base64UrlEncode(buildMimeMessage({
+    to: toHeaderValue(p.senderEmail, p.senderName),
+    subject: draftSubject(p),
+    body: draftBodyText(p),
+    attachment
+  }));
+
+  const message = { raw };
+  if (threadId) message.threadId = threadId;
+
+  const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts', {
+    method: 'POST',
+    body: JSON.stringify({ message })
+  });
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  if (!res.ok) {
+    let detail = '';
+    try { detail = ((await res.json()).error || {}).message || ''; } catch (e) { /* body already consumed or not JSON */ }
+    throw new Error('Gmail draft creation failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
+  }
+  const draft = await res.json();
+  return {
+    ok: true,
+    where: 'Gmail',
+    target: attachment ? 'a draft reply with the attachment' : 'a draft reply',
+    ref: { draftId: draft.id },
+    // The Drafts API doesn't return a stable, documented deep link to one
+    // specific draft the way Calendar's htmlLink does — linking to the
+    // Drafts folder itself is the honest version of "go see it" rather than
+    // a guessed URL that might not open the right thing.
+    url: 'https://mail.google.com/mail/u/0/#drafts'
+  };
+}
+
+async function gmailDraftUndo(ref) {
+  if (!ref || !ref.draftId) return { ok: false };
+  const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts/' + encodeURIComponent(ref.draftId), {
+    method: 'DELETE'
+  });
   return { ok: res.ok || res.status === 404 };
 }
 
@@ -1012,8 +1328,20 @@ async function summarizeAttachmentViaBackend(payload) {
 
 /* ---------------------------------------------------------------- dispatch */
 
-const WRITERS = { hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite, googleTasks: googleTasksWrite };
-const UNDOERS = { hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo, googleTasks: googleTasksUndo };
+// 'googleTask' (singular) is the action *kind* actions.js proposes; 'googleTasks'
+// (plural) is the connector id the popup's connect/disconnect flow and
+// connectorStatus() use. Same underlying write — kept as two keys pointing at
+// the same functions rather than renaming either caller to match the other.
+const WRITERS = {
+  hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
+  googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
+  calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite
+};
+const UNDOERS = {
+  hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
+  googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
+  calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo
+};
 
 async function connectorStatus() {
   const hs = await getHubspotAuth();
