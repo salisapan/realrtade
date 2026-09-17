@@ -1,6 +1,9 @@
-// The popup is the only configuration surface, and it is deliberately two
-// questions long: where may Glance write, and what kind of work is this. There is
-// no rule builder here and there never will be — that is the product boundary.
+// The popup is the only configuration surface, and it is deliberately one
+// question long: sign in, or don't. There is no rule builder here and there
+// never will be — that is the product boundary. It used to also ask "what
+// kind of work do you do" to steer domain-specific vocabulary; that's gone
+// from onboarding (see wireSave()'s comment) — one fewer decision between
+// installing and Glance actually doing something.
 
 (async function popupInit() {
   let status = await send({ type: 'flow:connector-status' });
@@ -10,7 +13,6 @@
   wireSave();
   wireRecipe();
   renderConnectors();
-  renderDomains();
   renderStatusPill();
   await renderLog();
 
@@ -46,7 +48,11 @@
   function renderConnectors() {
     const host = document.getElementById('connector-list');
     host.replaceChildren();
-    FLOW_CONNECTORS.forEach((c) => host.appendChild(connectorCard(c)));
+    // MVP surface is one connector, one decision: sign in, or don't. The rest
+    // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
+    // them wired) but showing four more cards here is exactly the setup
+    // friction the MVP is supposed to have zero of.
+    FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
   }
 
   function connectorCard(c) {
@@ -132,29 +138,10 @@
     return card;
   }
 
-  /* ------------------------------------------------------------- domains */
-
-  function renderDomains() {
-    const host = document.getElementById('domain-list');
-    host.replaceChildren();
-    FLOW_DOMAINS.forEach((d) => {
-      const label = el('label', 'opt');
-      const input = el('input');
-      input.type = 'radio'; input.name = 'domain'; input.value = d.id;
-      input.checked = state.domainId ? state.domainId === d.id : d.id === 'sales';
-      const txt = el('span', 'txt');
-      txt.appendChild(el('span', 'name', d.label));
-      txt.appendChild(el('span', 'kind', d.entity));
-      label.append(input, txt);
-      host.appendChild(label);
-    });
-  }
-
   /* ---------------------------------------------------------------- save */
 
   function wireSave() {
     document.getElementById('save').addEventListener('click', async () => {
-      const domain = document.querySelector('input[name="domain"]:checked');
       const connected = Object.keys(status || {}).filter((k) => status[k].connected);
       const note = document.getElementById('saved-note');
       if (!connected.length) {
@@ -164,7 +151,13 @@
       }
       await FlowStorage.set({
         onboarded: true,
-        domainId: domain ? domain.value : 'sales',
+        // domainId deliberately left unset: judgment.js's evaluate() falls
+        // back to FLOW_DOMAINS[0] whenever it's missing or unmatched, and
+        // that fallback already produces a good generic label (neutralTitle)
+        // for any text that isn't literally sales vocabulary — so there's
+        // nothing this question was buying a doctor, a lawyer, or a guide
+        // that the universal commit/obligation/date/money signals don't
+        // already cover on their own.
         connectorId: connected.includes(state.connectorId) ? state.connectorId : connected[0]
       });
       state = await FlowStorage.get();

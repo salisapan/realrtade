@@ -24,6 +24,12 @@ const FLOW_CONNECTORS = [
     kind: 'Personal to-do',
     status: 'live',
     auth: 'google',
+    // The only connector shown on the MVP setup screen (see popup.js's
+    // renderConnectors filter) — one destination, no "where should this go"
+    // decision for someone who just wants Glance to catch things for them.
+    // The rest still work (see WRITERS/UNDOERS in background.js) but aren't
+    // part of onboarding until the core loop has proven itself.
+    mvp: true,
     note: 'Creates a task — with the amount, the date, and a link back to the email — in a "Glance" list in the Google account you’re already signed into. No token to create, no app to authorize separately: one native Google sign-in.'
   },
   {
