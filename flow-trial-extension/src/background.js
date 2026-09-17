@@ -928,13 +928,27 @@ function chunk76(b64) {
   return (b64.match(/.{1,76}/g) || []).join('\r\n');
 }
 
+// Every value that ends up inside a MIME header or the multipart framing
+// below is DOM-derived (Gmail's own subject/sender text) — none of it is
+// something this file should trust to be a single line. A raw CR or LF
+// spliced into a header value is a classic header-injection vector (the
+// email equivalent of HTTP header injection): "Subject: X\r\nBcc:
+// attacker@evil.com" would silently add a real header to an outbound
+// draft. Folding any embedded CR/LF to a space closes that off at the one
+// place every header value passes through, rather than trusting each call
+// site to remember to sanitize its own input.
+function sanitizeMimeText(s) {
+  return String(s == null ? '' : s).replace(/[\r\n]+/g, ' ');
+}
+
 // RFC 2047 encoded-word — only applied when the value actually contains
 // something outside ASCII (a Hebrew subject line, a display name with
 // diacritics). A raw UTF-8 byte in a header is invalid and Gmail's API
 // rejects the whole message rather than mangling it.
 function mimeHeader(name, value) {
-  if (/^[\x00-\x7F]*$/.test(value)) return name + ': ' + value;
-  return name + ': =?UTF-8?B?' + btoa(unescape(encodeURIComponent(value))) + '?=';
+  const safe = sanitizeMimeText(value);
+  if (/^[\x00-\x7F]*$/.test(safe)) return name + ': ' + safe;
+  return name + ': =?UTF-8?B?' + btoa(unescape(encodeURIComponent(safe))) + '?=';
 }
 
 function toHeaderValue(email, name) {
@@ -994,8 +1008,8 @@ function buildMimeMessage(opts) {
     '',
     chunk76(btoa(unescape(encodeURIComponent(opts.body)))),
     '--' + boundary,
-    'Content-Type: ' + (opts.attachment.mimeType || 'application/octet-stream'),
-    'Content-Disposition: attachment; filename="' + String(opts.attachment.filename || 'attachment').replace(/"/g, '') + '"',
+    'Content-Type: ' + sanitizeMimeText(opts.attachment.mimeType || 'application/octet-stream'),
+    'Content-Disposition: attachment; filename="' + sanitizeMimeText(String(opts.attachment.filename || 'attachment').replace(/"/g, '')) + '"',
     'Content-Transfer-Encoding: base64',
     '',
     chunk76(opts.attachment.base64),
@@ -1332,6 +1346,16 @@ async function summarizeAttachmentViaBackend(payload) {
 // (plural) is the connector id the popup's connect/disconnect flow and
 // connectorStatus() use. Same underlying write — kept as two keys pointing at
 // the same functions rather than renaming either caller to match the other.
+//
+// The hubspot/notion/salesforce/slack/monday entries below are no longer
+// reachable from the live Gmail chip — content-gmail.js's action-planning
+// pipeline (intent.js -> actions.js) only ever proposes calendar/gmailDraft/
+// googleTask actions, and scanReadingPane() now stays silent entirely for a
+// stored connectorId that isn't 'googleTasks' rather than routing to one of
+// these (see the comment at that check). They're left wired here only so
+// flow:execute-action/flow:connect keep working for whatever still calls
+// them directly (the popup's own connect/disconnect flow, direct testing) —
+// not because the multi-action engine still writes to them.
 const WRITERS = {
   hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,

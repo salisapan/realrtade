@@ -272,15 +272,25 @@
   // The product is deliberately silent between chips, and a silent tool is
   // easy to forget you installed. This is the one place that answers "is it
   // actually doing anything" without turning into a notification.
+  // Distinct MESSAGES with at least one successful write, not raw write
+  // rows — a single Do It click can now produce up to 5 'written' entries
+  // at once (Calendar + Gmail Draft + Google Task from one email), and
+  // counting rows would make "N logged this week" and the referral gate
+  // below both overstate how many separate decisions the user actually
+  // acted on.
+  function distinctWrittenMessages(log) {
+    return new Set((log || []).filter((e) => e.kind === 'written').map((e) => e.messageId));
+  }
+
   function renderWeekStat(s) {
     const wrap = document.getElementById('weekStat');
     const written = (s.log || []).filter((e) => e.kind === 'written');
     if (!written.length) { wrap.hidden = true; return; }
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const thisWeek = written.filter((e) => e.ts >= weekAgo).length;
-    document.getElementById('weekCount').textContent = thisWeek;
+    const thisWeekIds = new Set(written.filter((e) => e.ts >= weekAgo).map((e) => e.messageId));
+    document.getElementById('weekCount').textContent = thisWeekIds.size;
     document.getElementById('weekLabel').textContent = ' logged this week';
-    document.getElementById('weekTotal').textContent = written.length + ' all-time';
+    document.getElementById('weekTotal').textContent = distinctWrittenMessages(s.log).size + ' all-time';
     wrap.hidden = false;
   }
 

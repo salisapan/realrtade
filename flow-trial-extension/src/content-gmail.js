@@ -187,6 +187,20 @@
     await FlowStorage.markSeen(messageId);
 
     state = await FlowStorage.get();
+
+    // The action-planning pipeline below only ever writes to Google
+    // (Calendar, Gmail, Tasks) — Notion/HubSpot/Salesforce/Slack/Monday.com
+    // are the MVP-paused connectors (connectors.js's mvp:true filter
+    // already limits onboarding to Google Tasks only, and background.js's
+    // WRITERS/UNDOERS entries for the others exist purely so a direct API
+    // caller isn't broken, not because the live chip still routes to them).
+    // A connectorId stored before that scope cut would otherwise get a
+    // chip that's guaranteed to fail with a confusing "connect Google"
+    // message for a system it never asked them to connect — stay silent
+    // until they reconnect through the popup instead, the same treatment
+    // as "not onboarded".
+    if (state.connectorId && state.connectorId !== 'googleTasks') return;
+
     const sender = extractSender(message);
     const subject = currentSubject();
 
@@ -348,14 +362,44 @@
     return btoa(binary);
   }
 
+  // Kept equal to background.js's own GMAIL_ATTACHMENT_MAX_BYTES — no reason
+  // to download and base64-encode a file here that the write path would
+  // reject anyway once it arrives; a large video or PDF attached to the
+  // thread would otherwise freeze this fetch (and the base64 conversion)
+  // for however long that download takes, for an attachment that was never
+  // going anywhere.
+  const ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+
+  // download_url is an attribute Gmail's own rendering sets on a real
+  // attachment chip (see findAttachmentChips below) — not something email
+  // content can write into the DOM — but a credentialed fetch
+  // (`credentials: 'include'`) carries the signed-in Gmail session, so this
+  // stays a belt-and-suspenders check rather than trusting that assumption
+  // unconditionally: only ever fetch a Google-hosted URL with the account's
+  // own cookies attached.
+  function isTrustedAttachmentUrl(url) {
+    try {
+      const h = new URL(url).hostname;
+      return h === 'google.com' || h.endsWith('.google.com') || h === 'googleusercontent.com' || h.endsWith('.googleusercontent.com');
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Best-effort, same policy as background.js's own findThreadId and
   // oversized-attachment handling: a failed fetch here means the draft is
   // still created, just without the attachment — never a failed action.
   async function fetchAttachmentBase64(meta) {
+    if (!isTrustedAttachmentUrl(meta.url)) return null;
     try {
       const res = await fetch(meta.url, { credentials: 'include' });
       if (!res.ok) return null;
+      const declaredLength = Number(res.headers.get('content-length') || 0);
+      if (declaredLength > ATTACHMENT_MAX_BYTES) return null;
       const buf = await res.arrayBuffer();
+      // Content-Length can be absent or wrong; the actual byte count is the
+      // real guard.
+      if (buf.byteLength > ATTACHMENT_MAX_BYTES) return null;
       return { filename: meta.filename, mimeType: meta.mimeType, base64: arrayBufferToBase64(buf) };
     } catch (e) {
       return null;
