@@ -65,7 +65,15 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  flex: 1 1 auto;
+  /* No flex-grow: with only 1-2 pills (the common case — several intent
+     types only ever produce a single action), a growing row stretches to
+     fill the leftover space in the button row, then left-aligns its pill(s)
+     inside that stretched box (this row is explicitly dir="ltr") — the
+     visible result was a pill floating with a dead gap before the card's
+     edge instead of sitting tight against Do It/dismiss. Shrink stays on so
+     a full 5-pill row still wraps inside its own box rather than
+     overflowing. */
+  flex: 0 1 auto;
   min-width: 0;
 }
 .flow-chip-action-pill {
@@ -197,6 +205,7 @@
 .flow-chip.flow-chip-done {
   all: initial;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   font-family: inherit;
@@ -240,6 +249,8 @@
    rather than hiding a partial result behind a single pass/fail state. */
 .flow-chip-partial-note {
   all: unset;
+  display: block;
+  flex: 1 1 100%;
   font-family: inherit;
   font-size: 11px;
   font-weight: 600;
