@@ -81,18 +81,57 @@ const FlowJudgment = (() => {
   // reply re-scores the whole thread — meaning "Sounds good, thanks!" over a
   // quoted contract scored identically to the contract itself, and Flow offered
   // to log the same decision again on every message in the thread.
+  //
+  // Every pattern here is a *fallback* — content-gmail.js's own ownMessageText()
+  // already cuts at Gmail's DOM-level quote wrapper (.gmail_quote) before this
+  // ever runs, which is language-independent by construction. These regexes
+  // exist for what that DOM cut can't see: a non-Gmail sender (Outlook, Apple
+  // Mail, a plain-text forward), or any caller that only ever had flattened
+  // text to begin with.
   const QUOTE_START = [
     /^\s*On\b[\s\S]{3,200}?\bwrote:\s*$/im,
+    // Gmail's Hebrew quote header always opens with "בתאריך" ("on the date")
+    // — a line-initial word essentially unique to this header, never how a
+    // genuine sentence starts — and always closes a short line with a colon
+    // (either "...כתב/ה/ו:" or "...מאת X:", depending on Gmail's exact
+    // phrasing at send time). Matching the open marker and the line-ending
+    // colon, rather than one exact closing phrase, means this doesn't depend
+    // on getting that closing wording exactly right. No \b after בתאריך —
+    // same reason every other Hebrew pattern in this file omits it: \b is
+    // defined against [A-Za-z0-9_], so it never fires around Hebrew letters
+    // and would silently turn this into a pattern that never matches.
+    /^\s*בתאריך[\s\S]{3,200}?:\s*$/im,
     /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
     /^\s*-{2,}\s*Forwarded message\s*-{2,}\s*$/im,
     /^\s*From:\s.*$\n^\s*Sent:\s/im,
+    // Outlook's Hebrew locale equivalent of the From:/Sent: header block
+    // above — same no-\b rule applies to both מאת and נשלח.
+    /^\s*מאת:\s.*$\n^\s*נשלח:\s/im,
     /^\s*>{1,}\s?\S/m
   ];
+
+  // Smart/curly quotes and apostrophes — auto-inserted by iOS/macOS Mail,
+  // Word, and plenty of other clients whenever someone types a straight one
+  // — are a different Unicode character from the plain ' every "we're"/
+  // "you'll"/"doesn't" pattern in this file and intent.js is written
+  // against. "we're good" and "we’re good" read identically to a person but
+  // not to a regex: the curly version silently failed to match at all,
+  // which is a real-world recall gap, not a rare edge case, given how
+  // common autocorrected quotes are in genuine email. Normalizing once
+  // here — the one function every text path already calls first — fixes
+  // it everywhere at once, instead of a `['’]` character class that would
+  // be easy to forget adding to the next new pattern.
+  function normalizeQuotes(text) {
+    return text
+      .replace(/[‘’ʼ]/g, "'")
+      .replace(/[“”]/g, '"');
+  }
 
   // Returns only the part of the message the sender actually just wrote. Falls
   // back to the whole text when no quote boundary is found, and ignores a
   // boundary so early that stripping would leave nothing to judge.
   function newContent(text) {
+    text = normalizeQuotes(text);
     let cut = text.length;
     for (const re of QUOTE_START) {
       const m = re.exec(text);

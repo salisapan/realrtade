@@ -16,10 +16,75 @@
 const FlowActions = (() => {
   const MAX_ACTIONS = 5;
 
-  // Execution priority from the spec, in order: a real calendar event beats
-  // a drafted reply beats a bare task. Google Tasks is the guaranteed
-  // fallback — always included unless the plan is already full — not
-  // "only when nothing else applies."
+  function calendarAction(intent, e, ctx) {
+    return {
+      id: 'calendar',
+      kind: 'calendar',
+      // Short — this is a collapsed-by-default pill label, not the whole
+      // sentence describing the action (see content-gmail.js's injectChip:
+      // only surfaced at all once someone opens "+N more"). The full
+      // description still exists, as `hint`, for the pill's title/aria-label.
+      label: 'Calendar',
+      hint: 'Add to Calendar: ' + (intent.label || 'Meeting'),
+      params: {
+        // intent.label, not entities.what — what is the full quoted
+        // sentence (can run to hundreds of characters), fine for a task's
+        // notes field but not for an event title.
+        title: (intent.label || e.what || 'Meeting').slice(0, 200),
+        dateIso: e.dateIso, hour: e.hour, minute: e.minute,
+        threadUrl: ctx.threadUrl
+      }
+    };
+  }
+
+  function draftAction(intent, e, ctx, hasAttachment) {
+    // For the SCHEDULED_EVENT + handoff combined case (a meeting invite
+    // that also asks the reader to confirm), entities.what is the MEETING
+    // sentence — the right title for the Calendar action above, but not
+    // what this draft should be replying to. entities.requestWhat (set by
+    // intent.js whenever a handoff signal is present, independent of which
+    // type won) is the actual ask; falling back to entities.what keeps
+    // REQUEST/COMMITMENT_OF_READER unchanged, since their own `what` is
+    // already the request/commitment sentence.
+    const what = (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && e.requestWhat) ? e.requestWhat : e.what;
+    return {
+      id: 'draft',
+      kind: 'gmailDraft',
+      label: hasAttachment ? 'Draft reply + file' : 'Draft reply',
+      hint: 'Prepare reply draft' + (hasAttachment ? ' with attachment' : ''),
+      params: {
+        intentType: intent.type,
+        what, when: e.when, amount: e.amount,
+        threadUrl: ctx.threadUrl,
+        includeAttachment: hasAttachment
+      }
+    };
+  }
+
+  function taskAction(intent, e, ctx) {
+    return {
+      id: 'task',
+      kind: 'googleTask',
+      label: 'Task',
+      hint: 'Create task: ' + (intent.label || e.what || intent.type),
+      params: {
+        title: intent.label || e.what,
+        dateIso: e.dateIso,
+        amount: e.amount,
+        threadUrl: ctx.threadUrl
+      }
+    };
+  }
+
+  // Execution priority from the spec: a real calendar event beats a drafted
+  // reply beats a bare task — EXCEPT for COMMITMENT_OF_READER, where the
+  // most useful first action is a reminder for the reader's own obligation,
+  // not a reply. "You agreed to send the report Friday" is primarily
+  // something for the reader to track, whether or not this particular
+  // message also happens to want a reply — so Task leads there, Draft
+  // second. Google Tasks is the guaranteed fallback in every case — always
+  // included unless the plan is already full — not "only when nothing else
+  // applies."
   function planFor(intent, ctx) {
     ctx = ctx || {};
     const actions = [];
@@ -28,31 +93,6 @@ const FlowActions = (() => {
     const e = intent.entities || {};
     const sig = intent.signals || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);
-
-    // Calendar: only ever from a SCHEDULED_EVENT classification — intent.js
-    // already required a meeting noun + date + time together before
-    // returning that type, so there is nothing further to gate here.
-    if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
-      actions.push({
-        id: 'calendar',
-        kind: 'calendar',
-        // Short — this is now a collapsed-by-default pill label, not the
-        // whole sentence describing the action (see content-gmail.js's
-        // injectChip: only surfaced at all once someone opens "+N more").
-        // The full description still exists, as `hint`, for the pill's
-        // title/aria-label.
-        label: 'Calendar event',
-        hint: 'Add to Calendar: ' + (intent.label || 'Meeting'),
-        params: {
-          // intent.label, not entities.what — what is the full quoted
-          // sentence (can run to hundreds of characters), fine for a
-          // task's notes field but not for an event title.
-          title: (intent.label || e.what || 'Meeting').slice(0, 200),
-          dateIso: e.dateIso, hour: e.hour, minute: e.minute,
-          threadUrl: ctx.threadUrl
-        }
-      });
-    }
 
     // A reply draft makes sense whenever the message is itself asking for
     // one (REQUEST, COMMITMENT_OF_READER) OR when an otherwise-calendar
@@ -65,40 +105,28 @@ const FlowActions = (() => {
       intent.type === FlowIntent.TYPES.REQUEST ||
       intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER ||
       (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && sig.handoff);
-    if (draftWorthy && actions.length < MAX_ACTIONS) {
-      actions.push({
-        id: 'draft',
-        kind: 'gmailDraft',
-        label: hasAttachment ? 'Reply draft + file' : 'Reply draft',
-        hint: 'Prepare reply draft' + (hasAttachment ? ' with attachment' : ''),
-        params: {
-          intentType: intent.type,
-          what: e.what, when: e.when, amount: e.amount,
-          threadUrl: ctx.threadUrl,
-          includeAttachment: hasAttachment
-        }
-      });
-    }
 
-    // Google Tasks: the guaranteed fallback. Always offered unless the plan
-    // has already hit the cap — a task is the one action that never
-    // requires a confident date+time (Calendar) or a confident reply
-    // (Draft), so it is the safety net when either of those wasn't
-    // confident enough to propose, and a useful paper trail even when they
-    // were.
-    if (actions.length < MAX_ACTIONS) {
-      actions.push({
-        id: 'task',
-        kind: 'googleTask',
-        label: 'Task',
-        hint: 'Create task: ' + (intent.label || e.what || intent.type),
-        params: {
-          title: intent.label || e.what,
-          dateIso: e.dateIso,
-          amount: e.amount,
-          threadUrl: ctx.threadUrl
-        }
-      });
+    function pushCalendar() { if (actions.length < MAX_ACTIONS) actions.push(calendarAction(intent, e, ctx)); }
+    function pushDraft() { if (draftWorthy && actions.length < MAX_ACTIONS) actions.push(draftAction(intent, e, ctx, hasAttachment)); }
+    function pushTask() { if (actions.length < MAX_ACTIONS) actions.push(taskAction(intent, e, ctx)); }
+
+    if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
+      // Calendar: only ever from this classification — intent.js already
+      // required a meeting noun + date + time together (and no cancellation
+      // signal) before returning it, so it's the single most concrete,
+      // unambiguous action and leads.
+      pushCalendar();
+      pushDraft();
+      pushTask();
+    } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
+      pushTask();
+      pushDraft();
+    } else {
+      // REQUEST: the draft IS the thing being asked for, so it leads.
+      // DECISION_TO_LOG / FOLLOW_UP: draftWorthy is false here, so
+      // pushDraft() is a no-op and the plan reduces to Task alone.
+      pushDraft();
+      pushTask();
     }
 
     return actions.slice(0, MAX_ACTIONS);

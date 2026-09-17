@@ -75,6 +75,42 @@
     return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
   }
 
+  // Gmail writes quoted/forwarded history into a message's own HTML inside
+  // an element carrying this class — a stable, widely-documented convention
+  // (not one of Gmail's internal minified names) that Gmail itself inserts
+  // whenever a message was composed as a reply or forward in Gmail, in any
+  // UI language. Cutting the DOM here, before any text ever reaches
+  // judgment/intent, is the strong signal; FlowJudgment.newContent()'s own
+  // regex-based cut (which classify() always runs regardless of this
+  // function's result) remains the fallback for quotes with no such
+  // wrapper — a non-Gmail sender, or a plain-text forward.
+  const QUOTE_CONTAINER_SELECTOR = '.gmail_quote';
+
+  // Returns only the text that renders before the first quote container —
+  // never the quoted history sitting after it. Matches messageNode's own
+  // innerText computation (rather than a DOM Range) specifically so the
+  // whitespace/line-break shape of what's returned is identical to what
+  // every other caller of .innerText in this file already expects; a
+  // second, differently-shaped text-extraction method here would risk
+  // corrupting the word-boundary-sensitive regexes downstream.
+  function ownMessageText(messageNode) {
+    const full = (messageNode?.innerText || '').trim();
+    if (!messageNode) return full;
+    const quoteBlock = messageNode.querySelector(QUOTE_CONTAINER_SELECTOR);
+    if (!quoteBlock) return full;
+    const quoted = (quoteBlock.innerText || '').trim();
+    if (!quoted) return full;
+    const idx = full.lastIndexOf(quoted);
+    // Not found at all (a rendering mismatch between the isolated block's
+    // own innerText and its innerText as read within the full message) —
+    // fall back to the unfiltered text rather than guess where to cut.
+    if (idx < 0) return full;
+    // idx === 0 (the quote is the entire visible message, nothing new was
+    // written) correctly yields an empty string here, same treatment as
+    // judgment.js's own newContent() gives that case.
+    return full.slice(0, idx).trim();
+  }
+
   // Gmail renders any recipient who is the signed-in account as the literal
   // text "me" rather than their name, on every message that arrived TO them.
   // That gives a way to read the account's own address without any
@@ -224,13 +260,16 @@
     // why "seen" alone used to make a rebuilt node's chip unrecoverable.
     if (await FlowStorage.hasTerminalOutcome(messageId)) return;
 
-    // ?. rather than a bare .innerText — Gmail can detach or replace this
-    // exact node between the synchronous work above and this line (the
-    // awaits above this point yield back to the event loop), and a crash
-    // here would violate this file's own "never crash, just stop showing
-    // the chip" contract from the header comment.
-    const text = (message?.innerText || '').trim();
-    if (text.length < 20) return; // still rendering
+    // ownMessageText (not a bare .innerText) both guards against Gmail
+    // detaching or replacing this exact node between the synchronous work
+    // above and this line (the awaits above this point yield back to the
+    // event loop — a crash here would violate this file's own "never
+    // crash, just stop showing the chip" contract) and — the actual point
+    // of the "quoted text" fix — never lets a long quoted contract sitting
+    // below a one-line "Sounds good!" reply count toward "is there enough
+    // new content to judge" in the first place.
+    const text = ownMessageText(message);
+    if (text.length < 20) return; // still rendering, or genuinely nothing new was written
 
     // Captured before markSeen flips it, so it still answers "is this the
     // first time," which is what decides whether to log 'shown' below.

@@ -148,5 +148,53 @@ console.log('  parsed:', JSON.stringify(pastDate));
 if (pastDate && pastDate.iso) { console.log('  FAIL: invented ISO date ' + pastDate.iso); failures++; }
 else console.log('  ok    kept the sender\'s words, emitted no ISO date');
 
+// Hebrew quote headers ("בתאריך ... כתב/ה:" or "בתאריך ... מאת X:") must be
+// stripped the same way the English "On ... wrote:" header already is —
+// the gap this session's quoted-text fix closes. Checked directly against
+// newContent() rather than through the full scorer, since the point here
+// is "was the boundary found," not "did this particular Hebrew sentence
+// clear the threshold."
+console.log('\nHebrew quote header ("בתאריך ... כתב:") is stripped like the English one:');
+const heQuoted = [
+  'מעולה, תודה!',
+  '',
+  'בתאריך יום ב׳, 1 בספט׳ 2025 בשעה 9:41 מאת דנה כהן <dana@meridian.com> כתבה:',
+  '> סוכם על 3,900$ לשנה.',
+  '> ההסכם נחתם, בתוקף מ-7 בספטמבר.'
+].join('\n');
+const heNewOnly = FlowJudgment.newContent(heQuoted);
+console.log('  kept:', JSON.stringify(heNewOnly));
+if (heNewOnly.includes('נחתם') || heNewOnly.includes('סוכם') || heNewOnly.includes('בתאריך')) {
+  console.log('  FAIL: quoted Hebrew content (or the quote header itself) leaked past the cut');
+  failures++;
+} else if (!heNewOnly.includes('מעולה')) {
+  console.log('  FAIL: the genuine new content was stripped along with the quote');
+  failures++;
+} else {
+  console.log('  ok    kept only the sender\'s new line, dropped the quoted history');
+}
+
+// The Outlook-style Hebrew "מאת:/נשלח:" header block must be stripped the
+// same way its English "From:/Sent:" equivalent already is.
+console.log('\nHebrew Outlook header ("מאת:"/"נשלח:") is stripped like the English one:');
+const heOutlook = [
+  'בסדר, אפשר להתקדם.',
+  '',
+  'מאת: דנה כהן <dana@meridian.com>',
+  'נשלח: יום שני, 1 בספטמבר 2025 9:41',
+  'אל: ישראל ישראלי',
+  'נושא: הסכם מרידיאן',
+  '',
+  'סוכם על 3,900$ לשנה.'
+].join('\n');
+const heOutlookNewOnly = FlowJudgment.newContent(heOutlook);
+console.log('  kept:', JSON.stringify(heOutlookNewOnly));
+if (heOutlookNewOnly.includes('סוכם')) {
+  console.log('  FAIL: quoted content leaked past the מאת:/נשלח: header');
+  failures++;
+} else {
+  console.log('  ok    kept only the sender\'s new line, dropped the quoted history');
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

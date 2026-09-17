@@ -141,12 +141,31 @@ const FlowIntent = (() => {
       score: s.total, threshold
     };
 
+    // The one sentence a human would point to as "this is the actual ask" —
+    // computed once, independent of which type ends up winning, and folded
+    // into every returned Intent's entities as `requestWhat`. This is what
+    // lets actions.js draft a reply that addresses the real ask ("could you
+    // confirm you can make it") rather than restating the event itself
+    // ("Meeting Sep 22 15:00") when a message carries BOTH a clear event
+    // and a request — see finish() below and actions.js's own comment on
+    // the SCHEDULED_EVENT + handoff combined case.
+    const requestWhat = s.flags.handoff ? whatText(text, REQUEST_PATTERNS) : null;
+
     function finish(type, confidence, entities) {
-      return { type, confidence, entities, label: shortLabel(type, facts, enrichedFacts), signals, facts };
+      return {
+        type, confidence,
+        entities: Object.assign({ requestWhat }, entities),
+        label: shortLabel(type, facts, enrichedFacts), signals, facts
+      };
     }
 
-    // --- 1. SCHEDULED_EVENT: hard gate, not score-based. All three or none. ---
-    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time) {
+    // --- 1. SCHEDULED_EVENT: hard gate, not score-based. All three or none,
+    //        and never when the same message also says the meeting itself
+    //        was called off — "the 3pm Friday sync is cancelled" must not
+    //        become a new Calendar entry for that meeting. Precision over
+    //        recall: a missed event chip costs one click; a calendar entry
+    //        for a meeting that was just cancelled is actively wrong.
+    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !s.flags.lost) {
       return finish(TYPES.SCHEDULED_EVENT, 'high', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
