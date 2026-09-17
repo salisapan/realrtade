@@ -129,7 +129,7 @@
   transition: max-height .28s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
 }
 .flow-chip-host.flow-chip-expanded .flow-chip-actions-row {
-  max-height: 160px;
+  max-height: 220px;
   opacity: 1;
 }
 .flow-chip-action-pill {
@@ -178,6 +178,50 @@
 }
 .flow-chip-action-pill-x:hover { color: #A32F22; background: rgba(163,47,34,.1); }
 .flow-chip-action-pill-x:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
+
+/* ---- attach chooser: sits under the gmailDraft pill only, and only when
+   that draft actually wants an attachment. One chip per real thread
+   attachment (the disambiguation surface when there's more than one) plus a
+   chip to pick a file from Drive instead — ghost styling, deliberately
+   quieter than the action pills above it, since this is a refinement of one
+   already-proposed action, not a new decision of its own weight. ---------- */
+.flow-chip-attach-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  width: 100%;
+  margin: -2px 0 2px;
+}
+.flow-chip-attach-chip {
+  all: initial;
+  font-family: inherit;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: #4a5578;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(40,70,150,.2);
+  background: transparent;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.flow-chip-attach-chip:hover { background: rgba(40,70,150,.06); color: #16214a; }
+.flow-chip-attach-chip:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
+.flow-chip-attach-chip[aria-pressed="true"] {
+  border-style: solid;
+  border-color: rgba(40,70,150,.5);
+  background: rgba(40,70,150,.1);
+  color: #16214a;
+}
+.flow-chip-attach-chip:disabled { cursor: default; opacity: .6; }
+.flow-chip-attach-drive { border-style: dashed; }
 
 /* ---- the Do It button: same shell/ring/shine family as the site's .doit,
    "glance" weight (thinner ring, shorter glow, quicker hover) ------------- */

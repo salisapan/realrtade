@@ -94,12 +94,49 @@
     return h ? h.textContent.trim() : '';
   }
 
+  // Multiple Google accounts can each have Gmail open in their own /mail/u/N/
+  // tab — the own-email cache below is kept per account index so switching
+  // tabs never reads (or overwrites) another account's cached address.
+  function accountIndex() {
+    const m = location.pathname.match(/\/mail\/u\/(\d+)/);
+    return m ? m[1] : '0';
+  }
+
   // Gmail's #all/<id> route resolves a legacy message id from any label, which
   // makes the link in the written record survive archiving.
   function threadUrl(legacyId) {
     if (!legacyId) return null;
-    const m = location.pathname.match(/\/mail\/u\/(\d+)/);
-    return 'https://mail.google.com/mail/u/' + (m ? m[1] : '0') + '/#all/' + legacyId;
+    return 'https://mail.google.com/mail/u/' + accountIndex() + '/#all/' + legacyId;
+  }
+
+  // ownEmailFromThread() above only finds an answer when the reader appears
+  // as a recipient somewhere in the visible thread — which is every ordinary
+  // multi-message thread, but NOT a thread made of exactly one message that
+  // is the reader's own freshly-sent, no-reply-yet outbound email (the
+  // reader never shows up as "me" in a thread where they're only ever the
+  // sender). Caching the answer the moment it IS found, per Google account,
+  // means that gap only ever shows up once per account — the very next
+  // ordinary thread fills the cache, and every single-message "I just sent
+  // this" thread after that is covered by it.
+  const OWN_EMAIL_STORAGE_KEY = 'flowOwnEmailByAccount';
+
+  async function getCachedOwnEmail() {
+    try {
+      const { flowOwnEmailByAccount } = await chrome.storage.local.get(OWN_EMAIL_STORAGE_KEY);
+      return (flowOwnEmailByAccount && flowOwnEmailByAccount[accountIndex()]) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function rememberOwnEmail(email) {
+    chrome.storage.local.get(OWN_EMAIL_STORAGE_KEY).then(({ flowOwnEmailByAccount }) => {
+      const map = Object.assign({}, flowOwnEmailByAccount);
+      const idx = accountIndex();
+      if (map[idx] === email) return; // already cached, avoid a needless write on every scan
+      map[idx] = email;
+      chrome.storage.local.set({ [OWN_EMAIL_STORAGE_KEY]: map });
+    }).catch(() => {});
   }
 
   async function scanReadingPane() {
@@ -117,12 +154,26 @@
     // and re-offered to log whatever the thread was already about. Walking
     // backward for the newest message that isn't from the account itself
     // finds the thing this scanner exists to react to: mail that arrived.
-    const ownEmail = ownEmailFromThread(messages);
+    let ownEmail = ownEmailFromThread(messages);
+    if (ownEmail) {
+      rememberOwnEmail(ownEmail);
+    } else {
+      ownEmail = await getCachedOwnEmail();
+    }
+    // Without a resolved own-email, "the last visible message" can't be told
+    // apart from "the reader's own outbound message to someone else" — and
+    // misreading something the reader asked of a third party as a request
+    // made OF the reader is a wrong classification, not just a missed one.
+    // Staying silent here is deliberate: the cache above fills in on the
+    // very next ordinary (multi-recipient) thread, so this only ever costs
+    // a missed chip once per account, never a wrong one.
+    if (!ownEmail) return;
+
     let message = null;
     for (let i = messages.length - 1; i >= 0; i--) {
       const candidate = messages[i];
       const candidateSender = extractSender(candidate);
-      if (ownEmail && candidateSender.email && candidateSender.email.toLowerCase() === ownEmail.toLowerCase()) continue;
+      if (candidateSender.email && candidateSender.email.toLowerCase() === ownEmail.toLowerCase()) continue;
       message = candidate;
       break;
     }
@@ -217,7 +268,8 @@
     });
     if (!intent.type) return;
 
-    const attachment = firstRealAttachment(message);
+    const attachments = allRealAttachments(message);
+    const attachment = attachments[0] || null;
     const actions = FlowActions.planFor(intent, {
       threadUrl: threadUrl(legacyId),
       hasThreadAttachment: Boolean(attachment)
@@ -225,7 +277,7 @@
     if (!actions.length) return; // defensive only — Google Tasks is always offered as the fallback
 
     injectChip(message, {
-      messageId, intent, actions, sender, subject, attachment,
+      messageId, intent, actions, sender, subject, attachment, attachments,
       threadUrl: threadUrl(legacyId),
       // Snapshotted now, not re-read from the DOM at click time — by the
       // time "Do It" is clicked the chip's own ctx has no live node
@@ -327,6 +379,94 @@
     return svg;
   }
 
+  // content-gmail.js can't open a chrome.windows popup itself — that API
+  // isn't exposed to content scripts — so opening the Drive picker means
+  // asking background.js to do it, then waiting for the result to come back
+  // as its own message (the picker is a separate window the user interacts
+  // with for as long as they like, not something a single request/response
+  // round-trip can represent). resolves null on cancel, on a background.js
+  // failure (e.g. the picker API key isn't configured yet), or if the
+  // picker window is closed without picking anything.
+  let drivePickerSeq = 0;
+  const pendingDrivePickerResolvers = new Map(); // requestId -> resolve(file|null)
+
+  function openDrivePicker() {
+    const requestId = 'dp_' + Date.now() + '_' + (++drivePickerSeq);
+    return new Promise((resolve) => {
+      pendingDrivePickerResolvers.set(requestId, resolve);
+      chrome.runtime.sendMessage({ type: 'flow:open-drive-picker', payload: { requestId } }, (response) => {
+        if (response && response.ok) return; // the real result arrives later via flow:drive-file-result
+        pendingDrivePickerResolvers.delete(requestId);
+        resolve(null);
+      });
+    });
+  }
+
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'flow:drive-file-result') return;
+    const resolve = pendingDrivePickerResolvers.get(msg.requestId);
+    if (!resolve) return; // already resolved (e.g. background.js's open-ack already failed), or a stale message
+    pendingDrivePickerResolvers.delete(msg.requestId);
+    resolve(msg.cancelled ? null : (msg.file || null));
+  });
+
+  // The attachment-choice row under the gmailDraft pill: one chip per real
+  // thread attachment (so the user can pick which one when there's more
+  // than one — this is the disambiguation surface, not a blocking prompt),
+  // plus a chip that opens the Drive picker as an alternative source.
+  // Mutates action.params directly — buildActionPayload() below reads
+  // whatever was last selected, defaulting to the thread's first attachment
+  // when the user never opens this row at all (the ordinary, one-attachment
+  // Zero-Prompt path this pill already handled before Drive existed).
+  function buildAttachChooser(action, ctx) {
+    const attachments = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
+
+    const row = el('div', 'flow-chip-attach-row');
+    row.setAttribute('dir', 'ltr');
+
+    const chips = [];
+    function selectChip(chosen) {
+      for (const c of chips) c.setAttribute('aria-pressed', String(c === chosen));
+    }
+
+    attachments.forEach((meta, i) => {
+      const chip = el('button', 'flow-chip-attach-chip', meta.filename || 'Attachment');
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', String(i === 0));
+      chips.push(chip);
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        action.params.driveFileId = null;
+        action.params.selectedAttachment = meta;
+        selectChip(chip);
+      });
+      row.appendChild(chip);
+    });
+
+    const driveChip = el('button', 'flow-chip-attach-chip flow-chip-attach-drive', attachments.length ? 'Choose from Drive instead' : 'Attach from Drive');
+    driveChip.type = 'button';
+    driveChip.setAttribute('aria-pressed', 'false');
+    chips.push(driveChip);
+    driveChip.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const prevLabel = driveChip.textContent;
+      driveChip.textContent = 'Opening Drive…';
+      driveChip.disabled = true;
+      const picked = await openDrivePicker();
+      driveChip.disabled = false;
+      if (!picked) { driveChip.textContent = prevLabel; return; }
+      action.params.selectedAttachment = null;
+      action.params.driveFileId = picked.id;
+      action.params.driveFileName = picked.name;
+      action.params.driveMimeType = picked.mimeType;
+      driveChip.textContent = 'Drive: ' + picked.name;
+      selectChip(driveChip);
+    });
+    row.appendChild(driveChip);
+
+    return row;
+  }
+
   // Zero-Prompt, deliberately: the idle card is one sentence and one
   // button. When intent.js/actions.js propose more than one action, that
   // fact shows up as a single quiet "+N more" toggle next to Do It — not
@@ -364,6 +504,7 @@
       pillRow.setAttribute('dir', 'ltr');
       pillRow.inert = true; // collapsed and non-interactive until the toggle opens it
       for (const action of ctx.actions) {
+        let attachChooser = null;
         const pill = el('span', 'flow-chip-action-pill');
         pill.appendChild(actionIcon(action.kind));
         pill.appendChild(el('span', 'flow-chip-action-pill-label', action.label));
@@ -376,12 +517,22 @@
           const idx = liveActions.indexOf(action);
           if (idx >= 0) liveActions.splice(idx, 1);
           pill.remove();
+          if (attachChooser) attachChooser.remove();
           // Zero actions left is a valid state, not a disabled one — Do It
           // still responds (as a dismiss; see onDoIt) rather than the
           // button going dead with no explanation.
         });
         pill.appendChild(x);
         pillRow.appendChild(pill);
+
+        // Only the gmailDraft pill ever has a document to choose — and only
+        // when it actually wants one. Google-ecosystem-only, same as every
+        // other write path here: the choice is between this thread's own
+        // attachment(s) and a single file picked from Drive, nothing else.
+        if (action.kind === 'gmailDraft' && action.params && action.params.includeAttachment) {
+          attachChooser = buildAttachChooser(action, ctx);
+          pillRow.appendChild(attachChooser);
+        }
       }
     }
 
@@ -493,10 +644,21 @@
     }
   }
 
-  function firstRealAttachment(messageNode) {
-    const chips = findAttachmentChips(messageNode);
-    if (!chips.length) return null;
-    return parseDownloadUrl(chips[0].getAttribute('download_url'));
+  // Every real attachment on the message, deduped by URL (Gmail sometimes
+  // renders more than one chip for the same file — inline preview plus the
+  // download chip). This is what lets the gmailDraft pill offer a real
+  // choice when a message has more than one attachment, instead of always
+  // silently picking the first one.
+  function allRealAttachments(messageNode) {
+    const seen = new Set();
+    const metas = [];
+    for (const chip of findAttachmentChips(messageNode)) {
+      const meta = parseDownloadUrl(chip.getAttribute('download_url'));
+      if (!meta || seen.has(meta.url)) continue;
+      seen.add(meta.url);
+      metas.push(meta);
+    }
+    return metas;
   }
 
   // Only the content script has credentials:'include' access to Gmail's own
@@ -511,15 +673,26 @@
     }
 
     if (action.kind === 'gmailDraft') {
+      // selectedAttachment/driveFileId are only ever set by the attach
+      // chooser (buildAttachChooser, above) — if the user never opened it,
+      // both stay undefined and this falls back to exactly the old
+      // single-attachment behaviour: the thread's first real attachment.
+      const { selectedAttachment, driveFileId, driveFileName, driveMimeType, ...cleanParams } = action.params;
       const payload = Object.assign(base, {
-        params: action.params,
+        params: driveFileId ? Object.assign({}, cleanParams, { driveFileId, driveFileName, driveMimeType }) : cleanParams,
         senderEmail: ctx.sender.email,
         senderName: ctx.sender.name,
         subject: ctx.subject
       });
-      if (action.params.includeAttachment && ctx.attachment) {
-        const fetched = await fetchAttachmentBase64(ctx.attachment);
-        if (fetched) payload.attachment = fetched;
+      if (driveFileId) {
+        // background.js fetches Drive bytes itself — it already holds the
+        // OAuth token that call needs, so there is nothing to attach here.
+      } else if (action.params.includeAttachment) {
+        const chosen = selectedAttachment !== undefined ? selectedAttachment : ctx.attachment;
+        if (chosen) {
+          const fetched = await fetchAttachmentBase64(chosen);
+          if (fetched) payload.attachment = fetched;
+        }
       }
       return payload;
     }

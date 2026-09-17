@@ -101,6 +101,11 @@ const GLANCE_TASK_LIST_TITLE = 'Glance';
 // step for the whole execution layer, not three.
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
+const GOOGLE_DRIVE_API = 'https://www.googleapis.com/drive/v3';
+// The Picker API key itself (a second, separate Google Cloud credential
+// from the OAuth Client ID above) lives only in picker/picker.js — that
+// page is what calls setDeveloperKey(), and there's nothing for this file
+// to do with the key itself, only with the OAuth-authed file access above.
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -1043,6 +1048,53 @@ async function findThreadId(senderEmail, subject) {
 // ceiling once base64-encoded.
 const GMAIL_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
 
+// Same chunked btoa as content-gmail.js's own arrayBufferToBase64 — kept as
+// a separate copy rather than a shared import because this file (a service
+// worker) and that one (a content script) have never shared code, each
+// reading and base64-encoding bytes from a different source (Gmail's
+// cookie-authed attachment URLs there, the Drive API's own OAuth-authed
+// bytes here).
+function arrayBufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  const CHUNK = 0x8000;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+// Drive files are fetched here, not by content-gmail.js, because reading a
+// Drive file needs the same OAuth bearer token every other Google write in
+// this file already holds — there is no reason to round-trip a base64
+// payload through chrome.runtime.sendMessage between the content script and
+// this worker when the worker can just call the Drive API directly.
+// Metadata first (cheap) so an oversized file never has its bytes
+// downloaded at all, not just rejected after the fact.
+async function fetchDriveFileAsAttachment(driveFileId) {
+  try {
+    const metaRes = await googleAuthedFetch(GOOGLE_DRIVE_API, '/files/' + encodeURIComponent(driveFileId) + '?fields=name,mimeType,size');
+    if (!metaRes.ok) return null;
+    const meta = await metaRes.json();
+    if (meta.size && Number(meta.size) > GMAIL_ATTACHMENT_MAX_BYTES) return null;
+
+    const contentRes = await googleAuthedFetch(GOOGLE_DRIVE_API, '/files/' + encodeURIComponent(driveFileId) + '?alt=media');
+    if (!contentRes.ok) return null;
+    const buf = await contentRes.arrayBuffer();
+    // Declared size can be absent or wrong; the actual byte count is the
+    // real guard — same policy as content-gmail.js's own attachment fetch.
+    if (buf.byteLength > GMAIL_ATTACHMENT_MAX_BYTES) return null;
+
+    return {
+      filename: meta.name || 'attachment',
+      mimeType: meta.mimeType || 'application/octet-stream',
+      base64: arrayBufferToBase64(buf)
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 async function gmailDraftWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
@@ -1057,6 +1109,14 @@ async function gmailDraftWrite(p) {
     if (approxBytes <= GMAIL_ATTACHMENT_MAX_BYTES) {
       attachment = { filename: p.attachment.filename, mimeType: p.attachment.mimeType, base64: p.attachment.base64 };
     }
+  }
+  // A file the user explicitly picked from Drive takes precedence over a
+  // thread attachment neither of them chose — this only ever runs when the
+  // thread-attachment branch above found nothing to attach, so a picked
+  // file is never silently dropped in favor of one auto-guessed from the
+  // thread.
+  if (!attachment && params.driveFileId) {
+    attachment = await fetchDriveFileAsAttachment(params.driveFileId);
   }
 
   const threadId = await findThreadId(p.senderEmail, p.subject);
@@ -1101,6 +1161,60 @@ async function gmailDraftUndo(ref) {
   });
   return { ok: res.ok || res.status === 404 };
 }
+
+/* ------------------------------------------------------ Google Drive picker */
+
+// content-gmail.js can't open chrome.windows itself (that API isn't exposed
+// to content scripts), and the picker has to live in its own extension page
+// rather than be loaded into the Gmail tab — Gmail's own CSP would be the
+// one deciding whether https://apis.google.com's gapi loader is even
+// allowed to run there, and there is no reason to depend on that. So the
+// content script asks this worker to open the window, and this worker
+// remembers which Gmail tab asked, keyed by the requestId the content
+// script minted — multiple Gmail tabs can each have a picker open at once
+// without their results crossing.
+const pendingDrivePickers = new Map(); // requestId -> { tabId, windowId }
+
+async function openDrivePicker(payload, sender) {
+  const requestId = payload && payload.requestId;
+  const tabId = sender && sender.tab && sender.tab.id;
+  if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
+
+  const win = await chrome.windows.create({
+    url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),
+    type: 'popup',
+    width: 640,
+    height: 620
+  });
+  if (!win) return { ok: false, error: 'Could not open the Drive picker window.' };
+  pendingDrivePickers.set(requestId, { tabId, windowId: win.id });
+  return { ok: true };
+}
+
+// picker.js posts this once, then closes its own window — this only ever
+// routes the result back to the one Gmail tab that asked for it (via
+// chrome.tabs.sendMessage), never a broadcast, so a second open Gmail tab
+// never sees a file meant for the first.
+function deliverDrivePickerResult(payload) {
+  const { requestId, file, cancelled } = payload || {};
+  const info = pendingDrivePickers.get(requestId);
+  if (!info) return { ok: true }; // already delivered, or the requesting tab is gone
+  pendingDrivePickers.delete(requestId);
+  chrome.tabs.sendMessage(info.tabId, { type: 'flow:drive-file-result', requestId, file, cancelled }).catch(() => {});
+  return { ok: true };
+}
+
+// The user closing the picker window (Escape, the × button, alt-F4) is a
+// cancellation that never posts flow:drive-file-picked at all — without
+// this, the content script's awaiting promise would simply hang forever.
+chrome.windows.onRemoved.addListener((windowId) => {
+  for (const [requestId, info] of pendingDrivePickers) {
+    if (info.windowId === windowId) {
+      pendingDrivePickers.delete(requestId);
+      chrome.tabs.sendMessage(info.tabId, { type: 'flow:drive-file-result', requestId, cancelled: true }).catch(() => {});
+    }
+  }
+});
 
 /* ------------------------------------------------------------------ Notion */
 
@@ -1409,7 +1523,7 @@ function reply(sendResponse, promise) {
   return true;
 }
 
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
 
   if (msg.type === 'flow:connector-status') return reply(sendResponse, connectorStatus());
@@ -1459,6 +1573,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg.type === 'flow:summarize-attachment') {
     return reply(sendResponse, summarizeAttachmentViaBackend(msg.payload || {}));
+  }
+
+  if (msg.type === 'flow:open-drive-picker') {
+    return reply(sendResponse, openDrivePicker(msg.payload || {}, sender));
+  }
+
+  if (msg.type === 'flow:drive-file-picked') {
+    return reply(sendResponse, Promise.resolve(deliverDrivePickerResult(msg.payload || {})));
   }
 
   // Fire-and-forget: telemetry is never allowed to affect what the caller
