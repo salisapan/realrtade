@@ -185,6 +185,29 @@ console.log('\n--- actions.js: every process names its anchor and its closure co
   }
 }
 
+console.log('\n--- actions.js: every step declares an explicit dependsOn slot ---\n');
+{
+  // A process is an atomic, ORDERED chain, not an unordered set of pills —
+  // content-gmail.js's sequencer/rollback (runActionsSequentially /
+  // rollbackChain) reads this field on every step to decide execution and
+  // undo order. `null` today (no catalog entry has a real cross-step
+  // dependency yet — see actions.js's buildStep), but the key must always
+  // be present, not merely absent-and-therefore-falsy, since a schema check
+  // like this one is what would catch a future step silently forgetting to
+  // set it at all.
+  const cases = [
+    'Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?',
+    'Could you please send me the signed contract by Friday, September 18?',
+    'Confirming you’ll send the signed report by Friday, September 18, as agreed.'
+  ];
+  for (const text of cases) {
+    const process = FlowActions.planFor(classify(text), { threadUrl: 'x', hasThreadAttachment: false });
+    const allDeclared = process.steps.every((s) => Object.prototype.hasOwnProperty.call(s, 'dependsOn'));
+    check('every step in "' + process.id + '" declares dependsOn (present, even when null)', allDeclared, process.steps.map((s) => s.id));
+    check('every step in "' + process.id + '" has no real dependency yet (dependsOn is null)', process.steps.every((s) => s.dependsOn === null), process.steps.map((s) => [s.id, s.dependsOn]));
+  }
+}
+
 console.log('\n--- actions.js: Execution Memory biases and demotes non-anchor steps ---\n');
 {
   const requestIntent = classify('Could you please send me the signed contract by Friday, September 18?');

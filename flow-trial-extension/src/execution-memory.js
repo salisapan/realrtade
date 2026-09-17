@@ -1,7 +1,31 @@
-// Execution Memory: the simplest possible local record of what a user
-// actually does with a proposed process, kept per process id (not per
-// message — "Schedule & Confirm" is one thing to have an opinion about,
-// regardless of which email triggered it this time).
+// Execution Memory: an append-only local event log of what a user actually
+// does with a proposed process. One entry per outcome, not just a running
+// counter — so the raw signal is never thrown away, and a future pass can
+// re-derive different statistics from the same history without having lost
+// anything.
+//
+// Schema (newest first), one entry per behavioral event:
+//   {
+//     intentionId: string | null,  // the message this process was proposed for
+//     processType: string,         // the process catalog id (e.g. 'reply-track')
+//     steps: string[],             // catalog step ids this event applies to
+//     status: 'accepted' | 'dismissed' | 'undone',
+//     timestamp: string            // ISO 8601
+//   }
+//
+// A single Do It click that keeps some steps and strips others produces TWO
+// events sharing the same intentionId/processType — one 'accepted' event for
+// the kept steps, one 'dismissed' event for the stripped ones — rather than
+// inventing a compound status this schema doesn't have. A step removed
+// before confirming and a fully dismissed chip are exactly the same signal
+// (see recordDismiss below), so both reuse the one 'dismissed' status.
+//
+// getAll() folds this log into the {processId: {closedCount, undoneCount,
+// steps: {kind: {accepted, removed, undone}}}} shape actions.js's
+// applyMemory() already consumes for scoring which non-anchor steps to keep,
+// drop, or reorder. The log is the only thing actually stored — the
+// aggregate is recomputed from it on every read, so there is exactly one
+// source of truth and nothing to keep in sync by hand.
 //
 // This exists for one purpose: "You intend — we execute" only holds if the
 // system gets better at guessing your intent the more it watches you close
@@ -9,45 +33,45 @@
 // repeatedly stripped off before confirming, or accepted and then undone,
 // is a real preference — not proposing it again next time is the system
 // acting on what it already learned, not a "smarter suggestion algorithm."
+// The process TYPE itself isn't scored the same way, because today's
+// catalog has no ambiguity to resolve there — intent.js's classification
+// already picks exactly one process per message (see actions.js's
+// processFor()); there is nothing to choose between yet.
 //
 // Everything here is local-only (chrome.storage.local), the same as every
 // other piece of state this extension keeps. Nothing about what a user
 // accepts, removes, or undoes is ever sent anywhere.
+//
+// Local storage, not SQLite: this runs inside a Chrome MV3 content script
+// and service worker, where chrome.storage.local already IS the local JSON
+// store this data belongs in — there's no filesystem to put a .sqlite file
+// on inside either context, and pulling in a wasm SQL engine for a log
+// capped at a few hundred small objects would add real bundle weight for no
+// behavioral gain over what's here.
 
 const FlowExecutionMemory = (() => {
-  const STORAGE_KEY = 'flowExecutionMemory';
+  const STORAGE_KEY = 'flowExecutionEvents';
+  // Same cap/ordering convention as FlowStorage's own appendLog
+  // (storage.js) — newest first, bounded so a long-lived mailbox never
+  // grows this without limit. Far more than actions.js needs to converge on
+  // a real preference; kept generous since this log doubles as the audit
+  // trail for what Execution Memory actually saw.
+  const MAX_EVENTS = 500;
 
-  // A process's memory is small and bounded by construction — at most a
-  // handful of step kinds, three counters each — so there is no cap to
-  // enforce the way FlowStorage's log needs one; this never grows with the
-  // number of messages seen, only with the number of distinct processes
-  // (currently four).
-
-  async function getAll() {
+  async function getLog() {
     try {
-      const { [STORAGE_KEY]: mem } = await chrome.storage.local.get(STORAGE_KEY);
-      return mem || {};
+      const { [STORAGE_KEY]: log } = await chrome.storage.local.get(STORAGE_KEY);
+      return log || [];
     } catch (e) {
-      return {};
+      return [];
     }
   }
 
-  function blankProcess() {
-    return { closedCount: 0, undoneCount: 0, steps: {} };
-  }
-
-  function blankStep() {
-    return { accepted: 0, removed: 0, undone: 0 };
-  }
-
-  async function mutate(processId, fn) {
-    if (!processId) return;
+  async function appendEvents(events) {
     try {
-      const mem = await getAll();
-      const proc = mem[processId] || blankProcess();
-      fn(proc);
-      mem[processId] = proc;
-      await chrome.storage.local.set({ [STORAGE_KEY]: mem });
+      const log = await getLog();
+      const next = [...events, ...log].slice(0, MAX_EVENTS);
+      await chrome.storage.local.set({ [STORAGE_KEY]: next });
     } catch (e) {
       // Never let memory bookkeeping be the reason a real write fails or a
       // dismiss doesn't register — this is a bias signal for next time, not
@@ -55,50 +79,70 @@ const FlowExecutionMemory = (() => {
     }
   }
 
+  function blankProcess() {
+    return { closedCount: 0, undoneCount: 0, steps: {} };
+  }
+  function blankStep() {
+    return { accepted: 0, removed: 0, undone: 0 };
+  }
+
+  // The read side: fold the raw event log into the per-process, per-step
+  // aggregate applyMemory() scores against. Recomputed on every call rather
+  // than cached, since the log is small (MAX_EVENTS) and this only ever
+  // runs once per Gmail reading-pane scan — not a hot path.
+  async function getAll() {
+    const log = await getLog();
+    const byProcess = {};
+    for (const ev of log) {
+      if (!ev || !ev.processType) continue;
+      const proc = byProcess[ev.processType] || (byProcess[ev.processType] = blankProcess());
+      if (ev.status === 'accepted') proc.closedCount++;
+      if (ev.status === 'undone') proc.undoneCount++;
+      for (const k of ev.steps || []) {
+        const step = proc.steps[k] || (proc.steps[k] = blankStep());
+        if (ev.status === 'accepted') step.accepted++;
+        else if (ev.status === 'dismissed') step.removed++;
+        else if (ev.status === 'undone') step.undone++;
+      }
+    }
+    return byProcess;
+  }
+
+  function makeEvent(intentionId, processType, steps, status) {
+    return { intentionId: intentionId || null, processType, steps: steps.slice(), status, timestamp: new Date().toISOString() };
+  }
+
   // Called once per Do It click: which step kinds survived into the actual
-  // write (acceptedKinds) and which were stripped off first with the ×
-  // (removedKinds) — both by kind, not by individual step, since the bias
-  // this feeds is "does this account want a Draft step in this process,"
-  // not "did this exact draft get removed."
-  function recordDoIt(processId, acceptedKinds, removedKinds) {
-    return mutate(processId, (proc) => {
-      proc.closedCount++;
-      for (const k of acceptedKinds) {
-        proc.steps[k] = proc.steps[k] || blankStep();
-        proc.steps[k].accepted++;
-      }
-      for (const k of removedKinds) {
-        proc.steps[k] = proc.steps[k] || blankStep();
-        proc.steps[k].removed++;
-      }
-    });
+  // write (acceptedKinds) and which were stripped off first with the × on
+  // the pill (removedKinds) — both by catalog step id, not by connector
+  // kind, since the bias this feeds is "does this account want a Draft step
+  // in this process," not "did this exact draft get removed." intentionId
+  // is the message this process was proposed for.
+  function recordDoIt(processId, acceptedKinds, removedKinds, intentionId) {
+    if (!processId) return Promise.resolve();
+    const events = [];
+    if (acceptedKinds && acceptedKinds.length) events.push(makeEvent(intentionId, processId, acceptedKinds, 'accepted'));
+    if (removedKinds && removedKinds.length) events.push(makeEvent(intentionId, processId, removedKinds, 'dismissed'));
+    if (!events.length) return Promise.resolve();
+    return appendEvents(events);
   }
 
   // Dismissing the whole chip is the same signal as removing every one of
   // its steps — the user looked at the full process and wanted none of it.
-  function recordDismiss(processId, allKinds) {
-    return mutate(processId, (proc) => {
-      for (const k of allKinds) {
-        proc.steps[k] = proc.steps[k] || blankStep();
-        proc.steps[k].removed++;
-      }
-    });
+  function recordDismiss(processId, allKinds, intentionId) {
+    if (!processId || !allKinds || !allKinds.length) return Promise.resolve();
+    return appendEvents([makeEvent(intentionId, processId, allKinds, 'dismissed')]);
   }
 
   // Accepted, then undone — a stronger "don't propose this" signal than a
   // pre-execution removal, since the user only found out they didn't want
   // it after seeing it actually happen.
-  function recordUndo(processId, undoneKinds) {
-    return mutate(processId, (proc) => {
-      proc.undoneCount++;
-      for (const k of undoneKinds) {
-        proc.steps[k] = proc.steps[k] || blankStep();
-        proc.steps[k].undone++;
-      }
-    });
+  function recordUndo(processId, undoneKinds, intentionId) {
+    if (!processId || !undoneKinds || !undoneKinds.length) return Promise.resolve();
+    return appendEvents([makeEvent(intentionId, processId, undoneKinds, 'undone')]);
   }
 
-  return { getAll, recordDoIt, recordDismiss, recordUndo };
+  return { getAll, getLog, recordDoIt, recordDismiss, recordUndo };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExecutionMemory };

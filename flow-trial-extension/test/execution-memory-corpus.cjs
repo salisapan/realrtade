@@ -94,6 +94,43 @@ async function run() {
     check('the unrelated process recorded independently', mem['follow-through'].steps.task.removed === 1 && mem['follow-through'].steps.draft.removed === 1, mem['follow-through']);
   }
 
+  console.log('\n--- execution-memory.js: the raw event log matches the requested schema ---\n');
+  store = {};
+  {
+    await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task'], 'msg-42');
+    const log = await FlowExecutionMemory.getLog();
+    check('a Do It with one kept and one removed step produces exactly two events', log.length === 2, log);
+
+    const accepted = log.find((e) => e.status === 'accepted');
+    const dismissed = log.find((e) => e.status === 'dismissed');
+    check('the accepted event carries only the kept step id', Boolean(accepted) && JSON.stringify(accepted.steps) === JSON.stringify(['draft']), accepted);
+    check('the dismissed event carries only the removed step id', Boolean(dismissed) && JSON.stringify(dismissed.steps) === JSON.stringify(['task']), dismissed);
+    check('both events carry the process id as processType', accepted.processType === 'reply-track' && dismissed.processType === 'reply-track', [accepted, dismissed]);
+    check('both events carry the message as intentionId', accepted.intentionId === 'msg-42' && dismissed.intentionId === 'msg-42', [accepted, dismissed]);
+    check('every event stamps an ISO timestamp', typeof accepted.timestamp === 'string' && !Number.isNaN(Date.parse(accepted.timestamp)), accepted.timestamp);
+
+    // Every field the schema in the follow-up guidelines specifies, present
+    // on every entry — not just the ones this suite happens to check above.
+    const requiredKeys = ['intentionId', 'processType', 'steps', 'status', 'timestamp'];
+    const schemaOk = log.every((e) => requiredKeys.every((k) => Object.prototype.hasOwnProperty.call(e, k)));
+    check('every logged event has all five required schema fields', schemaOk, log);
+  }
+  {
+    // No intentionId supplied (e.g. an older call site, or a process not
+    // tied to one specific message) -> null, never undefined or a crash.
+    await FlowExecutionMemory.recordDismiss('log-it', ['task']);
+    const log = await FlowExecutionMemory.getLog();
+    check('an event recorded with no intentionId stores null, not undefined', log[0].intentionId === null, log[0]);
+  }
+  {
+    // Newest-first, same convention as FlowStorage's own appendLog.
+    store = {};
+    await FlowExecutionMemory.recordDismiss('log-it', ['task'], 'msg-1');
+    await FlowExecutionMemory.recordDismiss('log-it', ['task'], 'msg-2');
+    const log = await FlowExecutionMemory.getLog();
+    check('the log is ordered newest-first', log[0].intentionId === 'msg-2' && log[1].intentionId === 'msg-1', log);
+  }
+
   console.log('\n--- execution-memory.js: a bookkeeping failure never throws ---\n');
   {
     // mutate() catches internally — recordDoIt with no processId is the

@@ -17,6 +17,13 @@
 // (Classification -> Decision -> Execution). Adding a platform later
 // (Outlook, WhatsApp) means adding new step kinds here and a matching
 // executor in background.js — this file's shape does not change.
+//
+// Each step also carries an explicit `dependsOn` (a prior step's id, or
+// null — see buildStep below) — the process is an atomic, ordered chain,
+// not an unordered set, and content-gmail.js's sequencer/rollback
+// (runActionsSequentially / rollbackChain) is built to honor that ordering
+// rather than assume steps are independent just because today's catalog
+// happens to make them so.
 
 const FlowActions = (() => {
   const MAX_ACTIONS = 5;
@@ -88,9 +95,20 @@ const FlowActions = (() => {
   }
 
   function buildStep(kind, intent, e, ctx, hasAttachment) {
-    if (kind === 'calendar') return calendarAction(intent, e, ctx);
-    if (kind === 'draft') return draftAction(intent, e, ctx, hasAttachment);
-    return taskAction(intent, e, ctx);
+    const step = kind === 'calendar' ? calendarAction(intent, e, ctx)
+      : kind === 'draft' ? draftAction(intent, e, ctx, hasAttachment)
+      : taskAction(intent, e, ctx);
+    // Explicit dependency slot: null for every step in today's catalog,
+    // since Calendar/Draft/Task each write independently from the same
+    // source intent/entities rather than from one another's results — there
+    // is no real "step B needs step A's output" case yet. The field exists
+    // so a step that DOES need a prior step's result (e.g. a future draft
+    // that quotes the calendar invite it was scheduled against) has
+    // somewhere real to declare it, and so content-gmail.js's executor
+    // (runActionsSequentially) and its rollback (rollbackChain) have
+    // something concrete to honor rather than being retrofitted later.
+    step.dependsOn = null;
+    return step;
   }
 
   // ---------------------------------------------------------------- catalog

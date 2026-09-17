@@ -776,18 +776,72 @@
     return new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:execute-action', payload }, resolve));
   }
 
-  // Sequential, not parallel — keeps per-action error handling simple, keeps
-  // the receipt's action order predictable, and avoids bursting multiple
+  // Sequential, not parallel — keeps per-step error handling simple, keeps
+  // the receipt's step order predictable, and avoids bursting multiple
   // simultaneous token requests at chrome.identity for what is, in the
-  // common case, 1-3 actions completing in well under a second combined.
-  async function runActionsSequentially(actions, ctx) {
+  // common case, 1-3 steps completing in well under a second combined.
+  //
+  // Each step carries an explicit `dependsOn` (a prior step's id, or null —
+  // see actions.js's buildStep). A step whose dependency didn't succeed is
+  // never attempted — it's recorded as skipped so the receipt can say so
+  // honestly, instead of quietly running a write that presumes a result
+  // that never happened. Today's catalog gives every step `dependsOn: null`
+  // (Calendar/Draft/Task each write independently from the same source
+  // facts), so this branch is inert in practice — but the chain is treated
+  // as one ordered, atomic unit either way, and the mechanism is real for
+  // the day a step does need one.
+  //
+  // onStepDone(result, doneCount, total), when given, fires once per step
+  // (success, failure, or skip) as it resolves — this is what lets the chip
+  // narrate progress while Do It is still running, not just before and
+  // after (see onDoIt's own use of it).
+  async function runActionsSequentially(actions, ctx, onStepDone) {
     const results = [];
+    const okIds = new Set();
     for (const action of actions) {
-      const payload = await buildActionPayload(action, ctx);
-      const response = await sendExecuteAction(payload);
-      results.push({ action, response });
+      let result;
+      if (action.dependsOn && !okIds.has(action.dependsOn)) {
+        result = { action, response: { ok: false, skipped: true, reason: 'dependency-failed' } };
+      } else {
+        const payload = await buildActionPayload(action, ctx);
+        const response = await sendExecuteAction(payload);
+        if (response && response.ok) okIds.add(action.id);
+        result = { action, response };
+      }
+      results.push(result);
+      if (onStepDone) onStepDone(result, results.length, actions.length);
     }
     return results;
+  }
+
+  // Reverses the successful chain and undoes it one step at a time, stopping
+  // at the first failure rather than firing every undo regardless — a
+  // rollback that silently skips a broken link isn't a rollback. Reverse
+  // order (not the original execution order, and not parallel) is the one
+  // order that's always safe for a dependency chain: if a later step's write
+  // referenced an earlier one's result, that later step must be undone
+  // before the earlier one is touched. Today's catalog has no such
+  // reference between steps, so the order only ever matters in principle —
+  // but this is the version that stays correct the day it does.
+  //
+  // What this deliberately does NOT claim: true two-phase-commit atomicity.
+  // Calendar, Gmail drafts, and Tasks are three independent Google APIs with
+  // no shared transaction protocol between them, so if step 2 of 3 fails to
+  // undo, steps that already reverted stay reverted rather than being
+  // silently re-created — there is no "undo the undo" for an external write.
+  // The honest contract is: stop immediately, report exactly what did and
+  // didn't revert, and never leave the account guessing.
+  async function rollbackChain(succeeded, ctx) {
+    const reverseOrder = succeeded.slice().reverse();
+    const undoneIds = [];
+    for (const r of reverseOrder) {
+      const result = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: r.action.kind, ref: r.response.ref }, resolve);
+      });
+      if (!result || !result.ok) return { ok: false, undoneIds, failedAt: r.action };
+      undoneIds.push(r.action.id);
+    }
+    return { ok: true, undoneIds, failedAt: null };
   }
 
   // Past-tense verbs for the receipt, keyed by connector kind (action.kind —
@@ -800,15 +854,19 @@
     googleTask: 'set a reminder'
   };
 
+  function joinWithAnd(items) {
+    if (items.length <= 1) return items[0] || '';
+    if (items.length === 2) return items[0] + ' and ' + items[1];
+    return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
+  }
+
   // The second half of "I'm going to close this for you": heClosing() says
   // what's about to happen before Do It; this says what just closed, in the
   // same declarative voice — "Closed — scheduled and tracked.", not "2
   // actions completed."
   function closedSummary(succeeded) {
     const verbs = succeeded.map((r) => STEP_DONE_VERB[r.action.kind] || 'completed one step');
-    if (verbs.length === 1) return 'Closed — ' + verbs[0] + '.';
-    if (verbs.length === 2) return 'Closed — ' + verbs[0] + ' and ' + verbs[1] + '.';
-    return 'Closed — ' + verbs.slice(0, -1).join(', ') + ', and ' + verbs[verbs.length - 1] + '.';
+    return 'Closed — ' + joinWithAnd(verbs) + '.';
   }
 
   // The chip's receipt for a closed process of 1-5 steps: the process name,
@@ -849,13 +907,14 @@
     undo.addEventListener('click', () => {
       undo.textContent = 'Undoing…';
       undo.disabled = true;
-      Promise.all(succeeded.map((r) => new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: r.action.kind, ref: r.response.ref }, resolve);
-      }))).then((undoResults) => {
-        if (undoResults.every((u) => u && u.ok)) {
+      rollbackChain(succeeded, ctx).then((result) => {
+        // Recorded regardless of whether the whole rollback reported ok —
+        // any step that genuinely reverted is a genuine "don't propose this
+        // again" signal, even if a later step in the chain couldn't.
+        if (result.undoneIds.length) FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
+        if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId });
-          FlowExecutionMemory.recordUndo(ctx.process.id, succeeded.map((r) => r.action.id));
         } else {
           undo.textContent = 'Some actions couldn’t be undone';
           undo.disabled = false;
@@ -891,13 +950,30 @@
 
     // By catalog step id (ctx.process.steps' own ids — 'calendar'/'draft'/
     // 'task'), not by connector kind — this is the vocabulary Execution
-    // Memory and actions.js's applyMemory() both key on.
+    // Memory and actions.js's applyMemory() both key on. intentionId is the
+    // message this specific process was proposed for.
     const liveIds = new Set(liveSteps.map((s) => s.id));
     const acceptedKinds = ctx.process.steps.filter((s) => liveIds.has(s.id)).map((s) => s.id);
     const removedKinds = ctx.process.steps.filter((s) => !liveIds.has(s.id)).map((s) => s.id);
-    FlowExecutionMemory.recordDoIt(ctx.process.id, acceptedKinds, removedKinds);
+    FlowExecutionMemory.recordDoIt(ctx.process.id, acceptedKinds, removedKinds, ctx.messageId);
 
-    runActionsSequentially(liveSteps, ctx)
+    // Stepwise feedback while the chain is still running — "I'm going to
+    // close this for you" has to keep feeling true mid-flight, not just
+    // before and after. doneVerbs only ever grows with what actually
+    // succeeded; a failed or dependency-skipped step never gets narrated as
+    // done. index/total (from runActionsSequentially) advances on every
+    // resolved step, success or not, so the count is always honest even
+    // when the description of what closed is momentarily behind it.
+    const doneVerbs = [];
+    function onStepDone(result, index, total) {
+      if (result.response && result.response.ok) {
+        doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
+      }
+      const progress = doneVerbs.length ? joinWithAnd(doneVerbs) : 'working';
+      setChipState(chip, 'flow-chip-pending', 'Closing (' + index + '/' + total + ') — ' + progress + '…');
+    }
+
+    runActionsSequentially(liveSteps, ctx, onStepDone)
       .then((results) => showMultiActionReceipt(host, chip, ctx, results))
       .catch(() => setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'));
   }
@@ -906,7 +982,7 @@
     host.remove();
     FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
     FlowStorage.calibrate('dismiss');
-    FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id));
+    FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
   }
 
