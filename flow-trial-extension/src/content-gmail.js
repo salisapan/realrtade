@@ -264,22 +264,37 @@
   // the Task/Calendar/Draft title, not UI copy). "Do It" itself is
   // deliberately left untranslated in the button — see chip.css's header
   // comment.
+  //
+  // Returns the sentence WITHOUT the "Flow" prefix — injectChip() renders
+  // that separately as a styled brand mark (sparkle + gradient wordmark),
+  // so this function only ever has to answer "what happened," not "how
+  // should the brand name look."
   function heLead(intent) {
     const e = intent.entities || {};
     const when = e.when ? ', ' + e.when : '';
     const amount = e.amount ? ', ' + e.amount : '';
     switch (intent.type) {
       case FlowIntent.TYPES.SCHEDULED_EVENT:
-        return 'Flow זיהה פגישה' + when + '?';
+        return 'זיהה פגישה' + when + '?';
       case FlowIntent.TYPES.COMMITMENT_OF_READER:
-        return 'Flow זיהה שהתחייבת למשהו' + when + amount + '?';
+        return 'זיהה שהתחייבת למשהו' + when + amount + '?';
       case FlowIntent.TYPES.REQUEST:
-        return 'Flow זיהה בקשה שמחכה לתשובה' + when + '?';
+        return 'זיהה בקשה שמחכה לתשובה' + when + '?';
       case FlowIntent.TYPES.FOLLOW_UP:
-        return 'Flow זיהה שיש כאן משהו להמשיך איתו' + when + '?';
+        return 'זיהה שיש כאן משהו להמשיך איתו' + when + '?';
       default: // DECISION_TO_LOG
-        return 'Flow זיהה החלטה שכדאי לתעד' + amount + when + '?';
+        return 'זיהה החלטה שכדאי לתעד' + amount + when + '?';
     }
+  }
+
+  // The one AI-forward visual signature on the card: a small sparkle mark
+  // ahead of a gradient-text "Flow" — the same blue family the Do It
+  // button's own ring/shell already use (see chip.css), not a new palette,
+  // and confined to a single word rather than a page-level gradient wash.
+  function sparkleIcon() {
+    const svg = svgEl('svg', { viewBox: '0 0 16 16', class: 'flow-chip-sparkle', 'aria-hidden': 'true' });
+    svg.appendChild(svgEl('path', { d: 'M8 1 L9.4 6.6 L15 8 L9.4 9.4 L8 15 L6.6 9.4 L1 8 L6.6 6.6 Z' }));
+    return svg;
   }
 
   // Small monochrome line icons, one per action kind — built via the SVG
@@ -324,7 +339,17 @@
 
     const host = el('div', 'flow-chip-host');
     host.setAttribute('dir', 'rtl');
-    host.appendChild(el('p', 'flow-chip-text', heLead(ctx.intent)));
+
+    // sparkle + gradient "Flow" + the rest of the sentence as its own text
+    // node — three children in that DOM order render correctly under the
+    // host's own dir="rtl" (the same bidi resolution a single mixed-script
+    // string already got), with the sparkle landing at the very start of
+    // the RTL line, right before the brand name.
+    const textEl = el('p', 'flow-chip-text');
+    textEl.appendChild(sparkleIcon());
+    textEl.appendChild(el('span', 'flow-chip-brand', 'Flow'));
+    textEl.appendChild(document.createTextNode(' ' + heLead(ctx.intent)));
+    host.appendChild(textEl);
 
     // liveActions is the mutable working copy Do It actually reads;
     // ctx.actions (what actions.js proposed) is left untouched so a

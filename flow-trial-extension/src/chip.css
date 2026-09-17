@@ -2,13 +2,15 @@
    own class names are obfuscated and change without notice, and `all: initial`
    on the host stops Gmail's cascade from reaching in.
 
-   @import is safe here specifically because this file is loaded via
-   manifest.json's content_scripts[].css array (Chrome's insertCSS
-   mechanism) rather than a content script inserting a <style> tag into
-   Gmail's own DOM — the former is exempt from the host page's CSP for its
-   own resource loading, the latter would not be. Same font the site
-   itself declares as --sans (trial.html, home.css, and the site's own
-   .doit button label) — 'Assistant'.
+   Font: the site itself runs two different type systems — trial.html/
+   home.css load 'Assistant' as a webfont, while the Apple-style redesign
+   (about.html, blog-article.css: "Apple product-page treatment... -apple-
+   system font stack") uses the real system font instead. This card follows
+   the second one on purpose — no @import, no webfont fetch, no network
+   dependency for a widget that has to render instantly inside somebody
+   else's page: -apple-system/BlinkMacSystemFont resolve to actual San
+   Francisco on macOS/iOS, matching the same "Apple product" character the
+   redesigned pages already committed to.
 
    Idle state is a two-part card: a Hebrew sentence describing what Flow found
    (.flow-chip-text) plus a "Do It" button built from the exact shell/ring/shine
@@ -19,7 +21,11 @@
    properties. The button's own label stays "Do It" in English on purpose —
    that's the one piece of vocabulary this product doesn't localize — while
    the sentence explaining what it's about to do is real Hebrew, generated
-   from the same facts (amount, date) the record itself will carry.
+   from the same facts (amount, date) the record itself will carry. The
+   sparkle mark + gradient "Flow" wordmark ahead of that sentence is the
+   card's one AI-forward signal — the same blue family the ring/shell
+   already use, not a new palette, and confined to a single word rather than
+   a page-level gradient wash.
 
    Pending/warn/error/done states replace the button's children entirely
    (see setChipState/showReceipt in content-gmail.js) rather than keeping the
@@ -36,14 +42,12 @@
    The toggle only exists at all when there IS more than one action — see
    injectChip() in content-gmail.js. */
 
-@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@500;600;700;800&display=swap');
-
 .flow-chip-host {
   all: initial;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   margin: 10px 0;
   padding: 10px 12px 10px 14px;
   border-radius: 14px;
@@ -60,6 +64,22 @@
   font-weight: 700;
   line-height: 1.45;
   color: #16214a;
+}
+
+.flow-chip-sparkle {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  vertical-align: -1px;
+  fill: #2f5bd8;
+  margin-inline-end: 3px;
+}
+.flow-chip-brand {
+  background: linear-gradient(120deg, #123ccb, #2f6fff 55%, #6fa8ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: 800;
 }
 
 /* The always-visible row: the quiet disclosure toggle (only when there's
@@ -192,6 +212,11 @@
   box-shadow: 0 0 8px rgba(59,116,255,.3), inset 0 0 0 1px rgba(255,255,255,.24),
               inset 0 0 7px rgba(47,91,216,.38);
   transition: box-shadow .22s, border-color .22s;
+  /* One brief pulse on arrival, not a loop — "I just noticed this," not a
+     blinking widget sitting in someone's inbox all day. backwards keeps the
+     ring at its 0% state during the delay instead of flashing its resting
+     state first. */
+  animation: flow-chip-ring-pulse .9s cubic-bezier(.2,.8,.2,1) .15s backwards;
 }
 .flow-chip .shine { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; z-index: -1 }
 .flow-chip .shine::before {
@@ -310,8 +335,15 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes flow-chip-ring-pulse {
+  0%   { box-shadow: 0 0 0 rgba(59,116,255,0), inset 0 0 0 1px rgba(255,255,255,.24), inset 0 0 7px rgba(47,91,216,.38); }
+  45%  { box-shadow: 0 0 16px rgba(59,116,255,.55), inset 0 0 0 1px rgba(255,255,255,.3), inset 0 0 10px rgba(47,91,216,.5); }
+  100% { box-shadow: 0 0 8px rgba(59,116,255,.3), inset 0 0 0 1px rgba(255,255,255,.24), inset 0 0 7px rgba(47,91,216,.38); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .flow-chip-host { animation: none; }
   .flow-chip:hover { transform: none; }
   .flow-chip-actions-row { transition: none; }
+  .flow-chip .ring { animation: none; }
 }
