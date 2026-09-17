@@ -1,9 +1,12 @@
-// Regression corpus for the decision layer (intent.js) and the action-plan
-// layer (actions.js) — judgment-corpus.cjs covers the scorer/extractor;
-// this file covers what sits on top of it: which of the five intent types
-// wins, what entities it carries, and which actions get proposed in what
-// order. Written alongside this session's quoted-text / label / ordering /
-// event-plus-request changes so those stay correct on the next edit.
+// Regression corpus for the decision layer (intent.js) and the process-plan
+// layer (actions.js) — judgment-corpus.cjs covers the scorer/extractor; this
+// file covers what sits on top of it: which of the five intent types wins,
+// what entities it carries, which named PROCESS gets proposed (never a bare
+// action list — see actions.js's own header), and how Execution Memory biases
+// and demotes that process's non-anchor steps. Written alongside this
+// session's quoted-text / label / ordering / event-plus-request changes, and
+// this segment's "You intend — we execute" process-model rewrite, so all of
+// it stays correct on the next edit.
 //
 // Run: node test/intent-actions-corpus.cjs
 
@@ -33,27 +36,39 @@ function classify(text, ctx) {
   return FlowIntent.classify(text, Object.assign({ senderEmail: 'dana@meridian.com', now: NOW, calibration: null }, ctx));
 }
 
+function stepIds(process) {
+  return (process && process.steps || []).map((s) => s.id);
+}
+function stepKinds(process) {
+  return (process && process.steps || []).map((s) => s.kind);
+}
+
 console.log('--- intent.js: type + entity checks ---\n');
 
-// 1. A meeting invite alone -> SCHEDULED_EVENT, Calendar only (no draft).
+// 1. A meeting invite alone -> SCHEDULED_EVENT, the plain "Schedule It"
+//    process: [Calendar, Task], no draft.
 {
   const intent = classify('Let’s do a call Friday, September 18 at 3pm to review the contract.');
   check('meeting alone classifies as SCHEDULED_EVENT', intent.type === FlowIntent.TYPES.SCHEDULED_EVENT, intent.type);
-  const actions = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('meeting alone proposes exactly [Calendar, Task]', JSON.stringify(actions.map((a) => a.kind)) === JSON.stringify(['calendar', 'googleTask']), actions.map((a) => a.kind));
+  const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
+  check('meeting alone proposes the "schedule" process', process.id === 'schedule', process && process.id);
+  check('meeting alone proposes exactly [calendar, task] step ids', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar', 'task']), stepIds(process));
+  check('meeting alone proposes exactly [Calendar, Task] connector kinds', JSON.stringify(stepKinds(process)) === JSON.stringify(['calendar', 'googleTask']), stepKinds(process));
 }
 
 // 2. Meeting invite that ALSO asks for confirmation -> still SCHEDULED_EVENT,
-//    but now [Calendar, Draft, Task], and the Draft's `what` must be the
-//    ASK ("could you confirm..."), not the meeting sentence itself.
+//    but now the "Schedule & Confirm" process: [Calendar, Draft, Task], and
+//    the Draft's `what` must be the ASK ("could you confirm..."), not the
+//    meeting sentence itself.
 {
   const text = 'Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?';
   const intent = classify(text);
   check('event + request still classifies as SCHEDULED_EVENT', intent.type === FlowIntent.TYPES.SCHEDULED_EVENT, intent.type);
   check('handoff signal is visible on the intent regardless of final type', intent.signals.handoff === true, intent.signals);
-  const actions = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('event + request proposes [Calendar, Draft, Task] in that order', JSON.stringify(actions.map((a) => a.kind)) === JSON.stringify(['calendar', 'gmailDraft', 'googleTask']), actions.map((a) => a.kind));
-  const draft = actions.find((a) => a.kind === 'gmailDraft');
+  const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
+  check('event + request proposes the "schedule-confirm" process', process.id === 'schedule-confirm', process && process.id);
+  check('event + request proposes [calendar, draft, task] in that order', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar', 'draft', 'task']), stepIds(process));
+  const draft = process.steps.find((s) => s.id === 'draft');
   check('the draft addresses the actual ask, not the meeting sentence', draft && /confirm/i.test(draft.params.what) && !/^let/i.test(draft.params.what), draft && draft.params.what);
 }
 
@@ -64,23 +79,26 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('cancelled meeting with a time does not fire SCHEDULED_EVENT', intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent.type);
 }
 
-// 4. A reader commitment reminder -> COMMITMENT_OF_READER, Task before Draft.
+// 4. A reader commitment reminder -> COMMITMENT_OF_READER, the "Follow
+//    Through" process, task anchor leading, draft second.
 {
   // Curly apostrophe deliberately (iOS/macOS Mail's own autocorrect) —
   // this is exactly the case newContent()'s normalizeQuotes() now fixes.
   const intent = classify('Confirming you’ll send the signed report by Friday, September 18, as agreed.');
   check('reminder classifies as COMMITMENT_OF_READER', intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER, intent.type);
-  const actions = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('commitment proposes [Task, Draft] — task leads', JSON.stringify(actions.map((a) => a.kind)) === JSON.stringify(['googleTask', 'gmailDraft']), actions.map((a) => a.kind));
+  const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
+  check('commitment proposes the "follow-through" process', process.id === 'follow-through', process && process.id);
+  check('commitment proposes [task, draft] — task leads', JSON.stringify(stepIds(process)) === JSON.stringify(['task', 'draft']), stepIds(process));
 }
 
-// 5. A direct request -> REQUEST, Draft before Task (the draft is what's
-//    literally being asked for).
+// 5. A direct request -> REQUEST, the "Reply & Track" process, draft anchor
+//    leading (the draft is what's literally being asked for).
 {
   const intent = classify('Could you please send me the signed contract by Friday, September 18?');
   check('a direct ask classifies as REQUEST', intent.type === FlowIntent.TYPES.REQUEST, intent.type);
-  const actions = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('request proposes [Draft, Task] — draft leads', JSON.stringify(actions.map((a) => a.kind)) === JSON.stringify(['gmailDraft', 'googleTask']), actions.map((a) => a.kind));
+  const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
+  check('request proposes the "reply-track" process', process.id === 'reply-track', process && process.id);
+  check('request proposes [draft, task] — draft leads', JSON.stringify(stepIds(process)) === JSON.stringify(['draft', 'task']), stepIds(process));
 }
 
 // 6. The reader's OWN outbound "could you send me X" must never be read as
@@ -137,19 +155,76 @@ console.log('\n--- judgment.js: curly (smart) quotes must match the same as stra
 console.log('\n--- actions.js: labels are short and collision-free ---\n');
 {
   const eventIntent = classify('Let’s do a call Friday, September 18 at 3pm to review the contract.');
-  const [calendarAction] = FlowActions.planFor(eventIntent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('Calendar label is short', calendarAction.label === 'Calendar', calendarAction.label);
+  const [calendarStep] = FlowActions.planFor(eventIntent, { threadUrl: 'x', hasThreadAttachment: false }).steps;
+  check('Calendar label is short', calendarStep.label === 'Calendar', calendarStep.label);
 
   const requestIntent = classify('Could you please send me the signed contract by Friday, September 18?');
-  const [draftAction, taskAction] = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: false });
-  check('Draft label without attachment is "Draft reply"', draftAction.label === 'Draft reply', draftAction.label);
-  check('Task label is "Task"', taskAction.label === 'Task', taskAction.label);
+  const [draftStep, taskStep] = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: false }).steps;
+  check('Draft label without attachment is "Draft reply"', draftStep.label === 'Draft reply', draftStep.label);
+  check('Task label is "Task"', taskStep.label === 'Task', taskStep.label);
 
-  const [draftWithFile] = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: true });
+  const [draftWithFile] = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: true }).steps;
   check('Draft label with attachment is "Draft reply + file"', draftWithFile.label === 'Draft reply + file', draftWithFile.label);
 
-  const labels = [calendarAction.label, draftAction.label, taskAction.label];
+  const labels = [calendarStep.label, draftStep.label, taskStep.label];
   check('no two pill labels collide', new Set(labels).size === labels.length, labels);
+}
+
+console.log('\n--- actions.js: every process names its anchor and its closure copy ---\n');
+{
+  const cases = [
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'schedule', 'calendar'],
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?', 'schedule-confirm', 'calendar'],
+    ['Could you please send me the signed contract by Friday, September 18?', 'reply-track', 'draft'],
+    ['Confirming you’ll send the signed report by Friday, September 18, as agreed.', 'follow-through', 'task']
+  ];
+  for (const [text, expectedId] of cases) {
+    const intent = classify(text);
+    const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
+    check('"' + expectedId + '" process carries a name, closingLine, and closedLine', Boolean(process.name && process.closingLine && process.closedLine), process);
+  }
+}
+
+console.log('\n--- actions.js: Execution Memory biases and demotes non-anchor steps ---\n');
+{
+  const requestIntent = classify('Could you please send me the signed contract by Friday, September 18?');
+  const baseCtx = { threadUrl: 'x', hasThreadAttachment: false };
+
+  // No memory yet -> catalog's own default order, untouched.
+  const cold = FlowActions.planFor(requestIntent, baseCtx);
+  check('with no memory, reply-track keeps its catalog order [draft, task]', JSON.stringify(stepIds(cold)) === JSON.stringify(['draft', 'task']), stepIds(cold));
+
+  // Task repeatedly removed/undone, well past the sample-size floor, and
+  // never once accepted -> demoted out of the process entirely. The anchor
+  // (draft) is untouched by memory regardless of its own stats.
+  const rejectedMemory = { 'reply-track': { steps: { task: { accepted: 0, removed: 4, undone: 1 }, draft: { accepted: 0, removed: 5, undone: 0 } } } };
+  const demoted = FlowActions.planFor(requestIntent, Object.assign({}, baseCtx, { executionMemory: rejectedMemory }));
+  check('a net-rejected non-anchor step (task) is dropped once past the sample floor', JSON.stringify(stepIds(demoted)) === JSON.stringify(['draft']), stepIds(demoted));
+  check('the anchor step (draft) is never demoted, even with a worse acceptance rate than the dropped step', stepIds(demoted).includes('draft'), stepIds(demoted));
+
+  // A step rejected only once or twice is noise, not a verdict — must not
+  // yet be dropped below DEMOTE_THRESHOLD.
+  const belowFloorMemory = { 'reply-track': { steps: { task: { accepted: 0, removed: 2, undone: 0 } } } };
+  const notYetDemoted = FlowActions.planFor(requestIntent, Object.assign({}, baseCtx, { executionMemory: belowFloorMemory }));
+  check('a step rejected below the sample-size floor is not yet demoted', JSON.stringify(stepIds(notYetDemoted)) === JSON.stringify(['draft', 'task']), stepIds(notYetDemoted));
+}
+{
+  // Schedule & Confirm has two non-anchor steps (draft, task) behind its
+  // calendar anchor — a real acceptance-rate gap between them should
+  // reorder the two without dropping either.
+  const eventIntent = classify('Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?');
+  const orderingMemory = {
+    'schedule-confirm': {
+      steps: {
+        // Both stay well under DEMOTE_THRESHOLD(3) rejections, so this is
+        // purely a reordering case — neither step should be dropped.
+        draft: { accepted: 1, removed: 2, undone: 0 }, // 33% kept
+        task: { accepted: 4, removed: 1, undone: 0 }   // 80% kept
+      }
+    }
+  };
+  const reordered = FlowActions.planFor(eventIntent, { threadUrl: 'x', hasThreadAttachment: false, executionMemory: orderingMemory });
+  check('non-anchor steps reorder by historical acceptance rate, anchor stays first', JSON.stringify(stepIds(reordered)) === JSON.stringify(['calendar', 'task', 'draft']), stepIds(reordered));
 }
 
 console.log('\nTOTAL FAILURES:', failures);

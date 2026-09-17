@@ -295,11 +295,11 @@
     const subject = currentSubject();
 
     // Classification (intent.js) -> Decision (actions.js) -> Execution
-    // (background.js's writer functions, dispatched by action.kind). This
+    // (background.js's writer functions, dispatched by step.kind). This
     // file only ever sits at the two ends of that chain: it hands intent.js
     // the raw text, hands actions.js the classified Intent, and later hands
-    // background.js one action at a time — it never re-derives what "this
-    // is a request" or "this should become a Calendar event" means.
+    // background.js one step at a time — it never re-derives what "this is
+    // a request" or "this should become a Calendar event" means.
     const intent = FlowIntent.classify(text, {
       senderEmail: sender.email,
       senderName: sender.name,
@@ -309,14 +309,20 @@
 
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
-    const actions = FlowActions.planFor(intent, {
+    // Execution Memory is fetched once here, not once per process — which
+    // process this message needs isn't known until after classification,
+    // and actions.js's planFor() does the per-process lookup itself from
+    // this same full blob.
+    const executionMemory = await FlowExecutionMemory.getAll();
+    const process = FlowActions.planFor(intent, {
       threadUrl: threadUrl(legacyId),
-      hasThreadAttachment: Boolean(attachment)
+      hasThreadAttachment: Boolean(attachment),
+      executionMemory
     });
-    if (!actions.length) return; // defensive only — Google Tasks is always offered as the fallback
+    if (!process) return; // defensive only — every catalog entry has at least an anchor step
 
     injectChip(message, {
-      messageId, intent, actions, sender, subject, attachment, attachments,
+      messageId, intent, process, sender, subject, attachment, attachments,
       threadUrl: threadUrl(legacyId),
       // Snapshotted now, not re-read from the DOM at click time — by the
       // time "Do It" is clicked the chip's own ctx has no live node
@@ -348,33 +354,38 @@
     return n;
   }
 
-  // The Hebrew sentence that sits above the action pills, explaining what
-  // Flow found — generated from intent.entities, the same who/what/when/
-  // amount fields every one of the 5 intent.js types normalizes onto,
-  // rather than a translation of intent.label (which stays English; that's
-  // the Task/Calendar/Draft title, not UI copy). "Do It" itself is
-  // deliberately left untranslated in the button — see chip.css's header
-  // comment.
+  // The Hebrew sentence that sits above the step list, saying what Flow is
+  // ABOUT TO DO — generated from intent.entities (the same who/what/when/
+  // amount fields every one of the 5 intent.js types normalizes onto) and
+  // keyed by process.id, not intent.type, so the sentence always matches
+  // the actual process actions.js chose (schedule-confirm vs. plain
+  // schedule reads differently, even though both come from
+  // SCHEDULED_EVENT). "You intend — we execute": this used to ask "זיהה
+  // פגישה?" ("detected a meeting?", ending in a question, inviting
+  // confirmation of a guess) — it now states what's about to close,
+  // declaratively, because that is the entire point of the redesign: the
+  // system is not offering to help you decide, it is telling you what it
+  // is closing.
   //
   // Returns the sentence WITHOUT the "Flow" prefix — injectChip() renders
   // that separately as a styled brand mark (sparkle + gradient wordmark),
-  // so this function only ever has to answer "what happened," not "how
-  // should the brand name look."
-  function heLead(intent) {
+  // so this function only ever has to answer "what is about to happen,"
+  // not "how should the brand name look."
+  function heClosing(process, intent) {
     const e = intent.entities || {};
     const when = e.when ? ', ' + e.when : '';
     const amount = e.amount ? ', ' + e.amount : '';
-    switch (intent.type) {
-      case FlowIntent.TYPES.SCHEDULED_EVENT:
-        return 'זיהה פגישה' + when + '?';
-      case FlowIntent.TYPES.COMMITMENT_OF_READER:
-        return 'זיהה שהתחייבת למשהו' + when + amount + '?';
-      case FlowIntent.TYPES.REQUEST:
-        return 'זיהה בקשה שמחכה לתשובה' + when + '?';
-      case FlowIntent.TYPES.FOLLOW_UP:
-        return 'זיהה שיש כאן משהו להמשיך איתו' + when + '?';
-      default: // DECISION_TO_LOG
-        return 'זיהה החלטה שכדאי לתעד' + amount + when + '?';
+    switch (process.id) {
+      case 'schedule-confirm':
+        return 'קובע את הפגישה' + when + ', שולח אישור, ופותח משימת מעקב.';
+      case 'schedule':
+        return 'קובע את הפגישה' + when + ' ופותח תזכורת להתכונן.';
+      case 'reply-track':
+        return 'עונה על הבקשה' + when + ' ופותח משימת מעקב.';
+      case 'follow-through':
+        return 'פותח תזכורת להתחייבות שלך' + when + amount + ', עם תשובה מוכנה.';
+      default: // log-it
+        return 'מתעד את ההחלטה' + amount + when + '.';
     }
   }
 
@@ -506,18 +517,24 @@
     return row;
   }
 
-  // Zero-Prompt, deliberately: the idle card is one sentence and one
-  // button. When intent.js/actions.js propose more than one action, that
-  // fact shows up as a single quiet "+N more" toggle next to Do It — not
-  // as a row of pills sitting open, competing with the button for
-  // attention, on every single message. Do It always runs the full
-  // proposal either way; opening the toggle is purely for someone who
-  // wants to look before confirming, or prune one action out.
+  // Zero-Prompt, deliberately: the idle card is one process badge, one
+  // sentence, and one button. actions.js already picked exactly one named
+  // process (never a loose action list) — when it has more than one step,
+  // that shows up as a quiet "N steps" toggle next to Do It, not a row of
+  // pills sitting open competing with the button for attention. Do It
+  // always closes the full process either way; opening the toggle is
+  // purely for someone who wants to look before confirming, or prune one
+  // step out — a real control, not the headline of the interaction.
   function injectChip(messageNode, ctx) {
     if (messageNode.querySelector('.flow-chip-host')) return;
 
     const host = el('div', 'flow-chip-host');
     host.setAttribute('dir', 'rtl');
+
+    // The process name as its own small, quiet label — "this is one named
+    // thing Flow is closing," stated before the sentence explains what
+    // that means, not left for the user to infer from a pile of pills.
+    host.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
 
     // sparkle + gradient "Flow" + the rest of the sentence as its own text
     // node — three children in that DOM order render correctly under the
@@ -527,37 +544,38 @@
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(sparkleIcon());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Flow'));
-    textEl.appendChild(document.createTextNode(' ' + heLead(ctx.intent)));
+    textEl.appendChild(document.createTextNode(' ' + heClosing(ctx.process, ctx.intent)));
     host.appendChild(textEl);
 
-    // liveActions is the mutable working copy Do It actually reads;
-    // ctx.actions (what actions.js proposed) is left untouched so a
-    // re-scan of this same message always starts from the full proposal
-    // again.
-    const liveActions = ctx.actions.slice();
-    const multi = ctx.actions.length > 1;
+    // liveSteps is the mutable working copy Do It actually reads;
+    // ctx.process.steps (what actions.js proposed) is left untouched so a
+    // re-scan of this same message always starts from the full process
+    // again, and so onDoIt can diff against it to tell Execution Memory
+    // which steps were kept vs. stripped off.
+    const liveSteps = ctx.process.steps.slice();
+    const multi = ctx.process.steps.length > 1;
 
     let pillRow = null;
     if (multi) {
       pillRow = el('div', 'flow-chip-actions-row');
       pillRow.setAttribute('dir', 'ltr');
       pillRow.inert = true; // collapsed and non-interactive until the toggle opens it
-      for (const action of ctx.actions) {
+      for (const step of ctx.process.steps) {
         let attachChooser = null;
         const pill = el('span', 'flow-chip-action-pill');
-        pill.appendChild(actionIcon(action.kind));
-        pill.appendChild(el('span', 'flow-chip-action-pill-label', action.label));
-        if (action.hint) pill.title = action.hint;
+        pill.appendChild(actionIcon(step.kind));
+        pill.appendChild(el('span', 'flow-chip-action-pill-label', step.label));
+        if (step.hint) pill.title = step.hint;
         const x = el('button', 'flow-chip-action-pill-x', '×');
         x.type = 'button';
-        x.setAttribute('aria-label', 'Remove: ' + (action.hint || action.label));
+        x.setAttribute('aria-label', 'Remove: ' + (step.hint || step.label));
         x.addEventListener('click', (e) => {
           e.stopPropagation();
-          const idx = liveActions.indexOf(action);
-          if (idx >= 0) liveActions.splice(idx, 1);
+          const idx = liveSteps.indexOf(step);
+          if (idx >= 0) liveSteps.splice(idx, 1);
           pill.remove();
           if (attachChooser) attachChooser.remove();
-          // Zero actions left is a valid state, not a disabled one — Do It
+          // Zero steps left is a valid state, not a disabled one — Do It
           // still responds (as a dismiss; see onDoIt) rather than the
           // button going dead with no explanation.
         });
@@ -568,8 +586,8 @@
         // when it actually wants one. Google-ecosystem-only, same as every
         // other write path here: the choice is between this thread's own
         // attachment(s) and a single file picked from Drive, nothing else.
-        if (action.kind === 'gmailDraft' && action.params && action.params.includeAttachment) {
-          attachChooser = buildAttachChooser(action, ctx);
+        if (step.kind === 'gmailDraft' && step.params && step.params.includeAttachment) {
+          attachChooser = buildAttachChooser(step, ctx);
           pillRow.appendChild(attachChooser);
         }
       }
@@ -579,7 +597,8 @@
     mainRow.setAttribute('dir', 'ltr');
 
     if (multi) {
-      const toggle = el('button', 'flow-chip-more-toggle', '+' + (ctx.actions.length - 1) + ' more');
+      const stepCount = ctx.process.steps.length;
+      const toggle = el('button', 'flow-chip-more-toggle', stepCount + ' steps');
       toggle.type = 'button';
       toggle.setAttribute('aria-expanded', 'false');
       toggle.addEventListener('click', (e) => {
@@ -588,7 +607,7 @@
         host.classList.toggle('flow-chip-expanded', expanding);
         pillRow.inert = !expanding;
         toggle.setAttribute('aria-expanded', String(expanding));
-        toggle.textContent = expanding ? 'Hide' : '+' + (ctx.actions.length - 1) + ' more';
+        toggle.textContent = expanding ? 'Hide steps' : stepCount + ' steps';
       });
       mainRow.appendChild(toggle);
     }
@@ -605,7 +624,7 @@
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
     chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
-    chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveActions));
+    chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveSteps));
     mainRow.appendChild(chip);
 
     host.appendChild(mainRow);
@@ -771,11 +790,36 @@
     return results;
   }
 
-  // The chip's receipt for a group of 1-5 actions: what succeeded, a link
-  // per successful write that has one, and a single "Undo all" that reverses
-  // every successful write in the group together — "Undo for every executed
-  // action or group of actions." A write that failed silently contributes
-  // nothing to undo; it was never done.
+  // Past-tense verbs for the receipt, keyed by connector kind (action.kind —
+  // 'calendar'/'gmailDraft'/'googleTask' — not the catalog step id used by
+  // Execution Memory). Deliberately what happened, not what kind of object
+  // got created: "scheduled," not "Calendar."
+  const STEP_DONE_VERB = {
+    calendar: 'scheduled',
+    gmailDraft: 'drafted a reply',
+    googleTask: 'set a reminder'
+  };
+
+  // The second half of "I'm going to close this for you": heClosing() says
+  // what's about to happen before Do It; this says what just closed, in the
+  // same declarative voice — "Closed — scheduled and tracked.", not "2
+  // actions completed."
+  function closedSummary(succeeded) {
+    const verbs = succeeded.map((r) => STEP_DONE_VERB[r.action.kind] || 'completed one step');
+    if (verbs.length === 1) return 'Closed — ' + verbs[0] + '.';
+    if (verbs.length === 2) return 'Closed — ' + verbs[0] + ' and ' + verbs[1] + '.';
+    return 'Closed — ' + verbs.slice(0, -1).join(', ') + ', and ' + verbs[verbs.length - 1] + '.';
+  }
+
+  // The chip's receipt for a closed process of 1-5 steps: the process name,
+  // a closure-framed summary of what actually happened, a link per
+  // successful write that has one, and a single "Undo all" that reverses
+  // every successful write in the group together. A write that failed
+  // silently contributes nothing to undo; it was never done. A successful
+  // undo is recorded to Execution Memory as a rejection of those step kinds
+  // — accepted-then-undone is a stronger "don't propose this" signal than a
+  // pre-execution removal, since the user only learned they didn't want it
+  // after seeing it actually happen.
   function showMultiActionReceipt(host, chip, ctx, results) {
     const succeeded = results.filter((r) => r.response && r.response.ok);
 
@@ -789,11 +833,8 @@
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-
-    const summaryText = succeeded.length === 1
-      ? 'Logged to ' + succeeded[0].response.where + ' · ' + succeeded[0].response.target
-      : succeeded.length + ' actions completed: ' + succeeded.map((r) => r.response.where).join(', ');
-    done.appendChild(el('span', 'flow-chip-label', summaryText));
+    done.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
+    done.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded)));
 
     const actionsRow = el('span', 'flow-chip-actions');
     for (const r of succeeded) {
@@ -814,6 +855,7 @@
         if (undoResults.every((u) => u && u.ok)) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId });
+          FlowExecutionMemory.recordUndo(ctx.process.id, succeeded.map((r) => r.action.id));
         } else {
           undo.textContent = 'Some actions couldn’t be undone';
           undo.disabled = false;
@@ -835,17 +877,27 @@
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
   }
 
-  function onDoIt(host, chip, ctx, liveActions) {
+  function onDoIt(host, chip, ctx, liveSteps) {
     // Every pill removed is a deliberate "do nothing" — the same outcome as
-    // dismissing the chip, not a disabled button with no explanation.
-    if (!liveActions.length) { onDismiss(host, ctx); return; }
+    // dismissing the chip, not a disabled button with no explanation. It also
+    // reads to Execution Memory as a full rejection (onDismiss records it),
+    // which is correct: the user saw the whole process and kept none of it.
+    if (!liveSteps.length) { onDismiss(host, ctx); return; }
 
-    setChipState(chip, 'flow-chip-pending', 'Working…');
+    setChipState(chip, 'flow-chip-pending', 'Closing…');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
     FlowStorage.calibrate('click');
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
-    runActionsSequentially(liveActions, ctx)
+    // By catalog step id (ctx.process.steps' own ids — 'calendar'/'draft'/
+    // 'task'), not by connector kind — this is the vocabulary Execution
+    // Memory and actions.js's applyMemory() both key on.
+    const liveIds = new Set(liveSteps.map((s) => s.id));
+    const acceptedKinds = ctx.process.steps.filter((s) => liveIds.has(s.id)).map((s) => s.id);
+    const removedKinds = ctx.process.steps.filter((s) => !liveIds.has(s.id)).map((s) => s.id);
+    FlowExecutionMemory.recordDoIt(ctx.process.id, acceptedKinds, removedKinds);
+
+    runActionsSequentially(liveSteps, ctx)
       .then((results) => showMultiActionReceipt(host, chip, ctx, results))
       .catch(() => setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'));
   }
@@ -854,6 +906,7 @@
     host.remove();
     FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
     FlowStorage.calibrate('dismiss');
+    FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id));
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
   }
 

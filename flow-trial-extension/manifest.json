@@ -34,6 +34,7 @@
         "src/judgment.js",
         "src/intent.js",
         "src/actions.js",
+        "src/execution-memory.js",
         "src/storage.js",
         "src/privacyShield.js",
         "src/docwriter.js",

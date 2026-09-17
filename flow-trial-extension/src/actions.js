@@ -1,29 +1,40 @@
-// The decision layer: given a classified Intent (from intent.js) plus a
-// little context about the message (thread URL, whether it carries an
-// attachment), decides WHICH concrete actions to propose — never executes
-// anything. Execution lives in background.js; this file only ever returns
-// a plan for the chip to render and, on click, hand to background.js one
-// action at a time.
+// The decision layer: given a classified Intent (from intent.js), a little
+// context about the message (thread URL, attachment), and this account's
+// own Execution Memory (execution-memory.js), decides on ONE short,
+// named PROCESS to close the intention — never a loose pile of
+// independent actions. Execution lives in background.js; this file only
+// ever returns a plan for the chip to render and, on click, hand to
+// background.js one step at a time.
+//
+// "You intend — we execute": a process is what a person would describe as
+// one outcome ("scheduled, confirmed, and a follow-up is set"), not three
+// separate things that happen to have appeared together. planFor()
+// returns { id, name, closingLine, steps } or null — never a bare array —
+// specifically so nothing downstream can drift back into treating this as
+// an unrelated grab-bag of pills.
 //
 // This is the middle of the three-layer split the spec requires
-// (Classification -> Decision -> Execution). It is deliberately the
-// smallest of the three: a lookup from intent type (plus a couple of raw
-// signals intent.js already computed) to an ordered list of action specs.
-// Adding a platform later (Outlook, WhatsApp) means adding new `kind`
-// values here and a matching executor in background.js — this file's
-// shape of "return an array of {id, kind, label, params}" does not change.
+// (Classification -> Decision -> Execution). Adding a platform later
+// (Outlook, WhatsApp) means adding new step kinds here and a matching
+// executor in background.js — this file's shape does not change.
 
 const FlowActions = (() => {
   const MAX_ACTIONS = 5;
+  // A step this process has been actively rejected on (removed before
+  // confirming, or accepted and then undone) more often than kept, across
+  // at least this many real occurrences, stops being proposed by default.
+  // Below this sample size a couple of removals reads as noise, not
+  // preference — one dismissal on a novel process is not a verdict.
+  const DEMOTE_THRESHOLD = 3;
 
   function calendarAction(intent, e, ctx) {
     return {
       id: 'calendar',
       kind: 'calendar',
-      // Short — this is a collapsed-by-default pill label, not the whole
-      // sentence describing the action (see content-gmail.js's injectChip:
-      // only surfaced at all once someone opens "+N more"). The full
-      // description still exists, as `hint`, for the pill's title/aria-label.
+      // Short — this is a collapsed-by-default step label, not the whole
+      // sentence describing the step (see content-gmail.js's injectChip:
+      // only surfaced at all once someone opens the step list). The full
+      // description still exists, as `hint`, for the step's title/aria-label.
       label: 'Calendar',
       hint: 'Add to Calendar: ' + (intent.label || 'Meeting'),
       params: {
@@ -38,10 +49,10 @@ const FlowActions = (() => {
   }
 
   function draftAction(intent, e, ctx, hasAttachment) {
-    // For the SCHEDULED_EVENT + handoff combined case (a meeting invite
+    // For the SCHEDULED_EVENT + handoff combined process (a meeting invite
     // that also asks the reader to confirm), entities.what is the MEETING
-    // sentence — the right title for the Calendar action above, but not
-    // what this draft should be replying to. entities.requestWhat (set by
+    // sentence — the right title for the Calendar step above, but not what
+    // this draft should be replying to. entities.requestWhat (set by
     // intent.js whenever a handoff signal is present, independent of which
     // type won) is the actual ask; falling back to entities.what keeps
     // REQUEST/COMMITMENT_OF_READER unchanged, since their own `what` is
@@ -76,63 +87,127 @@ const FlowActions = (() => {
     };
   }
 
-  // Execution priority from the spec: a real calendar event beats a drafted
-  // reply beats a bare task — EXCEPT for COMMITMENT_OF_READER, where the
-  // most useful first action is a reminder for the reader's own obligation,
-  // not a reply. "You agreed to send the report Friday" is primarily
-  // something for the reader to track, whether or not this particular
-  // message also happens to want a reply — so Task leads there, Draft
-  // second. Google Tasks is the guaranteed fallback in every case — always
-  // included unless the plan is already full — not "only when nothing else
-  // applies."
-  function planFor(intent, ctx) {
-    ctx = ctx || {};
-    const actions = [];
-    if (!intent || !intent.type) return actions;
-
-    const e = intent.entities || {};
-    const sig = intent.signals || {};
-    const hasAttachment = Boolean(ctx.hasThreadAttachment);
-
-    // A reply draft makes sense whenever the message is itself asking for
-    // one (REQUEST, COMMITMENT_OF_READER) OR when an otherwise-calendar
-    // message also carries a request signal (sig.handoff) — the "meeting
-    // invite that also asks you to confirm" case from the spec's own
-    // examples. Never proposed for DECISION_TO_LOG/FOLLOW_UP: those are
-    // reports of something that already happened, not something waiting on
-    // a reply.
-    const draftWorthy =
-      intent.type === FlowIntent.TYPES.REQUEST ||
-      intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER ||
-      (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && sig.handoff);
-
-    function pushCalendar() { if (actions.length < MAX_ACTIONS) actions.push(calendarAction(intent, e, ctx)); }
-    function pushDraft() { if (draftWorthy && actions.length < MAX_ACTIONS) actions.push(draftAction(intent, e, ctx, hasAttachment)); }
-    function pushTask() { if (actions.length < MAX_ACTIONS) actions.push(taskAction(intent, e, ctx)); }
-
-    if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
-      // Calendar: only ever from this classification — intent.js already
-      // required a meeting noun + date + time together (and no cancellation
-      // signal) before returning it, so it's the single most concrete,
-      // unambiguous action and leads.
-      pushCalendar();
-      pushDraft();
-      pushTask();
-    } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
-      pushTask();
-      pushDraft();
-    } else {
-      // REQUEST: the draft IS the thing being asked for, so it leads.
-      // DECISION_TO_LOG / FOLLOW_UP: draftWorthy is false here, so
-      // pushDraft() is a no-op and the plan reduces to Task alone.
-      pushDraft();
-      pushTask();
-    }
-
-    return actions.slice(0, MAX_ACTIONS);
+  function buildStep(kind, intent, e, ctx, hasAttachment) {
+    if (kind === 'calendar') return calendarAction(intent, e, ctx);
+    if (kind === 'draft') return draftAction(intent, e, ctx, hasAttachment);
+    return taskAction(intent, e, ctx);
   }
 
-  return { planFor };
+  // ---------------------------------------------------------------- catalog
+  //
+  // A small, fixed library of named, closing-oriented processes — not a
+  // rules engine, and deliberately not extensible from outside this file.
+  // `anchor` is the one step Execution Memory below may never demote or
+  // reorder: it's the concrete evidence the process exists on at all (a
+  // real date+time for a schedule process, the ask itself for a reply) —
+  // memory bias only ever touches the secondary steps around it.
+  function processFor(intent) {
+    const sig = intent.signals || {};
+    if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
+      if (sig.handoff) {
+        return {
+          id: 'schedule-confirm',
+          name: 'Schedule & Confirm',
+          closingLine: 'Scheduling this, replying to confirm, and setting a follow-up.',
+          closedLine: 'Scheduled, confirmed, and tracked.',
+          anchor: 'calendar',
+          stepKinds: ['calendar', 'draft', 'task']
+        };
+      }
+      return {
+        id: 'schedule',
+        name: 'Schedule It',
+        closingLine: 'Scheduling this and setting a reminder to prepare.',
+        closedLine: 'Scheduled, with a reminder set.',
+        anchor: 'calendar',
+        stepKinds: ['calendar', 'task']
+      };
+    }
+    if (intent.type === FlowIntent.TYPES.REQUEST) {
+      return {
+        id: 'reply-track',
+        name: 'Reply & Track',
+        closingLine: 'Drafting your reply and tracking it as a task.',
+        closedLine: 'Replied and tracked.',
+        anchor: 'draft',
+        stepKinds: ['draft', 'task']
+      };
+    }
+    if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
+      return {
+        id: 'follow-through',
+        name: 'Follow Through',
+        closingLine: 'Setting a reminder to follow through, with a reply ready.',
+        closedLine: 'Reminder set, reply ready.',
+        anchor: 'task',
+        stepKinds: ['task', 'draft']
+      };
+    }
+    // DECISION_TO_LOG / FOLLOW_UP — the chip's original job, narrowed to
+    // its own named process rather than a type-less default.
+    return {
+      id: 'log-it',
+      name: 'Log It',
+      closingLine: 'Logging this so it stays tracked.',
+      closedLine: 'Logged.',
+      anchor: 'task',
+      stepKinds: ['task']
+    };
+  }
+
+  // ----------------------------------------------------------- memory bias
+  //
+  // Within the non-anchor steps only: drop a step kind this account has
+  // net-rejected (removed-or-undone more than accepted) across a real
+  // sample size, and otherwise order the rest by historical acceptance
+  // rate — most-reliably-kept first. No history for a step yet -> neutral
+  // 0.5 rate, which keeps the catalog's own default order for ties.
+  function applyMemory(stepKinds, anchor, memoryForProcess) {
+    const rest = stepKinds.filter((k) => k !== anchor);
+    const stats = (memoryForProcess && memoryForProcess.steps) || {};
+
+    const kept = rest.filter((k) => {
+      const s = stats[k];
+      if (!s) return true;
+      const rejected = s.removed + s.undone;
+      return !(rejected >= DEMOTE_THRESHOLD && rejected > s.accepted);
+    });
+
+    const scored = kept.map((k, i) => {
+      const s = stats[k];
+      if (!s) return { k, rate: 0.5, i };
+      const total = s.accepted + s.removed + s.undone;
+      return { k, rate: total > 0 ? s.accepted / total : 0.5, i };
+    });
+    scored.sort((a, b) => b.rate - a.rate || a.i - b.i);
+
+    const ordered = scored.map((x) => x.k);
+    return stepKinds.includes(anchor) ? [anchor, ...ordered] : ordered;
+  }
+
+  // ctx.executionMemory, when present, is the FULL memory blob keyed by
+  // process id (FlowExecutionMemory.getAll()'s own shape) — fetched once by
+  // content-gmail.js per scan, not per process, since which process this
+  // message needs isn't known until after classification.
+  function planFor(intent, ctx) {
+    ctx = ctx || {};
+    if (!intent || !intent.type) return null;
+
+    const e = intent.entities || {};
+    const hasAttachment = Boolean(ctx.hasThreadAttachment);
+    const proc = processFor(intent);
+    const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
+    const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
+
+    const steps = orderedKinds
+      .map((kind) => buildStep(kind, intent, e, ctx, hasAttachment))
+      .filter(Boolean);
+    if (!steps.length) return null; // every non-anchor step demoted AND no anchor in this catalog entry — never happens today, but never silently propose nothing described
+
+    return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };
+  }
+
+  return { planFor, MAX_ACTIONS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };

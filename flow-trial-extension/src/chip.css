@@ -66,6 +66,34 @@
   color: #16214a;
 }
 
+/* The named-process badge: "this is one thing being closed," stated before
+   the sentence explains what that means. Same blue family as the ring/shell
+   (#1A4EF5), not a new accent — a label, not a second brand mark. Used both
+   on the idle card (first child of the column-flex host, so align-self
+   keeps it from stretching full width) and on the done receipt (inline
+   alongside the check icon, ahead of the closure summary), so it reads as
+   the same named thing before and after Do It closes it. */
+.flow-chip-process-name {
+  all: unset;
+  align-self: flex-start;
+  display: inline-block;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  line-height: 1.3;
+  color: #1A4EF5;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(26,78,245,.1);
+  border: 1px solid rgba(26,78,245,.22);
+}
+.flow-chip.flow-chip-done .flow-chip-process-name {
+  color: #0F6640;
+  background: rgba(15,102,64,.1);
+  border-color: rgba(15,102,64,.28);
+}
+
 .flow-chip-sparkle {
   display: inline-block;
   width: 11px;
