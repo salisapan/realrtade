@@ -25,16 +25,24 @@
    (see setChipState/showReceipt in content-gmail.js) rather than keeping the
    shell/ring/shine — those are brief, secondary states, not the moment this
    needs to look premium, so they keep the simpler flat-color treatment this
-   file always had. */
+   file always had.
+
+   Zero-Prompt is the product's whole premise, and the idle card is built to
+   read that way: one sentence, one button. When a message earns more than
+   one proposed action, that fact never arrives as a row of pills sitting
+   open by default — it arrives as one quiet "+N more" toggle next to Do It.
+   Nothing about what's behind it is visible until asked for; Do It itself
+   always executes the full proposal with zero further clicks either way.
+   The toggle only exists at all when there IS more than one action — see
+   injectChip() in content-gmail.js. */
 
 @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@500;600;700;800&display=swap');
 
 .flow-chip-host {
   all: initial;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   margin: 10px 0;
   padding: 10px 12px 10px 14px;
@@ -47,40 +55,68 @@
 
 .flow-chip-text {
   all: unset;
-  flex: 1 1 100%;
-  min-width: 0;
+  display: block;
   font-size: 13.5px;
   font-weight: 700;
   line-height: 1.45;
   color: #16214a;
 }
 
-/* ---- action pills: up to 5 proposed actions, each removable with a small
-   × before Do It is clicked. Sits between the lead sentence and the Do It
-   button — its own wrapped row, not a second decision surface. Removing a
-   pill just shrinks the row; the Do It button itself is never disabled,
-   even with zero pills left (see onDoIt's own empty-list handling). ------ */
+/* The always-visible row: the quiet disclosure toggle (only when there's
+   something to disclose), dismiss, Do It — right-aligned under the Hebrew
+   sentence above it, Do It closest to the card's edge as the clear anchor. */
+.flow-chip-main-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.flow-chip-more-toggle {
+  all: initial;
+  font-family: inherit;
+  cursor: pointer;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #4a5578;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px dashed rgba(40,70,150,.32);
+  background: transparent;
+  white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.flow-chip-more-toggle:hover { background: rgba(40,70,150,.06); border-color: rgba(40,70,150,.5); color: #16214a; }
+.flow-chip-more-toggle:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
+.flow-chip-more-toggle[aria-expanded="true"] { border-style: solid; background: rgba(40,70,150,.08); color: #16214a; }
+
+/* ---- action pills: revealed only once the toggle above is opened. Each
+   carries a small monochrome icon for its destination and is individually
+   removable with a small × before Do It is clicked — removing a pill just
+   shrinks the row; Do It itself is never disabled, even with zero pills
+   left (see onDoIt's own empty-list handling). The collapse is height +
+   opacity so opening/closing reads as one deliberate motion rather than a
+   hard cut. ---------------------------------------------------------------- */
 .flow-chip-actions-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  /* No flex-grow: with only 1-2 pills (the common case — several intent
-     types only ever produce a single action), a growing row stretches to
-     fill the leftover space in the button row, then left-aligns its pill(s)
-     inside that stretched box (this row is explicitly dir="ltr") — the
-     visible result was a pill floating with a dead gap before the card's
-     edge instead of sitting tight against Do It/dismiss. Shrink stays on so
-     a full 5-pill row still wraps inside its own box rather than
-     overflowing. */
-  flex: 0 1 auto;
-  min-width: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height .28s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
+}
+.flow-chip-host.flow-chip-expanded .flow-chip-actions-row {
+  max-height: 160px;
+  opacity: 1;
 }
 .flow-chip-action-pill {
   all: initial;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-family: inherit;
   font-size: 11.5px;
   font-weight: 700;
@@ -92,10 +128,21 @@
   border: 1px solid rgba(40,70,150,.18);
   white-space: nowrap;
 }
+.flow-chip-action-icon {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: .8;
+}
 .flow-chip-action-pill-label {
   all: unset;
   font-family: inherit;
-  max-width: 220px;
+  max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -266,4 +313,5 @@
 @media (prefers-reduced-motion: reduce) {
   .flow-chip-host { animation: none; }
   .flow-chip:hover { transform: none; }
+  .flow-chip-actions-row { transition: none; }
 }

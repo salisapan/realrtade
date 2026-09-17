@@ -36,11 +36,17 @@ const FlowActions = (() => {
       actions.push({
         id: 'calendar',
         kind: 'calendar',
-        // intent.label, not entities.what — what is the full quoted
-        // sentence (can run to hundreds of characters), fine for a task's
-        // notes field but not for a chip that has to stay lightweight.
-        label: 'Add to Calendar: ' + (intent.label || 'Meeting'),
+        // Short — this is now a collapsed-by-default pill label, not the
+        // whole sentence describing the action (see content-gmail.js's
+        // injectChip: only surfaced at all once someone opens "+N more").
+        // The full description still exists, as `hint`, for the pill's
+        // title/aria-label.
+        label: 'Calendar event',
+        hint: 'Add to Calendar: ' + (intent.label || 'Meeting'),
         params: {
+          // intent.label, not entities.what — what is the full quoted
+          // sentence (can run to hundreds of characters), fine for a
+          // task's notes field but not for an event title.
           title: (intent.label || e.what || 'Meeting').slice(0, 200),
           dateIso: e.dateIso, hour: e.hour, minute: e.minute,
           threadUrl: ctx.threadUrl
@@ -63,7 +69,8 @@ const FlowActions = (() => {
       actions.push({
         id: 'draft',
         kind: 'gmailDraft',
-        label: 'Prepare reply draft' + (hasAttachment ? ' with attachment' : ''),
+        label: hasAttachment ? 'Reply draft + file' : 'Reply draft',
+        hint: 'Prepare reply draft' + (hasAttachment ? ' with attachment' : ''),
         params: {
           intentType: intent.type,
           what: e.what, when: e.when, amount: e.amount,
@@ -83,7 +90,8 @@ const FlowActions = (() => {
       actions.push({
         id: 'task',
         kind: 'googleTask',
-        label: 'Create task: ' + (intent.label || e.what || intent.type),
+        label: 'Task',
+        hint: 'Create task: ' + (intent.label || e.what || intent.type),
         params: {
           title: intent.label || e.what,
           dateIso: e.dateIso,

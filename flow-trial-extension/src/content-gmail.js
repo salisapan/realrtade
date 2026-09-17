@@ -282,6 +282,43 @@
     }
   }
 
+  // Small monochrome line icons, one per action kind — built via the SVG
+  // DOM API (never innerHTML: every other element in this file is built the
+  // same way, via el()'s textContent, specifically so nothing here ever
+  // needs a markup-injection code path at all, even for content that's
+  // static and this file's own). stroke uses currentColor, so a pill's own
+  // text color is the icon's color for free — no separate palette to keep
+  // in sync.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs) {
+    const n = document.createElementNS(SVG_NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    return n;
+  }
+  function actionIcon(kind) {
+    const svg = svgEl('svg', { viewBox: '0 0 16 16', class: 'flow-chip-action-icon', 'aria-hidden': 'true' });
+    if (kind === 'calendar') {
+      svg.appendChild(svgEl('rect', { x: 2, y: 3, width: 12, height: 11, rx: 2 }));
+      svg.appendChild(svgEl('line', { x1: 2, y1: 6.5, x2: 14, y2: 6.5 }));
+      svg.appendChild(svgEl('line', { x1: 5, y1: 1.5, x2: 5, y2: 4.5 }));
+      svg.appendChild(svgEl('line', { x1: 11, y1: 1.5, x2: 11, y2: 4.5 }));
+    } else if (kind === 'gmailDraft') {
+      svg.appendChild(svgEl('rect', { x: 2, y: 3.5, width: 12, height: 9, rx: 1.5 }));
+      svg.appendChild(svgEl('polyline', { points: '2.5,4 8,9 13.5,4' }));
+    } else { // googleTask
+      svg.appendChild(svgEl('rect', { x: 2.5, y: 2.5, width: 11, height: 11, rx: 2.5 }));
+      svg.appendChild(svgEl('polyline', { points: '5,8.2 7,10.2 11,5.8' }));
+    }
+    return svg;
+  }
+
+  // Zero-Prompt, deliberately: the idle card is one sentence and one
+  // button. When intent.js/actions.js propose more than one action, that
+  // fact shows up as a single quiet "+N more" toggle next to Do It — not
+  // as a row of pills sitting open, competing with the button for
+  // attention, on every single message. Do It always runs the full
+  // proposal either way; opening the toggle is purely for someone who
+  // wants to look before confirming, or prune one action out.
   function injectChip(messageNode, ctx) {
     if (messageNode.querySelector('.flow-chip-host')) return;
 
@@ -289,50 +326,75 @@
     host.setAttribute('dir', 'rtl');
     host.appendChild(el('p', 'flow-chip-text', heLead(ctx.intent)));
 
-    // The proposed action list, each removable with its own × before Do It
-    // is clicked — "up to 5 actions... a small X to remove before
-    // confirming, only remaining actions execute." liveActions is the
-    // mutable working copy Do It actually reads; ctx.actions (what
-    // actions.js proposed) is left untouched so a re-scan of this same
-    // message always starts from the full proposal again.
+    // liveActions is the mutable working copy Do It actually reads;
+    // ctx.actions (what actions.js proposed) is left untouched so a
+    // re-scan of this same message always starts from the full proposal
+    // again.
     const liveActions = ctx.actions.slice();
-    const pillRow = el('div', 'flow-chip-actions-row');
-    pillRow.setAttribute('dir', 'ltr');
-    for (const action of ctx.actions) {
-      const pill = el('span', 'flow-chip-action-pill');
-      pill.appendChild(el('span', 'flow-chip-action-pill-label', action.label));
-      const x = el('button', 'flow-chip-action-pill-x', '×');
-      x.type = 'button';
-      x.setAttribute('aria-label', 'Remove: ' + action.label);
-      x.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const idx = liveActions.indexOf(action);
-        if (idx >= 0) liveActions.splice(idx, 1);
-        pill.remove();
-        // Zero actions left is a valid state, not a disabled one — Do It
-        // still responds (as a dismiss; see onDoIt) rather than the button
-        // going dead with no explanation.
-      });
-      pill.appendChild(x);
-      pillRow.appendChild(pill);
-    }
-    host.appendChild(pillRow);
+    const multi = ctx.actions.length > 1;
 
-    const chip = el('button', 'flow-chip');
-    chip.type = 'button';
-    chip.setAttribute('dir', 'ltr');
-    chip.appendChild(el('span', 'shell'));
-    chip.appendChild(el('span', 'ring'));
-    chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
-    chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveActions));
-    host.appendChild(chip);
+    let pillRow = null;
+    if (multi) {
+      pillRow = el('div', 'flow-chip-actions-row');
+      pillRow.setAttribute('dir', 'ltr');
+      pillRow.inert = true; // collapsed and non-interactive until the toggle opens it
+      for (const action of ctx.actions) {
+        const pill = el('span', 'flow-chip-action-pill');
+        pill.appendChild(actionIcon(action.kind));
+        pill.appendChild(el('span', 'flow-chip-action-pill-label', action.label));
+        if (action.hint) pill.title = action.hint;
+        const x = el('button', 'flow-chip-action-pill-x', '×');
+        x.type = 'button';
+        x.setAttribute('aria-label', 'Remove: ' + (action.hint || action.label));
+        x.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const idx = liveActions.indexOf(action);
+          if (idx >= 0) liveActions.splice(idx, 1);
+          pill.remove();
+          // Zero actions left is a valid state, not a disabled one — Do It
+          // still responds (as a dismiss; see onDoIt) rather than the
+          // button going dead with no explanation.
+        });
+        pill.appendChild(x);
+        pillRow.appendChild(pill);
+      }
+    }
+
+    const mainRow = el('div', 'flow-chip-main-row');
+    mainRow.setAttribute('dir', 'ltr');
+
+    if (multi) {
+      const toggle = el('button', 'flow-chip-more-toggle', '+' + (ctx.actions.length - 1) + ' more');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', 'false');
+      toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const expanding = !host.classList.contains('flow-chip-expanded');
+        host.classList.toggle('flow-chip-expanded', expanding);
+        pillRow.inert = !expanding;
+        toggle.setAttribute('aria-expanded', String(expanding));
+        toggle.textContent = expanding ? 'Hide' : '+' + (ctx.actions.length - 1) + ' more';
+      });
+      mainRow.appendChild(toggle);
+    }
 
     const dismiss = el('button', 'flow-chip-dismiss', '×');
     dismiss.type = 'button';
     dismiss.setAttribute('aria-label', 'Dismiss');
     dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, ctx); });
-    host.appendChild(dismiss);
+    mainRow.appendChild(dismiss);
+
+    const chip = el('button', 'flow-chip');
+    chip.type = 'button';
+    chip.appendChild(el('span', 'shell'));
+    chip.appendChild(el('span', 'ring'));
+    chip.appendChild(el('span', 'shine'));
+    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.addEventListener('click', () => onDoIt(host, chip, ctx, liveActions));
+    mainRow.appendChild(chip);
+
+    host.appendChild(mainRow);
+    if (pillRow) host.appendChild(pillRow);
 
     messageNode.insertBefore(host, messageNode.firstChild);
   }
