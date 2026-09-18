@@ -272,25 +272,21 @@
   // The product is deliberately silent between chips, and a silent tool is
   // easy to forget you installed. This is the one place that answers "is it
   // actually doing anything" without turning into a notification.
-  // Distinct MESSAGES with at least one successful write, not raw write
-  // rows — a single Do It click can now produce up to 5 'written' entries
-  // at once (Calendar + Gmail Draft + Google Task from one email), and
-  // counting rows would make "N logged this week" and the referral gate
-  // below both overstate how many separate decisions the user actually
-  // acted on.
-  function distinctWrittenMessages(log) {
-    return new Set((log || []).filter((e) => e.kind === 'written').map((e) => e.messageId));
-  }
-
+  // Both numbers come from storage.js's writeCountsFrom — the single
+  // definition, sitting next to the data. They used to be derived here from
+  // the 200-entry activity log, which made "all-time" GO DOWN as old rows
+  // were evicted (one Do It appends up to five 'written' rows, so ~40
+  // multi-step closes rolled the whole window) and undercounted "this week"
+  // for anyone closing more in a week than the log could hold. A counter that
+  // shrinks is not a rounding error — it is the product stating something it
+  // knows is false.
   function renderWeekStat(s) {
     const wrap = document.getElementById('weekStat');
-    const written = (s.log || []).filter((e) => e.kind === 'written');
-    if (!written.length) { wrap.hidden = true; return; }
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const thisWeekIds = new Set(written.filter((e) => e.ts >= weekAgo).map((e) => e.messageId));
-    document.getElementById('weekCount').textContent = thisWeekIds.size;
+    const counts = FlowStorage.writeCountsFrom(s);
+    if (!counts.total) { wrap.hidden = true; return; }
+    document.getElementById('weekCount').textContent = counts.week;
     document.getElementById('weekLabel').textContent = ' logged this week';
-    document.getElementById('weekTotal').textContent = distinctWrittenMessages(s.log).size + ' all-time';
+    document.getElementById('weekTotal').textContent = counts.total + ' all-time';
     wrap.hidden = false;
   }
 
@@ -367,8 +363,13 @@
   // Dismissing it is permanent; it never reappears once the user has said no.
   function renderReferral(s) {
     const wrap = document.getElementById('referral');
-    const written = (s.log || []).filter((e) => e.kind === 'written');
-    if (s.referralDismissed || written.length < 3) { wrap.hidden = true; return; }
+    // Distinct messages, via the same storage.js counter the stat row above
+    // uses. This gate used to count raw 'written' rows, so ONE Do It on a
+    // three-step process satisfied "three real writes" by itself — asking
+    // someone to recommend the product after a single click is precisely the
+    // nag the three-write threshold exists to avoid.
+    const total = FlowStorage.writeCountsFrom(s).total;
+    if (s.referralDismissed || total < 3) { wrap.hidden = true; return; }
     wrap.hidden = false;
   }
 

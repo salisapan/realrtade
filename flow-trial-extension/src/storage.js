@@ -40,6 +40,27 @@ const FlowStorage = (() => {
     // answer, not a snooze. See popup.js's renderMemoryInsight/
     // wireMemoryInsight and FlowExecutionMemory.recordPin.
     memoryInsightsSeen: [],
+    // Every messageId the user has actually closed — written, dismissed, or
+    // undone. This exists because `log` above is a CAPPED DISPLAY FEED and a
+    // decision is not a display concern: a single Do It can append up to five
+    // 'written' rows, so ~40 multi-step closes push the oldest entries out of
+    // the 200-entry window entirely. Before this set existed, that eviction
+    // silently un-resolved the message — hasTerminalOutcome went back to
+    // false, the chip re-injected on an email already written to Google
+    // Tasks, and clicking Do It wrote it a SECOND time. A duplicate write is
+    // the one failure this product cannot absorb; "no date beats a wrong one"
+    // applies with even more force to a record it already created. Ids only,
+    // so the cap buys roughly an order of magnitude more history than the
+    // same bytes of log would.
+    resolvedMessageIds: [],
+    // The write counters the Activity tab shows, kept here rather than
+    // recomputed from `log` for the same reason: derived from a capped feed,
+    // a number labelled "all-time" GOES DOWN as the log churns. `total` is
+    // monotonic and counts distinct messages with at least one successful
+    // write; `recent` holds one {id, ts} per distinct message so the
+    // "this week" figure stays right even for someone closing more in a week
+    // than the raw log can hold.
+    writeStats: { total: 0, recent: [] },
     // A random per-install identifier — never an email, never tied to a
     // Google/workspace identity. It exists for two things only: telling one
     // install's anonymous usage events apart from another's in aggregate
@@ -89,11 +110,71 @@ const FlowStorage = (() => {
     };
   }
 
+  const TERMINAL_KINDS = new Set(['dismissed', 'written', 'undone']);
+
+  // How many entries the Activity feed keeps. Unchanged — this is a display
+  // window, and the popup only ever renders 40 rows out of it anyway.
+  const LOG_CAP = 200;
+  // How many STILL-OPEN 'shown' entries may be carried past that window. The
+  // Morning Brief's only record that a process exists is its 'shown' entry,
+  // so plain oldest-first eviction quietly deleted open work from a panel
+  // whose own headline is "This is waiting to be closed." Carrying them is
+  // bounded (never more than LOG_CAP + OPEN_CARRY_CAP rows total) and costs
+  // the Activity tab nothing, since it filters 'shown' out.
+  const OPEN_CARRY_CAP = 60;
+  const RESOLVED_CAP = 1000;
+  const WRITE_RECENT_CAP = 300;
+
+  // Trims to the newest LOG_CAP entries, then puts back the still-open
+  // 'shown' entries that just fell off the end. An entry is skipped if the
+  // user already closed it, or if a newer entry inside the window already
+  // speaks for that message.
+  function trimLog(log, resolved) {
+    if (log.length <= LOG_CAP) return log;
+    const head = log.slice(0, LOG_CAP);
+    const spokenFor = new Set(head.map((e) => e.messageId).filter(Boolean));
+    const carried = [];
+    for (const e of log.slice(LOG_CAP)) {
+      if (carried.length >= OPEN_CARRY_CAP) break; // oldest open work is what gets sacrificed
+      if (e.kind !== 'shown' || !e.process || !e.messageId) continue;
+      if (resolved.has(e.messageId) || spokenFor.has(e.messageId)) continue;
+      spokenFor.add(e.messageId);
+      carried.push(e);
+    }
+    return head.concat(carried);
+  }
+
+  // The single place the durable derived state above is maintained, so it can
+  // never drift from the log it is derived from: one read, one write, inside
+  // the same serialized queue that already protects `log`.
   const appendLog = serialize(async function appendLog(entry) {
     const state = await get();
-    const log = [{ ts: Date.now(), ...entry }, ...state.log].slice(0, 200);
-    await set({ log });
-    return log;
+    const row = { ts: Date.now(), ...entry };
+    const patch = {};
+
+    const resolved = new Set(state.resolvedMessageIds || []);
+    if (row.messageId && TERMINAL_KINDS.has(row.kind) && !resolved.has(row.messageId)) {
+      resolved.add(row.messageId);
+      patch.resolvedMessageIds = [row.messageId, ...(state.resolvedMessageIds || [])].slice(0, RESOLVED_CAP);
+    }
+
+    // Distinct messages, not rows: one Do It can append five 'written' rows
+    // for the same message and must count once — the same rule the Activity
+    // tab's own counter has always used, just made durable.
+    if (row.kind === 'written' && row.messageId) {
+      const ws = state.writeStats || { total: 0, recent: [] };
+      const recent = ws.recent || [];
+      if (!recent.some((w) => w && w.id === row.messageId)) {
+        patch.writeStats = {
+          total: (ws.total || 0) + 1,
+          recent: [{ id: row.messageId, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
+        };
+      }
+    }
+
+    patch.log = trimLog([row, ...state.log], resolved);
+    await set(patch);
+    return patch.log;
   });
 
   const markSeen = serialize(async function markSeen(messageId) {
@@ -129,10 +210,12 @@ const FlowStorage = (() => {
   // 'undone' are terminal. A message that only ever logged 'shown' has no
   // recorded user decision, so it's safe — and correct — to judge and show
   // again after Gmail rebuilds its node.
-  const TERMINAL_KINDS = new Set(['dismissed', 'written', 'undone']);
-
   async function hasTerminalOutcome(messageId) {
     const state = await get();
+    // The durable set first — it outlives log eviction, which is the whole
+    // point of it. The log scan behind it is the migration path for installs
+    // that recorded decisions before resolvedMessageIds existed.
+    if ((state.resolvedMessageIds || []).includes(messageId)) return true;
     const entry = state.log.find((e) => e.messageId === messageId);
     return !!entry && TERMINAL_KINDS.has(entry.kind);
   }
@@ -175,16 +258,54 @@ const FlowStorage = (() => {
   // is the only thing stored, exactly like Execution Memory's own event log.
   async function getPending() {
     const state = await get();
-    const seen = new Set();
+    const resolved = new Set(state.resolvedMessageIds || []);
+    const listed = new Set();
     const open = [];
-    // Newest first (how the log is stored) — the first entry for a given
-    // messageId is its most recent outcome, matching hasTerminalOutcome.
+    // Newest first (how the log is stored). Only a TERMINAL entry closes a
+    // message. Taking the first entry of any kind used to close it too, which
+    // meant a Do It whose writes all FAILED — a 'clicked' row with no
+    // 'written' after it — dropped the process out of the Brief even though
+    // nothing had been written and hasTerminalOutcome still said it was open.
+    // The two functions claimed to share one definition of "still open" and
+    // did not. Non-terminal rows are now simply passed over.
     for (const entry of state.log) {
-      if (!entry.messageId || seen.has(entry.messageId)) continue;
-      seen.add(entry.messageId);
-      if (entry.kind === 'shown' && entry.process) open.push(entry);
+      if (!entry.messageId || resolved.has(entry.messageId)) continue;
+      if (TERMINAL_KINDS.has(entry.kind)) { resolved.add(entry.messageId); continue; }
+      if (entry.kind !== 'shown' || !entry.process) continue;
+      if (listed.has(entry.messageId)) continue;
+      listed.add(entry.messageId);
+      open.push(entry);
     }
     return open.reverse(); // oldest-still-open first
+  }
+
+  // The one definition of "how many separate decisions has this person
+  // actually closed." It lived in the popup as an ad-hoc log filter, got
+  // fixed once (count distinct MESSAGES, not rows — one Do It on a
+  // three-step process appends three 'written' rows) and left unfixed in the
+  // second caller right below it, whose own gate then fired after a single
+  // click. Two callers deriving the same number two ways is how that happens,
+  // so there is now one, next to the data it reads.
+  //
+  // writeStats is authoritative; the log is folded in only so an install that
+  // wrote things before writeStats existed doesn't watch its total reset to
+  // zero on upgrade. Neither number may ever go down.
+  function writeCountsFrom(state) {
+    const ws = (state && state.writeStats) || { total: 0, recent: [] };
+    const log = (state && state.log) || [];
+    const legacy = new Set(log.filter((e) => e.kind === 'written' && e.messageId).map((e) => e.messageId));
+
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const week = new Set((ws.recent || []).filter((w) => w && w.ts >= weekAgo).map((w) => w.id));
+    for (const e of log) {
+      if (e.kind === 'written' && e.messageId && e.ts >= weekAgo) week.add(e.messageId);
+    }
+
+    return { total: Math.max(ws.total || 0, legacy.size), week: week.size };
+  }
+
+  async function getWriteCounts() {
+    return writeCountsFrom(await get());
   }
 
   // Shared by every "at most once per calendar day (local time)" flag this
@@ -219,7 +340,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, consumeDailyBriefTrigger, consumeDailyActiveTrigger, markMemoryInsightSeen, calibrate, getInstallId, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, consumeDailyBriefTrigger, consumeDailyActiveTrigger, markMemoryInsightSeen, calibrate, getInstallId, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

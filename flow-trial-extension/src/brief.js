@@ -96,6 +96,22 @@ const FlowBrief = (() => {
     return wrap;
   }
 
+  // A brief is a brief. Rows arrive oldest-still-open first (storage.js's
+  // getPending), which is the right order to truncate from the far end of:
+  // the oldest open process is the one most likely to be genuinely forgotten,
+  // and a wall of a hundred rows is a backlog you scroll past, not something
+  // you close. The indicator behind this panel keeps showing the TRUE total —
+  // the count is never the thing that gets rounded down — and the footer
+  // below says plainly how many are not on screen, so the panel never implies
+  // it is showing everything.
+  const PANEL_MAX_ROWS = 12;
+
+  function overflowLabel(hidden) {
+    return hidden === 1
+      ? '1 more still open — close these first and it moves up'
+      : hidden + ' more still open — close these first and they move up';
+  }
+
   // rows: [{ id, title, subtitle, onDoIt(rowHost, doItBtn), onDismiss(rowHost) }]
   // opts: { onClose }
   function openPanel(rows, opts) {
@@ -115,9 +131,14 @@ const FlowBrief = (() => {
     head.appendChild(close);
     panelHost.appendChild(head);
 
+    const visible = rows.slice(0, PANEL_MAX_ROWS);
     const list = el('div', 'flow-brief-rows');
-    for (const row of rows) list.appendChild(buildRow(row));
+    for (const row of visible) list.appendChild(buildRow(row));
     panelHost.appendChild(list);
+
+    if (rows.length > visible.length) {
+      panelHost.appendChild(el('div', 'flow-brief-panel-more', overflowLabel(rows.length - visible.length)));
+    }
 
     document.body.appendChild(panelHost);
   }
