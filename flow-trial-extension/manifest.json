@@ -40,11 +40,13 @@
         "src/docwriter.js",
         "src/docreader.js",
         "src/sidebar.js",
+        "src/brief.js",
         "src/content-gmail.js"
       ],
       "css": [
         "src/chip.css",
-        "src/sidebar.css"
+        "src/sidebar.css",
+        "src/brief.css"
       ],
       "run_at": "document_idle"
     }

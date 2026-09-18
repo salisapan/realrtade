@@ -8,8 +8,18 @@ const FlowStorage = (() => {
     domainId: null,
     connectorId: null,
     // { ts, kind: 'shown'|'clicked'|'written'|'undone'|'dismissed', label, messageId, score, signals, where, url, ref }
+    // A 'shown' entry additionally carries { process, threadUrl, sender,
+    // subject, intent } — a full, DOM-free snapshot of what was proposed —
+    // so the Morning Brief (below) can re-run Do It / Dismiss on a message
+    // that isn't open in Gmail anymore, using the exact same process/action
+    // machinery as the live chip. Every other kind stays exactly as before.
     log: [],
     seenMessageIds: [],
+    // The last calendar day (local time, via Date#toDateString) the Morning
+    // Brief auto-opened itself. Never touched on a day with nothing pending
+    // — see consumeDailyBriefTrigger below — so the first day something
+    // really is open still gets a real auto-open, not a silently-burned turn.
+    briefLastShownDate: null,
     // The only thing that learns. Clicks make Flow slightly more willing to
     // speak; dismissals make it quieter. The user never sees or sets a number.
     calibration: { clicks: 0, dismissals: 0, ts: 0 },
@@ -132,6 +142,41 @@ const FlowStorage = (() => {
     return next;
   });
 
+  // The Morning Brief's entire data source: every process that was shown and
+  // has no terminal outcome yet, oldest-still-open first. Deliberately not a
+  // second, separately-tracked store — a message is "still open" by the same
+  // definition hasTerminalOutcome already uses (its most recent log entry
+  // isn't dismissed/written/undone), computed in bulk instead of one message
+  // at a time. This means resolving a message the ordinary way (the live
+  // chip's own Do It or dismiss, from any tab) automatically drops it from
+  // the next getPending() call with nothing extra to keep in sync — the log
+  // is the only thing stored, exactly like Execution Memory's own event log.
+  async function getPending() {
+    const state = await get();
+    const seen = new Set();
+    const open = [];
+    // Newest first (how the log is stored) — the first entry for a given
+    // messageId is its most recent outcome, matching hasTerminalOutcome.
+    for (const entry of state.log) {
+      if (!entry.messageId || seen.has(entry.messageId)) continue;
+      seen.add(entry.messageId);
+      if (entry.kind === 'shown' && entry.process) open.push(entry);
+    }
+    return open.reverse(); // oldest-still-open first
+  }
+
+  // At most one real auto-open per calendar day (local time) — "appears once
+  // a day," not once per Gmail tab load or per debounced DOM mutation.
+  // Serialized so two near-simultaneous callers (two Gmail tabs) can't both
+  // read "not shown today yet" before either writes the flag back.
+  const consumeDailyBriefTrigger = serialize(async function consumeDailyBriefTrigger() {
+    const state = await get();
+    const today = new Date().toDateString();
+    if (state.briefLastShownDate === today) return false;
+    await set({ briefLastShownDate: today });
+    return true;
+  });
+
   const getInstallId = serialize(async function getInstallId() {
     const state = await get();
     if (state.installId) return state.installId;
@@ -140,7 +185,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, calibrate, getInstallId, DEFAULTS };
+  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, consumeDailyBriefTrigger, calibrate, getInstallId, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

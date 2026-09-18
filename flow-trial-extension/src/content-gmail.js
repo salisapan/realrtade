@@ -38,6 +38,7 @@
     // mountSidebar() is off — see the note at wireAttachmentHoverCards()'s
     // call site in scanReadingPane() for why the whole sidebar surface
     // (badge, Draft-It, attachment X-ray) is cut, not just styled.
+    if (typeof FlowBrief !== 'undefined') checkBrief();
   }
 
   function stopWatching() {
@@ -45,6 +46,7 @@
     watching = false;
     currentContext = null;
     if (typeof FlowSidebar !== 'undefined') FlowSidebar.unmount();
+    if (typeof FlowBrief !== 'undefined') FlowBrief.hide();
   }
 
   // Mounted once per tab, idempotent (FlowSidebar.mount() itself no-ops if
@@ -335,8 +337,20 @@
     // 200-entry cap with duplicates for one message and evict real history
     // for others. Only record it the first time.
     if (!alreadyLoggedShown) {
-      FlowStorage.appendLog({ kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals });
+      // The extra fields below (process/threadUrl/sender/subject/intent) are
+      // what let the Morning Brief re-run Do It / Dismiss on this exact
+      // process later, without this message node — or even this tab — still
+      // existing. Every field is already a plain value at this point (no
+      // DOM references, nothing that depends on the live node), the same
+      // snapshot discipline injectChip's own ctx already follows.
+      FlowStorage.appendLog({
+        kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals,
+        process: { id: process.id, name: process.name, steps: process.steps },
+        threadUrl: threadUrl(legacyId), sender, subject,
+        intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score } }
+      });
       chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_shown', params: { domain: state.domainId } });
+      checkBrief();
     }
   }
 
@@ -974,7 +988,7 @@
     }
 
     runActionsSequentially(liveSteps, ctx, onStepDone)
-      .then((results) => showMultiActionReceipt(host, chip, ctx, results))
+      .then((results) => { showMultiActionReceipt(host, chip, ctx, results); checkBrief(); })
       .catch(() => setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'));
   }
 
@@ -984,6 +998,107 @@
     FlowStorage.calibrate('dismiss');
     FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
+    checkBrief();
+  }
+
+  /* --------------------------------------------------- Morning Brief (proactive closing) */
+  //
+  // The one habit-loop surface this extension has: a small, silent-by-default
+  // indicator for processes that were shown and never closed — not a second
+  // "you missed something" alert system, just the same Do It / Dismiss the
+  // live chip already offers, reachable for something that's no longer the
+  // message currently open in Gmail. Zero-Prompt rules apply here exactly as
+  // everywhere else: nothing renders at all when nothing is open, there is no
+  // settings screen, and the daily auto-open (see FlowStorage.
+  // consumeDailyBriefTrigger) is the only thing resembling a ritual — one
+  // real chance per day, never repeated, never forced if there's nothing to
+  // show.
+  //
+  // Deliberately does NOT expose per-step removal pills the way the live
+  // chip's "N steps" toggle does — a dense list of open items is not the
+  // place to re-litigate which steps to keep; Do It here closes the process
+  // exactly as it was proposed, or Dismiss closes it by declining. That's
+  // what keeps this a quiet extension of the chip instead of a second,
+  // heavier surface to manage.
+
+  function ctxFromPendingEntry(entry) {
+    // No DOM references (no message/messages node) — nothing in the
+    // execution path below needs them. Same reconstructed shape injectChip's
+    // own ctx already has for every field that matters to buildActionPayload,
+    // runActionsSequentially, showMultiActionReceipt, onDoIt, and onDismiss.
+    return {
+      messageId: entry.messageId,
+      threadUrl: entry.threadUrl,
+      sender: entry.sender,
+      subject: entry.subject,
+      intent: entry.intent,
+      process: entry.process
+    };
+  }
+
+  function briefRowSubtitle(entry) {
+    const who = (entry.sender && entry.sender.name) || (entry.sender && entry.sender.email) || '';
+    const what = entry.subject || entry.intent.label || '';
+    return who && what ? who + ' — ' + what : (what || who);
+  }
+
+  function openBriefPanel(pending) {
+    // Property names have to be exactly onDoIt/onDismiss — that's the row
+    // contract FlowBrief.buildRow calls into (brief.js). Each shorthand
+    // method here calls the file-level onDoIt/onDismiss functions above by
+    // the same name — that resolves to the outer function, not a
+    // self-reference, since an object method shorthand doesn't bind its own
+    // name inside its own body the way a named function declaration would.
+    const rows = pending.map((entry) => ({
+      id: entry.messageId,
+      title: entry.process.name,
+      subtitle: briefRowSubtitle(entry),
+      onDoIt(rowHost, doItBtn) {
+        const ctx = ctxFromPendingEntry(entry);
+        onDoIt(rowHost, doItBtn, ctx, ctx.process.steps);
+      },
+      onDismiss(rowHost) {
+        onDismiss(rowHost, ctxFromPendingEntry(entry));
+      }
+    }));
+    // Re-check on manual close, not just on every resolution inside the
+    // panel — closing it is the other moment the indicator's count (and its
+    // very existence) might now be stale, e.g. every item was resolved
+    // while the panel stayed open and nothing has re-triggered a check since.
+    FlowBrief.openPanel(rows, { onClose: () => { FlowBrief.closePanel(); checkBrief(); } });
+  }
+
+  // Called once when watching starts, and again right after anything that
+  // could change the pending set (a new chip shown, a Do It, a Dismiss) —
+  // deliberately not on every debounced Gmail DOM mutation, since the
+  // pending set only ever changes at those specific moments, not on
+  // arbitrary re-renders.
+  async function checkBrief() {
+    if (!watching) return;
+    const freshState = await FlowStorage.get();
+    // Same MVP scope gate as the live chip (scanReadingPane) — never
+    // resurface something Do It is guaranteed to fail on because the
+    // connector it was proposed for isn't the one currently wired up.
+    if (freshState.connectorId && freshState.connectorId !== 'googleTasks') { FlowBrief.hide(); return; }
+
+    const pending = await FlowStorage.getPending();
+    if (!pending.length) {
+      // Don't yank an already-open panel out from under someone the instant
+      // the last item in it resolves — they just watched it close and
+      // deserve to see that, not have the whole surface vanish under the
+      // receipt. Only fully hide when nothing is actively being looked at;
+      // the panel's own close button re-runs this check, so a stale
+      // indicator never outlives the panel that would have refreshed it.
+      if (!FlowBrief.isPanelOpen()) FlowBrief.hide();
+      return;
+    }
+
+    FlowBrief.show(pending.length, () => openBriefPanel(pending));
+
+    // The only thing resembling a daily ritual, and only spent on a day that
+    // actually has something to show — see the field's own comment in
+    // storage.js for why an empty day never consumes it.
+    if (await FlowStorage.consumeDailyBriefTrigger()) openBriefPanel(pending);
   }
 
   /* ------------------------------------------------------- Feature 2: Draft-It */

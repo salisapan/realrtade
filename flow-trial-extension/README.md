@@ -50,6 +50,22 @@ the fact. `actions.js` reads it to order those steps by how often this
 account has kept them, and to stop proposing a step it has net-rejected
 across a real sample size. Nothing in this log ever leaves the device.
 
+**A quiet Morning Brief for what's still open.** `src/brief.js` (rendering)
+and `src/storage.js`'s `getPending()`/`consumeDailyBriefTrigger()` (data)
+together are the one proactive surface Glance has, and it stays inside the
+same Zero-Prompt rules as everything else: a process a chip was shown for,
+and never closed with a Do It or a Dismiss, stays "pending" — that's just
+the existing per-message log's own `hasTerminalOutcome` definition applied
+in bulk, not a second store to keep in sync. When at least one thing is
+pending, a small "N still open" indicator appears (page-level, not
+per-message); clicking it opens a short list, and each row runs Do It /
+Dismiss through the exact same process/Execution Memory machinery the live
+chip uses — reconstructed entirely from the log's own snapshot, so it works
+even for a message that's no longer open in Gmail. It auto-opens at most
+once per calendar day, and only on a day something is actually open; with
+nothing pending, nothing renders at all — no empty state, no badge, no
+ritual to dismiss.
+
 **Five real write paths, all undoable.**
 
 | Connector | Auth | What one click does |
@@ -422,6 +438,8 @@ src/execution-memory.js  local event log of what a user keeps/strips/undoes per 
 src/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates/emails/phones before anything leaves the device
 src/sidebar.js         the injected sidebar pane: badge, Draft-It, Next-Step, attachment hover card
 src/sidebar.css        sidebar/floating-card styles (CSS logical properties, RTL/LTR safe)
+src/brief.js           Morning Brief UI: the page-level "N still open" indicator + its panel
+src/brief.css          brief indicator/panel styles, reusing the chip's own button states
 src/docwriter.js       generates a real .docx locally, no library (Feature 4 Path B)
 src/docreader.js       reads a .docx locally, no library (Feature 3's attachment text extraction)
 src/content-gmail.js   Gmail watcher, the chip, the sidebar wiring, and the receipt after a write
