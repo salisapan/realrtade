@@ -83,16 +83,49 @@ const FlowDocReader = (() => {
   // between them, rather than into the array of matches itself, is silently
   // dropped the moment the matches are joined without it. Walking paragraph
   // by paragraph keeps the break attached to the content it separates.
+  //
+  // That exact failure mode used to still exist one level down. <w:tab/>
+  // and <w:br/> are never nested inside a <w:t> — Word always writes them
+  // as sibling elements, one run for the text before the break and a
+  // separate run (or a bare element) for the break itself — so substituting
+  // them for \t/\n with a string .replace() first, then extracting text
+  // with a SEPARATE regex loop that only ever appends captured <w:t>
+  // groups, drops the substituted \t/\n right along with everything else
+  // sitting between two matches. A real two-line paragraph ("Line
+  // one<w:br/>Line two") extracted as "Line oneLine two" — confirmed
+  // against a genuine DEFLATE-compressed fixture built to match what real
+  // Word/Google Docs/LibreOffice output actually looks like, not just this
+  // file's own always-STORED writer counterpart in docwriter.js, which
+  // never exercises this path. One combined regex — matching a <w:t> run OR
+  // a tab OR a break in a single pass — keeps each piece in the position it
+  // actually occurred in, instead of splitting "extract the markers" and
+  // "extract the text" into two passes that can't see each other.
   function documentXmlToText(xml) {
     const paragraphs = [];
     const paraRe = /<w:p\b[^>]*>([\s\S]*?)<\/w:p>/g;
+    // <w:t[^>]*> would also match <w:tab/> itself: "tab/" satisfies
+    // [^>]* as if it were attribute content on a same-prefixed <w:t> tag,
+    // so the FIRST alternative wins at that position and swallows the
+    // literal text "<w:tab/>" plus everything up to the next real </w:t>
+    // into one corrupted capture -- confirmed against the fixture, this
+    // silently spliced the start of the NEXT run's opening tag into the
+    // output as literal text. Real WordprocessingML has several other
+    // w:t-prefixed tags that would collide the same way if they ever
+    // showed up inside a captured paragraph (w:tbl, w:tc, w:tcPr...).
+    // Requiring the character right after "<w:t" to be '>' or whitespace
+    // -- never another letter -- is how real XML tag-name boundaries work,
+    // and is enough to make "tab" fail to match here at all.
+    const partRe = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:tab\s*\/>|<w:br\s*\/>/g;
     let m;
     while ((m = paraRe.exec(xml)) !== null) {
-      const body = m[1].replace(/<w:tab\s*\/>/g, '\t').replace(/<w:br\s*\/>/g, '\n');
-      const runRe = /<w:t[^>]*>([\s\S]*?)<\/w:t>/g;
+      const body = m[1];
       let line = '';
-      let rm;
-      while ((rm = runRe.exec(body)) !== null) line += rm[1];
+      let pm;
+      partRe.lastIndex = 0;
+      while ((pm = partRe.exec(body)) !== null) {
+        if (pm[1] !== undefined) line += pm[1];
+        else line += pm[0].indexOf('tab') !== -1 ? '\t' : '\n';
+      }
       paragraphs.push(line);
     }
     return paragraphs.join('\n')
