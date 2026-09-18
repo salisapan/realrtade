@@ -206,7 +206,19 @@ const FlowDocWriter = (() => {
 
   function suggestedFilename(kind, ctx) {
     const base = (kind || 'document').replace(/[^a-z-]/gi, '');
-    const who = (ctx && (ctx.senderName || ctx.senderEmail) || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '');
+    // \p{L}\p{N} (Unicode letter/number) rather than the ASCII-only a-z0-9
+    // this used to keep. senderName is free text from the email itself —
+    // for this product's own Hebrew-speaking users that's routinely a
+    // Hebrew name, and [^a-z0-9]+ treats every character of it as
+    // punctuation to strip, collapsing the whole name to one separator
+    // that then gets trimmed away entirely. Two different Hebrew-named
+    // senders logged the same day produced the IDENTICAL filename
+    // (glance-receipt-2026-09-18.docx) with nothing to tell them apart —
+    // the one piece of the name meant to disambiguate multiple downloads
+    // silently doing nothing for the product's primary user base. Unicode
+    // letters/numbers are safe on every real filesystem; everything this
+    // still strips (colons, slashes, quotes, pipes) was genuinely unsafe.
+    const who = (ctx && (ctx.senderName || ctx.senderEmail) || '').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
     const stamp = new Date().toISOString().slice(0, 10);
     return ['glance', base, who, stamp].filter(Boolean).join('-') + '.docx';
   }
