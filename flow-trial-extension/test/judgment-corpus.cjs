@@ -213,5 +213,40 @@ if (heOutlookNewOnly.includes('סוכם')) {
   console.log('  ok    kept only the sender\'s new line, dropped the quoted history');
 }
 
+// The inverted-fact regression. Every trigger used to be tested against the
+// whole message with a bare .test(), which cannot tell agreement from refusal:
+// "We do NOT approve the $40,000" scored 59 and produced "Log $40,000 agreed",
+// identical to the genuine approval. Writing the opposite of what the sender
+// wrote is worse than writing nothing, so these must stay silent — while the
+// two SPEAK cases guard the other edge, that suppression stays per-sentence
+// and a real approval is not lost because something unrelated was negated
+// later in the same message.
+console.log('\nNegation, hedging and questions must not read as decisions:');
+{
+  const ctx = { now: NOW, subject: 'Re: Contract', senderEmail: 'dana@acme.com' };
+  const cases = [
+    ['speak',  'a plain approval',            'We approve the $40,000 and will sign Monday, so please send the paperwork over today.'],
+    ['speak',  'approval, negation elsewhere','We approved the $40,000 budget for the pilot. Separately, I will not be able to make the Tuesday sync.'],
+    ['speak',  'a genuine walk-away',         'Thanks for the proposal, but we are not moving forward with the renewal this year after all.'],
+    ['silent', 'an explicit refusal',         'We do NOT approve the $40,000 and will not sign anything before the board reviews it.'],
+    ['silent', '"cannot"',                    'We cannot approve the $40,000 at this time, as the budget has not been released yet.'],
+    ['silent', '"unable to"',                 'We are unable to approve the $40,000 until the new fiscal year opens in October.'],
+    ['silent', 'a conditional',               'If we approve the $40,000 we would sign Monday, but nothing has been decided internally yet.'],
+    ['silent', 'a tentative maybe',           'We might approve the $40,000 next quarter depending on how the pilot numbers come back.'],
+    ['silent', 'a question',                  'Would you approve the $40,000 and sign Monday, or do you need more time to review?'],
+    ['silent', 'a hypothetical',              'Suppose we approved the $40,000 for the pilot — would that actually work on your side?']
+  ];
+  for (const [expect, label, text] of cases) {
+    const r = FlowJudgment.evaluate(text, 'sales', ctx);
+    const ok = expect === 'speak' ? !!r : !r;
+    if (!ok) {
+      failures++;
+      console.log('  FAIL  ' + label + ' -> ' + (r ? 'spoke "' + r.label + '" (' + r.score + ')' : 'stayed silent') + ', expected ' + expect);
+    } else {
+      console.log('  ok    ' + label.padEnd(28) + (r ? 'speaks: "' + r.label + '"' : 'silent'));
+    }
+  }
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

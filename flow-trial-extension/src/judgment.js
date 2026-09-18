@@ -147,6 +147,58 @@ const FlowJudgment = (() => {
 
   // Every signal is {id, weight, why}. `why` is user-facing text — it shows up in
   // the popup, so it has to read like a sentence someone would say out loud.
+  // --- Does the sentence ASSERT its trigger, or deny it? -------------------
+  //
+  // Every trigger below used to be tested against the whole message with a
+  // bare .test(text), which asks only "does this word appear anywhere" — a
+  // question that cannot tell agreement from refusal. Measured, before this:
+  //
+  //   "We approve the $40,000 and will sign Monday."        -> Log $40,000 agreed
+  //   "We do NOT approve the $40,000 and will not sign."    -> Log $40,000 agreed
+  //   "We cannot approve the $40,000 at this time."         -> Log $40,000 agreed
+  //   "We might approve the $40,000 next quarter."          -> Log $40,000 agreed
+  //   "Would you approve the $40,000 and sign Monday?"      -> Log $40,000 agreed
+  //
+  // All five scored 59. The engine was writing the exact opposite of what the
+  // sender wrote into the user's calendar, with full confidence — an inverted
+  // fact, which is strictly worse than a missed one and the single thing this
+  // product cannot survive doing twice.
+  //
+  // So: find the trigger's OWN sentence and ask whether that sentence asserts
+  // it. Per-sentence matters — "We approved the budget. We won't make Tuesday."
+  // is still an approval, and a message-wide negation check would lose it.
+  const SENTENCE_SPLIT = /(?<=[.!?;])\s+|\n+/;
+
+  // Negation has to sit just BEFORE the trigger to count. A sentence that
+  // merely contains "no" somewhere ("Approved, no changes needed") is not a
+  // denial, and treating it as one would trade a wrong answer for a silent one
+  // far too often.
+  const NEG_BEFORE = /\b(?:not|never|cannot|can'?t|won'?t|wouldn'?t|shan'?t|don'?t|doesn'?t|didn'?t|isn'?t|aren'?t|no longer|unable to|declin\w*|refus\w*|reject\w*|denied|without)\b[^.!?;]{0,28}$/i;
+  const NEG_BEFORE_HE = /(?:לא|אין|בלי|נמנע|לא ניתן|לא נוכל)\s*(?:\S+\s+){0,3}$/;
+
+  // Conditionals and modals make a commitment contingent rather than made.
+  // "would" is knowingly included: it costs the occasional real signal from
+  // "we would like to confirm", and that costs silence, which is the side of
+  // the trade this file always takes.
+  const HEDGE = /\b(?:if|unless|assuming|suppose|supposing|provided that|subject to|pending|in case|once we|before we|might|may|could|would|perhaps|possibly|tentative(?:ly)?|proposed|hypothetical(?:ly)?)\b/i;
+  const HEDGE_HE = /(?:אם\s|אולי|ייתכן|בכפוף ל|בהנחה ש|במידה ו)/;
+
+  function assertedIn(text, pattern) {
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      const m = s.match(pattern);
+      if (!m) continue;
+      // A question asks for a decision; it does not record one.
+      if (/\?\s*$/.test(s.trim())) continue;
+      if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
+      const before = s.slice(0, m.index);
+      if (NEG_BEFORE.test(before) || NEG_BEFORE_HE.test(before)) continue;
+      return true; // at least one sentence states it plainly
+    }
+    return false;
+  }
+  const anyOf = (text, pats, fn) => pats.some((p) => fn(text, p));
+  const testsIn = (text, p) => p.test(text);
+
   function score(text, domain, facts) {
     const signals = [];
     const add = (id, weight, why) => signals.push({ id, weight, why });
@@ -157,11 +209,25 @@ const FlowJudgment = (() => {
     if (CALENDAR_NOISE.test(text)) add('calendar', -35, 'Calendar notification boilerplate');
     if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
-    const commitStrong = COMMIT_STRONG.test(text) || COMMIT_STRONG_HE.test(text);
-    const commit = commitStrong || COMMIT.test(text) || COMMIT_HE.test(text);
+    // A commitment counts only where a sentence actually states it. The
+    // "mentioned" forms are kept alongside so the difference between the two
+    // can be scored: a message that talks about approving without approving is
+    // not neutral evidence, it is evidence AGAINST acting.
+    const STRONG_PATS = [COMMIT_STRONG, COMMIT_STRONG_HE];
+    const COMMIT_PATS = [COMMIT, COMMIT_HE].concat(STRONG_PATS);
+    const EXEC_PATS = [EXECUTED, EXECUTED_HE];
+    const OBLIG_PATS = [OBLIGATION, OBLIGATION_HE];
+
+    const commitStrong = anyOf(text, STRONG_PATS, assertedIn);
+    const commit = commitStrong || anyOf(text, COMMIT_PATS, assertedIn);
+    const commitMentioned = anyOf(text, COMMIT_PATS, testsIn);
+    const executed = anyOf(text, EXEC_PATS, assertedIn);
+    const executedMentioned = anyOf(text, EXEC_PATS, testsIn);
+    // LOST is deliberately NOT routed through assertedIn: its own patterns
+    // embed the negation ("not moving forward", "no longer interested"), so
+    // asking whether the sentence negates them inverts the very signal.
     const lost = LOST.test(text) || LOST_HE.test(text);
-    const executed = EXECUTED.test(text) || EXECUTED_HE.test(text);
-    const obligation = OBLIGATION.test(text) || OBLIGATION_HE.test(text);
+    const obligation = anyOf(text, OBLIG_PATS, assertedIn);
     const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text);
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
 
@@ -185,6 +251,14 @@ const FlowJudgment = (() => {
     // Requiring a second signal alongside money is what keeps price lists quiet.
     const positives = signals.filter((s) => s.weight > 0);
     if (positives.length === 1 && positives[0].id === 'money') add('unsupported', -20, 'A figure alone, with nothing decided');
+
+    // Withholding the commitment points is not enough on its own. "We do NOT
+    // approve the $40,000" still carries a figure, a domain match and a reply
+    // bonus — 56 against a threshold of 50 — so it would clear the bar anyway
+    // and be labelled from the money alone, which reads "Log $40,000 agreed".
+    // A denied or merely-contemplated commitment has to push the other way.
+    if (!commit && commitMentioned) add('negated', -34, 'Names a decision the sentence does not actually make');
+    else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
     return { total, signals, flags: { commit, lost, executed, obligation, handoff, dispute, onDomain } };
