@@ -141,6 +141,23 @@ console.log('  same, 2 quiet weeks on:  threshold', t2w.toFixed(1));
 if (!(t2w < tNow)) { console.log('  FAIL: threshold did not recover'); failures++; }
 else console.log('  ok    recovers toward baseline on its own');
 
+// The mirror image, and the one that was actually broken: clicks were never
+// decayed at read time, so an engaged user who hit the six-click cap pinned the
+// threshold to MIN_THRESHOLD permanently — still there a year later. Someone
+// who used Flow hard and then took a month off came back to the most eager
+// version of it that exists, and dismissing could not walk it back, because
+// dismissals faded while the clicks holding the floor down did not.
+console.log('\nCalibration recovery (clicks must decay too, not just dismissals):');
+const clicked = { clicks: 6, dismissals: 0, ts: NOW.getTime() };
+const cNow = FlowJudgment.thresholdFrom(clicked, NOW.getTime());
+const c90d = FlowJudgment.thresholdFrom(clicked, NOW.getTime() + 90 * 864e5);
+console.log('  after 6 clicks:          threshold', cNow.toFixed(1));
+console.log('  same, 90 quiet days on:  threshold', c90d.toFixed(1));
+if (!(cNow <= FlowJudgment.MIN_THRESHOLD)) { console.log('  FAIL: clicks no longer lower the bar at all'); failures++; }
+else if (!(c90d > cNow)) { console.log('  FAIL: threshold stayed pinned at the floor'); failures++; }
+else if (Math.abs(c90d - FlowJudgment.BASE_THRESHOLD) > 0.5) { console.log('  FAIL: did not return to baseline, landed at ' + c90d.toFixed(1)); failures++; }
+else console.log('  ok    an eager profile relaxes back to baseline when unused');
+
 // A past bare date must not be silently rewritten into the future.
 console.log('\nAmbiguous past date must not invent a future year:');
 const pastDate = FlowExtract.extract('The March 3 kickoff already happened.', { now: NOW }).date;

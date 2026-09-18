@@ -624,8 +624,18 @@ const FlowJudgment = (() => {
     const c = calibration || {};
     const elapsed = Math.max(0, (now || Date.now()) - (c.ts || 0));
     const decay = c.ts ? Math.pow(0.5, elapsed / DISMISSAL_HALF_LIFE_MS) : 1;
+    // BOTH sides age. Decaying only dismissals here left clicks permanent, so
+    // the paragraph above ("a quiet week always walks the threshold back toward
+    // baseline") held in exactly one direction. Six clicks — which storage.js
+    // caps and an engaged user reaches in a week — pinned the threshold to
+    // MIN_THRESHOLD and kept it there: still 38 after a year of silence,
+    // measured. Someone who used Flow heavily and then took a month off came
+    // back to the most eager version of it that exists, which is the opposite
+    // of what this product promises, and no amount of dismissing could undo it
+    // because dismissals faded while the clicks holding the floor down did not.
+    const clicks = (c.clicks || 0) * decay;
     const dismissals = (c.dismissals || 0) * decay;
-    const t = BASE_THRESHOLD - (c.clicks || 0) * 4 + dismissals * 6;
+    const t = BASE_THRESHOLD - clicks * 4 + dismissals * 6;
     return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, t));
   }
 
