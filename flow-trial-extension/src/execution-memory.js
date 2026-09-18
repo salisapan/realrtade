@@ -160,7 +160,53 @@ const FlowExecutionMemory = (() => {
     return appendEvents([makeEvent(intentionId, processId, [stepKind], 'pinned')]);
   }
 
-  return { getAll, getLog, recordDoIt, recordDismiss, recordUndo, recordPin };
+  // --- Foundation for future anonymous team-level pattern sharing --------
+  //
+  // Not wired to anything today: no network call, no team or org concept
+  // anywhere in this product, no UI. This exists only so that when a real
+  // "share anonymous patterns with your team" feature is eventually built,
+  // the one genuinely hard part — deciding exactly which facts are safe to
+  // aggregate across people — is already settled, instead of invented from
+  // scratch under pressure the day someone asks for it.
+  //
+  // toPatternSummary() collapses getAll()'s per-account aggregate into a
+  // flat list of {processType, stepKind, accepted, removed, undone, pinned}
+  // rows. That is deliberately ALL it carries: no intentionId, no
+  // timestamp, no message content, no per-event detail, no identifier for
+  // this install or this person. Those live in the local log for this
+  // account's own use (see getAll() above) and have no reason to ever
+  // leave the device. What is left after stripping all of that is exactly
+  // the shape a team-level feature would need — "across people who chose
+  // to share, how often does this step in this process get kept" — and
+  // nothing more.
+  //
+  // Building the real feature on top of this later still requires, at
+  // minimum: an explicit per-user opt-in (off by default, same posture as
+  // Draft-It's masked processing), a real notion of "team" this product
+  // does not have yet, and a server endpoint that only ever receives rows
+  // in this exact shape. This function does not decide any of that — it
+  // only makes the eventual decision possible without a rewrite of the
+  // data this local log already keeps.
+  function toPatternSummary(byProcess) {
+    const rows = [];
+    for (const processType of Object.keys(byProcess || {})) {
+      const steps = (byProcess[processType] || {}).steps || {};
+      for (const stepKind of Object.keys(steps)) {
+        const s = steps[stepKind] || {};
+        rows.push({
+          processType,
+          stepKind,
+          accepted: s.accepted || 0,
+          removed: s.removed || 0,
+          undone: s.undone || 0,
+          pinned: s.pinned || 0
+        });
+      }
+    }
+    return rows;
+  }
+
+  return { getAll, getLog, recordDoIt, recordDismiss, recordUndo, recordPin, toPatternSummary };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExecutionMemory };

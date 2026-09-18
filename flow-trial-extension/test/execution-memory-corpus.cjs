@@ -114,6 +114,24 @@ async function run() {
     check('recordPin with missing arguments resolves quietly instead of throwing', threw === false);
   }
 
+  console.log('\n--- execution-memory.js: toPatternSummary() (team-sharing foundation, not wired to anything) ---\n');
+  store = {};
+  {
+    await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task'], 'msg-1');
+    await FlowExecutionMemory.recordUndo('reply-track', ['draft'], 'msg-1');
+    await FlowExecutionMemory.recordPin('reply-track', 'task', 'msg-1');
+    const mem = await FlowExecutionMemory.getAll();
+    const rows = FlowExecutionMemory.toPatternSummary(mem);
+
+    const draftRow = rows.find(r => r.processType === 'reply-track' && r.stepKind === 'draft');
+    const taskRow = rows.find(r => r.processType === 'reply-track' && r.stepKind === 'task');
+    check('every process/step combination in the aggregate produces exactly one row', rows.length === 2, rows);
+    check('a row carries the accepted/removed/undone/pinned counts from the aggregate', draftRow.accepted === 1 && draftRow.undone === 1 && taskRow.removed === 1 && taskRow.pinned === 1, rows);
+    check('a row never carries an intentionId, timestamp, or any other identifying field — only the five documented keys', Object.keys(draftRow).sort().join(',') === 'accepted,pinned,processType,removed,stepKind,undone', draftRow);
+    check('an empty aggregate produces an empty summary, not an error', FlowExecutionMemory.toPatternSummary({}).length === 0);
+    check('a missing aggregate produces an empty summary, not a throw', FlowExecutionMemory.toPatternSummary(undefined).length === 0);
+  }
+
   console.log('\n--- execution-memory.js: processes stay isolated from each other ---\n');
   store = {};
   {

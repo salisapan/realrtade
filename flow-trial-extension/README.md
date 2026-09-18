@@ -456,6 +456,25 @@ popup/                 the only configuration surface — two questions long
 netlify/functions/glance-assist/  masked-only backend proxy to a real LLM, for Draft-It + attachment X-ray
 ```
 
+## Future: anonymous team-level pattern sharing (foundation only, not built)
+
+`src/execution-memory.js` exports `toPatternSummary()`, a pure function that
+collapses one account's local Execution Memory into a flat list of
+`{processType, stepKind, accepted, removed, undone, pinned}` rows — no
+`intentionId`, no timestamp, no message content, no per-install identifier.
+That is the one hard design decision behind a real "see how your team
+tends to close the same processes" feature: exactly which facts are safe
+to aggregate across people. It is settled now so it doesn't get invented
+under pressure later.
+
+Nothing calls this function today. There is no team or org concept
+anywhere in this product, no network transmission of this data, and no
+UI for it. Building the real feature still needs, at minimum: an explicit
+per-user opt-in (off by default, same posture as Draft-It's masked
+processing — see above), an actual notion of "team," and a server
+endpoint that only ever accepts rows in this exact shape. This is
+foundation, not the feature.
+
 ## What is still deliberately narrow
 
 - **Gmail only.** The judgment engine takes plain text and knows nothing about
