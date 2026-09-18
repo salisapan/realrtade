@@ -26,9 +26,9 @@
   --bg:#FFFFFF; --panel:#F5F5F7; --line:rgba(0,0,0,.08);
   --txt:#424245; --txt-hi:#1D1D1F; --muted:#6E6E73; --accent:#0071E3; --accent-2:#0077ED; --navy:#07090F;
   --hero-a:rgba(0,113,227,.45); --hero-b:rgba(0,113,227,.18); --hero-bg:#FBFCFF;
-  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Helvetica Neue',Arial,sans-serif;
-  --disp:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Arial,sans-serif;
-  --serif:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
 }
 :root[data-theme="dark"]{
   --bg:#000000; --panel:#1D1D1F; --line:rgba(255,255,255,.14);
@@ -122,6 +122,7 @@ footer.site a{color:var(--muted)}
 .cta{margin:clamp(56px,7vw,96px) 0 10px; padding:clamp(40px,5vw,56px) 32px; background:var(--panel); border:0; border-radius:20px; text-align:center; font-family:var(--sans)}
 .cta p{margin:0 0 24px; color:var(--txt-hi); font-size:1.1rem; font-weight:400; line-height:1.5; max-width:52ch; margin-inline:auto}
 </style>
+<link rel="stylesheet" href="/assets/fonts.css">
 <link rel="stylesheet" href="/assets/flow-premium.css">
 <script>
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();

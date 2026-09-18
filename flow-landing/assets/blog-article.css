@@ -21,9 +21,9 @@
   --bg:#FFFFFF; --bg2:#F5F5F7; --panel:#F5F5F7; --line:rgba(0,0,0,.08);
   --txt:#424245; --txt-hi:#1D1D1F; --muted:#6E6E73; --accent:#0071E3; --accent-2:#0077ED;
   --navy:#07090F;
-  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Helvetica Neue',Arial,sans-serif;
-  --disp:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue',Arial,sans-serif;
-  --serif:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
 }
 :root[data-theme="dark"]{
   --bg:#000000; --bg2:#000000; --panel:#1D1D1F; --line:rgba(255,255,255,.14);
