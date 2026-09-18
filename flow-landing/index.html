@@ -1366,7 +1366,7 @@ Best,
       }
     })();
 
-    var W=0,H=0,DPR=1,U=0,prog=0,live=false,raf=null,t0=(typeof performance!=='undefined'?performance.now():Date.now());
+    var W=0,H=0,DPR=1,prog=0,live=false,raf=null,t0=(typeof performance!=='undefined'?performance.now():Date.now());
     var TILT=-.30, TCOS=Math.cos(TILT), TSIN=Math.sin(TILT), CAM=2.35, FOG='7,9,15';
 
     function size(){
@@ -1377,7 +1377,52 @@ Best,
       W=Math.max(1,Math.round(w*DPR)); H=Math.max(1,Math.round(h*DPR));
       if(cv.width!==W) cv.width=W;
       if(cv.height!==H) cv.height=H;
-      U=Math.min(W,H);
+      fit();
+    }
+
+    /* Auto-fit. The lattice is taller (1.18 units apex-to-base) than it is wide,
+       so scaling both axes by min(W,H) — as this did before — overflowed the
+       short axis of a wide, low canvas by ~18%: the apex was drawn above the
+       top edge and the base below the bottom one, which is what made the graph
+       look cropped rather than composed. Worse, yaw drifts continuously (see
+       yaw()), so the projected width changes as it turns and any scale derived
+       from a single orientation clips at some other one.
+
+       So: sample a full revolution once, take the worst-case projected bounding
+       box over every orientation AND over both ends of the settle animation,
+       and derive one stable scale and centre offset from it. Worst-case over
+       the whole revolution is what makes it stable — re-fitting per frame would
+       keep it tight, but the graph would visibly breathe as it rotated. */
+    var FITS=1, FITX=0, FITY=0, NSC=1;
+    function fit(){
+      var minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9,i,s,k;
+      for(s=0;s<48;s++){
+        var ya=s*(Math.PI*2/48), cy=Math.cos(ya), sy=Math.sin(ya);
+        for(i=0;i<NODES.length;i++){
+          var n=NODES[i];
+          for(k=0;k<2;k++){
+            var x=k?n.ox:n.cx, y=k?n.oy:n.cy, z=k?n.oz:n.cz;
+            var x1=x*cy+z*sy, z1=-x*sy+z*cy;
+            var y2=y*TCOS-z1*TSIN, z2=y*TSIN+z1*TCOS;
+            var f=CAM/(CAM+z2), ax=x1*f, ay=y2*f;
+            if(ax<minx)minx=ax; if(ax>maxx)maxx=ax;
+            if(ay<miny)miny=ay; if(ay>maxy)maxy=ay;
+          }
+        }
+      }
+      var bw=Math.max(1e-6,maxx-minx), bh=Math.max(1e-6,maxy-miny);
+      /* Reserve room for the node glow, but only the part of it that actually
+         reads: the halo is a radial gradient falling to full transparency at
+         4.6x the radius, and its outer third is already below perceptual
+         threshold, so reserving the whole 4.6x just shrinks the lattice for
+         pixels nobody can see. 2.4x keeps every visible part of the glow. */
+      var pad=9*DPR*2.4+8*DPR;
+      FITS=Math.min(Math.max(1,W-pad*2)/bw, Math.max(1,H-pad*2)/bh);
+      FITX=W/2-((minx+maxx)/2)*FITS;
+      FITY=H/2-((miny+maxy)/2)*FITS;
+      /* node radii were tuned against the old desktop scale; keep them
+         proportional so the lattice reads the same on a phone as on a monitor */
+      NSC=Math.max(.5,Math.min(1.4,FITS/850));
     }
 
     function scrollProg(){
@@ -1394,11 +1439,17 @@ Best,
     function yaw(p,tm){ return (rm?0:tm*.00005) + p*1.05; }
 
     function project(x,y,z,ya){
-      var y1=y*TCOS-z*TSIN, z1=y*TSIN+z*TCOS;
+      /* Yaw FIRST, about the lattice's own vertical axis, then tilt the camera.
+         The reverse order (tilt, then yaw on the already-tilted coordinates)
+         rotates about the camera's Y, which is no longer the cone's axis once
+         the camera is tilted — so the cone sheared sideways as it turned, apex
+         drifting one way and base the other, instead of spinning in place.
+         That shear was the whole reason the shape read as lopsided. */
       var cy=Math.cos(ya), sy=Math.sin(ya);
-      var x2=x*cy+z1*sy, z2=-x*sy+z1*cy;
+      var x1=x*cy+z*sy, z1=-x*sy+z*cy;
+      var y2=y*TCOS-z1*TSIN, z2=y*TSIN+z1*TCOS;
       var f=CAM/(CAM+z2);
-      return [W/2+x2*U*f, H/2+y1*U*f, f, z2];
+      return [FITX+x1*f*FITS, FITY+y2*f*FITS, f, z2];
     }
 
     function px(node,p,tm,ya){
@@ -1452,7 +1503,7 @@ Best,
         if(svis<=0) continue;
         var ex=A[0]+(B[0]-A[0])*t, ey=A[1]+(B[1]-A[1])*t;
         g.strokeStyle='rgba('+fogMix(LINE,favg)+','+(t*(ed.spine?.62:ed.beam?.46:.34)*Math.max(.35,favg)*svis).toFixed(3)+')';
-        g.lineWidth=ed.w*DPR*Math.max(.5,favg);
+        g.lineWidth=ed.w*DPR*NSC*Math.max(.5,favg);
         g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(ex,ey); g.stroke();
         /* once an edge is complete, a signal keeps travelling it — this is the
            "replicated to every teammate" beat, and it is what makes the graph
@@ -1462,7 +1513,7 @@ Best,
           var fade=Math.min(1,(p-.5)/.18)*(1-Math.abs(ph-.5)*1.1);
           if(fade>0){
             g.fillStyle='rgba('+fogMix(TEAM,favg)+','+(fade*.85*Math.max(.4,favg)).toFixed(3)+')';
-            g.beginPath(); g.arc(gx,gy,1.5*DPR*Math.max(.5,favg),0,6.283); g.fill();
+            g.beginPath(); g.arc(gx,gy,1.5*DPR*NSC*Math.max(.5,favg),0,6.283); g.fill();
           }
         }
       }
@@ -1477,7 +1528,7 @@ Best,
         var nd=NODES[i], P=pos[i], e=P[4], f=Math.max(.18,P[2]);
         var col = fogMix(nd.kind==='team' ? TEAM : nd.kind==='leaf' ? DIM : EXP, P[2]);
         var alpha = (nd.kind==='leaf' ? .32+e*.50 : .44+e*.54) * Math.max(.3,f);
-        var rr = nd.rad*DPR*(.62+e*.38)*f;
+        var rr = nd.rad*DPR*NSC*(.62+e*.38)*f;
 
         /* a soft, offset shadow beneath nodes near the camera — what actually
            reads as "depth" is nearby things casting weight, not just fading
