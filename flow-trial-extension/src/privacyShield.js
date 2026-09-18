@@ -42,10 +42,24 @@ const FlowPrivacyShield = (() => {
   // ("3,850 ₪"), not before it the way "$3,850" does, so the post-number
   // alternative needs the bare symbol as a first-class case too, matching
   // the same fix already made to extract.js's MONEY_RE.
+  // The number itself, in either convention. Continental European writing
+  // groups thousands with dots and decimalises with a comma — "1.234,56 EUR" —
+  // and the Anglo form alone matched only the tail of that, so the shield
+  // emitted "1.234,[CURRENCY_VAL_1]": the significant digits of the amount
+  // went to the model in clear, AND the sentence came back malformed. The
+  // European form is tried first because it is the more specific of the two;
+  // "3,900" and "1.50" still fall through to the Anglo branch unchanged.
+  const AMOUNT_DIGITS = '(?:\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?|\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?)';
+  // A magnitude suffix has to be a whole token — written as `(?:k|m)?` it
+  // matched the leading letter of the following word, so "$20 monthly" masked
+  // as "[CURRENCY_VAL_1]onthly" and "$50 kits" as "[CURRENCY_VAL_1]its". Here
+  // that is text corruption rather than a leak (the model receives a mangled
+  // sentence and drafts a reply from it), but it is the same defect, and the
+  // same fix, as extract.js's MONEY_RE.
+  const AMOUNT_MULT = '(?:\\s?(?:k|m|mm|bn|thousand|million|billion)(?![A-Za-z]))?';
   const MONEY_PATTERN = new RegExp(
-    '(?:(?:' + CURRENCY_SYMBOLS + '|' + CURRENCY_CODES + ')\\s?)' +
-    '\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?(?:\\s?(?:k|m))?' +
-    '|\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?(?:\\s?(?:k|m))?\\s?(?:' + CURRENCY_CODES + '|' + CURRENCY_SYMBOLS + ')',
+    '(?:(?:' + CURRENCY_SYMBOLS + '|' + CURRENCY_CODES + ')\\s?)' + AMOUNT_DIGITS + AMOUNT_MULT +
+    '|' + AMOUNT_DIGITS + AMOUNT_MULT + '\\s?(?:' + CURRENCY_CODES + '|' + CURRENCY_SYMBOLS + ')',
     'gi'
   );
 
@@ -71,7 +85,20 @@ const FlowPrivacyShield = (() => {
   // "+" preceded by whitespace is non-word-to-non-word — no transition — so
   // the match could never start early enough to consume them, leaking a
   // stray "(" or "+" next to an otherwise-fully-masked number.
-  const PHONE_PATTERN = /(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g;
+  //
+  // Two alternatives, because the first one below only ever described North
+  // American numbers. Anything with a different country code or grouping —
+  // "+44 20 7946 0958", "+972-54-123-4567" — matched nothing and reached the
+  // model in full. That is a leak of a category this product names explicitly
+  // in its own privacy claim, and it fell hardest on its own users: this
+  // extension ships Hebrew support, so +972 numbers are not an edge case here.
+  //
+  // The international branch is anchored on a literal "+", which is what makes
+  // it safe to be loose about the grouping that follows: invoice, PO and
+  // reference numbers do not begin with one. It still requires at least two
+  // separated groups after the country code, so "+1.5" and a bare "+972"
+  // cannot match.
+  const PHONE_PATTERN = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b/g;
 
   // A firm/company suffix is the anchor: without one, "capitalized word
   // sequence" catches far too much ordinary text (sentence starts, product
@@ -101,6 +128,17 @@ const FlowPrivacyShield = (() => {
   // word that wasn't sensitive costs nothing; an unmasked word that was
   // costs everything.
   const NAME_PATTERN = new RegExp('\\b(' + NAME_RUN + ')\\b', 'g');
+
+  // NAME_RUN needs two or more capitalized words, which means a name standing
+  // alone on the signature line — the single most reliable place in an email
+  // to find one — was never masked: "Thanks,\nDana" went out in clear. The
+  // Hebrew side already had exactly this pattern (HE_NAME_AFTER_SIGNOFF
+  // below); English simply never got one, so the shield was weaker in the
+  // language most of its traffic is in. Lookbehind keeps the sign-off word
+  // itself out of the match, the same way the Hebrew pair does, so "Thanks,"
+  // stays and only the name is replaced.
+  const SIGNOFF = '(?:Thanks|Thank you|Best|Best regards|Kind regards|Warm regards|Regards|Sincerely|Cheers|All the best|Warmly|Talk soon)';
+  const NAME_AFTER_SIGNOFF = new RegExp('(?<=' + SIGNOFF + '[,.!]?[ \\t]*\\n+[ \\t]*)' + CAP_WORD + '(?:\\s+' + CAP_WORD + '){0,2}', 'g');
 
   // Hebrew has no case — every letter has exactly one form — so CAP_WORD's
   // "starts with an uppercase letter" signal, which everything above is
@@ -315,6 +353,14 @@ const FlowPrivacyShield = (() => {
       tokenMap[token] = raw;
       return token;
     }, nameSeen, trimNameEdges));
+    // The signature-line name, which the two-word-minimum run above cannot
+    // reach. Shares nameN/nameSeen so a name that also appeared in the body
+    // resolves to the same token rather than a second one.
+    working = working.map((w) => maskCategory(w, NAME_AFTER_SIGNOFF, (raw) => {
+      const token = '[CLIENT_NAME_' + (++nameN) + ']';
+      tokenMap[token] = raw;
+      return token;
+    }, nameSeen));
     // Hebrew names — no opposing-counsel routing here (that concept, and
     // its trigger phrases, is English-only in this file; a documented scope
     // cut, not an oversight) — same nameN/nameSeen as the English pass so
