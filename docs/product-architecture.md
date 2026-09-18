@@ -375,3 +375,146 @@ look at a `$14/mo` Pro price and conclude that is what they are buying.
 Never let Trial/Pro copy imply security or compliance guarantees it
 doesn't have; never let Flow (core) read as "the same download, just
 bigger."
+
+---
+
+## 5. Playing Field Definition
+
+> Added by the product owner, 2026-09-18. Version 1.0. This section is the
+> strategic frame everything above sits inside: §§0-4 describe *what* the
+> three offerings are and how they're priced and deployed; this section
+> defines *why* — the specific, narrow game being played, and the hard
+> boundaries that keep the product from drifting into a different one. Like
+> §4's rule, this is a hard constraint on future feature and copy work, not
+> a style note. Its own internal numbering (5.1-5.9) is scoped to this
+> section only and does not renumber §§1-4 above, which other documents
+> (`CLAUDE.md`) reference directly by number.
+
+### 5.1 The Game We Are Playing
+
+We are not building:
+- Another AI email assistant
+- Another chatbot
+- Another general-purpose agent
+- Another legal research tool
+- Another productivity dashboard
+
+We are building:
+
+> **The most reliable system in the world at turning human intention into closed execution — silently, precisely, and with almost zero user effort.**
+
+Core principle (non-negotiable):
+
+**"You intend — we execute."**
+
+The user should feel that important things simply get closed, not that they received helpful suggestions.
+
+### 5.2 What "Winning" Looks Like
+
+We win when users experience the following:
+
+- They stop worrying about things falling through the cracks.
+- They develop a daily habit of trusting the system to surface and close open loops.
+- The system becomes more useful the longer they use it (personal Execution Memory).
+- They feel the product is private, precise, and respectful of their attention.
+- Clicking "Do It" feels like resolution, not like creating more work.
+
+We lose when:
+- The product becomes noisy.
+- The product requires management.
+- The product makes confident mistakes.
+- The product feels like "just another AI helper".
+
+### 5.3 Hard Boundaries (What We Explicitly Reject)
+
+**We will NOT compete on:**
+- General intelligence or frontier model performance
+- Legal research depth or case law analysis
+- Writing quality or long-form generation
+- Broad computer-use / full desktop control
+- Building a new email client
+- Heavy configuration or rule builders
+- Chat interfaces as the primary interaction
+
+**We will NOT prioritize:**
+- High recall at the expense of precision
+- Features that require the user to prompt or manage the system
+- Expanding to many platforms before mastering one deeply
+- Network effects that compromise privacy
+
+### 5.4 The Core Playing Field (Where We Must Be Best-in-Class)
+
+We must be the clear leader in the following combination:
+
+| Dimension                    | Our Standard                                      | Why It Matters |
+|-----------------------------|---------------------------------------------------|----------------|
+| **Precision**               | Prefer silence over a wrong action                | Trust is everything |
+| **Zero-Prompt UX**          | Silent by default. Appears only when relevant     | Attention is sacred |
+| **Process-level execution** | Closes short, meaningful loops — not single tasks | Real value |
+| **Local-first judgment**    | Core decisioning happens on-device when possible  | Privacy + speed + trust |
+| **Personal Execution Memory** | Learns how *this* user closes things             | Compounding advantage |
+| **Reversibility**           | Every action is undoable                          | Reduces fear of automation |
+| **Proactive closing**       | Surfaces unclosed intentions (Morning Brief etc.) | Creates habit & stickiness |
+
+This combination is our moat.
+No single feature is the moat — the tight integration of all of them is.
+
+### 5.5 Strategic Positioning
+
+**Against big labs (OpenAI, Anthropic, Google):**
+They win on general capability and research.
+We win on reliable, narrow, high-stakes execution of professional intentions with extreme respect for the user's attention and privacy.
+
+**Against email assistants (Superhuman, Shortwave, alfred_, Lindy, etc.):**
+Most of them help the user process email faster or draft better.
+We aim to make large parts of the follow-through disappear.
+
+**Against RPA / traditional automation:**
+They are brittle and require setup.
+We aim for intention-driven, adaptive, low-setup execution.
+
+### 5.6 Product North Star Metrics
+
+We measure success by:
+
+1. **Closure Rate** — % of detected intentions that reach a closed state
+2. **Trust Rate** — % of Do It actions that are not undone
+3. **Return Habit** — How often users engage with proactive surfaces (Morning Brief etc.)
+4. **Silence Quality** — How rarely we show something the user dismisses
+5. **Learning Usefulness** — Whether Execution Memory improves future suggestions
+
+Vanity metrics (raw number of actions suggested, model size, number of integrations) are secondary.
+
+### 5.7 Expansion Rules
+
+We expand only when the core is strong:
+
+1. First: Become excellent at closing intentions inside Gmail + Google ecosystem.
+2. Then: Add sticky proactive layers (Morning Brief + habit loops).
+3. Then: Make Execution Memory visible and valuable.
+4. Then: Expand to Outlook (critical for enterprise verticals).
+5. Only later: Deeper vertical intelligence or team-level network effects.
+
+Never expand horizontally before the core loop is clearly winning on precision + stickiness.
+
+### 5.8 Decision Filter (Use on Every Feature)
+
+Before building anything, ask:
+
+1. Does this move us closer to "You intend — we execute"?
+2. Does it increase the user's feeling that things get closed?
+3. Does it protect or improve precision and silence?
+4. Does it respect Zero-Prompt principles?
+5. Does it create compounding value over time (memory, habit, trust)?
+
+If the answer to most of these is "no" — do not build it.
+
+### 5.9 Final Statement
+
+We are not trying to be the smartest AI.
+We are trying to be the most trustworthy system at turning intention into reality with almost no friction.
+
+That is a hard, narrow, and valuable game.
+If we become the best in the world at this specific game, we have a path to a category-defining company.
+
+Everything else is noise.
