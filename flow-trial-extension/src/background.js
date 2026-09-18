@@ -789,10 +789,41 @@ async function googleTasksWrite(p) {
   const due = googleTaskDue(f);
   if (due) body.due = due;
 
-  const res = await googleTasksAuthedFetch('/lists/' + encodeURIComponent(auth.taskListId) + '/tasks', {
+  const post = (listId) => googleTasksAuthedFetch('/lists/' + encodeURIComponent(listId) + '/tasks', {
     method: 'POST',
     body: JSON.stringify(body)
   });
+
+  let taskListId = auth.taskListId;
+  let res = await post(taskListId);
+
+  // The Glance list is the one piece of state this connector keeps a stored
+  // id for, and it lives in an app Glance does not own. Deleting a list is
+  // ordinary tidying in Google Tasks, and it left the stored id pointing at
+  // nothing: every Do It from then on failed with "Google Tasks write failed
+  // (404)" — permanently, and with a message naming neither the cause nor
+  // the remedy. The only way out was Disconnect/Connect in the popup, which
+  // nothing told the user to do.
+  //
+  // findOrCreateGlanceTaskList already knows how to recover; it was simply
+  // only ever called at connect time. Calling it here on a 404 gives the
+  // write path the same "re-resolve once, then fail loudly" shape
+  // googleAuthedFetch already uses for a stale token one layer down. The new
+  // id is persisted so the next write doesn't pay for the round trip again.
+  if (res.status === 404) {
+    try {
+      const freshListId = await findOrCreateGlanceTaskList();
+      if (freshListId && freshListId !== taskListId) {
+        taskListId = freshListId;
+        await chrome.storage.local.set({ googleTasksAuth: Object.assign({}, auth, { taskListId }) });
+        res = await post(taskListId);
+      }
+    } catch (e) {
+      // Recovery failed — fall through and report the ORIGINAL 404 below
+      // rather than a second, more confusing error about list creation.
+    }
+  }
+
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
   if (!res.ok) {
     let detail = '';
@@ -804,8 +835,10 @@ async function googleTasksWrite(p) {
     ok: true,
     where: 'Google Tasks',
     target: GLANCE_TASK_LIST_TITLE + ' list',
-    ref: { taskListId: auth.taskListId, taskId: task.id },
-    url: 'https://tasks.google.com/embed/list/' + encodeURIComponent(auth.taskListId) + '?pli=1'
+    // The id actually written to, not the one this function started with —
+    // Undo has to delete from the list the task really landed in.
+    ref: { taskListId, taskId: task.id },
+    url: 'https://tasks.google.com/embed/list/' + encodeURIComponent(taskListId) + '?pli=1'
   };
 }
 
