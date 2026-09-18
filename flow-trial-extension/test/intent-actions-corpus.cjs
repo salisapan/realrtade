@@ -79,6 +79,28 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('cancelled meeting with a time does not fire SCHEDULED_EVENT', intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent.type);
 }
 
+// 3b. The other ways a meeting stops happening at the time the message names.
+//     The cancelled case above was gated on s.flags.lost — a lexicon about
+//     deals falling through, not meetings moving — so postponing, rescheduling
+//     and "no longer needed" all still produced a Calendar entry at the old,
+//     now-wrong time. Same cost as the cancelled case: the user shows up.
+{
+  const offCases = [
+    ['postponed',          'Let us postpone the call Friday, September 18 at 3pm \u2014 we will rebook it later.'],
+    ['rescheduled',        'We need to reschedule the call Friday, September 18 at 3pm to a better week.'],
+    ['moved to next week', 'Let us move the call Friday, September 18 at 3pm to the following week instead.'],
+    ['no longer needed',   'The call Friday, September 18 at 3pm is no longer needed, we sorted it over email.'],
+    ['called off',         'The call Friday, September 18 at 3pm has been called off by the client today.'],
+    ['pushed back',        'The call Friday, September 18 at 3pm is pushed back until the contract is final.'],
+    ['Hebrew postponed',   '\u05d4\u05e4\u05d2\u05d9\u05e9\u05d4 \u05d1\u05d9\u05d5\u05dd \u05e9\u05d9\u05e9\u05d9 \u05d1\u05e9\u05e2\u05d4 15:00 \u05e0\u05d3\u05d7\u05ea\u05d4 \u05dc\u05e9\u05d1\u05d5\u05e2 \u05d4\u05d1\u05d0.']
+  ];
+  for (const [label, text] of offCases) {
+    const intent = classify(text);
+    check('a ' + label + ' meeting does not become a Calendar entry',
+      !intent || intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+  }
+}
+
 // 4. A reader commitment reminder -> COMMITMENT_OF_READER, the "Follow
 //    Through" process, task anchor leading, draft second.
 {

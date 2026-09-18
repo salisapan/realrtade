@@ -37,6 +37,39 @@ const FlowIntent = (() => {
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation)\b/i;
   const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה)/;
 
+  // "This is not happening at the time this message names."
+  //
+  // The SCHEDULED_EVENT gate below already refused a CANCELLED meeting, but it
+  // did so via s.flags.lost — a lexicon about deals falling through, not about
+  // meetings moving. So the three commonest ways a meeting stops happening at
+  // its stated time all sailed through and produced a calendar entry at that
+  // exact, now-wrong time:
+  //
+  //   "Let's postpone the call Friday, September 18 at 3pm"        -> event, Fri 15:00
+  //   "Let's move the call Friday ... to the following week"       -> event, Fri 15:00
+  //   "The call Friday ... is no longer needed"                    -> event, Fri 15:00
+  //
+  // A postponed meeting is not a lost deal, so it needed its own signal rather
+  // than more words bolted onto LOST.
+  //
+  // Note what this deliberately gives up: "let's move the call to Friday at
+  // 3pm" — where the named time is the NEW one — also stops producing an
+  // event. Telling those two apart needs to know which of the times in the
+  // sentence the cue refers to, which this engine cannot do reliably, and the
+  // trade is the one the gate below already states in its own comment: a
+  // missed chip costs one click, a calendar entry at a time the sender
+  // explicitly moved away from costs a missed meeting.
+  const EVENT_CALLED_OFF = new RegExp([
+    'postpon(?:e|ed|ing)', 'reschedul(?:e|ed|ing)', 'call(?:ed|ing)? off',
+    'no longer (?:needed|necessary|happening|required|going ahead|relevant)',
+    "won'?t be going ahead", 'not going ahead',
+    'push(?:ed|ing)? (?:back|out)',
+    'mov(?:e|ed|ing)\\b[^.!?;]{0,60}?\\bto (?:next|another|the following|a later|sometime)',
+    "skip(?:ping)? (?:this|next) week'?s?",
+    '(?:take|drop) (?:it|this|that) (?:off|from) the calendar'
+  ].join('|'), 'i');
+  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|לא מתקיים|לא יתקיים|נקבע מחדש)/;
+
   // A reader-directed commitment reminder — narrow by design. This is not
   // "someone agreed to something" (that's DECISION_TO_LOG, judgment.js's
   // COMMIT/COMMIT_STRONG) but specifically "you, the reader, agreed to
@@ -165,7 +198,8 @@ const FlowIntent = (() => {
     //        become a new Calendar entry for that meeting. Precision over
     //        recall: a missed event chip costs one click; a calendar entry
     //        for a meeting that was just cancelled is actively wrong.
-    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !s.flags.lost) {
+    const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
+    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !calledOff) {
       return finish(TYPES.SCHEDULED_EVENT, 'high', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
