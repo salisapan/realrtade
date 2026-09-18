@@ -250,5 +250,44 @@ console.log('\n--- actions.js: Execution Memory biases and demotes non-anchor st
   check('non-anchor steps reorder by historical acceptance rate, anchor stays first', JSON.stringify(stepIds(reordered)) === JSON.stringify(['calendar', 'task', 'draft']), stepIds(reordered));
 }
 
+console.log('\n--- actions.js: an explicit pin overrides automatic demotion ---\n');
+{
+  // isNetRejected() directly — this is the exact predicate popup.js's
+  // Execution Memory insight card uses to decide whether there's anything
+  // to surface, so it has to be right on its own, not just as a side effect
+  // of planFor()'s behavior.
+  const rejected = { accepted: 0, removed: 4, undone: 1 };
+  check('a genuinely net-rejected step is flagged', FlowActions.isNetRejected(rejected) === true, rejected);
+  const pinnedButOtherwiseRejected = { accepted: 0, removed: 4, undone: 1, pinned: 1 };
+  check('a pin overrides an otherwise-qualifying rejection', FlowActions.isNetRejected(pinnedButOtherwiseRejected) === false, pinnedButOtherwiseRejected);
+  check('no stats at all is never flagged as rejected', FlowActions.isNetRejected(null) === false);
+  check('a step with only positive history is never flagged', FlowActions.isNetRejected({ accepted: 5, removed: 0, undone: 0 }) === false);
+
+  // End to end through planFor(): the exact same rejectedMemory shape that
+  // demoted the task step earlier in this file — with a pin added — must
+  // keep it in the process instead.
+  const requestIntent = classify('Could you please send me the signed contract by Friday, September 18?');
+  const pinnedMemory = { 'reply-track': { steps: { task: { accepted: 0, removed: 4, undone: 1, pinned: 1 } } } };
+  const keptByPin = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: false, executionMemory: pinnedMemory });
+  check('a pinned step survives planFor() despite stats that would otherwise demote it', stepIds(keptByPin).includes('task'), stepIds(keptByPin));
+}
+
+console.log('\n--- actions.js: PROCESS_CATALOG is the same table processFor() actually uses ---\n');
+{
+  const cases = [
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract.', 'schedule'],
+    ['Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?', 'schedule-confirm'],
+    ['Could you please send me the signed contract by Friday, September 18?', 'reply-track'],
+    ['Confirming you’ll send the signed report by Friday, September 18, as agreed.', 'follow-through']
+  ];
+  for (const [text, expectedId] of cases) {
+    const process = FlowActions.planFor(classify(text), { threadUrl: 'x', hasThreadAttachment: false });
+    const catalogEntry = FlowActions.PROCESS_CATALOG[expectedId];
+    check('PROCESS_CATALOG["' + expectedId + '"] name matches the live process name', Boolean(catalogEntry) && catalogEntry.name === process.name, catalogEntry);
+    check('PROCESS_CATALOG["' + expectedId + '"] anchor actually appears among the steps planFor() proposed', stepIds(process).includes(catalogEntry.anchor), { anchor: catalogEntry.anchor, actual: stepIds(process) });
+    check('PROCESS_CATALOG["' + expectedId + '"] stepKinds cover every id planFor() actually proposed', stepIds(process).every((id) => catalogEntry.stepKinds.includes(id)), { catalog: catalogEntry.stepKinds, actual: stepIds(process) });
+  }
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

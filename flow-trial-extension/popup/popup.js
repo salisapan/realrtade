@@ -294,6 +294,73 @@
     wrap.hidden = false;
   }
 
+  // Human-readable nouns for a catalog step id — cosmetic copy only, kept
+  // here rather than in actions.js since it's UI text, not decision data
+  // (unlike PROCESS_CATALOG/isNetRejected, which popup.js reads from
+  // actions.js precisely so this card can never disagree with what the live
+  // chip is actually doing).
+  const STEP_NOUNS = { calendar: 'the Calendar step', draft: 'the draft reply step', task: 'the Task step' };
+
+  // Execution Memory made visible: at most one insight shown at a time
+  // (never a pile of things to review), and only ever for a (process, step)
+  // combo that (a) actions.js's own applyMemory() is already demoting for a
+  // real reason and (b) hasn't already gotten a real answer from this
+  // person. Confirming or rejecting both close it permanently — this is a
+  // one-time correction opportunity, not a recurring setting.
+  let currentInsight = null;
+
+  async function renderMemoryInsight(s) {
+    const wrap = document.getElementById('memoryInsight');
+    if (typeof FlowExecutionMemory === 'undefined' || typeof FlowActions === 'undefined') { wrap.hidden = true; return; }
+
+    const mem = await FlowExecutionMemory.getAll();
+    const seen = new Set(s.memoryInsightsSeen || []);
+    currentInsight = null;
+
+    outer:
+    for (const processId of Object.keys(mem)) {
+      const catalogEntry = FlowActions.PROCESS_CATALOG[processId];
+      if (!catalogEntry) continue;
+      for (const stepKind of catalogEntry.stepKinds) {
+        if (stepKind === catalogEntry.anchor) continue; // never surfaced — see actions.js's own anchor comment
+        const key = processId + ':' + stepKind;
+        if (seen.has(key)) continue;
+        if (FlowActions.isNetRejected(mem[processId].steps[stepKind])) {
+          currentInsight = { processId, stepKind, key, processName: catalogEntry.name };
+          break outer;
+        }
+      }
+    }
+
+    if (!currentInsight) { wrap.hidden = true; return; }
+
+    document.getElementById('memoryInsightText').textContent =
+      'Glance noticed you usually remove ' + (STEP_NOUNS[currentInsight.stepKind] || 'a step') +
+      ' in ' + currentInsight.processName + ' processes — keep it that way?';
+    wrap.hidden = false;
+  }
+
+  function wireMemoryInsight() {
+    document.getElementById('memoryInsightConfirm').addEventListener('click', async () => {
+      if (!currentInsight) return;
+      await FlowStorage.markMemoryInsightSeen(currentInsight.key);
+      document.getElementById('memoryInsight').hidden = true;
+      currentInsight = null;
+    });
+    document.getElementById('memoryInsightReject').addEventListener('click', async () => {
+      if (!currentInsight) return;
+      // The one real lever here: pin the step so actions.js's applyMemory()
+      // stops demoting it, regardless of whatever removed/undone counts
+      // came before — a direct "no" outranks the inference that produced
+      // this card in the first place.
+      await FlowExecutionMemory.recordPin(currentInsight.processId, currentInsight.stepKind);
+      await FlowStorage.markMemoryInsightSeen(currentInsight.key);
+      document.getElementById('memoryInsight').hidden = true;
+      currentInsight = null;
+    });
+  }
+  wireMemoryInsight();
+
   // Earns its place after real usage rather than nagging on first open —
   // three real writes is evidence Glance is actually working for this person,
   // which is the only moment "tell a teammate" is credible instead of noise.
@@ -333,6 +400,7 @@
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderSensitivity(s);
+    await renderMemoryInsight(s);
     renderReferral(s);
     const host = document.getElementById('log-list');
     const empty = document.getElementById('log-empty');

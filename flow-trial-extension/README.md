@@ -304,6 +304,14 @@ nothing extracted is silently dropped.
 
 ## Set up HubSpot (needs the site owner)
 
+**Before this connector (or Salesforce/Slack/Monday.com) can actually be
+selected and used, it also needs its API host added back to
+`manifest.json`'s `host_permissions`** — they were deliberately removed
+pending Chrome Web Store submission, since `popup.js`'s onboarding screen
+only shows `mvp: true` connectors today (Google Tasks) and Web Store review
+expects requested host permissions to match what's actually reachable. See
+`src/connectors.js`'s own header comment for the exact hosts.
+
 1. [developers.hubspot.com](https://developers.hubspot.com) → create a free
    developer account → **Create app**.
 2. Under **Auth**, add this exact redirect URL:

@@ -16,6 +16,18 @@
 //              gated on the owner registering an OAuth Client ID (manifest.json
 //              oauth2.client_id), same as an 'oauth' connector, but with no
 //              server-side exchange or Client Secret to hold at all.
+//
+// manifest.json's host_permissions currently covers only what the live MVP
+// scope can actually reach: mail.google.com, the four Google API hosts, and
+// theflow-ai.com. HubSpot/Notion/Salesforce/Slack/Monday.com's API hosts
+// were deliberately removed from it (Chrome Web Store review — and just
+// good practice — expects host_permissions to match what a real user can
+// actually trigger, not every write path that exists in background.js but
+// has no live UI path today; see popup.js's mvp-only renderConnectors
+// filter). Re-enabling any of these connectors in onboarding means adding
+// its API host back to manifest.json's host_permissions in the same change
+// — otherwise its fetch calls in background.js will start failing with a
+// permission error the moment someone can actually reach them.
 
 const FLOW_CONNECTORS = [
   {

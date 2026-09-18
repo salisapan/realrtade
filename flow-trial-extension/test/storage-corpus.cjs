@@ -139,6 +139,44 @@ async function run() {
     check('and is consumed for that new day too', fourth === false);
   }
 
+  console.log('\n--- storage.js: consumeDailyActiveTrigger() is independent of the Brief\'s own daily flag ---\n');
+  store = {};
+  {
+    const briefFirst = await FlowStorage.consumeDailyBriefTrigger();
+    check('brief trigger fires once today', briefFirst === true);
+    const activeFirst = await FlowStorage.consumeDailyActiveTrigger();
+    check('the active-ping trigger is a separate flag — still fires today even though the brief one already did', activeFirst === true, activeFirst);
+    const activeSecond = await FlowStorage.consumeDailyActiveTrigger();
+    check('a second active-ping call the same day returns false', activeSecond === false);
+
+    store.activeLastTrackedDate = 'Mon Jan 01 2001';
+    const activeThird = await FlowStorage.consumeDailyActiveTrigger();
+    check('the active-ping trigger also resets on a new day', activeThird === true);
+    // And the brief flag, untouched by any of the above, is still consumed
+    // for today — confirms the two really are independent stored keys.
+    const briefSecond = await FlowStorage.consumeDailyBriefTrigger();
+    check('the brief trigger is unaffected by the active-ping trigger being reset', briefSecond === false, briefSecond);
+  }
+
+  console.log('\n--- storage.js: markMemoryInsightSeen() ---\n');
+  store = {};
+  {
+    let state = await FlowStorage.get();
+    check('no insights are marked seen on an untouched profile', state.memoryInsightsSeen.length === 0, state.memoryInsightsSeen);
+
+    await FlowStorage.markMemoryInsightSeen('reply-track:task');
+    state = await FlowStorage.get();
+    check('marking an insight seen records it', state.memoryInsightsSeen.includes('reply-track:task'), state.memoryInsightsSeen);
+
+    await FlowStorage.markMemoryInsightSeen('reply-track:task');
+    state = await FlowStorage.get();
+    check('marking the same insight seen twice does not duplicate it', state.memoryInsightsSeen.filter((k) => k === 'reply-track:task').length === 1, state.memoryInsightsSeen);
+
+    await FlowStorage.markMemoryInsightSeen('schedule-confirm:draft');
+    state = await FlowStorage.get();
+    check('a different insight is tracked independently', state.memoryInsightsSeen.includes('schedule-confirm:draft') && state.memoryInsightsSeen.includes('reply-track:task'), state.memoryInsightsSeen);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

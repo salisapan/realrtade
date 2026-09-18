@@ -57,11 +57,6 @@
   ],
   "host_permissions": [
     "https://mail.google.com/*",
-    "https://api.hubapi.com/*",
-    "https://api.notion.com/*",
-    "https://*.salesforce.com/*",
-    "https://slack.com/*",
-    "https://api.monday.com/*",
     "https://tasks.googleapis.com/*",
     "https://www.googleapis.com/calendar/*",
     "https://www.googleapis.com/drive/*",

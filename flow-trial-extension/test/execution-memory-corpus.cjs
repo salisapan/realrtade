@@ -84,6 +84,36 @@ async function run() {
     check('a step that was accepted but never undone keeps undone:0', proc.steps.calendar.accepted === 1 && proc.steps.calendar.undone === 0, proc.steps.calendar);
   }
 
+  console.log('\n--- execution-memory.js: recordPin() ---\n');
+  store = {};
+  {
+    // The setup an insight card would actually see: task net-rejected on
+    // reply-track, then the user explicitly answers "no, keep proposing it."
+    await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task']);
+    await FlowExecutionMemory.recordDoIt('reply-track', [], ['task']);
+    await FlowExecutionMemory.recordDoIt('reply-track', [], ['task']);
+    let mem = await FlowExecutionMemory.getAll();
+    // Same threshold actions.js's isNetRejected() applies (see its own
+    // dedicated tests in intent-actions-corpus.cjs) — checked inline here
+    // since this file doesn't load actions.js; the point of this block is
+    // recordPin()'s own effect on the aggregate, not re-testing that predicate.
+    const taskStats = mem['reply-track'].steps.task;
+    check('task is genuinely net-rejected before any pin', taskStats.removed + taskStats.undone >= 3 && taskStats.removed + taskStats.undone > taskStats.accepted, taskStats);
+
+    await FlowExecutionMemory.recordPin('reply-track', 'task');
+    mem = await FlowExecutionMemory.getAll();
+    check('recordPin sets pinned:1 on exactly the pinned step', mem['reply-track'].steps.task.pinned === 1, mem['reply-track'].steps.task);
+    check('recordPin does not touch other steps of the same process', mem['reply-track'].steps.draft.pinned === 0, mem['reply-track'].steps.draft);
+    check('the earlier removed/undone counts are untouched by pinning — the override lives in the pinned counter, not by erasing history', mem['reply-track'].steps.task.removed === 3, mem['reply-track'].steps.task);
+  }
+  {
+    // No processId or no stepKind -> same quiet no-op contract as the other
+    // record* functions.
+    let threw = false;
+    try { await FlowExecutionMemory.recordPin(null, 'task'); await FlowExecutionMemory.recordPin('reply-track', null); } catch (e) { threw = true; }
+    check('recordPin with missing arguments resolves quietly instead of throwing', threw === false);
+  }
+
   console.log('\n--- execution-memory.js: processes stay isolated from each other ---\n');
   store = {};
   {

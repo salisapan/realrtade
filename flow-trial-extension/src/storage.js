@@ -20,6 +20,12 @@ const FlowStorage = (() => {
     // — see consumeDailyBriefTrigger below — so the first day something
     // really is open still gets a real auto-open, not a silently-burned turn.
     briefLastShownDate: null,
+    // The last calendar day this install told the anonymous, aggregate-only
+    // usage pipe it was active — see consumeDailyActiveTrigger below and
+    // content-gmail.js's trackDailyActive(). This is the entire "is anyone
+    // still using this" signal: no content, no per-message detail, just one
+    // fired-once-a-day event per install id.
+    activeLastTrackedDate: null,
     // The only thing that learns. Clicks make Flow slightly more willing to
     // speak; dismissals make it quieter. The user never sees or sets a number.
     calibration: { clicks: 0, dismissals: 0, ts: 0 },
@@ -27,6 +33,13 @@ const FlowStorage = (() => {
     // tab has been dismissed. It earns its place after real usage (see
     // popup.js renderReferral) and, once dismissed, never comes back.
     referralDismissed: false,
+    // Which Execution Memory insight cards ("Glance noticed you usually
+    // remove X in Y — keep it that way?") the popup has already shown and
+    // gotten an answer to, keyed "processId:stepKind". Once a combo is in
+    // here it never resurfaces — confirming or rejecting are both a real
+    // answer, not a snooze. See popup.js's renderMemoryInsight/
+    // wireMemoryInsight and FlowExecutionMemory.recordPin.
+    memoryInsightsSeen: [],
     // A random per-install identifier — never an email, never tied to a
     // Google/workspace identity. It exists for two things only: telling one
     // install's anonymous usage events apart from another's in aggregate
@@ -93,6 +106,15 @@ const FlowStorage = (() => {
     const state = await get();
     return state.seenMessageIds.includes(messageId);
   }
+
+  // Same shape as markSeen — a small append-once set, capped generously
+  // since there are only ever a handful of (processId, stepKind) combos in
+  // the whole catalog to begin with.
+  const markMemoryInsightSeen = serialize(async function markMemoryInsightSeen(key) {
+    const state = await get();
+    if (state.memoryInsightsSeen.includes(key)) return;
+    await set({ memoryInsightsSeen: [key, ...state.memoryInsightsSeen].slice(0, 100) });
+  });
 
   // "Seen" alone isn't enough to decide whether to (re)inject a chip. Gmail
   // tears down and rebuilds div[role="listitem"] nodes constantly — expanding
@@ -165,17 +187,29 @@ const FlowStorage = (() => {
     return open.reverse(); // oldest-still-open first
   }
 
-  // At most one real auto-open per calendar day (local time) — "appears once
-  // a day," not once per Gmail tab load or per debounced DOM mutation.
-  // Serialized so two near-simultaneous callers (two Gmail tabs) can't both
-  // read "not shown today yet" before either writes the flag back.
-  const consumeDailyBriefTrigger = serialize(async function consumeDailyBriefTrigger() {
+  // Shared by every "at most once per calendar day (local time)" flag this
+  // file keeps — the Morning Brief's auto-open and the anonymous daily-active
+  // ping both need exactly this, just against a different stored date key.
+  // Each caller wraps its own call in serialize() itself (below) so two
+  // near-simultaneous callers racing the SAME flag (two Gmail tabs) can't
+  // both read "not consumed today yet" before either writes back — but the
+  // two flags are different top-level keys, so they never contend with each
+  // other (see this file's own note on serialize()).
+  async function consumeDailyTrigger(key) {
     const state = await get();
     const today = new Date().toDateString();
-    if (state.briefLastShownDate === today) return false;
-    await set({ briefLastShownDate: today });
+    if (state[key] === today) return false;
+    await set({ [key]: today });
     return true;
-  });
+  }
+
+  const consumeDailyBriefTrigger = serialize(() => consumeDailyTrigger('briefLastShownDate'));
+
+  // The one anonymous, aggregate signal for "is anyone still using this" —
+  // fired at most once per install per day, carrying nothing but the fact
+  // that Glance was active in a Gmail tab. See content-gmail.js's
+  // trackDailyActive() for where this actually turns into an event.
+  const consumeDailyActiveTrigger = serialize(() => consumeDailyTrigger('activeLastTrackedDate'));
 
   const getInstallId = serialize(async function getInstallId() {
     const state = await get();
@@ -185,7 +219,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, consumeDailyBriefTrigger, calibrate, getInstallId, DEFAULTS };
+  return { get, set, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, consumeDailyBriefTrigger, consumeDailyActiveTrigger, markMemoryInsightSeen, calibrate, getInstallId, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

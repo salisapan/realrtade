@@ -39,6 +39,19 @@
     // call site in scanReadingPane() for why the whole sidebar surface
     // (badge, Draft-It, attachment X-ray) is cut, not just styled.
     if (typeof FlowBrief !== 'undefined') checkBrief();
+    trackDailyActive();
+  }
+
+  // The one DAU-shaped signal this product has: "Glance was active in a
+  // Gmail tab today," fired at most once per install per day (see
+  // FlowStorage.consumeDailyActiveTrigger). No content, no per-message
+  // detail — the same allow-listed, install-id-only pipe every other
+  // 'flow:track' event already uses (see background.js's trackEvent and
+  // track-event.js's ALLOWED_EVENTS on the receiving end).
+  async function trackDailyActive() {
+    if (await FlowStorage.consumeDailyActiveTrigger()) {
+      chrome.runtime.sendMessage({ type: 'flow:track', event: 'extension_active', params: { domain: state.domainId } });
+    }
   }
 
   function stopWatching() {
@@ -929,6 +942,7 @@
         if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId });
+          chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
           undo.textContent = 'Some actions couldn’t be undone';
           undo.disabled = false;
@@ -948,6 +962,12 @@
       FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind });
     }
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
+    // The "opened vs closed" funnel pair with chip_shown — fired here and in
+    // onDismiss's own decline path, since both are real ways a proposed
+    // process stops being open (see storage.js's getPending/
+    // hasTerminalOutcome, which treat them identically). method is the only
+    // thing that tells the two apart downstream.
+    chrome.runtime.sendMessage({ type: 'flow:track', event: 'process_closed', params: { domain: state.domainId, method: 'done' } });
   }
 
   function onDoIt(host, chip, ctx, liveSteps) {
@@ -998,6 +1018,9 @@
     FlowStorage.calibrate('dismiss');
     FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
+    // See showMultiActionReceipt's own comment on process_closed — a decline
+    // is a real closure of the loop too, just via the other method.
+    chrome.runtime.sendMessage({ type: 'flow:track', event: 'process_closed', params: { domain: state.domainId, method: 'dismissed' } });
     checkBrief();
   }
 

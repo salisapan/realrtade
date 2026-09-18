@@ -1,17 +1,19 @@
 // Relays anonymous, aggregate Glance product-usage events (chip shown,
-// clicked, dismissed; a write completed; a connector configured; Draft-It
-// used; an attachment summarized) to GA4 via the Measurement Protocol. This
-// is the only visibility the product has into
-// whether an install ever sees real usage after the popup is closed — see
-// docs/product-architecture.md and the Value Hypothesis discussion this
-// exists to answer.
+// clicked, dismissed; a write completed; a process closed by either method;
+// an action undone; a connector configured; Draft-It used; an attachment
+// summarized; one daily active ping) to GA4 via the Measurement Protocol.
+// This — plus what a person can compute from these counts (acceptance rate,
+// dismissal rate, undo rate, opened-vs-closed) — is the entire retention
+// signal the product has into whether an install ever sees real usage after
+// the popup is closed. See docs/product-architecture.md and the Value
+// Hypothesis discussion this exists to answer.
 //
 // Deliberately never carries email content, sender identity, extracted
 // money/date facts, or anything else judgment.js scored — those never leave
 // the device, full stop (see privacy.html §5). Only the install id (a random
-// local identifier, not tied to any account) and a short, allow-listed event
-// name plus a couple of non-sensitive params (which connector, which line of
-// work) travel here.
+// local identifier, not tied to any account), a short allow-listed event
+// name, and a couple of non-sensitive, individually-validated params travel
+// here — see PARAM_VALIDATORS below for exactly what each one accepts.
 //
 // The API secret is a GA4 property setting (Admin > Data Streams > choose
 // the stream > Measurement Protocol API secrets > Create), not something
@@ -30,9 +32,28 @@ const ALLOWED_EVENTS = new Set([
   'chip_dismissed',
   'connector_configured',
   'draft_generated',
-  'attachment_summarized'
+  'attachment_summarized',
+  // Retention-measurement additions — see content-gmail.js's
+  // trackDailyActive(), showMultiActionReceipt(), and onDismiss().
+  'extension_active',
+  'action_undone',
+  'process_closed'
 ]);
-const ALLOWED_PARAM_KEYS = new Set(['domain', 'connector']);
+
+// Each allowed param key validates its own value rather than sharing one
+// blanket string/length check — actionCount is a real number (GA4's
+// Measurement Protocol accepts numeric params natively; the old blanket
+// `typeof === 'string'` check silently dropped it every time it was sent),
+// and method is constrained to the exact two closure types the extension
+// can actually produce, not any string someone might send this endpoint.
+const PARAM_VALIDATORS = {
+  domain: (v) => typeof v === 'string' && v.length <= 40,
+  connector: (v) => typeof v === 'string' && v.length <= 40,
+  method: (v) => v === 'done' || v === 'dismissed',
+  // Bounded by actions.js's own MAX_ACTIONS — never a real process closes
+  // with more steps than the catalog can propose.
+  actionCount: (v) => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= 5
+};
 
 exports.handler = async function (event) {
   var reqId = Math.random().toString(16).slice(2, 8);
@@ -58,9 +79,8 @@ exports.handler = async function (event) {
   var params = {};
   var rawParams = payload.params && typeof payload.params === 'object' ? payload.params : {};
   Object.keys(rawParams).forEach(function (k) {
-    if (ALLOWED_PARAM_KEYS.has(k) && typeof rawParams[k] === 'string' && rawParams[k].length <= 40) {
-      params[k] = rawParams[k];
-    }
+    var validate = PARAM_VALIDATORS[k];
+    if (validate && validate(rawParams[k])) params[k] = rawParams[k];
   });
 
   var apiSecret = process.env.GA4_MP_API_SECRET;

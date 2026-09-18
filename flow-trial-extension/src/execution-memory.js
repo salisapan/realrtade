@@ -9,7 +9,7 @@
 //     intentionId: string | null,  // the message this process was proposed for
 //     processType: string,         // the process catalog id (e.g. 'reply-track')
 //     steps: string[],             // catalog step ids this event applies to
-//     status: 'accepted' | 'dismissed' | 'undone',
+//     status: 'accepted' | 'dismissed' | 'undone' | 'pinned',
 //     timestamp: string            // ISO 8601
 //   }
 //
@@ -20,8 +20,15 @@
 // before confirming and a fully dismissed chip are exactly the same signal
 // (see recordDismiss below), so both reuse the one 'dismissed' status.
 //
+// 'pinned' is the one status this file never writes on its own — it exists
+// only for recordPin() below, fired from a direct human answer ("No, keep
+// proposing it") to the popup's Execution Memory insight card, not from
+// anything inferred. It permanently overrides isNetRejected() for that step
+// (see actions.js) regardless of whatever removed/undone counts pile up
+// after it: an explicit correction always outranks an inference.
+//
 // getAll() folds this log into the {processId: {closedCount, undoneCount,
-// steps: {kind: {accepted, removed, undone}}}} shape actions.js's
+// steps: {kind: {accepted, removed, undone, pinned}}}} shape actions.js's
 // applyMemory() already consumes for scoring which non-anchor steps to keep,
 // drop, or reorder. The log is the only thing actually stored — the
 // aggregate is recomputed from it on every read, so there is exactly one
@@ -83,7 +90,7 @@ const FlowExecutionMemory = (() => {
     return { closedCount: 0, undoneCount: 0, steps: {} };
   }
   function blankStep() {
-    return { accepted: 0, removed: 0, undone: 0 };
+    return { accepted: 0, removed: 0, undone: 0, pinned: 0 };
   }
 
   // The read side: fold the raw event log into the per-process, per-step
@@ -103,6 +110,7 @@ const FlowExecutionMemory = (() => {
         if (ev.status === 'accepted') step.accepted++;
         else if (ev.status === 'dismissed') step.removed++;
         else if (ev.status === 'undone') step.undone++;
+        else if (ev.status === 'pinned') step.pinned++;
       }
     }
     return byProcess;
@@ -142,7 +150,17 @@ const FlowExecutionMemory = (() => {
     return appendEvents([makeEvent(intentionId, processId, undoneKinds, 'undone')]);
   }
 
-  return { getAll, getLog, recordDoIt, recordDismiss, recordUndo };
+  // The one write path a click in this file's header comment describes as
+  // never self-generated — only the popup's Execution Memory insight card
+  // fires this, when a person explicitly answers "no" to "Glance noticed
+  // you usually remove X — keep it that way?" A single step, always
+  // (there's only ever one insight shown, and only one step in it).
+  function recordPin(processId, stepKind, intentionId) {
+    if (!processId || !stepKind) return Promise.resolve();
+    return appendEvents([makeEvent(intentionId, processId, [stepKind], 'pinned')]);
+  }
+
+  return { getAll, getLog, recordDoIt, recordDismiss, recordUndo, recordPin };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExecutionMemory };

@@ -1,69 +1,60 @@
-# Welcome to your Lovable project
+# Flow / Glance
 
-## Project info
+This repository holds two related products built on one shared idea — watch
+a moment, recognize it, act on it, always reversibly — and the site that
+sells both of them. See `docs/product-architecture.md` for the full split
+and `CLAUDE.md` for standing rules on pricing/positioning copy.
 
-**URL**: https://lovable.dev/projects/fe8dd5ce-7cf8-40e2-af75-4fac3c5dcdd6
+## Layout
 
-## How can I edit this code?
+```
+flow-trial-extension/   Glance — the Chrome extension (Flow Trial's Free/Pro tier).
+                         Local, on-device judgment engine + real write paths
+                         (Google Calendar/Tasks/Gmail, Notion, HubSpot,
+                         Salesforce, Slack, Monday.com). See its own README
+                         for setup, architecture, and how to load it locally.
 
-There are several ways of editing your application.
+flow-landing/            The marketing site (theflow-ai.com) — homepage,
+                         pricing, solutions pages, blog, and the Netlify
+                         functions backing signup/waitlist/analytics.
 
-**Use Lovable**
+docs/                    Cross-cutting product and design decisions that
+                         apply to both of the above:
+                           - product-architecture.md — the Flow Trial vs.
+                             Flow (core) split; what each tier may and may
+                             not claim.
+                           - design-principles.md — standing UI/UX review
+                             criteria for any change to the site or extension.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/fe8dd5ce-7cf8-40e2-af75-4fac3c5dcdd6) and start prompting.
+action-graph-video/      A Remotion project — the source for the Action
+                         Graph promo video embedded on the homepage. Not
+                         part of the live site's build; render it separately
+                         and self-host the output when it needs updating.
 
-Changes made via Lovable will be committed automatically to this repo.
+scripts/                 Repo-level tooling (e.g. build-glance-engine.sh,
+                         which syncs the extension's judgment engine into
+                         flow-landing's live in-page demo).
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+supabase/                Migrations and edge functions for Flow's own
+                         Supabase project (waitlist, the "Almost Missed"
+                         opt-in catches gallery) — backs flow-landing, not
+                         a separate app.
 ```
 
-**Edit a file directly in GitHub**
+## Working on this repo
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+There is no single root build — `flow-landing/` and `flow-trial-extension/`
+are independent projects with their own dependencies and their own READMEs.
+Start in whichever one you're actually changing:
 
-**Use GitHub Codespaces**
+```sh
+cd flow-landing && cat README.md          # marketing site
+cd flow-trial-extension && cat README.md  # the Glance extension
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## History note
 
-## What technologies are used for this project?
-
-This project is built with .
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/fe8dd5ce-7cf8-40e2-af75-4fac3c5dcdd6) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+This repo was originally scaffolded by Lovable for an unrelated project. That
+scaffold (a generic Vite/React/shadcn starter with no connection to Flow or
+Glance) has been removed — everything under `flow-landing/` and
+`flow-trial-extension/` was built independently of it.

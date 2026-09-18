@@ -50,6 +50,14 @@
         <span class="sense-bar"><i id="senseFill"></i></span>
         <span class="sense-note" id="senseNote"></span>
       </div>
+      <div class="memory-insight" id="memoryInsight" hidden>
+        <p class="memory-insight-txt" id="memoryInsightText"></p>
+        <div class="memory-insight-actions">
+          <button type="button" class="ghost sm" id="memoryInsightConfirm">Yes, keep it that way</button>
+          <button type="button" class="ghost sm" id="memoryInsightReject">No, propose it again</button>
+        </div>
+      </div>
+
       <div id="log-list" class="log-list"></div>
       <p id="log-empty" class="hint" hidden>Nothing yet. Glance only speaks up when an email actually decides something — silence is the normal state.</p>
 
@@ -70,6 +78,12 @@
   <script src="../src/extract.js"></script>
   <script src="../src/judgment.js"></script>
   <script src="../src/storage.js"></script>
+  <!-- actions.js exposes PROCESS_CATALOG/isNetRejected as static reads with
+       no call into planFor()/processFor() from the popup, so it loads fine
+       here without intent.js (which those two functions reference, but only
+       inside function bodies the popup never executes). -->
+  <script src="../src/actions.js"></script>
+  <script src="../src/execution-memory.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

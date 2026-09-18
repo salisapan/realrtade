@@ -190,6 +190,16 @@ main{padding:16px}
 .sense-bar i{display:block; height:100%; background:var(--accent); border-radius:2px; transition:width .4s}
 .sense-note{font-size:.72rem; color:var(--ink-3); flex:1; min-width:0}
 
+/* ---- Execution Memory insight: a silent bias made visible, answered once ---- */
+.memory-insight{
+  margin-bottom:14px; padding:11px 12px;
+  background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%), var(--accent-wash);
+  border:1px solid var(--glass-border); border-radius:10px;
+}
+.memory-insight-txt{font-size:.8rem; color:var(--ink-2); margin:0 0 9px; line-height:1.5}
+.memory-insight-actions{display:flex; gap:8px; flex-wrap:wrap}
+.memory-insight-actions .ghost{margin-top:0}
+
 /* ---- referral prompt: earns its place after real usage, dismiss forever ---- */
 .referral{
   position:relative; margin-top:14px; padding:11px 30px 11px 12px;

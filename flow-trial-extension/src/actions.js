@@ -119,77 +119,97 @@ const FlowActions = (() => {
   // reorder: it's the concrete evidence the process exists on at all (a
   // real date+time for a schedule process, the ask itself for a reply) —
   // memory bias only ever touches the secondary steps around it.
-  function processFor(intent) {
-    const sig = intent.signals || {};
-    if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
-      if (sig.handoff) {
-        return {
-          id: 'schedule-confirm',
-          name: 'Schedule & Confirm',
-          closingLine: 'Scheduling this, replying to confirm, and setting a follow-up.',
-          closedLine: 'Scheduled, confirmed, and tracked.',
-          anchor: 'calendar',
-          stepKinds: ['calendar', 'draft', 'task']
-        };
-      }
-      return {
-        id: 'schedule',
-        name: 'Schedule It',
-        closingLine: 'Scheduling this and setting a reminder to prepare.',
-        closedLine: 'Scheduled, with a reminder set.',
-        anchor: 'calendar',
-        stepKinds: ['calendar', 'task']
-      };
-    }
-    if (intent.type === FlowIntent.TYPES.REQUEST) {
-      return {
-        id: 'reply-track',
-        name: 'Reply & Track',
-        closingLine: 'Drafting your reply and tracking it as a task.',
-        closedLine: 'Replied and tracked.',
-        anchor: 'draft',
-        stepKinds: ['draft', 'task']
-      };
-    }
-    if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
-      return {
-        id: 'follow-through',
-        name: 'Follow Through',
-        closingLine: 'Setting a reminder to follow through, with a reply ready.',
-        closedLine: 'Reminder set, reply ready.',
-        anchor: 'task',
-        stepKinds: ['task', 'draft']
-      };
-    }
+  //
+  // Exported as-is (see the return statement below) so anything that needs
+  // to describe a process's fixed shape from just its id — popup.js's
+  // Execution Memory insight card, most notably — reads the exact same
+  // table processFor() selects from, instead of a second, hand-copied list
+  // that could quietly drift out of sync with it.
+  const PROCESS_CATALOG = {
+    'schedule-confirm': {
+      name: 'Schedule & Confirm',
+      closingLine: 'Scheduling this, replying to confirm, and setting a follow-up.',
+      closedLine: 'Scheduled, confirmed, and tracked.',
+      anchor: 'calendar',
+      stepKinds: ['calendar', 'draft', 'task']
+    },
+    'schedule': {
+      name: 'Schedule It',
+      closingLine: 'Scheduling this and setting a reminder to prepare.',
+      closedLine: 'Scheduled, with a reminder set.',
+      anchor: 'calendar',
+      stepKinds: ['calendar', 'task']
+    },
+    'reply-track': {
+      name: 'Reply & Track',
+      closingLine: 'Drafting your reply and tracking it as a task.',
+      closedLine: 'Replied and tracked.',
+      anchor: 'draft',
+      stepKinds: ['draft', 'task']
+    },
+    'follow-through': {
+      name: 'Follow Through',
+      closingLine: 'Setting a reminder to follow through, with a reply ready.',
+      closedLine: 'Reminder set, reply ready.',
+      anchor: 'task',
+      stepKinds: ['task', 'draft']
+    },
     // DECISION_TO_LOG / FOLLOW_UP — the chip's original job, narrowed to
     // its own named process rather than a type-less default.
-    return {
-      id: 'log-it',
+    'log-it': {
       name: 'Log It',
       closingLine: 'Logging this so it stays tracked.',
       closedLine: 'Logged.',
       anchor: 'task',
       stepKinds: ['task']
-    };
+    }
+  };
+
+  function processFor(intent) {
+    const sig = intent.signals || {};
+    let id;
+    if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
+      id = sig.handoff ? 'schedule-confirm' : 'schedule';
+    } else if (intent.type === FlowIntent.TYPES.REQUEST) {
+      id = 'reply-track';
+    } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
+      id = 'follow-through';
+    } else {
+      id = 'log-it';
+    }
+    return Object.assign({ id }, PROCESS_CATALOG[id]);
   }
 
   // ----------------------------------------------------------- memory bias
   //
-  // Within the non-anchor steps only: drop a step kind this account has
-  // net-rejected (removed-or-undone more than accepted) across a real
-  // sample size, and otherwise order the rest by historical acceptance
-  // rate — most-reliably-kept first. No history for a step yet -> neutral
-  // 0.5 rate, which keeps the catalog's own default order for ties.
+  // A step is net-rejected once it's been removed-or-undone more often than
+  // accepted, across a real sample size — below DEMOTE_THRESHOLD a couple of
+  // removals reads as noise, not preference, and one dismissal on a novel
+  // process is not a verdict. `pinned` overrides this unconditionally: it's
+  // set only by an explicit "No, keep proposing it" click on the popup's
+  // Execution Memory insight card (see FlowExecutionMemory.recordPin) — a
+  // human's direct answer to a direct question always outranks the
+  // algorithm's own inference from indirect signals.
+  //
+  // Exported (see the return statement below) so that same insight card can
+  // ask "is this actually being demoted right now" using the identical
+  // predicate applyMemory acts on, rather than a second copy of this math
+  // that could silently disagree with what the live chip is really doing.
+  function isNetRejected(stats) {
+    if (!stats || stats.pinned) return false;
+    const rejected = (stats.removed || 0) + (stats.undone || 0);
+    return rejected >= DEMOTE_THRESHOLD && rejected > (stats.accepted || 0);
+  }
+
+  // Within the non-anchor steps only: drop a step kind isNetRejected() flags,
+  // and otherwise order the rest by historical acceptance rate —
+  // most-reliably-kept first. No history for a step yet -> neutral 0.5 rate,
+  // which keeps the catalog's own default order for ties.
   function applyMemory(stepKinds, anchor, memoryForProcess) {
     const rest = stepKinds.filter((k) => k !== anchor);
     const stats = (memoryForProcess && memoryForProcess.steps) || {};
 
-    const kept = rest.filter((k) => {
-      const s = stats[k];
-      if (!s) return true;
-      const rejected = s.removed + s.undone;
-      return !(rejected >= DEMOTE_THRESHOLD && rejected > s.accepted);
-    });
+    const kept = rest.filter((k) => !isNetRejected(stats[k]));
 
     const scored = kept.map((k, i) => {
       const s = stats[k];
@@ -225,7 +245,7 @@ const FlowActions = (() => {
     return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };
   }
 
-  return { planFor, MAX_ACTIONS };
+  return { planFor, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };
