@@ -33,7 +33,7 @@
 
 :root{
   --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F3F6FC; --surface-3:#EAEFFA;
-  --ink:#0B0F1A; --ink-2:#454E63; --ink-3:#7B8398;
+  --ink:#0B0F1A; --ink-2:#454E63; --ink-3:#666C7E;
   /* translucent blue-mix borders, not flat opaque hex — same recipe as
      home.css's light-theme --line/--line-hi, reused verbatim so this page's
      borders read as sitting on the surface rather than drawn flat on top. */
@@ -75,7 +75,7 @@
 }
 :root[data-theme="dark"]{
   --bg:#07090F; --surface:#10141D; --surface-2:#141924; --surface-3:#1A2130;
-  --ink:#EEF2F9; --ink-2:#AEB9D6; --ink-3:#7A879F;
+  --ink:#EEF2F9; --ink-2:#AEB9D6; --ink-3:#98A3BA;
   --line:#212A3B; --line-2:#2C3852;
   --accent:#3B74FF; --accent-ink:#93B3FF; --accent-wash:#111C3A;
   --ok:#5FD39B; --ok-wash:#0F2019;
@@ -115,7 +115,7 @@ header.site nav a:hover{color:#fff}
 .theme-btn .sun{display:none}
 :root[data-theme="light"] .theme-btn .sun{display:block}
 :root[data-theme="light"] .theme-btn .moon{display:none}
-.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--accent); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 
 code{font-family:var(--mono); font-size:.86em; background:var(--surface-2); border:1px solid var(--line); border-radius:4px; padding:.12em .45em; color:var(--ink)}
@@ -317,6 +317,10 @@ p{margin:0 0 15px}
 .qnum.inline{margin-inline-end:8px}
 
 .mockrow .badge.live{background:var(--accent-wash); color:var(--accent)}
+/* accent-on-accent-wash measures 4.10:1 in dark theme, just under AA for
+   text this size, and this badge is the label that tells someone a
+   destination actually works. Brighten it against its own wash. */
+:root[data-theme="dark"] .mockrow .badge.live{color:#9DBBFF}
 
 /* mocklist — a faithful stand-in for the real extension popup UI */
 .mocklist{display:flex; flex-direction:column; gap:7px}
@@ -388,6 +392,12 @@ p{margin:0 0 15px}
 .formcard .status{font-family:var(--sans); font-size:.92rem; margin-top:12px; display:none}
 .formcard .status.ok{display:block; color:var(--ok)}
 .formcard .status.err{display:block; color:#C0392B}
+/* The same dark-theme error colour contact.html and pricing.html already
+   carry. Without it this rule measured 3.23:1 against the dark card —
+   below WCAG AA — and this page DEFAULTS to dark, so the form a user
+   mistypes their email into was the one place the error was hardest to
+   see. Third sibling of a fix that had been applied to the other two. */
+:root[data-theme="dark"] .formcard .status.err{color:#FF8A80}
 .sr-only{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
 
 /* install — horizontal wizard */
