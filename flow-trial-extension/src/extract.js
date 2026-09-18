@@ -30,10 +30,26 @@ const FlowExtract = (() => {
   // writing conventionally puts ₪ AFTER the number ("15,000 ₪"), not before
   // it the way "$15,000" does, so a post-only symbol had to be a first-class
   // case here rather than assumed to always be a 3-letter code like "NIS".
+  // The magnitude suffix MUST be a whole token. Written as a bare `(k|m)?` it
+  // matched the first letter of whatever word came next, because nothing
+  // required the suffix to end: "$20 monthly" parsed as 20 x 1e6 = $20,000,000,
+  // "$12 minimum" as $12,000,000, "$50 kits" as $50,000. Those are not exotic
+  // inputs — per-seat pricing is written "monthly" in half the emails this
+  // product exists to read, and a six-order-of-magnitude error in a figure the
+  // user is about to file is the single most damaging thing this file could do.
+  //
+  // The trailing lookahead closes it. Longer words are listed after the single
+  // letters and reached by backtracking: "million" first tries `m`, fails the
+  // lookahead on the following "i", and backtracks into the full word. The
+  // lookahead bans Hebrew letters too, so "מיליון" can't be clipped to a
+  // prefix the same way — and it is a lookahead rather than \b because \b is
+  // ASCII-only and never fires next to Hebrew (same trap documented in
+  // parseDate below and in privacyShield.js).
+  const MULT = { k: 1e3, thousand: 1e3, אלף: 1e3, m: 1e6, mm: 1e6, million: 1e6, מיליון: 1e6, bn: 1e9, billion: 1e9 };
   const MONEY_RE = new RegExp(
     '(?:(\\$|€|£|₪|₹|US\\$|C\\$|A\\$|USD|EUR|GBP|NIS|ILS|INR|CAD|AUD)\\s?)?' +
     '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)' +
-    '\\s?(k|m|אלף|מיליון)?' +
+    '(?:\\s?(k|m|mm|bn|thousand|million|billion|אלף|מיליון)(?![A-Za-z\\u0590-\\u05FF]))?' +
     '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels|\\$|€|£|₪|שקל(?:ים)?))?',
     'gi'
   );
@@ -51,7 +67,7 @@ const FlowExtract = (() => {
       // a version, a headcount. Refusing those is most of what keeps this honest.
       if (!code) continue;
       let value = parseFloat(digits.replace(/,/g, ''));
-      if (mult) value *= (mult.toLowerCase() === 'k' ? 1e3 : 1e6);
+      if (mult) value *= (MULT[mult.toLowerCase()] || 1);
       // Percentages and years dressed up as money are almost always neither.
       const after = text.slice(m.index + raw.length, m.index + raw.length + 2);
       if (after.trim().startsWith('%')) continue;
@@ -79,14 +95,70 @@ const FlowExtract = (() => {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // `new Date(y, m, d)` silently rolls impossible days forward: February 30
+  // becomes March 2, April 31 becomes May 1. A typo or an odd phrasing would
+  // therefore have produced a real-looking ISO date for a day the sender never
+  // wrote. Constructing and then confirming the calendar kept every field is
+  // the only way to tell a valid date from a rolled-over one.
+  function buildDate(year, monthIdx, day) {
+    if (!(monthIdx >= 0 && monthIdx <= 11) || !(day >= 1 && day <= 31)) return null;
+    const d = new Date(year, monthIdx, day);
+    if (d.getFullYear() !== year || d.getMonth() !== monthIdx || d.getDate() !== day) return null;
+    return d;
+  }
+
+  // How far either side of today a bare month-and-day is still unambiguous.
+  // Past is kept tight because a date a month gone is usually being recalled,
+  // not scheduled; forward is wider because that is where commitments live.
+  const PAST_MS = 1000 * 60 * 60 * 24 * 30;
+  const FUTURE_MS = 1000 * 60 * 60 * 24 * 120;
+
+  // A month and a day with no year attached. The old code simply assumed the
+  // current year, which breaks hardest exactly where email traffic is heaviest
+  // — across New Year. On 5 Jan 2027, "we signed on December 28" resolved to
+  // 2027-12-28: a commitment placed almost a full year in the future when the
+  // sender meant eight days in the past.
+  //
+  // Instead, score last year / this year / next year, and accept only if
+  // exactly ONE of them lands inside the window where the sender's intent is
+  // not in doubt. Two candidates in the window, or none, means the message
+  // genuinely did not say — and per this file's rule, no date beats a
+  // confidently wrong one, so it returns the sender's own words and no ISO.
+  function monthDay(raw, monthIdx, day, explicitYear, now) {
+    if (explicitYear) {
+      const d = buildDate(+explicitYear, monthIdx, day);
+      return d ? { raw, iso: iso(d) } : null;
+    }
+    const y = now.getFullYear();
+    const inWindow = [y - 1, y, y + 1]
+      .map((yy) => buildDate(yy, monthIdx, day))
+      .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+    if (inWindow.length !== 1) {
+      // Nothing valid at all (February 30 in any year) is a non-date, not an
+      // ambiguous one — say so differently so callers can tell them apart.
+      const anyValid = [y - 1, y, y + 1].some((yy) => buildDate(yy, monthIdx, day));
+      return anyValid ? { raw, iso: null, ambiguousYear: true } : null;
+    }
+    return { raw, iso: iso(inWindow[0]) };
+  }
+
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
   function parseDate(text, now) {
     now = now || new Date();
     let m;
 
+    // An ISO-shaped string is not automatically an ISO date. This passed
+    // "2026-13-45" and "2026-00-00" straight through as if they were real,
+    // because nothing checked the numbers — order and reference codes in that
+    // shape are common in invoice mail. Build it and confirm the calendar
+    // agrees before calling it a date.
     m = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if (m) return { raw: m[0], iso: m[0] };
+    if (m) {
+      const d = buildDate(+m[1], +m[2] - 1, +m[3]);
+      if (d) return { raw: m[0], iso: m[0] };
+      return null;
+    }
 
     const monthNames = MONTHS.join('|');
     // A bare "March 3" carries no year, so resolving it means guessing. Guessing
@@ -95,21 +167,11 @@ const FlowExtract = (() => {
     // into someone's CRM. When the year is genuinely ambiguous we keep the words
     // the sender used and refuse to emit an ISO date at all — no date beats a
     // confidently wrong one, which is the same rule the rest of this file follows.
-    const STALE_MS = 1000 * 60 * 60 * 24 * 30;
-
     m = text.match(new RegExp('\\b(' + monthNames + ')\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b', 'i'));
-    if (m) {
-      const d = new Date(m[3] ? +m[3] : now.getFullYear(), MONTHS.indexOf(m[1].toLowerCase()), +m[2]);
-      if (!m[3] && d < now && (now - d) > STALE_MS) return { raw: m[0], iso: null, ambiguousYear: true };
-      return { raw: m[0], iso: iso(d) };
-    }
+    if (m) return monthDay(m[0], MONTHS.indexOf(m[1].toLowerCase()), +m[2], m[3], now);
 
     m = text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + monthNames + ')(?:,?\\s+(\\d{4}))?\\b', 'i'));
-    if (m) {
-      const d = new Date(m[3] ? +m[3] : now.getFullYear(), MONTHS.indexOf(m[2].toLowerCase()), +m[1]);
-      if (!m[3] && d < now && (now - d) > STALE_MS) return { raw: m[0], iso: null, ambiguousYear: true };
-      return { raw: m[0], iso: iso(d) };
-    }
+    if (m) return monthDay(m[0], MONTHS.indexOf(m[2].toLowerCase()), +m[1], m[3], now);
 
     // "by Monday" / "next Friday" — only when a scheduling word introduces it,
     // so a signature line reading "Monday" is not mistaken for a deadline.
@@ -178,6 +240,14 @@ const FlowExtract = (() => {
       if (ap === 'pm' && h < 12) h += 12;
       if (ap === 'am' && h === 12) h = 0;
       if (h > 23 || min > 59) return null;
+      // With no am/pm, an hour that is also a valid afternoon hour says
+      // nothing: "let's meet at 3" in a work email means 15:00 essentially
+      // always, and logging 03:00 puts a meeting in the middle of the night.
+      // 12 is the same problem in the other direction (noon or midnight).
+      // Hours from 13 up are unambiguous, and so are 8-11, which nobody
+      // writes to mean 20:00-23:00 without saying pm. The rest we refuse,
+      // for the same reason parseDate refuses an ambiguous year.
+      if (!ap && (h < 8 || h === 12)) return null;
       return { raw: m[0], hour: h, minute: min };
     }
 

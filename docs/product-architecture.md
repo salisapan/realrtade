@@ -7,6 +7,34 @@
 > Flow's security/compliance guarantees, or make Flow look like a
 > self-serve download — stop and ask before shipping it.
 
+## 0a. Current shipping scope (read this before trusting anything below)
+
+> Added after an audit found this document describing a product the code no
+> longer matches — and, because this file is the hard constraint, watched
+> that error propagate into `trial.html`, `pricing.html` and `terms.html`.
+> Where this section and the detail below disagree, **this section wins**;
+> the rest describes the intended full shape, not what ships today.
+
+Verified in code (`src/connectors.js`, `popup/popup.js`, `manifest.json`):
+
+| | Described below | Actually ships today |
+|---|---|---|
+| Connectors reachable in setup | five (Notion, HubSpot, Salesforce, Slack, Monday.com) | **one** — Google. `connectors.js` marks exactly one entry `mvp: true`; `popup.js` renders only `mvp` connectors. The other five still have working write paths in `background.js`, but no UI reaches them. |
+| Where a Do It lands | the one connector the user chose | **Google Calendar, Google Tasks, or a Gmail draft** — and the user does not choose: `actions.js`'s process model picks per message. |
+| Setup questions | two ("where may it write", "what work do you do") | **one** — sign in with Google. `popup.js` deliberately leaves `domainId` unset; `judgment.js` falls back to the sales vocabulary. |
+| Sensitivity | — | not a setup input. It self-adjusts from clicks and dismissals; the popup only displays where it landed. |
+| Notion | "works today" | code path works; unreachable from onboarding. |
+
+Two consequences that bind future work:
+
+1. **`manifest.json`'s `host_permissions` match the reachable set, not the
+   code.** Re-enabling any dormant connector in onboarding means restoring
+   its API host in the same change, or its writes fail on a permission error.
+2. **Any copy naming a destination must name the Google three**, until that
+   changes here first.
+
+---
+
 ## 0. One engine, two products, three offerings
 
 Every offering runs the same underlying idea: **watch a moment, recognize
@@ -215,8 +243,9 @@ be redirected to offering #3, not sold Pro with an asterisk.
 
 ### 2.4 Status
 
-Not yet built. `pricing.html`'s `Notify Me` button is a `mailto:` link,
-not a checkout — there is no Stripe integration yet, and the specific
+Not yet built. `pricing.html`'s `Notify Me` button is a real double
+opt-in waitlist form (Supabase + `send-confirmation`), not a checkout —
+there is no Stripe integration yet, and the specific
 feature set above is a proposal, not a committed spec, pending the
 product owner's sign-off on which of these ship first.
 

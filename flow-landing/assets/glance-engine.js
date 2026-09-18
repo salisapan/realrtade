@@ -3,7 +3,7 @@
 //   flow-trial-extension/src/extract.js
 //   flow-trial-extension/src/judgment.js
 // Regenerate with: scripts/build-glance-engine.sh
-// Last synced: 2026-09-14
+// Last synced: 2026-09-18
 //
 // This is the exact client-side judgment engine the Glance extension
 // runs — concatenated as-is (no edits) so the live demo on trial.html
@@ -26,8 +26,11 @@ const FLOW_DOMAINS = [
     id: 'sales',
     label: 'Sales & business development',
     entity: 'Deal / client',
-    // Nouns that mean "this message is about the object of my work".
-    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr|msa|sow|statement of work)\b/i,
+    // Nouns that mean "this message is about the object of my work". The
+    // Hebrew half has no \b wrapper for the same reason judgment.js's Hebrew
+    // signals don't: \b only fires around [A-Za-z0-9_], so it's a silent
+    // no-op — never a match — against Hebrew letters.
+    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr|msa|sow|statement of work)\b|(עסקה|הצעת מחיר|חוזה|הזמנה|מנוי|חידוש|הסכם)/i,
     title(facts) {
       if (facts.lost) return 'Log lost deal';
       if (facts.moneyText && facts.date) return 'Log ' + facts.moneyText + ' confirmed, ' + facts.dateText;
@@ -115,6 +118,10 @@ if (typeof module !== 'undefined') module.exports = { FLOW_DOMAINS };
 const FlowExtract = (() => {
   const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
   const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  // Same Sunday-first order as DAYS above, so both arrays line up 1:1 with
+  // JS's own Date.getDay() (0 = Sunday) and the two "by/on <weekday>" blocks
+  // in parseDate() below can share identical delta math.
+  const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 
   const CURRENCY = {
     '$': 'USD', 'us$': 'USD', 'usd': 'USD',
@@ -126,11 +133,31 @@ const FlowExtract = (() => {
   };
 
   // Symbol/code before the number, or code after it. Optional k/m suffix.
+  // The post-group also accepts a bare symbol (₪/$/€/£) — Hebrew business
+  // writing conventionally puts ₪ AFTER the number ("15,000 ₪"), not before
+  // it the way "$15,000" does, so a post-only symbol had to be a first-class
+  // case here rather than assumed to always be a 3-letter code like "NIS".
+  // The magnitude suffix MUST be a whole token. Written as a bare `(k|m)?` it
+  // matched the first letter of whatever word came next, because nothing
+  // required the suffix to end: "$20 monthly" parsed as 20 x 1e6 = $20,000,000,
+  // "$12 minimum" as $12,000,000, "$50 kits" as $50,000. Those are not exotic
+  // inputs — per-seat pricing is written "monthly" in half the emails this
+  // product exists to read, and a six-order-of-magnitude error in a figure the
+  // user is about to file is the single most damaging thing this file could do.
+  //
+  // The trailing lookahead closes it. Longer words are listed after the single
+  // letters and reached by backtracking: "million" first tries `m`, fails the
+  // lookahead on the following "i", and backtracks into the full word. The
+  // lookahead bans Hebrew letters too, so "מיליון" can't be clipped to a
+  // prefix the same way — and it is a lookahead rather than \b because \b is
+  // ASCII-only and never fires next to Hebrew (same trap documented in
+  // parseDate below and in privacyShield.js).
+  const MULT = { k: 1e3, thousand: 1e3, אלף: 1e3, m: 1e6, mm: 1e6, million: 1e6, מיליון: 1e6, bn: 1e9, billion: 1e9 };
   const MONEY_RE = new RegExp(
     '(?:(\\$|€|£|₪|₹|US\\$|C\\$|A\\$|USD|EUR|GBP|NIS|ILS|INR|CAD|AUD)\\s?)?' +
     '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)' +
-    '\\s?(k|m)?' +
-    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels))?',
+    '(?:\\s?(k|m|mm|bn|thousand|million|billion|אלף|מיליון)(?![A-Za-z\\u0590-\\u05FF]))?' +
+    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels|\\$|€|£|₪|שקל(?:ים)?))?',
     'gi'
   );
 
@@ -142,12 +169,12 @@ const FlowExtract = (() => {
       const [raw, pre, digits, mult, post] = m;
       const code = CURRENCY[(pre || '').toLowerCase()] || CURRENCY[(post || '').toLowerCase().slice(0, 3)] ||
                    (/dollars/i.test(post || '') ? 'USD' : /euros/i.test(post || '') ? 'EUR' :
-                    /pounds/i.test(post || '') ? 'GBP' : /shekels/i.test(post || '') ? 'ILS' : null);
+                    /pounds/i.test(post || '') ? 'GBP' : /shekels|שקל/i.test(post || '') ? 'ILS' : null);
       // A bare number with no currency marker is not money — it's a floor number,
       // a version, a headcount. Refusing those is most of what keeps this honest.
       if (!code) continue;
       let value = parseFloat(digits.replace(/,/g, ''));
-      if (mult) value *= (mult.toLowerCase() === 'k' ? 1e3 : 1e6);
+      if (mult) value *= (MULT[mult.toLowerCase()] || 1);
       // Percentages and years dressed up as money are almost always neither.
       const after = text.slice(m.index + raw.length, m.index + raw.length + 2);
       if (after.trim().startsWith('%')) continue;
@@ -175,14 +202,70 @@ const FlowExtract = (() => {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
 
+  // `new Date(y, m, d)` silently rolls impossible days forward: February 30
+  // becomes March 2, April 31 becomes May 1. A typo or an odd phrasing would
+  // therefore have produced a real-looking ISO date for a day the sender never
+  // wrote. Constructing and then confirming the calendar kept every field is
+  // the only way to tell a valid date from a rolled-over one.
+  function buildDate(year, monthIdx, day) {
+    if (!(monthIdx >= 0 && monthIdx <= 11) || !(day >= 1 && day <= 31)) return null;
+    const d = new Date(year, monthIdx, day);
+    if (d.getFullYear() !== year || d.getMonth() !== monthIdx || d.getDate() !== day) return null;
+    return d;
+  }
+
+  // How far either side of today a bare month-and-day is still unambiguous.
+  // Past is kept tight because a date a month gone is usually being recalled,
+  // not scheduled; forward is wider because that is where commitments live.
+  const PAST_MS = 1000 * 60 * 60 * 24 * 30;
+  const FUTURE_MS = 1000 * 60 * 60 * 24 * 120;
+
+  // A month and a day with no year attached. The old code simply assumed the
+  // current year, which breaks hardest exactly where email traffic is heaviest
+  // — across New Year. On 5 Jan 2027, "we signed on December 28" resolved to
+  // 2027-12-28: a commitment placed almost a full year in the future when the
+  // sender meant eight days in the past.
+  //
+  // Instead, score last year / this year / next year, and accept only if
+  // exactly ONE of them lands inside the window where the sender's intent is
+  // not in doubt. Two candidates in the window, or none, means the message
+  // genuinely did not say — and per this file's rule, no date beats a
+  // confidently wrong one, so it returns the sender's own words and no ISO.
+  function monthDay(raw, monthIdx, day, explicitYear, now) {
+    if (explicitYear) {
+      const d = buildDate(+explicitYear, monthIdx, day);
+      return d ? { raw, iso: iso(d) } : null;
+    }
+    const y = now.getFullYear();
+    const inWindow = [y - 1, y, y + 1]
+      .map((yy) => buildDate(yy, monthIdx, day))
+      .filter((d) => d && (now - d) <= PAST_MS && (d - now) <= FUTURE_MS);
+    if (inWindow.length !== 1) {
+      // Nothing valid at all (February 30 in any year) is a non-date, not an
+      // ambiguous one — say so differently so callers can tell them apart.
+      const anyValid = [y - 1, y, y + 1].some((yy) => buildDate(yy, monthIdx, day));
+      return anyValid ? { raw, iso: null, ambiguousYear: true } : null;
+    }
+    return { raw, iso: iso(inWindow[0]) };
+  }
+
   // Only dates the message states outright. A date guessed from context is worse
   // than no date at all once it lands in someone's CRM.
   function parseDate(text, now) {
     now = now || new Date();
     let m;
 
+    // An ISO-shaped string is not automatically an ISO date. This passed
+    // "2026-13-45" and "2026-00-00" straight through as if they were real,
+    // because nothing checked the numbers — order and reference codes in that
+    // shape are common in invoice mail. Build it and confirm the calendar
+    // agrees before calling it a date.
     m = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if (m) return { raw: m[0], iso: m[0] };
+    if (m) {
+      const d = buildDate(+m[1], +m[2] - 1, +m[3]);
+      if (d) return { raw: m[0], iso: m[0] };
+      return null;
+    }
 
     const monthNames = MONTHS.join('|');
     // A bare "March 3" carries no year, so resolving it means guessing. Guessing
@@ -191,21 +274,11 @@ const FlowExtract = (() => {
     // into someone's CRM. When the year is genuinely ambiguous we keep the words
     // the sender used and refuse to emit an ISO date at all — no date beats a
     // confidently wrong one, which is the same rule the rest of this file follows.
-    const STALE_MS = 1000 * 60 * 60 * 24 * 30;
-
     m = text.match(new RegExp('\\b(' + monthNames + ')\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s+(\\d{4}))?\\b', 'i'));
-    if (m) {
-      const d = new Date(m[3] ? +m[3] : now.getFullYear(), MONTHS.indexOf(m[1].toLowerCase()), +m[2]);
-      if (!m[3] && d < now && (now - d) > STALE_MS) return { raw: m[0], iso: null, ambiguousYear: true };
-      return { raw: m[0], iso: iso(d) };
-    }
+    if (m) return monthDay(m[0], MONTHS.indexOf(m[1].toLowerCase()), +m[2], m[3], now);
 
     m = text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + monthNames + ')(?:,?\\s+(\\d{4}))?\\b', 'i'));
-    if (m) {
-      const d = new Date(m[3] ? +m[3] : now.getFullYear(), MONTHS.indexOf(m[2].toLowerCase()), +m[1]);
-      if (!m[3] && d < now && (now - d) > STALE_MS) return { raw: m[0], iso: null, ambiguousYear: true };
-      return { raw: m[0], iso: iso(d) };
-    }
+    if (m) return monthDay(m[0], MONTHS.indexOf(m[2].toLowerCase()), +m[1], m[3], now);
 
     // "by Monday" / "next Friday" — only when a scheduling word introduces it,
     // so a signature line reading "Monday" is not mistaken for a deadline.
@@ -227,12 +300,83 @@ const FlowExtract = (() => {
       return { raw: m[0], iso: iso(d) };
     }
 
+    // Hebrew equivalent of the "by/on <weekday>" block above — "עד יום שני"
+    // (by Monday), "ביום רביעי" (on Wednesday), "לא יאוחר מיום חמישי" (no
+    // later than Thursday). Requires the same scheduling-word guard so a
+    // signature reading "יום נעים" ("have a nice day") is never mistaken
+    // for a deadline.
+    //
+    // Deliberately no trailing \b: JS's \b is defined only against ASCII
+    // \w ([A-Za-z0-9_]), so a \b placed right after a Hebrew word sits
+    // between two non-\w characters — never a boundary — and the whole
+    // match silently never fires. Same failure shape as the PHONE_PATTERN
+    // fix earlier in privacyShield.js: a boundary that can only ever hold
+    // next to ASCII text is not a boundary at all next to Hebrew.
+    m = text.match(new RegExp('(?:עד|ב-?|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')'));
+    if (m) {
+      const target = DAYS_HE.indexOf(m[1]);
+      const d = new Date(now);
+      let delta = (target - d.getDay() + 7) % 7;
+      if (delta === 0) delta = 7;
+      else if (/הבא\s*$/.test(m[0])) delta += 7;
+      d.setDate(d.getDate() + delta);
+      return { raw: m[0], iso: iso(d) };
+    }
+
     // Numeric M/D or D/M is genuinely ambiguous across locales, so it is kept as
     // written and never normalized to an ISO date we cannot justify.
     m = text.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
     if (m) return { raw: m[0], iso: null };
 
     return null;
+  }
+
+  // Only a time the message states next to an explicit time marker ("at 3pm",
+  // "בשעה 15:00") — a bare "15:00" or "3" floating in text is as likely to be
+  // a flight number, a room, or a price as a meeting time, and guessing here
+  // would be the same mistake parseDate() above already refuses to make for
+  // an ambiguous year.
+  function parseTime(text) {
+    let m;
+
+    m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+    if (m) {
+      let h = +m[1];
+      const min = m[2] ? +m[2] : 0;
+      const ap = (m[3] || '').toLowerCase();
+      if (ap === 'pm' && h < 12) h += 12;
+      if (ap === 'am' && h === 12) h = 0;
+      if (h > 23 || min > 59) return null;
+      // With no am/pm, an hour that is also a valid afternoon hour says
+      // nothing: "let's meet at 3" in a work email means 15:00 essentially
+      // always, and logging 03:00 puts a meeting in the middle of the night.
+      // 12 is the same problem in the other direction (noon or midnight).
+      // Hours from 13 up are unambiguous, and so are 8-11, which nobody
+      // writes to mean 20:00-23:00 without saying pm. The rest we refuse,
+      // for the same reason parseDate refuses an ambiguous year.
+      if (!ap && (h < 8 || h === 12)) return null;
+      return { raw: m[0], hour: h, minute: min };
+    }
+
+    // בשעה/בשעות is an unambiguous "at the hour of" marker — unlike a bare
+    // "ב-" prefix (used elsewhere for "on <weekday>"), it is never a room
+    // number, a page reference, or anything else. Deliberately no trailing
+    // \b for the same reason parseDate()'s Hebrew weekday block has none:
+    // \b never fires next to Hebrew letters.
+    m = text.match(/(?:בשעה|בשעות)\s*(\d{1,2})(?::(\d{2}))?/);
+    if (m) {
+      const h = +m[1];
+      const min = m[2] ? +m[2] : 0;
+      if (h > 23 || min > 59) return null;
+      return { raw: m[0], hour: h, minute: min };
+    }
+
+    return null;
+  }
+
+  function fmtTime(t) {
+    if (!t) return null;
+    return String(t.hour).padStart(2, '0') + ':' + String(t.minute).padStart(2, '0');
   }
 
   // The sentence a human would quote if asked "what did this email decide?".
@@ -254,16 +398,19 @@ const FlowExtract = (() => {
 
   function extract(text, ctx) {
     const money = parseMoney(text);
+    const time = parseTime(text);
     return {
       money,
       moneyText: fmtMoney(money),
       date: parseDate(text, ctx && ctx.now),
+      time,
+      timeText: fmtTime(time),
       automated: senderIsAutomated(ctx && ctx.senderEmail, text),
       wordCount: (text.match(/\S+/g) || []).length
     };
   }
 
-  return { extract, parseMoney, parseDate, fmtMoney, decisiveSentence, senderIsAutomated };
+  return { extract, parseMoney, parseDate, parseTime, fmtMoney, fmtTime, decisiveSentence, senderIsAutomated };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExtract };
@@ -319,6 +466,25 @@ const FlowJudgment = (() => {
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|incorrect (?:amount|invoice)|dispute)\b/i;
 
+  // Hebrew twins of the seven signals above. No \b word-boundary wrapper here
+  // — \b is defined against [A-Za-z0-9_], so it never fires around Hebrew
+  // letters and would silently turn every one of these into a dead pattern.
+  // Same phrases, same intent, just the vocabulary an Israeli business inbox
+  // actually uses instead of "we're good at" / "approved" / "no longer interested".
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?)/;
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור)/;
+  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא)/;
+  const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם)/;
+  const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון)/;
+  // תשלח/י לי, צריך/ה ממך, בבקשה ת... — the direct "do X for me" phrasings a
+  // small, personal-scale request actually gets written in, on top of the
+  // more formal "תוכל/נשמח אם" business-register set already here. "בבקשה
+  // ת" is deliberately broad (any 2nd-person imperative/future verb, which
+  // in Hebrew all take a ת prefix, following "please") rather than
+  // enumerating every possible verb after it.
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת)/;
+  const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב)/;
+
   const MARKETING = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|webinar|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;
   const CALENDAR_NOISE = /\b(has (?:accepted|declined|tentatively accepted) (?:this|your) invitation|invitation from google calendar|added to your calendar)\b/i;
   // The fingerprint of a cold pitch. Without this, "our pricing starts at $99/mo,
@@ -332,18 +498,57 @@ const FlowJudgment = (() => {
   // reply re-scores the whole thread — meaning "Sounds good, thanks!" over a
   // quoted contract scored identically to the contract itself, and Flow offered
   // to log the same decision again on every message in the thread.
+  //
+  // Every pattern here is a *fallback* — content-gmail.js's own ownMessageText()
+  // already cuts at Gmail's DOM-level quote wrapper (.gmail_quote) before this
+  // ever runs, which is language-independent by construction. These regexes
+  // exist for what that DOM cut can't see: a non-Gmail sender (Outlook, Apple
+  // Mail, a plain-text forward), or any caller that only ever had flattened
+  // text to begin with.
   const QUOTE_START = [
     /^\s*On\b[\s\S]{3,200}?\bwrote:\s*$/im,
+    // Gmail's Hebrew quote header always opens with "בתאריך" ("on the date")
+    // — a line-initial word essentially unique to this header, never how a
+    // genuine sentence starts — and always closes a short line with a colon
+    // (either "...כתב/ה/ו:" or "...מאת X:", depending on Gmail's exact
+    // phrasing at send time). Matching the open marker and the line-ending
+    // colon, rather than one exact closing phrase, means this doesn't depend
+    // on getting that closing wording exactly right. No \b after בתאריך —
+    // same reason every other Hebrew pattern in this file omits it: \b is
+    // defined against [A-Za-z0-9_], so it never fires around Hebrew letters
+    // and would silently turn this into a pattern that never matches.
+    /^\s*בתאריך[\s\S]{3,200}?:\s*$/im,
     /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
     /^\s*-{2,}\s*Forwarded message\s*-{2,}\s*$/im,
     /^\s*From:\s.*$\n^\s*Sent:\s/im,
+    // Outlook's Hebrew locale equivalent of the From:/Sent: header block
+    // above — same no-\b rule applies to both מאת and נשלח.
+    /^\s*מאת:\s.*$\n^\s*נשלח:\s/im,
     /^\s*>{1,}\s?\S/m
   ];
+
+  // Smart/curly quotes and apostrophes — auto-inserted by iOS/macOS Mail,
+  // Word, and plenty of other clients whenever someone types a straight one
+  // — are a different Unicode character from the plain ' every "we're"/
+  // "you'll"/"doesn't" pattern in this file and intent.js is written
+  // against. "we're good" and "we’re good" read identically to a person but
+  // not to a regex: the curly version silently failed to match at all,
+  // which is a real-world recall gap, not a rare edge case, given how
+  // common autocorrected quotes are in genuine email. Normalizing once
+  // here — the one function every text path already calls first — fixes
+  // it everywhere at once, instead of a `['’]` character class that would
+  // be easy to forget adding to the next new pattern.
+  function normalizeQuotes(text) {
+    return text
+      .replace(/[‘’ʼ]/g, "'")
+      .replace(/[“”]/g, '"');
+  }
 
   // Returns only the part of the message the sender actually just wrote. Falls
   // back to the whole text when no quote boundary is found, and ignores a
   // boundary so early that stripping would leave nothing to judge.
   function newContent(text) {
+    text = normalizeQuotes(text);
     let cut = text.length;
     for (const re of QUOTE_START) {
       const m = re.exec(text);
@@ -369,13 +574,13 @@ const FlowJudgment = (() => {
     if (CALENDAR_NOISE.test(text)) add('calendar', -35, 'Calendar notification boilerplate');
     if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
-    const commitStrong = COMMIT_STRONG.test(text);
-    const commit = commitStrong || COMMIT.test(text);
-    const lost = LOST.test(text);
-    const executed = EXECUTED.test(text);
-    const obligation = OBLIGATION.test(text);
-    const handoff = HANDOFF.test(text);
-    const dispute = DISPUTE.test(text);
+    const commitStrong = COMMIT_STRONG.test(text) || COMMIT_STRONG_HE.test(text);
+    const commit = commitStrong || COMMIT.test(text) || COMMIT_HE.test(text);
+    const lost = LOST.test(text) || LOST_HE.test(text);
+    const executed = EXECUTED.test(text) || EXECUTED_HE.test(text);
+    const obligation = OBLIGATION.test(text) || OBLIGATION_HE.test(text);
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text);
+    const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
     if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
@@ -472,11 +677,11 @@ const FlowJudgment = (() => {
       automated: raw.automated,
       wordCount: raw.wordCount,
       isReply: /^re:/i.test(ctx.subject || ''),
-      lost: LOST.test(text),
-      executed: EXECUTED.test(text),
-      dispute: DISPUTE.test(text)
+      lost: LOST.test(text) || LOST_HE.test(text),
+      executed: EXECUTED.test(text) || EXECUTED_HE.test(text),
+      dispute: DISPUTE.test(text) || DISPUTE_HE.test(text)
     };
-    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT, LOST, EXECUTED, DISPUTE, OBLIGATION, HANDOFF]);
+    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT_STRONG_HE, COMMIT, COMMIT_HE, LOST, LOST_HE, EXECUTED, EXECUTED_HE, DISPUTE, DISPUTE_HE, OBLIGATION, OBLIGATION_HE, HANDOFF, HANDOFF_HE]);
     return facts;
   }
 
@@ -505,7 +710,7 @@ const FlowJudgment = (() => {
     const threshold = thresholdFrom(ctx.calibration, ctx.now);
     if (s.total < threshold) return null;
 
-    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT, LOST, EXECUTED, DISPUTE, OBLIGATION, HANDOFF]);
+    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT_STRONG_HE, COMMIT, COMMIT_HE, LOST, LOST_HE, EXECUTED, EXECUTED_HE, DISPUTE, DISPUTE_HE, OBLIGATION, OBLIGATION_HE, HANDOFF, HANDOFF_HE]);
 
     return {
       score: s.total,
@@ -517,7 +722,16 @@ const FlowJudgment = (() => {
     };
   }
 
-  return { evaluate, factsOnly, neutralTitle, thresholdFrom, BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD };
+  // score, newContent, and the HANDOFF pair are exposed for intent.js: the
+  // classifier reuses this exact scorer and this exact "is this a request"
+  // pattern (same signals, same weights, same tuning against
+  // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
+  // drifting copy of the same judgment.
+  return {
+    evaluate, factsOnly, neutralTitle, thresholdFrom, score, newContent,
+    HANDOFF, HANDOFF_HE,
+    BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
+  };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowJudgment };
