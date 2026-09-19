@@ -42,6 +42,11 @@ const chromeStub = {
 
 const sandbox = { module: undefined, console, chrome: chromeStub, crypto: { randomUUID: () => 'test-uuid' } };
 vm.createContext(sandbox);
+// getPmfSnapshot()/consumeWeeklyHabitTrigger() call into FlowPmfMetrics —
+// loaded first so it's defined by the time anything in storage.js actually
+// invokes it, the same load-order convention the real manifest.json/
+// popup.html use for core/ files ahead of src/storage.js.
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'pmf-metrics.js'), 'utf8'), sandbox, { filename: 'pmf-metrics.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8'), sandbox, { filename: 'storage.js' });
 const FlowStorage = vm.runInContext('FlowStorage', sandbox);
 
@@ -591,6 +596,90 @@ async function run() {
     const state = await FlowStorage.get();
     check('marking the same id twice never duplicates the entry', state.precisionAutoTuned.filter((id) => id === 'log-it').length === 1, state.precisionAutoTuned);
     check('an unrelated process id is unaffected', (await FlowStorage.wasPrecisionAutoTuned('reply-track')) === false);
+  }
+
+  console.log('\n--- storage.js: appendLog durably counts shownStats (PMF closure-rate denominator) ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'm1', process: { id: 'reply-track', name: 'Reply & Track', steps: [] } });
+    const state = await FlowStorage.get();
+    check('a shown entry with a real process counts toward shownStats', state.shownStats.total === 1, state.shownStats);
+
+    // Re-injecting the SAME message (Gmail rebuilding the DOM node) must
+    // never double-count it — the exact scenario content-gmail.js's own
+    // alreadyLoggedShown guard exists for, verified here at the storage layer.
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'm1', process: { id: 'reply-track', name: 'Reply & Track', steps: [] } });
+    const state2 = await FlowStorage.get();
+    check('the same message shown twice counts once, not twice', state2.shownStats.total === 1, state2.shownStats);
+
+    // A 'shown' entry with no process snapshot is not a real detection —
+    // storage.js's own trimLog already treats this the same way.
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'm2' });
+    const state3 = await FlowStorage.get();
+    check('a shown entry with no process attached never counts as detected', state3.shownStats.total === 1, state3.shownStats);
+  }
+
+  console.log('\n--- storage.js: appendLog durably counts undoneStats (PMF closure-rate correction) ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'm1' });
+    await FlowStorage.appendLog({ kind: 'undone', messageId: 'm1' });
+    const state = await FlowStorage.get();
+    check('an undone message is durably counted', state.undoneStats.total === 1, state.undoneStats);
+    check('writeStats is untouched by the later undo — it counts "was ever written," not "still stands"', state.writeStats.total === 1, state.writeStats);
+
+    await FlowStorage.appendLog({ kind: 'undone', messageId: 'm1' });
+    const state2 = await FlowStorage.get();
+    check('undoing the same message twice never double-counts', state2.undoneStats.total === 1, state2.undoneStats);
+  }
+
+  console.log('\n--- storage.js: consumeDailyActiveTrigger() also records the local activeDays history ---\n');
+  store = {};
+  {
+    const fired = await FlowStorage.consumeDailyActiveTrigger();
+    check('the first call of the day fires true, same as before this change', fired === true);
+    const state = await FlowStorage.get();
+    check('today\'s date is recorded in activeDays', state.activeDays.includes(new Date().toDateString()), state.activeDays);
+    check('activeDays holds exactly one entry so far', state.activeDays.length === 1, state.activeDays);
+
+    const firedAgain = await FlowStorage.consumeDailyActiveTrigger();
+    check('a second call the same day still returns false, same as before this change', firedAgain === false);
+    const state2 = await FlowStorage.get();
+    check('a second call the same day never duplicates the date', state2.activeDays.length === 1, state2.activeDays);
+  }
+
+  console.log('\n--- storage.js: consumeWeeklyHabitTrigger() fires at most once per calendar week ---\n');
+  store = {};
+  {
+    const notYet = await FlowStorage.consumeWeeklyHabitTrigger();
+    check('a fresh install with no history has not met the habit bar yet', notYet === false);
+
+    // Build up exactly what core/pmf-metrics.js's computeWeeklyHabit needs:
+    // 3 distinct active days this week, plus one real close this week.
+    const today = Date.now();
+    await FlowStorage.set({
+      activeDays: [new Date(today).toDateString(), new Date(today - 1 * 86400000).toDateString(), new Date(today - 2 * 86400000).toDateString()],
+      closeStats: { total: 1, recent: [{ id: 'm1', ts: today }] }
+    });
+
+    const firstFire = await FlowStorage.consumeWeeklyHabitTrigger();
+    check('the week the habit bar is first crossed fires true', firstFire === true);
+    const state = await FlowStorage.get();
+    check('the current week is recorded as reported', typeof state.lastHabitReportedWeek === 'string' && state.lastHabitReportedWeek.length > 0, state.lastHabitReportedWeek);
+
+    const secondFire = await FlowStorage.consumeWeeklyHabitTrigger();
+    check('the SAME week never fires a second time, even though the bar is still met', secondFire === false);
+  }
+
+  console.log('\n--- storage.js: getPmfSnapshot() assembles current state through core/pmf-metrics.js ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'm1', process: { id: 'reply-track', name: 'Reply & Track', steps: [] } });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'm1' });
+    const snapshot = await FlowStorage.getPmfSnapshot();
+    check('the snapshot reflects the exact same shown/written counters just recorded', snapshot.detectedTotal === 1 && snapshot.writtenTotal === 1, snapshot);
+    check('closureRate is computed, not left undefined', snapshot.closureRate === 1, snapshot);
+    check('the snapshot carries retention and habit sub-objects', Boolean(snapshot.retention) && Boolean(snapshot.habit), snapshot);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

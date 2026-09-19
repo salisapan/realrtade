@@ -87,6 +87,30 @@ const FlowStorage = (() => {
     // process's fate is settled either way), never a second time for the
     // same message. See closeCountsFrom below.
     closeStats: { total: 0, recent: [] },
+    // PMF measurement (see core/pmf-metrics.js and getPmfSnapshot below) —
+    // shownStats is the closure-rate denominator (distinct intentions ever
+    // detected), undoneStats is its "but not undone" numerator correction.
+    // Same durable-counter shape as writeStats/closeStats, for the same
+    // reason: a capped log alone would undercount a heavy account and let
+    // the rate drift as old rows evict.
+    shownStats: { total: 0, recent: [] },
+    undoneStats: { total: 0, recent: [] },
+    // One local calendar-day string (Date#toDateString, matching every
+    // other daily flag in this file) per day this install was ever active
+    // in a watched tab — the actual history retention/habit measurement
+    // needs, as opposed to activeLastTrackedDate above, which only ever
+    // remembers the SINGLE most recent day and answers a different
+    // question (today's once-a-day gate). Capped generously (ACTIVE_DAYS_CAP
+    // below) — comfortably past the longest window any PMF metric here
+    // looks back over.
+    activeDays: [],
+    // The most recent ISO week ('YYYY-Www', local time) this install's
+    // weekly-habit crossing was reported to the anonymous, aggregate
+    // pipe — see consumeWeeklyHabitTrigger below. Ensures the
+    // weekly_habit_formed event fires at most once per calendar week per
+    // install, the same "at most once" discipline every other anonymous
+    // signal in this file already follows.
+    lastHabitReportedWeek: null,
     // When the Weekly Closing Summary last actually rendered (ms epoch, not
     // a date string — this one needs to measure a 7-day gap, not just "not
     // today yet"). 0 means never shown. See consumeWeeklySummaryTrigger.
@@ -163,6 +187,10 @@ const FlowStorage = (() => {
   const OPEN_CARRY_CAP = 60;
   const RESOLVED_CAP = 1000;
   const WRITE_RECENT_CAP = 300;
+  // ~4 months of daily entries — comfortably past the longest lookback any
+  // PMF metric in core/pmf-metrics.js actually uses (4 weeks), so trimming
+  // never affects a real calculation; it only bounds long-lived installs.
+  const ACTIVE_DAYS_CAP = 120;
 
   // Trims to the newest LOG_CAP entries, then puts back the still-open
   // 'shown' entries that just fell off the end. An entry is skipped if the
@@ -216,6 +244,40 @@ const FlowStorage = (() => {
       if (!recent.some((w) => w && w.id === row.messageId)) {
         patch.writeStats = {
           total: (ws.total || 0) + 1,
+          recent: [{ id: row.messageId, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
+        };
+      }
+    }
+
+    // shownStats: the PMF closure-rate denominator — "how many distinct
+    // intentions did Glance ever actually detect," same durable-counter
+    // shape and same distinct-message dedup rule as writeStats above. Only
+    // a 'shown' entry that carries a real process snapshot counts — the
+    // same gate trimLog (above) already uses to decide what's worth
+    // carrying past the log's own cap, so this can never disagree with
+    // what getPending() considers a real detected process.
+    if (row.kind === 'shown' && row.process && row.messageId) {
+      const ss = state.shownStats || { total: 0, recent: [] };
+      const recent = ss.recent || [];
+      if (!recent.some((w) => w && w.id === row.messageId)) {
+        patch.shownStats = {
+          total: (ss.total || 0) + 1,
+          recent: [{ id: row.messageId, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
+        };
+      }
+    }
+
+    // undoneStats: the PMF closure-rate's "but not undone" half. A message
+    // can only ever be undone after it was written, so this durably counts
+    // distinct messages whose write was later reversed — see
+    // core/pmf-metrics.js's computeClosureRate for how this and writeStats
+    // combine into "accepted and not undone."
+    if (row.kind === 'undone' && row.messageId) {
+      const us = state.undoneStats || { total: 0, recent: [] };
+      const recent = us.recent || [];
+      if (!recent.some((w) => w && w.id === row.messageId)) {
+        patch.undoneStats = {
+          total: (us.total || 0) + 1,
           recent: [{ id: row.messageId, ts: row.ts }, ...recent].slice(0, WRITE_RECENT_CAP)
         };
       }
@@ -435,6 +497,17 @@ const FlowStorage = (() => {
     return closeCountsFrom(await get());
   }
 
+  // Product-market-fit visibility, computed entirely on-device from the
+  // durable counters above: closure rate, retention, and this week's habit
+  // status. See core/pmf-metrics.js for the actual math — this is just the
+  // one place that reads current state and hands it the shape it needs.
+  // Callable directly from a background-page console for local review
+  // ("chrome.storage.local" plus a calculator, made honest) — deliberately
+  // not surfaced in any UI, per this product's own no-heavy-dashboard rule.
+  async function getPmfSnapshot() {
+    return FlowPmfMetrics.computeSnapshot(await get());
+  }
+
   // Shared by every "at most once per calendar day (local time)" flag this
   // file keeps — the Morning Brief's auto-open and the anonymous daily-active
   // ping both need exactly this, just against a different stored date key.
@@ -457,7 +530,22 @@ const FlowStorage = (() => {
   // fired at most once per install per day, carrying nothing but the fact
   // that Glance was active in a Gmail tab. See content-gmail.js's
   // trackDailyActive() for where this actually turns into an event.
-  const consumeDailyActiveTrigger = serialize(() => consumeDailyTrigger('activeLastTrackedDate'));
+  //
+  // Also the ONLY place activeDays (this file's actual local retention
+  // history — see core/pmf-metrics.js) gets appended to, for the same
+  // "at most once per calendar day" reason: consumeDailyTrigger already
+  // proved this is a genuinely new day before this function runs, so
+  // there's no separate dedup to get wrong.
+  const consumeDailyActiveTrigger = serialize(async function consumeDailyActiveTrigger() {
+    const isNewDay = await consumeDailyTrigger('activeLastTrackedDate');
+    if (!isNewDay) return false;
+    const state = await get();
+    const today = new Date().toDateString();
+    if (!(state.activeDays || []).includes(today)) {
+      await set({ activeDays: [today, ...(state.activeDays || [])].slice(0, ACTIVE_DAYS_CAP) });
+    }
+    return true;
+  });
 
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
   // "A normal gap between two Gmail visits" vs "this person went quiet and
@@ -504,6 +592,21 @@ const FlowStorage = (() => {
     return { closed, open };
   });
 
+  // The one anonymous, aggregate signal for "did this account form a real
+  // weekly habit" — fires at most once per calendar week, and only the
+  // first time THIS week crosses core/pmf-metrics.js's bar (real, spread-
+  // out activity plus at least one real closure), never once per check.
+  // Mirrors consumeDailyActiveTrigger's own shape one level up: a local,
+  // on-device computation (FlowPmfMetrics.computeWeeklyHabit) decides
+  // whether it's true; this function only decides whether it's NEW.
+  const consumeWeeklyHabitTrigger = serialize(async function consumeWeeklyHabitTrigger() {
+    const state = await get();
+    const habit = FlowPmfMetrics.computeWeeklyHabit(state.activeDays, state.closeStats, Date.now());
+    if (!habit.metThisWeek || state.lastHabitReportedWeek === habit.week) return false;
+    await set({ lastHabitReportedWeek: habit.week });
+    return true;
+  });
+
   // Two independent contexts used to each generate their own installId the
   // first time THEY happened to need one — this file (called from the
   // popup's referral link) and background.js's own copy (used internally
@@ -545,7 +648,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

@@ -105,6 +105,100 @@ Ask this before writing anything:
   browser coupling back out of something already shipped) is the rewrite this
   split exists to avoid.
 
+## Adding a new inbox host (e.g. Outlook) — a different axis from the split above
+
+Everything above is about **Glance vs. Flow** — one brain, two future
+products. This section is about a narrower, nearer-term question: Glance
+itself is a Chrome extension that today only watches Gmail. Nothing here
+implements Outlook (or anything else) — this is only the audit that
+confirms doing so later won't force a rewrite, per the standing
+architectural-readiness requirement this section exists to satisfy.
+
+**The short version: almost nothing needs to change.** `core/` already has
+zero host coupling by construction (see "The rule" above — that was never
+Gmail-specific to begin with, it was written that way from the start). The
+real question was whether `src/` quietly baked Gmail assumptions into
+things that *should* have been generic. It mostly didn't:
+
+- **`src/brief.js` and `src/weekly.js` are already 100% host-agnostic.**
+  Pure DOM (`document.createElement`, no Gmail selectors, no `chrome.*`),
+  driven entirely by plain data (`{title, subtitle, onDoIt, onDismiss}` row
+  shapes) that `content-gmail.js` hands them. A future `content-outlook.js`
+  reuses both files verbatim — literally the same two `<script>` tags — for
+  the Morning Brief, the Weekly Closing Summary, and Contextual Resurfacing.
+- **`chip.css`'s classes are already generic** (`flow-chip-*`, not
+  `gmail-chip-*`), so the chip's visual language is reusable as-is.
+- **The step-kind vocabulary (`calendar`/`draft`/`task`) is already
+  platform-neutral.** "Draft a reply" is a real concept in Outlook too — the
+  catalog in `actions.js` never needed Gmail-specific language.
+- **`background.js`'s connector writers are Google-Workspace-specific, not
+  Gmail-specific** — worth stating explicitly because it's easy to conflate
+  the two. Calendar/Gmail-draft/Tasks are WRITE destinations, chosen by
+  what the user connected, completely independent of which inbox
+  SURFACED the intention. An Outlook-sourced "Do It" click can, and today
+  would, still write to Google Calendar — the host being added is the
+  *source* of detected intentions, not necessarily the destination.
+- **Every durable id (`messageId`, `intentionId`, `processId`) is an opaque
+  string.** No core logic parses a Gmail-specific id format, so a
+  different host's own id shape (Outlook's `internetMessageId`, say) needs
+  no translation layer.
+
+What genuinely is Gmail-specific, by design, is `content-gmail.js` itself —
+it exists to scrape Gmail's DOM (`role="main"` reading pane,
+`div[role="listitem"]` messages, the `email` attribute, `h2.hP`) into the
+plain `{text, sender, subject, messageId, threadUrl, attachments}` shape
+the rest of the system actually runs on. A new host means writing that
+file's equivalent, not touching anything it calls into.
+
+### The host-adapter contract
+
+A `content-<host>.js` must, at minimum:
+
+1. Extract plain data from the host's DOM/API: message body text, sender
+   name/email, subject, a stable per-message id, a thread URL, and any
+   real attachments. None of this may leak into `core/` as anything other
+   than plain strings/objects.
+2. Call `FlowIntent.classify(text, { senderEmail, senderName, calibration,
+   calibrationByType, now })` and `FlowActions.planFor(intent, {
+   threadUrl, hasThreadAttachment, executionMemory })` exactly as
+   `content-gmail.js` does — these two calls are the entire "detect and
+   plan" contract, and neither function has ever heard of Gmail.
+3. Render the chip using the same `chip.css` classes and the same
+   shell/ring/shine DOM structure `content-gmail.js`'s `injectChip`/`el()`
+   helpers build, so it inherits every existing visual and accessibility
+   property for free.
+4. Wire Do It / Dismiss / Undo to the exact same `FlowStorage.appendLog`,
+   `FlowStorage.calibrate`, and `FlowExecutionMemory.record*` calls
+   `content-gmail.js` makes — **tagging every `appendLog` call with its own
+   `SOURCE_APP` constant** (`content-gmail.js`'s own top-of-file constant
+   is the reference example; Outlook's would be `'outlook'`). This is the
+   one convention that must be followed exactly, since it's what lets the
+   Activity log, and any future per-host precision comparison, attribute
+   every outcome to the surface that produced it.
+5. Reuse `FlowBrief`/`FlowWeekly` verbatim for the sticky surfaces, and
+   `FlowStorage.getPending()`/`hasTerminalOutcome()` verbatim for "is this
+   still open" — both are already source-agnostic (point 5 above).
+6. Call `FlowStorage.consumeDailyActiveTrigger()` /
+   `consumeWeeklyHabitTrigger()` the same way `content-gmail.js`'s `init()`
+   does, so retention and habit-formation measurement (see
+   `core/pmf-metrics.js`) reflect activity in the new host too, not just
+   Gmail.
+
+Nothing above requires a single line of `core/` to change. If a future
+host genuinely can't be served this way — if it needs a core function to
+behave differently depending on which host called it — that's the signal
+an assumption snuck into `core/` that shouldn't be there, and the fix is to
+generalize that function's inputs, not to special-case the host inside it.
+
+### What's still a known, accepted gap (not fixed here)
+
+`intent.js`'s `classify()` hardcodes `domain = FLOW_DOMAINS[0]` regardless
+of the account's own `domainId` — a pre-existing gap in wiring the domain
+picker through to classification, not something a second host introduces
+or worsens. Left alone here since it's an orthogonal feature gap, not an
+architectural coupling risk, and fixing it means touching the same
+precision-critical scoring path this whole file exists to keep stable.
+
 ## What this does *not* do
 
 This is a code-organization boundary, not a running second product. There is

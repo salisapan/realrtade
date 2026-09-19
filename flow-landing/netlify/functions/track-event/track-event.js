@@ -1,7 +1,8 @@
 // Relays anonymous, aggregate Glance product-usage events (chip shown,
 // clicked, dismissed; a write completed; a process closed by either method;
 // an action undone; a connector configured; Draft-It used; an attachment
-// summarized; one daily active ping) to GA4 via the Measurement Protocol.
+// summarized; one daily active ping; one weekly-habit-formed ping) to GA4
+// via the Measurement Protocol.
 // This — plus what a person can compute from these counts (acceptance rate,
 // dismissal rate, undo rate, opened-vs-closed) — is the entire retention
 // signal the product has into whether an install ever sees real usage after
@@ -37,7 +38,15 @@ const ALLOWED_EVENTS = new Set([
   // trackDailyActive(), showMultiActionReceipt(), and onDismiss().
   'extension_active',
   'action_undone',
-  'process_closed'
+  'process_closed',
+  // Product-market-fit measurement: the one cross-install rollup signal
+  // this pipe carries. Fired at most once per install per calendar week —
+  // see content-gmail.js's trackWeeklyHabit() and storage.js's
+  // consumeWeeklyHabitTrigger(). Everything else PMF-related (closure
+  // rate, retention) is computed and stays entirely on-device — see
+  // core/pmf-metrics.js — because it's only ever meaningful per account,
+  // not as a population rollup.
+  'weekly_habit_formed'
 ]);
 
 // Each allowed param key validates its own value rather than sharing one

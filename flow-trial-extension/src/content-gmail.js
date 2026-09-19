@@ -11,6 +11,17 @@
 // judgment only ever reads text and the write path only ever adds a record.
 
 (function flowGmailWatcher() {
+  // Every FlowStorage.appendLog() call this file makes is tagged with this
+  // one constant — see core/README.md's "Adding a new inbox host" section.
+  // A future content-outlook.js defines its own SOURCE_APP ('outlook') and
+  // tags every one of ITS appendLog calls the same way; nothing else in
+  // this file, or in storage.js/execution-memory.js, needs to change for
+  // that to work. Historically only 'shown' entries carried this field —
+  // extended to every kind so the Activity log, and any future
+  // per-host precision comparison, can attribute every logged outcome to
+  // the surface that produced it, not just the ones that happened to
+  // remember to.
+  const SOURCE_APP = 'gmail';
   let state = null;
   let watching = false;
   let observer = null;
@@ -41,6 +52,7 @@
     if (typeof FlowBrief !== 'undefined') checkBrief();
     checkWeeklySummary();
     trackDailyActive();
+    trackWeeklyHabit();
     checkPrecisionSelfTune();
   }
 
@@ -110,6 +122,22 @@
   async function trackDailyActive() {
     if (await FlowStorage.consumeDailyActiveTrigger()) {
       chrome.runtime.sendMessage({ type: 'flow:track', event: 'extension_active', params: { domain: state.domainId } });
+    }
+  }
+
+  // The population-level half of weekly habit formation: "how many
+  // installs form one" is a question no single account's own local
+  // storage can answer, so — same posture as trackDailyActive() right
+  // above — this fires one anonymous, install-id-only event through the
+  // exact same allow-listed pipe, at most once per calendar week, only the
+  // first time this account's own local computation
+  // (core/pmf-metrics.js's computeWeeklyHabit, via
+  // consumeWeeklyHabitTrigger) says the week actually crossed the bar. No
+  // content, no per-day detail — just the fact that it happened, the same
+  // shape extension_active already uses for "is anyone still using this."
+  async function trackWeeklyHabit() {
+    if (await FlowStorage.consumeWeeklyHabitTrigger()) {
+      chrome.runtime.sendMessage({ type: 'flow:track', event: 'weekly_habit_formed', params: { domain: state.domainId } });
     }
   }
 
@@ -427,13 +455,13 @@
         process: { id: process.id, name: process.name, steps: process.steps },
         threadUrl: threadUrl(legacyId), sender, subject,
         intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score } },
-        // Which app this process was noticed in — Gmail is the only source
-        // today, but getPending()'s entries (and everything built on them:
-        // the Brief panel, the popup's Open tab, the badge count) are
-        // already source-agnostic, so a future Calendar or Drive content
-        // script only has to stamp its own value here to plug into the same
+        // Which app this process was noticed in — see this file's own
+        // SOURCE_APP constant. getPending()'s entries (and everything built
+        // on them: the Brief panel, the popup's Open tab, the badge count)
+        // are already source-agnostic, so a future host content script only
+        // has to stamp its own SOURCE_APP value here to plug into the same
         // engine, not change the engine itself.
-        app: 'gmail'
+        app: SOURCE_APP
       });
       chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_shown', params: { domain: state.domainId } });
       checkBrief();
@@ -1033,7 +1061,7 @@
         }
         if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
-          FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId });
+          FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
           undo.textContent = 'Some actions couldn’t be undone';
@@ -1059,7 +1087,7 @@
     // the Brief indicator, and any Resurfacing card for exactly the message
     // that just closed.
     await Promise.all(succeeded.map((r) =>
-      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind })
+      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
     ));
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
     // The "opened vs closed" funnel pair with chip_shown — fired here and in
@@ -1095,7 +1123,7 @@
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
-    FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
+    FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
     FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
@@ -1146,7 +1174,7 @@
     // necessarily landed, so it could still show up as "pending" for one
     // refresh cycle right after being dismissed.
     await Promise.all([
-      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score }),
+      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP }),
       FlowStorage.calibrate('dismiss', ctx.intent.type),
       FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId)
     ]);

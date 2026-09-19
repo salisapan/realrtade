@@ -35,6 +35,28 @@ being fixed in another. Apply these to every change, and when a fix
 reveals the same pattern elsewhere in the codebase, fix all instances in
 the same pass rather than waiting to be asked about each one.
 
+## The decision filter — apply before building anything non-trivial
+
+Every significant decision and new piece of work must pass one question,
+in `docs/decision-filter.md`: does this strengthen our ability to become
+the most reliable system in the world at turning intention into closed
+execution? If the answer is not a clear yes, do not build it. The doc
+grounds "intention," "execution," "closed," and "reliable" in concepts
+already load-bearing elsewhere in this codebase (`core/intent.js`,
+`background.js`'s connectors, `core/pmf-metrics.js`'s strict closure-rate
+definition, `judgment.js`'s precision-over-recall bias) rather than leaving
+the question abstract — read it before proposing new features, new data
+paths, or new UI surfaces, not just once.
+
+## The Magic Moment — read before touching onboarding or first-use copy
+
+`docs/magic-moment.md` defines, in concrete product terms, the first
+instant a new user realizes Glance actually closed something real for them
+without being managed — the first successful Do It, not the first chip
+shown or onboarding completing. Read it before changing onboarding flow,
+the first-run experience, or the receipt/closure copy in
+`flow-trial-extension/src/content-gmail.js`.
+
 ## ECC Agent Routing Protocol
 
 For every task requested by the user:
