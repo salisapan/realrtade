@@ -939,7 +939,7 @@
   // — accepted-then-undone is a stronger "don't propose this" signal than a
   // pre-execution removal, since the user only learned they didn't want it
   // after seeing it actually happen.
-  function showMultiActionReceipt(host, chip, ctx, results) {
+  async function showMultiActionReceipt(host, chip, ctx, results) {
     const succeeded = results.filter((r) => r.response && r.response.ok);
 
     if (!succeeded.length) {
@@ -992,9 +992,17 @@
 
     host.replaceChildren(done);
 
-    for (const r of succeeded) {
-      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind });
-    }
+    // Awaited (and the caller — onDoIt — awaits this whole function) so
+    // that by the time checkBrief() next reads FlowStorage fresh, these
+    // writes have actually landed. The two used to fire without a caller
+    // ever waiting on them, and checkBrief() ran immediately after on the
+    // same tick — meaning the just-closed message could still read as
+    // "pending" for one refresh cycle, showing a stale count on the badge,
+    // the Brief indicator, and any Resurfacing card for exactly the message
+    // that just closed.
+    await Promise.all(succeeded.map((r) =>
+      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind })
+    ));
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
     // The "opened vs closed" funnel pair with chip_shown — fired here and in
     // onDismiss's own decline path, since both are real ways a proposed
@@ -1004,7 +1012,24 @@
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'process_closed', params: { domain: state.domainId, method: 'done' } });
   }
 
-  function onDoIt(host, chip, ctx, liveSteps) {
+  async function onDoIt(host, chip, ctx, liveSteps) {
+    // A guard against acting on stale UI, not a defensive nicety: this
+    // product now has FOUR independent surfaces that can close the exact
+    // same process (the live chip, a Brief panel row, a Contextual
+    // Resurfacing card, and the popup's Open tab), each rendered from a
+    // snapshot that can go stale the moment any OTHER surface resolves the
+    // same message. Without this check, clicking Do It on a row that's
+    // already been dismissed or written elsewhere performs a REAL duplicate
+    // write — a second Google Task, a second Calendar event — which is the
+    // one failure this product has never accepted as tolerable. See
+    // storage.js's hasTerminalOutcome for the one shared definition of
+    // "already decided."
+    if (await FlowStorage.hasTerminalOutcome(ctx.messageId)) {
+      setChipState(chip, 'flow-chip-error', 'Already closed elsewhere — nothing to do.');
+      checkBrief();
+      return;
+    }
+
     // Every pill removed is a deliberate "do nothing" — the same outcome as
     // dismissing the chip, not a disabled button with no explanation. It also
     // reads to Execution Memory as a full rejection (onDismiss records it),
@@ -1042,15 +1067,31 @@
     }
 
     runActionsSequentially(liveSteps, ctx, onStepDone)
-      .then((results) => { showMultiActionReceipt(host, chip, ctx, results); checkBrief(); })
+      .then(async (results) => { await showMultiActionReceipt(host, chip, ctx, results); checkBrief(); })
       .catch(() => setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'));
   }
 
-  function onDismiss(host, ctx) {
+  async function onDismiss(host, ctx) {
     host.remove();
-    FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
-    FlowStorage.calibrate('dismiss');
-    FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId);
+    // Same staleness guard as onDoIt, for the same reason — just a lighter
+    // consequence here: recording a second 'dismissed' outcome for an
+    // already-closed message doesn't create a duplicate real-world write
+    // (storage.js's own resolvedMessageIds dedup already absorbs that), but
+    // it WOULD inflate Execution Memory's removed-count for these steps
+    // with a event that isn't a real, new decision — skewing actions.js's
+    // future bias toward dropping a step the user didn't actually reject
+    // twice. The row is already gone from the screen either way.
+    if (await FlowStorage.hasTerminalOutcome(ctx.messageId)) { checkBrief(); return; }
+    // Awaited together before checkBrief() runs — same reasoning as
+    // showMultiActionReceipt's own comment: checkBrief() reads FlowStorage
+    // fresh, and used to run before this message's own dismissal had
+    // necessarily landed, so it could still show up as "pending" for one
+    // refresh cycle right after being dismissed.
+    await Promise.all([
+      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score }),
+      FlowStorage.calibrate('dismiss'),
+      FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId)
+    ]);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
     // See showMultiActionReceipt's own comment on process_closed — a decline
     // is a real closure of the loop too, just via the other method.

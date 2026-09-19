@@ -1655,6 +1655,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:track') {
     return reply(sendResponse, trackEvent(msg.event, msg.params).then(() => ({ ok: true })).catch(() => ({ ok: true })));
   }
+
+  // Makes this file's own getInstallId() the single canonical generator —
+  // the service worker is the one long-lived instance this extension has,
+  // so it's the natural place for "generate once, reuse forever" to
+  // actually live. storage.js's own getInstallId() (used by the popup's
+  // referral link) asks for this first and only falls back to generating
+  // its own if the message fails; see that function's own comment for why
+  // two independent generators writing the same chrome.storage.local key
+  // was worth closing even though the practical race window was narrow.
+  if (msg.type === 'flow:get-install-id') {
+    return reply(sendResponse, getInstallId().then((id) => ({ ok: true, id })));
+  }
 });
 
 // Mirrors storage.js's getInstallId rather than importing it — background.js

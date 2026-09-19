@@ -258,6 +258,55 @@ async function run() {
       Object.keys(memOnSecond).length === 0, memOnSecond);
   }
 
+  console.log('\n--- execution-memory.js: concurrent record* calls never lose an event ---\n');
+  {
+    // A real chrome.storage.local round trip is never instant, so two
+    // near-simultaneous calls (now genuinely possible: the live chip, the
+    // Brief panel, Contextual Resurfacing, and the popup's Open tab can
+    // each fire a record* independently) can easily interleave. A plain
+    // setTimeout-based delay doesn't actually force that: Node drains every
+    // pending microtask (a full read-modify-write's worth) before it looks
+    // at the next timer, so two same-delay setTimeouts still resolve one
+    // call's entire chain before the other's callback even fires. This
+    // adapter instead holds get() open behind an explicit gate, so both
+    // calls' reads are guaranteed in flight — and unresolved — before
+    // either is allowed to proceed, which is the actual shape of the race:
+    // both read the old log, then whichever write lands second wins.
+    function gatedAdapter() {
+      const store = new Map();
+      let release;
+      const gate = new Promise((r) => { release = r; });
+      return {
+        backing: store,
+        openGate: () => release(),
+        async get(key) { await gate; return store.get(key); },
+        async set(key, value) { store.set(key, value); }
+      };
+    }
+    const gated = gatedAdapter();
+    FlowExecutionMemory.setStorageAdapter(gated);
+
+    // Fired without awaiting either individually — exactly how two
+    // independent UI surfaces would each call in, unaware of one another.
+    // Both calls' get()s are now blocked on the same unopened gate, so
+    // neither has read anything yet; opening it releases both at once.
+    const a = FlowExecutionMemory.recordDismiss('reply-track', ['task'], 'race-a');
+    const b = FlowExecutionMemory.recordDoIt('reply-track', ['draft'], [], 'race-b');
+    gated.openGate();
+    await Promise.all([a, b]);
+
+    const log = await FlowExecutionMemory.getLog();
+    check('both concurrent events survive — neither silently overwrote the other',
+      log.some((e) => e.intentionId === 'race-a') && log.some((e) => e.intentionId === 'race-b'),
+      log);
+
+    const mem = await FlowExecutionMemory.getAll();
+    const steps = (mem['reply-track'] && mem['reply-track'].steps) || {};
+    check('the aggregate reflects both events, not just whichever wrote last',
+      (steps.task || {}).removed === 1 && (steps.draft || {}).accepted === 1,
+      mem['reply-track']);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

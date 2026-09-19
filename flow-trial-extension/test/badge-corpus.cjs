@@ -17,10 +17,15 @@ function load() {
   const calls = [];
   let onMessageListener = null;
   let onInstalledListener = null;
+  // A real backing store (not the always-empty stub the other tests in this
+  // file use) — needed to prove getInstallId() actually persists across
+  // calls, not just that it returns a string once.
+  const storeBacking = {};
 
   const sandbox = {
     console,
     fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
+    crypto: { randomUUID: () => 'bg-test-uuid' },
     chrome: {
       runtime: {
         getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }),
@@ -34,7 +39,13 @@ function load() {
         setBadgeBackgroundColor: (o) => calls.push(['color', o.color])
       },
       identity: { getAuthToken: (o, cb) => cb('tok'), removeCachedAuthToken: (o, cb) => cb(), launchWebAuthFlow: () => {} },
-      storage: { local: { get: async () => ({}), set: async () => {}, remove: async () => {} } },
+      storage: {
+        local: {
+          get: async (key) => (typeof key === 'string' ? { [key]: storeBacking[key] } : { ...storeBacking }),
+          set: async (patch) => { Object.assign(storeBacking, patch); },
+          remove: async (key) => { delete storeBacking[key]; }
+        }
+      },
       windows: { create: () => {}, onRemoved: { addListener() {} } },
       tabs: { create: () => {}, sendMessage: () => {} },
       alarms: { create: () => {}, onAlarm: { addListener() {} } }
@@ -47,8 +58,14 @@ function load() {
 
   return {
     calls,
+    install: (details) => onInstalledListener(details),
+    // Fire-and-forget messages (flow:pending-count) never call sendResponse,
+    // so this variant is fine for them and for anything synchronous.
     message: (msg) => onMessageListener(msg, {}, () => {}),
-    install: (details) => onInstalledListener(details)
+    // For handlers that reply asynchronously (reply() returns true and
+    // calls sendResponse later, e.g. flow:get-install-id) — resolves with
+    // whatever sendResponse actually received.
+    messageAsync: (msg) => new Promise((resolve) => onMessageListener(msg, {}, resolve))
   };
 }
 
@@ -102,5 +119,17 @@ console.log('\n--- background.js: an update also resets the badge, not just a fi
   check('updateBadge(0) runs on every onInstalled reason, not only "install"', bg.calls.some((c) => c[0] === 'text' && c[1] === ''), bg.calls);
 }
 
-console.log('\nTOTAL FAILURES:', failures);
-process.exit(failures ? 1 : 0);
+console.log('\n--- background.js: flow:get-install-id is the canonical generator ---\n');
+(async () => {
+  {
+    const bg = load();
+    const res = await bg.messageAsync({ type: 'flow:get-install-id' });
+    check('responds ok with a real generated id', res && res.ok === true && typeof res.id === 'string' && res.id.length > 0, res);
+
+    const res2 = await bg.messageAsync({ type: 'flow:get-install-id' });
+    check('a second call returns the SAME id — proves it was actually persisted, not regenerated', res2.id === res.id, [res, res2]);
+  }
+
+  console.log('\nTOTAL FAILURES:', failures);
+  process.exit(failures ? 1 : 0);
+})();

@@ -441,9 +441,42 @@ const FlowStorage = (() => {
     return { closed, open };
   });
 
+  // Two independent contexts used to each generate their own installId the
+  // first time THEY happened to need one — this file (called from the
+  // popup's referral link) and background.js's own copy (used internally
+  // for analytics, and the far more frequent first-mover in practice, since
+  // it fires on the very first tracked event). Two generators writing the
+  // same chrome.storage.local key is duplicated state by definition: if
+  // both ever ran for the very first time close together, whichever wrote
+  // second would silently overwrite the other's id, and a shared referral
+  // link would stop matching the id analytics attributes events to.
+  //
+  // background.js's service worker is the one long-lived instance this
+  // extension has, so it's the natural single source of truth — this
+  // function now asks it first via message and only falls back to
+  // generating locally if that fails (no listener yet, or running
+  // somewhere — a test sandbox — with no background page at all), which
+  // also happens to be exactly backward-compatible with every install that
+  // already has an id: get() below still returns instantly for those,
+  // since it's checked before either code path runs.
   const getInstallId = serialize(async function getInstallId() {
     const state = await get();
     if (state.installId) return state.installId;
+
+    try {
+      const response = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: 'flow:get-install-id' }, (res) => {
+          if (chrome.runtime.lastError || !res || !res.id) reject(chrome.runtime.lastError || new Error('no install id in response'));
+          else resolve(res);
+        });
+      });
+      await set({ installId: response.id });
+      return response.id;
+    } catch (e) {
+      // No background page reachable — fall through to local generation so
+      // this function still always resolves to a usable id.
+    }
+
     const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/-/g, '').slice(0, 12);
     await set({ installId: id });
     return id;

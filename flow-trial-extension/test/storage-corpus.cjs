@@ -17,6 +17,11 @@ const vm = require('vm');
 // `store` falls back to the default value passed in, exactly like the real
 // API does when `keys` is an object.
 let store = {};
+// Swappable per test block (default: no listener reachable, matching a bare
+// test sandbox with no background page) — see the getInstallId tests below
+// for how this simulates background.js actually answering vs. being
+// unreachable.
+let runtimeMessageHandler = (msg, cb) => { cb(undefined); }; // chrome.runtime.lastError stays unset — real Chrome would set it here, but "response is undefined" alone is already enough for getInstallId's own check to fall back correctly.
 const chromeStub = {
   storage: {
     local: {
@@ -29,6 +34,9 @@ const chromeStub = {
       },
       set: (patch, cb) => { Object.assign(store, patch); if (cb) cb(); }
     }
+  },
+  runtime: {
+    sendMessage: (msg, cb) => runtimeMessageHandler(msg, cb)
   }
 };
 
@@ -488,6 +496,44 @@ async function run() {
     const due = await FlowStorage.consumeWeeklySummaryTrigger();
     check('mid-week with no real gap since last seen stays silent', due === null, due);
   }
+
+  console.log('\n--- storage.js: getInstallId() defers to background.js when it answers ---\n');
+  store = {};
+  {
+    runtimeMessageHandler = (msg, cb) => {
+      check('asks background.js with the documented message type', msg && msg.type === 'flow:get-install-id', msg);
+      cb({ ok: true, id: 'bg-canonical-id' });
+    };
+    const id = await FlowStorage.getInstallId();
+    check('adopts the id background.js returned rather than generating its own', id === 'bg-canonical-id', id);
+    const state = await FlowStorage.get();
+    check('persists that id locally so future reads are instant and consistent', state.installId === 'bg-canonical-id', state.installId);
+
+    runtimeMessageHandler = () => { throw new Error('should not be asked again once installId is already set'); };
+    const second = await FlowStorage.getInstallId();
+    check('a second call short-circuits on the now-stored id without messaging again', second === 'bg-canonical-id', second);
+  }
+
+  console.log('\n--- storage.js: getInstallId() falls back to local generation when background.js is unreachable ---\n');
+  store = {};
+  {
+    // No listener at all — e.g. the service worker hasn't started yet, or
+    // (as in every other test in this file) there simply isn't one.
+    runtimeMessageHandler = (msg, cb) => cb(undefined);
+    const id = await FlowStorage.getInstallId();
+    check('still resolves to a usable id when the message goes unanswered', typeof id === 'string' && id.length > 0, id);
+    const state = await FlowStorage.get();
+    check('the locally-generated id is persisted the same as before this change existed', state.installId === id, state);
+  }
+
+  console.log('\n--- storage.js: getInstallId() falls back when background.js answers without a valid id ---\n');
+  store = {};
+  {
+    runtimeMessageHandler = (msg, cb) => cb({ ok: false });
+    const id = await FlowStorage.getInstallId();
+    check('a malformed/failed response is treated the same as no response', typeof id === 'string' && id.length > 0, id);
+  }
+  runtimeMessageHandler = (msg, cb) => cb(undefined); // restore the default for anything after this block
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

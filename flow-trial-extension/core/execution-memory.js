@@ -99,7 +99,26 @@ const FlowExecutionMemory = (() => {
     }
   }
 
-  async function appendEvents(events) {
+  // The adapter interface is read-then-write with no atomic compare-and-set
+  // (chrome.storage.local doesn't have one, and neither does the in-memory
+  // default) — the exact same gap storage.js's own appendLog documents and
+  // guards against. Two record* calls close together (a real possibility
+  // now: the live chip, the Brief panel, Contextual Resurfacing, and the
+  // popup's Open tab can each fire one independently) used to both read the
+  // OLD log before either wrote back, so whichever appendEvents() call
+  // landed second silently overwrote the first — not a duplicate, a
+  // genuinely LOST behavioral event, which is worse: it never gets a chance
+  // to correct itself and just quietly under-counts how often a step gets
+  // rejected, skewing actions.js's future bias decisions. Serializing every
+  // call to appendEvents through one queue closes that window.
+  let queue = Promise.resolve();
+  function serialize(fn) {
+    const run = queue.then(fn);
+    queue = run.catch(() => {}); // one failure must not wedge later calls
+    return run;
+  }
+
+  const appendEvents = (events) => serialize(async () => {
     try {
       const log = await getLog();
       const next = [...events, ...log].slice(0, MAX_EVENTS);
@@ -109,7 +128,7 @@ const FlowExecutionMemory = (() => {
       // dismiss doesn't register — this is a bias signal for next time, not
       // something this click depends on.
     }
-  }
+  });
 
   function blankProcess() {
     return { closedCount: 0, undoneCount: 0, steps: {} };
