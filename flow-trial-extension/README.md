@@ -16,21 +16,21 @@ the full split.
 
 ## What actually works today
 
-**Judgment runs on this device.** `src/judgment.js` scores each message from
+**Judgment runs on this device.** `core/judgment.js` scores each message from
 weighted, named signals — a currency figure, a commitment verb, a dated
 obligation, a direct request, a stated loss — against negative ones like an
 automated sender or mailing-list boilerplate. It speaks only above a threshold
 that moves as you click and dismiss. No email text is sent anywhere to reach
 this decision.
 
-**Facts are extracted, not just detected.** `src/extract.js` pulls the amount
+**Facts are extracted, not just detected.** `core/extract.js` pulls the amount
 (with currency, `k`/`m` suffixes, and a refusal to treat a bare number or a
 percentage as money), the date (resolving weekday references and month names,
 and refusing to normalise a genuinely ambiguous `3/4`), and the sentence that
 carried the decision. That is what makes the written record worth having.
 
 **`Do It` closes one named process, not a pile of independent actions.**
-`src/actions.js` maps each of the five classified intent types onto exactly
+`core/actions.js` maps each of the five classified intent types onto exactly
 one process — Schedule & Confirm, Schedule It, Reply & Track, Follow
 Through, or Log It — never a loose action list. Each process names an
 *anchor* step (the concrete evidence it exists on — the calendar entry for
@@ -43,7 +43,7 @@ progress as each one closes; a single `Undo all` reverts the whole chain in
 reverse order, stopping immediately if any one step can't be undone rather
 than leaving the account guessing what did and didn't revert.
 
-`src/execution-memory.js` is a small local (`chrome.storage.local`) event
+`core/execution-memory.js` is a small local (`chrome.storage.local`) event
 log of what this account actually does with each process — which
 non-anchor steps it keeps, strips off before confirming, or undoes after
 the fact. `actions.js` reads it to order those steps by how often this
@@ -82,7 +82,7 @@ deletes anything that was already there.
 ## Local Privacy Shield, and where masked text is allowed to go
 
 Every message the sidebar or the chip ever reads is masked on-device first.
-`src/privacyShield.js` finds every name, company, law firm, monetary amount,
+`core/privacyShield.js` finds every name, company, law firm, monetary amount,
 date, email address, and phone number in a message and replaces each with a
 placeholder token
 (`[CLIENT_NAME_1]`, `[COMPANY_A]`, `[LAW_FIRM_B]`, `[OPPOSING_COUNSEL_1]`,
@@ -95,7 +95,7 @@ Two different things happen to that masked text after masking, and the
 distinction matters:
 
 - **The passive chip and judgment engine never send anything anywhere.**
-  `src/judgment.js` and `src/extract.js` score plain text entirely on this
+  `core/judgment.js` and `core/extract.js` score plain text entirely on this
   device — see "What is still deliberately narrow" below. This has not
   changed.
 - **Draft-It (below) and the attachment X-ray (below) are opt-in tools that
@@ -123,16 +123,16 @@ reply compose box.
 
 Hover a `.docx` attachment chip on an open message and a floating card
 appears with a one-line summary and an entity table (Counterparty, Effective
-Date, Financial Value, Governing Law). `src/docreader.js` reads the `.docx`
+Date, Financial Value, Governing Law). `core/docreader.js` reads the `.docx`
 entirely on-device (it's a ZIP of a few XML parts — the same insight
-`src/docwriter.js` uses in the write direction), the extracted text is masked,
+`core/docwriter.js` uses in the write direction), the extracted text is masked,
 and only the masked text goes to `glance-assist.js` for summarization.
 
 **PDF is not supported yet** — the hover card shows "Preview isn't available
 for this file type yet" for PDFs and any other file type. Real PDF text
 extraction (compressed content streams, font encoding tables) is a
 library-sized undertaking, not something to bolt on unreliably alongside a
-hand-rolled `.docx` reader; see `src/docreader.js`'s header comment.
+hand-rolled `.docx` reader; see `core/docreader.js`'s header comment.
 
 ## Next-Step CRM & Document Orchestrator (Feature 4)
 
@@ -144,7 +144,7 @@ button runs both halves of "what happens after this decision" from one click:
   `Undo` the chip itself uses, so the two never disagree about what a write
   looked like.
 - **Path B** generates a real, Word-openable `.docx` locally (no server call,
-  no library — `src/docwriter.js`) from the same extracted facts Path A just
+  no library — `core/docwriter.js`) from the same extracted facts Path A just
   wrote, and downloads it.
 
 Once both complete, the sidebar shows a receipt (where it logged to, a link,
@@ -310,7 +310,7 @@ selected and used, it also needs its API host added back to
 pending Chrome Web Store submission, since `popup.js`'s onboarding screen
 only shows `mvp: true` connectors today (Google Tasks) and Web Store review
 expects requested host permissions to match what's actually reachable. See
-`src/connectors.js`'s own header comment for the exact hosts.
+`core/connectors.js`'s own header comment for the exact hosts.
 
 1. [developers.hubspot.com](https://developers.hubspot.com) → create a free
    developer account → **Create app**.
@@ -435,30 +435,48 @@ not configured yet" rather than failing silently or half-completing a request.
 
 ## Layout
 
+`core/` is the portable brain — intention classification, process planning,
+Execution Memory, precision/harm calibration, document read/write. Nothing in
+it references `chrome.*`, `document`, or `window`; every module is loaded as a
+plain script here and also runs unmodified under Node (see `test/*.cjs`). This
+is the part a future Flow enterprise runtime would reuse without a rewrite —
+see `core/README.md` for the boundary contract. `src/` is everything that
+makes Glance specifically a Chrome extension talking to Gmail: persistence,
+the injected UI, the service worker, and the one file (`chrome-storage-
+adapter.js`) that wires core/'s storage seam to `chrome.storage.local`.
+
 ```
 manifest.json          MV3, pinned key so the extension ID is stable
-src/extract.js         money / date / decisive-sentence extraction (no network)
-src/judgment.js        weighted on-device scorer + adaptive threshold
-src/domains.js         per-field vocabulary and phrasing — never rules
-src/connectors.js      catalog: what each destination is and how it authenticates
-src/storage.js         chrome.storage wrapper; log and calibration
-src/execution-memory.js  local event log of what a user keeps/strips/undoes per named process — biases future step order and drops a net-rejected step (see "What actually works today")
-src/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates/emails/phones before anything leaves the device
-src/sidebar.js         the injected sidebar pane: badge, Draft-It, Next-Step, attachment hover card
-src/sidebar.css        sidebar/floating-card styles (CSS logical properties, RTL/LTR safe)
-src/brief.js           Morning Brief UI: the page-level "N still open" indicator + its panel
-src/brief.css          brief indicator/panel styles, reusing the chip's own button states
-src/docwriter.js       generates a real .docx locally, no library (Feature 4 Path B)
-src/docreader.js       reads a .docx locally, no library (Feature 3's attachment text extraction)
-src/content-gmail.js   Gmail watcher, the chip, the sidebar wiring, and the receipt after a write
-src/background.js      credentials, the five write paths, undo, and the glance-assist relay
-popup/                 the only configuration surface — two questions long
+
+core/domains.js         per-field vocabulary and phrasing — never rules
+core/connectors.js      catalog: what each destination is and how it authenticates
+core/extract.js         money / date / decisive-sentence extraction (no network)
+core/judgment.js        weighted on-device scorer + adaptive threshold + precision/harm calibration
+core/intent.js          classifies extracted facts into one of five intent types
+core/actions.js         intent -> named PROCESS -> ordered steps, biased by Execution Memory
+core/execution-memory.js  local event log of what a user keeps/strips/undoes per named process — biases future step order and drops a net-rejected step (see "What actually works today"); storage is an injected adapter, not hardcoded
+core/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates/emails/phones before anything leaves the device
+core/docwriter.js       generates a real .docx locally, no library (Feature 4 Path B)
+core/docreader.js       reads a .docx locally, no library (Feature 3's attachment text extraction)
+
+src/storage.js          chrome.storage wrapper; log, calibration, weekly/badge counters — Glance's own persistence choices, not core logic
+src/chrome-storage-adapter.js  wires core/execution-memory.js's storage seam to chrome.storage.local
+src/sidebar.js          the injected sidebar pane: badge, Draft-It, Next-Step, attachment hover card
+src/sidebar.css         sidebar/floating-card styles (CSS logical properties, RTL/LTR safe)
+src/brief.js            Morning Brief UI: the page-level "N still open" indicator + its panel + Contextual Resurfacing
+src/brief.css           brief indicator/panel/resurface styles, reusing the chip's own button states
+src/weekly.js           Weekly Closing Summary banner ("closed N this week / N still open")
+src/weekly.css          weekly summary banner styles
+src/content-gmail.js    Gmail watcher, the chip, the sidebar wiring, and the receipt after a write
+src/background.js       credentials, the five write paths, undo, the glance-assist relay, and the extension-icon badge
+
+popup/                  the only configuration surface, plus the Open tab (Unified Open Items Surface)
 netlify/functions/glance-assist/  masked-only backend proxy to a real LLM, for Draft-It + attachment X-ray
 ```
 
 ## Future: anonymous team-level pattern sharing (foundation only, not built)
 
-`src/execution-memory.js` exports `toPatternSummary()`, a pure function that
+`core/execution-memory.js` exports `toPatternSummary()`, a pure function that
 collapses one account's local Execution Memory into a flat list of
 `{processType, stepKind, accepted, removed, undone, pinned}` rows — no
 `intentionId`, no timestamp, no message content, no per-install identifier.
@@ -480,7 +498,7 @@ foundation, not the feature.
 - **Gmail only.** The judgment engine takes plain text and knows nothing about
   Gmail; adding a second source surface is a content script, not a rewrite.
 - **The passive judgment engine is not a language model, and sends nothing
-  anywhere.** `src/judgment.js`'s scorer is a transparent, explainable
+  anywhere.** `core/judgment.js`'s scorer is a transparent, explainable
   weighting, which is why the popup can show why Glance spoke — this has not
   changed. Draft-It and the attachment X-ray are separate, opt-in tools that
   do call a real model with masked-only text; see "Local Privacy Shield,

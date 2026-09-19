@@ -14,7 +14,7 @@ const vm = require('vm');
 
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'extract.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'extract.js'), 'utf8'), sandbox);
 const FlowExtract = vm.runInContext('FlowExtract', sandbox);
 
 let failures = 0;

@@ -28,7 +28,7 @@ const zlib = require('zlib');
 
 const sandbox = { module: undefined, console, Blob, Response, DecompressionStream, TextDecoder, ArrayBuffer };
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'docreader.js'), 'utf8'), sandbox, { filename: 'docreader.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'docreader.js'), 'utf8'), sandbox, { filename: 'docreader.js' });
 const FlowDocReader = vm.runInContext('FlowDocReader', sandbox);
 
 let failures = 0;

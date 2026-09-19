@@ -45,29 +45,54 @@
 // already picks exactly one process per message (see actions.js's
 // processFor()); there is nothing to choose between yet.
 //
-// Everything here is local-only (chrome.storage.local), the same as every
-// other piece of state this extension keeps. Nothing about what a user
-// accepts, removes, or undoes is ever sent anywhere.
+// Nothing about what a user accepts, removes, or undoes is ever sent
+// anywhere, regardless of host.
 //
-// Local storage, not SQLite: this runs inside a Chrome MV3 content script
-// and service worker, where chrome.storage.local already IS the local JSON
-// store this data belongs in — there's no filesystem to put a .sqlite file
-// on inside either context, and pulling in a wasm SQL engine for a log
-// capped at a few hundred small objects would add real bundle weight for no
-// behavioral gain over what's here.
-
+// Storage is an injected adapter, not a hardcoded chrome.storage.local call
+// — this file lives in core/ precisely because it must run somewhere other
+// than a Chrome extension context one day (Flow's future server-side
+// runtime), and a persistence choice baked into the business logic is
+// exactly the kind of thing that would force a rewrite to get there. The
+// default adapter below is a plain in-memory store: safe everywhere (never
+// throws, never touches a global that might not exist), correct for a
+// single process's lifetime, and simply not durable across restarts —
+// which is the right default for code that doesn't yet know what host it's
+// running in. Glance's actual persistence (chrome.storage.local) is wired
+// in from the CLIENT side via setStorageAdapter() — see
+// src/chrome-storage-adapter.js — so this file itself never references
+// chrome.* at all. A future Flow runtime wires in its own adapter
+// (a database row, a per-tenant KV store, whatever it needs) the same way,
+// without touching a line below.
 const FlowExecutionMemory = (() => {
   const STORAGE_KEY = 'flowExecutionEvents';
   // Same cap/ordering convention as FlowStorage's own appendLog
-  // (storage.js) — newest first, bounded so a long-lived mailbox never
+  // (src/storage.js) — newest first, bounded so a long-lived mailbox never
   // grows this without limit. Far more than actions.js needs to converge on
   // a real preference; kept generous since this log doubles as the audit
   // trail for what Execution Memory actually saw.
   const MAX_EVENTS = 500;
 
+  function inMemoryAdapter() {
+    const store = new Map();
+    return {
+      async get(key) { return store.get(key); },
+      async set(key, value) { store.set(key, value); }
+    };
+  }
+
+  let adapter = inMemoryAdapter();
+
+  // The one seam a host environment needs: swap what "persist" means
+  // without this file's business logic (getAll's fold, the record*
+  // functions, toPatternSummary) knowing or caring. `next` must implement
+  // { get(key) -> Promise<value>, set(key, value) -> Promise<void> }.
+  function setStorageAdapter(next) {
+    adapter = next;
+  }
+
   async function getLog() {
     try {
-      const { [STORAGE_KEY]: log } = await chrome.storage.local.get(STORAGE_KEY);
+      const log = await adapter.get(STORAGE_KEY);
       return log || [];
     } catch (e) {
       return [];
@@ -78,7 +103,7 @@ const FlowExecutionMemory = (() => {
     try {
       const log = await getLog();
       const next = [...events, ...log].slice(0, MAX_EVENTS);
-      await chrome.storage.local.set({ [STORAGE_KEY]: next });
+      await adapter.set(STORAGE_KEY, next);
     } catch (e) {
       // Never let memory bookkeeping be the reason a real write fails or a
       // dismiss doesn't register — this is a bias signal for next time, not
@@ -206,7 +231,7 @@ const FlowExecutionMemory = (() => {
     return rows;
   }
 
-  return { getAll, getLog, recordDoIt, recordDismiss, recordUndo, recordPin, toPatternSummary };
+  return { getAll, getLog, recordDoIt, recordDismiss, recordUndo, recordPin, toPatternSummary, setStorageAdapter };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExecutionMemory };

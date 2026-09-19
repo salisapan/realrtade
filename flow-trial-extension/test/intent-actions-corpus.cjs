@@ -17,7 +17,7 @@ const vm = require('vm');
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
 for (const f of ['domains.js', 'extract.js', 'judgment.js', 'intent.js', 'actions.js']) {
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8'), sandbox, { filename: f });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
 const FlowActions = vm.runInContext('FlowActions', sandbox);

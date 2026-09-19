@@ -1,9 +1,18 @@
-// Regression corpus for execution-memory.js — the local-only record of what
-// an account actually does with a proposed process (Do It / remove-before-
-// confirming / undo-after-confirming). actions.js's applyMemory() is only as
-// correct as the shape this module writes, so this file locks that shape
-// down directly, independent of the demotion/ordering math already covered
-// in intent-actions-corpus.cjs.
+// Regression corpus for core/execution-memory.js — the local-only record of
+// what an account actually does with a proposed process (Do It / remove-
+// before-confirming / undo-after-confirming). actions.js's applyMemory() is
+// only as correct as the shape this module writes, so this file locks that
+// shape down directly, independent of the demotion/ordering math already
+// covered in intent-actions-corpus.cjs.
+//
+// This module has no chrome.* reference at all (see its own header comment
+// for why — it's core/, meant to run somewhere other than a Chrome
+// extension one day) — persistence is an injected adapter, defaulting to a
+// plain in-memory store. `resetAdapter()` below gives each test block a
+// fresh, independent one via the SAME setStorageAdapter() seam a real host
+// (Glance's src/chrome-storage-adapter.js, or a future Flow runtime) uses —
+// this corpus is exercising the actual public contract, not a shortcut
+// around it.
 //
 // Run: node test/execution-memory-corpus.cjs
 
@@ -11,24 +20,24 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-// A minimal in-memory stand-in for chrome.storage.local — get/set are the
-// only two calls this module ever makes, both promise-based like the real
-// API. One shared `store` object per test file run, the same way a single
-// browser profile's storage would persist across calls within a session.
-let store = {};
-const chromeStub = {
-  storage: {
-    local: {
-      get: (key) => Promise.resolve(Object.prototype.hasOwnProperty.call(store, key) ? { [key]: store[key] } : {}),
-      set: (obj) => { Object.assign(store, obj); return Promise.resolve(); }
-    }
-  }
-};
-
-const sandbox = { module: undefined, console, chrome: chromeStub };
+const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'execution-memory.js'), 'utf8'), sandbox, { filename: 'execution-memory.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'execution-memory.js'), 'utf8'), sandbox, { filename: 'execution-memory.js' });
 const FlowExecutionMemory = vm.runInContext('FlowExecutionMemory', sandbox);
+
+// A fresh, independent in-memory adapter per test block — same shape a real
+// adapter must implement: { get(key) -> Promise<value>, set(key, value) -> Promise<void> }.
+function freshAdapter() {
+  const store = new Map();
+  return {
+    backing: store,
+    async get(key) { return store.get(key); },
+    async set(key, value) { store.set(key, value); }
+  };
+}
+function resetAdapter() {
+  FlowExecutionMemory.setStorageAdapter(freshAdapter());
+}
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -44,7 +53,7 @@ async function run() {
   }
 
   console.log('\n--- execution-memory.js: recordDoIt() ---\n');
-  store = {};
+  resetAdapter();
   {
     await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task']);
     const mem = await FlowExecutionMemory.getAll();
@@ -63,7 +72,7 @@ async function run() {
   }
 
   console.log('\n--- execution-memory.js: recordDismiss() ---\n');
-  store = {};
+  resetAdapter();
   {
     await FlowExecutionMemory.recordDismiss('schedule', ['calendar', 'task']);
     const mem = await FlowExecutionMemory.getAll();
@@ -73,7 +82,7 @@ async function run() {
   }
 
   console.log('\n--- execution-memory.js: recordUndo() ---\n');
-  store = {};
+  resetAdapter();
   {
     await FlowExecutionMemory.recordDoIt('schedule-confirm', ['calendar', 'draft', 'task'], []);
     await FlowExecutionMemory.recordUndo('schedule-confirm', ['draft', 'task']);
@@ -85,7 +94,7 @@ async function run() {
   }
 
   console.log('\n--- execution-memory.js: recordPin() ---\n');
-  store = {};
+  resetAdapter();
   {
     // The setup an insight card would actually see: task net-rejected on
     // reply-track, then the user explicitly answers "no, keep proposing it."
@@ -115,7 +124,7 @@ async function run() {
   }
 
   console.log('\n--- execution-memory.js: toPatternSummary() (team-sharing foundation, not wired to anything) ---\n');
-  store = {};
+  resetAdapter();
   {
     await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task'], 'msg-1');
     await FlowExecutionMemory.recordUndo('reply-track', ['draft'], 'msg-1');
@@ -133,7 +142,7 @@ async function run() {
   }
 
   console.log('\n--- execution-memory.js: processes stay isolated from each other ---\n');
-  store = {};
+  resetAdapter();
   {
     await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], []);
     await FlowExecutionMemory.recordDismiss('follow-through', ['task', 'draft']);
@@ -143,7 +152,7 @@ async function run() {
   }
 
   console.log('\n--- execution-memory.js: the raw event log matches the requested schema ---\n');
-  store = {};
+  resetAdapter();
   {
     await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task'], 'msg-42');
     const log = await FlowExecutionMemory.getLog();
@@ -172,7 +181,7 @@ async function run() {
   }
   {
     // Newest-first, same convention as FlowStorage's own appendLog.
-    store = {};
+    resetAdapter();
     await FlowExecutionMemory.recordDismiss('log-it', ['task'], 'msg-1');
     await FlowExecutionMemory.recordDismiss('log-it', ['task'], 'msg-2');
     const log = await FlowExecutionMemory.getLog();
@@ -189,6 +198,64 @@ async function run() {
     let threw = false;
     try { await FlowExecutionMemory.recordDoIt(null, ['draft'], []); } catch (e) { threw = true; }
     check('recordDoIt with no processId resolves quietly instead of throwing', threw === false);
+  }
+
+  // ------------------------------------------------------------------
+  // The core/client boundary itself: this module must never reference
+  // chrome.* (or any other host-specific global), and setStorageAdapter()
+  // must genuinely redirect persistence rather than being a no-op some
+  // caller forgot to wire up. This is the actual thing the src/ -> core/
+  // split depends on being true.
+  // ------------------------------------------------------------------
+
+  console.log('\n--- execution-memory.js: has no chrome.* (or other host-global) reference ---\n');
+  {
+    // Strip comments first — the file's own header prose explains, in
+    // words, why there's no chrome.storage.local call here, which would
+    // otherwise trip a naive text search on the very sentence documenting
+    // its absence. This checks the executable code, not the commentary
+    // about it.
+    const raw = fs.readFileSync(path.join(__dirname, '..', 'core', 'execution-memory.js'), 'utf8');
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    check('the executable code contains no reference to chrome.*', !/\bchrome\s*\./.test(code), 'a chrome.* reference would break this module outside a browser extension');
+    check('the executable code contains no reference to document/window', !/\b(document|window)\s*\./.test(code));
+  }
+
+  console.log('\n--- execution-memory.js: works with no adapter configured at all ---\n');
+  {
+    // A fresh sandbox, never calling setStorageAdapter — exercising the
+    // built-in default a bare `require('core/execution-memory.js')` gets
+    // before any host wires anything in.
+    const freshSandbox = { module: undefined, console };
+    vm.createContext(freshSandbox);
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'execution-memory.js'), 'utf8'), freshSandbox, { filename: 'execution-memory.js' });
+    const Fresh = vm.runInContext('FlowExecutionMemory', freshSandbox);
+    let threw = null;
+    try {
+      await Fresh.recordDoIt('reply-track', ['draft'], []);
+      var mem = await Fresh.getAll();
+    } catch (e) { threw = e.message; }
+    check('the unconfigured default never throws', threw === null, threw);
+    check('...and is fully functional (correct, just not durable)', mem && mem['reply-track'] && mem['reply-track'].steps.draft.accepted === 1, mem);
+  }
+
+  console.log('\n--- execution-memory.js: setStorageAdapter() genuinely redirects persistence ---\n');
+  {
+    const probe = freshAdapter();
+    FlowExecutionMemory.setStorageAdapter(probe);
+    await FlowExecutionMemory.recordDismiss('log-it', ['task'], 'probe-1');
+    check('an event written after setStorageAdapter() lands in THAT adapter’s own backing store',
+      Array.isArray(probe.backing.get('flowExecutionEvents')) && probe.backing.get('flowExecutionEvents').some((e) => e.intentionId === 'probe-1'),
+      probe.backing.get('flowExecutionEvents'));
+
+    // Swapping to a second adapter must not leak the first one's data in —
+    // each adapter is a genuinely independent store from the module's
+    // point of view.
+    const second = freshAdapter();
+    FlowExecutionMemory.setStorageAdapter(second);
+    const memOnSecond = await FlowExecutionMemory.getAll();
+    check('a newly-swapped-in adapter starts empty, not inheriting the previous one’s data',
+      Object.keys(memOnSecond).length === 0, memOnSecond);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

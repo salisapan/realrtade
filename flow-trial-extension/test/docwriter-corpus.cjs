@@ -26,8 +26,8 @@ const vm = require('vm');
 
 const sandbox = { module: undefined, console, TextEncoder, TextDecoder, Blob, Response, DecompressionStream, ArrayBuffer, Uint8Array };
 vm.createContext(sandbox);
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'docwriter.js'), 'utf8'), sandbox, { filename: 'docwriter.js' });
-vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'docreader.js'), 'utf8'), sandbox, { filename: 'docreader.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'docwriter.js'), 'utf8'), sandbox, { filename: 'docwriter.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'docreader.js'), 'utf8'), sandbox, { filename: 'docreader.js' });
 const FlowDocWriter = vm.runInContext('FlowDocWriter', sandbox);
 const FlowDocReader = vm.runInContext('FlowDocReader', sandbox);
 

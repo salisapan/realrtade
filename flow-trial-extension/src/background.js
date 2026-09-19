@@ -1472,7 +1472,7 @@ async function notionUndo(ref) {
 // handing text to these two functions, so nothing that reaches
 // glance-assist.js is a real name, company, amount, date, email, or phone
 // number — see
-// src/privacyShield.js and netlify/functions/glance-assist/glance-assist.js
+// core/privacyShield.js and netlify/functions/glance-assist/glance-assist.js
 // for the two ends of that contract. This file is just the relay: content
 // scripts can't call a third-party API directly (no CORS grant, and no
 // place to keep this off the page's own origin), so, same as every other

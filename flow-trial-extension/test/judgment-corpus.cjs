@@ -18,7 +18,7 @@ const vm = require('vm');
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
 for (const f of ['domains.js', 'extract.js', 'judgment.js']) {
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8'), sandbox, { filename: f });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
 }
 // Top-level `const` in a script creates a lexical binding rather than a property
 // on the global object, so read them back by evaluating in the same context.

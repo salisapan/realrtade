@@ -7,6 +7,22 @@ ladder. Full detail, including what each tier may and may not claim, is in
 `trial.html`'s positioning, or any copy that could imply the two products
 share security/compliance guarantees.
 
+## Glance/Flow code architecture — read before adding logic to the extension
+
+Inside `flow-trial-extension/`, `core/` and `src/` are a deliberate product
+boundary, not a folder preference: `core/` is portable business logic
+(intention classification, process planning, Execution Memory, precision/harm
+calibration, document read/write) with zero `chrome.*`/`document`/`window`
+reference, meant to outlive Glance's Chrome-extension packaging and one day
+serve a separate enterprise Flow runtime unchanged. `src/` is everything that
+makes Glance specifically a Chrome extension talking to Gmail (persistence,
+injected UI, the service worker). Full contract, the adapter pattern for
+giving a core module storage without coupling it to `chrome.storage.local`,
+and a decision guide for where new code belongs are in
+`flow-trial-extension/core/README.md` — read it before adding any new module
+to either directory, and route new logic there rather than mixing it into
+whichever file is already open.
+
 ## Design & UX review principles — read before any UI, copy, or flow change
 
 Twelve standing review criteria distilled from the product owner's live

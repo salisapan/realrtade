@@ -1,8 +1,8 @@
 # Chrome Web Store submission — Glance
 
 Everything below is drafted from the actual `manifest.json`, `README.md`, and
-source (`src/background.js`, `src/actions.js`, `src/execution-memory.js`,
-`src/brief.js`, `src/privacyShield.js`, `src/content-gmail.js`) as of this
+source (`src/background.js`, `core/actions.js`, `core/execution-memory.js`,
+`src/brief.js`, `core/privacyShield.js`, `src/content-gmail.js`) as of this
 doc's writing — nothing is invented. Copy/paste text fields directly into
 the Developer Dashboard; the checklist at the bottom tracks what still needs
 a human (screenshots and the dashboard form itself).
@@ -10,14 +10,14 @@ a human (screenshots and the dashboard form itself).
 **Revised for the current Google-only MVP scope.** The listing text below
 was rewritten to describe exactly what a real install can do today: Google
 Tasks/Calendar/Gmail Draft, reached through `mvp: true` in
-`src/connectors.js`. Notion/HubSpot/Salesforce/Slack/Monday.com have real,
+`core/connectors.js`. Notion/HubSpot/Salesforce/Slack/Monday.com have real,
 working code in `src/background.js` but no live path to reach them from the
 popup — describing them in the public listing would be a real
 promise-vs-reality gap (this project's own standing review principle,
 `docs/design-principles.md`) and, more concretely, Chrome Web Store review
 can reject a listing whose description doesn't match what the extension
 actually does. `manifest.json`'s `host_permissions` were narrowed to match
-for the same reason — see `src/connectors.js`'s header comment. Re-widen
+for the same reason — see `core/connectors.js`'s header comment. Re-widen
 both together (listing copy and host_permissions) if/when those connectors
 rejoin onboarding — not just the code that already exists for them.
 
@@ -145,7 +145,7 @@ Use these verbatim — each is traceable to the exact code that uses it.
 
 | Permission | Justification |
 |---|---|
-| `storage` | Stores the user's chosen connector, line-of-work profile, sensitivity calibration, the local activity log, and the local Execution Memory log (which steps of a process this account tends to keep or remove) — entirely in `chrome.storage.local` on the user's own device (`src/storage.js`, `src/execution-memory.js`). Never synced to a Glance-owned server. |
+| `storage` | Stores the user's chosen connector, line-of-work profile, sensitivity calibration, the local activity log, and the local Execution Memory log (which steps of a process this account tends to keep or remove) — entirely in `chrome.storage.local` on the user's own device (`src/storage.js`, `core/execution-memory.js`). Never synced to a Glance-owned server. |
 | `identity` | Used only for `chrome.identity.getAuthToken()` — Chrome's own native Google account chooser — so Glance can write to Google Calendar, Google Tasks, and Gmail drafts using an OAuth grant to the Google account the user is already signed into (`src/background.js`). No redirect page, no third-party auth screen. |
 | `host_permissions: https://mail.google.com/*` | The content script (`src/content-gmail.js`) runs only on Gmail to read the open message's visible text, subject, and sender, and to inject the Do It button / Morning Brief UI. |
 | `host_permissions: https://tasks.googleapis.com/*` | Direct API calls to create/undo a Google Tasks reminder after the user clicks Do It. |

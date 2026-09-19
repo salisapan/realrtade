@@ -45,6 +45,7 @@ function makeNode(tag) {
   };
 }
 
+const CORE = path.join(__dirname, '..', 'core');
 const SRC = path.join(__dirname, '..', 'src');
 const POPUP = path.join(__dirname, '..', 'popup');
 
@@ -85,9 +86,19 @@ function load(stored) {
 
   const sandbox = { module: undefined, console, document, chrome: chromeStub, crypto: { randomUUID: () => 'test-uuid' }, navigator: { clipboard: { writeText: async () => {} } } };
   vm.createContext(sandbox);
-  const files = ['domains.js', 'connectors.js', 'extract.js', 'judgment.js', 'storage.js', 'actions.js', 'execution-memory.js'];
-  for (const f of files) {
-    vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), sandbox, { filename: f });
+  // Same file list, same order popup.html actually loads them in — core/
+  // modules with storage.js (client-side) spliced in where it belongs, then
+  // the chrome-storage-adapter right after execution-memory.js so a real
+  // Dismiss persists through the chromeStub above, exactly like it does in
+  // the real extension.
+  const loadOrder = [
+    [CORE, 'domains.js'], [CORE, 'connectors.js'], [CORE, 'extract.js'], [CORE, 'judgment.js'],
+    [SRC, 'storage.js'],
+    [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
+    [SRC, 'chrome-storage-adapter.js']
+  ];
+  for (const [dir, f] of loadOrder) {
+    vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
   }
   return { sandbox, document, store: () => store };
 }
