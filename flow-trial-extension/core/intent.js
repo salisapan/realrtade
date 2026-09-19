@@ -242,11 +242,26 @@ const FlowIntent = (() => {
     // at all" question — reused as-is (same signals, same tuning against
     // test/judgment-corpus.cjs) for the two categories that don't have as
     // clean an independent evidentiary shape as the three hard-gated types
-    // above.
-    if (s.total < threshold) return { type: null, signals, facts };
+    // above. SCHEDULED_EVENT/COMMITMENT_OF_READER/REQUEST above never reach
+    // here — they're hard evidentiary gates, not a score against a moving
+    // bar, so there is no threshold for a per-type history to adjust.
+    //
+    // Which of the two remaining types this message WOULD become is already
+    // fully decided by the same flags DECISION_TO_LOG's own gate below
+    // checks — computing it one line early costs nothing and lets a type
+    // this account keeps dismissing (or undoing after Flow already acted)
+    // sit behind a quieter bar than the account-wide baseline, without
+    // touching what `signals.threshold` reports (still the account-wide
+    // number, for telemetry continuity).
+    const isDecision = s.flags.commit || s.flags.lost || s.flags.executed || s.flags.dispute;
+    const likelyType = isDecision ? TYPES.DECISION_TO_LOG : TYPES.FOLLOW_UP;
+    const gatingThreshold = FlowJudgment.applyTypeAdjustment(
+      threshold, ctx.calibrationByType && ctx.calibrationByType[likelyType], ctx.now
+    );
+    if (s.total < gatingThreshold) return { type: null, signals, facts };
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
-    if (s.flags.commit || s.flags.lost || s.flags.executed || s.flags.dispute) {
+    if (isDecision) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, [/\b(agreed|approved|confirmed|executed|declin(?:e|ed|ing))\b/i, /(סוכם|אישרנו|מאשרים|נחתם)/]) ||

@@ -29,6 +29,16 @@ const FlowStorage = (() => {
     // The only thing that learns. Clicks make Flow slightly more willing to
     // speak; dismissals make it quieter. The user never sees or sets a number.
     calibration: { clicks: 0, dismissals: 0, ts: 0 },
+    // Same shape as `calibration`, one bucket per FlowIntent type ('decision',
+    // 'followup', 'request', 'event', 'commitment') — see calibrate() below
+    // and core/judgment.js's applyTypeAdjustment(). The account-wide
+    // `calibration` above answers "should Flow be louder or quieter
+    // overall"; this answers the finer question the precision/harm audit
+    // asked for: "is THIS kind of decision one this account actually wants
+    // surfaced." A type this account keeps dismissing (or, worse, undoing
+    // after execution) gets a quieter bar than the account-wide baseline,
+    // without ever touching the baseline other types still rely on.
+    calibrationByType: {},
     // Whether the one-time "share with a teammate" prompt in the Activity
     // tab has been dismissed. It earns its place after real usage (see
     // popup.js renderReferral) and, once dismissed, never comes back.
@@ -40,6 +50,13 @@ const FlowStorage = (() => {
     // answer, not a snooze. See popup.js's renderMemoryInsight/
     // wireMemoryInsight and FlowExecutionMemory.recordPin.
     memoryInsightsSeen: [],
+    // Which process ids have already had a one-time, silent precision
+    // self-tune applied (see content-gmail.js's checkPrecisionSelfTune) —
+    // a process type this account has whole-dismissed repeatedly and never
+    // once closed gets its intent type(s) nudged quieter automatically, no
+    // chip, no popup, nothing rendered. Fires at most once per process id,
+    // ever, so a slow account doesn't get progressively quieter forever.
+    precisionAutoTuned: [],
     // Every messageId the user has actually closed — written, dismissed, or
     // undone. This exists because `log` above is a CAPPED DISPLAY FEED and a
     // decision is not a display concern: a single Do It can append up to five
@@ -229,6 +246,20 @@ const FlowStorage = (() => {
     await set({ memoryInsightsSeen: [key, ...state.memoryInsightsSeen].slice(0, 100) });
   });
 
+  // Same append-once shape as markMemoryInsightSeen, for the same reason:
+  // the catalog only ever has a handful of process ids, so a generous cap
+  // costs nothing and this only ever needs to remember "already tuned."
+  const markPrecisionAutoTuned = serialize(async function markPrecisionAutoTuned(processId) {
+    const state = await get();
+    if (state.precisionAutoTuned.includes(processId)) return;
+    await set({ precisionAutoTuned: [processId, ...state.precisionAutoTuned].slice(0, 100) });
+  });
+
+  async function wasPrecisionAutoTuned(processId) {
+    const state = await get();
+    return state.precisionAutoTuned.includes(processId);
+  }
+
   // "Seen" alone isn't enough to decide whether to (re)inject a chip. Gmail
   // tears down and rebuilds div[role="listitem"] nodes constantly — expanding
   // a thread, switching labels, coming back to a tab — which destroys
@@ -263,19 +294,51 @@ const FlowStorage = (() => {
   // reads this, and folding it in here keeps the stored value from drifting.
   const HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
 
-  const calibrate = serialize(async function calibrate(kind) {
-    const state = await get();
-    const c = state.calibration || { clicks: 0, dismissals: 0, ts: 0 };
-    const now = Date.now();
+  // 'undo' is a stronger negative signal than a pre-execution 'dismiss' —
+  // the user only found out they didn't want it after Flow actually acted,
+  // which is a costlier mistake than a click that never happened. Weighted
+  // as two dismissals rather than a separate counter so it moves the same
+  // clicks/dismissals math thresholdFrom already reads, instead of teaching
+  // that function a third input.
+  const CALIBRATE_WEIGHTS = {
+    click: { clicks: 1, dismissals: 0 },
+    dismiss: { clicks: 0, dismissals: 1 },
+    undo: { clicks: 0, dismissals: 2 }
+  };
+
+  // Decays both counters by elapsed time, then applies `kind`'s weight and
+  // re-caps at 6 — the exact math calibrate() below always used for the
+  // account-wide `calibration` object, factored out so calibrationByType can
+  // apply the identical decay/cap rule to each of its own per-type buckets
+  // without a second, potentially drifting copy of this formula.
+  function bumpCalibration(c, kind, now) {
+    c = c || { clicks: 0, dismissals: 0, ts: 0 };
     const decay = c.ts ? Math.pow(0.5, Math.max(0, now - c.ts) / HALF_LIFE_MS) : 1;
-    const clicks = (c.clicks || 0) * decay;
-    const dismissals = (c.dismissals || 0) * decay;
-    const next = {
-      clicks: Math.min(6, kind === 'click' ? clicks + 1 : clicks),
-      dismissals: Math.min(6, kind === 'dismiss' ? dismissals + 1 : dismissals),
+    const w = CALIBRATE_WEIGHTS[kind] || { clicks: 0, dismissals: 0 };
+    return {
+      clicks: Math.min(6, (c.clicks || 0) * decay + w.clicks),
+      dismissals: Math.min(6, (c.dismissals || 0) * decay + w.dismissals),
       ts: now
     };
-    await set({ calibration: next });
+  }
+
+  // `type`, when given, is one of FlowIntent.TYPES — the classified intent
+  // this click/dismiss/undo actually belonged to. Bumping the account-wide
+  // `calibration` and the per-type `calibrationByType[type]` bucket together
+  // means an account with no type-specific history yet behaves exactly as
+  // before (judgment.js's applyTypeAdjustment is a no-op with no bucket),
+  // and every call site keeps working even before it's updated to pass one.
+  const calibrate = serialize(async function calibrate(kind, type) {
+    const state = await get();
+    const now = Date.now();
+    const next = bumpCalibration(state.calibration, kind, now);
+    const patch = { calibration: next };
+    if (type) {
+      const byType = Object.assign({}, state.calibrationByType);
+      byType[type] = bumpCalibration(byType[type], kind, now);
+      patch.calibrationByType = byType;
+    }
+    await set(patch);
     return next;
   });
 
@@ -482,7 +545,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, markMemoryInsightSeen, calibrate, getInstallId, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

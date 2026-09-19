@@ -248,5 +248,35 @@ console.log('\nNegation, hedging and questions must not read as decisions:');
   }
 }
 
+// Precision/harm audit: applyTypeAdjustment layers a bounded, per-intent-type
+// correction on top of the account-wide threshold. Tested in isolation from
+// storage.js's calibrate() (which produces the {clicks, dismissals, ts}
+// shape this consumes) so a bug in either half fails at the layer it's
+// actually in.
+console.log('\napplyTypeAdjustment: a per-type history nudges the gating threshold, bounded and reversible:');
+{
+  const base = 50;
+  const noHistory = FlowJudgment.applyTypeAdjustment(base, undefined, NOW.getTime());
+  if (noHistory !== base) { failures++; console.log('  FAIL  no calibrationByType entry should be a no-op, got', noHistory); }
+  else console.log('  ok    no history -> threshold unchanged (' + noHistory + ')');
+
+  const dismissed = FlowJudgment.applyTypeAdjustment(base, { clicks: 0, dismissals: 6, ts: NOW.getTime() }, NOW.getTime());
+  if (!(dismissed > base)) { failures++; console.log('  FAIL  heavy per-type dismissals should raise the bar above base, got', dismissed); }
+  else console.log('  ok    6 recent dismissals for this type -> quieter bar (' + dismissed + ' > ' + base + ')');
+
+  const clicked = FlowJudgment.applyTypeAdjustment(base, { clicks: 6, dismissals: 0, ts: NOW.getTime() }, NOW.getTime());
+  if (!(clicked < base)) { failures++; console.log('  FAIL  heavy per-type clicks should lower the bar below base, got', clicked); }
+  else console.log('  ok    6 recent clicks for this type -> more proactive (' + clicked + ' < ' + base + ')');
+
+  const capped = FlowJudgment.applyTypeAdjustment(FlowJudgment.MAX_THRESHOLD - 2, { clicks: 0, dismissals: 6, ts: NOW.getTime() }, NOW.getTime());
+  if (capped > FlowJudgment.MAX_THRESHOLD) { failures++; console.log('  FAIL  adjustment must never push past MAX_THRESHOLD, got', capped); }
+  else console.log('  ok    clamped at MAX_THRESHOLD even when base is already near the ceiling (' + capped + ')');
+
+  const oldTs = NOW.getTime() - 90 * 24 * 60 * 60 * 1000; // 90 days ago, well past the 7-day half-life
+  const decayed = FlowJudgment.applyTypeAdjustment(base, { clicks: 0, dismissals: 6, ts: oldTs }, NOW.getTime());
+  if (!(decayed < dismissed)) { failures++; console.log('  FAIL  old dismissals should have decayed toward no effect, got', decayed, 'vs fresh', dismissed); }
+  else console.log('  ok    a 90-day-old dismissal run has mostly decayed away (' + decayed + ' vs fresh ' + dismissed + ')');
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

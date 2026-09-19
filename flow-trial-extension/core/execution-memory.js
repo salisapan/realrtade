@@ -10,6 +10,8 @@
 //     processType: string,         // the process catalog id (e.g. 'reply-track')
 //     steps: string[],             // catalog step ids this event applies to
 //     status: 'accepted' | 'dismissed' | 'undone' | 'pinned',
+//     scope: 'whole' | 'partial' | null,  // only meaningful when status is
+//                                          // 'dismissed' — see makeEvent
 //     timestamp: string            // ISO 8601
 //   }
 //
@@ -28,11 +30,15 @@
 // after it: an explicit correction always outranks an inference.
 //
 // getAll() folds this log into the {processId: {closedCount, undoneCount,
-// steps: {kind: {accepted, removed, undone, pinned}}}} shape actions.js's
-// applyMemory() already consumes for scoring which non-anchor steps to keep,
-// drop, or reorder. The log is the only thing actually stored — the
-// aggregate is recomputed from it on every read, so there is exactly one
-// source of truth and nothing to keep in sync by hand.
+// wholeDismissCount, steps: {kind: {accepted, removed, undone, pinned}}}}
+// shape. actions.js's applyMemory() consumes the per-step half for scoring
+// which non-anchor steps to keep, drop, or reorder; wholeDismissCount is the
+// higher-level, whole-process pattern content-gmail.js's silent self-tune
+// (see checkPrecisionSelfTune) reads to notice a process TYPE this account
+// has never once wanted, not just one step within it. The log is the only
+// thing actually stored — the aggregate is recomputed from it on every
+// read, so there is exactly one source of truth and nothing to keep in sync
+// by hand.
 //
 // This exists for one purpose: "You intend — we execute" only holds if the
 // system gets better at guessing your intent the more it watches you close
@@ -131,7 +137,14 @@ const FlowExecutionMemory = (() => {
   });
 
   function blankProcess() {
-    return { closedCount: 0, undoneCount: 0, steps: {} };
+    // wholeDismissCount is the higher-level pattern the precision/harm audit
+    // asked for beyond step counts: not "which step gets stripped" but
+    // "does this account ever actually want this KIND of process at all."
+    // Read together with closedCount (see isNetRejected-style callers), a
+    // process with several whole dismissals and zero closes is a process
+    // type this account has never once wanted — a real behavioral pattern,
+    // not step-level noise.
+    return { closedCount: 0, undoneCount: 0, wholeDismissCount: 0, steps: {} };
   }
   function blankStep() {
     return { accepted: 0, removed: 0, undone: 0, pinned: 0 };
@@ -149,6 +162,9 @@ const FlowExecutionMemory = (() => {
       const proc = byProcess[ev.processType] || (byProcess[ev.processType] = blankProcess());
       if (ev.status === 'accepted') proc.closedCount++;
       if (ev.status === 'undone') proc.undoneCount++;
+      // Missing scope reads as 'partial' — see makeEvent's own comment on
+      // why that's the conservative default for pre-existing log entries.
+      if (ev.status === 'dismissed' && ev.scope === 'whole') proc.wholeDismissCount++;
       for (const k of ev.steps || []) {
         const step = proc.steps[k] || (proc.steps[k] = blankStep());
         if (ev.status === 'accepted') step.accepted++;
@@ -160,8 +176,17 @@ const FlowExecutionMemory = (() => {
     return byProcess;
   }
 
-  function makeEvent(intentionId, processType, steps, status) {
-    return { intentionId: intentionId || null, processType, steps: steps.slice(), status, timestamp: new Date().toISOString() };
+  // `scope` only means anything on a 'dismissed' event: 'whole' means every
+  // step of the process was rejected in one motion (the entire chip was
+  // dismissed, or every pill was stripped before confirming — onDoIt's own
+  // comment already treats those as the same signal); 'partial' means some
+  // steps were kept and only these specific ones were removed. Older log
+  // entries recorded before this field existed simply lack it — getAll()
+  // below treats a missing scope as 'partial' (the more conservative read:
+  // undercounting a whole-process rejection pattern is a smaller mistake
+  // than inventing one), and it self-heals as the 500-entry log rolls over.
+  function makeEvent(intentionId, processType, steps, status, scope) {
+    return { intentionId: intentionId || null, processType, steps: steps.slice(), status, scope: scope || null, timestamp: new Date().toISOString() };
   }
 
   // Called once per Do It click: which step kinds survived into the actual
@@ -174,7 +199,9 @@ const FlowExecutionMemory = (() => {
     if (!processId) return Promise.resolve();
     const events = [];
     if (acceptedKinds && acceptedKinds.length) events.push(makeEvent(intentionId, processId, acceptedKinds, 'accepted'));
-    if (removedKinds && removedKinds.length) events.push(makeEvent(intentionId, processId, removedKinds, 'dismissed'));
+    // 'partial': some steps survived into the write, so this removal is a
+    // preference about which steps, not a rejection of the whole process.
+    if (removedKinds && removedKinds.length) events.push(makeEvent(intentionId, processId, removedKinds, 'dismissed', 'partial'));
     if (!events.length) return Promise.resolve();
     return appendEvents(events);
   }
@@ -183,7 +210,7 @@ const FlowExecutionMemory = (() => {
   // its steps — the user looked at the full process and wanted none of it.
   function recordDismiss(processId, allKinds, intentionId) {
     if (!processId || !allKinds || !allKinds.length) return Promise.resolve();
-    return appendEvents([makeEvent(intentionId, processId, allKinds, 'dismissed')]);
+    return appendEvents([makeEvent(intentionId, processId, allKinds, 'dismissed', 'whole')]);
   }
 
   // Accepted, then undone — a stronger "don't propose this" signal than a
@@ -234,7 +261,8 @@ const FlowExecutionMemory = (() => {
   function toPatternSummary(byProcess) {
     const rows = [];
     for (const processType of Object.keys(byProcess || {})) {
-      const steps = (byProcess[processType] || {}).steps || {};
+      const proc = byProcess[processType] || {};
+      const steps = proc.steps || {};
       for (const stepKind of Object.keys(steps)) {
         const s = steps[stepKind] || {};
         rows.push({
@@ -243,7 +271,13 @@ const FlowExecutionMemory = (() => {
           accepted: s.accepted || 0,
           removed: s.removed || 0,
           undone: s.undone || 0,
-          pinned: s.pinned || 0
+          pinned: s.pinned || 0,
+          // Process-level, not step-level — repeated on every row for this
+          // processType rather than a separate array, so a future team-level
+          // consumer can read one flat row shape without a second join. Same
+          // privacy posture as every other field here: an aggregate count,
+          // never a message, never an identifier.
+          wholeDismissed: proc.wholeDismissCount || 0
         });
       }
     }

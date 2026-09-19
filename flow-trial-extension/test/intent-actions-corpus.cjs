@@ -311,5 +311,43 @@ console.log('\n--- actions.js: PROCESS_CATALOG is the same table processFor() ac
   }
 }
 
+console.log('\n--- intent.js: per-type calibration nudges the gating threshold, not the hard-gated types ---\n');
+{
+  // classify() always scores against FLOW_DOMAINS[0] ('sales') — "contract
+  // renewal" earns the domain-match bonus alongside the strong-commitment
+  // signal, clearing the account-wide threshold (50) with room either side
+  // for the per-type adjustment below to move it across the line. Long
+  // enough to clear the scorer's own too-short penalty (under 12 words).
+  const text = 'Approved — go ahead with the contract renewal, and let the whole team know it is confirmed.';
+  const baseline = classify(text, { calibrationByType: null });
+  check('baseline (no per-type history) fires as DECISION_TO_LOG', baseline.type === FlowIntent.TYPES.DECISION_TO_LOG, baseline);
+
+  // A calibrationByType entry for 'decision' with heavy recent dismissals
+  // pushes ONLY this message's actual gating threshold up — signals.threshold
+  // (the account-wide number reported for telemetry) must stay untouched.
+  const heavyDismiss = { decision: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const quieted = classify(text, { calibrationByType: heavyDismiss });
+  check('a per-type history of dismissals for "decision" can silence a message that would otherwise fire',
+    quieted.type === null, quieted);
+  check('signals.threshold still reports the account-wide baseline, unaffected by the per-type nudge',
+    baseline.signals.threshold === quieted.signals.threshold,
+    { baselineThreshold: baseline.signals.threshold, quietedThreshold: quieted.signals.threshold });
+
+  // The same history keyed under the WRONG type must never leak across —
+  // 'followup' is not what this message resolves to, so its own history
+  // must have zero effect on it.
+  const wrongType = { followup: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const unaffected = classify(text, { calibrationByType: wrongType });
+  check('history for a DIFFERENT intent type never affects this message', unaffected.type === FlowIntent.TYPES.DECISION_TO_LOG, unaffected);
+
+  // A hard-gated type (SCHEDULED_EVENT) never consults calibrationByType at
+  // all — this is deliberate (see intent.js's own comment): a per-type
+  // history sitting under 'event' must not change whether the meeting fires.
+  const meetingText = 'Let’s do a call Friday, September 18 at 3pm to review the contract.';
+  const heavyEventDismiss = { event: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const stillFires = classify(meetingText, { calibrationByType: heavyEventDismiss });
+  check('a hard-gated type (SCHEDULED_EVENT) ignores calibrationByType entirely', stillFires.type === FlowIntent.TYPES.SCHEDULED_EVENT, stillFires);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

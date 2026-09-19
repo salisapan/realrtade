@@ -296,6 +296,34 @@ const FlowJudgment = (() => {
     return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, t));
   }
 
+  // The account-wide threshold above answers "should Flow be louder or
+  // quieter overall." This answers the narrower question the precision/harm
+  // audit asked for: within that account, is THIS classified intent type one
+  // it keeps rejecting (or, worse, undoing after Flow already acted on it)?
+  // A bounded correction on top of the account-wide threshold, never a
+  // replacement for it — deliberately smaller than thresholdFrom's own
+  // swing (22 points either side of BASE_THRESHOLD) so a single type never
+  // dominates the account's overall calibration, and clamped through the
+  // same MIN/MAX floor and ceiling so this can never push a message's bar
+  // outside the range any threshold is allowed to sit in.
+  const TYPE_ADJUST_CAP = 10;
+
+  // `typeCalibration` is one entry of storage.js's calibrationByType map —
+  // { clicks, dismissals, ts } for one FlowIntent type, or undefined for a
+  // type with no history yet. No entry means no adjustment: a brand-new
+  // install, or any caller (the marketing site's live demo, in particular)
+  // that never passes calibrationByType at all, gets exactly the
+  // account-wide threshold back, unchanged.
+  function applyTypeAdjustment(baseThreshold, typeCalibration, now) {
+    if (!typeCalibration) return baseThreshold;
+    const elapsed = Math.max(0, (now || Date.now()) - (typeCalibration.ts || 0));
+    const decay = typeCalibration.ts ? Math.pow(0.5, elapsed / DISMISSAL_HALF_LIFE_MS) : 1;
+    const clicks = (typeCalibration.clicks || 0) * decay;
+    const dismissals = (typeCalibration.dismissals || 0) * decay;
+    const delta = Math.max(-TYPE_ADJUST_CAP, Math.min(TYPE_ADJUST_CAP, dismissals * 3 - clicks * 2));
+    return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, baseThreshold + delta));
+  }
+
   // ISO is right for a database field and wrong for a button someone reads in
   // half a second.
   function humanDate(d) {
@@ -395,7 +423,7 @@ const FlowJudgment = (() => {
   // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
   // drifting copy of the same judgment.
   return {
-    evaluate, factsOnly, neutralTitle, thresholdFrom, score, newContent,
+    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, score, newContent,
     HANDOFF, HANDOFF_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };

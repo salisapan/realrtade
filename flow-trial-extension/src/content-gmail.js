@@ -41,6 +41,44 @@
     if (typeof FlowBrief !== 'undefined') checkBrief();
     checkWeeklySummary();
     trackDailyActive();
+    checkPrecisionSelfTune();
+  }
+
+  // Silent precision self-tuning — no chip, no popup card, nothing rendered.
+  // This is the "should improve itself without requiring manual tuning"
+  // half of the precision/harm work: a process type this account has
+  // whole-dismissed repeatedly and never once closed gets its intent
+  // type(s) nudged toward a quieter bar automatically, the same way an
+  // organic run of dismissals would — just applied all at once instead of
+  // waiting for enough individual dismissals to accumulate. Runs once per
+  // Gmail tab load (same cadence as checkWeeklySummary above), which is
+  // plenty for a background correction that only ever needs to fire once
+  // per process id, ever (see storage.js's precisionAutoTuned).
+  const SELF_TUNE_WHOLE_DISMISS_MIN = 3;
+  async function checkPrecisionSelfTune() {
+    if (typeof FlowExecutionMemory === 'undefined') return;
+    const mem = await FlowExecutionMemory.getAll();
+    // Scoped to 'log-it' only: it's the one catalog entry whose intent
+    // type(s) (DECISION_TO_LOG / FOLLOW_UP) actually consult a calibrated
+    // threshold at all — see intent.js's gate. schedule/reply-track/
+    // follow-through's own types (event/request/commitment) are hard
+    // evidentiary gates with no threshold for this to adjust; whole-
+    // dismissing one of those is a real signal too, but not one this
+    // mechanism can act on without changing what those gates mean, which is
+    // outside what a silent background nudge should ever do.
+    const logIt = mem['log-it'];
+    if (!logIt || logIt.closedCount > 0) return; // closed at least once -> not a rejected type
+    if (logIt.wholeDismissCount < SELF_TUNE_WHOLE_DISMISS_MIN) return;
+    if (await FlowStorage.wasPrecisionAutoTuned('log-it')) return;
+    // 'log-it' backs both DECISION_TO_LOG and FOLLOW_UP (see actions.js's
+    // processFor) — the event log has no record of which of the two each
+    // whole dismissal actually was, so the conservative move is to ease off
+    // both rather than guess and risk quieting only the wrong one.
+    await Promise.all([
+      FlowStorage.calibrate('dismiss', 'decision'),
+      FlowStorage.calibrate('dismiss', 'followup'),
+      FlowStorage.markPrecisionAutoTuned('log-it')
+    ]);
   }
 
   // Runs once per init() — a fresh page load, or the rare onboarding/
@@ -345,7 +383,8 @@
     const intent = FlowIntent.classify(text, {
       senderEmail: sender.email,
       senderName: sender.name,
-      calibration: state.calibration
+      calibration: state.calibration,
+      calibrationByType: state.calibrationByType
     });
     if (!intent.type) return;
 
@@ -947,6 +986,14 @@
       return;
     }
 
+    // The Magic Moment (see docs/magic-moment.md): read BEFORE this close's
+    // own 'written' log entries land further down, so "is this the very
+    // first thing Glance has ever closed for this account" is answered
+    // against state prior to this call, not state this same call is about
+    // to change. No new UI, no popup — the same receipt every close already
+    // shows, with one extra, concrete line exactly once, ever.
+    const isFirstEverClose = (await FlowStorage.get()).writeStats.total === 0;
+
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     const icon = el('span', 'flow-chip-done-icon', '✓');
@@ -954,6 +1001,9 @@
     done.appendChild(icon);
     done.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
     done.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded)));
+    if (isFirstEverClose) {
+      done.appendChild(el('span', 'flow-chip-first-close', 'Nothing else to open, nothing else to check — that’s handled.'));
+    }
 
     const actionsRow = el('span', 'flow-chip-actions');
     for (const r of succeeded) {
@@ -971,8 +1021,16 @@
       rollbackChain(succeeded, ctx).then((result) => {
         // Recorded regardless of whether the whole rollback reported ok —
         // any step that genuinely reverted is a genuine "don't propose this
-        // again" signal, even if a later step in the chain couldn't.
-        if (result.undoneIds.length) FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
+        // again" signal, even if a later step in the chain couldn't. Feeds
+        // both memories: the step-level bias (recordUndo, already existed)
+        // and now the intent-type threshold too (calibrate('undo', ...),
+        // new) — an accepted-then-undone process is real, measured harm,
+        // and the precision/harm audit's whole point was that harm has to
+        // reach the confidence bar, not just Execution Memory's step bias.
+        if (result.undoneIds.length) {
+          FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
+          FlowStorage.calibrate('undo', ctx.intent.type);
+        }
         if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId });
@@ -1038,7 +1096,7 @@
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score });
-    FlowStorage.calibrate('click');
+    FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
     // By catalog step id (ctx.process.steps' own ids — 'calendar'/'draft'/
@@ -1089,7 +1147,7 @@
     // refresh cycle right after being dismissed.
     await Promise.all([
       FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score }),
-      FlowStorage.calibrate('dismiss'),
+      FlowStorage.calibrate('dismiss', ctx.intent.type),
       FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId)
     ]);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });

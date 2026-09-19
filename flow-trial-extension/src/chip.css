@@ -402,6 +402,22 @@
   margin-inline-start: 6px;
 }
 
+/* The one line the Magic Moment adds — see docs/magic-moment.md. Same
+   receipt, same green family as the rest of flow-chip-done, just a lighter
+   weight than flow-chip-label so it reads as a footnote to what already
+   happened, not a second headline competing with it. */
+.flow-chip-first-close {
+  all: unset;
+  display: block;
+  flex: 1 1 100%;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #0F6640;
+  margin-inline-start: 6px;
+  opacity: .85;
+}
+
 @keyframes flow-chip-in {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }

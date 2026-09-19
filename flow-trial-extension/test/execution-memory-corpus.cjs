@@ -79,6 +79,61 @@ async function run() {
     const proc = mem['schedule'];
     check('a full dismiss records every step kind as removed', proc.steps.calendar.removed === 1 && proc.steps.task.removed === 1, proc.steps);
     check('a dismiss does not touch closedCount', proc.closedCount === 0, proc.closedCount);
+    check('a whole-chip dismiss counts toward wholeDismissCount', proc.wholeDismissCount === 1, proc.wholeDismissCount);
+  }
+
+  console.log('\n--- execution-memory.js: wholeDismissCount distinguishes a rejected process TYPE from a rejected step ---\n');
+  resetAdapter();
+  {
+    // recordDoIt's own removedKinds path is a PARTIAL rejection — some steps
+    // survived into the write, so this is a preference about which steps,
+    // not a verdict on the whole process. Must never inflate wholeDismissCount.
+    await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task']);
+    await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], ['task']);
+    const afterPartial = await FlowExecutionMemory.getAll();
+    check('two partial removals (Do It with a stripped step) leave wholeDismissCount at 0',
+      afterPartial['reply-track'].wholeDismissCount === 0, afterPartial['reply-track']);
+    check('but the step itself still accrues its own removed count, unaffected',
+      afterPartial['reply-track'].steps.task.removed === 2, afterPartial['reply-track'].steps.task);
+
+    // recordDismiss (the whole chip declined) is the pattern that SHOULD move
+    // wholeDismissCount — this is the higher-level "does this account ever
+    // want this KIND of process at all" signal, distinct from step bias.
+    await FlowExecutionMemory.recordDismiss('reply-track', ['draft', 'task']);
+    await FlowExecutionMemory.recordDismiss('reply-track', ['draft', 'task']);
+    await FlowExecutionMemory.recordDismiss('reply-track', ['draft', 'task']);
+    const afterWhole = await FlowExecutionMemory.getAll();
+    check('three whole-chip dismissals bring wholeDismissCount to 3, unaffected by the earlier partial removals',
+      afterWhole['reply-track'].wholeDismissCount === 3, afterWhole['reply-track']);
+
+    // A SEPARATE process id, whole-dismissed the same way but with no Do It
+    // ever recorded against it, is the exact shape content-gmail.js's
+    // checkPrecisionSelfTune looks for: closedCount === 0 alongside a
+    // repeated wholeDismissCount. Kept apart from 'reply-track' above (which
+    // this block already gave two real closes) so this check isn't
+    // accidentally right for the wrong reason.
+    await FlowExecutionMemory.recordDismiss('log-it', ['task']);
+    await FlowExecutionMemory.recordDismiss('log-it', ['task']);
+    await FlowExecutionMemory.recordDismiss('log-it', ['task']);
+    const neverClosed = await FlowExecutionMemory.getAll();
+    check('a process that has been whole-dismissed repeatedly and never closed reads exactly as checkPrecisionSelfTune expects',
+      neverClosed['log-it'].closedCount === 0 && neverClosed['log-it'].wholeDismissCount >= 3,
+      neverClosed['log-it']);
+
+    // An older log entry recorded before `scope` existed (no scope field at
+    // all) must read as 'partial' — the conservative default documented in
+    // makeEvent's own comment — not silently count toward a whole-process
+    // pattern it never actually was. Seeded directly into a fresh adapter's
+    // backing store, since this shape can only exist from data written
+    // before this field was added, never from a live call today.
+    const legacyAdapter = freshAdapter();
+    legacyAdapter.backing.set('flowExecutionEvents', [
+      { intentionId: null, processType: 'reply-track', steps: ['draft'], status: 'dismissed', timestamp: new Date().toISOString() } // no `scope` field at all
+    ]);
+    FlowExecutionMemory.setStorageAdapter(legacyAdapter);
+    const legacyMem = await FlowExecutionMemory.getAll();
+    check('a pre-existing dismissed event with no scope field is read as partial, not whole',
+      legacyMem['reply-track'].wholeDismissCount === 0, legacyMem['reply-track']);
   }
 
   console.log('\n--- execution-memory.js: recordUndo() ---\n');
@@ -136,9 +191,22 @@ async function run() {
     const taskRow = rows.find(r => r.processType === 'reply-track' && r.stepKind === 'task');
     check('every process/step combination in the aggregate produces exactly one row', rows.length === 2, rows);
     check('a row carries the accepted/removed/undone/pinned counts from the aggregate', draftRow.accepted === 1 && draftRow.undone === 1 && taskRow.removed === 1 && taskRow.pinned === 1, rows);
-    check('a row never carries an intentionId, timestamp, or any other identifying field — only the five documented keys', Object.keys(draftRow).sort().join(',') === 'accepted,pinned,processType,removed,stepKind,undone', draftRow);
+    check('a row never carries an intentionId, timestamp, or any other identifying field — only the six documented keys', Object.keys(draftRow).sort().join(',') === 'accepted,pinned,processType,removed,stepKind,undone,wholeDismissed', draftRow);
     check('an empty aggregate produces an empty summary, not an error', FlowExecutionMemory.toPatternSummary({}).length === 0);
     check('a missing aggregate produces an empty summary, not a throw', FlowExecutionMemory.toPatternSummary(undefined).length === 0);
+  }
+
+  console.log('\n--- execution-memory.js: toPatternSummary() carries the process-level whole-dismiss pattern too ---\n');
+  resetAdapter();
+  {
+    await FlowExecutionMemory.recordDoIt('reply-track', ['draft'], []);
+    await FlowExecutionMemory.recordDismiss('reply-track', ['draft']);
+    await FlowExecutionMemory.recordDismiss('reply-track', ['draft']);
+    const mem = await FlowExecutionMemory.getAll();
+    const rows = FlowExecutionMemory.toPatternSummary(mem);
+    const draftRow = rows.find((r) => r.processType === 'reply-track' && r.stepKind === 'draft');
+    check('wholeDismissed on the row matches the process-level wholeDismissCount, not a step-level count',
+      draftRow.wholeDismissed === 2, draftRow);
   }
 
   console.log('\n--- execution-memory.js: processes stay isolated from each other ---\n');

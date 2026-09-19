@@ -535,6 +535,64 @@ async function run() {
   }
   runtimeMessageHandler = (msg, cb) => cb(undefined); // restore the default for anything after this block
 
+  console.log('\n--- storage.js: calibrate() bumps the account-wide counter exactly as before ---\n');
+  store = {};
+  {
+    const c1 = await FlowStorage.calibrate('click');
+    check('a click increments clicks by 1', c1.clicks === 1, c1);
+    check('a click never touches dismissals', c1.dismissals === 0, c1);
+
+    const c2 = await FlowStorage.calibrate('dismiss');
+    check('a dismiss increments dismissals by 1 without resetting the earlier click', c2.dismissals === 1 && c2.clicks > 0, c2);
+
+    const state = await FlowStorage.get();
+    check('calling calibrate() with no type never creates a calibrationByType entry', Object.keys(state.calibrationByType).length === 0, state.calibrationByType);
+  }
+
+  console.log('\n--- storage.js: calibrate(kind, type) also bumps a per-type bucket, independently ---\n');
+  store = {};
+  {
+    await FlowStorage.calibrate('dismiss', 'decision');
+    const state = await FlowStorage.get();
+    check('a typed dismiss creates that type\'s own bucket', state.calibrationByType.decision && state.calibrationByType.decision.dismissals === 1, state.calibrationByType);
+    check('an untouched type never gets a bucket at all', !state.calibrationByType.followup, state.calibrationByType);
+    check('the account-wide calibration still moved too — typed calls are additive, not a replacement', state.calibration.dismissals === 1, state.calibration);
+
+    await FlowStorage.calibrate('click', 'followup');
+    const state2 = await FlowStorage.get();
+    check('a second type accrues independently of the first', state2.calibrationByType.followup.clicks === 1 && state2.calibrationByType.decision.dismissals === 1, state2.calibrationByType);
+  }
+
+  console.log('\n--- storage.js: calibrate("undo", type) counts as a stronger dismissal, not a separate signal ---\n');
+  store = {};
+  {
+    const c = await FlowStorage.calibrate('undo', 'decision');
+    check('undo raises dismissals by more than a plain dismiss would (harsher — it was discovered post-execution)', c.dismissals === 2, c);
+    check('undo never touches clicks', c.clicks === 0, c);
+    const state = await FlowStorage.get();
+    check('the typed bucket reflects the same undo weighting', state.calibrationByType.decision.dismissals === 2, state.calibrationByType.decision);
+  }
+
+  console.log('\n--- storage.js: calibrate() counters stay capped at 6, same as before this change ---\n');
+  store = {};
+  {
+    for (let i = 0; i < 5; i++) await FlowStorage.calibrate('undo', 'decision'); // 5 * 2 = 10, would overshoot without the cap
+    const state = await FlowStorage.get();
+    check('the per-type dismissals counter is capped at 6, exactly like the account-wide one', state.calibrationByType.decision.dismissals === 6, state.calibrationByType.decision);
+  }
+
+  console.log('\n--- storage.js: precisionAutoTuned is a simple, append-once set ---\n');
+  store = {};
+  {
+    check('a process id starts out not auto-tuned', (await FlowStorage.wasPrecisionAutoTuned('log-it')) === false);
+    await FlowStorage.markPrecisionAutoTuned('log-it');
+    check('marking it records the answer', (await FlowStorage.wasPrecisionAutoTuned('log-it')) === true);
+    await FlowStorage.markPrecisionAutoTuned('log-it'); // idempotent — must not duplicate or throw
+    const state = await FlowStorage.get();
+    check('marking the same id twice never duplicates the entry', state.precisionAutoTuned.filter((id) => id === 'log-it').length === 1, state.precisionAutoTuned);
+    check('an unrelated process id is unaffected', (await FlowStorage.wasPrecisionAutoTuned('reply-track')) === false);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }
