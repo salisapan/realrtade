@@ -123,7 +123,30 @@ chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('popup/popup.html') });
   }
+  // A fresh install (or an update inheriting a stale badge from a killed
+  // service worker) should never show a leftover number before anything has
+  // actually been computed — see updateBadge's own comment for why this file
+  // never computes the count itself.
+  updateBadge(0);
 });
+
+/* -------------------------------------------------------- persistent badge */
+// The Subtle Persistent Indicator: a small number on the extension icon,
+// never a notification, never a popup of its own. Deliberately NOT computed
+// here — background.js has never loaded storage.js (see getInstallId's own
+// comment below), and re-deriving "how many processes are still open" a
+// second way in this file is exactly how two definitions of "pending"
+// quietly drift apart, the same failure storage.js's own writeCountsFrom/
+// closeCountsFrom comments warn about. Instead, any surface that already
+// has FlowStorage loaded — the Gmail content script today, the popup's Open
+// tab, a future Calendar or Drive content script — recomputes
+// FlowStorage.getPending().length itself and posts it here. This file's only
+// job is turning that one number into a badge.
+function updateBadge(count) {
+  const n = count > 0 ? count : 0;
+  chrome.action.setBadgeText({ text: n ? String(Math.min(n, 99)) : '' });
+  if (n) chrome.action.setBadgeBackgroundColor({ color: '#123ccb' });
+}
 
 /* ------------------------------------------------------------------ shared */
 
@@ -1614,6 +1637,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:drive-file-picked') {
     return reply(sendResponse, Promise.resolve(deliverDrivePickerResult(msg.payload || {})));
+  }
+
+  // Fire-and-forget, same as flow:track below — the caller already computed
+  // the real number from FlowStorage.getPending().length; this never talks
+  // back, so a slow or missing response can never affect what the sender
+  // does next.
+  if (msg.type === 'flow:pending-count') {
+    updateBadge(Number(msg.count) || 0);
+    return;
   }
 
   // Fire-and-forget: telemetry is never allowed to affect what the caller

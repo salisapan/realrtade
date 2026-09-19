@@ -41,12 +41,14 @@
         "src/docreader.js",
         "src/sidebar.js",
         "src/brief.js",
+        "src/weekly.js",
         "src/content-gmail.js"
       ],
       "css": [
         "src/chip.css",
         "src/sidebar.css",
-        "src/brief.css"
+        "src/brief.css",
+        "src/weekly.css"
       ],
       "run_at": "document_idle"
     }

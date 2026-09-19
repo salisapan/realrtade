@@ -8,6 +8,19 @@
 (async function popupInit() {
   let status = await send({ type: 'flow:connector-status' });
   let state = await FlowStorage.get();
+  // Declared here, not next to renderMemoryInsight/wireMemoryInsight further
+  // down, because it has to be. `let` bindings are live from the top of
+  // their function's scope but stay in the temporal dead zone until their
+  // own statement runs — and renderMemoryInsight (called from inside
+  // renderLog, called on the very next line below) reads this variable
+  // before execution would ever reach its old declaration site further down
+  // this same function body. That's not a hypothetical: it threw
+  // "Cannot access 'currentInsight' before initialization" on every single
+  // popup open, which aborted renderLog() partway through — silently
+  // breaking the Activity tab's memory-insight card, referral prompt, and
+  // the log list itself, every time, since nothing after the throwing
+  // await in this function ever ran.
+  let currentInsight = null;
 
   wireTabs();
   wireSave();
@@ -15,6 +28,7 @@
   renderConnectors();
   renderStatusPill();
   await renderLog();
+  await renderOpen();
 
   function send(msg) {
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
@@ -239,8 +253,94 @@
         document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
         document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === tab.dataset.tab));
         if (tab.dataset.tab === 'log') await renderLog();
+        if (tab.dataset.tab === 'open') await renderOpen();
       });
     });
+  }
+
+  /* ---------------------------------------------------------------- open */
+  // The Unified Open Items Surface: every process Glance has proposed and
+  // gotten no decision on yet, from FlowStorage.getPending() — the exact
+  // same source of truth the in-Gmail indicator/panel and the extension-icon
+  // badge already read. This is deliberately the one place that list is
+  // visible independent of which thread (today) or app (Calendar/Drive,
+  // later — see 'app' on each entry) it came from.
+  //
+  // Do It is intentionally NOT offered here. content-gmail.js's own onDoIt/
+  // buildActionPayload needs a live Gmail tab for at least one real path
+  // (fetching an attachment's bytes with the page's own cookies — see its
+  // own comment on why that fetch can't happen anywhere else), and this
+  // product's own rule about a duplicate write being the one failure it
+  // can't absorb means a second, partially-DOM-independent copy of that
+  // ~150-line orchestration living here — drifting from the original the
+  // day either one changes — is a worse outcome than routing "close this"
+  // back through the message it was proposed for. View jumps there directly;
+  // Dismiss (genuinely DOM-independent — see content-gmail.js's own
+  // onDismiss) is safe to offer verbatim.
+
+  function pendingRowSubtitle(entry) {
+    const who = (entry.sender && entry.sender.name) || (entry.sender && entry.sender.email) || '';
+    const what = entry.subject || (entry.intent && entry.intent.label) || '';
+    return who && what ? who + ' — ' + what : (what || who);
+  }
+
+  function openRow(entry) {
+    const item = el('div', 'log-item');
+    const top = el('div', 'log-top');
+    top.appendChild(el('span', 'log-label', entry.process.name));
+    // 'app' only exists on entries logged after this was added — every
+    // entry from before falls back to 'gmail', the only source that has
+    // ever existed, rather than showing a blank tag.
+    top.appendChild(el('span', 'log-kind', (entry.app || 'gmail').toUpperCase()));
+    item.appendChild(top);
+
+    const subtitle = pendingRowSubtitle(entry);
+    if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
+
+    const acts = el('div', 'log-acts');
+    if (entry.threadUrl) {
+      const view = el('a', 'ghost sm', 'View');
+      view.href = entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
+      acts.appendChild(view);
+    }
+    const dismiss = el('button', 'ghost sm', 'Dismiss');
+    dismiss.type = 'button';
+    dismiss.addEventListener('click', async () => {
+      dismiss.disabled = true; dismiss.textContent = 'Dismissing…';
+      // The exact same storage/module calls content-gmail.js's own
+      // onDismiss makes, verbatim — no DOM, no background.js round trip.
+      await FlowStorage.appendLog({
+        kind: 'dismissed',
+        label: (entry.intent && entry.intent.label) || entry.process.name,
+        messageId: entry.messageId,
+        score: entry.signals && entry.signals.score
+      });
+      await FlowStorage.calibrate('dismiss');
+      if (typeof FlowExecutionMemory !== 'undefined' && entry.process && entry.process.steps) {
+        await FlowExecutionMemory.recordDismiss(entry.process.id, entry.process.steps.map((s) => s.id), entry.messageId);
+      }
+      chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
+      chrome.runtime.sendMessage({ type: 'flow:track', event: 'process_closed', params: { domain: state.domainId, method: 'dismissed' } });
+      await renderOpen();
+    });
+    acts.appendChild(dismiss);
+    item.appendChild(acts);
+    return item;
+  }
+
+  async function renderOpen() {
+    const pending = await FlowStorage.getPending();
+    // Keeps the extension-icon badge honest even when the popup is the
+    // first surface opened after a browser restart, before any Gmail tab
+    // has had a chance to recompute it itself — see background.js's
+    // updateBadge comment for why this file never trusts a cached number.
+    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: pending.length });
+
+    const host = document.getElementById('open-list');
+    const empty = document.getElementById('open-empty');
+    host.replaceChildren();
+    empty.hidden = pending.length > 0;
+    pending.forEach((entry) => host.appendChild(openRow(entry)));
   }
 
   function when(ts) {
@@ -303,7 +403,8 @@
   // real reason and (b) hasn't already gotten a real answer from this
   // person. Confirming or rejecting both close it permanently — this is a
   // one-time correction opportunity, not a recurring setting.
-  let currentInsight = null;
+  // (currentInsight itself is declared at the top of popupInit — see that
+  // declaration's own comment for why it can't live here.)
 
   async function renderMemoryInsight(s) {
     const wrap = document.getElementById('memoryInsight');

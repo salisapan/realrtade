@@ -39,7 +39,28 @@
     // call site in scanReadingPane() for why the whole sidebar surface
     // (badge, Draft-It, attachment X-ray) is cut, not just styled.
     if (typeof FlowBrief !== 'undefined') checkBrief();
+    checkWeeklySummary();
     trackDailyActive();
+  }
+
+  // Runs once per init() — a fresh page load, or the rare onboarding/
+  // connector-change re-init below — never on every debounced Gmail
+  // mutation, since storage.js's consumeWeeklySummaryTrigger already owns
+  // the entire "is this actually due" question (once a week, or on return
+  // from inactivity, never more than once a day, never with nothing to
+  // say). This function's only job is rendering whatever that call decides.
+  async function checkWeeklySummary() {
+    if (!watching || typeof FlowWeekly === 'undefined') return;
+    const summary = await FlowStorage.consumeWeeklySummaryTrigger();
+    if (!summary) return; // not due, or due with nothing to report — stay silent either way
+    FlowWeekly.showSummary(summary, {
+      onOpenList: async () => {
+        // Pending is re-fetched at click time, not reused from whatever was
+        // true when the banner rendered — could be minutes or days later.
+        const pending = await FlowStorage.getPending();
+        if (pending.length) openBriefPanel(pending);
+      }
+    });
   }
 
   // The one DAU-shaped signal this product has: "Glance was active in a
@@ -250,6 +271,12 @@
       messageId: legacyId || hashNode(message),
       threadUrl: threadUrl(legacyId)
     };
+    // Only worth re-checking when the message actually being looked at
+    // changed — a new thread opened, or this one reopened after Gmail tore
+    // its nodes down — not on every debounced mutation inside a thread
+    // that's already open, which fires far more often than the underlying
+    // pending set could possibly have changed.
+    if (messageChanged) checkContextualResurface(messages, currentContext.messageId);
     // wireAttachmentHoverCards(message) is off — Draft-It and the attachment
     // X-ray both depend on the same glance-assist backend call, and that call
     // isn't reliably configured yet ("This feature is not configured yet"
@@ -360,7 +387,14 @@
         kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals,
         process: { id: process.id, name: process.name, steps: process.steps },
         threadUrl: threadUrl(legacyId), sender, subject,
-        intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score } }
+        intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score } },
+        // Which app this process was noticed in — Gmail is the only source
+        // today, but getPending()'s entries (and everything built on them:
+        // the Brief panel, the popup's Open tab, the badge count) are
+        // already source-agnostic, so a future Calendar or Drive content
+        // script only has to stamp its own value here to plug into the same
+        // engine, not change the engine itself.
+        app: 'gmail'
       });
       chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_shown', params: { domain: state.domainId } });
       checkBrief();
@@ -1065,6 +1099,60 @@
     return who && what ? who + ' — ' + what : (what || who);
   }
 
+  /* -------------------------------------------------- Contextual Resurfacing */
+  //
+  // A still-open process from EARLIER in the exact thread just opened —
+  // never "same sender," never "looks related," only ever a genuine other
+  // message in this one thread. That's deliberately narrow: this reuses the
+  // Brief's own storage and row machinery (a message only ever gets here by
+  // already being in FlowStorage.getPending()), so the risk isn't a wrong
+  // process being invented, only surfacing the right one in a context looser
+  // than intended — and thread-scoped is the tightest "related" this
+  // extension can state honestly without a real thread id from Gmail to
+  // match on (see threadUrl's own comment on what a legacy message id can
+  // and can't promise).
+
+  async function checkContextualResurface(threadMessages, excludeMessageId) {
+    if (typeof FlowBrief === 'undefined') return;
+
+    const freshState = await FlowStorage.get();
+    // Same MVP scope gate checkBrief() applies — never resurface a Do It
+    // that's guaranteed to fail because the connector it was proposed for
+    // isn't the one currently wired up.
+    if (freshState.connectorId && freshState.connectorId !== 'googleTasks') { FlowBrief.hideResurface(); return; }
+
+    const threadIds = new Set();
+    for (const m of threadMessages) {
+      const id = m.getAttribute('data-legacy-message-id');
+      if (id && id !== excludeMessageId) threadIds.add(id);
+    }
+    if (!threadIds.size) { FlowBrief.hideResurface(); return; }
+
+    const pending = await FlowStorage.getPending();
+    // Oldest-still-open first (getPending's own order) — if more than one
+    // other message in this thread is somehow still open, the same "oldest
+    // first" bias the Brief panel uses applies here too.
+    const match = pending.find((entry) => threadIds.has(entry.messageId));
+    if (!match) { FlowBrief.hideResurface(); return; }
+
+    FlowBrief.showResurface({
+      id: match.messageId,
+      title: match.process.name,
+      subtitle: briefRowSubtitle(match),
+      onDoIt(rowHost, doItBtn) {
+        const ctx = ctxFromPendingEntry(match);
+        onDoIt(rowHost, doItBtn, ctx, ctx.process.steps);
+      },
+      onDismiss(rowHost) {
+        onDismiss(rowHost, ctxFromPendingEntry(match));
+        // onDismiss only ever removes the row it's handed — this cleans up
+        // the resurface card's own wrapper (its "Still open" label) so
+        // dismissing doesn't leave an orphaned, row-less shell on screen.
+        FlowBrief.hideResurface();
+      }
+    });
+  }
+
   function openBriefPanel(pending) {
     // Property names have to be exactly onDoIt/onDismiss — that's the row
     // contract FlowBrief.buildRow calls into (brief.js). Each shorthand
@@ -1096,15 +1184,25 @@
   // deliberately not on every debounced Gmail DOM mutation, since the
   // pending set only ever changes at those specific moments, not on
   // arbitrary re-renders.
+  // The one place this file tells background.js how many processes are
+  // open, so the extension-icon badge (the Subtle Persistent Indicator) can
+  // stay in sync without background.js ever computing that number itself —
+  // see background.js's own updateBadge comment for why. Fire-and-forget:
+  // there is no reply to wait for and nothing here depends on one.
+  function reportPendingCount(n) {
+    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: n });
+  }
+
   async function checkBrief() {
     if (!watching) return;
     const freshState = await FlowStorage.get();
     // Same MVP scope gate as the live chip (scanReadingPane) — never
     // resurface something Do It is guaranteed to fail on because the
     // connector it was proposed for isn't the one currently wired up.
-    if (freshState.connectorId && freshState.connectorId !== 'googleTasks') { FlowBrief.hide(); return; }
+    if (freshState.connectorId && freshState.connectorId !== 'googleTasks') { FlowBrief.hide(); reportPendingCount(0); return; }
 
     const pending = await FlowStorage.getPending();
+    reportPendingCount(pending.length);
     if (!pending.length) {
       // Don't yank an already-open panel out from under someone the instant
       // the last item in it resolves — they just watched it close and

@@ -382,6 +382,113 @@ async function run() {
     check('pre-upgrade history is still counted, and still per-message', c.total === 2 && c.week === 2, c);
   }
 
+  console.log('\n--- storage.js: closeCountsFrom counts written, dismissed, and undone alike ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'w1', process: proc });
+    await FlowStorage.appendLog({ kind: 'written', messageId: 'w1', where: 'Google Tasks' });
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'd1', process: proc });
+    await FlowStorage.appendLog({ kind: 'dismissed', messageId: 'd1' });
+    let c = FlowStorage.closeCountsFrom(await FlowStorage.get());
+    check('a write and a dismissal both count toward "closed"', c.total === 2 && c.week === 2, c);
+
+    // A write later undone must not be counted twice — the message became
+    // resolved once, at the write, and the undo only records a further fact
+    // about an already-settled message.
+    await FlowStorage.appendLog({ kind: 'undone', messageId: 'w1' });
+    c = FlowStorage.closeCountsFrom(await FlowStorage.get());
+    check('undoing an already-closed message does not double-count it', c.total === 2, c);
+
+    check('getCloseCounts() agrees with the synchronous form',
+      JSON.stringify(await FlowStorage.getCloseCounts()) === JSON.stringify(c));
+  }
+
+  console.log('\n--- storage.js: closeCountsFrom windows to the last 7 days ---\n');
+  store = {};
+  {
+    const DAY = 24 * 60 * 60 * 1000;
+    await FlowStorage.appendLog({ kind: 'dismissed', messageId: 'recent' });
+    const state = await FlowStorage.get();
+    state.closeStats.recent.push({ id: 'old', ts: Date.now() - 42 * DAY });
+    state.closeStats.total += 1;
+    await FlowStorage.set({ closeStats: state.closeStats });
+    const c = FlowStorage.closeCountsFrom(await FlowStorage.get());
+    check('an old closure counts all-time but not this week', c.total === 2 && c.week === 1, c);
+  }
+
+  console.log('\n--- storage.js: closeCountsFrom falls back to the log for pre-upgrade installs ---\n');
+  store = {};
+  {
+    store = {
+      closeStats: { total: 0, recent: [] },
+      log: [
+        { ts: Date.now(), kind: 'written', messageId: 'a', where: 'Google Tasks' },
+        { ts: Date.now(), kind: 'dismissed', messageId: 'b' }
+      ]
+    };
+    const c = FlowStorage.closeCountsFrom(await FlowStorage.get());
+    check('pre-upgrade terminal log entries are still counted', c.total === 2 && c.week === 2, c);
+  }
+
+  console.log('\n--- storage.js: consumeWeeklySummaryTrigger() ---\n');
+  const DAY = 24 * 60 * 60 * 1000;
+  store = {};
+  {
+    // Nothing closed, nothing open — even on a first-ever call (which is
+    // otherwise always "due", the same precedent consumeDailyBriefTrigger
+    // already sets for a brand new install), silence wins.
+    const first = await FlowStorage.consumeWeeklySummaryTrigger();
+    check('an empty profile never shows a summary, even though it is technically "due"', first === null, first);
+    const state = await FlowStorage.get();
+    check('lastActiveTs is still stamped even when the summary itself stays silent', state.lastActiveTs > 0, state.lastActiveTs);
+  }
+
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'open-one', process: proc });
+    const first = await FlowStorage.consumeWeeklySummaryTrigger();
+    check('a first-ever call with something open fires (matches the Brief\'s own "first real day" precedent)',
+      first !== null && first.open === 1 && first.closed === 0, first);
+
+    const second = await FlowStorage.consumeWeeklySummaryTrigger();
+    check('a second call the same day never fires, regardless of cadence', second === null, second);
+  }
+
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'open-two', process: proc });
+    await FlowStorage.consumeWeeklySummaryTrigger(); // consume the first-ever showing
+    // Eight days later, with nothing new closed or opened, the weekly
+    // cadence alone is enough to fire again.
+    const state = await FlowStorage.get();
+    await FlowStorage.set({ weeklySummaryLastShownTs: Date.now() - 8 * DAY, lastActiveTs: Date.now() });
+    const due = await FlowStorage.consumeWeeklySummaryTrigger();
+    check('a full week since the last showing fires again on cadence alone', due !== null && due.open === 1, due);
+  }
+
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'open-three', process: proc });
+    await FlowStorage.consumeWeeklySummaryTrigger();
+    // Only two days since last shown (not a week), but four days since the
+    // user was last seen at all — a return from real inactivity fires on its
+    // own, independent of the weekly clock.
+    await FlowStorage.set({ weeklySummaryLastShownTs: Date.now() - 2 * DAY, lastActiveTs: Date.now() - 4 * DAY });
+    const due = await FlowStorage.consumeWeeklySummaryTrigger();
+    check('returning after several days of inactivity fires even mid-week', due !== null && due.open === 1, due);
+  }
+
+  store = {};
+  {
+    await FlowStorage.appendLog({ kind: 'shown', messageId: 'open-four', process: proc });
+    await FlowStorage.consumeWeeklySummaryTrigger();
+    // Two days since shown, one day since last active — neither condition
+    // met, so it correctly stays silent.
+    await FlowStorage.set({ weeklySummaryLastShownTs: Date.now() - 2 * DAY, lastActiveTs: Date.now() - 1 * DAY });
+    const due = await FlowStorage.consumeWeeklySummaryTrigger();
+    check('mid-week with no real gap since last seen stays silent', due === null, due);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

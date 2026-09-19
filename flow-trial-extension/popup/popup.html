@@ -14,6 +14,7 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab" data-tab="setup" role="tab" aria-selected="true">Setup</button>
+    <button class="tab" data-tab="open" role="tab" aria-selected="false">Open</button>
     <button class="tab" data-tab="log" role="tab" aria-selected="false">Activity</button>
   </nav>
 
@@ -38,6 +39,12 @@
         </div>
         <p id="recipeNote" class="saved-note" hidden></p>
       </div>
+    </section>
+
+    <section data-panel="open" class="panel">
+      <p class="hint">Every process Glance has proposed and hasn't heard a decision on yet — the same list the in-Gmail indicator counts, in one place regardless of which thread it came from. Do It still happens from the message itself; from here you can jump to it or decide it doesn't need one.</p>
+      <div id="open-list" class="log-list"></div>
+      <p id="open-empty" class="hint" hidden>Nothing open — Glance is caught up.</p>
     </section>
 
     <section data-panel="log" class="panel">

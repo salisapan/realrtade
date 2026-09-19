@@ -132,5 +132,53 @@ console.log('\n--- brief.js: opening twice does not stack panels ---\n');
   check('closePanel removes it', !FlowBrief.isPanelOpen());
 }
 
+console.log('\n--- brief.js: showResurface renders a single labeled row ---\n');
+{
+  function fire(node, evt) { (node.listeners[evt] || []).forEach((fn) => fn()); }
+  function resurfaceHost() { return body.children.find((n) => n.id === 'flow-resurface-host'); }
+
+  let didDoIt = false;
+  FlowBrief.showResurface({ id: 'r1', title: 'Reply & Track', subtitle: 'Dana — re: invoice', onDoIt: () => { didDoIt = true; }, onDismiss: () => {} });
+  const host = resurfaceHost();
+  check('mounts exactly one resurface host', Boolean(host));
+  check('carries the "still open" label', find(host, 'flow-resurface-label').length === 1);
+  check('renders exactly one row', find(host, 'flow-brief-row').length === 1);
+  check('the row shows the process name', find(host, 'flow-chip-process-name')[0].textContent === 'Reply & Track');
+
+  const doIt = find(host, 'flow-brief-doit')[0];
+  fire(doIt, 'click');
+  check('clicking Do It on the resurfaced row calls its own onDoIt', didDoIt === true);
+  FlowBrief.hideResurface();
+}
+
+console.log('\n--- brief.js: showResurface replaces, never stacks ---\n');
+{
+  FlowBrief.showResurface({ id: 'r1', title: 'First', onDoIt: () => {}, onDismiss: () => {} });
+  FlowBrief.showResurface({ id: 'r2', title: 'Second', onDoIt: () => {}, onDismiss: () => {} });
+  const hosts = body.children.filter((n) => n.id === 'flow-resurface-host');
+  check('exactly one resurface card exists at a time', hosts.length === 1, hosts.length);
+  check('the second call’s row is what’s actually shown', find(hosts[0], 'flow-chip-process-name')[0].textContent === 'Second');
+  FlowBrief.hideResurface();
+}
+
+console.log('\n--- brief.js: hideResurface removes it outright ---\n');
+{
+  FlowBrief.showResurface({ id: 'r1', title: 'X', onDoIt: () => {}, onDismiss: () => {} });
+  FlowBrief.hideResurface();
+  check('hideResurface leaves nothing in the DOM', !body.children.some((n) => n.id === 'flow-resurface-host'));
+  let threw = null;
+  try { FlowBrief.hideResurface(); } catch (e) { threw = e.message; }
+  check('calling it again with nothing mounted does not throw', threw === null, threw);
+}
+
+console.log('\n--- brief.js: the global hide() also clears an active resurface card ---\n');
+{
+  FlowBrief.show(1, () => {});
+  FlowBrief.showResurface({ id: 'r1', title: 'X', onDoIt: () => {}, onDismiss: () => {} });
+  FlowBrief.hide();
+  check('hide() (watching stopped / nothing pending) tears down the resurface card too',
+    !body.children.some((n) => n.id === 'flow-resurface-host'));
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

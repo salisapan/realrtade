@@ -148,6 +148,43 @@
   .flow-brief-indicator:hover { transform: none; }
 }
 
+/* Contextual Resurfacing: one older, still-open process from the thread
+   just reopened. Anchored top-right, deliberately distinct from the
+   indicator (bottom-right) and the Weekly Closing Summary (top-center) so
+   the rare moment more than one of these is on screen at once never has two
+   surfaces overlapping. */
+.flow-resurface {
+  all: initial;
+  position: fixed;
+  inset-block-start: 14px;
+  inset-inline-end: 18px;
+  z-index: 2147482999;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 300px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  padding: 10px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(240,244,253,.94));
+  border: 1px solid rgba(40,70,150,.22);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 16px 36px -16px rgba(20,40,100,.4);
+  animation: flow-brief-in 180ms ease-out;
+}
+.flow-resurface-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: #5B6478;
+  padding-inline-start: 2px;
+}
+.flow-resurface .flow-brief-row { background: rgba(40,70,150,.07); }
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-resurface { animation: none; }
+}
+
 /* The honest remainder line under a truncated Brief. Deliberately quiet —
    it is a fact about the list, not another thing to act on, and it must not
    read as a row you can click. */

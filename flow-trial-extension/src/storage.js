@@ -61,6 +61,28 @@ const FlowStorage = (() => {
     // "this week" figure stays right even for someone closing more in a week
     // than the raw log can hold.
     writeStats: { total: 0, recent: [] },
+    // The Weekly Closing Summary's "X closed" half, kept exactly like
+    // writeStats above and for the same reason: recomputing "closed this
+    // week" from the capped `log` alone undercounts anyone who closes more
+    // in a week than the log can hold, and would even go DOWN as old rows
+    // evict. Bumped in appendLog at the exact moment a messageId first
+    // becomes resolved (dismissed, written, or undone all count — the
+    // process's fate is settled either way), never a second time for the
+    // same message. See closeCountsFrom below.
+    closeStats: { total: 0, recent: [] },
+    // When the Weekly Closing Summary last actually rendered (ms epoch, not
+    // a date string — this one needs to measure a 7-day gap, not just "not
+    // today yet"). 0 means never shown. See consumeWeeklySummaryTrigger.
+    weeklySummaryLastShownTs: 0,
+    // The ms timestamp of the last time a Glance-watched tab called init() —
+    // i.e. "the user was last here." Its only job is measuring the GAP
+    // before it gets overwritten, which is what lets
+    // consumeWeeklySummaryTrigger tell "it's been a normal few hours" apart
+    // from "this person hasn't opened Gmail in five days and just came
+    // back" — activeLastTrackedDate above is a date STRING, precise only to
+    // the day, which is enough for its own once-a-day analytics gate but not
+    // for measuring a multi-day inactivity gap in milliseconds.
+    lastActiveTs: 0,
     // A random per-install identifier — never an email, never tied to a
     // Google/workspace identity. It exists for two things only: telling one
     // install's anonymous usage events apart from another's in aggregate
@@ -156,6 +178,16 @@ const FlowStorage = (() => {
     if (row.messageId && TERMINAL_KINDS.has(row.kind) && !resolved.has(row.messageId)) {
       resolved.add(row.messageId);
       patch.resolvedMessageIds = [row.messageId, ...(state.resolvedMessageIds || [])].slice(0, RESOLVED_CAP);
+      // The one moment a process's fate is settled for good, whichever of
+      // the three terminal kinds got it there — exactly the definition the
+      // Weekly Closing Summary means by "closed." Piggybacking on this
+      // branch (rather than a second dedup check) means it can never fire
+      // more than once for the same message, for free.
+      const cs = state.closeStats || { total: 0, recent: [] };
+      patch.closeStats = {
+        total: (cs.total || 0) + 1,
+        recent: [{ id: row.messageId, ts: row.ts }, ...(cs.recent || [])].slice(0, WRITE_RECENT_CAP)
+      };
     }
 
     // Distinct messages, not rows: one Do It can append five 'written' rows
@@ -256,8 +288,10 @@ const FlowStorage = (() => {
   // chip's own Do It or dismiss, from any tab) automatically drops it from
   // the next getPending() call with nothing extra to keep in sync — the log
   // is the only thing stored, exactly like Execution Memory's own event log.
-  async function getPending() {
-    const state = await get();
+  // The core logic, taking an already-fetched state so callers that already
+  // hold one (consumeWeeklySummaryTrigger, below) don't pay for a second
+  // chrome.storage.local round trip inside their own serialized transaction.
+  function getPendingFrom(state) {
     const resolved = new Set(state.resolvedMessageIds || []);
     const listed = new Set();
     const open = [];
@@ -277,6 +311,10 @@ const FlowStorage = (() => {
       open.push(entry);
     }
     return open.reverse(); // oldest-still-open first
+  }
+
+  async function getPending() {
+    return getPendingFrom(await get());
   }
 
   // The one definition of "how many separate decisions has this person
@@ -308,6 +346,32 @@ const FlowStorage = (() => {
     return writeCountsFrom(await get());
   }
 
+  // The Weekly Closing Summary's "closed" number — same shape and same
+  // never-goes-down/legacy-log-fallback guarantees as writeCountsFrom right
+  // above, just over closeStats/TERMINAL_KINDS instead of writeStats/
+  // 'written'. Kept as a genuinely separate function rather than a filtered
+  // call into writeCountsFrom: "closed" and "written" are different claims
+  // (a dismiss closes a process without ever writing anything), and folding
+  // them into one function with a mode flag is how two callers quietly start
+  // disagreeing about which one they meant.
+  function closeCountsFrom(state) {
+    const cs = (state && state.closeStats) || { total: 0, recent: [] };
+    const log = (state && state.log) || [];
+    const legacy = new Set(log.filter((e) => TERMINAL_KINDS.has(e.kind) && e.messageId).map((e) => e.messageId));
+
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const week = new Set((cs.recent || []).filter((w) => w && w.ts >= weekAgo).map((w) => w.id));
+    for (const e of log) {
+      if (TERMINAL_KINDS.has(e.kind) && e.messageId && e.ts >= weekAgo) week.add(e.messageId);
+    }
+
+    return { total: Math.max(cs.total || 0, legacy.size), week: week.size };
+  }
+
+  async function getCloseCounts() {
+    return closeCountsFrom(await get());
+  }
+
   // Shared by every "at most once per calendar day (local time)" flag this
   // file keeps — the Morning Brief's auto-open and the anonymous daily-active
   // ping both need exactly this, just against a different stored date key.
@@ -332,6 +396,51 @@ const FlowStorage = (() => {
   // trackDailyActive() for where this actually turns into an event.
   const consumeDailyActiveTrigger = serialize(() => consumeDailyTrigger('activeLastTrackedDate'));
 
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  // "A normal gap between two Gmail visits" vs "this person went quiet and
+  // just came back" — three days with nothing from this install is well
+  // past a weekend, so a return after this long is treated the same as the
+  // weekly cadence itself: worth one honest summary, not a notification.
+  const INACTIVITY_MS = 3 * 24 * 60 * 60 * 1000;
+  // Never fire twice from two near-simultaneous init() calls (e.g. two Gmail
+  // tabs opened together) even if both cadence checks below would otherwise
+  // pass — a floor under the whole function, independent of the weekly and
+  // inactivity conditions it gates.
+  const MIN_GAP_MS = 24 * 60 * 60 * 1000;
+
+  // Weekly Closing Summary's entire trigger policy in one place: fires at
+  // most once a day regardless, and then only on a real weekly cadence OR a
+  // return from several days of inactivity — never both counted as two
+  // reasons, never neither. Returns null (render nothing) whenever it isn't
+  // due, OR when it IS due but there is nothing to say — "0 closed, 0 open"
+  // is exactly the silence Zero-Prompt asks for, not a summary that says
+  // zero twice. serialize()d for the same reason appendLog/markSeen/
+  // calibrate are: two near-simultaneous callers must not both read
+  // "not shown recently" before either writes back weeklySummaryLastShownTs.
+  const consumeWeeklySummaryTrigger = serialize(async function consumeWeeklySummaryTrigger() {
+    const state = await get();
+    const now = Date.now();
+    const lastShown = state.weeklySummaryLastShownTs || 0;
+    const lastActive = state.lastActiveTs || 0;
+    const gapSinceActive = lastActive ? now - lastActive : 0;
+    // Recorded unconditionally, whether or not a summary ends up showing —
+    // "the user was just here" is true regardless, and this is the only
+    // place that fact gets stamped.
+    await set({ lastActiveTs: now });
+
+    if (now - lastShown < MIN_GAP_MS) return null;
+    const weeklyDue = now - lastShown >= WEEK_MS;
+    const returningDue = gapSinceActive >= INACTIVITY_MS;
+    if (!weeklyDue && !returningDue) return null;
+
+    const closed = closeCountsFrom(state).week;
+    const open = getPendingFrom(state).length;
+    if (!closed && !open) return null; // nothing to close, nothing waiting — stay silent
+
+    await set({ weeklySummaryLastShownTs: now });
+    return { closed, open };
+  });
+
   const getInstallId = serialize(async function getInstallId() {
     const state = await get();
     if (state.installId) return state.installId;
@@ -340,7 +449,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, consumeDailyBriefTrigger, consumeDailyActiveTrigger, markMemoryInsightSeen, calibrate, getInstallId, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, markMemoryInsightSeen, calibrate, getInstallId, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

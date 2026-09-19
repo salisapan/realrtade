@@ -15,8 +15,10 @@
 const FlowBrief = (() => {
   const INDICATOR_ID = 'flow-brief-indicator-host';
   const PANEL_ID = 'flow-brief-panel-host';
+  const RESURFACE_ID = 'flow-resurface-host';
   let indicatorHost = null;
   let panelHost = null;
+  let resurfaceHost = null;
 
   function el(tag, cls, text) {
     const n = document.createElement(tag);
@@ -55,6 +57,7 @@ const FlowBrief = (() => {
   // called whenever there is nothing pending, or watching stops entirely.
   function hide() {
     closePanel();
+    hideResurface();
     if (indicatorHost && indicatorHost.parentNode) indicatorHost.parentNode.removeChild(indicatorHost);
     indicatorHost = null;
   }
@@ -94,6 +97,32 @@ const FlowBrief = (() => {
 
     wrap.appendChild(actions);
     return wrap;
+  }
+
+  // Contextual Resurfacing: one specific older process, surfaced because the
+  // thread it belongs to was just reopened — not "here is everything open"
+  // (that's the indicator/panel above), so this is deliberately a single row
+  // with its own small label, not another entry point into the full list.
+  // Reuses buildRow verbatim: content-gmail.js hands it the exact same
+  // { title, subtitle, onDoIt, onDismiss } shape a Brief panel row gets, so
+  // Do It / Dismiss here behave identically to everywhere else they appear.
+  function showResurface(row) {
+    hideResurface();
+    resurfaceHost = el('div', 'flow-resurface');
+    resurfaceHost.id = RESURFACE_ID;
+    resurfaceHost.setAttribute('dir', 'ltr');
+    resurfaceHost.appendChild(el('span', 'flow-resurface-label', 'Still open from this thread'));
+    resurfaceHost.appendChild(buildRow(row));
+    document.body.appendChild(resurfaceHost);
+  }
+
+  // Called whenever content-gmail.js decides nothing in the currently open
+  // thread still qualifies — switching to a different thread, or the one
+  // match there resolving — same "remove outright, no idle empty state"
+  // contract as hide() above.
+  function hideResurface() {
+    if (resurfaceHost && resurfaceHost.parentNode) resurfaceHost.parentNode.removeChild(resurfaceHost);
+    resurfaceHost = null;
   }
 
   // A brief is a brief. Rows arrive oldest-still-open first (storage.js's
@@ -152,5 +181,5 @@ const FlowBrief = (() => {
     return Boolean(panelHost);
   }
 
-  return { show, hide, openPanel, closePanel, isPanelOpen };
+  return { show, hide, openPanel, closePanel, isPanelOpen, showResurface, hideResurface };
 })();
