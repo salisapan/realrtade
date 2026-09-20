@@ -787,6 +787,7 @@
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
+    if (response.skipped) return 'Skipped — an earlier step in this process didn’t complete.';
     return response.error || 'Couldn’t complete that action.';
   }
 
@@ -1113,8 +1114,17 @@
     actionsRow.appendChild(undo);
     done.appendChild(actionsRow);
 
+    // A partial success (some steps didn't complete) has to say which ones
+    // and why, not just how many — "1 of 2 didn't complete" leaves the user
+    // guessing whether to retry, reconnect something, or ignore it. Reuses
+    // the same action.label the step's own pill already shows, and the same
+    // reasonMessage() the fully-failed path (above) already uses, so a
+    // failure reads the same whether it's the only thing that happened or
+    // one line in a partial receipt.
     if (results.length > succeeded.length) {
-      done.appendChild(el('span', 'flow-chip-partial-note', '(' + (results.length - succeeded.length) + ' of ' + results.length + ' didn’t complete)'));
+      const failed = results.filter((r) => !(r.response && r.response.ok));
+      const detail = failed.map((r) => r.action.label + ': ' + reasonMessage(r.response, ctx)).join(' · ');
+      done.appendChild(el('span', 'flow-chip-partial-note', '(' + detail + ')'));
     }
 
     host.replaceChildren(done);
