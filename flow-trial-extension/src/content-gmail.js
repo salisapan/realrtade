@@ -521,11 +521,11 @@
     const amount = e.amount ? ', ' + e.amount : '';
     switch (process.id) {
       case 'schedule-confirm':
-        return 'is scheduling the meeting' + when + ', sending a confirmation, and opening a follow-up task.';
+        return 'is scheduling the meeting' + when + ', drafting a reply to confirm, and opening a follow-up task.';
       case 'schedule':
         return 'is scheduling the meeting' + when + ' and opening a reminder to prepare.';
       case 'reply-track':
-        return 'is replying to the request' + when + ' and opening a follow-up task.';
+        return 'is drafting a reply to the request' + when + ' and opening a follow-up task.';
       case 'follow-through':
         return 'is opening a reminder for your commitment' + when + amount + ', with a reply ready.';
       default: // log-it
