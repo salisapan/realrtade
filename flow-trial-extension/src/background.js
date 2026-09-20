@@ -260,7 +260,7 @@ async function hubspotPortalId(token) {
 
 async function connectHubspot() {
   if (!HUBSPOT_CLIENT_ID || HUBSPOT_CLIENT_ID === 'YOUR_HUBSPOT_CLIENT_ID') {
-    throw new Error('HubSpot isn’t configured on this build yet. Notion works today — connect that instead.');
+    throw new Error('HubSpot isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const redirectUri = chrome.identity.getRedirectURL();
   const authUrl =
@@ -384,7 +384,7 @@ async function saveSalesforceAuth(tokenResponse, extra) {
 
 async function connectSalesforce() {
   if (!SALESFORCE_CLIENT_ID || SALESFORCE_CLIENT_ID === 'YOUR_SALESFORCE_CLIENT_ID') {
-    throw new Error('Salesforce isn’t configured on this build yet. Notion works today — connect that instead.');
+    throw new Error('Salesforce isn’t configured on this build yet — it needs a Consumer Key set by whoever built this extension.');
   }
   const redirectUri = chrome.identity.getRedirectURL();
   const authUrl =
@@ -511,7 +511,7 @@ async function getSlackAuth() {
 
 async function connectSlack(channel) {
   if (!SLACK_CLIENT_ID || SLACK_CLIENT_ID === 'YOUR_SLACK_CLIENT_ID') {
-    throw new Error('Slack isn’t configured on this build yet. Notion works today — connect that instead.');
+    throw new Error('Slack isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const channelId = String(channel || '').trim();
   if (!channelId) {
@@ -598,7 +598,7 @@ async function saveMondayAuth(tokenResponse, extra) {
 
 async function connectMonday(boardId) {
   if (!MONDAY_CLIENT_ID || MONDAY_CLIENT_ID === 'YOUR_MONDAY_CLIENT_ID') {
-    throw new Error('Monday.com isn’t configured on this build yet. Notion works today — connect that instead.');
+    throw new Error('Monday.com isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const board = String(boardId || '').trim();
   if (!board) {
@@ -785,7 +785,7 @@ async function findOrCreateGlanceTaskList() {
 
 async function connectGoogleTasks() {
   if (!googleTasksConfigured()) {
-    throw new Error('Google Tasks isn’t configured on this build yet. Notion works today — connect that instead.');
+    throw new Error('Google isn’t configured on this build yet — manifest.json’s oauth2.client_id still needs a real Google OAuth Client ID (see the README’s “Set up Google” section).');
   }
   // interactive:true is the one moment Chrome may show the account chooser
   // or consent screen; every later call in this file passes interactive:true
