@@ -339,6 +339,12 @@
 
     const subtitle = pendingRowSubtitle(entry);
     if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
+    // "Make unresolved processes harder to forget" — an item open for three
+    // weeks used to look identical to one from ten minutes ago in this
+    // list. Same when()/.when the Activity tab's own logRow() already uses,
+    // reused rather than a second age-formatting rule, on entry.ts —
+    // appendLog stamps every row with ts unconditionally, 'shown' included.
+    if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
 
     const acts = el('div', 'log-acts');
     if (entry.threadUrl) {

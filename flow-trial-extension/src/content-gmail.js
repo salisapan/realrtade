@@ -1292,10 +1292,27 @@
     };
   }
 
+  // Same shape as popup.js's own when() for the Activity tab and its Open
+  // tab's row — kept as a small local copy rather than a shared import
+  // since this file has no existing UI-formatting utility module to put it
+  // in, and it's six lines. "Make unresolved processes harder to forget":
+  // a process open for three weeks used to look identical, in this same
+  // Brief panel, to one from ten minutes ago.
+  function relativeAge(ts) {
+    const mins = Math.round((Date.now() - ts) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + 'm ago';
+    const hrs = Math.round(mins / 60);
+    if (hrs < 24) return hrs + 'h ago';
+    return new Date(ts).toLocaleDateString();
+  }
+
   function briefRowSubtitle(entry) {
     const who = (entry.sender && entry.sender.name) || (entry.sender && entry.sender.email) || '';
     const what = entry.subject || entry.intent.label || '';
-    return who && what ? who + ' — ' + what : (what || who);
+    const base = who && what ? who + ' — ' + what : (what || who);
+    const age = entry.ts ? relativeAge(entry.ts) : '';
+    return age ? (base ? base + ' — ' + age : age) : base;
   }
 
   /* -------------------------------------------------- Contextual Resurfacing */
