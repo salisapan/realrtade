@@ -127,6 +127,32 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('a genuine future invite still fires SCHEDULED_EVENT', invite.type === FlowIntent.TYPES.SCHEDULED_EVENT, invite.type);
 }
 
+// 3d. An explicit date already in the past must NOT become a Calendar entry,
+//     independent of any recap phrasing. extract.js's explicit-year branch
+//     takes a sender-stated year completely literally (correctly — it's not
+//     a guess), so a plain, unadorned recap like "We had our sync on March
+//     3, 2020 at 3pm, it was productive" carries no EVENT_RECAP phrase yet
+//     still must not schedule a meeting six years gone. isPastDate() is the
+//     unconditional backstop 3c's phrasing-based check can't be.
+{
+  const now = new Date('2026-09-17T12:00:00Z');
+  const pastDateCases = [
+    ['explicit past year',  'We had our sync on March 3, 2020 at 3pm, it was productive.'],
+    ['past ISO date',       'The kickoff call on 2020-03-03 at 3pm covered the whole roadmap.'],
+    ['past date this year', 'Great sync on March 3, 2026 at 3pm before the deal fell through.']
+  ];
+  for (const [label, text] of pastDateCases) {
+    const intent = classify(text, { now });
+    check('a ' + label + ' does not become a Calendar entry',
+      !intent || intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+  }
+  // Sanity: today's date and a genuine future explicit date must still fire.
+  const todayCase = classify("Let's do the sync on September 17, 2026 at 3pm.", { now });
+  check('a same-day explicit date still fires SCHEDULED_EVENT', todayCase.type === FlowIntent.TYPES.SCHEDULED_EVENT, todayCase.type);
+  const futureCase = classify("Let's do the sync on March 3, 2027 at 3pm.", { now });
+  check('a genuine future explicit date still fires SCHEDULED_EVENT', futureCase.type === FlowIntent.TYPES.SCHEDULED_EVENT, futureCase.type);
+}
+
 // 4. A reader commitment reminder -> COMMITMENT_OF_READER, the "Follow
 //    Through" process, task anchor leading, draft second.
 {

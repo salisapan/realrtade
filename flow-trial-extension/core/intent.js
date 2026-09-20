@@ -94,6 +94,27 @@ const FlowIntent = (() => {
   ].join('|'), 'i');
   const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה))/;
 
+  // The other half of the "don't schedule the past" fix above: EVENT_RECAP
+  // only helps when the message uses recognizable past-tense phrasing.
+  // extract.js's own explicit-year branch (parseDate's `explicitYear` path)
+  // takes a sender-stated year completely literally, with no window check
+  // (that check only applies to a bare month-and-day with NO year, where the
+  // year has to be guessed) — correctly, since a year the sender actually
+  // wrote is not a guess. But "correctly parsed" and "safe to calendar" are
+  // different questions: "We had our sync on March 3, 2020 at 3pm, it was
+  // productive" has a real meeting noun, a real date, a real time, and no
+  // recap phrasing EVENT_RECAP recognizes — and still must not become a
+  // Calendar entry for a day six years gone. Unlike phrasing, "is this ISO
+  // date already before today" is a plain, unconditional fact — no lexicon
+  // to keep growing, and no legitimate SCHEDULED_EVENT ever needs a past
+  // date, so this check applies with no exceptions.
+  function isPastDate(dateIso, now) {
+    if (!dateIso) return false;
+    const n = now || new Date();
+    const todayIso = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+    return dateIso < todayIso;
+  }
+
   // A reader-directed commitment reminder — narrow by design. This is not
   // "someone agreed to something" (that's DECISION_TO_LOG, judgment.js's
   // COMMIT/COMMIT_STRONG) but specifically "you, the reader, agreed to
@@ -223,10 +244,12 @@ const FlowIntent = (() => {
     //        recall: a missed event chip costs one click; a calendar entry
     //        for a meeting that was just cancelled is actively wrong. Same
     //        refusal for a recap of a meeting that already happened — see
-    //        EVENT_RECAP above.
+    //        EVENT_RECAP above — and for a message that plainly names a date
+    //        already in the past, recap phrasing or not — see isPastDate.
     const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
-    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !calledOff && !isRecap) {
+    const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
+    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !calledOff && !isRecap && !isPast) {
       return finish(TYPES.SCHEDULED_EVENT, 'high', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
