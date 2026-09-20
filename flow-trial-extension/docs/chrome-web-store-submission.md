@@ -175,7 +175,7 @@ based on what the code actually does:
 | Personal communications | **Yes** (narrow) | The open Gmail message's text is read locally to score it; only the fields above (never the full message) ever leave the device, and only on explicit click. |
 | Location | No | — |
 | Web history | No | — |
-| User activity | **Yes** (aggregate only) | Anonymous, aggregate product-usage counts only — a suggestion was shown/clicked/dismissed, a write completed, an action was undone, a process closed (and by which method), one ping per day the extension was active — each tagged with a random per-install ID, never message content, never which specific email or record. Full allow-list: `flow-landing/netlify/functions/track-event/track-event.js`'s `ALLOWED_EVENTS`/`PARAM_VALIDATORS`, which reject anything else server-side. |
+| User activity | **Yes** (aggregate only) | Anonymous, aggregate product-usage counts only — a suggestion was shown/clicked/dismissed, a write completed, an action was undone, a process closed (and by which method), a connector was set up, Draft-It generated a reply, an attachment was summarised, one ping per day the extension was active, and (at most once per install per calendar week) whether a recurring usage habit had formed — each tagged with a random per-install ID, never message content, never which specific email or record. Full allow-list: `flow-landing/netlify/functions/track-event/track-event.js`'s `ALLOWED_EVENTS`/`PARAM_VALIDATORS`, which reject anything else server-side. |
 | Website content | **Yes** (narrow, as above) | Same as Personal communications — the open message only, never bulk-scanned. |
 
 Certification checkboxes this data supports:
@@ -250,11 +250,14 @@ background/framing), not something to upload as-is.
       genuinely IS a Store-submission blocker now, since Google is the only
       live connector. See `README.md`'s "Set up Google" section for the
       full Cloud Console walkthrough.
-- [ ] Read `privacy.html` (theflow-ai.com) against this doc's data-usage
-      table before submitting — it predates the retention-instrumentation
-      events (`extension_active`, `action_undone`, `process_closed`) and
-      the Morning Brief/Execution Memory local storage additions; the
-      Store's privacy-policy-must-match-disclosure check will compare them.
+- [x] `privacy.html` checked against this doc's data-usage table and the
+      actual `ALLOWED_EVENTS` list. Section 5's "What stays local" and
+      "Connection credentials" bullets already covered the Morning
+      Brief/Execution Memory local-storage additions correctly. The
+      "Anonymous product-usage events" bullet named 7 of the 10 actually
+      allowed events — missing `connector_configured`, `draft_generated`,
+      `attachment_summarized`, and `weekly_habit_formed` — fixed to
+      enumerate all 10, matching this table's own row above exactly.
 - [ ] The four non-Google connector `CLIENT_ID` placeholders in
       `src/background.js` (`HUBSPOT_CLIENT_ID`, `SALESFORCE_CLIENT_ID`,
       `SLACK_CLIENT_ID`, `MONDAY_CLIENT_ID`) are out of scope for this
