@@ -245,6 +245,101 @@ async function run() {
     check('it confirms the export the same way Setup tab\'s own button does', exportBtn.textContent === 'Exported', exportBtn.textContent);
   }
 
+  console.log('\n--- popup.js: importing a recipe applies it instead of silently throwing ---\n');
+  {
+    // Regression guard for a real bug: the import handler's success path
+    // called renderDomains() — a function that had been deleted along with
+    // the domain-picker UI it used to refresh (domain selection moved out
+    // of onboarding; see wireSave()'s own comment). That reference threw
+    // BEFORE either noteRecipe() call below it ever ran, so a real recipe
+    // import silently did nothing visible in the popup — not even an error
+    // — while still writing to storage first if a domain field validated.
+    // Today's own Export button only ever sets connectorId now (also
+    // fixed alongside this, in exportRecipe() — see that function's own
+    // comment), so this is also the shape every real recipe this product
+    // currently produces actually has.
+    const stored = { connectorId: null };
+    const { sandbox, document } = load(stored);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const input = document.getElementById('recipeImport');
+    const fakeFile = { text: async () => JSON.stringify({ flowRecipe: 1, connectorId: 'googleTasks', connectorLabel: 'Google Tasks' }) };
+    let threw = null;
+    try {
+      await Promise.all((input.listeners.change || []).map((fn) => fn({ target: { files: [fakeFile], value: '' } })));
+    } catch (e) { threw = e; }
+    check('importing a real recipe does not throw', threw === null, threw && String(threw));
+
+    const note = document.getElementById('recipeNote');
+    check('it shows a real confirmation, not silence', note.hidden === false);
+    check('the confirmation names the connector, not "undefined"', note.textContent.includes('Google Tasks'), note.textContent);
+    check('it is shown as success, not an error', note.style.color === 'var(--ok)', note.style.color);
+  }
+
+  console.log('\n--- popup.js: importing a recipe for a dormant (non-MVP) connector never points at a card that isn\'t there ---\n');
+  {
+    // Same dead-end class as background.js's own connector-error fix from
+    // this pass, reached through a different door: notion has real,
+    // working connect code (background.js's WRITERS/UNDOERS) but carries
+    // no `mvp` flag, so renderConnectors() never gives it a card on this
+    // screen (see core/connectors.js's own header comment). Telling the
+    // user to "Connect Notion above" would send them looking for a button
+    // that was never rendered.
+    const { sandbox, document } = load({});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const input = document.getElementById('recipeImport');
+    const fakeFile = { text: async () => JSON.stringify({ flowRecipe: 1, connectorId: 'notion', connectorLabel: 'Notion' }) };
+    await Promise.all((input.listeners.change || []).map((fn) => fn({ target: { files: [fakeFile], value: '' } })));
+
+    const note = document.getElementById('recipeNote');
+    check('it still confirms the load', note.hidden === false, note);
+    check('it never tells the user to connect a card that was never shown', !note.textContent.includes('Connect Notion above'), note.textContent);
+  }
+
+  console.log('\n--- popup.js: an invalid recipe file is still rejected, not silently accepted ---\n');
+  {
+    const { sandbox, document } = load({});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const input = document.getElementById('recipeImport');
+    const fakeFile = { text: async () => 'not json at all' };
+    await Promise.all((input.listeners.change || []).map((fn) => fn({ target: { files: [fakeFile], value: '' } })));
+
+    const note = document.getElementById('recipeNote');
+    check('garbage input is rejected with a real error, not a crash or silent success', note.hidden === false && note.style.color === 'var(--err)', [note.hidden, note.style.color]);
+  }
+
+  console.log('\n--- popup.js: exportRecipe() no longer fabricates a domain nobody chose ---\n');
+  {
+    // Regression guard for a related state-truthfulness bug in the same
+    // area: domain selection isn't a live onboarding question anymore
+    // (wireSave() deliberately leaves domainId unset), but exportRecipe()
+    // used to default an unset domainId to 'sales' unconditionally — every
+    // account's exported recipe claimed a domain choice that was never
+    // actually made, lawyer or doctor accounts included.
+    const stored = { connectorId: 'googleTasks' }; // no domainId set — the real, common MVP case
+    const { sandbox, document } = load(stored);
+    let captured = null;
+    sandbox.URL.createObjectURL = (blob) => { captured = blob; return 'blob:test'; };
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const exportBtn = document.getElementById('recipeExport');
+    (exportBtn.listeners.click || []).forEach((fn) => fn());
+
+    const recipe = JSON.parse(captured.parts[0]);
+    check('the exported recipe carries the real connector', recipe.connectorId === 'googleTasks', recipe);
+    check('it does not fabricate a domain that was never chosen', !('domainId' in recipe), recipe);
+  }
+
   console.log('\n--- popup.js: the memory-insight card renders instead of throwing ---\n');
   {
     // Regression guard for a real bug: STEP_NOUNS was declared as a `const`

@@ -216,10 +216,20 @@
   }
 
   /* --------------------------------------------------------------- recipe */
-  // A recipe is a shareable "how someone else set Glance up" — literally just
-  // the two picks on this screen. It never carries a token, a log entry, or
-  // anything Glance wrote, so passing a .glance file around is as safe as
-  // describing your setup in a Slack message.
+  // A recipe is a shareable "how someone else set Glance up" — never a
+  // token, a log entry, or anything Glance wrote, so passing a .glance file
+  // around is as safe as describing your setup in a Slack message.
+  //
+  // Domain (FLOW_DOMAINS) used to be a live onboarding question here too —
+  // it isn't anymore (see wireSave()'s own comment: domainId is now
+  // deliberately left unset, and judgment.js falls back to FLOW_DOMAINS[0]
+  // whenever it's missing). A recipe exported today therefore carries only
+  // connectorId, the one thing Setup still actually asks. Import still
+  // honors a domainId from an OLDER recipe if one is present — that field
+  // isn't meaningless, just no longer collected — but never requires it:
+  // gating the whole import on a field the current product doesn't even
+  // offer a way to set was rejecting every recipe this product can produce
+  // today as "not a valid Glance recipe."
 
   function noteRecipe(text, ok) {
     const note = document.getElementById('recipeNote');
@@ -233,20 +243,19 @@
   // same confirmation copy — instead of a second export path that could
   // quietly drift from this one.
   function exportRecipe() {
-    const domain = FLOW_DOMAINS.find((d) => d.id === state.domainId) || FLOW_DOMAINS.find((d) => d.id === 'sales');
+    const domain = state.domainId ? FLOW_DOMAINS.find((d) => d.id === state.domainId) : null;
     const connector = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
-    const recipe = {
-      flowRecipe: 1,
-      domainId: domain.id,
-      domainLabel: domain.label,
-      connectorId: connector ? connector.id : null,
-      connectorLabel: connector ? connector.label : null
-    };
+    const recipe = { flowRecipe: 1, connectorId: connector ? connector.id : null, connectorLabel: connector ? connector.label : null };
+    // Only included when this account actually has one set — see this
+    // section's header comment for why fabricating a default here (every
+    // export used to claim domainId:'sales' whether or not that was ever
+    // chosen) was its own small state-truthfulness bug.
+    if (domain) { recipe.domainId = domain.id; recipe.domainLabel = domain.label; }
     const blob = new Blob([JSON.stringify(recipe, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'glance-recipe-' + domain.id + (connector ? '-' + connector.id : '') + '.glance';
+    a.download = 'glance-recipe' + (connector ? '-' + connector.id : '') + (domain ? '-' + domain.id : '') + '.glance';
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -269,21 +278,38 @@
         return;
       }
       // Only ever read two known string fields off the parsed JSON — never
-      // trust or store anything else a file could contain.
+      // trust or store anything else a file could contain. Accept the file
+      // if EITHER is present and recognized; today's own export only ever
+      // sets connectorId (see this section's header comment), so requiring
+      // domainId too rejected every recipe this product can currently
+      // produce.
+      const wantedConnector = FLOW_CONNECTORS.find((c) => c.id === parsed.connectorId);
       const validDomain = FLOW_DOMAINS.find((d) => d.id === parsed.domainId);
-      if (!validDomain) {
+      if (!wantedConnector && !validDomain) {
         noteRecipe('That file isn’t a valid Glance recipe.', false);
         return;
       }
-      await FlowStorage.set({ domainId: validDomain.id });
+      if (validDomain) await FlowStorage.set({ domainId: validDomain.id });
       state = await FlowStorage.get();
-      renderDomains();
-      const wantedConnector = FLOW_CONNECTORS.find((c) => c.id === parsed.connectorId);
+      // There is no domain picker left in this UI to re-render (see this
+      // section's header comment) — a call here used to reference a
+      // renderDomains() that had already been deleted along with that
+      // picker, throwing before either noteRecipe() below ever ran. Every
+      // import silently did nothing visible, whether or not the storage
+      // write itself (above) actually succeeded.
+      const what = validDomain && wantedConnector ? validDomain.label + ' + ' + wantedConnector.label
+        : validDomain ? validDomain.label
+        : wantedConnector.label;
+      // mvp is the same bar renderConnectors() uses to decide which cards
+      // this Setup screen actually shows — pointing at "Connect X above"
+      // for one of the four dormant connectors would be the exact dead-end
+      // this pass's own connector-error fix (background.js) exists to
+      // avoid, just reached from a different door.
       const alreadyConnected = wantedConnector && status && status[wantedConnector.id] && status[wantedConnector.id].connected;
-      if (wantedConnector && !alreadyConnected) {
-        noteRecipe('Loaded — ' + validDomain.label + '. Connect ' + wantedConnector.label + ' above to match it exactly, or use whatever you already have.', true);
+      if (wantedConnector && wantedConnector.mvp && !alreadyConnected) {
+        noteRecipe('Loaded — ' + what + '. Connect ' + wantedConnector.label + ' above to match it exactly, or use whatever you already have.', true);
       } else {
-        noteRecipe('Loaded — ' + validDomain.label + '. Click Save & start to apply it.', true);
+        noteRecipe('Loaded — ' + what + '. Click Save & start to apply it.', true);
       }
     });
   }
@@ -573,8 +599,8 @@
     });
     // The same real, working setup this account already has, exported as
     // the exact .glance file the Setup tab's own Export button produces
-    // (see exportRecipe()) — a teammate imports it and matches this domain
-    // and connector in one drop, no separate onboarding conversation. This
+    // (see exportRecipe()) — a teammate imports it and matches this
+    // connector in one drop, no separate onboarding conversation. This
     // is a second path inside the SAME earned-trust card rather than a
     // second dismissible surface: two independent "tell someone" prompts
     // stacking after the same threshold would read as being asked twice.
