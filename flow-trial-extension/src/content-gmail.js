@@ -1012,7 +1012,7 @@
   //
   // When every step the chip actually proposed succeeded, this prefers the
   // catalog's own hand-written closedLine (actions.js's PROCESS_CATALOG —
-  // e.g. "Scheduled, confirmed, and tracked.") over the generic verb-join:
+  // e.g. "Scheduled, drafted, and tracked.") over the generic verb-join:
   // it's specific to what this exact PROCESS means when it fully closes,
   // not just a list of what happened to succeed. The dynamic verb-join
   // stays as the honest fallback for a partial success (some steps failed)

@@ -128,8 +128,15 @@ const FlowActions = (() => {
   const PROCESS_CATALOG = {
     'schedule-confirm': {
       name: 'Schedule & Confirm',
-      closingLine: 'Scheduling this, replying to confirm, and setting a follow-up.',
-      closedLine: 'Scheduled, confirmed, and tracked.',
+      // "replying to confirm" / "confirmed" would both overclaim: the draft
+      // step (gmailDraftWrite, background.js) only ever creates a Gmail
+      // draft — never sends — as a deliberate safety choice, never on the
+      // user's behalf without their own review. Saying "confirmed" here
+      // would tell the user this process already sent something it
+      // didn't, which is the one thing worse than an honest "still needs
+      // you to hit send": believing it's done when it isn't.
+      closingLine: 'Scheduling this, drafting a reply to confirm, and setting a follow-up.',
+      closedLine: 'Scheduled, drafted, and tracked.',
       anchor: 'calendar',
       stepKinds: ['calendar', 'draft', 'task']
     },
@@ -143,7 +150,9 @@ const FlowActions = (() => {
     'reply-track': {
       name: 'Reply & Track',
       closingLine: 'Drafting your reply and tracking it as a task.',
-      closedLine: 'Replied and tracked.',
+      // Same accuracy fix as schedule-confirm above: the draft step never
+      // sends, so "Replied" claimed a step this process doesn't take.
+      closedLine: 'Drafted and tracked.',
       anchor: 'draft',
       stepKinds: ['draft', 'task']
     },
