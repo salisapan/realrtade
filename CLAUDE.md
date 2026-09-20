@@ -37,16 +37,22 @@ the same pass rather than waiting to be asked about each one.
 
 ## The decision filter — apply before building anything non-trivial
 
-Every significant decision and new piece of work must pass one question,
-in `docs/decision-filter.md`: does this strengthen our ability to become
-the most reliable system in the world at turning intention into closed
-execution? If the answer is not a clear yes, do not build it. The doc
-grounds "intention," "execution," "closed," and "reliable" in concepts
-already load-bearing elsewhere in this codebase (`core/intent.js`,
-`background.js`'s connectors, `core/pmf-metrics.js`'s strict closure-rate
-definition, `judgment.js`'s precision-over-recall bias) rather than leaving
-the question abstract — read it before proposing new features, new data
-paths, or new UI surfaces, not just once.
+There is one enforced decision filter, run at two levels. Start with
+`docs/product-architecture.md` §5.8 — the product owner's own five-question
+checklist ("You intend — we execute," feeling of closure, precision and
+silence, Zero-Prompt, compounding value) — for every significant decision
+and new piece of work. When an answer there is genuinely ambiguous, or a
+"no" needs explaining rather than just asserting, drop down to
+`docs/decision-filter.md`, the detailed reference underneath it: one
+grounded question (does this strengthen our ability to become the most
+reliable system in the world at turning intention into closed execution?)
+with "intention," "execution," "closed," and "reliable" mapped onto actual
+code (`core/intent.js`, `background.js`'s connectors,
+`core/pmf-metrics.js`'s strict closure-rate definition, `judgment.js`'s
+precision-over-recall bias) and an explicit table showing how its four
+terms cover all five of §5.8's questions. Read whichever level you need
+before proposing new features, new data paths, or new UI surfaces — not
+just once.
 
 ## The Magic Moment — read before touching onboarding or first-use copy
 

@@ -507,6 +507,10 @@ Before building anything, ask:
 4. Does it respect Zero-Prompt principles?
 5. Does it create compounding value over time (memory, habit, trust)?
 
+For the detailed, code-grounded version of this same filter — useful when
+an answer above is genuinely ambiguous, or a "no" needs explaining rather
+than just asserting — see `docs/decision-filter.md`.
+
 If the answer to most of these is "no" — do not build it.
 
 ### 5.9 Final Statement

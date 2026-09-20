@@ -16,6 +16,46 @@ surface, a piece of infrastructure — ask:
 
 If the answer is not a clear yes, do not build it.
 
+## Relationship to product-architecture.md §5.8
+
+`docs/product-architecture.md` §5.8 ("Decision Filter — Use on Every
+Feature") is the product owner's own authored checklist, added 2026-09-18
+— a fast, five-question pass meant for day-to-day use while actually
+building something:
+
+1. Does this move us closer to "You intend — we execute"?
+2. Does it increase the user's feeling that things get closed?
+3. Does it protect or improve precision and silence?
+4. Does it respect Zero-Prompt principles?
+5. Does it create compounding value over time (memory, habit, trust)?
+
+That checklist is canonical — it is the one to reach for first, every
+time, because it is faster to run and it names the two phrases
+("You intend — we execute," Zero-Prompt) everything in this product
+ultimately has to answer to. This document is not a second, competing
+filter that happens to sound similar. It is the detailed reference
+underneath that checklist, for the two moments the five-question pass
+alone doesn't resolve: when an answer is genuinely ambiguous and needs
+tracing to actual code to settle, and when a "no" needs to be explained
+to someone rather than just asserted.
+
+The mapping is exact, not approximate — every one of the five questions
+above lands on one or more of the four grounded terms below:
+
+| §5.8 question | Grounded term(s) here |
+|---|---|
+| 1. "You intend — we execute" | Intention -> Execution, the whole pipeline |
+| 2. Feeling that things get closed | Closed (accepted and not undone) |
+| 3. Precision and silence | Reliable |
+| 4. Zero-Prompt | Reliable (a prompt is a new failure mode: a mistuned or ignored one) |
+| 5. Compounding value | Reliable, sustained — precision and closure holding as usage grows, not just on day one |
+
+Run §5.8 first. If every answer is a clear yes, build it — there is no
+need to re-derive the single question below on top of it. Come here only
+when §5.8 leaves a real question mark on one of its five, and that
+question mark needs settling against what "intention," "execution,"
+"closed," and "reliable" actually cash out to in this codebase.
+
 ## What "reliable" and "closed execution" actually mean here
 
 This is not a vague aspiration — it maps directly onto concepts already
