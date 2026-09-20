@@ -215,12 +215,6 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(1.9rem,3.4vw,
 .hb-partner span{font-family:var(--sans); font-weight:600; font-size:.85rem; white-space:nowrap}
 @media (max-width:640px){ .hero-banner{padding:var(--space-7) 0 4px} .hb-partner-row{gap:18px 22px} }
 
-.btn{display:inline-flex; align-items:center; gap:8px; background:var(--accent); color:#fff !important; text-decoration:none; font-family:var(--sans); font-weight:700; font-size:1rem; padding:14px 26px; border-radius:11px; border:0; cursor:pointer; box-shadow:0 10px 24px -12px rgba(26,78,245,.55); transition:transform .12s,box-shadow .12s,filter .12s}
-.btn:hover{filter:brightness(1.07); transform:translateY(-1px)}
-.btn.ghost{background:var(--surface); color:var(--ink) !important; border:1px solid var(--line-2); box-shadow:none}
-.btn.ghost:hover{border-color:var(--accent); color:var(--accent-ink) !important}
-.btn.block{width:100%; justify-content:center}
-
 /* the site's real [Do It] button — same component as the homepage, not a lookalike */
 .doit{--pad-y:16px; --pad-x:32px; position:relative; display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:var(--pad-y) var(--pad-x); border:0; cursor:pointer; isolation:isolate; border-radius:999px; background:transparent; text-decoration:none; -webkit-tap-highlight-color:transparent; font-family:var(--disp); font-weight:700; font-size:1.05rem; color:var(--doit-text); text-shadow:0 1px 10px var(--glow); transition:transform .28s cubic-bezier(.2,.8,.2,1)}
 .doit .shell{position:absolute; inset:0; border-radius:inherit; z-index:-2; background:linear-gradient(180deg,var(--glass-gloss) 0%,transparent 24%),linear-gradient(180deg,var(--glass-top),var(--glass-bot)); border:1px solid var(--glass-border); box-shadow:inset 0 1.5px 0 var(--glass-gloss), inset 0 -12px 26px rgba(14,32,80,.24), 0 16px 46px -10px var(--glow); transition:box-shadow .3s}
