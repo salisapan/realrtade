@@ -67,7 +67,7 @@ body{
 
 .tabs{display:flex; gap:2px; padding:0 16px; border-bottom:1px solid var(--line)}
 .tab{
-  all:unset; cursor:pointer; font-family:inherit; font-size:.86rem; font-weight:700;
+  all:unset; box-sizing:border-box; cursor:pointer; font-family:inherit; font-size:.86rem; font-weight:700;
   color:var(--ink-3); padding:9px 6px 11px; border-bottom:2px solid transparent;
   transition:color .2s, border-color .2s;
 }
@@ -147,7 +147,15 @@ main{padding:16px}
    visible text; see popup.html's Save & start button and
    connectorCard()'s connect button in popup.js for the exact markup. */
 .primary{
-  all:unset; display:flex; align-items:center; justify-content:center; width:100%;
+  /* all:unset resets box-sizing to its initial value (content-box),
+     overriding the sheet-wide *{box-sizing:border-box} rule — with
+     width:100% and real padding below, that silently rendered this
+     button wider than its own container (measured: 360px inside a
+     352px-wide popup body) instead of the intended full-width-and-no-
+     wider. Every other sized element in this file assumes border-box;
+     this one has to say so explicitly since all:unset wiped it. */
+  all:unset; box-sizing:border-box;
+  display:flex; align-items:center; justify-content:center; width:100%;
   position:relative; isolation:isolate; cursor:pointer;
   border-radius:999px; padding:13px 20px;
   font-family:var(--disp); font-weight:700; font-size:.92rem; color:var(--doit-text);
@@ -187,7 +195,11 @@ main{padding:16px}
 
 @keyframes g-sweep{to{transform:translateX(260%) skewX(-18deg)}}
 .ghost{
-  all:unset; display:inline-block; text-align:center; cursor:pointer; margin-top:10px;
+  /* Same all:unset-resets-box-sizing issue as .primary above — .ghost.wide
+     and .referral-row .ghost both combine width:100% with real padding,
+     which needs border-box to stay inside their container. */
+  all:unset; box-sizing:border-box;
+  display:inline-block; text-align:center; cursor:pointer; margin-top:10px;
   font-family:inherit; font-weight:600; font-size:.8rem; color:var(--ink-2);
   border:1px solid var(--line-2); border-radius:999px; padding:6px 14px;
   transition:border-color .15s, color .15s, background .15s;
