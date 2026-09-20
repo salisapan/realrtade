@@ -183,6 +183,10 @@ main{padding:16px}
 .week-stat span{font-size:.78rem; color:var(--ink-2)}
 .week-stat .week-total{margin-inline-start:auto; color:var(--ink-3); font-size:.72rem}
 
+/* ---- compounding-value read-out: what Execution Memory has actually
+   learned, not just how many times Glance has written something ---- */
+.learned-stat{font-size:.72rem; color:var(--ink-3); margin:-6px 0 14px; line-height:1.4}
+
 /* ---- sensitivity read-out ---- */
 .sense{display:flex; align-items:center; gap:9px; margin-bottom:14px}
 .sense-label{font-family:'JetBrains Mono',monospace; font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3)}

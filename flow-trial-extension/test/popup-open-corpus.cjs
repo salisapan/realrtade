@@ -64,14 +64,28 @@ function load(stored) {
   const chromeStub = {
     storage: {
       local: {
+        // Two real callers, two real calling conventions — both genuinely
+        // supported by chrome.storage.local, not two different stubs papering
+        // over one: storage.js passes an object of keys-with-defaults plus a
+        // callback; chrome-storage-adapter.js (execution-memory.js's own
+        // client-side adapter) passes a single string key and awaits a
+        // Promise instead, with no defaults concept at all. A stub that only
+        // implements the callback half silently starves anything that reads
+        // Execution Memory through the popup — `await undefined` resolves
+        // immediately, indistinguishable from "no memory yet."
         get: (keysWithDefaults, cb) => {
+          const isString = typeof keysWithDefaults === 'string';
+          const keys = isString ? [keysWithDefaults] : Object.keys(keysWithDefaults);
           const result = {};
-          for (const k of Object.keys(keysWithDefaults)) {
-            result[k] = Object.prototype.hasOwnProperty.call(store, k) ? store[k] : keysWithDefaults[k];
+          for (const k of keys) {
+            result[k] = Object.prototype.hasOwnProperty.call(store, k)
+              ? store[k]
+              : (isString ? undefined : keysWithDefaults[k]);
           }
-          cb(result);
+          if (cb) { cb(result); return; }
+          return Promise.resolve(result);
         },
-        set: (patch, cb) => { Object.assign(store, patch); if (cb) cb(); }
+        set: (patch, cb) => { Object.assign(store, patch); if (cb) { cb(); return; } return Promise.resolve(); }
       }
     },
     runtime: {
@@ -190,6 +204,66 @@ async function run() {
     check('dismissing from the popup really closes the message', await FlowStorage.hasTerminalOutcome('m1'));
     check('...and it drops out of the pending list', (await FlowStorage.getPending()).length === 0);
     check('the dismissal was actually persisted to storage, not just in memory', (store().log || []).some((e) => e.kind === 'dismissed' && e.messageId === 'm1'));
+  }
+
+  console.log('\n--- popup.js: the memory-insight card renders instead of throwing ---\n');
+  {
+    // Regression guard for a real bug: STEP_NOUNS was declared as a `const`
+    // AFTER renderLog()/renderMemoryInsight() were already called earlier in
+    // the same popupInit() function body — a `const` is in the temporal dead
+    // zone until its own statement runs, same as the `let currentInsight`
+    // bug this file's own comment already documents fixing. Because
+    // STEP_NOUNS is only read after renderMemoryInsight's own
+    // `if (!currentInsight) return` guard, this stayed hidden through every
+    // popup open that had nothing to show — and threw ReferenceError,
+    // aborting the rest of popupInit() silently, the first time Execution
+    // Memory actually had something to say.
+    const makeEvent = (status) => ({ intentionId: 'm' + Math.random(), processType: 'reply-track', steps: ['task'], status, scope: status === 'dismissed' ? 'partial' : null, timestamp: new Date().toISOString() });
+    const stored = { flowExecutionEvents: [makeEvent('dismissed'), makeEvent('dismissed'), makeEvent('dismissed')] };
+    const { sandbox, document } = load(stored);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const card = document.getElementById('memoryInsight');
+    check('the insight card renders instead of the popup throwing', card.hidden === false);
+    const text = document.getElementById('memoryInsightText').textContent;
+    check('it names the actual step and the human process name, not the raw id',
+      text.includes('the Task step') && text.includes('Reply & Track'), text);
+  }
+
+  console.log('\n--- popup.js: the Activity tab surfaces compounding Execution Memory value ---\n');
+  {
+    // Three real dismissals of the same non-anchor step, no acceptances —
+    // exactly the sample size and shape FlowActions.isNetRejected() (and so
+    // applyMemory()) already treats as a real, acted-on preference, not
+    // noise. renderLearned() must count this the same way or its claim
+    // could disagree with what the live chip is actually doing.
+    const makeEvent = (status) => ({ intentionId: 'm' + Math.random(), processType: 'reply-track', steps: ['task'], status, scope: status === 'dismissed' ? 'partial' : null, timestamp: new Date().toISOString() });
+    const stored = { flowExecutionEvents: [makeEvent('dismissed'), makeEvent('dismissed'), makeEvent('dismissed')] };
+    const { sandbox, document } = load(stored);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const el = document.getElementById('learnedStat');
+    check('the learned-stat line is shown once a real preference exists', el.hidden === false);
+    check('it states the count in plain language', el.textContent === 'Glance has adjusted 1 thing about how it works for you.', el.textContent);
+  }
+
+  console.log('\n--- popup.js: a fresh account with no Execution Memory shows nothing ---\n');
+  {
+    // Zero learned preferences is the common, correct state for a new
+    // install — it must stay silent rather than announce "0 things
+    // learned," which would read as the product failing at the one thing
+    // this line exists to reassure about.
+    const { sandbox, document } = load({});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const el = document.getElementById('learnedStat');
+    check('the learned-stat line stays hidden with nothing learned yet', el.hidden === true);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

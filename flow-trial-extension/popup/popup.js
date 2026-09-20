@@ -22,6 +22,19 @@
   // await in this function ever ran.
   let currentInsight = null;
 
+  // Same relocation, same reason, one variable over: STEP_NOUNS is a
+  // `const`, but a `const` is exactly as dead-zoned as a `let` until its own
+  // statement runs — it does not matter that this one is never reassigned.
+  // renderMemoryInsight (called from renderLog, called two lines below)
+  // only reaches STEP_NOUNS after its own `if (!currentInsight) return`
+  // guard, which is why this stayed hidden even after the currentInsight
+  // fix above: it only throws once there is an actual insight to show, not
+  // on every popup open — silently breaking the Activity tab (and, later,
+  // the "Learned" stat right above it) the first time Execution Memory
+  // finally had something to say, rather than the first time anyone opened
+  // the popup.
+  const STEP_NOUNS = { calendar: 'the Calendar step', draft: 'the draft reply step', task: 'the Task step' };
+
   wireTabs();
   wireSave();
   wireRecipe();
@@ -390,12 +403,39 @@
     wrap.hidden = false;
   }
 
-  // Human-readable nouns for a catalog step id — cosmetic copy only, kept
-  // here rather than in actions.js since it's UI text, not decision data
-  // (unlike PROCESS_CATALOG/isNetRejected, which popup.js reads from
-  // actions.js precisely so this card can never disagree with what the live
-  // chip is actually doing).
-  const STEP_NOUNS = { calendar: 'the Calendar step', draft: 'the draft reply step', task: 'the Task step' };
+  // Compounding value made visible: how many (process, step) preferences
+  // Execution Memory has actually learned and acted on for this account —
+  // not a raw click count (weekStat above already shows that), but real
+  // adjustments to what Glance proposes next. Reuses FlowActions.isNetRejected()
+  // rather than a second definition of "learned," so this claim can never
+  // disagree with the exact math applyMemory() uses to actually demote a
+  // step. A step the person explicitly pinned counts too — that is still
+  // Glance's behavior having adapted for this account, the correction just
+  // came from a direct answer instead of an inference (see recordPin's own
+  // comment in execution-memory.js). Zero is a real, common state (a new
+  // install, or one that has never removed or pinned a step) and stays
+  // hidden rather than announcing "0 things learned," which would read as
+  // the product failing at the one thing this line exists to reassure
+  // about — see the Magic Moment's own "nothing to prove yet" precedent.
+  async function renderLearned() {
+    const wrap = document.getElementById('learnedStat');
+    if (typeof FlowExecutionMemory === 'undefined' || typeof FlowActions === 'undefined') { wrap.hidden = true; return; }
+    const mem = await FlowExecutionMemory.getAll();
+    let count = 0;
+    for (const processId of Object.keys(mem)) {
+      const steps = (mem[processId] && mem[processId].steps) || {};
+      for (const stepKind of Object.keys(steps)) {
+        const s = steps[stepKind];
+        if ((s.pinned || 0) > 0 || FlowActions.isNetRejected(s)) count++;
+      }
+    }
+    if (!count) { wrap.hidden = true; return; }
+    wrap.textContent = 'Glance has adjusted ' + count + (count === 1 ? ' thing' : ' things') + ' about how it works for you.';
+    wrap.hidden = false;
+  }
+
+  // STEP_NOUNS lives near currentInsight at the top of this function now —
+  // see the comment there for why.
 
   // Execution Memory made visible: at most one insight shown at a time
   // (never a pile of things to review), and only ever for a (process, step)
@@ -501,6 +541,7 @@
   async function renderLog() {
     const s = await FlowStorage.get();
     renderWeekStat(s);
+    await renderLearned();
     renderSensitivity(s);
     await renderMemoryInsight(s);
     renderReferral(s);
