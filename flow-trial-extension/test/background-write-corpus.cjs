@@ -257,6 +257,59 @@ async function run() {
       (await attempt(env.fn('googleCalendarUndo')({ eventId: 'ev_1' }))).ok === true);
   }
 
+  console.log('\n--- background.js: each shared-destination write attributes itself distinctly ---\n');
+  {
+    // Every write that lands somewhere a teammate might see it (a CRM note,
+    // a Slack message, a Notion page, a Calendar event) credits Glance with
+    // one quiet line — this trial's actual distribution channel, per this
+    // file's own header comment on ATTRIBUTION_TEXT/attributionUrl. Each
+    // surface must carry ITS OWN ref code, not a shared generic one, or a
+    // click from a HubSpot note is indistinguishable from a click from a
+    // Slack message in the numbers later. A Gmail draft is deliberately
+    // exempt (see this file's own comment there) — it is not tested here.
+    const env = load();
+    const p = { label: 'Renewal agreed', facts: {}, threadUrl: 'https://mail.google.com/x' };
+
+    const hubspot = env.fn('hubspotNoteBody')(p);
+    check('HubSpot note attributes with ref=hubspot', hubspot.includes('ref=hubspot'), hubspot);
+
+    const salesforce = env.fn('salesforceTaskDescription')(p);
+    check('Salesforce task attributes with ref=salesforce', salesforce.includes('ref=salesforce'), salesforce);
+
+    const slack = env.fn('slackMessageText')(p);
+    check('Slack message attributes with ref=slack', slack.includes('ref=slack'), slack);
+
+    const monday = env.fn('mondayUpdateBody')(p);
+    check('Monday.com update attributes with ref=monday', monday.includes('ref=monday'), monday);
+
+    const notion = JSON.stringify(env.fn('notionBlocks')(p));
+    check('Notion page attributes with ref=notion', notion.includes('ref=notion'), notion);
+
+    // Every ref code actually differs — the whole point is telling these
+    // apart later, so two surfaces silently sharing one code would defeat it
+    // just as quietly as the old single shared ATTRIBUTION_URL did.
+    const codes = [hubspot, salesforce, slack, monday, notion].map((s) => (s.match(/ref=(\w+)/) || [])[1]);
+    check('all five ref codes are distinct', new Set(codes).size === codes.length, codes);
+  }
+
+  console.log('\n--- background.js: a Calendar event attributes itself without throwing ---\n');
+  {
+    // Regression guard for a real bug: attributionUrl() replaced the single
+    // ATTRIBUTION_URL constant everywhere BUT this call site kept referencing
+    // the now-deleted constant, which would have thrown ReferenceError on
+    // every single Calendar write in production — caught only by actually
+    // invoking the writer, not by any string-level check above.
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_9', htmlLink: 'https://calendar.google.com/x' }) }]]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      params: { title: 'Kickoff', dateIso: '2026-09-21', hour: 15, minute: 0 }
+    }));
+    check('the write succeeds rather than throwing', out.ok === true, out);
+    check('the request actually reached the Calendar API', env.calls.some((c) => c.includes('POST') && c.includes('/calendars/primary/events')), env.calls);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

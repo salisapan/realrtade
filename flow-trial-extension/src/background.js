@@ -116,7 +116,18 @@ const NOTION_VERSION = '2022-06-28';
 // distribution channel this trial has: read organically by exactly the
 // person it would actually help, at the moment they're already looking at
 // proof it works.
-const ATTRIBUTION_URL = 'https://theflow-ai.com/trial.html?ref=note';
+// One url per shared destination rather than one shared ATTRIBUTION_URL —
+// this file's own comment above already calls this line "this trial's
+// entire distribution channel," and a single generic ?ref=note code meant
+// every one of those five channels was pooled into one number with no way
+// to tell a HubSpot teammate's click from a Slack teammate's. The url
+// itself still resolves to the exact same page either way; only the query
+// string differs, so nothing about what a reader sees or where they land
+// changes — this is purely which of several already-built exposure
+// surfaces is worth building on next becoming answerable instead of guessed.
+function attributionUrl(surface) {
+  return 'https://theflow-ai.com/trial.html?ref=' + surface;
+}
 const ATTRIBUTION_TEXT = 'Logged by Glance — theflow-ai.com/trial';
 
 chrome.runtime.onInstalled.addListener((details) => {
@@ -305,7 +316,7 @@ function hubspotNoteBody(p) {
     rows ? '<ul>' + rows + '</ul>' : '',
     p.facts && p.facts.quote ? '<blockquote>' + esc(p.facts.quote) + '</blockquote>' : '',
     p.threadUrl ? '<p><a href="' + esc(p.threadUrl) + '">Open the original email in Gmail</a></p>' : '',
-    '<p><i>Logged by <a href="' + ATTRIBUTION_URL + '">Glance</a> — one click, from the message itself.</i></p>'
+    '<p><i>Logged by <a href="' + attributionUrl('hubspot') + '">Glance</a> — one click, from the message itself.</i></p>'
   ].filter(Boolean).join('');
 }
 
@@ -439,7 +450,7 @@ function salesforceTaskDescription(p) {
   const lines = factLines(p).map((r) => r[0] + ': ' + r[1]);
   if (p.facts && p.facts.quote) lines.push('"' + p.facts.quote + '"');
   if (p.threadUrl) lines.push('Original email: ' + p.threadUrl);
-  lines.push(ATTRIBUTION_TEXT + ' — ' + ATTRIBUTION_URL);
+  lines.push(ATTRIBUTION_TEXT + ' — ' + attributionUrl('salesforce'));
   return lines.join('\n');
 }
 
@@ -535,7 +546,7 @@ function slackMessageText(p) {
   const parts = ['*' + p.label + '*'].concat(lines);
   if (p.facts && p.facts.quote) parts.push('> ' + p.facts.quote);
   if (p.threadUrl) parts.push('<' + p.threadUrl + '|Open the original email in Gmail>');
-  parts.push('_<' + ATTRIBUTION_URL + '|Logged by Glance> — one click, from the message itself._');
+  parts.push('_<' + attributionUrl('slack') + '|Logged by Glance> — one click, from the message itself._');
   return parts.join('\n');
 }
 
@@ -635,7 +646,7 @@ function mondayUpdateBody(p) {
   const lines = factLines(p).map((r) => r[0] + ': ' + r[1]);
   if (p.facts && p.facts.quote) lines.push('"' + p.facts.quote + '"');
   if (p.threadUrl) lines.push('Original email: ' + p.threadUrl);
-  lines.push(ATTRIBUTION_TEXT + ' — ' + ATTRIBUTION_URL);
+  lines.push(ATTRIBUTION_TEXT + ' — ' + attributionUrl('monday'));
   return lines.join('\n');
 }
 
@@ -917,7 +928,7 @@ async function googleCalendarWrite(p) {
   const timeZone = localTimeZone();
   const descriptionLines = [];
   if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);
-  descriptionLines.push(ATTRIBUTION_TEXT + ' — ' + ATTRIBUTION_URL);
+  descriptionLines.push(ATTRIBUTION_TEXT + ' — ' + attributionUrl('calendar'));
 
   const body = {
     summary: String(params.title || 'Meeting').slice(0, 200),
@@ -1398,7 +1409,7 @@ function notionBlocks(p) {
   }
   blocks.push({
     object: 'block', type: 'paragraph',
-    paragraph: { rich_text: [{ text: { content: ATTRIBUTION_TEXT, link: { url: ATTRIBUTION_URL } } }, { text: { content: ' — one click, from the message itself.' } }], color: 'gray' }
+    paragraph: { rich_text: [{ text: { content: ATTRIBUTION_TEXT, link: { url: attributionUrl('notion') } } }, { text: { content: ' — one click, from the message itself.' } }], color: 'gray' }
   });
   return blocks;
 }
