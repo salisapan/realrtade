@@ -70,6 +70,30 @@ const FlowIntent = (() => {
   ].join('|'), 'i');
   const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|לא מתקיים|לא יתקיים|נקבע מחדש)/;
 
+  // "This already happened — don't schedule it again."
+  //
+  // extract.js's own weekday resolver ("on Monday", "by Friday") always
+  // resolves forward from `now` — deliberately, since a bare future weekday
+  // reference has no other sane reading. But that same forward-only rule
+  // misreads a PAST-tense recap the same way: "Thanks for the call on
+  // Monday at 3pm — great meeting!" sent on a Thursday has a meeting noun,
+  // a resolved date, and a resolved time, and the gate below would create a
+  // brand-new Calendar entry for a meeting that already happened, on the
+  // wrong (next) Monday. Same asymmetry the EVENT_CALLED_OFF comment above
+  // already states for a different cause: a missed chip costs one click; a
+  // phantom future meeting for something that's already over is actively
+  // wrong, so recap language wins over an otherwise-complete gate.
+  const EVENT_RECAP = new RegExp([
+    'thanks? for (?:the |our )?(?:call|meeting|chat|time)',
+    'thank you for (?:the |our )?(?:call|meeting|chat|time)',
+    'great (?:meeting|call|chat|talking to you|speaking with you)',
+    'good (?:speaking|talking|chatting) with you',
+    "it was (?:great|good|nice) (?:to (?:meet|speak|talk|chat)|meeting you|speaking with you|chatting)",
+    'enjoyed (?:our|the) (?:call|meeting|chat|conversation)',
+    'glad (?:we|to have) (?:synced|caught up|connected|spoke|talked)'
+  ].join('|'), 'i');
+  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה))/;
+
   // A reader-directed commitment reminder — narrow by design. This is not
   // "someone agreed to something" (that's DECISION_TO_LOG, judgment.js's
   // COMMIT/COMMIT_STRONG) but specifically "you, the reader, agreed to
@@ -197,9 +221,12 @@ const FlowIntent = (() => {
     //        was called off — "the 3pm Friday sync is cancelled" must not
     //        become a new Calendar entry for that meeting. Precision over
     //        recall: a missed event chip costs one click; a calendar entry
-    //        for a meeting that was just cancelled is actively wrong.
+    //        for a meeting that was just cancelled is actively wrong. Same
+    //        refusal for a recap of a meeting that already happened — see
+    //        EVENT_RECAP above.
     const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
-    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !calledOff) {
+    const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
+    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !calledOff && !isRecap) {
       return finish(TYPES.SCHEDULED_EVENT, 'high', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',

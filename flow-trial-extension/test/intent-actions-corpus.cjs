@@ -101,6 +101,32 @@ console.log('--- intent.js: type + entity checks ---\n');
   }
 }
 
+// 3c. A past-tense recap of a meeting that already happened must NOT become
+//     a Calendar entry either. extract.js's weekday resolver always resolves
+//     "on Monday" forward from `now`, so a recap sent a few days later reads
+//     as a meeting-noun + a resolved date + a resolved time — the same shape
+//     as a genuine future invite — unless the recap language itself is
+//     recognized and refuses the gate, same principle as 3b above.
+{
+  const now = new Date('2026-09-17T12:00:00Z'); // a Thursday
+  const recapCases = [
+    ['thanks for the call',   'Thanks for the call on Monday at 3pm — great meeting, glad we synced!'],
+    ['it was great meeting',  'It was great meeting you on Monday at 3pm, looking forward to next steps.'],
+    ['good talking with you', 'Good talking with you on Monday at 3pm.'],
+    ['Hebrew recap',          'תודה על השיחה ביום שני בשעה 15:00, היה נעים לדבר.']
+  ];
+  for (const [label, text] of recapCases) {
+    const intent = classify(text, { now });
+    check('a ' + label + ' recap does not become a Calendar entry',
+      !intent || intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+  }
+  // Sanity: a genuine future invite using the same "on <weekday> at <time>"
+  // shape, with no recap language, must still fire — this fix must narrow
+  // the gate, not just make it stricter across the board.
+  const invite = classify('Can we schedule a call on Monday at 3pm?', { now });
+  check('a genuine future invite still fires SCHEDULED_EVENT', invite.type === FlowIntent.TYPES.SCHEDULED_EVENT, invite.type);
+}
+
 // 4. A reader commitment reminder -> COMMITMENT_OF_READER, the "Follow
 //    Through" process, task anchor leading, draft second.
 {
