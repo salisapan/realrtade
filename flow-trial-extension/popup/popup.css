@@ -35,6 +35,13 @@
   --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace;
+
+  /* A real spacing scale, not ad-hoc numbers picked per component —
+     6/7/8/9/10/11/12/13/14px all coexisting was the actual "not proper
+     spacing" complaint: nothing shared a rhythm, so nothing read as
+     deliberate. Every margin/padding/gap below now comes from this list. */
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-7:32px;
 }
 
 *{box-sizing:border-box}
@@ -46,7 +53,7 @@ body{
   font-family:var(--sans); direction:ltr; font-size:14px;
 }
 
-.hdr{display:flex; align-items:center; gap:9px; padding:16px 16px 12px}
+.hdr{display:flex; align-items:center; gap:var(--space-2); padding:var(--space-5) var(--space-5) var(--space-3)}
 .hdr .mark{
   position:relative;
   width:9px; height:9px; border-radius:50%; background:var(--accent); flex:none;
@@ -65,67 +72,67 @@ body{
 }
 .ver.on{color:var(--ok); background:var(--ok-wash); border-color:color-mix(in srgb, var(--ok) 35%, transparent); box-shadow:0 0 10px color-mix(in srgb, var(--ok) 25%, transparent)}
 
-.tabs{display:flex; gap:2px; padding:0 16px; border-bottom:1px solid var(--line)}
+.tabs{display:flex; gap:var(--space-1); padding:0 var(--space-5); border-bottom:1px solid var(--line)}
 .tab{
   all:unset; box-sizing:border-box; cursor:pointer; font-family:inherit; font-size:.86rem; font-weight:700;
-  color:var(--ink-3); padding:9px 6px 11px; border-bottom:2px solid transparent;
+  color:var(--ink-3); padding:var(--space-3) var(--space-3) var(--space-3); border-bottom:2px solid transparent;
   transition:color .2s, border-color .2s;
 }
 .tab:hover{color:var(--ink-2)}
 .tab[aria-selected="true"]{color:var(--accent); border-bottom-color:var(--accent)}
 
-main{padding:16px}
+main{padding:var(--space-5)}
 .panel{display:none}
 .panel.active{display:block}
 
-.block{margin-bottom:22px}
-.label{font-size:.92rem; font-weight:700; margin:0 0 3px; color:var(--ink)}
-.hint{font-size:.78rem; color:var(--ink-3); margin:0 0 11px; line-height:1.55}
+.block{margin-bottom:var(--space-6)}
+.label{font-size:.92rem; font-weight:700; margin:0 0 var(--space-1); color:var(--ink)}
+.hint{font-size:.78rem; color:var(--ink-3); margin:0 0 var(--space-3); line-height:1.55}
 
 /* ---- connector cards ---- */
-.conn-list{display:flex; flex-direction:column; gap:9px}
+.conn-list{display:flex; flex-direction:column; gap:var(--space-3)}
 .conn{
   background:
     linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%),
     linear-gradient(180deg, var(--glass-top), var(--glass-bot)), var(--surface);
-  border:1px solid var(--glass-border); border-radius:12px;
-  padding:12px 13px; box-shadow:var(--shadow); transition:border-color .2s, box-shadow .2s;
+  border:1px solid var(--glass-border); border-radius:14px;
+  padding:var(--space-4); box-shadow:var(--shadow); transition:border-color .2s, box-shadow .2s;
 }
 .conn.on{
   border-color:color-mix(in srgb, var(--ok) 45%, var(--glass-border));
   box-shadow:var(--shadow), 0 0 0 1px color-mix(in srgb, var(--ok) 18%, transparent);
 }
 .conn.planned{opacity:.5; box-shadow:none}
-.conn-head{display:flex; align-items:center; gap:8px}
-.conn-name{display:flex; flex-direction:column; min-width:0; flex:1}
+.conn-head{display:flex; align-items:center; gap:var(--space-2)}
+.conn-name{display:flex; flex-direction:column; min-width:0; flex:1; gap:2px}
 .conn-name b{font-size:.9rem; font-weight:700}
 .conn-name i{font-style:normal; font-size:.72rem; color:var(--ink-3)}
 .badge{
   font-family:var(--mono); font-size:.6rem; letter-spacing:.05em;
   text-transform:uppercase; color:var(--ink-3); background:var(--surface-2);
-  border-radius:5px; padding:3px 7px; flex:none;
+  border-radius:5px; padding:4px 8px; flex:none;
 }
 .badge.on{background:var(--ok-wash); color:var(--ok)}
 .badge.live{background:var(--accent-wash); color:var(--accent)}
-.conn-note{font-size:.75rem; color:var(--ink-3); line-height:1.5; margin:8px 0 0}
-.conn-detail{font-size:.75rem; color:var(--ok); margin:6px 0 0}
-.conn-err{font-size:.75rem; color:var(--err); margin:8px 0 0; line-height:1.45}
+.conn-note{font-size:.75rem; color:var(--ink-3); line-height:1.55; margin:var(--space-3) 0 0}
+.conn-detail{font-size:.75rem; color:var(--ok); margin:var(--space-2) 0 0}
+.conn-err{font-size:.75rem; color:var(--err); margin:var(--space-2) 0 0; line-height:1.45}
 
-.conn-form{display:flex; flex-direction:column; gap:6px; margin-top:10px}
+.conn-form{display:flex; flex-direction:column; gap:var(--space-2); margin-top:var(--space-3)}
 .conn-form input{
-  font-family:var(--mono); font-size:.75rem; padding:8px 10px;
+  font-family:var(--mono); font-size:.75rem; padding:var(--space-2) var(--space-3);
   border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink);
 }
 .conn-form input:focus{outline:2px solid var(--accent); outline-offset:1px}
-.conn-help{font-size:.72rem; color:var(--accent); text-decoration:none; align-self:flex-start}
+.conn-help{font-size:.72rem; color:var(--accent); text-decoration:none; align-self:flex-start; margin-top:2px}
 .conn-help:hover{text-decoration:underline}
 
 /* ---- domain radios ---- */
-.radio-list{display:flex; flex-direction:column; gap:6px}
+.radio-list{display:flex; flex-direction:column; gap:var(--space-2)}
 .opt{
-  display:flex; align-items:center; gap:10px;
+  display:flex; align-items:center; gap:var(--space-3);
   background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%), var(--surface);
-  border:1px solid var(--glass-border); border-radius:10px; padding:9px 11px; cursor:pointer;
+  border:1px solid var(--glass-border); border-radius:10px; padding:var(--space-3); cursor:pointer;
   transition:border-color .15s, background .15s, transform .15s;
 }
 .opt:hover{transform:translateY(-1px)}
@@ -157,7 +164,7 @@ main{padding:16px}
   all:unset; box-sizing:border-box;
   display:flex; align-items:center; justify-content:center; width:100%;
   position:relative; isolation:isolate; cursor:pointer;
-  border-radius:999px; padding:13px 20px;
+  border-radius:999px; padding:var(--space-4) var(--space-5);
   font-family:var(--disp); font-weight:700; font-size:.92rem; color:var(--doit-text);
   text-shadow:0 1px 8px var(--glow); text-align:center;
   transition:transform .22s cubic-bezier(.2,.8,.2,1);
@@ -182,7 +189,12 @@ main{padding:16px}
   transform:skewX(-18deg);
 }
 .primary .btn-label{position:relative}
-.primary.sm{margin-top:10px; padding:10px 16px; font-size:.84rem}
+.primary.sm{margin-top:var(--space-4); padding:var(--space-3) var(--space-4); font-size:.84rem}
+/* #save sits directly under main{}, not wrapped in its own .block — this
+   is the one place that rhythm has to be spelled out explicitly rather
+   than inherited from .block, on both sides: the same var(--space-6) gap
+   every other section boundary in this file uses. */
+#save{margin-bottom:var(--space-6)}
 .primary:hover{transform:translateY(-1px) scale(1.01)}
 .primary:hover .shell{box-shadow:inset 0 1px 0 rgba(255,255,255,.4), inset 0 -8px 16px rgba(6,14,36,.5), 0 18px 42px -8px var(--glow)}
 .primary:hover .ring{border-color:var(--accent); box-shadow:0 0 18px var(--glow), inset 0 0 14px var(--glow)}
@@ -199,25 +211,24 @@ main{padding:16px}
      and .referral-row .ghost both combine width:100% with real padding,
      which needs border-box to stay inside their container. */
   all:unset; box-sizing:border-box;
-  display:inline-block; text-align:center; cursor:pointer; margin-top:10px;
+  display:inline-block; text-align:center; cursor:pointer; margin-top:var(--space-3);
   font-family:inherit; font-weight:600; font-size:.8rem; color:var(--ink-2);
-  border:1px solid var(--line-2); border-radius:999px; padding:6px 14px;
+  border:1px solid var(--line-2); border-radius:999px; padding:var(--space-2) var(--space-4);
   transition:border-color .15s, color .15s, background .15s;
 }
-.ghost.sm{margin-top:0; font-size:.74rem; padding:4px 12px}
-.ghost.wide{display:block; width:100%; text-align:center; padding:9px; font-size:.82rem}
+.ghost.sm{margin-top:0; font-size:.74rem; padding:var(--space-2) var(--space-3)}
+.ghost.wide{display:block; width:100%; text-align:center; padding:var(--space-3); font-size:.82rem}
 .ghost:hover{border-color:var(--accent); color:var(--accent); background:var(--accent-wash)}
-.saved-note{font-size:.8rem; color:var(--ok); margin-top:10px; text-align:center; line-height:1.5}
+.saved-note{font-size:.8rem; color:var(--ok); margin-top:var(--space-3); text-align:center; line-height:1.5}
 
 /* ---- recipe export/import ---- */
-.recipe-block{margin-top:-6px}
-.recipe-row{display:flex; gap:8px}
+.recipe-row{display:flex; gap:var(--space-2)}
 .recipe-row .ghost{margin-top:0; flex:1; text-align:center}
 
 /* ---- weekly value read-out ---- */
 .week-stat{
-  display:flex; align-items:baseline; gap:5px; margin-bottom:14px;
-  background:var(--accent-wash); border-radius:9px; padding:9px 12px;
+  display:flex; align-items:baseline; gap:var(--space-2); margin-bottom:var(--space-2);
+  background:var(--accent-wash); border-radius:10px; padding:var(--space-3) var(--space-4);
 }
 .week-stat b{font-size:1.05rem; font-weight:800; color:var(--accent)}
 .week-stat span{font-size:.78rem; color:var(--ink-2)}
@@ -225,34 +236,37 @@ main{padding:16px}
 
 /* ---- compounding-value read-out: what Execution Memory has actually
    learned, not just how many times Glance has written something ---- */
-.learned-stat{font-size:.72rem; color:var(--ink-3); margin:-6px 0 14px; line-height:1.4}
+.learned-stat{font-size:.72rem; color:var(--ink-3); margin:0 0 var(--space-6); line-height:1.5}
 
 /* ---- sensitivity read-out ---- */
-.sense{display:flex; align-items:center; gap:9px; margin-bottom:14px}
-.sense-label{font-family:var(--mono); font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3)}
-.sense-bar{flex:0 0 74px; height:4px; border-radius:2px; background:var(--surface-2); overflow:hidden}
+/* flex-start, not center: .sense-note routinely wraps to 2-3 lines while
+   the label and bar stay single-line — centered, they floated in the
+   middle of the paragraph instead of reading as its leading edge. */
+.sense{display:flex; align-items:flex-start; gap:var(--space-3); margin-bottom:var(--space-6)}
+.sense-label{font-family:var(--mono); font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3); margin-top:3px}
+.sense-bar{flex:0 0 74px; height:4px; border-radius:2px; background:var(--surface-2); overflow:hidden; margin-top:7px}
 .sense-bar i{display:block; height:100%; background:var(--accent); border-radius:2px; transition:width .4s}
-.sense-note{font-size:.72rem; color:var(--ink-3); flex:1; min-width:0}
+.sense-note{font-size:.72rem; color:var(--ink-3); flex:1; min-width:0; line-height:1.5}
 
 /* ---- Execution Memory insight: a silent bias made visible, answered once ---- */
 .memory-insight{
-  margin-bottom:14px; padding:11px 12px;
+  margin-bottom:var(--space-6); padding:var(--space-4);
   background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%), var(--accent-wash);
-  border:1px solid var(--glass-border); border-radius:10px;
+  border:1px solid var(--glass-border); border-radius:12px;
 }
-.memory-insight-txt{font-size:.8rem; color:var(--ink-2); margin:0 0 9px; line-height:1.5}
-.memory-insight-actions{display:flex; gap:8px; flex-wrap:wrap}
+.memory-insight-txt{font-size:.8rem; color:var(--ink-2); margin:0 0 var(--space-3); line-height:1.5}
+.memory-insight-actions{display:flex; gap:var(--space-2); flex-wrap:wrap}
 .memory-insight-actions .ghost{margin-top:0}
 
 /* ---- referral prompt: earns its place after real usage, dismiss forever ---- */
 .referral{
-  position:relative; margin-top:14px; padding:11px 30px 11px 12px;
+  position:relative; margin-top:var(--space-6); padding:var(--space-4) 36px var(--space-4) var(--space-4);
   background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%), var(--surface-2);
-  border:1px solid var(--glass-border); border-radius:10px;
+  border:1px solid var(--glass-border); border-radius:12px;
 }
-.referral-txt{font-size:.8rem; color:var(--ink-2); margin:0 0 8px; line-height:1.5}
+.referral-txt{font-size:.8rem; color:var(--ink-2); margin:0 0 var(--space-3); line-height:1.5}
 .referral-x{
-  position:absolute; top:6px; inset-inline-end:6px; width:20px; height:20px;
+  position:absolute; top:var(--space-2); inset-inline-end:var(--space-2); width:20px; height:20px;
   border:0; background:transparent; color:var(--ink-3); font-size:1rem; line-height:1;
   cursor:pointer; border-radius:5px;
 }
@@ -260,17 +274,17 @@ main{padding:16px}
 /* Stacked, not a two-column split — "Export your setup for them" forced
    into half of a 320px row with white-space:nowrap had nowhere to go but
    over its neighbor. Full-width rows have room to actually say the words. */
-.referral-row{display:flex; flex-direction:column; gap:8px}
+.referral-row{display:flex; flex-direction:column; gap:var(--space-2)}
 .referral-row .ghost{margin-top:0; width:100%; text-align:center}
 
 /* ---- activity log ---- */
-.log-list{display:flex; flex-direction:column; gap:8px; max-height:320px; overflow-y:auto}
+.log-list{display:flex; flex-direction:column; gap:var(--space-3); max-height:320px; overflow-y:auto}
 .log-item{
   background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 40%), var(--surface);
-  border:1px solid var(--glass-border); border-radius:11px;
-  padding:10px 12px; font-size:.82rem; line-height:1.5; box-shadow:var(--shadow);
+  border:1px solid var(--glass-border); border-radius:12px;
+  padding:var(--space-4); font-size:.82rem; line-height:1.5; box-shadow:var(--shadow);
 }
-.log-top{display:flex; align-items:flex-start; gap:8px}
+.log-top{display:flex; align-items:flex-start; gap:var(--space-2)}
 .log-label{flex:1; font-weight:600; color:var(--ink)}
 .log-kind{
   font-family:var(--mono); font-size:.58rem; letter-spacing:.05em;
@@ -279,8 +293,8 @@ main{padding:16px}
 }
 .log-kind.written{background:var(--ok-wash); color:var(--ok)}
 .log-kind.clicked{background:var(--accent-wash); color:var(--accent)}
-.log-where{display:block; color:var(--ink-2); font-size:.76rem; margin-top:2px}
-.when{color:var(--ink-3); font-size:.7rem; display:block; margin-top:3px}
-.log-acts{display:flex; gap:6px; margin-top:8px}
+.log-where{display:block; color:var(--ink-2); font-size:.76rem; margin-top:3px}
+.when{color:var(--ink-3); font-size:.7rem; display:block; margin-top:4px}
+.log-acts{display:flex; gap:var(--space-2); margin-top:var(--space-3)}
 
-.ftr{padding:10px 16px; border-top:1px solid var(--line); font-size:.68rem; color:var(--ink-3); text-align:center; line-height:1.5}
+.ftr{padding:var(--space-4) var(--space-5); border-top:1px solid var(--line); font-size:.68rem; color:var(--ink-3); text-align:center; line-height:1.6}
