@@ -12,17 +12,16 @@
    Francisco on macOS/iOS, matching the same "Apple product" character the
    redesigned pages already committed to.
 
-   Idle state is a two-part card: a Hebrew sentence describing what Flow found
-   (.flow-chip-text) plus a "Do It" button built from the exact shell/ring/shine
-   recipe as the marketing site's canonical .doit component (flow-premium.css)
-   — same three-layer construction (gradient shell, glowing ring, diagonal
-   shine sweep on hover), same light-theme token values, just namespaced and
-   inlined here since this stylesheet has no access to the site's CSS custom
-   properties. The button's own label stays "Do It" in English on purpose —
-   that's the one piece of vocabulary this product doesn't localize — while
-   the sentence explaining what it's about to do is real Hebrew, generated
-   from the same facts (amount, date) the record itself will carry. The
-   sparkle mark + gradient "Flow" wordmark ahead of that sentence is the
+   Idle state is a two-part card: a declarative sentence describing what
+   Glance is about to close (.flow-chip-text) plus a "Do It" button built
+   from the exact shell/ring/shine recipe as the marketing site's canonical
+   .doit component (flow-premium.css) — same three-layer construction
+   (gradient shell, glowing ring, diagonal shine sweep on hover), same
+   light-theme token values, just namespaced and inlined here since this
+   stylesheet has no access to the site's CSS custom properties. The
+   sentence is generated from the same facts (amount, date) the record
+   itself will carry — see content-gmail.js's closingSentence(). The
+   sparkle mark + gradient "Glance" wordmark ahead of that sentence is the
    card's one AI-forward signal — the same blue family the ring/shell
    already use, not a new palette, and confined to a single word rather than
    a page-level gradient wash.
@@ -111,7 +110,7 @@
 }
 
 /* The always-visible row: the quiet disclosure toggle (only when there's
-   something to disclose), dismiss, Do It — right-aligned under the Hebrew
+   something to disclose), dismiss, Do It — right-aligned under the closing
    sentence above it, Do It closest to the card's edge as the clear anchor. */
 .flow-chip-main-row {
   display: flex;

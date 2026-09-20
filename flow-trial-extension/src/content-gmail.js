@@ -494,38 +494,42 @@
     return n;
   }
 
-  // The Hebrew sentence that sits above the step list, saying what Flow is
+  // The sentence that sits above the step list, saying what Glance is
   // ABOUT TO DO — generated from intent.entities (the same who/what/when/
   // amount fields every one of the 5 intent.js types normalizes onto) and
   // keyed by process.id, not intent.type, so the sentence always matches
   // the actual process actions.js chose (schedule-confirm vs. plain
   // schedule reads differently, even though both come from
-  // SCHEDULED_EVENT). "You intend — we execute": this used to ask "זיהה
-  // פגישה?" ("detected a meeting?", ending in a question, inviting
-  // confirmation of a guess) — it now states what's about to close,
-  // declaratively, because that is the entire point of the redesign: the
-  // system is not offering to help you decide, it is telling you what it
-  // is closing.
+  // SCHEDULED_EVENT). "You intend — we execute": this used to ask a
+  // question ("detected a meeting?", inviting confirmation of a guess) —
+  // it now states what's about to close, declaratively, because that is
+  // the entire point of the redesign: the system is not offering to help
+  // you decide, it is telling you what it is closing. Originally written
+  // in Hebrew (a deliberate choice at the time — see this file's git
+  // history) and translated to English to match the receipt, the Brief,
+  // the Weekly Summary, the popup, and everything else in the product,
+  // which were never Hebrew: a user used to read this sentence in one
+  // language and the "Closed —" receipt in another.
   //
-  // Returns the sentence WITHOUT the "Flow" prefix — injectChip() renders
+  // Returns the sentence WITHOUT the "Glance" prefix — injectChip() renders
   // that separately as a styled brand mark (sparkle + gradient wordmark),
   // so this function only ever has to answer "what is about to happen,"
   // not "how should the brand name look."
-  function heClosing(process, intent) {
+  function closingSentence(process, intent) {
     const e = intent.entities || {};
     const when = e.when ? ', ' + e.when : '';
     const amount = e.amount ? ', ' + e.amount : '';
     switch (process.id) {
       case 'schedule-confirm':
-        return 'קובע את הפגישה' + when + ', שולח אישור, ופותח משימת מעקב.';
+        return 'is scheduling the meeting' + when + ', sending a confirmation, and opening a follow-up task.';
       case 'schedule':
-        return 'קובע את הפגישה' + when + ' ופותח תזכורת להתכונן.';
+        return 'is scheduling the meeting' + when + ' and opening a reminder to prepare.';
       case 'reply-track':
-        return 'עונה על הבקשה' + when + ' ופותח משימת מעקב.';
+        return 'is replying to the request' + when + ' and opening a follow-up task.';
       case 'follow-through':
-        return 'פותח תזכורת להתחייבות שלך' + when + amount + ', עם תשובה מוכנה.';
+        return 'is opening a reminder for your commitment' + when + amount + ', with a reply ready.';
       default: // log-it
-        return 'מתעד את ההחלטה' + amount + when + '.';
+        return 'is logging the decision' + amount + when + '.';
     }
   }
 
@@ -669,22 +673,22 @@
     if (messageNode.querySelector('.flow-chip-host')) return;
 
     const host = el('div', 'flow-chip-host');
-    host.setAttribute('dir', 'rtl');
+    host.setAttribute('dir', 'ltr');
 
     // The process name as its own small, quiet label — "this is one named
-    // thing Flow is closing," stated before the sentence explains what
+    // thing Glance is closing," stated before the sentence explains what
     // that means, not left for the user to infer from a pile of pills.
     host.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
 
-    // sparkle + gradient "Flow" + the rest of the sentence as its own text
-    // node — three children in that DOM order render correctly under the
-    // host's own dir="rtl" (the same bidi resolution a single mixed-script
-    // string already got), with the sparkle landing at the very start of
-    // the RTL line, right before the brand name.
+    // sparkle + gradient "Glance" + the rest of the sentence as its own
+    // text node — three children in that DOM order, sparkle first, right
+    // before the brand name, same as before this was translated to
+    // English (see closingSentence's own header comment for why it no
+    // longer needs a dir="rtl" host).
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(sparkleIcon());
-    textEl.appendChild(el('span', 'flow-chip-brand', 'Flow'));
-    textEl.appendChild(document.createTextNode(' ' + heClosing(ctx.process, ctx.intent)));
+    textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
+    textEl.appendChild(document.createTextNode(' ' + closingSentence(ctx.process, ctx.intent)));
     host.appendChild(textEl);
 
     // liveSteps is the mutable working copy Do It actually reads;
@@ -1000,11 +1004,22 @@
     return items.slice(0, -1).join(', ') + ', and ' + items[items.length - 1];
   }
 
-  // The second half of "I'm going to close this for you": heClosing() says
-  // what's about to happen before Do It; this says what just closed, in the
-  // same declarative voice — "Closed — scheduled and tracked.", not "2
-  // actions completed."
-  function closedSummary(succeeded) {
+  // The second half of "I'm going to close this for you": closingSentence()
+  // says what's about to happen before Do It; this says what just closed,
+  // in the same declarative voice — "Closed — scheduled and tracked.", not
+  // "2 actions completed."
+  //
+  // When every step the chip actually proposed succeeded, this prefers the
+  // catalog's own hand-written closedLine (actions.js's PROCESS_CATALOG —
+  // e.g. "Scheduled, confirmed, and tracked.") over the generic verb-join:
+  // it's specific to what this exact PROCESS means when it fully closes,
+  // not just a list of what happened to succeed. The dynamic verb-join
+  // stays as the honest fallback for a partial success (some steps failed)
+  // — closedLine describes the full process and would overclaim if only
+  // some of it actually landed.
+  function closedSummary(succeeded, ctx) {
+    const isFullClose = ctx && ctx.process.closedLine && succeeded.length === ctx.process.steps.length;
+    if (isFullClose) return ctx.process.closedLine;
     const verbs = succeeded.map((r) => STEP_DONE_VERB[r.action.kind] || 'completed one step');
     return 'Closed — ' + joinWithAnd(verbs) + '.';
   }
@@ -1027,12 +1042,26 @@
     }
 
     // The Magic Moment (see docs/magic-moment.md): read BEFORE this close's
-    // own 'written' log entries land further down, so "is this the very
-    // first thing Glance has ever closed for this account" is answered
+    // own 'written' log entries land further down, so "how many things has
+    // Glance ever closed for this account, before this one" is answered
     // against state prior to this call, not state this same call is about
     // to change. No new UI, no popup — the same receipt every close already
-    // shows, with one extra, concrete line exactly once, ever.
-    const isFirstEverClose = (await FlowStorage.get()).writeStats.total === 0;
+    // shows, with one extra, concrete line, for however many of the first
+    // few closes actually need it.
+    //
+    // Covers the first THREE closes, not just the very first: the first
+    // close is the moment of discovery, but a new user's trust in "this
+    // actually works" isn't fully earned on one data point — the second
+    // and third closes are what confirm it wasn't a fluke. The line stays
+    // exactly the same across all three rather than escalating or varying
+    // it: repeating the same concrete claim is reinforcement, while three
+    // different lines for three closes a day or two apart would read as a
+    // script, not a system telling the truth about what it just did. From
+    // the fourth close on, the receipt goes back to just closedSummary()
+    // alone — by then the pattern is established and restating it would
+    // cheapen it into a slogan.
+    const priorCloses = (await FlowStorage.get()).writeStats.total;
+    const isEarlyClose = priorCloses < 3;
 
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
@@ -1040,8 +1069,8 @@
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
     done.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
-    done.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded)));
-    if (isFirstEverClose) {
+    done.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
+    if (isEarlyClose) {
       done.appendChild(el('span', 'flow-chip-first-close', 'Nothing else to open, nothing else to check — that’s handled.'));
     }
 
@@ -1162,16 +1191,17 @@
     // close this for you" has to keep feeling true mid-flight, not just
     // before and after. doneVerbs only ever grows with what actually
     // succeeded; a failed or dependency-skipped step never gets narrated as
-    // done. index/total (from runActionsSequentially) advances on every
-    // resolved step, success or not, so the count is always honest even
-    // when the description of what closed is momentarily behind it.
+    // done. Deliberately no "(1/2)" step counter here — a raw fraction
+    // reads as a technical progress bar, not as someone telling you what
+    // they're doing; the verbs alone already say exactly as much as the
+    // user needs mid-flight, and the counter added nothing but arithmetic.
     const doneVerbs = [];
-    function onStepDone(result, index, total) {
+    function onStepDone(result) {
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
       }
       const progress = doneVerbs.length ? joinWithAnd(doneVerbs) : 'working';
-      setChipState(chip, 'flow-chip-pending', 'Closing (' + index + '/' + total + ') — ' + progress + '…');
+      setChipState(chip, 'flow-chip-pending', 'Closing — ' + progress + '…');
     }
 
     runActionsSequentially(liveSteps, ctx, onStepDone)

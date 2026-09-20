@@ -311,6 +311,23 @@ console.log('\n--- actions.js: PROCESS_CATALOG is the same table processFor() ac
   }
 }
 
+console.log('\n--- actions.js: every process has a real, decisive closedLine — content-gmail.js\'s closedSummary() now actually shows it ---\n');
+{
+  // closedLine used to be computed and passed through planFor() without
+  // ever being displayed — content-gmail.js's closedSummary() built its
+  // own generic verb-joined sentence instead. Now that closedSummary()
+  // prefers closedLine on a full, unpruned success, an empty or missing
+  // closedLine would silently regress the receipt back to the generic
+  // fallback for every process. This locks in that every catalog entry
+  // still has one, and that it reads as a real sentence, not a fragment.
+  for (const id of Object.keys(FlowActions.PROCESS_CATALOG)) {
+    const entry = FlowActions.PROCESS_CATALOG[id];
+    check('PROCESS_CATALOG["' + id + '"].closedLine is a real, non-empty sentence',
+      typeof entry.closedLine === 'string' && entry.closedLine.length > 5 && /[a-zA-Z]/.test(entry.closedLine),
+      entry.closedLine);
+  }
+}
+
 console.log('\n--- intent.js: per-type calibration nudges the gating threshold, not the hard-gated types ---\n');
 {
   // classify() always scores against FLOW_DOMAINS[0] ('sales') — "contract

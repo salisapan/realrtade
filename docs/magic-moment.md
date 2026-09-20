@@ -71,14 +71,20 @@ firing:
 - **Timing**: nothing about the receipt is delayed, batched, or deferred to
   a summary later — the confirmation appears the instant the write actually
   succeeds, in the same chip the user is already looking at.
-- **The first-time-only line**: `showMultiActionReceipt` checks, once, per
-  account, whether this is the very first successful close this install has
-  ever had (`writeStats.total === 0`, read *before* this close's own writes
-  land). On exactly that first close, and never again, the receipt adds one
-  extra line: "Nothing else to open, nothing else to check — that's
-  handled." Every close after the first gets the normal receipt only — the
-  moment is real once, and restating it on every subsequent close would
-  turn a genuine realization into a slogan.
+- **The early-closes line**: `showMultiActionReceipt` checks, before this
+  close's own writes land, how many successful closes this account has had
+  before this one (`writeStats.total`). For each of the first three
+  closes — not just the very first — the receipt adds one extra line:
+  "Nothing else to open, nothing else to check — that's handled." The
+  first close is the moment of discovery; trust in "this actually works"
+  isn't fully earned on one data point, and the second and third closes
+  are what confirm it wasn't a fluke. The line stays identical across all
+  three rather than escalating into a growing narrative — repeating the
+  same concrete claim is reinforcement, while three different lines a day
+  or two apart would read as a script. From the fourth close on, the
+  receipt goes back to `closedSummary()` alone — by then the pattern is
+  established, and restating it would turn a genuine realization into a
+  slogan.
 
 This is implemented entirely inside the existing receipt UI. No new screen,
 no popup, no onboarding wizard — the Zero-Prompt rule applies to the Magic

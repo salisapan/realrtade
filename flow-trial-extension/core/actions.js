@@ -159,7 +159,12 @@ const FlowActions = (() => {
     'log-it': {
       name: 'Log It',
       closingLine: 'Logging this so it stays tracked.',
-      closedLine: 'Logged.',
+      // "Logged." alone read thinner than every sibling closedLine here
+      // (all the others state two things that happened) now that this
+      // string is actually shown in the receipt — see content-gmail.js's
+      // closedSummary(). "and tracked" also matches reply-track's own
+      // vocabulary for the same underlying step (a Google Task).
+      closedLine: 'Logged and tracked.',
       anchor: 'task',
       stepKinds: ['task']
     }
