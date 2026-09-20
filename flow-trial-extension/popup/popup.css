@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Fonts are self-hosted via fonts.css (linked from popup.html, same file
+   the marketing site serves from assets/fonts.css) — not a live Google
+   Fonts @import. A popup that depends on a network fetch to render its own
+   text renders in whatever the OS's fallback sans-serif happens to be the
+   moment Chrome opens it, which is exactly why this used to look like a
+   generic settings panel instead of the product's own typography. */
 
 /* Dark is the popup's one and only theme, not a prefers-color-scheme
    toggle — same call the marketing site already made site-wide (dark by
@@ -15,10 +20,21 @@
   --accent:#3B74FF; --accent-wash:#101B37;
   --ok:#5FD39B; --ok-wash:#0E1F18;
   --err:#FF8A80;
-  --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 28px -18px rgba(0,0,0,.9);
+  /* A touch of accent glow layered onto every card's shadow, not just the
+     Do-It-style button — "subtle glow" was one specific ask, and a card
+     that only ever gets a plain black drop shadow reads flatter than the
+     site's own surfaces, which lean on this same glow throughout. */
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 28px -18px rgba(0,0,0,.9), 0 0 32px -22px var(--glow);
   --glass-top:rgba(255,255,255,.06); --glass-bot:rgba(255,255,255,.015);
   --glass-gloss:rgba(255,255,255,.10); --glass-border:rgba(255,255,255,.09);
   --glow:rgba(59,116,255,.35);
+  /* Same values as the site's own dark-theme .doit button (trial.html) —
+     the popup's primary buttons below are a literal port of that
+     component, not a lookalike. */
+  --ring:#5B8CFF; --doit-text:#E6EFFF;
+  --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
 }
 
 *{box-sizing:border-box}
@@ -27,7 +43,7 @@ body{
   background:
     radial-gradient(420px 220px at 85% -10%, var(--accent-wash), transparent 60%),
     var(--paper);
-  font-family:'Assistant',system-ui,sans-serif; direction:ltr; font-size:14px;
+  font-family:var(--sans); direction:ltr; font-size:14px;
 }
 
 .hdr{display:flex; align-items:center; gap:9px; padding:16px 16px 12px}
@@ -42,7 +58,7 @@ body{
 }
 .hdr h1{font-size:1.02rem; margin:0; font-weight:800; letter-spacing:-.01em}
 .ver{
-  margin-inline-start:auto; font-family:'JetBrains Mono',monospace; font-size:.62rem;
+  margin-inline-start:auto; font-family:var(--mono); font-size:.62rem;
   letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3);
   background:var(--surface-2); border-radius:999px; padding:4px 9px;
   border:1px solid var(--line);
@@ -85,7 +101,7 @@ main{padding:16px}
 .conn-name b{font-size:.9rem; font-weight:700}
 .conn-name i{font-style:normal; font-size:.72rem; color:var(--ink-3)}
 .badge{
-  font-family:'JetBrains Mono',monospace; font-size:.6rem; letter-spacing:.05em;
+  font-family:var(--mono); font-size:.6rem; letter-spacing:.05em;
   text-transform:uppercase; color:var(--ink-3); background:var(--surface-2);
   border-radius:5px; padding:3px 7px; flex:none;
 }
@@ -97,7 +113,7 @@ main{padding:16px}
 
 .conn-form{display:flex; flex-direction:column; gap:6px; margin-top:10px}
 .conn-form input{
-  font-family:'JetBrains Mono',monospace; font-size:.75rem; padding:8px 10px;
+  font-family:var(--mono); font-size:.75rem; padding:8px 10px;
   border-radius:8px; border:1px solid var(--line-2); background:var(--surface-2); color:var(--ink);
 }
 .conn-form input:focus{outline:2px solid var(--accent); outline-offset:1px}
@@ -123,35 +139,53 @@ main{padding:16px}
 .opt .kind{font-size:.72rem; color:var(--ink-3); display:block}
 
 /* ---- buttons ----
-   Same shell/ring/shine family as the marketing site's Do It button — a
-   glass ring inset from the edge (::before) and a diagonal shine that
-   sweeps across on hover (::after) — built with pseudo-elements instead
-   of the site's three <span>s so the popup markup stays untouched. */
+   .primary is a literal port of the marketing site's .doit component
+   (trial.html) — the same shell/ring/shine three-layer structure, the
+   same Rubik display font, the same glass-ring-inset-from-the-edge look —
+   not a pseudo-element approximation of it. Every .primary needs its
+   three child spans (.shell/.ring/.shine) plus a .btn-label wrapping the
+   visible text; see popup.html's Save & start button and
+   connectorCard()'s connect button in popup.js for the exact markup. */
 .primary{
-  all:unset; display:block; text-align:center; width:100%;
-  position:relative; isolation:isolate; overflow:hidden;
-  background:linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white 8%), var(--accent));
-  color:#fff; font-family:inherit; font-weight:700; font-size:.9rem; border-radius:999px;
-  padding:12px; cursor:pointer;
-  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.4), inset 0 -10px 18px rgba(0,0,0,.14), 0 10px 24px -10px var(--glow);
-  transition:filter .2s, transform .18s, box-shadow .22s;
+  all:unset; display:flex; align-items:center; justify-content:center; width:100%;
+  position:relative; isolation:isolate; cursor:pointer;
+  border-radius:999px; padding:13px 20px;
+  font-family:var(--disp); font-weight:700; font-size:.92rem; color:var(--doit-text);
+  text-shadow:0 1px 8px var(--glow); text-align:center;
+  transition:transform .22s cubic-bezier(.2,.8,.2,1);
 }
-.primary::before{
-  content:''; position:absolute; inset:3px; border-radius:999px; z-index:1; pointer-events:none;
-  border:1px solid rgba(255,255,255,.32);
+.primary .shell{
+  position:absolute; inset:0; border-radius:inherit; z-index:-2;
+  background:linear-gradient(180deg, var(--glass-gloss) 0%, transparent 24%), linear-gradient(180deg, var(--glass-top), var(--glass-bot)), var(--accent-wash);
+  border:1px solid var(--glass-border);
+  box-shadow:inset 0 1.5px 0 var(--glass-gloss), inset 0 -10px 20px rgba(6,14,36,.4), 0 14px 32px -10px var(--glow);
+  transition:box-shadow .3s;
 }
-.primary::after{
-  content:''; position:absolute; inset-block:-60%; inline-size:36%; inset-inline-start:-50%; z-index:1; pointer-events:none;
-  background:linear-gradient(105deg, transparent, rgba(255,255,255,.55), transparent);
+.primary .ring{
+  position:absolute; inset:5px; border-radius:999px; z-index:-1;
+  border:2px solid var(--ring);
+  box-shadow:0 0 12px var(--glow), inset 0 0 0 1px rgba(255,255,255,.18), inset 0 0 10px color-mix(in srgb, var(--ring) 42%, transparent);
+  transition:box-shadow .3s, border-color .3s;
+}
+.primary .shine{position:absolute; inset:0; border-radius:inherit; overflow:hidden; z-index:-1}
+.primary .shine::before{
+  content:''; position:absolute; inset-block:-40%; inline-size:40%; inset-inline-start:-60%;
+  background:linear-gradient(105deg, transparent, rgba(255,255,255,.5), transparent);
   transform:skewX(-18deg);
 }
-.primary.sm{margin-top:10px; padding:9px; font-size:.82rem}
-.primary:hover{filter:brightness(1.06); transform:translateY(-1px); box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5), inset 0 -8px 16px rgba(0,0,0,.1), 0 14px 30px -8px var(--glow)}
-.primary:hover::after{animation:g-sweep .6s cubic-bezier(.3,.6,.2,1) forwards}
-.primary:active{transform:translateY(0)}
-.primary:disabled{opacity:.55; cursor:default; transform:none; box-shadow:none}
+.primary .btn-label{position:relative}
+.primary.sm{margin-top:10px; padding:10px 16px; font-size:.84rem}
+.primary:hover{transform:translateY(-1px) scale(1.01)}
+.primary:hover .shell{box-shadow:inset 0 1px 0 rgba(255,255,255,.4), inset 0 -8px 16px rgba(6,14,36,.5), 0 18px 42px -8px var(--glow)}
+.primary:hover .ring{border-color:var(--accent); box-shadow:0 0 18px var(--glow), inset 0 0 14px var(--glow)}
+.primary:hover .shine::before{animation:g-sweep .7s cubic-bezier(.3,.6,.2,1) forwards}
+.primary:active{transform:translateY(0) scale(.99)}
+.primary:disabled{cursor:default; opacity:.6}
+.primary:disabled:hover{transform:none}
+.primary:disabled:hover .shell{box-shadow:inset 0 1.5px 0 var(--glass-gloss), inset 0 -10px 20px rgba(6,14,36,.4), 0 14px 32px -10px var(--glow)}
+.primary:disabled:hover .ring{border-color:var(--ring); box-shadow:0 0 12px var(--glow), inset 0 0 0 1px rgba(255,255,255,.18), inset 0 0 10px color-mix(in srgb, var(--ring) 42%, transparent)}
 
-@keyframes g-sweep{to{inset-inline-start:130%}}
+@keyframes g-sweep{to{transform:translateX(260%) skewX(-18deg)}}
 .ghost{
   all:unset; display:inline-block; text-align:center; cursor:pointer; margin-top:10px;
   font-family:inherit; font-weight:600; font-size:.8rem; color:var(--ink-2);
@@ -183,7 +217,7 @@ main{padding:16px}
 
 /* ---- sensitivity read-out ---- */
 .sense{display:flex; align-items:center; gap:9px; margin-bottom:14px}
-.sense-label{font-family:'JetBrains Mono',monospace; font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3)}
+.sense-label{font-family:var(--mono); font-size:.6rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-3)}
 .sense-bar{flex:0 0 74px; height:4px; border-radius:2px; background:var(--surface-2); overflow:hidden}
 .sense-bar i{display:block; height:100%; background:var(--accent); border-radius:2px; transition:width .4s}
 .sense-note{font-size:.72rem; color:var(--ink-3); flex:1; min-width:0}
@@ -211,8 +245,11 @@ main{padding:16px}
   cursor:pointer; border-radius:5px;
 }
 .referral-x:hover{background:var(--surface); color:var(--ink)}
-.referral-row{display:flex; gap:8px; flex-wrap:wrap}
-.referral-row .ghost{margin-top:0; flex:1; text-align:center; white-space:nowrap}
+/* Stacked, not a two-column split — "Export your setup for them" forced
+   into half of a 320px row with white-space:nowrap had nowhere to go but
+   over its neighbor. Full-width rows have room to actually say the words. */
+.referral-row{display:flex; flex-direction:column; gap:8px}
+.referral-row .ghost{margin-top:0; width:100%; text-align:center}
 
 /* ---- activity log ---- */
 .log-list{display:flex; flex-direction:column; gap:8px; max-height:320px; overflow-y:auto}
@@ -224,7 +261,7 @@ main{padding:16px}
 .log-top{display:flex; align-items:flex-start; gap:8px}
 .log-label{flex:1; font-weight:600; color:var(--ink)}
 .log-kind{
-  font-family:'JetBrains Mono',monospace; font-size:.58rem; letter-spacing:.05em;
+  font-family:var(--mono); font-size:.58rem; letter-spacing:.05em;
   text-transform:uppercase; border-radius:5px; padding:2px 6px; flex:none;
   background:var(--surface-2); color:var(--ink-3);
 }

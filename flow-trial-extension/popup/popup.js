@@ -54,6 +54,16 @@
     return n;
   }
 
+  // A .primary button's visible text lives in its .btn-label span, not the
+  // button's own textContent — the shell/ring/shine spans are siblings of
+  // that text, and `btn.textContent = ...` would silently delete all three
+  // of them along with whatever was there before. Falls back to plain
+  // textContent for a .ghost button, which has no such spans.
+  function setBtnLabel(btn, text) {
+    const label = btn.querySelector('.btn-label');
+    if (label) label.textContent = text; else btn.textContent = text;
+  }
+
   async function refresh() {
     status = await send({ type: 'flow:connector-status' });
     state = await FlowStorage.get();
@@ -143,10 +153,22 @@
     }
 
     const ready = st.configured !== false;
-    const btn = el('button', (ready ? 'primary sm' : 'ghost wide'), 'Connect ' + c.label);
+    // Only the ready (primary/.doit-style) button gets the shell/ring/shine
+    // spans — .ghost.wide (missing OAuth config, MVP-inert) stays a plain
+    // outlined pill, same distinction the marketing site draws between its
+    // .doit button and everything else.
+    const btn = el('button', ready ? 'primary sm' : 'ghost wide');
+    if (ready) {
+      btn.appendChild(el('span', 'shell'));
+      btn.appendChild(el('span', 'ring'));
+      btn.appendChild(el('span', 'shine'));
+      btn.appendChild(el('span', 'btn-label', 'Connect ' + c.label));
+    } else {
+      btn.textContent = 'Connect ' + c.label;
+    }
     btn.type = 'button';
     btn.addEventListener('click', async () => {
-      btn.disabled = true; btn.textContent = 'Connecting…'; err.hidden = true;
+      btn.disabled = true; setBtnLabel(btn, 'Connecting…'); err.hidden = true;
       const msg = { type: 'flow:connect', connectorId: c.id };
       Object.keys(inputs).forEach((k) => { msg[k] = inputs[k].value; });
       const res = await send(msg);
@@ -155,7 +177,7 @@
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {
-        btn.disabled = false; btn.textContent = 'Connect ' + c.label;
+        btn.disabled = false; setBtnLabel(btn, 'Connect ' + c.label);
         err.textContent = (res && res.error) || 'Connection failed.';
         err.hidden = false;
       }
