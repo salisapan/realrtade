@@ -206,24 +206,32 @@
     note.hidden = false;
   }
 
+  // Pulled out of wireRecipe()'s click handler so the referral card below
+  // can trigger the exact same export — same file shape, same download,
+  // same confirmation copy — instead of a second export path that could
+  // quietly drift from this one.
+  function exportRecipe() {
+    const domain = FLOW_DOMAINS.find((d) => d.id === state.domainId) || FLOW_DOMAINS.find((d) => d.id === 'sales');
+    const connector = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
+    const recipe = {
+      flowRecipe: 1,
+      domainId: domain.id,
+      domainLabel: domain.label,
+      connectorId: connector ? connector.id : null,
+      connectorLabel: connector ? connector.label : null
+    };
+    const blob = new Blob([JSON.stringify(recipe, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glance-recipe-' + domain.id + (connector ? '-' + connector.id : '') + '.glance';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function wireRecipe() {
     document.getElementById('recipeExport').addEventListener('click', () => {
-      const domain = FLOW_DOMAINS.find((d) => d.id === state.domainId) || FLOW_DOMAINS.find((d) => d.id === 'sales');
-      const connector = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
-      const recipe = {
-        flowRecipe: 1,
-        domainId: domain.id,
-        domainLabel: domain.label,
-        connectorId: connector ? connector.id : null,
-        connectorLabel: connector ? connector.label : null
-      };
-      const blob = new Blob([JSON.stringify(recipe, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'glance-recipe-' + domain.id + (connector ? '-' + connector.id : '') + '.glance';
-      a.click();
-      URL.revokeObjectURL(url);
+      exportRecipe();
       noteRecipe('Recipe exported. Anyone can drop this file into their own Glance to match your setup.', true);
     });
 
@@ -534,6 +542,20 @@
       } catch (e) {
         btn.textContent = 'https://theflow-ai.com/trial.html';
       }
+    });
+    // The same real, working setup this account already has, exported as
+    // the exact .glance file the Setup tab's own Export button produces
+    // (see exportRecipe()) — a teammate imports it and matches this domain
+    // and connector in one drop, no separate onboarding conversation. This
+    // is a second path inside the SAME earned-trust card rather than a
+    // second dismissible surface: two independent "tell someone" prompts
+    // stacking after the same threshold would read as being asked twice.
+    document.getElementById('referralExportRecipe').addEventListener('click', () => {
+      const btn = document.getElementById('referralExportRecipe');
+      exportRecipe();
+      const original = btn.textContent;
+      btn.textContent = 'Exported';
+      setTimeout(() => { btn.textContent = original; }, 1800);
     });
   }
   wireReferral();

@@ -41,7 +41,11 @@ function makeNode(tag) {
     getAttribute(k) { return this.attrs[k]; },
     addEventListener(k, fn) { (this.listeners[k] = this.listeners[k] || []).push(fn); },
     querySelectorAll: () => [],
-    querySelector: () => null
+    querySelector: () => null,
+    // exportRecipe() (Setup tab's own Export button, and the referral card's
+    // "Export your setup for them") builds a real <a> and calls .click() on
+    // it to trigger the download — a no-op here is all a headless stub needs.
+    click() {}
   };
 }
 
@@ -98,7 +102,20 @@ function load(stored) {
     }
   };
 
-  const sandbox = { module: undefined, console, document, chrome: chromeStub, crypto: { randomUUID: () => 'test-uuid' }, navigator: { clipboard: { writeText: async () => {} } } };
+  // Blob/URL: only exportRecipe() (Setup tab and, since this session's growth
+  // work, the referral card) needs these — real objects are pointless here,
+  // just enough surface that the call doesn't throw ReferenceError.
+  const sandbox = {
+    module: undefined, console, document, chrome: chromeStub,
+    crypto: { randomUUID: () => 'test-uuid' },
+    navigator: { clipboard: { writeText: async () => {} } },
+    Blob: class { constructor(parts, opts) { this.parts = parts; this.type = opts && opts.type; } },
+    URL: { createObjectURL: () => 'blob:test', revokeObjectURL: () => {} },
+    // Both button-confirmation resets (referralCopy's "Copied", and this
+    // session's referralExportRecipe's "Exported") use the real setTimeout —
+    // Node's own is a faithful stand-in, not a stub that needs its own logic.
+    setTimeout, clearTimeout
+  };
   vm.createContext(sandbox);
   // Same file list, same order popup.html actually loads them in — core/
   // modules with storage.js (client-side) spliced in where it belongs, then
@@ -204,6 +221,28 @@ async function run() {
     check('dismissing from the popup really closes the message', await FlowStorage.hasTerminalOutcome('m1'));
     check('...and it drops out of the pending list', (await FlowStorage.getPending()).length === 0);
     check('the dismissal was actually persisted to storage, not just in memory', (store().log || []).some((e) => e.kind === 'dismissed' && e.messageId === 'm1'));
+  }
+
+  console.log('\n--- popup.js: the referral card offers exporting the real setup, not just a link ---\n');
+  {
+    // Reuses the exact same "earned trust" gate the referral link already
+    // has (3+ real writes, storage.js's own writeCountsFrom) rather than a
+    // second dismissible surface — see wireReferral()'s own comment on why
+    // this lives inside the existing card instead of a new one.
+    const stored = { writeStats: { total: 3, recent: [] }, domainId: 'sales', connectorId: 'googleTasks' };
+    const { sandbox, document } = load(stored);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const referral = document.getElementById('referral');
+    check('the referral card is shown after 3 real writes', referral.hidden === false);
+
+    const exportBtn = document.getElementById('referralExportRecipe');
+    let threw = null;
+    try { (exportBtn.listeners.click || []).forEach((fn) => fn()); } catch (e) { threw = e; }
+    check('clicking it exports the real setup without throwing', threw === null, threw && String(threw));
+    check('it confirms the export the same way Setup tab\'s own button does', exportBtn.textContent === 'Exported', exportBtn.textContent);
   }
 
   console.log('\n--- popup.js: the memory-insight card renders instead of throwing ---\n');
