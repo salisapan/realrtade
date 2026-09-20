@@ -1673,12 +1673,30 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // has never loaded storage.js (it talks to chrome.storage.local directly
 // throughout this file, same as every other auth blob above), and this way
 // the service worker gains no new cross-file dependency for one field.
+// Caches the in-flight PROMISE, not just the resolved id — the read-then-
+// write below has the same gap storage.js's own getInstallId used to have
+// before it became canonical: two concurrent callers (a 'chip_shown'
+// trackEvent firing at the same moment a content script's own first-ever
+// getInstallId message arrives) can each read `undefined` before either
+// write lands, and whichever set() runs second silently overwrites the
+// first's id. Caching the promise means every concurrent caller during
+// generation awaits the exact same in-progress call instead of racing a
+// second one; once resolved, later calls just get the resolved id back
+// with no further storage read. Reset only by a service-worker restart,
+// which is correct — the NEXT call reads whatever chrome.storage.local
+// already has, exactly like before this existed.
+let installIdPromise = null;
 async function getInstallId() {
-  const { installId } = await chrome.storage.local.get('installId');
-  if (installId) return installId;
-  const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/-/g, '').slice(0, 12);
-  await chrome.storage.local.set({ installId: id });
-  return id;
+  if (!installIdPromise) {
+    installIdPromise = (async () => {
+      const { installId } = await chrome.storage.local.get('installId');
+      if (installId) return installId;
+      const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)).replace(/-/g, '').slice(0, 12);
+      await chrome.storage.local.set({ installId: id });
+      return id;
+    })();
+  }
+  return installIdPromise;
 }
 
 async function trackEvent(name, params) {

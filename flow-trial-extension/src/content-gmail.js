@@ -86,11 +86,23 @@
     // processFor) — the event log has no record of which of the two each
     // whole dismissal actually was, so the conservative move is to ease off
     // both rather than guess and risk quieting only the wrong one.
+    //
+    // Deliberately sequenced, not one flat Promise.all with
+    // markPrecisionAutoTuned alongside the two calibrate() calls: if either
+    // calibrate() call failed but markPrecisionAutoTuned still ran (as it
+    // could in a flat Promise.all — resolution order isn't guaranteed by
+    // array position), this account would be permanently marked "already
+    // tuned" without ever actually having been quieted, with no future
+    // init() able to retry it. Marking it done only after both calibrate()
+    // calls genuinely succeed means an interrupted attempt here just tries
+    // again next page load — the safe direction for this specific failure,
+    // unlike onDismiss/showMultiActionReceipt's independent-catch sites
+    // just above, where retrying isn't the right recovery.
     await Promise.all([
       FlowStorage.calibrate('dismiss', 'decision'),
-      FlowStorage.calibrate('dismiss', 'followup'),
-      FlowStorage.markPrecisionAutoTuned('log-it')
+      FlowStorage.calibrate('dismiss', 'followup')
     ]);
+    await FlowStorage.markPrecisionAutoTuned('log-it');
   }
 
   // Runs once per init() — a fresh page load, or the rare onboarding/
@@ -1086,8 +1098,18 @@
     // "pending" for one refresh cycle, showing a stale count on the badge,
     // the Brief indicator, and any Resurfacing card for exactly the message
     // that just closed.
+    //
+    // Each call is individually caught rather than left to a bare
+    // Promise.all: the real writes above already succeeded by this point,
+    // so a bookkeeping failure here must never surface as "Something went
+    // wrong" on a process that actually closed — that would invite exactly
+    // the retry-produces-a-duplicate-write scenario this product treats as
+    // the one unacceptable failure. Losing this specific log entry is a
+    // real, narrow residual risk (hasTerminalOutcome wouldn't yet know this
+    // message is resolved), logged so it's at least visible, not silent.
     await Promise.all(succeeded.map((r) =>
       FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
+        .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e))
     ));
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
     // The "opened vs closed" funnel pair with chip_shown — fired here and in
@@ -1173,10 +1195,20 @@
     // fresh, and used to run before this message's own dismissal had
     // necessarily landed, so it could still show up as "pending" for one
     // refresh cycle right after being dismissed.
+    //
+    // Each of the three is independently caught for the same reason
+    // showMultiActionReceipt's write-logging is: these are three genuinely
+    // separate stores (the display log, the calibration counters,
+    // Execution Memory), and one failing must never take the other two
+    // down with it via a shared Promise.all rejection, nor skip the
+    // tracking/checkBrief() below that a real dismiss still deserves.
     await Promise.all([
-      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP }),
-      FlowStorage.calibrate('dismiss', ctx.intent.type),
+      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP })
+        .catch((e) => console.error('[Glance] failed to record a dismiss in the activity log', e)),
+      FlowStorage.calibrate('dismiss', ctx.intent.type)
+        .catch((e) => console.error('[Glance] failed to update precision calibration for a dismiss', e)),
       FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId)
+        .catch((e) => console.error('[Glance] failed to record a dismiss in Execution Memory', e))
     ]);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
     // See showMultiActionReceipt's own comment on process_closed — a decline

@@ -21,11 +21,16 @@ function load() {
   // file use) — needed to prove getInstallId() actually persists across
   // calls, not just that it returns a string once.
   const storeBacking = {};
+  // Distinct per call, not a fixed literal — a race between two concurrent
+  // getInstallId() calls that each generated their own id would otherwise
+  // be invisible: two racing calls both stamping the same fixed string
+  // would look identical whether or not the race was actually closed.
+  let uuidCounter = 0;
 
   const sandbox = {
     console,
     fetch: async () => ({ ok: false, status: 500, json: async () => ({}) }),
-    crypto: { randomUUID: () => 'bg-test-uuid' },
+    crypto: { randomUUID: () => 'bg-test-uuid-' + (++uuidCounter) },
     chrome: {
       runtime: {
         getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }),
@@ -128,6 +133,24 @@ console.log('\n--- background.js: flow:get-install-id is the canonical generator
 
     const res2 = await bg.messageAsync({ type: 'flow:get-install-id' });
     check('a second call returns the SAME id — proves it was actually persisted, not regenerated', res2.id === res.id, [res, res2]);
+  }
+
+  console.log('\n--- background.js: two concurrent flow:get-install-id calls never generate two different ids ---\n');
+  {
+    // Fresh install, nothing generated yet — fire both calls before either
+    // has a chance to finish its own read-then-write of chrome.storage.local.
+    // Before getInstallId() cached its own in-flight promise, both calls
+    // would read "no id yet" and each generate + persist their own random
+    // id, with whichever set() landed second silently winning — exactly
+    // the duplicated-generator bug storage.js's own getInstallId was fixed
+    // for one layer up (see storage-corpus.cjs), just inside this file's
+    // own function this time.
+    const bg = load();
+    const [a, b] = await Promise.all([
+      bg.messageAsync({ type: 'flow:get-install-id' }),
+      bg.messageAsync({ type: 'flow:get-install-id' })
+    ]);
+    check('both concurrent callers receive the exact same id', a.ok && b.ok && a.id === b.id, [a, b]);
   }
 
   console.log('\nTOTAL FAILURES:', failures);
