@@ -1,30 +1,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* Dark is the popup's one and only theme, not a prefers-color-scheme
+   toggle — same call the marketing site already made site-wide (dark by
+   default everywhere except the homepage's explicit switch), and this
+   popup has no theme control of its own to make a light/dark split
+   meaningful. The glass-card and shell/ring/shine components below were
+   designed against these dark values; on the light palette they used to
+   read as a plain white card with a flat blue button — the gloss gradient
+   and glow both depend on a dark base to actually show. */
 :root{
-  --paper:#F5F7FB; --surface:#FFFFFF; --surface-2:#EDF1F8;
-  --ink:#0B0F1A; --ink-2:#3F4757; --ink-3:#6B7488;
-  --line:#DFE4EE; --line-2:#C6CEDD;
-  --accent:#1A4EF5; --accent-wash:#EAF0FF;
-  --ok:#12694A; --ok-wash:#E1F3EA;
-  --err:#B3261E;
-  --shadow:0 1px 2px rgba(11,15,26,.05), 0 10px 24px -16px rgba(11,15,26,.30);
-  --glass-top:rgba(255,255,255,.9); --glass-bot:rgba(255,255,255,.55);
-  --glass-gloss:rgba(255,255,255,.65); --glass-border:rgba(11,15,26,.07);
-  --glow:rgba(26,78,245,.28);
-}
-@media (prefers-color-scheme: dark){
-  :root{
-    --paper:#07090F; --surface:#11151F; --surface-2:#171D29;
-    --ink:#E9EDF6; --ink-2:#AEB8CB; --ink-3:#7E889C;
-    --line:#1F2634; --line-2:#2D3648;
-    --accent:#3B74FF; --accent-wash:#101B37;
-    --ok:#5FD39B; --ok-wash:#0E1F18;
-    --err:#FF8A80;
-    --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 28px -18px rgba(0,0,0,.9);
-    --glass-top:rgba(255,255,255,.06); --glass-bot:rgba(255,255,255,.015);
-    --glass-gloss:rgba(255,255,255,.10); --glass-border:rgba(255,255,255,.09);
-    --glow:rgba(59,116,255,.35);
-  }
+  --paper:#07090F; --surface:#11151F; --surface-2:#171D29;
+  --ink:#E9EDF6; --ink-2:#AEB8CB; --ink-3:#7E889C;
+  --line:#1F2634; --line-2:#2D3648;
+  --accent:#3B74FF; --accent-wash:#101B37;
+  --ok:#5FD39B; --ok-wash:#0E1F18;
+  --err:#FF8A80;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 28px -18px rgba(0,0,0,.9);
+  --glass-top:rgba(255,255,255,.06); --glass-bot:rgba(255,255,255,.015);
+  --glass-gloss:rgba(255,255,255,.10); --glass-border:rgba(255,255,255,.09);
+  --glow:rgba(59,116,255,.35);
 }
 
 *{box-sizing:border-box}
