@@ -254,10 +254,10 @@ background/framing), not something to upload as-is.
       actual `ALLOWED_EVENTS` list. Section 5's "What stays local" and
       "Connection credentials" bullets already covered the Morning
       Brief/Execution Memory local-storage additions correctly. The
-      "Anonymous product-usage events" bullet named 7 of the 10 actually
+      "Anonymous product-usage events" bullet named 7 of the 11 actually
       allowed events — missing `connector_configured`, `draft_generated`,
       `attachment_summarized`, and `weekly_habit_formed` — fixed to
-      enumerate all 10, matching this table's own row above exactly.
+      enumerate all 11, matching this table's own row above exactly.
 - [ ] The four non-Google connector `CLIENT_ID` placeholders in
       `src/background.js` (`HUBSPOT_CLIENT_ID`, `SALESFORCE_CLIENT_ID`,
       `SLACK_CLIENT_ID`, `MONDAY_CLIENT_ID`) are out of scope for this
