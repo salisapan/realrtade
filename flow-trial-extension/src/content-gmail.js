@@ -581,27 +581,55 @@
   // round-trip can represent). resolves null on cancel, on a background.js
   // failure (e.g. the picker API key isn't configured yet), or if the
   // picker window is closed without picking anything.
+  //
+  // The one gap that pattern doesn't cover on its own: background.js's
+  // pendingDrivePickers map (the record of which requestId belongs to which
+  // Gmail tab) lives only in the service worker's memory. MV3 kills an idle
+  // service worker after a short window with no activity — entirely
+  // plausible while the user is just browsing folders in the picker with no
+  // messages passing through background.js — and a restart silently empties
+  // that map. picker.js still posts its result and still closes itself
+  // either way, so the window closing looks like nothing went wrong; but
+  // deliverDrivePickerResult() then finds no matching entry and treats it as
+  // "already delivered, or the tab is gone" (its own comment's other two
+  // cases), so flow:drive-file-result never arrives here. Without a bound,
+  // this promise — and the "Opening Drive…" chip that awaits it, disabled
+  // the whole time — would hang forever, exactly the "user gets stuck" this
+  // product treats as unacceptable everywhere else. DRIVE_PICKER_TIMEOUT_MS
+  // is generous enough to never fire on a real pick (minutes, not seconds)
+  // and simply resolves null — the same outcome an explicit cancel already
+  // produces — rather than inventing a new, scarier failure state for what
+  // is, from the user's side, indistinguishable from having closed the
+  // window themselves.
+  const DRIVE_PICKER_TIMEOUT_MS = 10 * 60 * 1000;
   let drivePickerSeq = 0;
   const pendingDrivePickerResolvers = new Map(); // requestId -> resolve(file|null)
 
   function openDrivePicker() {
     const requestId = 'dp_' + Date.now() + '_' + (++drivePickerSeq);
     return new Promise((resolve) => {
-      pendingDrivePickerResolvers.set(requestId, resolve);
+      const settle = (result) => {
+        if (!pendingDrivePickerResolvers.has(requestId)) return; // already settled via the other path
+        pendingDrivePickerResolvers.delete(requestId);
+        clearTimeout(timer);
+        resolve(result);
+      };
+      const timer = setTimeout(() => settle(null), DRIVE_PICKER_TIMEOUT_MS);
+      pendingDrivePickerResolvers.set(requestId, settle);
       chrome.runtime.sendMessage({ type: 'flow:open-drive-picker', payload: { requestId } }, (response) => {
         if (response && response.ok) return; // the real result arrives later via flow:drive-file-result
-        pendingDrivePickerResolvers.delete(requestId);
-        resolve(null);
+        settle(null);
       });
     });
   }
 
   chrome.runtime.onMessage.addListener((msg) => {
     if (!msg || msg.type !== 'flow:drive-file-result') return;
-    const resolve = pendingDrivePickerResolvers.get(msg.requestId);
-    if (!resolve) return; // already resolved (e.g. background.js's open-ack already failed), or a stale message
-    pendingDrivePickerResolvers.delete(msg.requestId);
-    resolve(msg.cancelled ? null : (msg.file || null));
+    // settle() itself guards against a requestId that's already gone (the
+    // open-ack failure path, or DRIVE_PICKER_TIMEOUT_MS already firing) and
+    // does its own map cleanup — no separate get/delete needed here.
+    const settle = pendingDrivePickerResolvers.get(msg.requestId);
+    if (settle) settle(msg.cancelled ? null : (msg.file || null));
   });
 
   // The attachment-choice row under the gmailDraft pill: one chip per real
