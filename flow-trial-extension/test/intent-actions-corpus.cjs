@@ -478,14 +478,67 @@ console.log('\n--- intent.js: per-type calibration nudges the gating threshold, 
   const wrongType = { followup: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
   const unaffected = classify(text, { calibrationByType: wrongType });
   check('history for a DIFFERENT intent type never affects this message', unaffected.type === FlowIntent.TYPES.DECISION_TO_LOG, unaffected);
+}
 
-  // A hard-gated type (SCHEDULED_EVENT) never consults calibrationByType at
-  // all — this is deliberate (see intent.js's own comment): a per-type
-  // history sitting under 'event' must not change whether the meeting fires.
+console.log('\n--- intent.js + judgment.js: isTypeSuppressed self-calibrates the three hard-gated types ---\n');
+{
+  // A hard-gated type never consults calibrationByType via a THRESHOLD (it
+  // has none to move — the evidence gate stays a pure boolean, exactly as
+  // intent.js's own comment documents), but it now DOES consult it via
+  // isTypeSuppressed: sustained, close-to-unanimous rejection of that exact
+  // type mutes it, everything short of that leaves it untouched.
   const meetingText = 'Let’s do a call Friday, September 18 at 3pm to review the contract.';
+
+  // Light, normal dismissal history (well under SUPPRESS_MARGIN) must NOT
+  // suppress — a couple of dismissals is ordinary noise, not a lesson.
+  const lightEventDismiss = { event: { clicks: 0, dismissals: 2, ts: NOW.getTime() } };
+  const stillFiresLight = classify(meetingText, { calibrationByType: lightEventDismiss });
+  check('light dismissal history (2, well under the margin) does not suppress SCHEDULED_EVENT',
+    stillFiresLight.type === FlowIntent.TYPES.SCHEDULED_EVENT, stillFiresLight);
+
+  // Heavy, near-unanimous, RECENT dismissal history clears SUPPRESS_MARGIN
+  // and mutes the type — this is the new, intended behavior this item adds.
   const heavyEventDismiss = { event: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
-  const stillFires = classify(meetingText, { calibrationByType: heavyEventDismiss });
-  check('a hard-gated type (SCHEDULED_EVENT) ignores calibrationByType entirely', stillFires.type === FlowIntent.TYPES.SCHEDULED_EVENT, stillFires);
+  const suppressed = classify(meetingText, { calibrationByType: heavyEventDismiss });
+  check('heavy, recent dismissal history (6, 0 clicks) DOES suppress SCHEDULED_EVENT',
+    suppressed.type === null, suppressed);
+
+  // A single real click resets the balance enough to unmute — the same
+  // "clicking says more like that" rule the account-wide threshold follows.
+  const oneClickBack = { event: { clicks: 2, dismissals: 6, ts: NOW.getTime() } };
+  const unmuted = classify(meetingText, { calibrationByType: oneClickBack });
+  check('enough clicks against the same heavy dismissal history un-suppresses it again',
+    unmuted.type === FlowIntent.TYPES.SCHEDULED_EVENT, unmuted);
+
+  // Heavy dismissal history that has fully decayed (ts far in the past, well
+  // past the 7-day half-life) must not suppress either — silence must never
+  // become a one-way door, the same rule thresholdFrom's own comment states
+  // for the account-wide bar.
+  const staleEventDismiss = { event: { clicks: 0, dismissals: 6, ts: NOW.getTime() - 1000 * 60 * 60 * 24 * 60 } };
+  const healedBack = classify(meetingText, { calibrationByType: staleEventDismiss });
+  check('heavy dismissal history that has fully decayed (60 days old) no longer suppresses',
+    healedBack.type === FlowIntent.TYPES.SCHEDULED_EVENT, healedBack);
+
+  // Suppression is per-type — heavy dismissal history sitting under 'event'
+  // must have zero effect on REQUEST or COMMITMENT_OF_READER firing for a
+  // DIFFERENT message, and vice versa.
+  const requestText = 'Could you please send me the signed contract when you get a chance?';
+  const requestUnaffected = classify(requestText, { calibrationByType: heavyEventDismiss });
+  check('heavy "event" dismissal history never suppresses a REQUEST', requestUnaffected.type === FlowIntent.TYPES.REQUEST, requestUnaffected);
+
+  const heavyRequestDismiss = { request: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const requestSuppressed = classify(requestText, { calibrationByType: heavyRequestDismiss });
+  check('heavy dismissal history under "request" DOES suppress REQUEST for its own message',
+    requestSuppressed.type === null, requestSuppressed);
+
+  const commitText = 'You agreed to send the invoice by Friday.';
+  const heavyCommitDismiss = { commitment: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const commitSuppressed = classify(commitText, { calibrationByType: heavyCommitDismiss });
+  check('heavy dismissal history under "commitment" DOES suppress COMMITMENT_OF_READER for its own message',
+    commitSuppressed.type === null, commitSuppressed);
+  const commitEventDismissUnaffected = classify(commitText, { calibrationByType: heavyEventDismiss });
+  check('heavy "event" dismissal history never suppresses a COMMITMENT_OF_READER',
+    commitEventDismissUnaffected.type === FlowIntent.TYPES.COMMITMENT_OF_READER, commitEventDismissUnaffected);
 }
 
 console.log('\n--- intent.js: REQUEST fires on a named concrete object, no date/amount needed ---\n');

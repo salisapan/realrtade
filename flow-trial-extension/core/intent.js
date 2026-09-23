@@ -11,14 +11,22 @@
 // platform (Outlook, WhatsApp) reading the same classified Intent — without
 // touching the other.
 //
-// Precision over recall, explicitly: two of the five types (SCHEDULED_EVENT,
-// COMMITMENT_OF_READER) require a hard, deterministic evidence combination —
-// not a score that happens to clear a bar. The other three reuse
+// Precision over recall, explicitly: three of the five types (SCHEDULED_EVENT,
+// COMMITMENT_OF_READER, REQUEST) require a hard, deterministic evidence
+// combination — not a score that happens to clear a bar. The other two reuse
 // FlowJudgment's own proven scorer (the exact signals and threshold already
 // tuned against test/judgment-corpus.cjs) as their gate, so "should Glance
 // speak up at all" is never re-litigated here, only "which of these five
 // things is it." When nothing clears its bar, classify() returns
 // { type: null } — silence, same as the chip's own default state.
+//
+// The three hard-gated types have no threshold for a per-account history to
+// nudge — that's the whole point of a hard gate — but an account can still
+// teach Glance to stop surfacing a TYPE it keeps rejecting, via
+// FlowJudgment.isTypeSuppressed (see each hard gate below): a separate,
+// later question from "is the evidence real," answered from that type's own
+// calibrationByType bucket, never by blurring the evidence gate itself into
+// a score.
 
 const FlowIntent = (() => {
   const TYPES = {
@@ -277,6 +285,16 @@ const FlowIntent = (() => {
       };
     }
 
+    // The self-calibration outlet for the three hard-gated types below — see
+    // FlowJudgment.isTypeSuppressed's own header comment for the full
+    // reasoning. Reads the SAME ctx.calibrationByType map applyTypeAdjustment
+    // reads for the two score-based types further down, keyed by the type
+    // being gated, so this needs no new storage shape and no new call site
+    // in content-gmail.js's existing calibrate('click'|'dismiss', ...) calls.
+    function suppressed(type) {
+      return FlowJudgment.isTypeSuppressed(ctx.calibrationByType && ctx.calibrationByType[type], ctx.now);
+    }
+
     // --- 1. SCHEDULED_EVENT: hard gate, not score-based. Meeting noun + a
     //        resolved date, or none — and never when the same message also
     //        says the meeting itself was called off — "the 3pm Friday sync
@@ -300,7 +318,7 @@ const FlowIntent = (() => {
     const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
     const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
-    if (hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast) {
+    if (hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast && !suppressed(TYPES.SCHEDULED_EVENT)) {
       return finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
@@ -323,7 +341,7 @@ const FlowIntent = (() => {
     //        than a dated/priced commitment — 'medium' there, matching
     //        REQUEST's own confidence for its equivalent object-only path,
     //        vs 'high' when a real anchor is present.
-    if (isReaderCommit && (hasConcreteAnchor || hasConcreteCommitmentObject)) {
+    if (isReaderCommit && (hasConcreteAnchor || hasConcreteCommitmentObject) && !suppressed(TYPES.COMMITMENT_OF_READER)) {
       return finish(TYPES.COMMITMENT_OF_READER, hasConcreteAnchor ? 'high' : 'medium', {
         who, amount,
         what: commitmentWhat || shortLabel(TYPES.COMMITMENT_OF_READER, facts, enrichedFacts),
@@ -345,7 +363,7 @@ const FlowIntent = (() => {
     //        what to do with — see judgment-corpus.cjs / this file's own
     //        earlier miss on "אבקש לקבל ממך את הקבלה", which had neither a
     //        date nor an amount and was silently dropped before this.
-    if (s.flags.handoff && (hasConcreteAnchor || hasConcreteRequestObject)) {
+    if (s.flags.handoff && (hasConcreteAnchor || hasConcreteRequestObject) && !suppressed(TYPES.REQUEST)) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || shortLabel(TYPES.REQUEST, facts, enrichedFacts),

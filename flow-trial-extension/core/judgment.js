@@ -454,13 +454,55 @@ const FlowJudgment = (() => {
     };
   }
 
+  // Hard-gated types (SCHEDULED_EVENT, COMMITMENT_OF_READER, REQUEST in
+  // intent.js) have no threshold for applyTypeAdjustment above to nudge —
+  // they fire on a deterministic evidence gate, not a score compared to a
+  // moving bar. But an account can still teach Glance to stop surfacing a
+  // TYPE it keeps rejecting, the same way it teaches the two score-based
+  // types: this is that lesson's outlet for the three that have none.
+  // Deliberately NOT a blend into the evidence gate itself (that stays a
+  // pure boolean, exactly as documented at each gate's own call site) — it's
+  // a separate, later question: "the evidence is real, does this account
+  // still want to see it."
+  //
+  // SUPPRESS_MARGIN is set high (5 of bumpCalibration's own 6-per-counter
+  // cap) on purpose. One or two dismissals of a genuine REQUEST/EVENT/
+  // COMMITMENT are completely normal noise (already handling it elsewhere,
+  // wasn't in the mood, misclicked) and must never silence a hard-gated
+  // type on that alone — silencing a message with real, unambiguous
+  // evidence is a worse failure than one extra chip, the same precision-
+  // over-recall bias every hard gate in intent.js is built on. This only
+  // fires after sustained, close-to-unanimous rejection of that exact type,
+  // and — through the same decay every other calibration number here uses —
+  // self-heals within roughly a week of no further dismissals. Silence must
+  // never become a one-way door; that's thresholdFrom's own rule above,
+  // applied here too.
+  const SUPPRESS_MARGIN = 5;
+
+  // `typeCalibration` is the same calibrationByType[type] bucket
+  // applyTypeAdjustment reads — { clicks, dismissals, ts } — already
+  // populated for every FlowIntent type by storage.js's calibrate(), hard-
+  // gated types included (content-gmail.js calls
+  // FlowStorage.calibrate('dismiss'|'click', ctx.intent.type) for every
+  // intent type, not just the two score-based ones). No entry, same as
+  // applyTypeAdjustment, means no suppression: a brand-new install or a
+  // caller with no calibration history behaves exactly as before.
+  function isTypeSuppressed(typeCalibration, now) {
+    if (!typeCalibration) return false;
+    const elapsed = Math.max(0, (now || Date.now()) - (typeCalibration.ts || 0));
+    const decay = typeCalibration.ts ? Math.pow(0.5, elapsed / DISMISSAL_HALF_LIFE_MS) : 1;
+    const clicks = (typeCalibration.clicks || 0) * decay;
+    const dismissals = (typeCalibration.dismissals || 0) * decay;
+    return (dismissals - clicks) >= SUPPRESS_MARGIN;
+  }
+
   // score, newContent, and the HANDOFF pair are exposed for intent.js: the
   // classifier reuses this exact scorer and this exact "is this a request"
   // pattern (same signals, same weights, same tuning against
   // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
   // drifting copy of the same judgment.
   return {
-    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, score, newContent,
+    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, score, newContent,
     HANDOFF, HANDOFF_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };
