@@ -191,6 +191,57 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('a date-only recap does not fire SCHEDULED_EVENT', !dateOnlyRecap || dateOnlyRecap.type !== FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyRecap && dateOnlyRecap.type);
 }
 
+// 3f. MEETING_NOUN/MEETING_NOUN_HE's broader event-noun vocabulary, plus a
+//     real, PRE-EXISTING precision bug found and fixed while broadening it:
+//     "Could you send me the call recording by Friday?" — a REQUEST for a
+//     deliverable — used to fire SCHEDULED_EVENT even with the ORIGINAL,
+//     unmodified word list, because "call" (a meeting noun) plus "by
+//     Friday" (a resolved date) was already sufficient evidence for the
+//     event gate, with no check for whether the meeting noun was actually
+//     describing a scheduled meeting or just naming the ARTIFACT of one.
+//     Fixed with a negative lookahead excluding "artifact of a meeting"
+//     continuations (recording, notes, transcript, minutes, summary,
+//     recap, feedback, materials, slides, deck, agenda) — narrow and
+//     evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP.
+{
+  const collisionCases = [
+    ['call recording', 'Could you send me the call recording by Friday?'],
+    ['session notes', 'Please send the session notes by Monday.'],
+    ['interview feedback', 'Can you send the interview feedback by Friday?'],
+    ['meeting notes', 'Could you send the meeting notes from yesterday?'],
+    ['workshop materials', 'Could you send the workshop materials by Friday?'],
+    ['webinar recording', 'Please send me the webinar recording by Monday.']
+  ];
+  for (const [label, text] of collisionCases) {
+    const intent = classify(text);
+    check('artifact-of-meeting request ("' + label + '") stays REQUEST, not SCHEDULED_EVENT',
+      intent && intent.type === FlowIntent.TYPES.REQUEST, intent && intent.type);
+  }
+
+  const newNounCases = [
+    ['standup', "Let's do a standup on Monday at 9am."],
+    ['retro', 'Can we schedule a retro on Friday?'],
+    ['workshop', "Let's set up a workshop on Wednesday at 2pm."],
+    ['webinar', 'The webinar is on Thursday at 11am.'],
+    ['huddle', 'Quick huddle on Monday morning?'],
+    ['kickoff', 'The kickoff is on Monday.'],
+    ['town hall', 'The town hall is on Friday at 4pm.'],
+    ['office hours', 'Office hours are on Wednesday at 3pm.'],
+    ['one-on-one', "Let's do our one-on-one on Tuesday."],
+    ['strategy session', 'Can we set up a strategy session on Monday?'],
+    ['deposition', 'The deposition is on Wednesday at 10am.'],
+    ['hearing', 'The hearing is on Friday.'],
+    ['mediation', 'The mediation is on Tuesday at 1pm.'],
+    ['HE: עמידה יומית (standup)', 'בואו נקבע עמידה יומית ביום שני.'],
+    ['HE: סדנה (workshop)', 'אפשר לקבוע סדנה ביום רביעי?'],
+    ['HE: וובינר (webinar)', 'הוובינר מתוכנן ביום חמישי.']
+  ];
+  for (const [label, text] of newNounCases) {
+    const intent = classify(text);
+    check(label + ' -> SCHEDULED_EVENT', intent && intent.type === FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+  }
+}
+
 // 4. A reader commitment reminder -> COMMITMENT_OF_READER, the "Follow
 //    Through" process, task anchor leading, draft second.
 {

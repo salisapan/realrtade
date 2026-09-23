@@ -42,8 +42,24 @@ const FlowIntent = (() => {
   // not enough: "let's talk about the budget" (noun, no date/time) or
   // "the report is due at 3pm Friday" (date+time, no meeting noun — that's
   // a deadline, not an event) must not become a calendar entry.
-  const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation)\b/i;
-  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו)/;
+  //
+  // The trailing negative lookahead is a real, pre-existing bug fix found
+  // while broadening this list, not new behavior invented for the sake of
+  // it: "Could you send me the call recording by Friday?" is a REQUEST for
+  // a deliverable, but "call" + a resolved date ("by Friday") already
+  // satisfied SCHEDULED_EVENT's gate with the ORIGINAL, unmodified word
+  // list too — confirmed before this fix, on "call", "session", and
+  // "interview" specifically. Broadening the list without fixing this
+  // would only make a real, existing precision problem fire more often,
+  // working directly against this widening's whole purpose. The lookahead
+  // excludes the common "artifact OF a meeting" continuations (recording,
+  // notes, transcript, minutes, summary, recap, feedback, materials,
+  // slides, deck, agenda) so a meeting noun immediately followed by one of
+  // these reads as "the [artifact] of X", not "let's have X" — narrow and
+  // evidence-based, the same shape as EVENT_CALLED_OFF/EVENT_RECAP above
+  // rather than a blanket reordering of which gate wins.
+  const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
+  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
 
   // "This is not happening at the time this message names."
   //
