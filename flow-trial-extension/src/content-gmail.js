@@ -193,6 +193,60 @@
     }
   }
 
+  // The remote fallback classifier — see glance-assist.js's 'classify'
+  // action for the actual model call and content-gmail.js's own comment at
+  // this function's one call site for why it exists at all. Masks text
+  // with FlowPrivacyShield exactly the way Draft-It and the attachment
+  // summarizer already do (same tokens, same contract — this reuses it,
+  // doesn't invent a second one), unmasks the entities that come back, and
+  // returns a full FlowIntent.classify()-shaped object so actions.js and
+  // everything downstream of it need no changes at all: as far as
+  // planFor() is concerned, this is indistinguishable from a local hit.
+  // Returns null on any failure — not configured, network error, model
+  // found nothing either — and the caller treats that exactly like the
+  // local classifier's own { type: null }: stay silent, no crash, no chip.
+  async function ensureRemoteClassification(rawText) {
+    if (typeof FlowPrivacyShield === 'undefined') return null;
+    const lang = (typeof FlowSidebar !== 'undefined' && FlowSidebar.isRTLText(rawText)) ? 'he' : 'en';
+    const masked = FlowPrivacyShield.mask(rawText);
+    let res;
+    try {
+      res = await new Promise((resolve) => chrome.runtime.sendMessage(
+        { type: 'flow:classify-remote', payload: { lang, maskedText: masked.maskedText } },
+        resolve
+      ));
+    } catch (e) {
+      return null;
+    }
+    if (!res || !res.ok || !res.result || !res.result.type) return null;
+
+    const r = res.result;
+    const unmask = (v) => FlowPrivacyShield.unmask(v || '', masked.tokenMap);
+    const what = unmask(r.what);
+    const when = unmask(r.when);
+    const amount = unmask(r.amount);
+    const who = unmask(r.who);
+    const requestWhat = unmask(r.requestWhat);
+
+    return {
+      type: r.type,
+      confidence: 'remote',
+      entities: { who, what, when, amount, requestWhat, dateIso: r.dateIso || null },
+      label: what || requestWhat || who || 'Update',
+      // Not a graded score the way the local scorer produces one — the
+      // model either returned a type or it didn't — but appendLog's
+      // 'shown' entry reads intent.signals.score unconditionally, so this
+      // needs a real number, not a fabricated confidence percentage.
+      signals: { score: 100, threshold: 50, remote: true },
+      facts: {
+        money: amount ? { raw: amount } : null,
+        date: r.dateIso ? { raw: when, iso: r.dateIso } : null,
+        wordCount: rawText.trim().split(/\s+/).filter(Boolean).length,
+        automated: false
+      }
+    };
+  }
+
   // Mounted once per tab, idempotent (FlowSidebar.mount() itself no-ops if
   // already attached). Feature 1's badge appears the moment the sidebar
   // mounts — it isn't gated behind the judgment engine finding anything,
@@ -436,12 +490,14 @@
     // already limits onboarding to Google Tasks only, and background.js's
     // WRITERS/UNDOERS entries for the others exist purely so a direct API
     // caller isn't broken, not because the live chip still routes to them).
-    // A connectorId stored before that scope cut would otherwise get a
-    // chip that's guaranteed to fail with a confusing "connect Google"
-    // message for a system it never asked them to connect — stay silent
-    // until they reconnect through the popup instead, the same treatment
-    // as "not onboarded".
-    if (state.connectorId && state.connectorId !== 'googleTasks') return;
+    // A stored connectorId left over from one of those — most commonly an
+    // old manual Notion connect from before this MVP cut, which still
+    // reports as "connected" in the popup's status pill — used to dead-end
+    // classification right here with no way back short of the Setup tab.
+    // It no longer does: this is now treated exactly like "not onboarded"
+    // and handed to ensureGoogleAutoConnect() below, which silently
+    // upgrades the account to Google (overwriting the stale connectorId)
+    // the moment it can, using the same one-time grant either path takes.
 
     const sender = extractSender(message);
     const subject = currentSubject();
@@ -452,12 +508,23 @@
     // the raw text, hands actions.js the classified Intent, and later hands
     // background.js one step at a time — it never re-derives what "this is
     // a request" or "this should become a Calendar event" means.
-    const intent = FlowIntent.classify(text, {
+    let intent = FlowIntent.classify(text, {
       senderEmail: sender.email,
       senderName: sender.name,
       calibration: state.calibration,
       calibrationByType: state.calibrationByType
     });
+    // The free, local, fixed-pattern classifier found nothing — not the
+    // same thing as "there was nothing here." It's a regex corpus, tuned
+    // hardest for English; a plainly real request or commitment in Hebrew
+    // (or any phrasing its patterns never anticipated) reads the same as
+    // an actual non-decision unless something else looks harder. That's
+    // what this is: one remote attempt, only ever reached when the local
+    // pass already gave up, sending only privacy-masked text (see
+    // ensureRemoteClassification). Silent either way if it also finds
+    // nothing, times out, or the backend isn't configured — same "just
+    // don't show a chip" contract the local path already follows.
+    if (!intent.type) intent = await ensureRemoteClassification(text) || intent;
     if (!intent.type) return;
 
     const attachments = allRealAttachments(message);
@@ -476,9 +543,13 @@
 
     // The one moment this account is ever asked for Google access at all —
     // right here, after judgment has already found a real Do It moment on
-    // screen, never before and never from a settings page. See
-    // ensureGoogleAutoConnect() below for what this actually does.
-    if (!state.onboarded && !(await ensureGoogleAutoConnect())) return;
+    // screen, never before and never from a settings page. Covers both "not
+    // onboarded yet" and "onboarded, but to a stale non-Google connectorId"
+    // (see the comment above this function's earlier connectorId check) —
+    // either way, the account isn't actually ready to write to Google, and
+    // ensureGoogleAutoConnect() is the one path that can fix that silently.
+    const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
+    if (!usingGoogle && !(await ensureGoogleAutoConnect())) return;
 
     injectChip(message, {
       messageId, intent, process, sender, subject, attachment, attachments,

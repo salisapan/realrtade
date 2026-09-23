@@ -1521,6 +1521,15 @@ async function summarizeAttachmentViaBackend(payload) {
   return { ok: true, summary: data.summary, entities: data.entities };
 }
 
+// payload: { lang, maskedText } — already masked by the caller; see
+// glance-assist.js's classify() and content-gmail.js's
+// ensureRemoteClassification() for the one caller of this. Never called for
+// every message — only when the local classifier already returned nothing.
+async function classifyViaBackend(payload) {
+  const data = await callGlanceAssist({ action: 'classify', lang: payload.lang, maskedText: payload.maskedText });
+  return { ok: true, result: data.result };
+}
+
 /* ---------------------------------------------------------------- dispatch */
 
 // 'googleTask' (singular) is the action *kind* actions.js proposes; 'googleTasks'
@@ -1640,6 +1649,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:summarize-attachment') {
     return reply(sendResponse, summarizeAttachmentViaBackend(msg.payload || {}));
+  }
+
+  if (msg.type === 'flow:classify-remote') {
+    return reply(sendResponse, classifyViaBackend(msg.payload || {}));
   }
 
   if (msg.type === 'flow:open-drive-picker') {
