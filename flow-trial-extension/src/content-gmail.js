@@ -1097,11 +1097,28 @@
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
-    done.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
-    done.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
+
+    // Leads with the human read of what just happened — "handled," full
+    // stop — before the specific, accurate detail underneath it. The old
+    // order put the process-name badge and the verb list first and saved
+    // this feeling for a one-time bonus line on someone's first three
+    // closes only, trailing AFTER that detail; every close now opens the
+    // same reassuring way, every time, for as long as the account exists —
+    // closer to how a person would actually tell you what happened
+    // ("handled — " then the specifics), not a status log read top to
+    // bottom. The first three closes get their own longer, warmer version
+    // of the same lead line (see isEarlyClose below) rather than showing
+    // both and repeating "handled" twice in one receipt.
     if (isEarlyClose) {
       done.appendChild(el('span', 'flow-chip-first-close', 'Nothing else to open, nothing else to check — that’s handled.'));
+    } else {
+      done.appendChild(el('span', 'flow-chip-handled', 'Handled.'));
     }
+
+    const detail = el('span', 'flow-chip-detail');
+    detail.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
+    detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
+    done.appendChild(detail);
 
     const actionsRow = el('span', 'flow-chip-actions');
     for (const r of succeeded) {

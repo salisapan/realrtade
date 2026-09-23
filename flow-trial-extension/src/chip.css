@@ -368,6 +368,38 @@
   color: #fff; font-size: 12px; font-weight: 800; line-height: 1;
 }
 .flow-chip.flow-chip-done .flow-chip-label { color: #0B4F32; font-weight: 700 }
+
+/* The standing lead line — sits on the icon's own line, before the process
+   badge and closedSummary() text below it. The permanent, every-close
+   counterpart to flow-chip-first-close's one-time warm sentence (see that
+   rule and docs/magic-moment.md): from the 4th close onward this is the
+   first thing read, sized and weighted as the receipt's primary text so
+   "handled" always lands before the specifics do. */
+.flow-chip-handled {
+  all: unset;
+  display: inline-block;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #0B4F32;
+}
+
+/* Wraps the process badge + closedSummary() sentence that used to open the
+   receipt on their own. Now a full-width secondary line beneath the lead
+   phrase above (flow-chip-handled or, for the first three closes,
+   flow-chip-first-close) — still exact and readable, just no longer the
+   first thing competing for the reader's attention. */
+.flow-chip-detail {
+  all: unset;
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 6px;
+  opacity: .82;
+}
+.flow-chip-detail .flow-chip-label { font-size: 12.5px; }
+
 .flow-chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 4px; }
 .flow-chip-link {
   all: initial;
@@ -401,10 +433,15 @@
   margin-inline-start: 6px;
 }
 
-/* The one line the Magic Moment adds — see docs/magic-moment.md. Same
-   receipt, same green family as the rest of flow-chip-done, just a lighter
-   weight than flow-chip-label so it reads as a footnote to what already
-   happened, not a second headline competing with it. */
+/* The Magic Moment's one-time warm sentence for a new account's first
+   three closes — see docs/magic-moment.md. Sits in the receipt's lead
+   position, before flow-chip-detail's process badge and closedSummary()
+   text (flow-chip-handled is its every-close counterpart from the 4th
+   close on; only one of the two is ever appended for a given close). Same
+   green family as the rest of flow-chip-done, still a touch lighter than
+   flow-chip-handled's weight so it reads as reassurance rather than a
+   second headline — the technical detail underneath stays the quiet part
+   either way. */
 .flow-chip-first-close {
   all: unset;
   display: block;
