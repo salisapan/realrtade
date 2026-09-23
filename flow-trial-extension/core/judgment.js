@@ -1,9 +1,15 @@
 // The judgment engine: decides whether one email is worth speaking up about.
 //
-// It runs entirely on the device. No email text leaves the machine to reach this
-// decision — that is a deliberate architectural choice, not a limitation of the
-// trial, and it is what lets Glance hold the same local-first line as the
-// full product.
+// This file itself runs entirely on the device and sends nothing anywhere —
+// still true, and still the default path for every message, English or
+// Hebrew, that its patterns actually cover. It is a fixed keyword/regex
+// corpus, not language understanding, so it has a real ceiling: a message
+// this file scores { type: null } is not "Glance stayed local," it's
+// "Glance found nothing" — content-gmail.js's ensureRemoteClassification()
+// is the one place that gap gets a second, masked-text-only attempt (see
+// glance-assist.js). Growing the corpus below keeps more real Hebrew and
+// English business email inside this free, instant, fully local path
+// rather than needing that fallback at all.
 //
 // It is not a keyword match. Each signal carries a weight and a reason; the
 // score is their sum, and the chip only appears once the score clears a
@@ -54,19 +60,31 @@ const FlowJudgment = (() => {
   // letters and would silently turn every one of these into a dead pattern.
   // Same phrases, same intent, just the vocabulary an Israeli business inbox
   // actually uses instead of "we're good at" / "approved" / "no longer interested".
-  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?)/;
-  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור)/;
-  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא)/;
-  const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם)/;
-  const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון)/;
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?)/;
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה)/;
+  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא הולכים על זה|בחרנו באופציה אחרת|בחרנו בספק אחר|לצערנו לא נוכל|אנחנו לא ממשיכים איתכם|ירדנו מהעניין)/;
+  const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם|חתמתי על|נחתם וסגור|חתום ומאושר)/;
+  const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון|עד סוף החודש|יש להעביר עד|נדרש לשלם עד|יש להשלים עד)/;
   // תשלח/י לי, צריך/ה ממך, בבקשה ת... — the direct "do X for me" phrasings a
   // small, personal-scale request actually gets written in, on top of the
   // more formal "תוכל/נשמח אם" business-register set already here. "בבקשה
   // ת" is deliberately broad (any 2nd-person imperative/future verb, which
   // in Hebrew all take a ת prefix, following "please") rather than
   // enumerating every possible verb after it.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת)/;
-  const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב)/;
+  //
+  // אבקש/מבקש(ת/ים) — first-person "I request/ask" — was the exact gap that
+  // let a plain, real request ("אבקש לקבל ממך את הקבלה...") score a flat 0:
+  // every other alternative here is either 2nd-person (asking the reader
+  // directly) or a fixed "please" phrase, and neither covers someone
+  // stating their own request in first person, which is at least as common
+  // in Hebrew business writing as the "תוכל..." forms already covered. נא
+  // ל.../אנא.../אודה if/לקבל round out the other common register: a
+  // slightly more formal or more polite "please" than "בבקשה ת" alone
+  // captures. (?:^|\s) in front of the 2-letter נא guards the same
+  // substring risk NEG_BEFORE_HE/HEDGE_HE document above it in this file —
+  // "נא" bare would otherwise match inside unrelated longer words.
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|נדרש ממך|חשוב שתעביר)/;
+  const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב|הסכום שגוי|יש טעות בחשבונית|לא תואם למוסכם)/;
 
   const MARKETING = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|webinar|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;
   const CALENDAR_NOISE = /\b(has (?:accepted|declined|tentatively accepted) (?:this|your) invitation|invitation from google calendar|added to your calendar)\b/i;

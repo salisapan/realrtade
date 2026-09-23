@@ -35,7 +35,7 @@ const FlowIntent = (() => {
   // "the report is due at 3pm Friday" (date+time, no meeting noun — that's
   // a deadline, not an event) must not become a calendar entry.
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation)\b/i;
-  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה)/;
+  const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו)/;
 
   // "This is not happening at the time this message names."
   //
@@ -68,7 +68,7 @@ const FlowIntent = (() => {
     "skip(?:ping)? (?:this|next) week'?s?",
     '(?:take|drop) (?:it|this|that) (?:off|from) the calendar'
   ].join('|'), 'i');
-  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|לא מתקיים|לא יתקיים|נקבע מחדש)/;
+  const EVENT_CALLED_OFF_HE = /(נדח(?:ה|ית|תה)|לדחות|דוחים את|מבוטל|בוטל|לא מתקיים|לא יתקיים|נקבע מחדש|מבטלים את הפגישה|הפגישה לא תתקיים|יש לדחות את)/;
 
   // "This already happened — don't schedule it again."
   //
@@ -92,7 +92,7 @@ const FlowIntent = (() => {
     'enjoyed (?:our|the) (?:call|meeting|chat|conversation)',
     'glad (?:we|to have) (?:synced|caught up|connected|spoke|talked)'
   ].join('|'), 'i');
-  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה))/;
+  const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר)/;
 
   // The other half of the "don't schedule the past" fix above: EVENT_RECAP
   // only helps when the message uses recognizable past-tense phrasing.
@@ -124,7 +124,7 @@ const FlowIntent = (() => {
   // far too much, so — same as judgment.js's own signal pairs — these stay
   // separate regexes rather than one pattern trying to cover both.
   const READER_COMMIT = /\b(you (?:agreed|committed|promised|confirmed) to|as (?:you|per your) (?:agreed|committed|promised|discussed)|confirming you(?:'ll| will)|per your commitment|as discussed,? you(?:'ll| will))\b/i;
-  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש)/;
+  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש|כפי שהבטחת|כמו שהבטחת)/;
 
   // The one sentence a human would point to as "this is the ask" — reused
   // as the `what` entity rather than synthesizing new wording, the same
