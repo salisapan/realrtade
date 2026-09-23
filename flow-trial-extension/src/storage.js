@@ -7,6 +7,16 @@ const FlowStorage = (() => {
     onboarded: false,
     domainId: null,
     connectorId: null,
+    // Set once content-gmail.js's automatic Google connect (see
+    // ensureGoogleAutoConnect there) has actually shown the interactive
+    // account chooser and the account either declined it or it failed for a
+    // real reason — never set for the "Google isn't configured on this
+    // build yet" case, which fails instantly with no UI shown at all and is
+    // safe (and meant) to retry silently on the next actionable email. This
+    // flag exists purely to stop a declined/failed real prompt from
+    // reopening on every subsequent email, which would be exactly the kind
+    // of nagging the automatic flow exists to avoid.
+    autoConnectAttempted: false,
     // { ts, kind: 'shown'|'clicked'|'written'|'undone'|'dismissed', label, messageId, score, signals, where, url, ref }
     // A 'shown' entry additionally carries { process, threadUrl, sender,
     // subject, intent } — a full, DOM-free snapshot of what was proposed —

@@ -25,6 +25,10 @@
   let state = null;
   let watching = false;
   let observer = null;
+  // Guards ensureGoogleAutoConnect() below against firing twice for two
+  // messages classified in the same debounced scanReadingPane pass, before
+  // either call's FlowStorage.set({ onboarded: true }) has landed.
+  let autoConnectInFlight = false;
 
   // The reading pane's currently open thread, refreshed on every
   // scanReadingPane() pass — this is what Feature 2 (Draft-It) and Feature 4
@@ -36,16 +40,14 @@
 
   async function init() {
     state = await FlowStorage.get();
-    // Disconnecting a connector in the popup flips onboarded back to false
-    // and fires the onChanged listener below, which calls init() again —
-    // this is the only place that transition is handled, so it has to
-    // actually tear the observer down, not just decline to start a new one.
-    // Without this, the observer created by observe() below keeps running
-    // forever: watching never goes back to false, so scanReadingPane's own
-    // guard never trips, and Flow keeps injecting chips whose "Do It" click
-    // is now guaranteed to fail (state.connectorId is null once disconnected).
-    if (!state.onboarded) { stopWatching(); return; }
+    // Watching starts regardless of onboarded state now — scanReadingPane()
+    // still runs the real judgment pipeline on every message either way, and
+    // it's the one that decides (in ensureGoogleAutoConnect(), right before
+    // it would otherwise show a chip) whether this is the moment to ask for
+    // Google access at all. A not-yet-onboarded account isn't "off," it's
+    // just quiet until there's something real to connect for.
     if (!watching) { watching = true; observe(); }
+    if (!state.onboarded) return;
     // mountSidebar() is off — see the note at wireAttachmentHoverCards()'s
     // call site in scanReadingPane() for why the whole sidebar surface
     // (badge, Draft-It, attachment X-ray) is cut, not just styled.
@@ -153,12 +155,42 @@
     }
   }
 
-  function stopWatching() {
-    if (observer) { observer.disconnect(); observer = null; }
-    watching = false;
-    currentContext = null;
-    if (typeof FlowSidebar !== 'undefined') FlowSidebar.unmount();
-    if (typeof FlowBrief !== 'undefined') FlowBrief.hide();
+  // Called from scanReadingPane() at the one moment this account is ever
+  // asked for Google access: right after judgment has already found a real
+  // Do It moment on screen, never on install and never from a settings
+  // page. Reuses the exact same chrome.identity grant popup.js's manual
+  // "Connect Google Tasks" + "Save & start" flow already triggers — this
+  // just removes the trip through Setup to get there. That manual path
+  // stays available as a fallback regardless of anything below (including
+  // autoConnectAttempted, which only ever gates this automatic one).
+  async function ensureGoogleAutoConnect() {
+    if (autoConnectInFlight || state.autoConnectAttempted) return false;
+    autoConnectInFlight = true;
+    try {
+      const status = await new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:connector-status' }, resolve));
+      // Not yet configured (manifest.json's oauth2.client_id is still the
+      // placeholder) — background.js's connectGoogleTasks() would reject
+      // instantly with no account chooser shown at all. Stay quiet and
+      // retryable rather than remembering this as a decline: the very next
+      // actionable email after the owner configures a real Client ID should
+      // just work, with no reinstall or manual reset needed.
+      if (!status || !status.googleTasks || !status.googleTasks.configured) return false;
+
+      const res = await new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:connect', connectorId: 'googleTasks' }, resolve));
+      if (res && res.ok) {
+        await FlowStorage.set({ onboarded: true, connectorId: 'googleTasks' });
+        state = await FlowStorage.get();
+        chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: 'googleTasks', via: 'auto' } });
+        return true;
+      }
+      // Google IS configured but the account chooser was closed, denied, or
+      // failed for a real reason — remember that so the next actionable
+      // email doesn't reopen it too.
+      await FlowStorage.set({ autoConnectAttempted: true });
+      return false;
+    } finally {
+      autoConnectInFlight = false;
+    }
   }
 
   // Mounted once per tab, idempotent (FlowSidebar.mount() itself no-ops if
@@ -441,6 +473,12 @@
       executionMemory
     });
     if (!process) return; // defensive only — every catalog entry has at least an anchor step
+
+    // The one moment this account is ever asked for Google access at all —
+    // right here, after judgment has already found a real Do It moment on
+    // screen, never before and never from a settings page. See
+    // ensureGoogleAutoConnect() below for what this actually does.
+    if (!state.onboarded && !(await ensureGoogleAutoConnect())) return;
 
     injectChip(message, {
       messageId, intent, process, sender, subject, attachment, attachments,
