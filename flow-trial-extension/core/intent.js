@@ -264,26 +264,37 @@ const FlowIntent = (() => {
       };
     }
 
-    // --- 1. SCHEDULED_EVENT: hard gate, not score-based. All three or none,
-    //        and never when the same message also says the meeting itself
-    //        was called off — "the 3pm Friday sync is cancelled" must not
-    //        become a new Calendar entry for that meeting. Precision over
-    //        recall: a missed event chip costs one click; a calendar entry
-    //        for a meeting that was just cancelled is actively wrong. Same
-    //        refusal for a recap of a meeting that already happened — see
-    //        EVENT_RECAP above — and for a message that plainly names a date
-    //        already in the past, recap phrasing or not — see isPastDate.
+    // --- 1. SCHEDULED_EVENT: hard gate, not score-based. Meeting noun + a
+    //        resolved date, or none — and never when the same message also
+    //        says the meeting itself was called off — "the 3pm Friday sync
+    //        is cancelled" must not become a new Calendar entry for that
+    //        meeting. Precision over recall: a missed event chip costs one
+    //        click; a calendar entry for a meeting that was just cancelled
+    //        is actively wrong. Same refusal for a recap of a meeting that
+    //        already happened — see EVENT_RECAP above — and for a message
+    //        that plainly names a date already in the past, recap phrasing
+    //        or not — see isPastDate.
+    //
+    //        facts.time is no longer required. "Let's meet Tuesday" names a
+    //        meeting and a day exactly as unambiguously as "Let's meet
+    //        Tuesday at 3pm" does — the missing clock time is a real gap in
+    //        what got planned, not a reason to stay silent about the
+    //        meeting existing at all. background.js's googleCalendarWrite
+    //        creates a real all-day Calendar entry (Google's own {date: ...}
+    //        shape, not {dateTime: ...}) when hour/minute come through null,
+    //        rather than erroring the way it used to when they were simply
+    //        missing.
     const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
     const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
-    if (hasMeetingNoun && facts.date && facts.date.iso && facts.time && !calledOff && !isRecap && !isPast) {
-      return finish(TYPES.SCHEDULED_EVENT, 'high', {
+    if (hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast) {
+      return finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso,
-        hour: facts.time.hour,
-        minute: facts.time.minute
+        hour: facts.time ? facts.time.hour : null,
+        minute: facts.time ? facts.time.minute : null
       });
     }
 

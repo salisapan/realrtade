@@ -153,6 +153,44 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('a genuine future explicit date still fires SCHEDULED_EVENT', futureCase.type === FlowIntent.TYPES.SCHEDULED_EVENT, futureCase.type);
 }
 
+// 3e. A meeting mentioned with a real, resolvable date but no clock time —
+//     "let's do a call Monday", no "at Xpm" anywhere — used to fail the hard
+//     gate entirely (it required facts.time), so a plain, unambiguous
+//     scheduling request produced no chip at all. The gate now accepts
+//     hasMeetingNoun + a resolved date on its own, at 'medium' confidence
+//     (vs 'high' when a time is also stated) and with hour/minute left null
+//     so the downstream Calendar write (googleCalendarWrite in background.js)
+//     knows to create an all-day event instead of guessing a time that was
+//     never in the email.
+{
+  const now = new Date('2026-09-17T12:00:00Z'); // a Thursday
+  const dateOnly = classify('Can we schedule a call on Monday?', { now });
+  check('a date-only meeting (no time) fires SCHEDULED_EVENT', dateOnly.type === FlowIntent.TYPES.SCHEDULED_EVENT, dateOnly.type);
+  check('a date-only meeting gets medium confidence, not high', dateOnly.confidence === 'medium', dateOnly.confidence);
+  check('a date-only meeting carries hour:null', dateOnly.entities && dateOnly.entities.hour === null, dateOnly.entities);
+  check('a date-only meeting carries minute:null', dateOnly.entities && dateOnly.entities.minute === null, dateOnly.entities);
+  check('a date-only meeting still resolves dateIso', !!(dateOnly.entities && dateOnly.entities.dateIso), dateOnly.entities);
+
+  const dateOnlyExplicit = classify("Let's do the sync on September 21, 2026 to go over the roadmap.", { now });
+  check('a date-only meeting with an explicit resolvable date fires SCHEDULED_EVENT', dateOnlyExplicit.type === FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyExplicit.type);
+  check('a date-only explicit-date meeting gets medium confidence', dateOnlyExplicit.confidence === 'medium', dateOnlyExplicit.confidence);
+
+  // Sanity: the same "on <weekday>" shape WITH a time must still get 'high'
+  // confidence and real hour/minute values — this widening must not blur
+  // the two confidence tiers together.
+  const withTime = classify('Can we schedule a call on Monday at 3pm?', { now });
+  check('a same-shape meeting WITH a time still gets high confidence', withTime.confidence === 'high', withTime.confidence);
+  check('a same-shape meeting WITH a time still carries real hour/minute', withTime.entities && withTime.entities.hour === 15 && withTime.entities.minute === 0, withTime.entities);
+
+  // Precision check: date-only cancelled/recap language must still be
+  // silenced exactly as it was before this widening — a date-only gate must
+  // not be an easier gate to slip through than the timed one.
+  const dateOnlyCancelled = classify('Let us postpone the call on Monday, we will rebook it later.', { now });
+  check('a date-only postponed meeting does not fire SCHEDULED_EVENT', !dateOnlyCancelled || dateOnlyCancelled.type !== FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyCancelled && dateOnlyCancelled.type);
+  const dateOnlyRecap = classify('Thanks for the call on Monday, great meeting, glad we synced!', { now });
+  check('a date-only recap does not fire SCHEDULED_EVENT', !dateOnlyRecap || dateOnlyRecap.type !== FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyRecap && dateOnlyRecap.type);
+}
+
 // 4. A reader commitment reminder -> COMMITMENT_OF_READER, the "Follow
 //    Through" process, task anchor leading, draft second.
 {

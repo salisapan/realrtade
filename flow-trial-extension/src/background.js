@@ -918,12 +918,30 @@ function calendarDateTime(dateIso, hour, minute, addMinutes) {
     'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes()) + ':00';
 }
 
+// Google Calendar's all-day event shape needs the day AFTER the event as
+// its own end.date — {date} is exclusive, unlike {dateTime}'s inclusive
+// start/end pair, so a single-day all-day event is start=today, end=tomorrow.
+function nextDateIso(dateIso) {
+  const [y, m, d] = dateIso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + 1);
+  const pad = (n) => String(n).padStart(2, '0');
+  return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+}
+
 async function googleCalendarWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   const params = p.params || {};
-  if (!params.dateIso || params.hour == null || params.minute == null) {
-    return { ok: false, reason: 'error', error: 'Missing a date and time for this event.' };
+  if (!params.dateIso) {
+    return { ok: false, reason: 'error', error: 'Missing a date for this event.' };
   }
+  // A meeting the email names a day for but never a clock time — "let's
+  // meet Tuesday" — is real, unambiguous evidence a person would act on
+  // immediately, exactly like intent.js's own REQUEST evidence widening a
+  // few commits back. This used to error out entirely rather than create
+  // anything; now it creates a genuine all-day Calendar entry (Google's own
+  // {date} shape, no {dateTime}/{timeZone}) instead of guessing a time that
+  // was never stated.
+  const hasTime = params.hour != null && params.minute != null;
 
   const timeZone = localTimeZone();
   const descriptionLines = [];
@@ -932,10 +950,15 @@ async function googleCalendarWrite(p) {
 
   const body = {
     summary: String(params.title || 'Meeting').slice(0, 200),
-    description: descriptionLines.join('\n'),
-    start: { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute), timeZone },
-    end: { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone }
+    description: descriptionLines.join('\n')
   };
+  if (hasTime) {
+    body.start = { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute), timeZone };
+    body.end = { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone };
+  } else {
+    body.start = { date: params.dateIso };
+    body.end = { date: nextDateIso(params.dateIso) };
+  }
 
   const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events', {
     method: 'POST',
