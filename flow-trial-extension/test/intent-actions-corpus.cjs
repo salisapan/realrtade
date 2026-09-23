@@ -245,6 +245,57 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('request proposes [draft, task] — draft leads', JSON.stringify(stepIds(process)) === JSON.stringify(['draft', 'task']), stepIds(process));
 }
 
+// 5b. REQUESTED_OBJECT/REQUESTED_OBJECT_HE's much broader business-noun
+//     vocabulary — finance, legal, documents, reports, access, deliverables,
+//     scheduling, and HR terms that didn't exist before this widening. A
+//     representative sample across categories, not exhaustive (the full
+//     list runs to well over a hundred terms per language) — each of these
+//     used to silently return { type: null } for lack of a recognized
+//     object, with no date or amount to fall back on either.
+{
+  const objectCases = [
+    ['EN finance: NDA', 'Could you send over the NDA before our call?'],
+    ['EN finance: purchase order', 'Please send the purchase order when you get a chance.'],
+    ['EN finance: W-9', 'Can you send us your W-9 for our records?'],
+    ['EN legal: SOW', 'Could you review and send back the SOW?'],
+    ['EN legal: amendment', 'Please send the amendment to the agreement.'],
+    ['EN docs: spreadsheet', 'Could you send the spreadsheet with the numbers?'],
+    ['EN docs: certificate', 'Please send the certificate of insurance.'],
+    ['EN reports: forecast', 'Can you send the Q3 forecast when ready?'],
+    ['EN reports: meeting notes', 'Could you send the meeting notes from yesterday?'],
+    ['EN access: credentials', 'Please send the credentials for the staging server.'],
+    ['EN access: API key', 'Can you send me the API key for the integration?'],
+    ['EN communication: sign-off', 'Could you send your sign-off on this before Friday close?'],
+    ['EN deliverables: wireframes', 'Please send the wireframes for the new page.'],
+    ['EN scheduling: availability', 'Could you send your availability for next week?'],
+    ['EN HR: resume', 'Can you send over your resume and references?'],
+    ['HE finance: NDA (הסכם סודיות)', 'תוכל לשלוח לי את הסכם הסודיות?'],
+    ['HE legal: addendum (נספח)', 'אשמח אם תשלח לי את הנספח להסכם.'],
+    ['HE access: permissions (הרשאות)', 'תוכל לשלוח לי את פרטי ההרשאות למערכת?'],
+    // The construct-state (smichut) definite-article case — "קורות חיים"
+    // (resume) takes its definite article on the SECOND word when combined
+    // with a possessive ("קורות החיים שלך", not "הקורות חיים שלך"). The
+    // regex must match the natural, definite phrasing, not just the bare
+    // indefinite noun.
+    ['HE HR: resume, definite form (קורות החיים)', 'אבקש לקבל ממך את קורות החיים שלך.'],
+    ['HE deliverables: mockup (מוקאפ)', 'אשמח אם תוכל לשלוח את המוקאפ שהכנת.']
+  ];
+  for (const [label, text] of objectCases) {
+    const intent = classify(text);
+    check(label + ' -> REQUEST', intent && intent.type === FlowIntent.TYPES.REQUEST, intent && intent.type);
+  }
+
+  // Precision check: the expanded list must not have reopened the vague-ask
+  // door. "pricing" (bare) was deliberately dropped from the list during
+  // this widening for exactly this reason — it matched inside "our new
+  // pricing plan" in a cold-pitch sentence that has no real requested
+  // object at all. price lists?/quotes?/quotations? still cover the
+  // legitimate "send me a quote" case without that false-positive risk.
+  const pitchStillSilent = classify('Could you take a look at our new pricing plan and let me know your thoughts?');
+  check('a cold pitch mentioning "pricing" (not a real object) still stays silent',
+    !pitchStillSilent || pitchStillSilent.type === null, pitchStillSilent && pitchStillSilent.type);
+}
+
 // 6. The reader's OWN outbound "could you send me X" must never be read as
 //    a request made of the reader — this is content-gmail.js's own-email
 //    skip logic (session's prior fix), not intent.js's job to re-derive.

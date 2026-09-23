@@ -177,8 +177,72 @@ const FlowIntent = (() => {
   // like "help" or "thoughts" that would blur this back into "any polite
   // ask at all," which is the false-positive shape this whole gate exists
   // to keep out (see hasConcreteAnchor's own comment just below).
-  const REQUESTED_OBJECT = /\b(receipt|invoice|document|file|contract|quote|quotation|proposal|report|update|confirmation|copy|statement|agreement|attach(?:ment|ed)|signature|approval|draft|form|link|access|details|information|availability|feedback|estimate|breakdown|summary|status|schedule)\b/i;
-  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית|מסמך|קובץ|חוזה|הצעת מחיר|דוח|עדכון|אישור|עותק|פרטים|מידע|הסכם|חתימה|טופס|קישור|גישה|זמינות|משוב|תקציר|סטטוס|לוח זמנים|הצעה|תעודה)/;
+  //
+  // This list is safe to broaden aggressively because it never gates on its
+  // own — it's only ever tested against a sentence the handoff/commitment
+  // phrase regex ALREADY matched (requestWhat/commitmentWhat below), never
+  // the raw message. Widening it only widens which already-flagged
+  // sentences also clear the object bar; it can never manufacture a
+  // request or commitment by itself. Grouped by business category (not one
+  // flat alternation) purely for maintainability — same array-join('|')
+  // construction EVENT_CALLED_OFF/EVENT_RECAP above already use for a long
+  // OR-list. Deliberately still excludes bare pronouns/abstractions ("that",
+  // "this", "it", "help", "thoughts") — see judgment-corpus.cjs and this
+  // file's own vague-request negative tests for why those must stay out.
+  const REQUESTED_OBJECT_GROUPS_EN = [
+    // Finance
+    'receipts?', 'tax invoices?', 'invoices?', 'credit notes?', 'refunds?', 'reimbursements?',
+    'expense reports?', 'purchase orders?', 'POs?', 'price lists?', 'quotes?', 'quotations?',
+    'estimates?', 'budgets?', 'payments?', 'invoice numbers?', 'W-?9s?', 'W-?2s?', '1099s?',
+    // Legal / contractual
+    'contracts?', 'agreements?', 'NDAs?', 'non-disclosure agreements?', 'MSAs?', 'master service agreements?',
+    'SOWs?', 'statements? of work', 'amendments?', 'addend(?:um|a)', 'waivers?', 'releases?',
+    'licen[cs]es?', 'terms(?: and conditions)?', 'polic(?:y|ies)', 'redlines?', 'markups?',
+    // Documents / files
+    'documents?', 'files?', 'scans?', 'PDFs?', 'spreadsheets?', 'presentations?', 'decks?', 'slides?',
+    'templates?', 'forms?', 'applications?', 'certificates?', 'transcripts?', 'diplomas?', 'cop(?:y|ies)',
+    // Reports / updates
+    'reports?', 'updates?', 'status(?: updates?)?', 'summar(?:y|ies)', 'recaps?', 'breakdowns?',
+    'analys[ie]s', 'forecasts?', 'projections?', 'roadmaps?', 'timelines?', 'schedules?', 'itinerar(?:y|ies)',
+    'agendas?', 'minutes', 'meeting notes', 'action items?',
+    // Access / credentials
+    'access', 'logins?', 'credentials?', 'passwords?', 'API keys?', 'permissions?', 'invites?',
+    'invitation links?', 'dashboard access',
+    // Communication
+    'confirmations?', 'approvals?', 'sign-?offs?', 'feedback', 'comments?', 'input', 'responses?',
+    'repl(?:y|ies)', 'clarifications?', 'guidance', 'instructions?',
+    // Deliverables
+    'drafts?', 'deliverables?', 'proposals?', 'samples?', 'mockups?', 'prototypes?', 'wireframes?',
+    'designs?', 'artwork', 'specs?', 'specifications?', 'requirements?',
+    // Scheduling
+    'availability', 'calendars?', 'time slots?',
+    // HR
+    'r[ée]sum[ée]s?', 'CVs?', 'cover letters?', 'references?', 'offer letters?', 'employment contracts?',
+    'onboarding paperwork', 'background checks?',
+    // Kept from the original list
+    'links?', 'attach(?:ments?|ed)', 'signatures?', 'information', 'details', 'data', 'figures?'
+  ];
+  const REQUESTED_OBJECT = new RegExp('\\b(' + REQUESTED_OBJECT_GROUPS_EN.join('|') + ')\\b', 'i');
+
+  // Hebrew twin of the same business-object breadth above. Same "no \b" rule
+  // every other Hebrew pattern in this file follows — \b is ASCII-only and
+  // never fires around Hebrew letters (see judgment.js's NEG_BEFORE_HE/
+  // HEDGE_HE header comments for the substring-collision bug class this
+  // avoids). Plain alternation, not grouped-array, since Hebrew business
+  // vocabulary here doesn't share the same singular/plural suffix patterns
+  // English does — each term is written out rather than suffix-generalized.
+  // (?:ה)? between the two halves of a construct-state (smichut) compound —
+  // קורות חיים, הזמנת רכש, מפת דרכים, סדר יום, מכתב הצעת עבודה, פעולות
+  // נדרשות — matters because Hebrew definiteness on a smichut chain lands
+  // on the LAST word, not the first ("קורות חיים" -> "קורות החיים", not
+  // "הקורות חיים"), so the plain indefinite phrase alone silently failed
+  // to match the far more natural definite form ("...שלח לי את קורות
+  // החיים שלך"). Every other multi-word phrase below is already covered
+  // independently by one of its own words appearing elsewhere in this same
+  // list (e.g. "חשבונית מס" needs no fix because bare "חשבונית" already
+  // matches regardless), so only the handful with no such fallback needed
+  // this treatment.
+  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית מס|חשבונית|זיכוי|החזר כספי|החזר|הוצאות|דוח הוצאות|הזמנת (?:ה)?רכש|מחירון|הצעת מחיר|תקציב|תשלום|חוזה|הסכם|הסכם סודיות|נספח|תיקון להסכם|ויתור|שחרור מהתחייבות|רישיון|תנאי שימוש|תנאים והגבלות|מדיניות|מסמך|קובץ|סריקה|מצגת|תבנית|טופס|בקשת הצטרפות|תעודה|תעודת זהות|גיליון אלקטרוני|תמליל|דוח|עדכון|עדכון סטטוס|סטטוס|תקציר|סיכום|סיכום פגישה|ניתוח|תחזית|תחזית תקציבית|מפת (?:ה)?דרכים|לוח זמנים|סדר (?:ה)?יום|פרוטוקול|(?:ה)?פעולות (?:ה)?נדרשות|גישה|פרטי התחברות|סיסמה|מפתח API|הרשאה|הרשאות|הזמנה|קישור הזמנה|אישור|חתימה|משוב|הערות|תגובה|מענה|הבהרה|הנחיה|הוראות|טיוטה|תוצר|הצעה|דוגמה|מוקאפ|אבטיפוס|עיצוב|גרפיקה|מפרט|דרישות|זמינות|לוח שנה|חלון זמן|קורות (?:ה)?חיים|מכתב מקדים|המלצות|מכתב הצעת (?:ה)?עבודה|חוזה העסקה|קישור|פרטים|מידע|נתונים|נתונים מספריים)/;
 
   // A short English label for the write paths that still expect one (Google
   // Tasks title, Notion title, popup activity log) — kept alongside the full
