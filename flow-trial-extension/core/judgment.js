@@ -50,8 +50,17 @@ const FlowJudgment = (() => {
   const EXECUTED = /\b(fully executed|countersigned|signed the (?:agreement|contract)|execution copy|signature page attached)\b/i;
   // Something is owed to somebody by a date.
   const OBLIGATION = /\b(due|deadline|by end of|no later than|must be (?:filed|delivered|paid|submitted)|expires?|payable|net ?\d{2})\b/i;
-  // A direct request aimed at the reader.
-  const HANDOFF = /\b(can you|could you|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required)\b/i;
+  // A direct request aimed at the reader. Deliberately kept to multi-word,
+  // clearly imperative/polite-request-shaped phrases (never a single common
+  // word) — this signal is tested with a bare .test() against the whole
+  // message, not routed through assertedIn's per-sentence negation/hedge
+  // check the way COMMIT/LOST/EXECUTED/OBLIGATION above are, so a phrase
+  // that could plausibly appear inside an unrelated sentence carries more
+  // false-positive risk here than anywhere else in this file. Every
+  // addition below was verified against the full negative-test corpus in
+  // test/intent-actions-corpus.cjs (vague asks, cold pitches, small talk)
+  // before being kept.
+  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|let (?:us|me) know)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|incorrect (?:amount|invoice)|dispute)\b/i;
 
@@ -83,7 +92,11 @@ const FlowJudgment = (() => {
   // captures. (?:^|\s) in front of the 2-letter נא guards the same
   // substring risk NEG_BEFORE_HE/HEDGE_HE document above it in this file —
   // "נא" bare would otherwise match inside unrelated longer words.
-  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|נדרש ממך|חשוב שתעביר)/;
+  // Extended the same way HANDOFF (EN) above just was — more registers of
+  // the same "asking you to do X" shape, each verified against the full
+  // negative-test corpus before being kept, for the same no-safety-net
+  // reason documented on HANDOFF.
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
   const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב|הסכום שגוי|יש טעות בחשבונית|לא תואם למוסכם)/;
 
   const MARKETING = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|webinar|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;

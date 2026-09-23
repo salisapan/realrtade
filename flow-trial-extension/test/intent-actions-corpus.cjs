@@ -296,6 +296,54 @@ console.log('--- intent.js: type + entity checks ---\n');
     !pitchStillSilent || pitchStillSilent.type === null, pitchStillSilent && pitchStillSilent.type);
 }
 
+// 5c. FlowJudgment.HANDOFF/HANDOFF_HE's much broader request-phrase
+//     registers — more polite/formal ways of asking, in both languages.
+//     Unlike REQUESTED_OBJECT above, this lexicon is tested with a bare
+//     .test() (no per-sentence negation/hedge check), so every addition
+//     here was specifically re-verified against the full negative-test
+//     corpus (vague asks, cold pitches, small talk, both languages) before
+//     being kept — see judgment.js's own HANDOFF header comment.
+{
+  const handoffCases = [
+    ['EN: would you be able to', 'Would you be able to send the invoice by Friday?'],
+    ['EN: would you mind', 'Would you mind sending over the contract?'],
+    ['EN: would it be possible for you to', 'Would it be possible for you to forward the report?'],
+    ['EN: I was hoping you could', 'I was hoping you could send the signed agreement.'],
+    ['EN: kindly', 'Kindly send the updated proposal at your earliest convenience.'],
+    ['EN: I would appreciate it if you', "I'd appreciate it if you could confirm the invoice amount."],
+    ['EN: requesting that you', 'We are requesting that you send the signed NDA.'],
+    ['EN: asking you to', 'I am asking you to review and send the draft.'],
+    ['EN: your help is needed', 'Your help is needed to finalize the contract.'],
+    ['EN: we need your approval', 'We need your approval on the attached proposal.'],
+    ['EN: please arrange', 'Please arrange to send the certificate this week.'],
+    ['HE: אם תוכל', 'אם תוכל לשלוח לי את החוזה זה יעזור מאוד.'],
+    ['HE: תודה מראש על', 'תודה מראש על שליחת הקבלה.'],
+    ['HE: נשמח לקבל', 'נשמח לקבל את המסמך המעודכן.'],
+    ['HE: נודה לך אם', 'נודה לך אם תוכל להעביר את הדוח.'],
+    ['HE: אנא ציין', 'אנא ציין את הפרטים המעודכנים במסמך.']
+  ];
+  for (const [label, text] of handoffCases) {
+    const intent = classify(text);
+    check(label + ' -> REQUEST', intent && intent.type === FlowIntent.TYPES.REQUEST, intent && intent.type);
+  }
+
+  // Precision re-check with the WIDENED lexicon: the same 6 negative cases
+  // section 5b already proved silent for the object-lexicon widening must
+  // still be silent now that the phrase lexicon is also wider — the two
+  // widenings compound, so both need to hold at once, not just separately.
+  const negativeCases = [
+    ['Vague, no object', 'Can you send that over?'],
+    ['Vague abstract', 'Could you help me understand the process better?'],
+    ['Small talk', 'Just wanted to say hi and see how you have been doing lately!'],
+    ['HE small talk', 'רק רציתי להגיד שלום ולראות מה שלומך!'],
+    ['HE vague', 'תוכל להתקשר אליי מאוחר יותר?']
+  ];
+  for (const [label, text] of negativeCases) {
+    const intent = classify(text);
+    check(label + ' still stays silent after the HANDOFF widening', !intent || intent.type === null, intent && intent.type);
+  }
+}
+
 // 6. The reader's OWN outbound "could you send me X" must never be read as
 //    a request made of the reader — this is content-gmail.js's own-email
 //    skip logic (session's prior fix), not intent.js's job to re-derive.
