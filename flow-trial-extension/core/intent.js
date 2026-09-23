@@ -159,6 +159,19 @@ const FlowIntent = (() => {
   // request and the quoted sentence could disagree.
   const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE];
 
+  // The other half of REQUEST's evidence bar, alongside hasConcreteAnchor
+  // below — a named, tangible thing being asked for. "Could you send that
+  // over?" with no object named is still too vague to act on sight unseen;
+  // "could you send me the invoice" names exactly what closing this means,
+  // which is real evidence on its own, independent of whether the message
+  // also happens to carry a date or a dollar figure. Deliberately concrete
+  // nouns only (documents, records, access, status) — no vague abstractions
+  // like "help" or "thoughts" that would blur this back into "any polite
+  // ask at all," which is the false-positive shape this whole gate exists
+  // to keep out (see hasConcreteAnchor's own comment just below).
+  const REQUESTED_OBJECT = /\b(receipt|invoice|document|file|contract|quote|quotation|proposal|report|update|confirmation|copy|statement|agreement|attach(?:ment|ed)|signature|approval|draft|form|link|access|details|information|availability|feedback|estimate|breakdown|summary|status|schedule)\b/i;
+  const REQUESTED_OBJECT_HE = /(קבלה|חשבונית|מסמך|קובץ|חוזה|הצעת מחיר|דוח|עדכון|אישור|עותק|פרטים|מידע|הסכם|חתימה|טופס|קישור|גישה|זמינות|משוב|תקציר|סטטוס|לוח זמנים|הצעה|תעודה)/;
+
   // A short English label for the write paths that still expect one (Google
   // Tasks title, Notion title, popup activity log) — kept alongside the full
   // quoted `entities.what` rather than replacing it, so nothing downstream
@@ -196,28 +209,16 @@ const FlowIntent = (() => {
 
     const hasMeetingNoun = MEETING_NOUN.test(text) || MEETING_NOUN_HE.test(text);
     // A resolved date or a resolved money figure — "something concrete
-    // enough to actually act on" — is half the evidence bar for
-    // COMMITMENT_OF_READER and REQUEST below. Neither a bare "could you
-    // send that?" nor a bare "you agreed to help" should speak up on the
-    // phrase alone; that's exactly the false-positive shape the scorer's
-    // own money-alone penalty already refuses ("A figure alone, with
-    // nothing decided").
+    // enough to actually act on" — is the full evidence bar for
+    // COMMITMENT_OF_READER below, and one of two ways to clear REQUEST's
+    // (see hasConcreteRequestObject just below, computed after requestWhat
+    // is known). A bare "you agreed to help" with nothing dated or priced
+    // attached is exactly the false-positive shape the scorer's own
+    // money-alone penalty already refuses ("A figure alone, with nothing
+    // decided") — that reasoning still fully applies to
+    // COMMITMENT_OF_READER, which has no second evidentiary path.
     const hasConcreteAnchor = Boolean(facts.money) || Boolean(facts.date && facts.date.iso);
     const isReaderCommit = READER_COMMIT.test(text) || READER_COMMIT_HE.test(text);
-
-    // Every raw signal, independent of which type ends up winning — the
-    // decision layer (actions.js) reads this to notice a message is
-    // multi-actionable (a meeting invite that ALSO asks for confirmation is
-    // still an EVENT here, but actions.js can still see signals.handoff and
-    // propose a reply draft alongside the calendar event).
-    const signals = {
-      hasMeetingNoun, hasConcreteAnchor, isReaderCommit,
-      handoff: s.flags.handoff,
-      hasDate: Boolean(facts.date && facts.date.iso),
-      hasTime: Boolean(facts.time),
-      hasMoney: Boolean(facts.money),
-      score: s.total, threshold
-    };
 
     // The one sentence a human would point to as "this is the actual ask" —
     // computed once, independent of which type ends up winning, and folded
@@ -228,6 +229,32 @@ const FlowIntent = (() => {
     // and a request — see finish() below and actions.js's own comment on
     // the SCHEDULED_EVENT + handoff combined case.
     const requestWhat = s.flags.handoff ? whatText(text, REQUEST_PATTERNS) : null;
+
+    // REQUEST's second evidentiary path, alongside hasConcreteAnchor above:
+    // a real request verb/phrase aimed at a named, tangible object ("could
+    // you send the invoice") is unambiguous evidence a person would act on
+    // immediately, with no date or dollar figure needed to make it real —
+    // see REQUESTED_OBJECT/REQUESTED_OBJECT_HE's own header comment for why
+    // this doesn't reopen the door to vague chatter. Tested against
+    // requestWhat (the actual matched sentence), not the whole message, so
+    // an unrelated document mention three paragraphs away from a vague
+    // "let me know your thoughts" can't manufacture evidence for it.
+    const hasConcreteRequestObject = Boolean(requestWhat) &&
+      (REQUESTED_OBJECT.test(requestWhat) || REQUESTED_OBJECT_HE.test(requestWhat));
+
+    // Every raw signal, independent of which type ends up winning — the
+    // decision layer (actions.js) reads this to notice a message is
+    // multi-actionable (a meeting invite that ALSO asks for confirmation is
+    // still an EVENT here, but actions.js can still see signals.handoff and
+    // propose a reply draft alongside the calendar event).
+    const signals = {
+      hasMeetingNoun, hasConcreteAnchor, hasConcreteRequestObject, isReaderCommit,
+      handoff: s.flags.handoff,
+      hasDate: Boolean(facts.date && facts.date.iso),
+      hasTime: Boolean(facts.time),
+      hasMoney: Boolean(facts.money),
+      score: s.total, threshold
+    };
 
     function finish(type, confidence, entities) {
       return {
@@ -275,11 +302,20 @@ const FlowIntent = (() => {
       });
     }
 
-    // --- 3. REQUEST: an ask directed at the reader (same hard-gate shape). ---
-    //        s.flags.handoff is FlowJudgment.score()'s own HANDOFF/HANDOFF_HE
-    //        test, already computed above — reused rather than re-imported,
-    //        so there is exactly one place that pattern is defined.
-    if (s.flags.handoff && hasConcreteAnchor) {
+    // --- 3. REQUEST: an ask directed at the reader (same hard-gate shape, ---
+    //        now with two independent ways to clear it). s.flags.handoff is
+    //        FlowJudgment.score()'s own HANDOFF/HANDOFF_HE test, already
+    //        computed above — reused rather than re-imported, so there is
+    //        exactly one place that pattern is defined. A date/amount
+    //        anchor and a named concrete object are treated as equally
+    //        sufficient evidence, not stacked requirements: "could you
+    //        confirm by Friday" (anchor, no object) and "could you send
+    //        the invoice" (object, no date) are both, on their own, exactly
+    //        the kind of message a human reads once and immediately knows
+    //        what to do with — see judgment-corpus.cjs / this file's own
+    //        earlier miss on "אבקש לקבל ממך את הקבלה", which had neither a
+    //        date nor an amount and was silently dropped before this.
+    if (s.flags.handoff && (hasConcreteAnchor || hasConcreteRequestObject)) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || shortLabel(TYPES.REQUEST, facts, enrichedFacts),

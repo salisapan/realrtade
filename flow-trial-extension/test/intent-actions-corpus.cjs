@@ -418,5 +418,60 @@ console.log('\n--- intent.js: per-type calibration nudges the gating threshold, 
   check('a hard-gated type (SCHEDULED_EVENT) ignores calibrationByType entirely', stillFires.type === FlowIntent.TYPES.SCHEDULED_EVENT, stillFires);
 }
 
+console.log('\n--- intent.js: REQUEST fires on a named concrete object, no date/amount needed ---\n');
+// A real-world miss corpus, not synthetic edge cases: every "should detect"
+// case here is a short, ordinary request a human reads once and immediately
+// knows what to do with, with no date and no money figure attached — the
+// exact shape that used to silently return { type: null } before REQUEST
+// gained hasConcreteRequestObject as a second, independent way to clear its
+// evidence bar (see intent.js's own comment at that gate). Every "should
+// stay silent" case is deliberately adjacent to a real one — same handoff
+// phrasing, same register — so this also proves the new object check didn't
+// just widen REQUEST into "any polite ask," which was the one thing it had
+// to not do.
+{
+  // The exact sentence that surfaced this gap in real use: no money, no
+  // date, first-person "אבקש" rather than a 2nd-person "תוכל", and it used
+  // to score well under threshold with no independent path to REQUEST.
+  const he1 = classify('שלום רב, אבקש לקבל ממך את הקבלה על דמי התיווך ששילמנו. תודה.');
+  check('HE: first-person request for a receipt, no anchor -> REQUEST', he1.type === FlowIntent.TYPES.REQUEST, he1);
+  check('HE: hasConcreteRequestObject signal is true, hasConcreteAnchor is false', he1.signals.hasConcreteRequestObject === true && he1.signals.hasConcreteAnchor === false, he1.signals);
+
+  const he2 = classify('תוכל בבקשה לשלוח לי את החוזה המעודכן?');
+  check('HE: 2nd-person request for a contract, no anchor -> REQUEST', he2.type === FlowIntent.TYPES.REQUEST, he2);
+
+  const he3 = classify('אשמח לקבל עדכון לגבי הסטטוס של הפרויקט, תודה מראש.');
+  check('HE: polite request for a status update, no anchor -> REQUEST', he3.type === FlowIntent.TYPES.REQUEST, he3);
+
+  const en1 = classify('Could you send me the invoice when you get a chance?');
+  check('EN: request for an invoice, no anchor -> REQUEST', en1.type === FlowIntent.TYPES.REQUEST, en1);
+
+  const en2 = classify('please send me the file for the Meridian account');
+  check('EN: bare "please send me the file", no anchor -> REQUEST', en2.type === FlowIntent.TYPES.REQUEST, en2);
+
+  const en3 = classify('Just following up — could you share the updated contract?');
+  check('EN: follow-up ask for a contract, no anchor -> REQUEST', en3.type === FlowIntent.TYPES.REQUEST, en3);
+
+  // --- Precision check: adjacent, genuinely vague asks must still stay silent ---
+  const vague1 = classify('Can you send that over?');
+  check('EN: vague "that" with no named object stays silent', vague1.type === null, vague1);
+
+  const vague2 = classify('Could you help me understand the process better?');
+  check('EN: vague, abstract ask stays silent', vague2.type === null, vague2);
+
+  const vague3 = classify('תוכל להתקשר אליי מאוחר יותר?');
+  check('HE: vague request with no named object stays silent', vague3.type === null, vague3);
+
+  // A cold pitch already carries a handoff phrase ("could you") — must not
+  // gain a second life just because "plan" or "pricing" sit near it. Neither
+  // word is in REQUESTED_OBJECT's list, and SOLICITATION's own penalty in
+  // judgment.js still applies underneath this regardless.
+  const pitch = classify('Could you take a look at our new pricing plan and let me know your thoughts?');
+  check('EN: cold pitch with a handoff phrase but no concrete object stays silent', pitch.type === null, pitch);
+
+  const smalltalk = classify('Just wanted to say hi and see how you have been doing lately!');
+  check('EN: pure greeting/small talk, no handoff at all, stays silent', smalltalk.type === null, smalltalk);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
