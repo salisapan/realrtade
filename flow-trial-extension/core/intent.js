@@ -209,16 +209,29 @@ const FlowIntent = (() => {
 
     const hasMeetingNoun = MEETING_NOUN.test(text) || MEETING_NOUN_HE.test(text);
     // A resolved date or a resolved money figure — "something concrete
-    // enough to actually act on" — is the full evidence bar for
-    // COMMITMENT_OF_READER below, and one of two ways to clear REQUEST's
-    // (see hasConcreteRequestObject just below, computed after requestWhat
-    // is known). A bare "you agreed to help" with nothing dated or priced
-    // attached is exactly the false-positive shape the scorer's own
-    // money-alone penalty already refuses ("A figure alone, with nothing
-    // decided") — that reasoning still fully applies to
-    // COMMITMENT_OF_READER, which has no second evidentiary path.
+    // enough to actually act on" — is one of two ways to clear both
+    // COMMITMENT_OF_READER's evidence bar below (see
+    // hasConcreteCommitmentObject just below) and REQUEST's (see
+    // hasConcreteRequestObject further down, computed after requestWhat is
+    // known). A bare "you agreed to help" with nothing dated, priced, or
+    // naming a concrete object attached is exactly the false-positive shape
+    // the scorer's own money-alone penalty already refuses ("A figure
+    // alone, with nothing decided").
     const hasConcreteAnchor = Boolean(facts.money) || Boolean(facts.date && facts.date.iso);
     const isReaderCommit = READER_COMMIT.test(text) || READER_COMMIT_HE.test(text);
+
+    // COMMITMENT_OF_READER's second evidentiary path, alongside
+    // hasConcreteAnchor above — the same widening REQUEST got via
+    // hasConcreteRequestObject a few lines down. "You agreed to send the
+    // contract" names exactly what closing this commitment means, which is
+    // real evidence a person would act on immediately, independent of
+    // whether a date or dollar figure was also stated. Tested against the
+    // actual matched commitment sentence (not the whole message) for the
+    // same false-positive reason requestWhat is used instead of raw text —
+    // see REQUESTED_OBJECT/REQUESTED_OBJECT_HE's own header comment.
+    const commitmentWhat = isReaderCommit ? whatText(text, [READER_COMMIT, READER_COMMIT_HE]) : null;
+    const hasConcreteCommitmentObject = Boolean(commitmentWhat) &&
+      (REQUESTED_OBJECT.test(commitmentWhat) || REQUESTED_OBJECT_HE.test(commitmentWhat));
 
     // The one sentence a human would point to as "this is the actual ask" —
     // computed once, independent of which type ends up winning, and folded
@@ -248,7 +261,7 @@ const FlowIntent = (() => {
     // still an EVENT here, but actions.js can still see signals.handoff and
     // propose a reply draft alongside the calendar event).
     const signals = {
-      hasMeetingNoun, hasConcreteAnchor, hasConcreteRequestObject, isReaderCommit,
+      hasMeetingNoun, hasConcreteAnchor, hasConcreteRequestObject, hasConcreteCommitmentObject, isReaderCommit,
       handoff: s.flags.handoff,
       hasDate: Boolean(facts.date && facts.date.iso),
       hasTime: Boolean(facts.time),
@@ -298,16 +311,22 @@ const FlowIntent = (() => {
       });
     }
 
-    // --- 2. COMMITMENT_OF_READER: hard gate (regex + a concrete anchor). ---
-    //        Deliberately NOT gated on the generic scorer threshold — that bar
-    //        was tuned for a coarser "should the chip appear at all" decision
-    //        across every kind of message, and a reader-commitment reminder
-    //        with a real deadline attached is already unambiguous evidence on
-    //        its own, the same way a meeting noun + date + time is above.
-    if (isReaderCommit && hasConcreteAnchor) {
-      return finish(TYPES.COMMITMENT_OF_READER, 'high', {
+    // --- 2. COMMITMENT_OF_READER: hard gate (regex + one of two evidence ---
+    //        paths, same shape as REQUEST below). Deliberately NOT gated on
+    //        the generic scorer threshold — that bar was tuned for a coarser
+    //        "should the chip appear at all" decision across every kind of
+    //        message, and a reader-commitment reminder with a real deadline
+    //        attached is already unambiguous evidence on its own, the same
+    //        way a meeting noun + date + time is above. A commitment naming
+    //        a concrete object with no date/amount ("you agreed to send the
+    //        contract") is real evidence too, just one notch less certain
+    //        than a dated/priced commitment — 'medium' there, matching
+    //        REQUEST's own confidence for its equivalent object-only path,
+    //        vs 'high' when a real anchor is present.
+    if (isReaderCommit && (hasConcreteAnchor || hasConcreteCommitmentObject)) {
+      return finish(TYPES.COMMITMENT_OF_READER, hasConcreteAnchor ? 'high' : 'medium', {
         who, amount,
-        what: whatText(text, [READER_COMMIT, READER_COMMIT_HE]) || shortLabel(TYPES.COMMITMENT_OF_READER, facts, enrichedFacts),
+        what: commitmentWhat || shortLabel(TYPES.COMMITMENT_OF_READER, facts, enrichedFacts),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date && facts.date.iso
       });

@@ -203,6 +203,38 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('commitment proposes [task, draft] — task leads', JSON.stringify(stepIds(process)) === JSON.stringify(['task', 'draft']), stepIds(process));
 }
 
+// 4b. COMMITMENT_OF_READER fires on a named concrete object with no
+//     date/amount anchor — the same widening REQUEST got in section 5b
+//     below, applied to the commitment gate. "You agreed to send the
+//     invoice" (no date, no dollar figure) used to be silently dropped:
+//     hasConcreteAnchor was the ONLY evidence path, so the commitment's own
+//     regex match plus a named, tangible object still wasn't enough.
+{
+  const noAnchorCommit = classify("You agreed to send the invoice.");
+  check('EN: commitment to send an invoice, no anchor -> COMMITMENT_OF_READER', noAnchorCommit.type === FlowIntent.TYPES.COMMITMENT_OF_READER, noAnchorCommit.type);
+  check('EN: no-anchor commitment gets medium confidence, not high', noAnchorCommit.confidence === 'medium', noAnchorCommit.confidence);
+  check('EN: hasConcreteCommitmentObject signal is true, hasConcreteAnchor is false', noAnchorCommit.signals.hasConcreteCommitmentObject === true && noAnchorCommit.signals.hasConcreteAnchor === false, noAnchorCommit.signals);
+
+  const heNoAnchorCommit = classify('כפי שהתחייבת, תשלח לי את הקבלה.');
+  check('HE: commitment to send a receipt, no anchor -> COMMITMENT_OF_READER', heNoAnchorCommit.type === FlowIntent.TYPES.COMMITMENT_OF_READER, heNoAnchorCommit.type);
+  check('HE: no-anchor commitment gets medium confidence', heNoAnchorCommit.confidence === 'medium', heNoAnchorCommit.confidence);
+
+  // Sanity: the same commitment phrase WITH a real anchor must still fire
+  // at 'high' confidence exactly as before — the widening adds a second
+  // path, it doesn't downgrade the original one.
+  const withAnchorCommit = classify('You agreed to send the invoice by Friday.');
+  check('EN: commitment WITH a real anchor still fires at high confidence', withAnchorCommit.confidence === 'high', withAnchorCommit.confidence);
+  check('EN: commitment WITH a real anchor still sets hasConcreteAnchor', withAnchorCommit.signals.hasConcreteAnchor === true, withAnchorCommit.signals);
+
+  // Precision check: a vague commitment naming no object and no anchor must
+  // still stay silent — the widening must not reopen "any commitment
+  // phrase at all," only ones naming something tangible or dated/priced.
+  const vagueCommit = classify("As discussed, you'll help with this.");
+  check('EN: vague commitment with no object and no anchor stays silent', !vagueCommit || vagueCommit.type !== FlowIntent.TYPES.COMMITMENT_OF_READER, vagueCommit && vagueCommit.type);
+  const heVagueCommit = classify('כפי שהתחייבת, תעזור עם זה.');
+  check('HE: vague commitment with no object and no anchor stays silent', !heVagueCommit || heVagueCommit.type !== FlowIntent.TYPES.COMMITMENT_OF_READER, heVagueCommit && heVagueCommit.type);
+}
+
 // 5. A direct request -> REQUEST, the "Reply & Track" process, draft anchor
 //    leading (the draft is what's literally being asked for).
 {
