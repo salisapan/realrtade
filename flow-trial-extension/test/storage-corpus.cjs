@@ -47,6 +47,9 @@ vm.createContext(sandbox);
 // invokes it, the same load-order convention the real manifest.json/
 // popup.html use for core/ files ahead of src/storage.js.
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'pmf-metrics.js'), 'utf8'), sandbox, { filename: 'pmf-metrics.js' });
+// getClassificationSnapshot() calls into FlowClassificationMetrics — loaded
+// here for the same load-order reason pmf-metrics.js is above.
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'classification-metrics.js'), 'utf8'), sandbox, { filename: 'classification-metrics.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8'), sandbox, { filename: 'storage.js' });
 const FlowStorage = vm.runInContext('FlowStorage', sandbox);
 
@@ -680,6 +683,63 @@ async function run() {
     check('the snapshot reflects the exact same shown/written counters just recorded', snapshot.detectedTotal === 1 && snapshot.writtenTotal === 1, snapshot);
     check('closureRate is computed, not left undefined', snapshot.closureRate === 1, snapshot);
     check('the snapshot carries retention and habit sub-objects', Boolean(snapshot.retention) && Boolean(snapshot.habit), snapshot);
+  }
+
+  console.log('\n--- storage.js: recordClassificationOutcome() + getClassificationSnapshot() ---\n');
+  store = {};
+  {
+    // 'local' outcome — the free local pass resolved a real type on its own.
+    await FlowStorage.recordClassificationOutcome('m1', 'local');
+    const afterLocal = (await FlowStorage.get()).classificationStats;
+    check('a local outcome increments localFired only', afterLocal.localFired === 1 && afterLocal.localMissed === 0, afterLocal);
+
+    // 'ai' — local gave up, the one remote fallback attempt rescued it.
+    await FlowStorage.recordClassificationOutcome('m2', 'ai');
+    const afterAi = (await FlowStorage.get()).classificationStats;
+    check('an ai outcome increments localMissed AND aiFired (local gave up first)', afterAi.localMissed === 1 && afterAi.aiFired === 1, afterAi);
+
+    // 'miss' — neither pass ever found anything for this message.
+    await FlowStorage.recordClassificationOutcome('m3', 'miss');
+    const stats = (await FlowStorage.get()).classificationStats;
+    check('a miss outcome increments localMissed AND aiMissed', stats.localMissed === 2 && stats.aiMissed === 1, stats);
+
+    const snapshot = await FlowStorage.getClassificationSnapshot();
+    check('getClassificationSnapshot() assembles current state through core/classification-metrics.js',
+      snapshot.totalScanned === 3 && snapshot.localFired === 1 && snapshot.aiFired === 1 && snapshot.aiMissed === 1, snapshot);
+
+    // Re-scanning the SAME message (Gmail rebuilding a still-open,
+    // still-chipless node across several debounced mutations) must never
+    // count twice — the exact bug this dedup rule exists to prevent.
+    await FlowStorage.recordClassificationOutcome('m1', 'local');
+    await FlowStorage.recordClassificationOutcome('m3', 'miss');
+    const restated = (await FlowStorage.get()).classificationStats;
+    check('re-recording the same messageId is a no-op, even with the same outcome',
+      restated.localFired === 1 && restated.aiMissed === 1, restated);
+
+    // A messageId later re-scanned with a DIFFERENT outcome (e.g. the corpus
+    // was upgraded between two scans and now resolves locally where it used
+    // to need the AI fallback) must still be a no-op — "already counted
+    // once, ever" per message, not per (message, outcome) pair.
+    await FlowStorage.recordClassificationOutcome('m3', 'local');
+    const stillMiss = (await FlowStorage.get()).classificationStats;
+    check('re-recording the same messageId with a DIFFERENT outcome is still a no-op',
+      stillMiss.localFired === 1 && stillMiss.aiMissed === 1, stillMiss);
+
+    // Malformed calls (no messageId, unrecognized outcome) must be silently
+    // ignored, never throw and never corrupt the counters.
+    await FlowStorage.recordClassificationOutcome(null, 'local');
+    await FlowStorage.recordClassificationOutcome('m4', 'not-a-real-outcome');
+    const guarded = (await FlowStorage.get()).classificationStats;
+    check('a missing messageId or an unrecognized outcome is silently ignored',
+      guarded.localFired === 1 && guarded.localMissed === 2 && guarded.aiFired === 1 && guarded.aiMissed === 1, guarded);
+  }
+
+  console.log('\n--- storage.js: getClassificationSnapshot() on an untouched profile ---\n');
+  store = {};
+  {
+    const empty = await FlowStorage.getClassificationSnapshot();
+    check('zero recorded classifications returns null rates, not fabricated 0%s',
+      empty.totalScanned === 0 && empty.localCoverageRate === null && empty.aiCatchRate === null && empty.totalMissRate === null, empty);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

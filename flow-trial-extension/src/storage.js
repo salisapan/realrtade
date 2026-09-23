@@ -105,6 +105,20 @@ const FlowStorage = (() => {
     // the rate drift as old rows evict.
     shownStats: { total: 0, recent: [] },
     undoneStats: { total: 0, recent: [] },
+    // The empirical, real-usage answer to a question this product used to
+    // only be able to answer by hand-writing more test sentences: of every
+    // message the local pass (core/intent.js + core/judgment.js — free,
+    // instant, on-device) ever looked at, how many did it resolve on its
+    // own, how many did the one remote AI fallback attempt then rescue, and
+    // how many stayed fully unresolved either way. See
+    // core/classification-metrics.js and getClassificationSnapshot below.
+    // Same durable-counter shape and same distinct-messageId dedup rule as
+    // shownStats/writeStats above, for the same reason — a capped log alone
+    // would undercount a heavy account and let the rate drift as old rows
+    // evict. Deliberately counts and rates only, never message text, sender,
+    // or subject — this file's privacy posture applies here exactly as
+    // everywhere else.
+    classificationStats: { localFired: 0, localMissed: 0, aiFired: 0, aiMissed: 0, recent: [] },
     // One local calendar-day string (Date#toDateString, matching every
     // other daily flag in this file) per day this install was ever active
     // in a watched tab — the actual history retention/habit measurement
@@ -518,6 +532,55 @@ const FlowStorage = (() => {
     return FlowPmfMetrics.computeSnapshot(await get());
   }
 
+  // `outcome` is one of 'local' (the free local pass resolved a real type on
+  // its own), 'ai' (the local pass gave up but the one remote fallback
+  // attempt then found a type), or 'miss' (both passes gave up — nothing
+  // ever fired for this message). Same distinct-messageId dedup as
+  // shownStats/writeStats above: content-gmail.js's scanReadingPane() can
+  // re-run classification on the same still-open, still-chipless message
+  // across several debounced DOM mutations, and each of those re-runs must
+  // count once toward this account's real miss rate, not once per mutation.
+  const recordClassificationOutcome = serialize(async function recordClassificationOutcome(messageId, outcome) {
+    if (!messageId || (outcome !== 'local' && outcome !== 'ai' && outcome !== 'miss')) return;
+    const state = await get();
+    const cs = state.classificationStats || { localFired: 0, localMissed: 0, aiFired: 0, aiMissed: 0, recent: [] };
+    const recent = cs.recent || [];
+    if (recent.some((r) => r && r.id === messageId)) return; // already counted once, ever
+    const next = {
+      localFired: cs.localFired || 0,
+      localMissed: cs.localMissed || 0,
+      aiFired: cs.aiFired || 0,
+      aiMissed: cs.aiMissed || 0
+    };
+    if (outcome === 'local') {
+      next.localFired += 1;
+    } else {
+      // Both 'ai' and 'miss' only ever happen after the local pass already
+      // gave up — see content-gmail.js's own recordClassificationOutcome
+      // call site for exactly where these three cases are told apart.
+      next.localMissed += 1;
+      if (outcome === 'ai') next.aiFired += 1;
+      else next.aiMissed += 1;
+    }
+    await set({
+      classificationStats: Object.assign({}, next, {
+        recent: [{ id: messageId, ts: Date.now() }, ...recent].slice(0, WRITE_RECENT_CAP)
+      })
+    });
+  });
+
+  // The rates core/classification-metrics.js computes from the durable
+  // counters above: how much of everything Glance ever looked at the free
+  // local pass alone resolved, how much of what it missed the one remote
+  // fallback rescued, and the true ground-level miss rate this account is
+  // actually experiencing — the real-usage answer this product needed
+  // instead of continuing to hand-write more test sentences to guess at it.
+  // Same console-only access pattern as getPmfSnapshot above — deliberately
+  // not surfaced in any UI.
+  async function getClassificationSnapshot() {
+    return FlowClassificationMetrics.computeSnapshot((await get()).classificationStats);
+  }
+
   // Shared by every "at most once per calendar day (local time)" flag this
   // file keeps — the Morning Brief's auto-open and the anonymous daily-active
   // ping both need exactly this, just against a different stored date key.
@@ -658,7 +721,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };
