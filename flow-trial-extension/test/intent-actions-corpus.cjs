@@ -235,6 +235,39 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('HE: vague commitment with no object and no anchor stays silent', !heVagueCommit || heVagueCommit.type !== FlowIntent.TYPES.COMMITMENT_OF_READER, heVagueCommit && heVagueCommit.type);
 }
 
+// 4c. READER_COMMIT/READER_COMMIT_HE's much broader reminder-phrasing
+//     registers, EN+HE — same "bare .test(), no negation/hedge safety net"
+//     risk profile as HANDOFF/HANDOFF_HE above, so each addition here was
+//     also re-verified against the full negative-test corpus before being
+//     kept. Paired with a concrete object each time so the gate actually
+//     fires (isReaderCommit alone is not sufficient — see the hard gate
+//     itself in intent.js).
+{
+  const readerCommitCases = [
+    ['EN: you said you would', 'You said you would send the invoice by Friday.'],
+    ['EN: you mentioned you would', "You mentioned you'd send the signed contract."],
+    ['EN: you are supposed to', "You're supposed to send the report by end of day."],
+    ['EN: you were going to', 'You were going to send the updated proposal, right?'],
+    ['EN: as we agreed', 'As we agreed, you will send the invoice by Friday.'],
+    ['EN: per our conversation', "Per our conversation, you'll send the signed NDA."],
+    ['EN: reminding you that you agreed', 'Just reminding you that you agreed to send the contract by Friday.'],
+    ['HE: אתה אמור ל', 'אתה אמור לשלוח לי את החוזה עד יום שני.'],
+    ['HE: היית אמור ל', 'היית אמור לשלוח את החשבונית שבוע שעבר.'],
+    ['HE: לפי הסיכום שלנו', 'לפי הסיכום שלנו, אתה תשלח את הדוח.'],
+    ['HE: כפי שהיה מוסכם', 'כפי שהיה מוסכם, תעביר לי את הקובץ.']
+  ];
+  for (const [label, text] of readerCommitCases) {
+    const intent = classify(text);
+    check(label + ' -> COMMITMENT_OF_READER', intent && intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER, intent && intent.type);
+  }
+
+  // Precision re-check with the widened phrase lexicon in place.
+  const stillVague = classify("As discussed, you'll help with this.");
+  check('vague commitment still stays silent after the READER_COMMIT widening', !stillVague || stillVague.type === null, stillVague && stillVague.type);
+  const stillVagueHe = classify('כפי שהתחייבת, תעזור עם זה.');
+  check('HE vague commitment still stays silent after the READER_COMMIT widening', !stillVagueHe || stillVagueHe.type === null, stillVagueHe && stillVagueHe.type);
+}
+
 // 5. A direct request -> REQUEST, the "Reply & Track" process, draft anchor
 //    leading (the draft is what's literally being asked for).
 {

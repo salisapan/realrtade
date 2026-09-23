@@ -131,8 +131,12 @@ const FlowIntent = (() => {
   // enough that a shared pattern would either miss most real cases or catch
   // far too much, so — same as judgment.js's own signal pairs — these stay
   // separate regexes rather than one pattern trying to cover both.
-  const READER_COMMIT = /\b(you (?:agreed|committed|promised|confirmed) to|as (?:you|per your) (?:agreed|committed|promised|discussed)|confirming you(?:'ll| will)|per your commitment|as discussed,? you(?:'ll| will))\b/i;
-  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש|כפי שהבטחת|כמו שהבטחת)/;
+  // Broadened the same "clearly reader-directed, not a single common word"
+  // way HANDOFF/HANDOFF_HE were — this signal is also a bare .test() with
+  // no per-sentence negation/hedge check, so each addition below was
+  // re-verified against the full negative-test corpus before being kept.
+  const READER_COMMIT = /\b(you (?:agreed|committed|promised|confirmed) to|you (?:said|mentioned|indicated) you(?:'d| would)|you told (?:us|me) you(?:'d| would)|you'?re supposed to|you were (?:going|supposed) to|as (?:you|per your|we) (?:agreed|committed|promised|discussed)|confirming you(?:'ll| will)|per your commitment|as (?:discussed|promised|previously agreed),? you(?:'ll| will)|per our conversation,? you(?:'ll| will)|reminding you (?:that )?you (?:agreed|committed|promised) to)\b/i;
+  const READER_COMMIT_HE = /(כפי שהתחייבת|כמו שהתחייבת|כפי שסיכמת|כמו שסיכמת|את(?:ה)? התחייבת|כמו שאמרת ש|כפי שהבטחת|כמו שהבטחת|אתה אמור ל|את אמורה ל|היית אמור ל|היית אמורה ל|לפי הסיכום שלנו|בהתאם למה שסיכמנו|כפי שהיה מוסכם|כמו שהיה מוסכם)/;
 
   // The one sentence a human would point to as "this is the ask" — reused
   // as the `what` entity rather than synthesizing new wording, the same
