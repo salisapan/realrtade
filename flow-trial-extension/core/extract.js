@@ -50,7 +50,11 @@ const FlowExtract = (() => {
     '(?:(\\$|€|£|₪|₹|US\\$|C\\$|A\\$|USD|EUR|GBP|NIS|ILS|INR|CAD|AUD)\\s?)?' +
     '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)' +
     '(?:\\s?(k|m|mm|bn|thousand|million|billion|אלף|מיליון)(?![A-Za-z\\u0590-\\u05FF]))?' +
-    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels|\\$|€|£|₪|שקל(?:ים)?))?',
+    // ש״ח / ש"ח / שח — the abbreviation Israeli business writing actually
+    // uses for the shekel far more often than spelling out שקלים or reaching
+    // for the ₪ symbol; missing this meant a real, explicit figure like
+    // "3,850 ש״ח" parsed as no money signal at all.
+    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels|\\$|€|£|₪|שקל(?:ים)?|ש(?:״|")?ח))?',
     'gi'
   );
 
@@ -62,7 +66,7 @@ const FlowExtract = (() => {
       const [raw, pre, digits, mult, post] = m;
       const code = CURRENCY[(pre || '').toLowerCase()] || CURRENCY[(post || '').toLowerCase().slice(0, 3)] ||
                    (/dollars/i.test(post || '') ? 'USD' : /euros/i.test(post || '') ? 'EUR' :
-                    /pounds/i.test(post || '') ? 'GBP' : /shekels|שקל/i.test(post || '') ? 'ILS' : null);
+                    /pounds/i.test(post || '') ? 'GBP' : /shekels|שקל|ש(?:״|")?ח/i.test(post || '') ? 'ILS' : null);
       // A bare number with no currency marker is not money — it's a floor number,
       // a version, a headcount. Refusing those is most of what keeps this honest.
       if (!code) continue;

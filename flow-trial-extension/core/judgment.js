@@ -174,14 +174,33 @@ const FlowJudgment = (() => {
   // denial, and treating it as one would trade a wrong answer for a silent one
   // far too often.
   const NEG_BEFORE = /\b(?:not|never|cannot|can'?t|won'?t|wouldn'?t|shan'?t|don'?t|doesn'?t|didn'?t|isn'?t|aren'?t|no longer|unable to|declin\w*|refus\w*|reject\w*|denied|without)\b[^.!?;]{0,28}$/i;
-  const NEG_BEFORE_HE = /(?:לא|אין|בלי|נמנע|לא ניתן|לא נוכל)\s*(?:\S+\s+){0,3}$/;
+  // (?:^|\s) in front of the short two-letter forms (לא, אין) matters: JS
+  // regex has no \b for Hebrew (\b is defined over the ASCII \w class, which
+  // Hebrew letters aren't part of), so a bare לא or אין with no boundary of
+  // its own matches as a substring of any longer, unrelated word that
+  // happens to end the same way — most commonly מלא ("full") ending in לא,
+  // or מאין ("whence") ending in אין. Without this guard, "התקציב מלא סוכם"
+  // ("the budget [that's] full [was] agreed") read מלא's own לא as a
+  // negation sitting right before סוכם, and inverted a plain agreement into
+  // signals.js's 'negated' penalty — the same class of bug as HEDGE_HE
+  // below, found together while tracing why a real confirmed-and-dated
+  // email scored a negative total instead of clearing the threshold.
+  const NEG_BEFORE_HE = /(?:^|\s)(?:לא|אין|בלי|נמנע|לא ניתן|לא נוכל)\s*(?:\S+\s+){0,3}$/;
 
   // Conditionals and modals make a commitment contingent rather than made.
   // "would" is knowingly included: it costs the occasional real signal from
   // "we would like to confirm", and that costs silence, which is the side of
   // the trade this file always takes.
   const HEDGE = /\b(?:if|unless|assuming|suppose|supposing|provided that|subject to|pending|in case|once we|before we|might|may|could|would|perhaps|possibly|tentative(?:ly)?|proposed|hypothetical(?:ly)?)\b/i;
-  const HEDGE_HE = /(?:אם\s|אולי|ייתכן|בכפוף ל|בהנחה ש|במידה ו)/;
+  // (?:^|\s) before אם\s for the same reason as NEG_BEFORE_HE above: bare אם
+  // ("if") with no boundary matched as a substring of בהתאם ("accordingly" /
+  // "pursuant to") — an extremely common, entirely non-conditional word in
+  // formal Hebrew correspondence ("...בהתאם למסמך המצורף" = "...in
+  // accordance with the attached document") — which silently discarded a
+  // real, plainly-stated commitment as "hedged" on every message that used
+  // it. The other alternatives here are 4+ letters and weren't observed to
+  // have the same false-positive risk, so only this one needed the guard.
+  const HEDGE_HE = /(?:(?:^|\s)אם\s|אולי|ייתכן|בכפוף ל|בהנחה ש|במידה ו)/;
 
   function assertedIn(text, pattern) {
     for (const s of String(text || '').split(SENTENCE_SPLIT)) {
