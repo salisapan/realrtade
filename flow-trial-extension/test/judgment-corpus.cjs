@@ -100,7 +100,82 @@ const CASES = [
   { name: 'office lease under the finance profile', domain: 'finance', fire: true,
     labelNot: ['offer', 'renewal', 'churn', 'candidate'],
     subject: 'Re: Suite 400 lease',
-    text: 'We are agreed on the office lease for Suite 400 at $3,900 per month, commencing Sep 7. Countersigned copy attached.' }
+    text: 'We are agreed on the office lease for Suite 400 at $3,900 per month, commencing Sep 7. Countersigned copy attached.' },
+
+  // ---- COMMIT/COMMIT_STRONG/LOST/EXECUTED/DISPUTE, broadened per the
+  //      "as broad as possible, staying entirely local" request. Every case
+  //      below uses a phrasing that did NOT exist in the corpus before this
+  //      widening. Domain words (contract, proposal, purchase order) are
+  //      included deliberately — LOST alone (46) and DISPUTE alone (28) both
+  //      sit under the 50-point account-wide threshold with no other signal
+  //      present, exactly as their ORIGINAL, unwidened phrasings always did;
+  //      this isn't new behavior, it's why every case in this file that
+  //      relies on one of those two signals alone already paired it with a
+  //      domain match or a dated/priced anchor. ----
+  { name: 'COMMIT: "sounds good" + contract renewal', domain: 'sales', fire: true,
+    subject: 'Re: renewal',
+    text: "Sounds good, let's move forward with the $45,000 contract renewal starting Monday." },
+
+  { name: 'COMMIT: "works for us" + contract', domain: 'sales', fire: true,
+    subject: 'Re: contract',
+    text: 'That works for us — please proceed with the $30,000 contract starting next week.' },
+
+  { name: 'COMMIT_STRONG: "authorized" + purchase order', domain: 'sales', fire: true,
+    subject: 'Re: PO',
+    text: 'This is authorized — please proceed with the $50,000 purchase order effective Monday.' },
+
+  { name: 'COMMIT_STRONG: "formally approved" + contract', domain: 'sales', fire: true,
+    subject: 'Re: contract approval',
+    text: 'The $60,000 contract has been formally approved, effective immediately, starting Monday.' },
+
+  { name: 'LOST: "decided to pass" on a proposal', domain: 'sales', fire: true,
+    subject: 'Re: proposal',
+    text: "We've decided to pass on this proposal after careful consideration, but thank you so much for your time." },
+
+  { name: 'LOST: "not the right fit" for a proposal', domain: 'sales', fire: true,
+    subject: 'Re: proposal',
+    text: 'Unfortunately, after reviewing your proposal internally, this is not the right fit for us at this time.' },
+
+  { name: 'EXECUTED: "signed and returned"', domain: 'legal', fire: true,
+    subject: 'Re: contract',
+    text: 'The contract has been signed and returned, fully executed as of today.' },
+
+  { name: 'DISPUTE: "billing discrepancy" on a contract renewal invoice', domain: 'finance', fire: true,
+    subject: 'Re: invoice',
+    text: 'There is a billing discrepancy of $1,200 on our contract renewal invoice, the amount charged does not match the proposal we received.' },
+
+  { name: 'DISPUTE: "duplicate charge" + handoff', domain: 'finance', fire: true,
+    subject: 'Re: statement',
+    text: 'We noticed a duplicate charge on our contract renewal statement this month, please investigate and confirm.' },
+
+  { name: 'HE COMMIT: נשמע טוב + חוזה', domain: 'sales', fire: true,
+    subject: 'Re: חוזה',
+    text: 'נשמע טוב, נתקדם עם החוזה על סך 45,000 שקל החל מיום שני.' },
+
+  { name: 'HE COMMIT_STRONG: אושר רשמית + חוזה', domain: 'sales', fire: true,
+    subject: 'Re: אישור',
+    text: 'החוזה אושר רשמית על סך 60,000 שקל, החל מיום שני.' },
+
+  { name: 'HE LOST: לא מתאים לנו + חוזה', domain: 'sales', fire: true,
+    subject: 'Re: חוזה',
+    text: 'לאחר בדיקת החוזה שלכם, לצערנו זה לא מתאים לנו כרגע, אך אנחנו מעריכים את ההצעה שלכם.' },
+
+  { name: 'HE DISPUTE: חיוב יתר + חידוש חוזה', domain: 'finance', fire: true,
+    subject: 'Re: חשבונית',
+    text: 'שמנו לב לחיוב יתר של 500 שקל בחשבונית חידוש החוזה שקיבלנו מכם, הסכום לא תואם למה שסיכמנו.' },
+
+  // ---- precision: the widened lexicons must still respect negation/hedging ----
+  { name: 'negated commit must not fire (widened lexicon)', domain: 'sales', fire: false,
+    subject: 'Re: budget',
+    text: 'We do NOT approve the budget and will not sign the contract.' },
+
+  { name: 'hedged commit must not fire (widened lexicon)', domain: 'sales', fire: false,
+    subject: 'Re: budget',
+    text: 'We might approve the budget next quarter, but nothing is confirmed yet.' },
+
+  { name: 'HE negated commit must not fire (widened lexicon)', domain: 'sales', fire: false,
+    subject: 'Re: תקציב',
+    text: 'לא מאשרים את התקציב ולא נחתום על ההסכם.' }
 ];
 
 function evaluate(c) {

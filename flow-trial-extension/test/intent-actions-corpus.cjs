@@ -339,6 +339,11 @@ console.log('--- intent.js: type + entity checks ---\n');
 {
   const objectCases = [
     ['EN finance: NDA', 'Could you send over the NDA before our call?'],
+    // "statement" was present in the ORIGINAL, pre-widening REQUESTED_OBJECT
+    // list and was silently dropped when that list was reorganized into
+    // grouped arrays — caught and restored during this widening pass. A
+    // real recall regression, not a new addition, so it earns its own case.
+    ['EN finance: statement (restored, was dropped during regrouping)', 'Could you send the bank statement for this month?'],
     ['EN finance: purchase order', 'Please send the purchase order when you get a chance.'],
     ['EN finance: W-9', 'Can you send us your W-9 for our records?'],
     ['EN legal: SOW', 'Could you review and send back the SOW?'],

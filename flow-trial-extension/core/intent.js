@@ -212,7 +212,7 @@ const FlowIntent = (() => {
   const REQUESTED_OBJECT_GROUPS_EN = [
     // Finance
     'receipts?', 'tax invoices?', 'invoices?', 'credit notes?', 'refunds?', 'reimbursements?',
-    'expense reports?', 'purchase orders?', 'POs?', 'price lists?', 'quotes?', 'quotations?',
+    'expense reports?', 'purchase orders?', 'POs?', 'price lists?', 'quotes?', 'quotations?', 'statements?',
     'estimates?', 'budgets?', 'payments?', 'invoice numbers?', 'W-?9s?', 'W-?2s?', '1099s?',
     // Legal / contractual
     'contracts?', 'agreements?', 'NDAs?', 'non-disclosure agreements?', 'MSAs?', 'master service agreements?',

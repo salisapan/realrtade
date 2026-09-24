@@ -38,18 +38,30 @@ const FlowJudgment = (() => {
   // it lives in the sales profile's entityWords where it belongs. Left in this
   // list it handed every cold pitch containing "here's the deal" a full
   // commitment score, which measurably ranked spam above real decisions.
-  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed)\b/i;
+  //
+  // Broadened alongside every other lexicon in this file per the "as broad
+  // as possible, staying entirely local" request — safe to do fairly
+  // aggressively here because every addition below is routed through
+  // assertedIn's per-sentence negation/hedge/question check (unlike
+  // HANDOFF/HANDOFF_HE above and LOST/LOST_HE below, which are bare
+  // .test() and documented separately for exactly that reason).
+  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed|sounds good|works for (?:us|me)|happy to (?:move forward|proceed)|let'?s proceed|we'?re on board|consider it done|that works (?:for us|for me)?|agreed upon|in agreement|we concur|we'?re aligned|you have our agreement)\b/i;
   // An explicit, unambiguous authorisation. These carry more weight than the
   // general list because "Approved — go ahead" is the single most common real
   // decision in business email and it arrives with no money and no date
   // attached, so it has to clear the bar largely on its own.
-  const COMMIT_STRONG = /\b(approved?|signed off|sign-off|go ahead|green[- ]?lit|locked in|countersigned|fully executed|signature page attached)\b/i;
-  // A decision was made in the other direction.
-  const LOST = /\b(not (?:moving|going) forward|we'?re pulling out|decided to go with (?:someone|another)|going a different direction|no longer interested|cancel(?:ling|led)? the|terminate the|declin(?:e|ed|ing))\b/i;
+  const COMMIT_STRONG = /\b(approved?|signed off|sign-?off|go ahead|green[- ]?lit|locked in|countersigned|fully executed|signature page attached|authori[sz]ed|formally approved|ratified|endorsed|cleared for (?:launch|takeoff|release)|final approval|greenlight given)\b/i;
+  // A decision was made in the other direction. LOST is deliberately NOT
+  // routed through assertedIn (see score()'s own comment on this below —
+  // its patterns already embed the negation), so it carries the same
+  // bare-.test() false-positive risk HANDOFF/MEETING_NOUN above do, and
+  // every addition here was kept to clearly deal-ending, multi-word phrases
+  // for the same reason.
+  const LOST = /\b(not (?:moving|going) forward|we'?re pulling out|decided to go with (?:someone|another)|going a different direction|no longer interested|cancel(?:ling|led)? the|terminate the|declin(?:e|ed|ing)|we'?ve decided to pass|passing on this (?:opportunity|offer|proposal)?|not the right fit|going with a different (?:vendor|provider|option)|we won'?t be proceeding|backing out of|withdrawing from|opted not to (?:move forward|proceed)|chose not to move forward)\b/i;
   // A signature that an agreement completed.
-  const EXECUTED = /\b(fully executed|countersigned|signed the (?:agreement|contract)|execution copy|signature page attached)\b/i;
+  const EXECUTED = /\b(fully executed|countersigned|signed the (?:agreement|contract)|execution copy|signature page attached|signed and returned|signed copy attached|agreement is signed|contract is signed|deal is closed|paperwork is complete)\b/i;
   // Something is owed to somebody by a date.
-  const OBLIGATION = /\b(due|deadline|by end of|no later than|must be (?:filed|delivered|paid|submitted)|expires?|payable|net ?\d{2})\b/i;
+  const OBLIGATION = /\b(due|deadline|by end of|no later than|must be (?:filed|delivered|paid|submitted|completed|finalized)|expires?|payable|net ?\d{2}|required by|needs? to be (?:finalized|submitted|completed) by|has to be submitted by|owed by|payment is due)\b/i;
   // A direct request aimed at the reader. Deliberately kept to multi-word,
   // clearly imperative/polite-request-shaped phrases (never a single common
   // word) — this signal is tested with a bare .test() against the whole
@@ -62,18 +74,29 @@ const FlowJudgment = (() => {
   // before being kept.
   const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|let (?:us|me) know)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
   // A disagreement about money.
-  const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|incorrect (?:amount|invoice)|dispute)\b/i;
+  const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|undercharged|incorrect (?:amount|invoice)|dispute|wrong amount|billing discrepancy|invoice error|charged incorrectly|duplicate charge|unauthorized charge)\b/i;
 
   // Hebrew twins of the seven signals above. No \b word-boundary wrapper here
   // — \b is defined against [A-Za-z0-9_], so it never fires around Hebrew
   // letters and would silently turn every one of these into a dead pattern.
   // Same phrases, same intent, just the vocabulary an Israeli business inbox
   // actually uses instead of "we're good at" / "approved" / "no longer interested".
-  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?)/;
-  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה)/;
-  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא הולכים על זה|בחרנו באופציה אחרת|בחרנו בספק אחר|לצערנו לא נוכל|אנחנו לא ממשיכים איתכם|ירדנו מהעניין)/;
-  const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם|חתמתי על|נחתם וסגור|חתום ומאושר)/;
-  const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון|עד סוף החודש|יש להעביר עד|נדרש לשלם עד|יש להשלים עד)/;
+  // Broadened alongside the EN twins above, same assertedIn-safety-net
+  // reasoning (LOST_HE is the one exception — see LOST's own comment).
+  // "מתאים לנו" ("works for us") was deliberately dropped from this list —
+  // it collided with LOST_HE's own new "לא מתאים לנו" ("not a fit for us")
+  // below: NEG_BEFORE_HE correctly saw the negation and kept assertedIn
+  // from crediting the commitment, but commitMentioned (the raw, negation-
+  // blind test) still saw "מתאים לנו" present and stacked the -34 "negated"
+  // penalty on top of LOST's own +46, dragging a plain rejection message
+  // below threshold. Same false-positive-adjacent bug class this file's
+  // NEG_BEFORE_HE/HEDGE_HE header comments already document — found here by
+  // the same "run the negative corpus before committing" discipline.
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה)/;
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל)/;
+  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא הולכים על זה|בחרנו באופציה אחרת|בחרנו בספק אחר|לצערנו לא נוכל|אנחנו לא ממשיכים איתכם|ירדנו מהעניין|החלטנו לוותר|לא מתאים לנו|הולכים על ספק אחר|פורשים מההסכם|לא נמשיך בתהליך)/;
+  const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם|חתמתי על|נחתם וסגור|חתום ומאושר|נשלח חתום|העותק החתום מצורף|העסקה נסגרה|הניירת הושלמה)/;
+  const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון|עד סוף החודש|יש להעביר עד|נדרש לשלם עד|יש להשלים עד|יש להגיש עד|נדרש להשלים עד|התשלום נדרש עד|יש לסיים עד)/;
   // תשלח/י לי, צריך/ה ממך, בבקשה ת... — the direct "do X for me" phrasings a
   // small, personal-scale request actually gets written in, on top of the
   // more formal "תוכל/נשמח אם" business-register set already here. "בבקשה
@@ -97,7 +120,7 @@ const FlowJudgment = (() => {
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
   const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
-  const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב|הסכום שגוי|יש טעות בחשבונית|לא תואם למוסכם)/;
+  const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב|הסכום שגוי|יש טעות בחשבונית|לא תואם למוסכם|חיוב יתר|חיוב חסר|טעות בגבייה|חיוב לא מורשה)/;
 
   const MARKETING = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|webinar|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;
   const CALENDAR_NOISE = /\b(has (?:accepted|declined|tentatively accepted) (?:this|your) invitation|invitation from google calendar|added to your calendar)\b/i;
