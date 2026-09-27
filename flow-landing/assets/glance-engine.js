@@ -3,11 +3,12 @@
 //   flow-trial-extension/src/extract.js
 //   flow-trial-extension/src/judgment.js
 // Regenerate with: scripts/build-glance-engine.sh
-// Last synced: 2026-09-14
+// Last synced: 2026-09-27
 //
 // This is the exact client-side judgment engine the Glance extension
-// runs — concatenated as-is (no edits) so the live demo on trial.html
-// runs the real product, not a re-implementation of it.
+// runs — concatenated as-is (no edits) so Inbox Scan
+// (flow-landing/missed-deadline.html) runs the real product, not a
+// re-implementation of it.
 
 // Domain profiles — the "what kind of work do you do" dimension.
 //
@@ -26,8 +27,11 @@ const FLOW_DOMAINS = [
     id: 'sales',
     label: 'Sales & business development',
     entity: 'Deal / client',
-    // Nouns that mean "this message is about the object of my work".
-    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr|msa|sow|statement of work)\b/i,
+    // Nouns that mean "this message is about the object of my work". The
+    // Hebrew half has no \b wrapper for the same reason judgment.js's Hebrew
+    // signals don't: \b only fires around [A-Za-z0-9_], so it's a silent
+    // no-op — never a match — against Hebrew letters.
+    entityWords: /\b(deal|proposal|quote|pricing|contract|renewal|pilot|po\b|purchase order|order|subscription|seat[s]?|contract value|mrr|arr|msa|sow|statement of work)\b|(עסקה|הצעת מחיר|חוזה|הזמנה|מנוי|חידוש|הסכם)/i,
     title(facts) {
       if (facts.lost) return 'Log lost deal';
       if (facts.moneyText && facts.date) return 'Log ' + facts.moneyText + ' confirmed, ' + facts.dateText;
@@ -115,6 +119,10 @@ if (typeof module !== 'undefined') module.exports = { FLOW_DOMAINS };
 const FlowExtract = (() => {
   const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
   const DAYS = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  // Same Sunday-first order as DAYS above, so both arrays line up 1:1 with
+  // JS's own Date.getDay() (0 = Sunday) and the two "by/on <weekday>" blocks
+  // in parseDate() below can share identical delta math.
+  const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
 
   const CURRENCY = {
     '$': 'USD', 'us$': 'USD', 'usd': 'USD',
@@ -126,11 +134,15 @@ const FlowExtract = (() => {
   };
 
   // Symbol/code before the number, or code after it. Optional k/m suffix.
+  // The post-group also accepts a bare symbol (₪/$/€/£) — Hebrew business
+  // writing conventionally puts ₪ AFTER the number ("15,000 ₪"), not before
+  // it the way "$15,000" does, so a post-only symbol had to be a first-class
+  // case here rather than assumed to always be a 3-letter code like "NIS".
   const MONEY_RE = new RegExp(
     '(?:(\\$|€|£|₪|₹|US\\$|C\\$|A\\$|USD|EUR|GBP|NIS|ILS|INR|CAD|AUD)\\s?)?' +
     '(\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)' +
-    '\\s?(k|m)?' +
-    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels))?',
+    '\\s?(k|m|אלף|מיליון)?' +
+    '(?:\\s?(USD|EUR|GBP|NIS|ILS|INR|CAD|AUD|dollars|euros|pounds|shekels|\\$|€|£|₪|שקל(?:ים)?))?',
     'gi'
   );
 
@@ -142,7 +154,7 @@ const FlowExtract = (() => {
       const [raw, pre, digits, mult, post] = m;
       const code = CURRENCY[(pre || '').toLowerCase()] || CURRENCY[(post || '').toLowerCase().slice(0, 3)] ||
                    (/dollars/i.test(post || '') ? 'USD' : /euros/i.test(post || '') ? 'EUR' :
-                    /pounds/i.test(post || '') ? 'GBP' : /shekels/i.test(post || '') ? 'ILS' : null);
+                    /pounds/i.test(post || '') ? 'GBP' : /shekels|שקל/i.test(post || '') ? 'ILS' : null);
       // A bare number with no currency marker is not money — it's a floor number,
       // a version, a headcount. Refusing those is most of what keeps this honest.
       if (!code) continue;
@@ -223,6 +235,29 @@ const FlowExtract = (() => {
       // a full week regardless of "next", so it needs no separate bump.
       if (delta === 0) delta = 7;
       else if (/next\s/i.test(m[0])) delta += 7;
+      d.setDate(d.getDate() + delta);
+      return { raw: m[0], iso: iso(d) };
+    }
+
+    // Hebrew equivalent of the "by/on <weekday>" block above — "עד יום שני"
+    // (by Monday), "ביום רביעי" (on Wednesday), "לא יאוחר מיום חמישי" (no
+    // later than Thursday). Requires the same scheduling-word guard so a
+    // signature reading "יום נעים" ("have a nice day") is never mistaken
+    // for a deadline.
+    //
+    // Deliberately no trailing \b: JS's \b is defined only against ASCII
+    // \w ([A-Za-z0-9_]), so a \b placed right after a Hebrew word sits
+    // between two non-\w characters — never a boundary — and the whole
+    // match silently never fires. Same failure shape as the PHONE_PATTERN
+    // fix earlier in privacyShield.js: a boundary that can only ever hold
+    // next to ASCII text is not a boundary at all next to Hebrew.
+    m = text.match(new RegExp('(?:עד|ב-?|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')'));
+    if (m) {
+      const target = DAYS_HE.indexOf(m[1]);
+      const d = new Date(now);
+      let delta = (target - d.getDay() + 7) % 7;
+      if (delta === 0) delta = 7;
+      else if (/הבא\s*$/.test(m[0])) delta += 7;
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
     }
@@ -319,6 +354,19 @@ const FlowJudgment = (() => {
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|incorrect (?:amount|invoice)|dispute)\b/i;
 
+  // Hebrew twins of the seven signals above. No \b word-boundary wrapper here
+  // — \b is defined against [A-Za-z0-9_], so it never fires around Hebrew
+  // letters and would silently turn every one of these into a dead pattern.
+  // Same phrases, same intent, just the vocabulary an Israeli business inbox
+  // actually uses instead of "we're good at" / "approved" / "no longer interested".
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?)/;
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור)/;
+  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא)/;
+  const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם)/;
+  const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון)/;
+  const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל)/;
+  const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב)/;
+
   const MARKETING = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|webinar|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;
   const CALENDAR_NOISE = /\b(has (?:accepted|declined|tentatively accepted) (?:this|your) invitation|invitation from google calendar|added to your calendar)\b/i;
   // The fingerprint of a cold pitch. Without this, "our pricing starts at $99/mo,
@@ -369,13 +417,13 @@ const FlowJudgment = (() => {
     if (CALENDAR_NOISE.test(text)) add('calendar', -35, 'Calendar notification boilerplate');
     if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
-    const commitStrong = COMMIT_STRONG.test(text);
-    const commit = commitStrong || COMMIT.test(text);
-    const lost = LOST.test(text);
-    const executed = EXECUTED.test(text);
-    const obligation = OBLIGATION.test(text);
-    const handoff = HANDOFF.test(text);
-    const dispute = DISPUTE.test(text);
+    const commitStrong = COMMIT_STRONG.test(text) || COMMIT_STRONG_HE.test(text);
+    const commit = commitStrong || COMMIT.test(text) || COMMIT_HE.test(text);
+    const lost = LOST.test(text) || LOST_HE.test(text);
+    const executed = EXECUTED.test(text) || EXECUTED_HE.test(text);
+    const obligation = OBLIGATION.test(text) || OBLIGATION_HE.test(text);
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text);
+    const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
     if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
@@ -472,11 +520,11 @@ const FlowJudgment = (() => {
       automated: raw.automated,
       wordCount: raw.wordCount,
       isReply: /^re:/i.test(ctx.subject || ''),
-      lost: LOST.test(text),
-      executed: EXECUTED.test(text),
-      dispute: DISPUTE.test(text)
+      lost: LOST.test(text) || LOST_HE.test(text),
+      executed: EXECUTED.test(text) || EXECUTED_HE.test(text),
+      dispute: DISPUTE.test(text) || DISPUTE_HE.test(text)
     };
-    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT, LOST, EXECUTED, DISPUTE, OBLIGATION, HANDOFF]);
+    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT_STRONG_HE, COMMIT, COMMIT_HE, LOST, LOST_HE, EXECUTED, EXECUTED_HE, DISPUTE, DISPUTE_HE, OBLIGATION, OBLIGATION_HE, HANDOFF, HANDOFF_HE]);
     return facts;
   }
 
@@ -505,7 +553,7 @@ const FlowJudgment = (() => {
     const threshold = thresholdFrom(ctx.calibration, ctx.now);
     if (s.total < threshold) return null;
 
-    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT, LOST, EXECUTED, DISPUTE, OBLIGATION, HANDOFF]);
+    facts.quote = FlowExtract.decisiveSentence(text, [COMMIT_STRONG, COMMIT_STRONG_HE, COMMIT, COMMIT_HE, LOST, LOST_HE, EXECUTED, EXECUTED_HE, DISPUTE, DISPUTE_HE, OBLIGATION, OBLIGATION_HE, HANDOFF, HANDOFF_HE]);
 
     return {
       score: s.total,

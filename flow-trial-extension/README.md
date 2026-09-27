@@ -23,6 +23,14 @@ automated sender or mailing-list boilerplate. It speaks only above a threshold
 that moves as you click and dismiss. No email text is sent anywhere to reach
 this decision.
 
+Inbox Scan (`flow-landing/missed-deadline.html`) does not keep its own scorer.
+It loads `flow-landing/assets/glance-engine.js`, which is `src/domains.js`,
+`src/extract.js`, and `src/judgment.js` concatenated and nothing else. After
+changing any of those three files, regenerate that copy from the repo root
+with `scripts/build-glance-engine.sh` and commit it.
+`scripts/build-glance-engine.sh --check` fails when the copy has drifted.
+The "Last synced" date in the header is not part of that comparison.
+
 **Facts are extracted, not just detected.** `src/extract.js` pulls the amount
 (with currency, `k`/`m` suffixes, and a refusal to treat a bare number or a
 percentage as money), the date (resolving weekday references and month names,
