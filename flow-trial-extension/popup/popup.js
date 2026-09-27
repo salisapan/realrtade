@@ -365,6 +365,7 @@
 
     const subtitle = pendingRowSubtitle(entry);
     if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
+    if (entry.why) item.appendChild(el('span', 'log-why', entry.why));
     // "Make unresolved processes harder to forget" — an item open for three
     // weeks used to look identical to one from ten minutes ago in this
     // list. Same when()/.when the Activity tab's own logRow() already uses,
@@ -384,11 +385,13 @@
       dismiss.disabled = true; dismiss.textContent = 'Dismissing…';
       // The exact same storage/module calls content-gmail.js's own
       // onDismiss makes, verbatim — no DOM, no background.js round trip.
+      const why = entry.why && String(entry.why).trim();
       await FlowStorage.appendLog({
         kind: 'dismissed',
         label: (entry.intent && entry.intent.label) || entry.process.name,
         messageId: entry.messageId,
-        score: entry.signals && entry.signals.score
+        score: entry.signals && entry.signals.score,
+        ...(why ? { why: why } : {})
       });
       await FlowStorage.calibrate('dismiss');
       if (typeof FlowExecutionMemory !== 'undefined' && entry.process && entry.process.steps) {
@@ -624,11 +627,27 @@
     const host = document.getElementById('log-list');
     const empty = document.getElementById('log-empty');
     host.replaceChildren();
-    // "shown" entries are noise once the outcome is known; the log should read as
-    // a record of what happened, not a stream of every evaluation.
-    const rows = (s.log || []).filter((e) => e.kind !== 'shown').slice(0, 40);
+    // Outcome rows replace `shown` once the user has acted. A shown row stays
+    // only when it is the only record, because that is where the reason lives
+    // until a click, write, or dismiss copies it. See FlowStorage.activityRows.
+    const rows = FlowStorage.activityRows(s.log).slice(0, 40);
     empty.hidden = rows.length > 0;
+    fillExample(rows.length === 0, s.calibration);
     rows.forEach((e) => host.appendChild(logRow(e)));
+  }
+
+  function fillExample(show, calibration) {
+    const example = document.getElementById('log-example');
+    if (!example) return;
+    if (!show) { example.hidden = true; example.textContent = ''; return; }
+    const sample = FlowJudgment.activityExample({ calibration: calibration, now: Date.now() });
+    if (!sample || !sample.quote || !sample.why) {
+      example.hidden = true;
+      example.textContent = '';
+      return;
+    }
+    example.hidden = false;
+    example.textContent = 'For example, “' + sample.quote + '” is enough for Glance to speak up. The reason it would give: ' + sample.why + '.';
   }
 
   function logRow(e) {
@@ -639,6 +658,7 @@
     item.appendChild(top);
 
     if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
+    if (e.why) item.appendChild(el('span', 'log-why', e.why));
     item.appendChild(el('span', 'when', when(e.ts)));
 
     if (e.kind === 'written' && (e.url || e.ref)) {
