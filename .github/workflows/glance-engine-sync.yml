@@ -1,0 +1,28 @@
+# Fails when flow-landing/assets/glance-engine.js is not a fresh concat of
+# flow-trial-extension/src/domains.js, extract.js, and judgment.js.
+#
+# This file is separate from .github/workflows/ci.yml (PR #22) and
+# glance-install-zip.yml (PR #21). Those workflows are not edited here.
+# After #22 merges, the same command can also be a step in ci.yml:
+#   bash scripts/build-glance-engine.sh --check
+
+name: Glance engine sync
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    name: Landing engine matches extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check glance-engine.js is generated from the extension scorer
+        run: bash scripts/build-glance-engine.sh --check
+      - name: Syntax-check the mirrored engine
+        run: node --check flow-landing/assets/glance-engine.js
