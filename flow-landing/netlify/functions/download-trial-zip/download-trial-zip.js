@@ -8,9 +8,10 @@
 // actually enforced by anything. This closes that gap.
 //
 // The zip is not source. scripts/package_trial_extension.py writes it here
-// during the Netlify build (and in CI). node_bundler = "none" on this
-// function keeps that file next to the handler so __dirname resolves.
-// See flow-trial-extension/docs/SETUP.md.
+// during the Netlify build (and in CI). This function lists that zip in
+// included_files and sets node_bundler = "none", so the file is deployed
+// next to the handler and __dirname resolves. See
+// flow-trial-extension/docs/SETUP.md.
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -20,10 +21,9 @@ const SITE_URL = 'https://theflow-ai.com';
 const LOG_PREFIX = '[download-trial-zip]';
 const ZIP_NAME = 'flow-trial-extension.zip';
 
-// esbuild's default function bundle does not keep a sibling zip, and
 // __dirname vs process.cwd() differ between `netlify dev` (base directory
-// flow-landing) and the deployed lambda (node_bundler = "none" puts the
-// zip next to this file). Take the first one that exists.
+// flow-landing) and the deployed lambda (included_files places the zip
+// next to this file). Take the first one that exists.
 function resolveZipPath() {
   const candidates = [
     path.join(__dirname, ZIP_NAME),

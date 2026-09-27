@@ -12,7 +12,9 @@
   directory = "netlify/functions"
 
 # The handler reads flow-trial-extension.zip via __dirname. The default
-# esbuild bundler does not ship that file. Packaging this one function
-# as-is keeps the zip the build command just wrote next to the handler.
+# esbuild bundler does not ship that file, and node_bundler = "none"
+# only ships the handler plus included_files — not the rest of the
+# directory. The path is relative to this folder (the Netlify base).
 [functions."download-trial-zip"]
   node_bundler = "none"
+  included_files = ["netlify/functions/download-trial-zip/flow-trial-extension.zip"]

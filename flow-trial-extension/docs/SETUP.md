@@ -25,10 +25,13 @@ python3 ../scripts/package_trial_extension.py
 ```
 
 before functions are packaged. `download-trial-zip` sets
-`node_bundler = "none"` so the generated zip is shipped next to the
-handler and `path.join(__dirname, 'flow-trial-extension.zip')` resolves.
-The handler also checks `process.cwd()` for the same filename, which is
-the layout `netlify dev` uses when the base directory is `flow-landing`.
+`node_bundler = "none"` and `included_files` to that zip. The none
+bundler ships only the handler plus `included_files`, not every file
+sitting in the directory, and it does not apply `.gitignore`, so the
+generated zip is what gets deployed next to the handler.
+`path.join(__dirname, 'flow-trial-extension.zip')` resolves there. The
+handler also checks `process.cwd()` for the same filename, which is the
+layout `netlify dev` uses when the base directory is `flow-landing`.
 
 Check it locally from the repo root:
 
