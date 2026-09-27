@@ -810,6 +810,8 @@
     const when = e.when ? ', ' + e.when : '';
     const amount = e.amount ? ', ' + e.amount : '';
     switch (process.id) {
+      case 'hold':
+        return 'is putting this on your calendar' + when + '.';
       case 'schedule-confirm':
         return 'is scheduling the meeting' + when + ', drafting a reply to confirm, and opening a follow-up task.';
       case 'schedule':

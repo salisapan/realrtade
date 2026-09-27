@@ -1138,17 +1138,137 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     JSON.stringify(typeIds) === JSON.stringify(['commitment', 'decision', 'event', 'followup', 'request']), typeIds);
 }
 
+console.log('\n--- personal close: a clock time or an explicit meeting ask is a Calendar hold ---\n');
+{
+  function planOf(text) {
+    const intent = classify(text);
+    return { intent, process: FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false }) };
+  }
+  function isHold(text) {
+    const { intent, process } = planOf(text);
+    const step = process && process.steps[0];
+    return intent.personalClose === 'calendar-hold' &&
+      process && process.id === 'hold' &&
+      process.steps.length === 1 &&
+      step && step.kind === 'calendar' && step.params.requireTime === true &&
+      typeof step.params.dateIso === 'string' &&
+      Number.isInteger(step.params.hour) && Number.isInteger(step.params.minute);
+  }
+
+  const holds = [
+    ['EN promise + date + time', 'I will send you the signed contract by Friday, September 18 at 3pm.'],
+    ['EN agreed + date + time, no meeting noun', 'We agreed to file the amendment by September 21 at 3pm.'],
+    ['HE promise + date + time', 'אני אשלח לך את החוזה ביום שישי בשעה 15:00.'],
+    ['EN explicit schedule-a-call ask', 'Can you schedule a call Friday, September 18 at 3pm?'],
+    ['EN could-you-meet ask', 'Could you meet Friday, September 18 at 3pm to review the contract?'],
+    ['EN can-we-meet ask', 'Can we meet Friday, September 18 at 10:00am?'],
+    ['HE please-set-a-meeting ask', 'בבקשה תקבע פגישה ביום שישי בשעה 15:00.']
+  ];
+  for (const [label, text] of holds) {
+    const { intent, process } = planOf(text);
+    check(label + ' is a calendar-hold and nothing else', isHold(text), {
+      type: intent.type,
+      personalClose: intent.personalClose,
+      id: process && process.id,
+      steps: process && process.steps.map((s) => ({ kind: s.kind, params: s.params }))
+    });
+    const step = process && process.steps[0];
+    check(label + ' event title is the sentence, not "Log this decision"',
+      Boolean(step && step.params.title && step.params.title.indexOf('Log this decision') === -1 && step.params.title.length > 8),
+      step && step.params.title);
+  }
+
+  const promise = planOf('I will send you the signed contract by Friday, September 18 at 3pm.');
+  check('a timed promise stays a decision, and the step carries 15:00',
+    promise.intent.type === FlowIntent.TYPES.DECISION_TO_LOG &&
+      promise.process.steps[0].params.hour === 15 && promise.process.steps[0].params.minute === 0,
+    promise.process.steps[0].params);
+  check('a timed promise does not also open a task or a draft',
+    promise.process.steps.every((s) => s.kind === 'calendar'));
+
+  const ask = planOf('Can you schedule a call Friday, September 18 at 3pm?');
+  check('an explicit meeting ask stays an event, not a draft',
+    ask.intent.type === FlowIntent.TYPES.SCHEDULED_EVENT &&
+      !ask.process.steps.some((s) => s.kind === 'gmailDraft' || s.kind === 'googleTask'));
+
+  const deadlineAsk = planOf('Could you meet the deadline by Friday, September 18 at 3pm?');
+  check('meet-the-deadline stays a follow-up ask, not a calendar hold',
+    deadlineAsk.intent.personalClose === 'follow-up-ask' && deadlineAsk.process.id === 'reply-track',
+    { personalClose: deadlineAsk.intent.personalClose, id: deadlineAsk.process && deadlineAsk.process.id });
+
+  const dateOnly = planOf('We agreed to file the amendment by September 21.');
+  check('a dated commitment with no clock time stays a task',
+    dateOnly.intent.personalClose === 'dated-commitment' && dateOnly.process.id === 'log-it',
+    dateOnly.intent.personalClose);
+
+  const announced = planOf('Let’s do a call Friday, September 18 at 3pm to review the contract.');
+  check('a bare meeting announcement is still schedule, not a personal hold',
+    announced.intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && !announced.intent.personalClose && announced.process.id === 'schedule',
+    { personalClose: announced.intent.personalClose, id: announced.process && announced.process.id });
+
+  const confirm = planOf('Let’s do a call Friday, September 18 at 3pm to review the contract. Could you please confirm you can make it?');
+  check('a confirm ask on an already-stated meeting stays schedule-confirm',
+    confirm.process.id === 'schedule-confirm' && !confirm.intent.personalClose,
+    { personalClose: confirm.intent.personalClose, id: confirm.process && confirm.process.id });
+
+  const reader = planOf('You agreed to send the invoice by Friday, September 18 at 3pm.');
+  check('a reader commitment with a time is not a calendar hold',
+    reader.intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER && !reader.intent.personalClose,
+    reader.intent.personalClose);
+
+  const amount = planOf('Confirming the amount is $4,200 for the year.');
+  check('a confirmed amount with no time stays a task',
+    amount.intent.personalClose === 'confirmed-amount' && amount.process.id === 'log-it');
+
+  const sendAsk = planOf('Please follow up with Dana about the invoice.');
+  check('an explicit send ask stays a draft plus a task',
+    sendAsk.intent.personalClose === 'follow-up-ask' && sendAsk.process.id === 'reply-track');
+
+  const silent = [
+    ['hedged promise', 'I might send the contract by Friday, September 18 at 3pm if legal signs off.'],
+    ['question about an agreement', 'Did we agree to file the amendment by September 21 at 3pm?'],
+    ['negated promise', 'We will not send the contract by Friday, September 18 at 3pm.'],
+    ['past time', 'We agreed to the terms on March 3, 2020 at 3pm and that was the end of it.'],
+    ['due at a time, nothing agreed', 'The report is due at 3pm Friday, September 18.'],
+    ['floated meeting', 'Can we meet Friday, September 18 at 3pm if you\'re free?'],
+    ['pitch', 'Hope this email finds you well. Can you schedule a call Friday, September 18 at 3pm?'],
+    ['calendar boilerplate', 'Dana has accepted this invitation. Meeting Friday, September 18 at 3pm.']
+  ];
+  for (const [label, text] of silent) {
+    const intent = classify(text);
+    check('calendar hold stays silent: ' + label, !intent.type && !intent.personalClose, {
+      type: intent.type, personalClose: intent.personalClose
+    });
+  }
+
+  const heavyEvent = { event: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const suppressedAsk = classify('Can you schedule a call Friday, September 18 at 3pm?', { calibrationByType: heavyEvent });
+  check('heavy event dismissals suppress an explicit meeting ask', !suppressedAsk.type, suppressedAsk.type);
+  const heavyDecision = { decision: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const suppressedPromise = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyDecision });
+  check('heavy decision dismissals suppress a timed commitment', !suppressedPromise.type, suppressedPromise.type);
+  const notThat = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyEvent });
+  check('event-dismissal history does not suppress a timed commitment',
+    notThat.personalClose === 'calendar-hold', notThat.personalClose);
+}
+
 console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');
 {
   const lines = FlowActions.receiptWrittenLines([
-    { response: { ok: true, written: 'Google Task · due Sep 21' } },
+    { response: { ok: true, written: 'Calendar · Kickoff · Sep 18 15:00' } },
+    { response: { ok: false, written: 'Calendar · should not appear · Sep 18 15:00' } },
+    { response: { ok: true, written: 'Calendar · Kickoff · Sep 18 15:00' } },
+    { response: { ok: true, written: '  Google Task · due Sep 21  ' } },
     { response: { ok: false, written: 'should not appear' } },
-    { response: { ok: true, written: 'Google Task · due Sep 21' } },
     { response: { ok: true, written: '  Gmail draft · the invoice  ' } },
     { response: { ok: true, written: '   ' } }
   ]);
   check('receipt keeps each successful written line once, trimmed',
-    JSON.stringify(lines) === JSON.stringify(['Google Task · due Sep 21', 'Gmail draft · the invoice']),
+    JSON.stringify(lines) === JSON.stringify([
+      'Calendar · Kickoff · Sep 18 15:00',
+      'Google Task · due Sep 21',
+      'Gmail draft · the invoice'
+    ]),
     lines);
   check('a close with no written field stays quiet',
     JSON.stringify(FlowActions.receiptWrittenLines([{ response: { ok: true } }])) === '[]');

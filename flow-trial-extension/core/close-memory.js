@@ -1,6 +1,6 @@
 // Personal close memory. After a Trusted Do It fully writes — one of the
-// three personal closes from intent.js (dated commitment, explicit
-// follow-up or send ask, confirmed amount), every attempted step ok —
+// personal closes from intent.js (dated commitment, explicit follow-up or
+// send ask, confirmed amount, calendar hold), every attempted step ok —
 // Glance keeps a compact local record of that matter. The next time a
 // message clearly continues the same matter, Glance stays quiet instead
 // of offering another Do It.
@@ -29,8 +29,9 @@
 //
 // What is stored, newest first, capped at MAX_CLOSES: close type, thread
 // id, subject hash, snippet hash, write targets (tasks / draft / notion),
-// message id, timestamp. Never the subject or the body. Calendar is not
-// a target here; a meeting is not one of the three personal closes.
+// message id, timestamp. Never the subject or the body. A calendar hold
+// records the target `calendar`. A bare meeting announcement is not a
+// personal close, so it never reaches this store.
 // Nothing in this file is sent anywhere.
 //
 // Storage is an injected adapter, same seam as execution-memory.js, and
@@ -40,15 +41,15 @@ const FlowCloseMemory = (() => {
   const STORAGE_KEY = 'glancePersonalCloseMemory';
   const MAX_CLOSES = 40;
   const MIN_SPECIFIC_SUBJECT = 12;
-  const PERSONAL_CLOSE_TYPES = ['dated-commitment', 'confirmed-amount', 'follow-up-ask'];
+  const PERSONAL_CLOSE_TYPES = ['dated-commitment', 'confirmed-amount', 'follow-up-ask', 'calendar-hold'];
   const TRUSTED = new Set(PERSONAL_CLOSE_TYPES);
 
   // Connector kinds the live chip actually writes, plus the compact names
-  // a caller might already have normalized. Calendar is intentionally
-  // absent — see the header.
+  // a caller might already have normalized.
   const TARGET_BY_KIND = {
     googleTask: 'tasks',
     gmailDraft: 'draft',
+    calendar: 'calendar',
     notion: 'notion',
     tasks: 'tasks',
     draft: 'draft'

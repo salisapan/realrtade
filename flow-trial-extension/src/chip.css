@@ -483,10 +483,11 @@
    unambiguous, and this line is the warmer claim under that word. Same
    green family, lighter weight, so it reads as reassurance rather than
    a second headline. A partial close does not get this line. */
-/* What the close actually wrote — "Google Task · $4,200 · due Sep 21",
-   "Gmail draft · …". Comes from the writer's own `written` field, so it
-   only appears after that write succeeded. Full width, directly under
-   Handled, so the record is read before the process badge. */
+/* What the close actually wrote — "Calendar · title · Sep 18 15:00",
+   "Google Task · $4,200 · due Sep 21", "Gmail draft · …". Comes from the
+   writer's own `written` field, so it only appears after that write
+   succeeded. Full width, directly under Handled, so the record is read
+   before the process badge. */
 .flow-chip-written {
   all: unset;
   display: block;

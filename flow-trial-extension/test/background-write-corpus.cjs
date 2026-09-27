@@ -777,6 +777,138 @@ async function run() {
     check('the receipt names today', out.written === 'Google Task · due Sep 18', out.written);
   }
 
+  console.log('\n--- background.js: a timed Calendar hold is a real events.insert, and the receipt names it ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_hold', htmlLink: 'https://calendar.google.com/event?eid=hold' }) }]]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/abc',
+      params: {
+        title: 'I will send you the signed contract by Friday, September 18 at 3pm.',
+        dateIso: '2026-09-18',
+        hour: 15,
+        minute: 0,
+        requireTime: true
+      }
+    }));
+    check('the hold write succeeds', out.ok === true, out);
+    check('it POSTs to the Calendar events collection',
+      env.calls.includes('POST /calendars/primary/events'), env.calls);
+    const body = env.bodies[0] || {};
+    check('the summary is the sentence that was closed',
+      body.summary === 'I will send you the signed contract by Friday, September 18 at 3pm.', body.summary);
+    check('start is that clock time, not an all-day date',
+      body.start && body.start.dateTime === '2026-09-18T15:00:00' && !body.start.date, body.start);
+    check('end is the 30-minute default, not a guessed window',
+      body.end && body.end.dateTime === '2026-09-18T15:30:00', body.end);
+    check('the undo ref is the event id Calendar returned',
+      (out.ref || {}).eventId === 'ev_hold', out.ref);
+    check('the receipt names Calendar, the title, and the time that was written',
+      out.written === 'Calendar · I will send you the signed contract by Friday, September 18 at 3pm. · Sep 18 15:00',
+      out.written);
+    check('one request', env.calls.length === 1, env.calls);
+  }
+
+  console.log('\n--- background.js: an invalid date or time is not written, and does not look like success ---\n');
+  {
+    const badDate = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'should_not' }) }]]
+    });
+    const dateOut = await attempt(badDate.fn('googleCalendarWrite')({
+      params: { title: 'Hold', dateIso: '2026-02-31', hour: 15, minute: 0, requireTime: true }
+    }));
+    check('an impossible date fails', dateOut.ok === false && !dateOut.written, dateOut);
+    check('an impossible date never reaches the Calendar API', badDate.calls.length === 0, badDate.calls);
+
+    const badTime = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'should_not' }) }]]
+    });
+    const timeOut = await attempt(badTime.fn('googleCalendarWrite')({
+      params: { title: 'Hold', dateIso: '2026-09-18', hour: 25, minute: 0, requireTime: true }
+    }));
+    check('an impossible hour fails', timeOut.ok === false && !timeOut.written, timeOut);
+    check('an impossible hour never reaches the Calendar API', badTime.calls.length === 0, badTime.calls);
+
+    const noTime = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'should_not' }) }]]
+    });
+    const missing = await attempt(noTime.fn('googleCalendarWrite')({
+      params: { title: 'Hold', dateIso: '2026-09-18', requireTime: true }
+    }));
+    check('a hold without a clock time fails instead of becoming all-day',
+      missing.ok === false && !missing.written, missing);
+    check('a hold without a clock time never reaches the Calendar API', noTime.calls.length === 0, noTime.calls);
+
+    const offline = load({ stored: {} });
+    const disconnected = await attempt(offline.fn('googleCalendarWrite')({
+      params: { title: 'Hold', dateIso: '2026-09-18', hour: 15, minute: 0, requireTime: true }
+    }));
+    check('a disconnected calendar write fails and does not call the API',
+      disconnected.ok === false && disconnected.reason === 'not-connected' && !disconnected.written && offline.calls.length === 0,
+      { out: disconnected, calls: offline.calls });
+  }
+
+  console.log('\n--- background.js: a date-only meeting is still an all-day event, and a create with no id is not success ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_day', htmlLink: 'https://calendar.google.com/event?eid=day' }) }]]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      params: { title: 'Sync', dateIso: '2026-09-21' }
+    }));
+    const body = env.bodies[0] || {};
+    check('a date-only write still succeeds', out.ok === true, out);
+    check('a date-only write is an all-day event',
+      body.start && body.start.date === '2026-09-21' && body.end && body.end.date === '2026-09-22' && !body.start.dateTime,
+      body);
+    check('the receipt names the day and does not invent a clock time',
+      out.written === 'Calendar · Sync · Sep 21', out.written);
+
+    const empty = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, {}) }]]
+    });
+    const noId = await attempt(empty.fn('googleCalendarWrite')({
+      params: { title: 'Sync', dateIso: '2026-09-21', hour: 15, minute: 0 }
+    }));
+    check('a create that returns no event id is not a success',
+      noId.ok === false && !noId.written, noId);
+
+    const failed = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(400, { error: { message: 'bad' } }) }]]
+    });
+    const apiFail = await attempt(failed.fn('googleCalendarWrite')({
+      params: { title: 'Sync', dateIso: '2026-09-21', hour: 15, minute: 0 }
+    }));
+    check('a Calendar API error is not a success', apiFail.ok === false && !apiFail.written, apiFail);
+  }
+
+  console.log('\n--- background.js: Calendar undo deletes the event, and a refusal is not undone ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events\/ev_hold$/, { reply: res(204, {}) }],
+        [/\/calendars\/primary\/events\/ev_denied$/, { reply: res(403, { error: { message: 'forbidden' } }) }]
+      ]
+    });
+    const undo = env.fn('googleCalendarUndo');
+    const ok = await attempt(undo({ eventId: 'ev_hold' }));
+    check('undo deletes that event', ok.ok === true && env.calls.includes('DELETE /calendars/primary/events/ev_hold'), env.calls);
+    const denied = await attempt(undo({ eventId: 'ev_denied' }));
+    check('a delete Calendar refuses is not reported as undone', denied.ok === false, denied);
+    const callsBefore = env.calls.length;
+    check('undo without an event id does not call the API',
+      (await undo(null)).ok === false && (await undo({})).ok === false && env.calls.length === callsBefore);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }
