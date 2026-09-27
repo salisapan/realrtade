@@ -480,6 +480,7 @@ src/brief.js            Morning Brief UI: the page-level "N still open" indicato
 src/brief.css           brief indicator/panel/resurface styles, reusing the chip's own button states
 src/weekly.js           Weekly Closing Summary banner ("closed N this week / N still open")
 src/weekly.css          weekly summary banner styles
+src/receipt-copy.js     the receipt's status words ("Handled." / "Partly handled.") and the Undo label — pure, no DOM
 src/content-gmail.js    Gmail watcher, the chip, the sidebar wiring, and the receipt after a write
 src/background.js       credentials, the five write paths, undo, the glance-assist relay, and the extension-icon badge
 

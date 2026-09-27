@@ -1621,7 +1621,10 @@ async function notionUndo(ref) {
   const res = await fetch(NOTION_API + '/pages/' + encodeURIComponent(ref.pageId), {
     method: 'PATCH', headers: notionHeaders(auth.token), body: JSON.stringify({ archived: true })
   });
-  return { ok: res.ok };
+  // 404 matches the Google undoers: an already-archived page must not
+  // stop a retry of the rest of the chain. Notion has no hard delete;
+  // archiving is the undo, and a missing page is already gone.
+  return { ok: res.ok || res.status === 404 };
 }
 
 /* ------------------------------------------------------------- glance-assist */
