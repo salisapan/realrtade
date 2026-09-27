@@ -50,6 +50,11 @@ const FlowActions = (() => {
         // notes field but not for an event title.
         title: (intent.label || e.what || 'Meeting').slice(0, 200),
         dateIso: e.dateIso, hour: e.hour, minute: e.minute,
+        // The sentence the event is about. The title stays short ("Meeting
+        // Sep 18 15:00"); without this, View opens a Calendar event that
+        // never says what was scheduled. "Meeting" is the classifier's
+        // fallback when no sentence was found — not a quote.
+        quote: (e.what && e.what !== 'Meeting') ? String(e.what).slice(0, 400) : null,
         threadUrl: ctx.threadUrl
       }
     };

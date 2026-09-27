@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Regenerates flow-landing/assets/glance-engine.js from the real judgment
-# engine's source of truth in flow-trial-extension/src/. Run this any time
+# engine's source of truth in flow-trial-extension/core/. Run this any time
 # domains.js, extract.js, or judgment.js change — there is no build step for
 # flow-landing, so this is the one manual step that keeps the marketing
 # site's copy of the engine in sync with the extension's.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SRC_DIR="flow-trial-extension/src"
+SRC_DIR="flow-trial-extension/core"
 OUT="flow-landing/assets/glance-engine.js"
 
 {
   echo "// Mirrored, not authored, here — source of truth is:"
-  echo "//   flow-trial-extension/src/domains.js"
-  echo "//   flow-trial-extension/src/extract.js"
-  echo "//   flow-trial-extension/src/judgment.js"
+  echo "//   flow-trial-extension/core/domains.js"
+  echo "//   flow-trial-extension/core/extract.js"
+  echo "//   flow-trial-extension/core/judgment.js"
   echo "// Regenerate with: scripts/build-glance-engine.sh"
   echo "// Last synced: $(date -u +%Y-%m-%d)"
   echo "//"

@@ -54,6 +54,10 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('meeting alone proposes the "schedule" process', process.id === 'schedule', process && process.id);
   check('meeting alone proposes exactly [calendar, task] step ids', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar', 'task']), stepIds(process));
   check('meeting alone proposes exactly [Calendar, Task] connector kinds', JSON.stringify(stepKinds(process)) === JSON.stringify(['calendar', 'googleTask']), stepKinds(process));
+  const calendar = process.steps.find((s) => s.id === 'calendar');
+  check('the calendar step carries the meeting sentence, not only the short title',
+    calendar && /review the contract/i.test(calendar.params.quote) && calendar.params.title !== calendar.params.quote,
+    calendar && calendar.params);
 }
 
 // 2. Meeting invite that ALSO asks for confirmation -> still SCHEDULED_EVENT,
@@ -189,6 +193,63 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('a date-only postponed meeting does not fire SCHEDULED_EVENT', !dateOnlyCancelled || dateOnlyCancelled.type !== FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyCancelled && dateOnlyCancelled.type);
   const dateOnlyRecap = classify('Thanks for the call on Monday, great meeting, glad we synced!', { now });
   check('a date-only recap does not fire SCHEDULED_EVENT', !dateOnlyRecap || dateOnlyRecap.type !== FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyRecap && dateOnlyRecap.type);
+}
+
+// 3g. A refused or only-maybe meeting that still names a day and a time
+//     must not become a Calendar entry. The noun + date gate used to treat
+//     "I can't do the call on Monday" the same as "let's do the call on
+//     Monday". A real invite, including a question, still has to fire.
+{
+  const now = new Date('2026-09-17T12:00:00Z'); // Thursday
+  const refused = [
+    ['cannot', "I can't do the call on Monday at 3pm, something came up with the contract review."],
+    ["let's not", "Let's not do the call on Monday at 3pm after all regarding the contract."],
+    ['will not', 'We will not be having the meeting on Monday at 3pm to review the contract.'],
+    ['unable', 'Unable to make the call on Monday at 3pm to review the contract.'],
+    ['might', 'We might do a call on Monday at 3pm if the contract is ready for review.'],
+    ['Hebrew cannot', 'לא נוכל לקיים את הפגישה ביום שני בשעה 15:00 לסקירת החוזה.']
+  ];
+  for (const [label, text] of refused) {
+    const intent = classify(text, { now });
+    check('a ' + label + ' meeting does not become a Calendar entry',
+      !intent || intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+  }
+  const stillOn = classify('The call on Monday at 3pm still works, but I can\'t do the Tuesday workshop.', { now });
+  check('a negation about a different day does not hide the real meeting',
+    stillOn && stillOn.type === FlowIntent.TYPES.SCHEDULED_EVENT, stillOn && stillOn.type);
+  const polite = classify('Could you join the call on Monday at 3pm to review the contract?', { now });
+  check('a polite "could you join" invite still fires SCHEDULED_EVENT',
+    polite && polite.type === FlowIntent.TYPES.SCHEDULED_EVENT, polite && polite.type);
+
+  const nextFriday = classify('Let us do a call next Friday at 3pm to review the contract.', { now });
+  check('a bare "next Friday" meeting fires SCHEDULED_EVENT',
+    nextFriday && nextFriday.type === FlowIntent.TYPES.SCHEDULED_EVENT, nextFriday && nextFriday.type);
+  check('a bare "next Friday" lands a week past this Friday',
+    nextFriday && nextFriday.entities && nextFriday.entities.dateIso === '2026-09-25', nextFriday && nextFriday.entities);
+
+  const tomorrow = classify('Let us do a call tomorrow at 3pm to review the contract.', { now });
+  check('a "tomorrow" meeting fires SCHEDULED_EVENT on the next day',
+    tomorrow && tomorrow.type === FlowIntent.TYPES.SCHEDULED_EVENT && tomorrow.entities.dateIso === '2026-09-18' && tomorrow.entities.hour === 15,
+    tomorrow && tomorrow.entities);
+
+  const heNext = classify('נקבע פגישה ביום שני הבא בשעה 15:00 לסקירת החוזה וההסכם.', { now });
+  check('Hebrew "ביום שני הבא" is a meeting on the following Monday',
+    heNext && heNext.type === FlowIntent.TYPES.SCHEDULED_EVENT && heNext.entities.dateIso === '2026-09-28' && heNext.entities.hour === 15,
+    heNext && heNext.entities);
+
+  const heTomorrow = classify('נקבע שיחה מחר בשעה 15:00 לסקירת החוזה וההסכם המלא.', { now });
+  check('Hebrew "מחר" is a meeting tomorrow',
+    heTomorrow && heTomorrow.type === FlowIntent.TYPES.SCHEDULED_EVENT && heTomorrow.entities.dateIso === '2026-09-18',
+    heTomorrow && heTomorrow.entities);
+
+  const heMonth = classify('נקבע פגישה ב-21 בספטמבר בשעה 15:00 לסקירת החוזה.', { now });
+  check('a Hebrew day-and-month meeting resolves that day',
+    heMonth && heMonth.type === FlowIntent.TYPES.SCHEDULED_EVENT && heMonth.entities.dateIso === '2026-09-21',
+    heMonth && heMonth.entities);
+
+  const pitch = classify('Hope this email finds you well. Can we schedule a call tomorrow at 3pm? Our pricing starts at $99/mo.', { now });
+  check('a cold pitch that says "tomorrow" stays silent',
+    !pitch || pitch.type === null, pitch && pitch.type);
 }
 
 // 3f. MEETING_NOUN/MEETING_NOUN_HE's broader event-noun vocabulary, plus a
