@@ -558,6 +558,51 @@ async function run() {
     check('the small candidate is the one actually attached', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
   }
 
+  console.log('\n--- background.js: Gmail draft undo deletes that draft, and a missing one is already undone ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/users\/me\/drafts\/draft_1$/, { reply: res(204, {}) }],
+        [/\/users\/me\/drafts\/gone$/, { reply: res(404, {}) }]
+      ]
+    });
+    const undo = env.fn('gmailDraftUndo');
+    check('undoing a Gmail draft deletes that draft',
+      (await attempt(undo({ draftId: 'draft_1' }))).ok === true
+      && env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/users/me/drafts/draft_1')),
+      env.calls);
+    check('an already-deleted draft still counts as undone',
+      (await attempt(undo({ draftId: 'gone' }))).ok === true);
+    check('a draft undo without an id does not guess',
+      (await undo({})).ok === false && (await undo(null)).ok === false);
+  }
+
+  console.log('\n--- background.js: Notion undo archives the page, and a missing page is already gone ---\n');
+  {
+    const env = load({
+      stored: { notionAuth: { token: 'secret_test', databaseId: 'db' } },
+      routes: [
+        [/\/pages\/page_1$/, { reply: res(200, {}) }],
+        [/\/pages\/gone$/, { reply: res(404, {}) }]
+      ]
+    });
+    const undo = env.fn('notionUndo');
+    const ok = await attempt(undo({ pageId: 'page_1' }));
+    const archive = env.bodies[env.calls.findIndex((c) => c.includes('/pages/page_1'))];
+    check('undoing a Notion page archives it', ok.ok === true && archive && archive.archived === true, { ok, archive, calls: env.calls });
+    check('the Notion undo is a PATCH',
+      env.calls.some((c) => c.startsWith('PATCH ') && c.includes('/pages/page_1')), env.calls);
+    check('an already-missing Notion page still counts as undone',
+      (await attempt(undo({ pageId: 'gone' }))).ok === true);
+    check('a Notion undo without a page id does nothing',
+      (await undo(null)).ok === false && (await undo({})).ok === false);
+    const disconnected = load({ stored: {} });
+    check('a Notion undo with no token does not call the API',
+      (await attempt(disconnected.fn('notionUndo')({ pageId: 'page_1' }))).ok === false
+      && disconnected.calls.length === 0, disconnected.calls);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

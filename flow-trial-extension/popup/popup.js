@@ -391,6 +391,10 @@
         score: entry.signals && entry.signals.score
       });
       await FlowStorage.calibrate('dismiss');
+      // Same reject as the in-Gmail chip dismiss. Once per message.
+      if (entry.messageId) {
+        await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: entry.messageId, reason: 'dismiss' });
+      }
       if (typeof FlowExecutionMemory !== 'undefined' && entry.process && entry.process.steps) {
         await FlowExecutionMemory.recordDismiss(entry.process.id, entry.process.steps.map((s) => s.id), entry.messageId);
       }
@@ -627,9 +631,20 @@
     });
   }
 
+  function renderCloseQuality(s) {
+    const node = document.getElementById('closeQuality');
+    if (!node) return;
+    if (typeof FlowCloseQuality === 'undefined') { node.hidden = true; return; }
+    const line = FlowCloseQuality.activityLine(FlowCloseQuality.computeSnapshot(s.closeQuality));
+    if (!line) { node.hidden = true; return; }
+    node.textContent = line;
+    node.hidden = false;
+  }
+
   async function renderLog() {
     const s = await FlowStorage.get();
     renderWeekStat(s);
+    renderCloseQuality(s);
     await renderLearned();
     renderSensitivity(s);
     await renderMemoryInsight(s);
@@ -648,7 +663,10 @@
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
     top.appendChild(el('span', 'log-label', e.label || '—'));
-    top.appendChild(el('span', 'log-kind ' + e.kind, e.kind));
+    // The stored kind stays 'written' — counters and CSS key off it. The
+    // badge a person reads should say what the chip just said.
+    const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
+    top.appendChild(el('span', 'log-kind ' + e.kind, KIND_LABEL[e.kind] || e.kind));
     item.appendChild(top);
 
     if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
@@ -670,6 +688,9 @@
           if (r && r.ok) {
             await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId });
             if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(e.messageId);
+            if (e.messageId) {
+              await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+            }
             await renderLog();
           } else {
             u.textContent = 'Undo failed';

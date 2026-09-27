@@ -43,6 +43,7 @@ it, not touching the module.
 | `close-memory.js` | Personal close memory: a capped local record of Trusted Do It full writes (dated commitment, follow-up/send ask, confirmed amount). On a later message that clearly continues that matter, recall prefers **silence**. Same injected-adapter seam, its own key (`glancePersonalCloseMemory`), no raw subject or body. |
 | `privacyShield.js` | Finds and masks every sensitive span in text before it's allowed to leave the device. |
 | `docreader.js` / `docwriter.js` | Read and write real `.docx` files using only Web Platform APIs (`Blob`, `TextEncoder`/`TextDecoder`, `DecompressionStream`) — no browser-only API, which is why these already run under Node unmodified. |
+| `close-quality-metrics.js` | The three personal-close counts (full-write success, day-level return, dismiss-or-undo false-Do-It). Pure fold over plain events. Persistence stays in `src/storage.js`. |
 
 Notably absent: **storage.js stays in `src/`.** It is Glance's own choice of
 *how* to remember things (`chrome.storage.local`, capped logs, weekly/badge

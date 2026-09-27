@@ -53,6 +53,7 @@
         <b id="weekCount">0</b><span id="weekLabel"> logged this week</span>
         <span class="week-total" id="weekTotal"></span>
       </div>
+      <p class="learned-stat" id="closeQuality" hidden title="On this device only. Full close = every proposed step wrote. Return = Do It on a later day. Turned down = the chip was dismissed or the write was undone."></p>
       <p class="learned-stat" id="learnedStat" hidden></p>
       <div class="sense" id="sense" hidden>
         <span class="sense-label">Sensitivity</span>
@@ -104,8 +105,9 @@
   <script src="../core/close-memory.js"></script>
   <script src="../core/pmf-metrics.js"></script>
   <script src="../core/classification-metrics.js"></script>
+  <script src="../core/close-quality-metrics.js"></script>
   <!-- Wires execution-memory.js and close-memory.js to chrome.storage.local.
-       Must load after both and before popup.js. -->
+       Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../src/chrome-storage-adapter.js"></script>
   <script src="popup.js"></script>
 </body>

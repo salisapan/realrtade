@@ -124,6 +124,7 @@ function load(stored) {
   // the real extension.
   const loadOrder = [
     [CORE, 'domains.js'], [CORE, 'connectors.js'], [CORE, 'extract.js'], [CORE, 'judgment.js'],
+    [CORE, 'close-quality-metrics.js'],
     [SRC, 'storage.js'],
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js']
@@ -221,6 +222,8 @@ async function run() {
     check('dismissing from the popup really closes the message', await FlowStorage.hasTerminalOutcome('m1'));
     check('...and it drops out of the pending list', (await FlowStorage.getPending()).length === 0);
     check('the dismissal was actually persisted to storage, not just in memory', (store().log || []).some((e) => e.kind === 'dismissed' && e.messageId === 'm1'));
+    const quality = store().closeQuality;
+    check('dismissing the chip fires one false-Do-It', quality && quality.falseDoIt === 1 && quality.recent[0].kind === 'falseDoIt' && quality.recent[0].reason === 'dismiss', quality);
   }
 
   console.log('\n--- popup.js: the referral card offers exporting the real setup, not just a link ---\n');
@@ -407,6 +410,27 @@ async function run() {
 
     const el = document.getElementById('learnedStat');
     check('the learned-stat line stays hidden with nothing learned yet', el.hidden === true);
+  }
+
+  console.log('\n--- popup.js: a written log row reads as Handled and still offers Undo ---\n');
+  {
+    const stored = {
+      log: [
+        { ts: Date.now(), kind: 'written', label: 'Log the invoice', messageId: 'm1', where: 'Google Tasks', url: 'https://tasks.google.com/x', ref: { taskId: 't1' }, connectorId: 'googleTask' },
+        { ts: Date.now() - 1000, kind: 'undone', label: 'Log the invoice', messageId: 'm0' }
+      ]
+    };
+    const { sandbox, document } = load(stored);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const host = document.getElementById('log-list');
+    const kinds = find(host, 'log-kind').map((n) => n.textContent);
+    check('a written row is labeled Handled, not the stored kind', kinds.includes('Handled'), kinds);
+    check('an undone row is labeled Undone', kinds.includes('Undone'), kinds);
+    const undo = find(host, 'ghost').find((n) => n.tagName === 'button' && n.textContent === 'Undo');
+    check('the written row still has an Undo button', Boolean(undo));
   }
 
   console.log('\nTOTAL FAILURES:', failures);
