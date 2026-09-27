@@ -81,6 +81,14 @@ const MONDAY_API = 'https://api.monday.com/v2';
 const MONDAY_EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/monday-oauth-exchange';
 const MONDAY_REFRESH_URL = 'https://theflow-ai.com/.netlify/functions/monday-oauth-refresh';
 
+// Same rule as clientIdConfigured() in core/connectors.js. Empty, YOUR_*,
+// and REPLACE_WITH_* are unset. When the install-zip branch's
+// publicClientId() lands, call that instead of this copy.
+function oauthClientConfigured(value) {
+  const id = String(value == null ? '' : value).trim();
+  return Boolean(id) && !/^(YOUR_|REPLACE_WITH_)/.test(id);
+}
+
 // HubSpot's documented default association type ID for "note to contact". If it
 // ever changes, note creation fails loudly with a 4xx rather than silently
 // writing to the wrong place.
@@ -311,7 +319,7 @@ async function hubspotPortalId(token) {
 }
 
 async function connectHubspot() {
-  if (!HUBSPOT_CLIENT_ID || HUBSPOT_CLIENT_ID === 'YOUR_HUBSPOT_CLIENT_ID') {
+  if (!oauthClientConfigured(HUBSPOT_CLIENT_ID)) {
     throw new Error('HubSpot isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const redirectUri = chrome.identity.getRedirectURL();
@@ -435,7 +443,7 @@ async function saveSalesforceAuth(tokenResponse, extra) {
 }
 
 async function connectSalesforce() {
-  if (!SALESFORCE_CLIENT_ID || SALESFORCE_CLIENT_ID === 'YOUR_SALESFORCE_CLIENT_ID') {
+  if (!oauthClientConfigured(SALESFORCE_CLIENT_ID)) {
     throw new Error('Salesforce isn’t configured on this build yet — it needs a Consumer Key set by whoever built this extension.');
   }
   const redirectUri = chrome.identity.getRedirectURL();
@@ -562,7 +570,7 @@ async function getSlackAuth() {
 }
 
 async function connectSlack(channel) {
-  if (!SLACK_CLIENT_ID || SLACK_CLIENT_ID === 'YOUR_SLACK_CLIENT_ID') {
+  if (!oauthClientConfigured(SLACK_CLIENT_ID)) {
     throw new Error('Slack isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const channelId = String(channel || '').trim();
@@ -649,7 +657,7 @@ async function saveMondayAuth(tokenResponse, extra) {
 }
 
 async function connectMonday(boardId) {
-  if (!MONDAY_CLIENT_ID || MONDAY_CLIENT_ID === 'YOUR_MONDAY_CLIENT_ID') {
+  if (!oauthClientConfigured(MONDAY_CLIENT_ID)) {
     throw new Error('Monday.com isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const board = String(boardId || '').trim();
@@ -1722,21 +1730,21 @@ async function connectorStatus() {
     },
     hubspot: {
       connected: Boolean(hs),
-      configured: Boolean(HUBSPOT_CLIENT_ID && HUBSPOT_CLIENT_ID !== 'YOUR_HUBSPOT_CLIENT_ID')
+      configured: oauthClientConfigured(HUBSPOT_CLIENT_ID)
     },
     notion: { connected: Boolean(nt), configured: true, detail: nt ? nt.dbTitle : null },
     salesforce: {
       connected: Boolean(sf),
-      configured: Boolean(SALESFORCE_CLIENT_ID && SALESFORCE_CLIENT_ID !== 'YOUR_SALESFORCE_CLIENT_ID')
+      configured: oauthClientConfigured(SALESFORCE_CLIENT_ID)
     },
     slack: {
       connected: Boolean(sl),
-      configured: Boolean(SLACK_CLIENT_ID && SLACK_CLIENT_ID !== 'YOUR_SLACK_CLIENT_ID'),
+      configured: oauthClientConfigured(SLACK_CLIENT_ID),
       detail: sl ? '#' + sl.channelId : null
     },
     monday: {
       connected: Boolean(md),
-      configured: Boolean(MONDAY_CLIENT_ID && MONDAY_CLIENT_ID !== 'YOUR_MONDAY_CLIENT_ID'),
+      configured: oauthClientConfigured(MONDAY_CLIENT_ID),
       detail: md ? 'Board ' + md.boardId : null
     }
   };

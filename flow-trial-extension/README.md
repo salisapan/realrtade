@@ -320,10 +320,13 @@ nothing extracted is silently dropped.
 **Before this connector (or Salesforce/Slack/Monday.com) can actually be
 selected and used, it also needs its API host added back to
 `manifest.json`'s `host_permissions`** — they were deliberately removed
-pending Chrome Web Store submission, since `popup.js`'s onboarding screen
-only shows `mvp: true` connectors today (Google Tasks) and Web Store review
-expects requested host permissions to match what's actually reachable. See
-`core/connectors.js`'s own header comment for the exact hosts.
+pending Chrome Web Store submission. Onboarding shows Google
+(Tasks, Calendar, Gmail drafts, Drive read). `connectorShownInPopup()`
+also hides an OAuth connector while its client id is empty, `YOUR_*`, or
+`REPLACE_WITH_*`, so the popup does not offer a Connect button that cannot
+succeed. Notion's token writer stays in `src/background.js` and is not a
+second setup card. Web Store review expects requested host permissions to
+match what's actually reachable. See `core/connectors.js`.
 
 1. [developers.hubspot.com](https://developers.hubspot.com) → create a free
    developer account → **Create app**.
@@ -346,8 +349,8 @@ expects requested host permissions to match what's actually reachable. See
 6. HubSpot developer accounts include a free **test account** (a full CRM
    sandbox) if you don't have a live portal to try it against.
 
-Until step 4 is done the popup shows HubSpot as *Needs setup* and says so
-plainly rather than failing halfway through a handshake.
+Until step 4 is done the popup does not list HubSpot. The write code stays
+in `src/background.js`. There is no *Needs setup* card.
 
 ## Set up Salesforce (needs the site owner)
 
@@ -372,7 +375,8 @@ plainly rather than failing halfway through a handshake.
 6. A free [Salesforce Developer Edition](https://developer.salesforce.com/signup)
    org gives you a full CRM to test against if you don't have a live one.
 
-Until step 4 is done the popup shows Salesforce as *Needs setup*.
+Until step 4 is done the popup does not list Salesforce. The write code stays
+in `src/background.js`.
 
 ## Set up Slack (needs the site owner)
 
@@ -399,7 +403,8 @@ Until step 4 is done the popup shows Salesforce as *Needs setup*.
    a private channel; `chat:write.public` lets it post to public ones
    without an invite.
 
-Until step 4 is done the popup shows Slack as *Needs setup*.
+Until step 4 is done the popup does not list Slack. The write code stays
+in `src/background.js`.
 
 ## Set up Monday.com (needs the site owner)
 
@@ -421,14 +426,15 @@ Until step 4 is done the popup shows Slack as *Needs setup*.
 6. In the popup, after connecting, paste the **Board ID** Glance should write
    to (open the board — it's the number in the URL after `/boards/`).
 
-Until step 4 is done the popup shows Monday.com as *Needs setup*.
+Until step 4 is done the popup does not list Monday.com. The write code stays
+in `src/background.js`.
 
 ## Load it locally
 
 1. `chrome://extensions` → turn on **Developer mode**.
 2. **Load unpacked** → select this folder.
-3. Open the popup, connect a system, pick the kind of work you do, **Save &
-   start**.
+3. Open the popup, sign in with Google (Tasks, Calendar, and Gmail drafts),
+   **Save & start**.
 4. Open Gmail. Most messages produce nothing — that is the product working.
 
 ## Set up Draft-It / Attachment X-ray (needs the site owner)

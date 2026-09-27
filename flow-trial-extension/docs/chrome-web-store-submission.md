@@ -1,11 +1,27 @@
 # Chrome Web Store submission — Glance
 
-Everything below is drafted from the actual `manifest.json`, `README.md`, and
-source (`src/background.js`, `core/actions.js`, `core/execution-memory.js`,
-`src/brief.js`, `core/privacyShield.js`, `src/content-gmail.js`) as of this
-doc's writing — nothing is invented. Copy/paste text fields directly into
-the Developer Dashboard; the checklist at the bottom tracks what still needs
-a human (screenshots and the dashboard form itself).
+This file is a draft. Glance is **not** on the Chrome Web Store. The install
+path that exists today is Load unpacked: confirm email, download the zip,
+Developer mode, Load unpacked, sign in with Google. `trial.html` step 5 and
+`README.md` say that. Do not describe a store listing as live, and do not
+submit this draft from the repo.
+
+`manifest.json` version is **0.7.0**. The live Do It path writes to the
+user's Google account: a Calendar event, a Google Task, a Gmail draft, and
+(when a file is needed) a read-only Drive search. That is a real Calendar
+API write, not a hold template. Notion's token writer is in
+`src/background.js` and is not an onboarding card. HubSpot, Salesforce,
+Slack, and Monday.com stay hidden while their client ids are unset, and
+their API hosts are not in `host_permissions`.
+
+`oauth2.client_id` in `manifest.json` is set — it is not the
+`YOUR_GOOGLE_OAUTH_CLIENT_ID` placeholder. `picker/picker.js`'s
+`GOOGLE_PICKER_API_KEY` is still `YOUR_GOOGLE_PICKER_API_KEY`, so the Drive
+picker is blocked on an owner key. This draft does not invent either value.
+
+Everything below is drafted from `manifest.json`, `README.md`, and source.
+Copy/paste the listing fields into the Developer Dashboard only after the
+checklist at the bottom is done by the account owner.
 
 **Revised for the current Google-only MVP scope.** The listing text below
 was rewritten to describe exactly what a real install can do today: Google
@@ -52,14 +68,13 @@ Glance is built to stay quiet on price lists, newsletters, and automated
 mail, and to speak up only when something real happened.
 
 HOW JUDGMENT WORKS
-The scoring that decides whether to show the Do It button runs entirely on
-your device. It's a transparent, weighted scorer — not a black box, not a
-language model — looking for a currency figure, a commitment verb, a dated
-obligation, a direct request, a stated loss, and staying quiet on
-automated-sender and mailing-list signals. No email text leaves your
-machine to reach that decision. The threshold that decides "is this
-confident enough to speak up" adjusts automatically as you click or
-dismiss suggestions — no configuration screen, no rules to write.
+The first pass runs on your device: a transparent, weighted scorer looking
+for a commitment, a date, a request, and similar signals, and staying quiet
+on automated mail. No email text leaves your machine for that pass. If it
+finds nothing, Glance may send a masked copy — names, companies, amounts,
+dates, emails, and phone numbers already replaced with placeholders — for
+one remote classification. The threshold adjusts as you click or dismiss.
+There is no rules screen.
 
 CLOSES A NAMED PROCESS, NOT A PILE OF BUTTONS
 Glance doesn't propose loose, independent actions — it recognizes one of a
@@ -77,39 +92,15 @@ small, silent-by-default indicator lets you close it later, even after
 you've moved on to a different email. Nothing appears at all when there's
 nothing left open.
 
-LOCAL PRIVACY SHIELD
-Before any text reaches an AI-assisted feature (see below), Glance's
-on-device Privacy Shield finds every name, company, monetary amount, date,
-email address, and phone number in the message and replaces each with a
-placeholder token. A visible badge in the sidebar confirms this is active
-— it isn't a policy promise, it's what the code does before anything is
-sent anywhere.
-
-DRAFT-IT (opt-in)
-Click Draft-It in the sidebar and Glance drafts a reply to the open thread,
-matched to whether the thread is in English or Hebrew. Only masked
-placeholder text — never a real name, company, amount, date, email
-address, or phone number — is sent to generate the draft; the real values
-are substituted back in on your device before you see it. Insert it
-directly into Gmail's reply box, or ask for a redraft.
-
-ATTACHMENT SUMMARY (opt-in)
-Hover a .docx attachment on an open message and a card appears with a
-one-line summary and the key facts (counterparty, effective date,
-financial value, governing law). The file is read entirely on-device;
-again, only masked placeholder text is sent to generate the summary. PDF
-attachments aren't supported yet.
-
 WHAT GLANCE NEVER DOES
-Glance doesn't read your mailbox in bulk, doesn't send full email content
+Glance doesn't read your mailbox in bulk, doesn't send the full email
 anywhere to decide whether to act, doesn't sell data, and doesn't use your
-data to train any AI model. The only things that ever leave your device
-are: (1) the exact fields you approve when you click Do It, written
-directly to your own Google account, (2) for the two opt-in AI features
-above, masked placeholder text only, and (3) a small number of anonymous
-usage counts (was a suggestion shown/clicked/dismissed/undone) tagged with
-a random per-install ID, never message content. Full detail:
-theflow-ai.com/privacy.html
+data to train any AI model. What can leave your device: (1) the fields you
+approve when you click Do It, written to your own Google account (Calendar,
+Tasks, a Gmail draft, and a Drive file only when the message asks for one),
+(2) a masked copy of the open message only when the on-device scorer found
+nothing, and (3) anonymous usage counts tagged with a random per-install
+ID, never message content. Full detail: theflow-ai.com/privacy.html
 
 Glance is free and general-purpose. It's a separate product from Flow
 (theflow-ai.com), our enterprise workflow platform for organizations with
@@ -117,7 +108,7 @@ regulated or sensitive data — Glance carries none of Flow's compliance
 guarantees and isn't intended for that kind of material.
 
 Setup takes under a minute: sign in with the Google account Glance should
-write to, say what kind of work you do, and open an email.
+write to, and open an email.
 ```
 
 ### Category
@@ -132,10 +123,11 @@ scheduled event, a request, a deadline) and, only when the user clicks an
 on-screen button, close it by writing the appropriate record(s) — a Google
 Calendar event, a Google Tasks reminder, a Gmail draft reply, or a
 combination of these — to the user's own, already-signed-in Google
-account. It does not do anything else: it does not scan the mailbox in
-bulk, does not act automatically, and does not serve any purpose unrelated
-to turning one open, user-selected email into one user-approved,
-one-click-undoable record.
+account. It does not scan the mailbox in bulk and does not write unless
+you click. If the on-device scorer finds nothing, it may send a masked
+copy of that one message for a single classification. It does not serve
+any purpose unrelated to turning one open, user-selected email into one
+user-approved, one-click-undoable record.
 ```
 
 ## Permission justifications (Privacy practices tab)
@@ -152,13 +144,15 @@ Use these verbatim — each is traceable to the exact code that uses it.
 | `host_permissions: https://www.googleapis.com/calendar/*` | Direct API calls to create/undo a Google Calendar event after the user clicks Do It. |
 | `host_permissions: https://www.googleapis.com/drive/*` | Direct, read-only API calls (`drive.readonly` scope — cannot write, rename, or delete anything) used two ways when the user clicks Do It on a message that asks for a file: (1) behind the optional Drive picker, when the user explicitly chooses a file to attach; (2) automatically, when nothing is already attached and nothing was manually picked, Glance searches the account's own Drive by filename/content for a file matching what the email asked for and attaches the best match itself (`driveSearchAttachment` in `src/background.js`). Either way the file only ever lands in a Gmail draft — never sent — and an auto-found file is flagged in the draft's own text as unverified, for the user to confirm before sending. |
 | `host_permissions: https://gmail.googleapis.com/*` | Direct API calls to create/undo a Gmail draft reply after the user clicks Do It. |
-| `host_permissions: https://theflow-ai.com/*` | Calls Glance's own Netlify Functions for the two opt-in AI features (Draft-It, attachment summary), which only ever receive masked placeholder text, and for the anonymous, aggregate-only usage-count pings described below. |
+| `host_permissions: https://theflow-ai.com/*` | Calls Glance's own Netlify Functions for the masked remote classification (only when the on-device scorer found nothing) and for anonymous, aggregate-only usage counts. Draft-It and the attachment X-ray call the same host from code that is not mounted in the Gmail UI. |
 
-Notion, HubSpot, Salesforce, Slack, and Monday.com have real, working
-connector code in `src/background.js`, but no live path to reach them from
-onboarding today (see the top of this document) — their API hosts are
-deliberately not in `host_permissions` and are not represented in this
-listing. Re-add both together if that scope is reopened.
+Notion's token writer, and HubSpot, Salesforce, Slack, and Monday.com, have
+code in `src/background.js`. Onboarding does not offer them. Their API
+hosts are not in `host_permissions` and they are not in this listing.
+Draft-It, the docx X-ray, and the sidebar Privacy Shield badge are in the
+tree and unmounted (`content-gmail.js` does not call `mountSidebar()`).
+Do not paste them into the store listing until that UI is on. Re-add a
+connector's host permission and its listing sentence in the same change.
 
 ## Data usage disclosure (Privacy practices tab — data types collected)
 
@@ -208,26 +202,22 @@ priority order:
    a price, deadline, or agreement; the chip should be visible next to the
    message. This is the single most important screenshot — it's the whole
    product in one frame.
-2. **The extension popup, Setup tab** — showing the connector list and
-   "what kind of work you do" picker (this one *can* be captured without
-   Gmail, since it's just the popup UI — see note below).
-3. **The written record** — a Notion page or Slack message right after a
-   Do It click, showing the real fields that landed (amount, date, sender,
-   quoted sentence).
-4. **The Draft-It sidebar** — the drafted reply with Insert/Redraft buttons.
-5. **The attachment X-ray hover card** — the summary + entity table over a
-   `.docx` attachment.
+2. **The extension popup, Setup tab** — Google sign-in, not a list of CRM
+   connectors and not a "kind of work" picker. Capturable without Gmail.
+3. **The written record** — a Google Calendar event, a task in the Glance
+   list, or a Gmail draft right after Do It. Not a Notion page and not a
+   Slack message; those are not what this build writes from the chip.
+4. **Do not shoot Draft-It or the docx X-ray for this submission.** Both
+   UIs are unmounted until glance-assist is configured. A screenshot of
+   either would advertise a click the extension does not offer.
 
-**#2 is done.** `docs/screenshots/popup-setup-tab.png` is a real capture —
-the extension was actually loaded unpacked into Chromium (via
-`--load-extension`) and its live popup was screenshotted, so `chrome.storage`
-and `chrome.runtime` are real, not stubbed; the extension ID that came back
-(`dnjhplgmnkabbjogfpbhofjedlkehkai`) matches the one pinned in
-`manifest.json` and baked into every connector's OAuth redirect URL in the
-README, confirming that setup is still correct. It's 380×620 — Chrome Web
-Store screenshots must be exactly 1280×800 or 640×400, so this is source
-material to composite onto a listing-sized canvas (centered, with your own
-background/framing), not something to upload as-is.
+`docs/screenshots/popup-setup-tab.png` is a real unpacked-extension capture,
+380×620, extension id `dnjhplgmnkabbjogfpbhofjedlkehkai`. It is **not** the
+current setup screen: it shows Notion, HubSpot, Salesforce, Slack, and
+Monday.com, with **Needs setup** on the four OAuth connectors. Do not upload
+it. Recapture the popup after this change (Google sign-in only) and composite
+that capture onto 1280×800 or 640×400. Store screenshots cannot be this size
+as-is, and a fake or old frame would misrepresent 0.7.0.
 
 ## Manifest notes confirmed correct (no action needed)
 
@@ -247,18 +237,25 @@ background/framing), not something to upload as-is.
 
 ## Still open — not something this doc can close alone
 
-- [x] Screenshot #2 (popup Setup tab) — `docs/screenshots/popup-setup-tab.png`.
-- [ ] Composite that screenshot onto a proper 1280×800 or 640×400 canvas.
-- [ ] Capture the other real screenshots above (need a live Gmail account) —
-      the Do It chip, the Morning Brief indicator/panel, and the receipt
-      after a write are the three that matter most now that the listing
-      describes the process/Brief model rather than the five-connector one.
-- [ ] Fill in the Developer Dashboard form itself using the text above.
-- [ ] **`oauth2.client_id` in `manifest.json` is still the placeholder**
-      (`YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com`) — this
-      genuinely IS a Store-submission blocker now, since Google is the only
-      live connector. See `README.md`'s "Set up Google" section for the
-      full Cloud Console walkthrough.
+- [ ] Recapture the popup Setup tab. The file on disk
+      (`docs/screenshots/popup-setup-tab.png`) is an older Notion / Needs
+      setup screen, 380×620. Composite a new Google-only capture onto
+      1280×800 or 640×400. Do not upload the old file.
+- [ ] Capture the other real screenshots above (need a live Gmail account
+      the owner controls) — the Do It chip, the Morning Brief, and a
+      Calendar event, Task, or Gmail draft after a write. Do not fake them.
+- [ ] Fill in the Developer Dashboard form itself. This repo cannot do that.
+      Do not submit the listing from here.
+- [x] `oauth2.client_id` is no longer the `YOUR_GOOGLE_OAUTH_CLIENT_ID`
+      placeholder. Confirm in Cloud Console that this client is the Chrome
+      extension item id `dnjhplgmnkabbjogfpbhofjedlkehkai`, that the consent
+      screen is in Testing with the right test users, and that the sensitive
+      scopes (`tasks`, `calendar.events`, `gmail.compose`) and the restricted
+      `drive.readonly` scope are the ones you intend to ship. Public launch
+      past Testing still needs Google's verification. Not done in this PR.
+- [ ] `GOOGLE_PICKER_API_KEY` in `picker/picker.js` is still
+      `YOUR_GOOGLE_PICKER_API_KEY`. Drive picker stays off until the owner
+      pastes a restricted key. Do not invent one.
 - [x] `privacy.html` checked against this doc's data-usage table and the
       actual `ALLOWED_EVENTS` list. Section 5's "What stays local" and
       "Connection credentials" bullets already covered the Morning
@@ -267,13 +264,12 @@ background/framing), not something to upload as-is.
       allowed events — missing `connector_configured`, `draft_generated`,
       `attachment_summarized`, and `weekly_habit_formed` — fixed to
       enumerate all 11, matching this table's own row above exactly.
-- [ ] The four non-Google connector `CLIENT_ID` placeholders in
-      `src/background.js` (`HUBSPOT_CLIENT_ID`, `SALESFORCE_CLIENT_ID`,
-      `SLACK_CLIENT_ID`, `MONDAY_CLIENT_ID`) are out of scope for this
-      listing entirely now — see this doc's revision note at the top. Leave
-      them unset until that scope is deliberately reopened.
-- [ ] Decide the release strategy: this project's earlier recommendation
-      was a dual track — submit to the Web Store for the public listing,
-      and keep documenting Load-unpacked in the README for anyone who
-      wants an update before the next Store review completes (Store
-      reviews apply to every version, not just the first).
+- [x] HubSpot, Salesforce, Slack, and Monday.com client ids stay
+      `YOUR_*` placeholders. The popup hides them. Leave the ids unset
+      until those connectors are deliberately reopened, with host
+      permissions added in the same change. No real client ids were added
+      in this draft.
+- [ ] Release track, once the owner is ready: submit this listing, and keep
+      Load unpacked in the README for anyone installing before review
+      finishes. Until that submission exists, Load unpacked is the only
+      install. Store review applies to every version, not just the first.

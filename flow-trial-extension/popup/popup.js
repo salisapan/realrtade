@@ -85,11 +85,13 @@
   function renderConnectors() {
     const host = document.getElementById('connector-list');
     host.replaceChildren();
-    // MVP surface is one connector, one decision: sign in, or don't. The rest
-    // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
-    // them wired) but showing four more cards here is exactly the setup
-    // friction the MVP is supposed to have zero of.
-    FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
+    // Front door is Google (mvp). HubSpot, Salesforce, Slack, and Monday.com
+    // stay off this list while their client ids are placeholders. Notion's
+    // writer remains in background.js and is not a second setup card.
+    const visible = FLOW_CONNECTORS.filter((c) => connectorShownInPopup(c, status && status[c.id]));
+    visible.forEach((c) => host.appendChild(connectorCard(c)));
+    const empty = document.getElementById('connector-empty');
+    if (empty) empty.hidden = visible.length > 0;
   }
 
   function connectorCard(c) {
@@ -104,8 +106,7 @@
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'Planned'));
     else if (st.connected) head.appendChild(el('span', 'badge on', 'Connected'));
-    else if (c.status === 'live') head.appendChild(el('span', 'badge live', 'Works now'));
-    else head.appendChild(el('span', 'badge', 'Needs setup'));
+    else if (c.status === 'live' && st.configured !== false) head.appendChild(el('span', 'badge live', 'Works now'));
     card.appendChild(head);
 
     if (c.note) card.appendChild(el('p', 'conn-note', c.note));
@@ -300,13 +301,12 @@
       const what = validDomain && wantedConnector ? validDomain.label + ' + ' + wantedConnector.label
         : validDomain ? validDomain.label
         : wantedConnector.label;
-      // mvp is the same bar renderConnectors() uses to decide which cards
-      // this Setup screen actually shows — pointing at "Connect X above"
-      // for one of the four dormant connectors would be the exact dead-end
-      // this pass's own connector-error fix (background.js) exists to
-      // avoid, just reached from a different door.
-      const alreadyConnected = wantedConnector && status && status[wantedConnector.id] && status[wantedConnector.id].connected;
-      if (wantedConnector && wantedConnector.mvp && !alreadyConnected) {
+      // Same bar as renderConnectors(). "Connect HubSpot above" is a dead
+      // end while that card is hidden; Notion is not on this screen either.
+      const wantedStatus = wantedConnector && status && status[wantedConnector.id];
+      const alreadyConnected = wantedStatus && wantedStatus.connected;
+      const shown = wantedConnector && connectorShownInPopup(wantedConnector, wantedStatus);
+      if (wantedConnector && shown && !alreadyConnected) {
         noteRecipe('Loaded — ' + what + '. Connect ' + wantedConnector.label + ' above to match it exactly, or use whatever you already have.', true);
       } else {
         noteRecipe('Loaded — ' + what + '. Click Save & start to apply it.', true);

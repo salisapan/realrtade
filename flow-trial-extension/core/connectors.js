@@ -19,15 +19,15 @@
 //
 // manifest.json's host_permissions currently covers only what the live MVP
 // scope can actually reach: mail.google.com, the four Google API hosts, and
-// theflow-ai.com. HubSpot/Notion/Salesforce/Slack/Monday.com's API hosts
-// were deliberately removed from it (Chrome Web Store review — and just
-// good practice — expects host_permissions to match what a real user can
-// actually trigger, not every write path that exists in background.js but
-// has no live UI path today; see popup.js's mvp-only renderConnectors
-// filter). Re-enabling any of these connectors in onboarding means adding
-// its API host back to manifest.json's host_permissions in the same change
-// — otherwise its fetch calls in background.js will start failing with a
-// permission error the moment someone can actually reach them.
+// theflow-ai.com. HubSpot, Salesforce, Slack, and Monday.com's API hosts
+// were deliberately removed from it (Chrome Web Store review expects
+// host_permissions to match what a real user can trigger). Notion's host
+// is out for the same reason: the token writer is live in background.js,
+// and onboarding does not offer it. popup.js shows a card only when
+// connectorShownInPopup() says so — the Google entry (mvp: true) is the
+// front door; an OAuth connector with an unset client id stays off the
+// list instead of rendering "Needs setup". Re-enabling any of them means
+// adding its API host back to host_permissions in the same change.
 
 const FLOW_CONNECTORS = [
   {
@@ -109,4 +109,29 @@ const FLOW_CONNECTORS = [
   { id: 'pipedrive', label: 'Pipedrive', kind: 'CRM', status: 'planned' }
 ];
 
-if (typeof module !== 'undefined') module.exports = { FLOW_CONNECTORS };
+// Empty, YOUR_*, and REPLACE_WITH_* are unset. REPLACE_WITH_* is the
+// placeholder shape used by the install-zip branch's publicClientId().
+// When that helper lands, call it instead of keeping this copy.
+function clientIdConfigured(value) {
+  const id = String(value == null ? '' : value).trim();
+  return Boolean(id) && !/^(YOUR_|REPLACE_WITH_)/.test(id);
+}
+
+// Onboarding shows the Google front door (mvp). Building OAuth connectors
+// stay hidden while their client id is unset, including if someone marks
+// one mvp before the id is real. Notion stays in the catalog; it is not a
+// second front door. A connected card stays visible so Disconnect works.
+// Planned entries (Pipedrive) are not shown as "Needs setup".
+function connectorShownInPopup(connector, statusEntry) {
+  if (!connector) return false;
+  const st = statusEntry || {};
+  if (st.connected) return true;
+  if (connector.status === 'planned') return false;
+  if (connector.auth === 'oauth' && st.configured !== true) return false;
+  // A missing status (configured undefined) still shows Google. An explicit
+  // false means this build has no client id, so the card would be a dead end.
+  if (connector.auth === 'google' && st.configured === false) return false;
+  return connector.mvp === true;
+}
+
+if (typeof module !== 'undefined') module.exports = { FLOW_CONNECTORS, clientIdConfigured, connectorShownInPopup };
