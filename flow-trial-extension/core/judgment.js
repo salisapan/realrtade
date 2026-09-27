@@ -279,6 +279,16 @@ const FlowJudgment = (() => {
   // have the same false-positive risk, so only this one needed the guard.
   const HEDGE_HE = /(?:(?:^|\s)אם\s|אולי|ייתכן|בכפוף ל|בהנחה ש|במידה ו)/;
 
+  // True when a negation sits in the window immediately before a match.
+  // Exported so intent.js's meeting gate can reuse this exact window
+  // instead of growing a second copy that drifts. Questions and hedges
+  // are deliberately not this function's job: "Can we do a call Monday?"
+  // is a real invite, and assertedIn() is what refuses those for
+  // commitments.
+  function isNegatedBefore(before) {
+    return NEG_BEFORE.test(before || '') || NEG_BEFORE_HE.test(before || '');
+  }
+
   function assertedIn(text, pattern) {
     for (const s of String(text || '').split(SENTENCE_SPLIT)) {
       const m = s.match(pattern);
@@ -287,7 +297,7 @@ const FlowJudgment = (() => {
       if (/\?\s*$/.test(s.trim())) continue;
       if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
       const before = s.slice(0, m.index);
-      if (NEG_BEFORE.test(before) || NEG_BEFORE_HE.test(before)) continue;
+      if (isNegatedBefore(before)) continue;
       return true; // at least one sentence states it plainly
     }
     return false;
@@ -305,7 +315,7 @@ const FlowJudgment = (() => {
       if (!m) continue;
       const before = s.slice(0, m.index);
       if (HEDGE.test(before) || HEDGE_HE.test(before)) continue;
-      if (NEG_BEFORE.test(before) || NEG_BEFORE_HE.test(before)) continue;
+      if (isNegatedBefore(before)) continue;
       return true;
     }
     return false;
@@ -593,7 +603,7 @@ const FlowJudgment = (() => {
   // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
   // drifting copy of the same judgment.
   return {
-    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, score, newContent,
+    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent,
     HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };

@@ -311,7 +311,35 @@ const FlowIntent = (() => {
     const who = ctx.senderName || ctx.senderEmail || null;
     const amount = facts.moneyText || null;
 
-    const hasMeetingNoun = MEETING_NOUN.test(text) || MEETING_NOUN_HE.test(text);
+    // A meeting noun only counts in a sentence that actually states it.
+    // "I can't do the call on Monday" and "לא נוכל לקיים את הפגישה ביום שני"
+    // name a meeting and a resolvable day, and the gate below used to write
+    // a Calendar entry for a meeting the sender had just refused. Negation
+    // has to sit before the noun — the same window judgment.js uses — so
+    // "the call Monday still works, but I can't do Tuesday" stays an event.
+    //
+    // The soft hedge is narrower than judgment.js's HEDGE on purpose.
+    // "could" and "if" are how real invites are written ("could you join
+    // the call Monday if you're free"). "might" / "maybe" / "אולי" are not,
+    // and filing those is a confident mistake.
+    const MEETING_SOFT = /\b(?:might|maybe|perhaps|possibly|tentatively)\b|(?:^|\s)(?:אולי|ייתכן)/;
+    function meetingAsserted(pattern) {
+      const sentences = String(text || '').split(/(?<=[.!?;])\s+|\n+/);
+      for (const s of sentences) {
+        const hit = s.match(pattern);
+        if (!hit) continue;
+        // הפגישה matches on פגישה, leaving the definite ה in front of the
+        // noun. That ה is the article, not a word in the negation window —
+        // without moving it, "לא נוכל לקיים את הפגישה" never looks negated.
+        let index = hit.index;
+        if (index > 0 && s.charAt(index - 1) === 'ה' && (index === 1 || /\s/.test(s.charAt(index - 2)))) index -= 1;
+        if (FlowJudgment.isNegatedBefore(s.slice(0, index))) continue;
+        if (MEETING_SOFT.test(s)) continue;
+        return true;
+      }
+      return false;
+    }
+    const hasMeetingNoun = meetingAsserted(MEETING_NOUN) || meetingAsserted(MEETING_NOUN_HE);
     // A resolved date or a resolved money figure — "something concrete
     // enough to actually act on" — is one of two ways to clear both
     // COMMITMENT_OF_READER's evidence bar below (see

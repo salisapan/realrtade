@@ -421,6 +421,39 @@ async function run() {
     }));
     check('the write succeeds rather than throwing', out.ok === true, out);
     check('the request actually reached the Calendar API', env.calls.some((c) => c.includes('POST') && c.includes('/calendars/primary/events')), env.calls);
+    const bare = env.bodies.find((b) => b && b.summary === 'Kickoff');
+    check('a calendar event with no quote does not invent a sentence',
+      bare && !/^Quote:/.test(bare.description) && bare.description.includes('ref=calendar'), bare && bare.description);
+  }
+
+  console.log('\n--- background.js: a Calendar event\'s description is the sentence that was closed ---\n');
+  {
+    // View opens htmlLink. A title of "Meeting Sep 18 15:00" plus an
+    // attribution line is not what the chip proposed. The description has
+    // to carry the sender's sentence so the event matches the receipt.
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_quote', htmlLink: 'https://calendar.google.com/event?eid=abc' }) }]]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/thread1',
+      params: {
+        title: 'Meeting Sep 18 15:00',
+        dateIso: '2026-09-18',
+        hour: 15,
+        minute: 0,
+        quote: 'Let us do a call tomorrow at 3pm to review the contract.'
+      }
+    }));
+    check('the quoted event still returns the Calendar link for View',
+      out.ok === true && out.url === 'https://calendar.google.com/event?eid=abc', out);
+    const body = env.bodies.find((b) => b && b.start && b.start.dateTime);
+    check('the description leads with the sentence, then the Gmail link',
+      body && body.description.indexOf('Let us do a call tomorrow at 3pm to review the contract.') === 0
+        && body.description.includes('https://mail.google.com/mail/u/0/#inbox/thread1'),
+      body && body.description);
+    check('the clock time that was stated is the event time',
+      body && body.start.dateTime.indexOf('T15:00:00') > 0, body && body.start);
   }
 
   console.log('\n--- background.js: gmailDraftWrite — a plain draft with nothing to attach ---\n');

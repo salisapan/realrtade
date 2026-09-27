@@ -1053,6 +1053,10 @@ async function googleCalendarWrite(p) {
 
   const timeZone = localTimeZone();
   const descriptionLines = [];
+  // The sentence Do It actually closed, so the event View opens is the
+  // same fact the chip proposed — not only a title and an attribution line.
+  const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim() : '';
+  if (quote) descriptionLines.push(quote.slice(0, QUOTE_MAX_CHARS));
   if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);
   descriptionLines.push(ATTRIBUTION_TEXT + ' — ' + attributionUrl('calendar'));
 
