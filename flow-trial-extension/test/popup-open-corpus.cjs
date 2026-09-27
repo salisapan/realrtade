@@ -124,6 +124,7 @@ function load(stored) {
   // the real extension.
   const loadOrder = [
     [CORE, 'domains.js'], [CORE, 'connectors.js'], [CORE, 'extract.js'], [CORE, 'judgment.js'],
+    [CORE, 'close-quality-metrics.js'],
     [SRC, 'storage.js'],
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js']
@@ -221,6 +222,8 @@ async function run() {
     check('dismissing from the popup really closes the message', await FlowStorage.hasTerminalOutcome('m1'));
     check('...and it drops out of the pending list', (await FlowStorage.getPending()).length === 0);
     check('the dismissal was actually persisted to storage, not just in memory', (store().log || []).some((e) => e.kind === 'dismissed' && e.messageId === 'm1'));
+    const quality = store().closeQuality;
+    check('dismissing the chip fires one false-Do-It', quality && quality.falseDoIt === 1 && quality.recent[0].kind === 'falseDoIt' && quality.recent[0].reason === 'dismiss', quality);
   }
 
   console.log('\n--- popup.js: the referral card offers exporting the real setup, not just a link ---\n');

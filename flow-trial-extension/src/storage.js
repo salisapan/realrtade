@@ -119,6 +119,20 @@ const FlowStorage = (() => {
     // or subject — this file's privacy posture applies here exactly as
     // everywhere else.
     classificationStats: { localFired: 0, localMissed: 0, aiFired: 0, aiMissed: 0, recent: [] },
+    // Personal-close quality for this account only: full-write success,
+    // day-level return, and dismiss-or-undo false-Do-It. The shape and the
+    // rules live in core/close-quality-metrics.js; this is just the
+    // chrome.storage.local copy. Counts, message ids, and a calendar-day
+    // string — never message text. See docs/close-quality-metrics.md.
+    closeQuality: {
+      success: 0,
+      return: 0,
+      falseDoIt: 0,
+      lastDoItDay: null,
+      successIds: [],
+      falseDoItIds: [],
+      recent: []
+    },
     // One local calendar-day string (Date#toDateString, matching every
     // other daily flag in this file) per day this install was ever active
     // in a watched tab — the actual history retention/habit measurement
@@ -581,6 +595,37 @@ const FlowStorage = (() => {
     return FlowClassificationMetrics.computeSnapshot((await get()).classificationStats);
   }
 
+  // Records one personal-close event and returns the event that was
+  // stored, or null when the call was a duplicate or not one of the three
+  // signals (a first Do It, a same-day Do It, a second success for the
+  // same message). `event.kind` is 'success' | 'doIt' | 'falseDoIt'.
+  // falseDoIt also needs `reason`: 'dismiss' | 'undo'. Day defaults to
+  // today's local calendar day — the same Date#toDateString() key the
+  // return definition uses. Nothing here leaves the device.
+  const recordCloseQuality = serialize(async function recordCloseQuality(event) {
+    if (!event || (event.kind !== 'success' && event.kind !== 'doIt' && event.kind !== 'falseDoIt')) return null;
+    const state = await get();
+    const current = state.closeQuality || FlowCloseQuality.emptyState();
+    const applied = FlowCloseQuality.applyEvent(current, {
+      kind: event.kind,
+      messageId: event.messageId,
+      reason: event.reason,
+      day: event.day || new Date().toDateString(),
+      ts: event.ts || Date.now()
+    });
+    if (JSON.stringify(current) !== JSON.stringify(applied.state)) {
+      await set({ closeQuality: applied.state });
+    }
+    return applied.recorded;
+  });
+
+  // The three counts plus the recent event list, for the Activity tab and
+  // for a background-page console. Same local-only posture as
+  // getPmfSnapshot — not an org dashboard and not a network call.
+  async function getCloseQualitySnapshot() {
+    return FlowCloseQuality.computeSnapshot((await get()).closeQuality);
+  }
+
   // Shared by every "at most once per calendar day (local time)" flag this
   // file keeps — the Morning Brief's auto-open and the anonymous daily-active
   // ping both need exactly this, just against a different stored date key.
@@ -721,7 +766,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

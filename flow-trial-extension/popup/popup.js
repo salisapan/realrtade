@@ -391,6 +391,10 @@
         score: entry.signals && entry.signals.score
       });
       await FlowStorage.calibrate('dismiss');
+      // Same reject as the in-Gmail chip dismiss. Once per message.
+      if (entry.messageId) {
+        await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: entry.messageId, reason: 'dismiss' });
+      }
       if (typeof FlowExecutionMemory !== 'undefined' && entry.process && entry.process.steps) {
         await FlowExecutionMemory.recordDismiss(entry.process.id, entry.process.steps.map((s) => s.id), entry.messageId);
       }
@@ -614,9 +618,20 @@
   }
   wireReferral();
 
+  function renderCloseQuality(s) {
+    const node = document.getElementById('closeQuality');
+    if (!node) return;
+    if (typeof FlowCloseQuality === 'undefined') { node.hidden = true; return; }
+    const line = FlowCloseQuality.activityLine(FlowCloseQuality.computeSnapshot(s.closeQuality));
+    if (!line) { node.hidden = true; return; }
+    node.textContent = line;
+    node.hidden = false;
+  }
+
   async function renderLog() {
     const s = await FlowStorage.get();
     renderWeekStat(s);
+    renderCloseQuality(s);
     await renderLearned();
     renderSensitivity(s);
     await renderMemoryInsight(s);
@@ -659,6 +674,9 @@
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
           if (r && r.ok) {
             await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId });
+            if (e.messageId) {
+              await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+            }
             await renderLog();
           } else {
             u.textContent = 'Undo failed';
