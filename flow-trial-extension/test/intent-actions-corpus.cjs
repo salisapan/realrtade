@@ -804,5 +804,147 @@ console.log('\n--- intent.js: REQUEST fires on a named concrete object, no date/
   check('EN: pure greeting/small talk, no handoff at all, stays silent', smalltalk.type === null, smalltalk);
 }
 
+// Personal close types the chip must trust, and the silence cases next to
+// them. Chosen after probing classify() (the path content-gmail.js actually
+// uses) against the three candidate shapes:
+//
+//   1. Dated commitment — an asserted agreement, or a first-person delivery
+//      promise, plus a resolved date. Short mail of this shape scored ~17
+//      (commitment 30 + date 12 − too-short 25) and the chip stayed quiet.
+//   2. Explicit ask to follow up or send a named thing — "could you send the
+//      invoice" already fired; "please follow up … about the invoice" did not,
+//      because HANDOFF never listed "follow up".
+//   3. Confirmed amount — "agreed at $3,900, effective Sep 7" already cleared
+//      50; "Confirming the amount is $4,200" scored 39 and stayed quiet.
+//
+// Silence: hard gates used to ignore solicitation / marketing / calendar
+// boilerplate, so a priced cold pitch and a calendar acceptance both chipped
+// at a negative score. A handoff plus a dollar figure and nothing else did too.
+console.log('\n--- personal close types: dated commitment, explicit ask, confirmed amount ---\n');
+{
+  function planId(text) {
+    return FlowActions.planFor(classify(text), { threadUrl: 'x', hasThreadAttachment: false });
+  }
+
+  const dated = [
+    ['EN agreed + date', 'We agreed to file the amendment by September 21.'],
+    ['EN confirmed + date', 'Confirmed. I will have the report to you by October 14.'],
+    ['EN sender promise + date', 'I will send you the signed contract by Friday, September 18.'],
+    ['HE sender promise + date', 'אני אשלח לך את החוזה עד יום שישי.']
+  ];
+  for (const [label, text] of dated) {
+    const intent = classify(text);
+    const process = planId(text);
+    check(label + ' -> DECISION_TO_LOG at high confidence',
+      intent.type === FlowIntent.TYPES.DECISION_TO_LOG && intent.confidence === 'high',
+      { type: intent.type, confidence: intent.confidence, score: intent.signals && intent.signals.score });
+    check(label + ' closes with the log-it task, carrying the date',
+      process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.dateIso),
+      process && { id: process.id, dates: process.steps.map((s) => s.params && s.params.dateIso) });
+  }
+
+  const datedSilent = [
+    ['promise with no date', 'I will send you the signed contract.'],
+    ['hedged promise', 'I might send the contract by Friday if legal signs off.'],
+    ['agreement with no date', 'We agreed. See you.'],
+    ['negated promise', 'We will not send the contract by Friday, September 18.'],
+    ['question, not a commitment', 'Did we agree to file the amendment by September 21?'],
+    ['past date only', 'We agreed to the terms on March 3, 2020 and that was the end of it.']
+  ];
+  for (const [label, text] of datedSilent) {
+    const intent = classify(text);
+    check('dated commitment stays silent: ' + label, !intent.type, intent.type);
+  }
+
+  const asks = [
+    ['please follow up + invoice', 'Please follow up with Dana about the invoice.'],
+    ['please follow up + date + status', 'Please follow up with the vendor by Friday and send the status update.'],
+    ['question-shaped follow up + invoice', 'Please follow up with Dana about the invoice?'],
+    ['HE follow up + invoice', 'תעקוב אחרי החשבונית בבקשה, זה דחוף מצדנו.'],
+    ['dated confirm ask', 'Could you confirm the $4,200 payment by Friday?']
+  ];
+  for (const [label, text] of asks) {
+    const intent = classify(text);
+    const process = planId(text);
+    check(label + ' -> REQUEST', intent.type === FlowIntent.TYPES.REQUEST, intent.type);
+    check(label + ' closes with reply-track (draft + task)',
+      process && process.id === 'reply-track' && process.steps.some((s) => s.kind === 'gmailDraft') && process.steps.some((s) => s.kind === 'googleTask'),
+      process && process.id);
+  }
+
+  const askSilent = [
+    ['follow up, nothing named', 'Please follow up when you can.'],
+    ['follow up on this', 'Can you follow up on this?'],
+    ['negated follow up', "Please don't follow up with Dana about the invoice."],
+    ['HE follow up, nothing named', 'תעקוב אחרי זה כשתהיה לך דקה פנויה בבקשה.'],
+    ['money alone is not an ask', 'Can you confirm the $4,200?']
+  ];
+  for (const [label, text] of askSilent) {
+    const intent = classify(text);
+    check('explicit ask stays silent: ' + label, !intent.type, { type: intent.type, signals: intent.signals });
+  }
+
+  const amounts = [
+    ['EN confirming a figure', 'Confirming the amount is $4,200 for the year.'],
+    ['HE confirming a figure', 'מאשרים שהסכום הוא 4,200 שקל.'],
+    ['approved fee', 'Approved. The fee is $2,400.']
+  ];
+  for (const [label, text] of amounts) {
+    const intent = classify(text);
+    const process = planId(text);
+    check(label + ' -> DECISION_TO_LOG at high confidence',
+      intent.type === FlowIntent.TYPES.DECISION_TO_LOG && intent.confidence === 'high',
+      { type: intent.type, confidence: intent.confidence, score: intent.signals && intent.signals.score });
+    check(label + ' task carries the amount',
+      process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.amount),
+      process && process.steps.map((s) => s.params && s.params.amount));
+  }
+
+  const amountSilent = [
+    ['figure with nothing decided', 'The total came to $4,200.'],
+    ['a quote, not a confirmation', 'Our quote is $12,500 for the work described below in the attached scope document today.'],
+    ['refused figure', 'We do not confirm the $4,200 figure at all.'],
+    ['hedged figure', 'We might confirm the $4,200 next quarter once the board meets to review it.']
+  ];
+  for (const [label, text] of amountSilent) {
+    const intent = classify(text);
+    check('confirmed amount stays silent: ' + label, !intent.type, { type: intent.type, score: intent.signals && intent.signals.score });
+  }
+
+  // Hard gates must not outvote a noise penalty. Each of these chipped before
+  // this pass, at a negative score.
+  const noise = [
+    ['priced cold pitch', 'Hope this email finds you well. Our pricing starts at $99/mo. Can you confirm a time this week?'],
+    ['bump asking for an invoice', 'Just bumping this — could you send the invoice?'],
+    ['circling back on a reader commitment', 'Circling back on the contract. You agreed to send it by Friday.'],
+    ['pitch-shaped confirmation', 'Hope this email finds you well. Confirming we are agreed at $3,900 for the year, effective September 7.'],
+    ['calendar acceptance boilerplate', 'Dana has accepted this invitation. Meeting Friday, September 18 at 3pm.']
+  ];
+  for (const [label, text] of noise) {
+    const intent = classify(text);
+    check('noise stays silent: ' + label, !intent.type, { type: intent.type, score: intent.signals && intent.signals.score });
+  }
+
+  // A real ask that merely says "following up" (not the solicitation phrase
+  // "following up on my last email") must still chip.
+  const realFollow = classify('Just following up — could you share the updated contract?');
+  check('a real follow-up that names a contract still chips as REQUEST', realFollow.type === FlowIntent.TYPES.REQUEST, realFollow.type);
+
+  // Sustained rejection of "decision" mutes the new hard gates the same way
+  // it mutes the other hard-gated types — evidence stays real, the account
+  // has still asked to stop seeing it.
+  const heavyDecision = { decision: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const lightDecision = { decision: { clicks: 0, dismissals: 2, ts: NOW.getTime() } };
+  const stillDated = classify('We agreed to file the amendment by September 21.', { calibrationByType: lightDecision });
+  check('two "decision" dismissals do not suppress a dated commitment', stillDated.type === FlowIntent.TYPES.DECISION_TO_LOG, stillDated.type);
+  const suppressedDate = classify('We agreed to file the amendment by September 21.', { calibrationByType: heavyDecision });
+  check('heavy "decision" dismissals suppress a dated commitment', !suppressedDate.type, suppressedDate.type);
+  const suppressedAmount = classify('Confirming the amount is $4,200 for the year.', { calibrationByType: heavyDecision });
+  check('heavy "decision" dismissals suppress a confirmed amount', !suppressedAmount.type, suppressedAmount.type);
+  const otherType = { request: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const notSuppressed = classify('We agreed to file the amendment by September 21.', { calibrationByType: otherType });
+  check('request-dismissal history does not suppress a dated commitment', notSuppressed.type === FlowIntent.TYPES.DECISION_TO_LOG, notSuppressed.type);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
