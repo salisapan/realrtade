@@ -50,6 +50,11 @@ const FlowActions = (() => {
         // notes field but not for an event title.
         title: (intent.label || e.what || 'Meeting').slice(0, 200),
         dateIso: e.dateIso, hour: e.hour, minute: e.minute,
+        // The sentence the event is about. The title stays short ("Meeting
+        // Sep 18 15:00"); without this, View opens a Calendar event that
+        // never says what was scheduled. "Meeting" is the classifier's
+        // fallback when no sentence was found — not a quote.
+        quote: (e.what && e.what !== 'Meeting') ? String(e.what).slice(0, 400) : null,
         threadUrl: ctx.threadUrl
       }
     };
@@ -99,6 +104,10 @@ const FlowActions = (() => {
         title: intent.label || e.what,
         dateIso: e.dateIso,
         amount: e.amount,
+        // The sentence this close is about. The writer quotes it even when
+        // the later caller only still has the step (a Brief replay stores
+        // steps, and used to drop intent.entities).
+        what: e.what || null,
         threadUrl: ctx.threadUrl
       }
     };
@@ -269,7 +278,22 @@ const FlowActions = (() => {
     return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };
   }
 
-  return { planFor, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected };
+  // The receipt lines for writes that actually landed. A failed step can
+  // still carry a `written` string from a partial attempt — it must not
+  // show up, because the receipt is the claim that the thing exists.
+  function receiptWrittenLines(results) {
+    const lines = [];
+    for (const r of results || []) {
+      const response = r && r.response;
+      if (!response || !response.ok || typeof response.written !== 'string') continue;
+      const line = response.written.trim();
+      if (!line || lines.indexOf(line) !== -1) continue;
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  return { planFor, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowActions };

@@ -53,6 +53,7 @@
         <b id="weekCount">0</b><span id="weekLabel"> logged this week</span>
         <span class="week-total" id="weekTotal"></span>
       </div>
+      <p class="learned-stat" id="closeQuality" hidden title="On this device only. Full close = every proposed step wrote. Return = Do It on a later day. Turned down = the chip was dismissed or the write was undone."></p>
       <p class="learned-stat" id="learnedStat" hidden></p>
       <div class="sense" id="sense" hidden>
         <span class="sense-label">Sensitivity</span>
@@ -69,6 +70,11 @@
 
       <div id="log-list" class="log-list"></div>
       <p id="log-empty" class="hint" hidden>Nothing yet. Glance only speaks up when an email actually decides something — silence is the normal state.</p>
+
+      <div class="close-memory">
+        <p class="hint">Personal close memory stays on this device. Clear it to let Glance speak again on matters it already closed.</p>
+        <button type="button" class="ghost sm" id="clearCloseMemory">Clear close memory</button>
+      </div>
 
       <div class="referral" id="referral" hidden>
         <button type="button" class="referral-x" id="referralDismiss" aria-label="Dismiss">&times;</button>
@@ -96,13 +102,12 @@
        inside function bodies the popup never executes). -->
   <script src="../core/actions.js"></script>
   <script src="../core/execution-memory.js"></script>
+  <script src="../core/close-memory.js"></script>
   <script src="../core/pmf-metrics.js"></script>
   <script src="../core/classification-metrics.js"></script>
-  <!-- Wires core/execution-memory.js's storage seam to chrome.storage.local
-       — must load right after it and before popup.js, which calls
-       FlowExecutionMemory.recordDismiss() from the Open tab and needs that
-       to actually persist, not silently land in the core module's
-       in-memory default. -->
+  <script src="../core/close-quality-metrics.js"></script>
+  <!-- Wires execution-memory.js and close-memory.js to chrome.storage.local.
+       Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../src/chrome-storage-adapter.js"></script>
   <script src="popup.js"></script>
 </body>

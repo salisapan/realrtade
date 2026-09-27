@@ -421,6 +421,39 @@ async function run() {
     }));
     check('the write succeeds rather than throwing', out.ok === true, out);
     check('the request actually reached the Calendar API', env.calls.some((c) => c.includes('POST') && c.includes('/calendars/primary/events')), env.calls);
+    const bare = env.bodies.find((b) => b && b.summary === 'Kickoff');
+    check('a calendar event with no quote does not invent a sentence',
+      bare && !/^Quote:/.test(bare.description) && bare.description.includes('ref=calendar'), bare && bare.description);
+  }
+
+  console.log('\n--- background.js: a Calendar event\'s description is the sentence that was closed ---\n');
+  {
+    // View opens htmlLink. A title of "Meeting Sep 18 15:00" plus an
+    // attribution line is not what the chip proposed. The description has
+    // to carry the sender's sentence so the event matches the receipt.
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_quote', htmlLink: 'https://calendar.google.com/event?eid=abc' }) }]]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/thread1',
+      params: {
+        title: 'Meeting Sep 18 15:00',
+        dateIso: '2026-09-18',
+        hour: 15,
+        minute: 0,
+        quote: 'Let us do a call tomorrow at 3pm to review the contract.'
+      }
+    }));
+    check('the quoted event still returns the Calendar link for View',
+      out.ok === true && out.url === 'https://calendar.google.com/event?eid=abc', out);
+    const body = env.bodies.find((b) => b && b.start && b.start.dateTime);
+    check('the description leads with the sentence, then the Gmail link',
+      body && body.description.indexOf('Let us do a call tomorrow at 3pm to review the contract.') === 0
+        && body.description.includes('https://mail.google.com/mail/u/0/#inbox/thread1'),
+      body && body.description);
+    check('the clock time that was stated is the event time',
+      body && body.start.dateTime.indexOf('T15:00:00') > 0, body && body.start);
   }
 
   console.log('\n--- background.js: gmailDraftWrite — a plain draft with nothing to attach ---\n');
@@ -438,6 +471,8 @@ async function run() {
     }));
     check('a draft with nothing to attach still succeeds', out.ok === true, out);
     check('target reads as a plain draft reply, no attachment claim', out.target === 'a draft reply', out.target);
+    check('the receipt names the draft and the ask it wrote',
+      out.written === 'Gmail draft · the signed contract', out.written);
     const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
     const decoded = decodeDraftRaw(draftCall.message.raw);
     check('no attachment filename ends up in the MIME message', decoded.attachmentFilename === null, decoded);
@@ -556,6 +591,137 @@ async function run() {
     const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
     const decoded = decodeDraftRaw(draftCall.message.raw);
     check('the small candidate is the one actually attached', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
+  }
+
+  console.log('\n--- background.js: Gmail draft undo deletes that draft, and a missing one is already undone ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/users\/me\/drafts\/draft_1$/, { reply: res(204, {}) }],
+        [/\/users\/me\/drafts\/gone$/, { reply: res(404, {}) }]
+      ]
+    });
+    const undo = env.fn('gmailDraftUndo');
+    check('undoing a Gmail draft deletes that draft',
+      (await attempt(undo({ draftId: 'draft_1' }))).ok === true
+      && env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/users/me/drafts/draft_1')),
+      env.calls);
+    check('an already-deleted draft still counts as undone',
+      (await attempt(undo({ draftId: 'gone' }))).ok === true);
+    check('a draft undo without an id does not guess',
+      (await undo({})).ok === false && (await undo(null)).ok === false);
+  }
+
+  console.log('\n--- background.js: Notion undo archives the page, and a missing page is already gone ---\n');
+  {
+    const env = load({
+      stored: { notionAuth: { token: 'secret_test', databaseId: 'db' } },
+      routes: [
+        [/\/pages\/page_1$/, { reply: res(200, {}) }],
+        [/\/pages\/gone$/, { reply: res(404, {}) }]
+      ]
+    });
+    const undo = env.fn('notionUndo');
+    const ok = await attempt(undo({ pageId: 'page_1' }));
+    const archive = env.bodies[env.calls.findIndex((c) => c.includes('/pages/page_1'))];
+    check('undoing a Notion page archives it', ok.ok === true && archive && archive.archived === true, { ok, archive, calls: env.calls });
+    check('the Notion undo is a PATCH',
+      env.calls.some((c) => c.startsWith('PATCH ') && c.includes('/pages/page_1')), env.calls);
+    check('an already-missing Notion page still counts as undone',
+      (await attempt(undo({ pageId: 'gone' }))).ok === true);
+    check('a Notion undo without a page id does nothing',
+      (await undo(null)).ok === false && (await undo({})).ok === false);
+    const disconnected = load({ stored: {} });
+    check('a Notion undo with no token does not call the API',
+      (await attempt(disconnected.fn('notionUndo')({ pageId: 'page_1' }))).ok === false
+      && disconnected.calls.length === 0, disconnected.calls);
+  }
+
+  console.log('\n--- background.js: the planned Google Task is the close, even when facts are empty ---\n');
+  {
+    // The chip's task step already carries dateIso, amount, and the
+    // sentence. facts used to be a second, parallel copy, so a payload
+    // that only had the plan (Morning Brief replay, or any caller that
+    // forwards the step) wrote a task with no due date and no quote.
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_plan' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Log commitment for Sep 21',
+      facts: {},
+      entities: {},
+      senderName: 'Dana',
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/abc',
+      params: {
+        dateIso: '2026-09-21',
+        what: 'We agreed to file the amendment by September 21.'
+      }
+    }));
+    check('a plan-only task write succeeds', out.ok === true, out);
+    const body = env.bodies[0] || {};
+    check('due is the planned date', body.due === '2026-09-21T00:00:00.000Z', body && body.due);
+    check('notes quote the planned sentence', (body.notes || '').includes('Quote: "We agreed to file the amendment by September 21."'), body.notes);
+    check('notes name that date', (body.notes || '').includes('Sep 21'), body.notes);
+    check('the receipt names the task and the due date, and does not invent an amount',
+      out.written === 'Google Task · due Sep 21', out.written);
+  }
+
+  console.log('\n--- background.js: a confirmed amount with no date is the close, and only that ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_amt' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Log $4,200 agreed',
+      facts: {},
+      params: { amount: '$4,200', dateIso: null }
+    }));
+    check('an amount-only task write succeeds', out.ok === true, out);
+    const body = env.bodies[0] || {};
+    check('no due date is sent when the plan has none', !body.due, body.due);
+    check('notes carry the planned amount once', (body.notes || '').split('Amount:').length === 2 && (body.notes || '').includes('Amount: $4,200'), body.notes);
+    check('the receipt names the amount and does not claim a due date',
+      out.written === 'Google Task · $4,200', out.written);
+  }
+
+  console.log('\n--- background.js: a bad planned date is not written, and facts still supply a real one ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_bad' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Log this decision',
+      facts: {},
+      params: { dateIso: '2026-13-45', amount: '   ' }
+    }));
+    check('an invalid plan still succeeds', out.ok === true, out);
+    const body = env.bodies[0] || {};
+    check('an impossible date is not sent as due', !body.due, body);
+    check('a blank amount is not a note', !(body.notes || '').includes('Amount:'), body.notes);
+    check('the receipt does not claim a date or a figure', out.written === 'Google Task', out.written);
+  }
+
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_facts' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Log commitment for Oct 14',
+      facts: { date: { iso: '2026-10-14', raw: 'October 14' }, moneyText: '$4,200' },
+      params: { dateIso: '2026-09-21', amount: '$4,200' }
+    }));
+    const body = env.bodies[0] || {};
+    check('when the plan and the facts disagree, the planned date is what gets written',
+      body.due === '2026-09-21T00:00:00.000Z', body.due);
+    check('the amount line is not duplicated when facts already carried it',
+      (body.notes || '').split('Amount:').length === 2, body.notes);
+    check('the receipt names both the figure and the planned due date',
+      out.written === 'Google Task · $4,200 · due Sep 21', out.written);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

@@ -345,6 +345,38 @@
     return 'https://mail.google.com/mail/u/' + accountIndex() + '/#all/' + legacyId;
   }
 
+  // Gmail stamps data-legacy-thread-id on the message or an ancestor. A
+  // missing attribute is not guessed at — personal close memory treats a
+  // missing thread id as "not clear" unless the subject itself is specific.
+  function threadIdFrom(message) {
+    let node = message;
+    while (node && node.getAttribute) {
+      const id = node.getAttribute('data-legacy-thread-id');
+      if (id) return id;
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  // Prefer silence when this open message clearly continues a personal
+  // matter Glance already fully closed. No effect when memory is absent,
+  // the message is not one of the three trusted closes, or the match is
+  // not clear — the chip then decides as usual. A storage failure must
+  // never be the reason a real chip disappears.
+  async function personalCloseSaysSilence(intent, threadId, subject) {
+    if (!intent || !intent.personalClose || typeof FlowCloseMemory === 'undefined') return false;
+    try {
+      const recalled = await FlowCloseMemory.recall({
+        personalClose: intent.personalClose,
+        threadId: threadId,
+        subject: subject
+      });
+      return Boolean(recalled && recalled.action === 'silence');
+    } catch (e) {
+      return false;
+    }
+  }
+
   // ownEmailFromThread() above only finds an answer when the reader appears
   // as a recipient somewhere in the visible thread — which is every ordinary
   // multi-message thread, but NOT a thread made of exactly one message that
@@ -477,9 +509,11 @@
     const text = ownMessageText(message);
     if (text.length < 20) return; // still rendering, or genuinely nothing new was written
 
-    // Captured before markSeen flips it, so it still answers "is this the
-    // first time," which is what decides whether to log 'shown' below.
-    const alreadyLoggedShown = await FlowStorage.wasSeen(messageId);
+    // Seen-ids stay a "we already looked at this message" mark, including
+    // when personal-close memory stays quiet below. The 'shown' row is a
+    // separate question, answered from the log itself at inject time: a
+    // silence return never writes that row, so clearing close memory can
+    // still record the first real chip.
     await FlowStorage.markSeen(messageId);
 
     state = await FlowStorage.get();
@@ -501,6 +535,7 @@
 
     const sender = extractSender(message);
     const subject = currentSubject();
+    const threadId = threadIdFrom(message);
 
     // Classification (intent.js) -> Decision (actions.js) -> Execution
     // (background.js's writer functions, dispatched by step.kind). This
@@ -553,6 +588,11 @@
     });
     if (!process) return; // defensive only — every catalog entry has at least an anchor step
 
+    // Same matter, already fully closed: stay quiet. Checked before the
+    // Google connect prompt so a continuation never asks for access, and
+    // before 'shown' is logged so it never becomes an open Brief row.
+    if (await personalCloseSaysSilence(intent, threadId, subject)) return;
+
     // The one moment this account is ever asked for Google access at all —
     // right here, after judgment has already found a real Do It moment on
     // screen, never before and never from a settings page. Covers both "not
@@ -566,6 +606,7 @@
     injectChip(message, {
       messageId, intent, process, sender, subject, attachment, attachments,
       threadUrl: threadUrl(legacyId),
+      threadId: threadId,
       // Snapshotted now, not re-read from the DOM at click time — by the
       // time "Do It" is clicked the chip's own ctx has no live node
       // reference to this message, and Gmail may have long since rebuilt or
@@ -575,8 +616,11 @@
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
     // not a rare edge case — logging 'shown' again every time would fill the
     // 200-entry cap with duplicates for one message and evict real history
-    // for others. Only record it the first time.
-    if (!alreadyLoggedShown) {
+    // for others. Dedup against the log, not the seen-id set: silence marks
+    // a message seen without a 'shown' row, and that row is what the Brief
+    // actually reads.
+    const shownAlready = (state.log || []).some((entry) => entry && entry.kind === 'shown' && entry.messageId === messageId);
+    if (!shownAlready) {
       // The extra fields below (process/threadUrl/sender/subject/intent) are
       // what let the Morning Brief re-run Do It / Dismiss on this exact
       // process later, without this message node — or even this tab — still
@@ -586,8 +630,8 @@
       FlowStorage.appendLog({
         kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals,
         process: { id: process.id, name: process.name, steps: process.steps },
-        threadUrl: threadUrl(legacyId), sender, subject,
-        intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score } },
+        threadUrl: threadUrl(legacyId), threadId: threadId, sender, subject,
+        intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score }, personalClose: intent.personalClose || null },
         // Which app this process was noticed in — see this file's own
         // SOURCE_APP constant. getPending()'s entries (and everything built
         // on them: the Brief panel, the popup's Open tab, the badge count)
@@ -1049,22 +1093,24 @@
       return payload;
     }
 
-    // googleTask — background.js's existing googleTasksWrite(p) predates
-    // actions.js and still expects the old top-level shape (label/facts),
-    // not params. Reusing it unmodified rather than reshaping a write path
-    // that already works.
+    // googleTask — label/facts/entities stay, because the writer still
+    // builds the title and the From/Subject lines from them. params is the
+    // close itself: the date, the amount, and the sentence the chip
+    // planned. The writer prefers those over facts when both are present.
+    const taskEntities = (ctx.intent && ctx.intent.entities)
+      || (action.params && action.params.what ? { what: action.params.what } : null);
     return Object.assign(base, {
       label: action.params.title || action.label,
+      params: {
+        dateIso: action.params.dateIso || null,
+        amount: action.params.amount || null,
+        what: action.params.what || null
+      },
       facts: ctx.intent.facts,
-      // entities.what/requestWhat is the actual quoted sentence Do It was
-      // proposed for — facts alone (amount/date) never carried it, so the
-      // task's own notes (background.js's factLines()) had no way to
-      // include what was actually decided, only metadata about it. Notion's
-      // write path already gets this same intent object and has included a
-      // "Quote" field from it since the original build; Google Tasks never
-      // did, because this field was the one thing buildActionPayload never
-      // forwarded here.
-      entities: ctx.intent.entities,
+      // The quoted sentence. Live clicks still have intent.entities; a Brief
+      // or resurface replay only kept the step, so the sentence rides on
+      // params.what and is reconstructed here when entities are gone.
+      entities: taskEntities,
       senderName: ctx.sender.name,
       senderEmail: ctx.sender.email,
       subject: ctx.subject,
@@ -1183,10 +1229,11 @@
     return 'Closed — ' + joinWithAnd(verbs) + '.';
   }
 
-  // The chip's receipt for a closed process of 1-5 steps: the process name,
-  // a closure-framed summary of what actually happened, a link per
-  // successful write that has one, and a single "Undo all" that reverses
-  // every successful write in the group together. A write that failed
+  // The chip's receipt for a closed process of 1-5 steps: the status word
+  // ("Handled." or "Partly handled."), the process name, a closure-framed
+  // summary of what actually happened, a link per successful write that
+  // has one, and Undo (or "Undo all") that reverses every successful write
+  // in the group together. A write that failed
   // silently contributes nothing to undo; it was never done. A successful
   // undo is recorded to Execution Memory as a rejection of those step kinds
   // — accepted-then-undone is a stronger "don't propose this" signal than a
@@ -1205,50 +1252,41 @@
     // Glance ever closed for this account, before this one" is answered
     // against state prior to this call, not state this same call is about
     // to change. No new UI, no popup — the same receipt every close already
-    // shows, with one extra, concrete line, for however many of the first
-    // few closes actually need it.
-    //
-    // Covers the first THREE closes, not just the very first: the first
-    // close is the moment of discovery, but a new user's trust in "this
-    // actually works" isn't fully earned on one data point — the second
-    // and third closes are what confirm it wasn't a fluke. The line stays
-    // exactly the same across all three rather than escalating or varying
-    // it: repeating the same concrete claim is reinforcement, while three
-    // different lines for three closes a day or two apart would read as a
-    // script, not a system telling the truth about what it just did. From
-    // the fourth close on, the receipt goes back to just closedSummary()
-    // alone — by then the pattern is established and restating it would
-    // cheapen it into a slogan.
+    // shows. The status word is always there. The extra magic-moment line
+    // is only for the first three full closes, under that word, not
+    // instead of it.
     const priorCloses = (await FlowStorage.get()).writeStats.total;
-    const isEarlyClose = priorCloses < 3;
+    // Status word and Undo label live in receipt-copy.js so a partial
+    // close cannot say "Handled." and the first three closes cannot
+    // replace that word with the longer magic-moment sentence. The
+    // sentence, when it applies, is an extra line under the status.
+    const copy = FlowReceipt.confirmation({
+      succeeded: succeeded.length,
+      total: results.length,
+      priorCloses
+    });
 
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
 
-    // Leads with the human read of what just happened — "handled," full
-    // stop — before the specific, accurate detail underneath it. The old
-    // order put the process-name badge and the verb list first and saved
-    // this feeling for a one-time bonus line on someone's first three
-    // closes only, trailing AFTER that detail; every close now opens the
-    // same reassuring way, every time, for as long as the account exists —
-    // closer to how a person would actually tell you what happened
-    // ("handled — " then the specifics), not a status log read top to
-    // bottom. The first three closes get their own longer, warmer version
-    // of the same lead line (see isEarlyClose below) rather than showing
-    // both and repeating "handled" twice in one receipt.
-    if (isEarlyClose) {
-      done.appendChild(el('span', 'flow-chip-first-close', 'Nothing else to open, nothing else to check — that’s handled.'));
-    } else {
-      done.appendChild(el('span', 'flow-chip-handled', 'Handled.'));
-    }
+    const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), copy.status);
+    done.appendChild(status);
+    if (copy.earlyLine) done.appendChild(el('span', 'flow-chip-first-close', copy.earlyLine));
 
     const detail = el('span', 'flow-chip-detail');
     detail.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
     detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
     done.appendChild(detail);
+
+    // Named from the writer (`response.written`), after the write succeeded.
+    // One line per personal write that landed — the task, the draft, or both.
+    for (const line of FlowActions.receiptWrittenLines(succeeded)) {
+      done.appendChild(el('span', 'flow-chip-written', line));
+    }
 
     const actionsRow = el('span', 'flow-chip-actions');
     for (const r of succeeded) {
@@ -1258,8 +1296,12 @@
       actionsRow.appendChild(view);
     }
 
-    const undo = el('button', 'flow-chip-link', succeeded.length > 1 ? 'Undo all' : 'Undo');
+    const undo = el('button', 'flow-chip-undo', copy.undoLabel);
     undo.type = 'button';
+    undo.setAttribute('aria-label', copy.undoLabel === 'Undo all'
+      ? 'Undo all and remove what was just written'
+      : 'Undo and remove what was just written');
+    let undoNote = null;
     undo.addEventListener('click', () => {
       undo.textContent = 'Undoing…';
       undo.disabled = true;
@@ -1275,14 +1317,31 @@
         if (result.undoneIds.length) {
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
+          // The full close is no longer true, so a later message in this
+          // matter may speak again. Independent of the receipt text below.
+          if (typeof FlowCloseMemory !== 'undefined') {
+            FlowCloseMemory.forgetMessage(ctx.messageId).catch(() => {});
+          }
+          // false-Do-It: the user took back a write that had landed.
+          // Once per message, even if a later step in the chain could not
+          // be undone — any real revert is the reject. Separate store
+          // from personal close memory.
+          FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: ctx.messageId, reason: 'undo' })
+            .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
         }
         if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
-          undo.textContent = 'Some actions couldn’t be undone';
+          // The button stays Undo. Replacing its label with the failure
+          // sentence hid the only control that can finish the rollback.
+          undo.textContent = copy.undoLabel;
           undo.disabled = false;
+          if (!undoNote) {
+            undoNote = el('span', 'flow-chip-partial-note', 'Some of this couldn’t be undone.');
+            done.appendChild(undoNote);
+          }
         }
       });
     });
@@ -1302,6 +1361,11 @@
       done.appendChild(el('span', 'flow-chip-partial-note', '(' + detail + ')'));
     }
 
+    // The host is still the proposal card (blue frame on the chip, blue
+    // row in the Brief). Drop that chrome so the receipt is the only
+    // thing left on screen — a blue card around "Handled." reads as if
+    // the proposal is still open.
+    host.classList.add('flow-chip-settled');
     host.replaceChildren(done);
 
     // Awaited (and the caller — onDoIt — awaits this whole function) so
@@ -1321,10 +1385,37 @@
     // the one unacceptable failure. Losing this specific log entry is a
     // real, narrow residual risk (hasTerminalOutcome wouldn't yet know this
     // message is resolved), logged so it's at least visible, not silent.
-    await Promise.all(succeeded.map((r) =>
+    const bookkeeping = succeeded.map((r) =>
       FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
         .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e))
-    ));
+    );
+    // Personal close memory: only a Trusted Do It whose every attempted
+    // step actually wrote. A partial chain is not a closed matter. This
+    // does not touch the receipt copy above, and it does not share a
+    // storage key with close-quality metrics.
+    if (typeof FlowCloseMemory !== 'undefined' && ctx.intent && ctx.intent.personalClose && FlowCloseMemory.fullWriteOf(results)) {
+      bookkeeping.push(
+        FlowCloseMemory.recordClose({
+          personalClose: ctx.intent.personalClose,
+          fullWrite: true,
+          threadId: ctx.threadId,
+          subject: ctx.subject,
+          snippet: ctx.bodyText,
+          messageId: ctx.messageId,
+          targets: succeeded.map((r) => r.action && r.action.kind)
+        }).catch((e) => console.error('[Glance] failed to remember a personal close — the write itself already succeeded', e))
+      );
+    }
+    // success: every step the chip proposed actually wrote. Partials stay
+    // out. This count does not follow the receipt string ("Handled." vs
+    // "Partly handled."). Local only; not a flow:track event.
+    if (typeof FlowCloseQuality !== 'undefined' && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length)) {
+      bookkeeping.push(
+        FlowStorage.recordCloseQuality({ kind: 'success', messageId: ctx.messageId })
+          .catch((e) => console.error('[Glance] failed to record a full-close success', e))
+      );
+    }
+    await Promise.all(bookkeeping);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
     // The "opened vs closed" funnel pair with chip_shown — fired here and in
     // onDismiss's own decline path, since both are real ways a proposed
@@ -1357,6 +1448,12 @@
     // reads to Execution Memory as a full rejection (onDismiss records it),
     // which is correct: the user saw the whole process and kept none of it.
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
+
+    // return: this is a real Do It use (the guards above already rejected
+    // a stale row and an empty step list). The first one ever, and any
+    // later one on the same local day, do not increment the counter.
+    FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId })
+      .catch((e) => console.error('[Glance] failed to record a Do It use for return', e));
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
@@ -1423,7 +1520,11 @@
       FlowStorage.calibrate('dismiss', ctx.intent.type)
         .catch((e) => console.error('[Glance] failed to update precision calibration for a dismiss', e)),
       FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId)
-        .catch((e) => console.error('[Glance] failed to record a dismiss in Execution Memory', e))
+        .catch((e) => console.error('[Glance] failed to record a dismiss in Execution Memory', e)),
+      // false-Do-It: dismissing the chip is the reject. The same message
+      // from another surface is a no-op inside recordCloseQuality.
+      FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: ctx.messageId, reason: 'dismiss' })
+        .catch((e) => console.error('[Glance] failed to record a dismiss as a false-Do-It', e))
     ]);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
     // See showMultiActionReceipt's own comment on process_closed — a decline
@@ -1460,6 +1561,7 @@
     return {
       messageId: entry.messageId,
       threadUrl: entry.threadUrl,
+      threadId: entry.threadId || null,
       sender: entry.sender,
       subject: entry.subject,
       intent: entry.intent,

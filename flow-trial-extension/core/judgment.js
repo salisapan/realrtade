@@ -120,6 +120,22 @@ const FlowJudgment = (() => {
   // negative-test corpus before being kept, for the same no-safety-net
   // reason documented on HANDOFF.
   const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל|תשלחי?\s+לי|(?:צריך|צריכ(?:ה|ים))\s+ממך|בבקשה ת|אבקש|מבקש(?:ת|ים)?|אודה (?:לך |לכם )?(?:מאוד )?אם|אשמח (?:אם )?לקבל|(?:^|\s)נא\s+ל|אנא (?:שלח|תשלחו?|העבר|תעבירו?|אשר|תאשרו?|עדכן|תעדכנו?|ציין|תציינו?|פרט|תפרטו?|מלא|תמלאו?)|האם תוכלו?|תוכלו? בבקשה|אשמח אם תשלחו?|(?:אפשר|ניתן) לקבל את|יש צורך ש|נדרש ממך|חשוב שתעביר|(?:^|\s)אם תוכלו?\s|(?:^|\s)אם תוכלי\s|(?:^|\s)אם אפשר\s|נשמח לקבל|תודה מראש (?:על|ש)|יהיה נהדר אם תוכלו?|נודה לך אם|ההשתתפות שלך נדרשת)/;
+  // "Please follow up with Dana about the invoice" is an explicit ask, and
+  // it never matched HANDOFF: "follow up" isn't in that verb list, and the
+  // "send" later in the sentence isn't adjacent to "please". Kept out of
+  // HANDOFF on purpose — these go through directedAsk() below (negation and
+  // a hedge sitting in front of the phrase still kill them) instead of
+  // HANDOFF's bare .test(), which cannot see "please don't follow up".
+  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up)\b/i;
+  const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי/;
+  // A first-person delivery promise. Not a COMMIT word ("agreed",
+  // "approved") and not a reader reminder ("you agreed to") — "I will send
+  // the contract by Friday" is the sender closing a dated obligation on
+  // themselves. Weight stays zero: without a resolved date this is not
+  // evidence, and only intent.js's dated-commitment gate reads the flag.
+  // Delivery verbs only, so "I'll have a look" / "I'll see" never count.
+  const SENDER_PROMISE = /\b(?:I|we)(?:'ll| will)\s+(?:send|deliver|share|provide|submit|file|pay|return|forward|transfer|wire|prepare|email|finish|complete)\b/i;
+  const SENDER_PROMISE_HE = /(?:^|\s)(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/;
   const DISPUTE_HE = /(לא תואם|אי התאמה|חיוב כפול|חיוב שגוי|מחלוקת|טעות בחיוב|הסכום שגוי|יש טעות בחשבונית|לא תואם למוסכם|חיוב יתר|חיוב חסר|טעות בגבייה|חיוב לא מורשה)/;
 
   const MARKETING = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|webinar|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;
@@ -128,6 +144,13 @@ const FlowJudgment = (() => {
   // can you confirm a time this week?" collects money + commitment + handoff and
   // outscores an actual signed contract.
   const SOLICITATION = /\b(pricing starts at|book a (?:demo|call|time)|schedule a (?:demo|call|quick chat)|free trial|hope this (?:email )?finds you well|following up on my (?:last|previous) email|just bumping this|circling back|quick question for you|reaching out because|thought you'?d be interested|worth a (?:quick )?chat)\b/i;
+  // Hard-gate veto, narrower than SOLICITATION / MARKETING on purpose.
+  // "schedule a call" and "webinar" are in those penalties AND in the
+  // meeting lexicon — a score hit is right, a veto would hide a real
+  // "can we schedule a call on Monday". What remains is a pitch or a
+  // mailing even when the message also names a date or an object.
+  const PITCH_VETO = /\b(pricing starts at|free trial|hope this (?:email )?finds you well|following up on my (?:last|previous) email|just bumping this|circling back|quick question for you|reaching out because|thought you'?d be interested|worth a (?:quick )?chat|book a demo|schedule a demo)\b/i;
+  const MARKETING_VETO = /\b(unsubscribe|view (?:this )?in (?:your )?browser|manage (?:your )?(?:email )?preferences|newsletter|limited[- ]time|special offer|% off|register now|save your seat)\b/i;
 
   // Where a reply stops being new and starts being history. Gmail's own quote
   // header runs about 60 characters ("On Mon, Sep 1, 2025 at 9:41 AM Dana Cole
@@ -256,6 +279,16 @@ const FlowJudgment = (() => {
   // have the same false-positive risk, so only this one needed the guard.
   const HEDGE_HE = /(?:(?:^|\s)אם\s|אולי|ייתכן|בכפוף ל|בהנחה ש|במידה ו)/;
 
+  // True when a negation sits in the window immediately before a match.
+  // Exported so intent.js's meeting gate can reuse this exact window
+  // instead of growing a second copy that drifts. Questions and hedges
+  // are deliberately not this function's job: "Can we do a call Monday?"
+  // is a real invite, and assertedIn() is what refuses those for
+  // commitments.
+  function isNegatedBefore(before) {
+    return NEG_BEFORE.test(before || '') || NEG_BEFORE_HE.test(before || '');
+  }
+
   function assertedIn(text, pattern) {
     for (const s of String(text || '').split(SENTENCE_SPLIT)) {
       const m = s.match(pattern);
@@ -264,8 +297,26 @@ const FlowJudgment = (() => {
       if (/\?\s*$/.test(s.trim())) continue;
       if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
       const before = s.slice(0, m.index);
-      if (NEG_BEFORE.test(before) || NEG_BEFORE_HE.test(before)) continue;
+      if (isNegatedBefore(before)) continue;
       return true; // at least one sentence states it plainly
+    }
+    return false;
+  }
+  // Same per-sentence negation/hedge test as assertedIn, except a question
+  // still counts. Follow-up asks are questions as often as they are
+  // imperatives ("please follow up with Dana about the invoice?"); the
+  // commitment scorer is right to ignore questions, and an ask scorer is
+  // wrong to. Hedge and negation only count when they sit BEFORE the
+  // phrase, so "please follow up on the invoice if you have the latest
+  // copy" stays an ask — the condition trails it, it doesn't withdraw it.
+  function directedAsk(text, pattern) {
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      const m = s.match(pattern);
+      if (!m) continue;
+      const before = s.slice(0, m.index);
+      if (HEDGE.test(before) || HEDGE_HE.test(before)) continue;
+      if (isNegatedBefore(before)) continue;
+      return true;
     }
     return false;
   }
@@ -276,10 +327,22 @@ const FlowJudgment = (() => {
     const signals = [];
     const add = (id, weight, why) => signals.push({ id, weight, why });
 
-    if (facts.automated) add('automated', -60, 'The sender looks automated');
-    if (MARKETING.test(text)) add('marketing', -45, 'Reads like a mailing list, not a person');
-    if (SOLICITATION.test(text)) add('solicitation', -55, 'Reads like a cold pitch, not your work');
-    if (CALENDAR_NOISE.test(text)) add('calendar', -35, 'Calendar notification boilerplate');
+    // These four are not just point penalties. intent.js's hard gates do
+    // not consult the total, so a cold bump that names an invoice, a
+    // "circling back, you agreed…", and a calendar acceptance used to chip
+    // at a negative score. `noise` is that same decision, visible to the
+    // gates.
+    //
+    // Narrower than the penalties just above — see PITCH_VETO / MARKETING_VETO.
+    const automated = !!facts.automated;
+    const marketing = MARKETING.test(text);
+    const solicitation = SOLICITATION.test(text);
+    const calendarNoise = CALENDAR_NOISE.test(text);
+    const noise = automated || calendarNoise || PITCH_VETO.test(text) || MARKETING_VETO.test(text);
+    if (automated) add('automated', -60, 'The sender looks automated');
+    if (marketing) add('marketing', -45, 'Reads like a mailing list, not a person');
+    if (solicitation) add('solicitation', -55, 'Reads like a cold pitch, not your work');
+    if (calendarNoise) add('calendar', -35, 'Calendar notification boilerplate');
     if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
     // A commitment counts only where a sentence actually states it. The
@@ -301,8 +364,10 @@ const FlowJudgment = (() => {
     // asking whether the sentence negates them inverts the very signal.
     const lost = LOST.test(text) || LOST_HE.test(text);
     const obligation = anyOf(text, OBLIG_PATS, assertedIn);
-    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text);
+    const followUpAsk = anyOf(text, [FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE], directedAsk);
+    const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text) || followUpAsk;
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
+    const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
     if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
@@ -334,7 +399,7 @@ const FlowJudgment = (() => {
     else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
-    return { total, signals, flags: { commit, lost, executed, obligation, handoff, dispute, onDomain } };
+    return { total, signals, flags: { commit, lost, executed, obligation, handoff, dispute, onDomain, senderPromise, noise } };
   }
 
   // The threshold is the only thing that learns. Clicking says "more like that",
@@ -538,8 +603,8 @@ const FlowJudgment = (() => {
   // test/judgment-corpus.cjs) rather than re-deriving a second, potentially
   // drifting copy of the same judgment.
   return {
-    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, score, newContent,
-    HANDOFF, HANDOFF_HE,
+    evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, isNegatedBefore, score, newContent,
+    HANDOFF, HANDOFF_HE, FOLLOW_UP_ASK, FOLLOW_UP_ASK_HE, SENDER_PROMISE, SENDER_PROMISE_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };
 })();

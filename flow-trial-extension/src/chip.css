@@ -56,6 +56,16 @@
   animation: flow-chip-in 180ms ease-out;
 }
 
+/* After Do It, the host is no longer a proposal. The receipt card is the
+   whole surface — leaving the blue proposal frame around it made "Handled."
+   look like one more line inside a still-open chip. */
+.flow-chip-host.flow-chip-settled {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
 .flow-chip-text {
   all: unset;
   display: block;
@@ -370,20 +380,22 @@
 .flow-chip.flow-chip-done .flow-chip-label { color: #0B4F32; font-weight: 700 }
 
 /* The standing lead line — sits on the icon's own line, before the process
-   badge and closedSummary() text below it. The permanent, every-close
-   counterpart to flow-chip-first-close's one-time warm sentence (see that
-   rule and docs/magic-moment.md): from the 4th close onward this is the
-   first thing read, sized and weighted as the receipt's primary text so
-   "handled" always lands before the specifics do. */
+   badge and closedSummary() text below it. Every close, including the
+   first three, leads with this word. A partial close recolors it amber
+   (flow-chip-handled-partial) because "Handled." is only a full close.
+   Sized and weighted as the receipt's primary text so the outcome is
+   read before the specifics. */
 .flow-chip-handled {
   all: unset;
   display: inline-block;
+  flex: 1 1 auto;
   font-family: inherit;
   font-size: 14.5px;
   font-weight: 800;
   line-height: 1.2;
   color: #0B4F32;
 }
+.flow-chip-handled-partial { color: #8A5A00; }
 
 /* Wraps the process badge + closedSummary() sentence that used to open the
    receipt on their own. Now a full-width secondary line beneath the lead
@@ -400,7 +412,7 @@
 }
 .flow-chip-detail .flow-chip-label { font-size: 12.5px; }
 
-.flow-chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 4px; }
+.flow-chip-actions { display: inline-flex; flex: 1 1 100%; align-items: center; gap: 6px; margin-inline-start: 4px; }
 .flow-chip-link {
   all: initial;
   font-family: inherit;
@@ -419,6 +431,28 @@
 .flow-chip-link:hover { background: rgba(15,102,64,.14); border-color: rgba(15,102,64,.5); }
 .flow-chip-link:focus-visible { outline: 2px solid #0F6640; outline-offset: 1px; }
 
+/* Undo is the one control on the receipt that changes what was just
+   written. View stays the quiet outline above; Undo is filled so the two
+   cannot be read as the same kind of link. It is not a second Do It —
+   Do It keeps the blue shell/ring/shine, and this stays in the receipt's
+   own green. */
+.flow-chip-undo {
+  all: initial;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid #0B4F32;
+  background: linear-gradient(180deg, #17a866, #0F6640);
+  line-height: 1;
+}
+.flow-chip-undo:hover { filter: brightness(1.06); }
+.flow-chip-undo:disabled { opacity: .65; cursor: default; }
+.flow-chip-undo:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
+
 /* Appended to a multi-action receipt only when at least one of the actions
    in the group didn't complete — the receipt still shows what DID succeed
    rather than hiding a partial result behind a single pass/fail state. */
@@ -433,15 +467,28 @@
   margin-inline-start: 6px;
 }
 
-/* The Magic Moment's one-time warm sentence for a new account's first
-   three closes — see docs/magic-moment.md. Sits in the receipt's lead
-   position, before flow-chip-detail's process badge and closedSummary()
-   text (flow-chip-handled is its every-close counterpart from the 4th
-   close on; only one of the two is ever appended for a given close). Same
-   green family as the rest of flow-chip-done, still a touch lighter than
-   flow-chip-handled's weight so it reads as reassurance rather than a
-   second headline — the technical detail underneath stays the quiet part
-   either way. */
+/* The Magic Moment's extra sentence for a new account's first three
+   full closes — see docs/magic-moment.md. Sits under flow-chip-handled,
+   never instead of it: the status word is what makes the outcome
+   unambiguous, and this line is the warmer claim under that word. Same
+   green family, lighter weight, so it reads as reassurance rather than
+   a second headline. A partial close does not get this line. */
+/* What the close actually wrote — "Google Task · $4,200 · due Sep 21",
+   "Gmail draft · …". Comes from the writer's own `written` field, so it
+   only appears after that write succeeded. Full width, under the process
+   line, so a long ask can wrap instead of overflowing the receipt. */
+.flow-chip-written {
+  all: unset;
+  display: block;
+  flex: 1 1 100%;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0B4F32;
+  white-space: normal;
+}
+
 .flow-chip-first-close {
   all: unset;
   display: block;

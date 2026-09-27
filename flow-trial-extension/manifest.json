@@ -37,8 +37,10 @@
         "core/intent.js",
         "core/actions.js",
         "core/execution-memory.js",
+        "core/close-memory.js",
         "core/pmf-metrics.js",
         "core/classification-metrics.js",
+        "core/close-quality-metrics.js",
         "src/chrome-storage-adapter.js",
         "src/storage.js",
         "core/privacyShield.js",
@@ -47,6 +49,7 @@
         "src/sidebar.js",
         "src/brief.js",
         "src/weekly.js",
+        "src/receipt-copy.js",
         "src/content-gmail.js"
       ],
       "css": [

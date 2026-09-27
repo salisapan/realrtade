@@ -15,6 +15,9 @@ const FlowExtract = (() => {
   // JS's own Date.getDay() (0 = Sunday) and the two "by/on <weekday>" blocks
   // in parseDate() below can share identical delta math.
   const DAYS_HE = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  // Gregorian month names as Israeli business mail actually writes them
+  // ("7 בספטמבר"), in the same order as MONTHS so the index is the month.
+  const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 
   const CURRENCY = {
     '$': 'USD', 'us$': 'USD', 'usd': 'USD',
@@ -177,6 +180,14 @@ const FlowExtract = (() => {
     m = text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + monthNames + ')(?:,?\\s+(\\d{4}))?\\b', 'i'));
     if (m) return monthDay(m[0], MONTHS.indexOf(m[2].toLowerCase()), +m[1], m[3], now);
 
+    // "7 בספטמבר" / "ב-21 בספטמבר 2026". The ב clings to the month name
+    // (בספטמבר), the same way English puts the month name next to the day.
+    // No year uses monthDay()'s window, so a bare day six months out stays
+    // unresolved instead of being filed on the wrong year. A Hebrew letter
+    // after the month name ("בספטמבראי") is not that month.
+    m = text.match(new RegExp('(?:^|[^\\d\\u0590-\\u05FF])(\\d{1,2})\\s+ב-?(' + MONTHS_HE.join('|') + ')(?![\\u0590-\\u05FF])(?:\\s+(\\d{4}))?'));
+    if (m) return monthDay(m[0].replace(/^[^\d]+/, ''), MONTHS_HE.indexOf(m[2]), +m[1], m[3], now);
+
     // "by Monday" / "next Friday" — only when a scheduling word introduces it,
     // so a signature line reading "Monday" is not mistaken for a deadline.
     m = text.match(new RegExp('\\b(?:by|on|before|due|until|no later than|signing|closing|starting|effective|kick(?:ing)? off)\\s+(?:on\\s+)?(?:next\\s+)?(' + DAYS.join('|') + ')\\b', 'i'));
@@ -197,6 +208,22 @@ const FlowExtract = (() => {
       return { raw: m[0], iso: iso(d) };
     }
 
+    // "Let's do a call next Friday" has no "on"/"by" in front of it. "next"
+    // is itself the scheduling word — a signature line does not say "next
+    // Friday" — and leaving it unresolved dropped a real meeting. Same
+    // delta rule as "on next Friday" above, including "next Friday" said
+    // on a Friday staying one week out rather than two.
+    m = text.match(new RegExp('\\bnext\\s+(' + DAYS.join('|') + ')\\b', 'i'));
+    if (m) {
+      const target = DAYS.indexOf(m[1].toLowerCase());
+      const d = new Date(now);
+      let delta = (target - d.getDay() + 7) % 7;
+      if (delta === 0) delta = 7;
+      else delta += 7;
+      d.setDate(d.getDate() + delta);
+      return { raw: m[0], iso: iso(d) };
+    }
+
     // Hebrew equivalent of the "by/on <weekday>" block above — "עד יום שני"
     // (by Monday), "ביום רביעי" (on Wednesday), "לא יאוחר מיום חמישי" (no
     // later than Thursday). Requires the same scheduling-word guard so a
@@ -209,15 +236,61 @@ const FlowExtract = (() => {
     // match silently never fires. Same failure shape as the PHONE_PATTERN
     // fix earlier in privacyShield.js: a boundary that can only ever hold
     // next to ASCII text is not a boundary at all next to Hebrew.
-    m = text.match(new RegExp('(?:עד|ב-?|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')'));
+    // "הבא" ("next") follows the weekday ("ביום שני הבא"). The old check
+    // looked for הבא at the end of a match that stopped at the weekday, so
+    // it never fired and "next Monday" was filed on this Monday. הבא must
+    // not be a prefix of a longer word ("הבאנו", "we brought") — there is
+    // no \b after Hebrew, so the lookahead is the boundary.
+    m = text.match(new RegExp('(?:עד|ב-?|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')(?:\\s+הבא(?![\\u0590-\\u05FF]))?'));
     if (m) {
       const target = DAYS_HE.indexOf(m[1]);
       const d = new Date(now);
       let delta = (target - d.getDay() + 7) % 7;
+      const isNext = /הבא(?![\u0590-\u05FF])/.test(m[0]);
       if (delta === 0) delta = 7;
-      else if (/הבא\s*$/.test(m[0])) delta += 7;
+      else if (isNext) delta += 7;
       d.setDate(d.getDate() + delta);
       return { raw: m[0], iso: iso(d) };
+    }
+
+    // A single named day, not a range. "tomorrow" said on Friday is
+    // Saturday — the sender stated it. "next week" is a span, so it stays
+    // unresolved. Checked after explicit dates and weekdays so "Friday,
+    // or tomorrow if needed" keeps Friday.
+    //
+    // "today" is not in that list. "as of today" and "the document today"
+    // are not a day to file, and treating them as one pushed a price quote
+    // over the threshold. Today counts only next to a deadline word, a
+    // meeting word, or a clock ("due today", "meet today", "today at 3pm").
+    m = text.match(/\b(the day after tomorrow|tomorrow)\b/i);
+    if (m) {
+      const word = m[1].toLowerCase();
+      const days = word === 'tomorrow' ? 1 : 2;
+      const d = new Date(now);
+      d.setDate(d.getDate() + days);
+      return { raw: m[0], iso: iso(d) };
+    }
+    m = text.match(/\b(?:by|due|before|until|no later than)\s+today\b|\b(?:meet(?:ing)?|call|sync)\s+today\b|\btoday\s+at\b/i);
+    if (m) {
+      const d = new Date(now);
+      return { raw: m[0], iso: iso(d) };
+    }
+
+    // מחרתיים before מחר so the longer word is not clipped. ל? covers
+    // למחר ("for tomorrow"). אתמול stays unresolved: a past day is not
+    // something to put on a calendar. היום is the same trap as English
+    // "today" — only next to a meeting or a clock.
+    m = text.match(/(?:^|[^\u0590-\u05FF])ל?(מחרתיים|מחר)(?![\u0590-\u05FF])/);
+    if (m) {
+      const days = m[1] === 'מחר' ? 1 : 2;
+      const d = new Date(now);
+      d.setDate(d.getDate() + days);
+      return { raw: m[1], iso: iso(d) };
+    }
+    m = text.match(/(?:פגישה|שיחה|עד)\s+היום(?![\u0590-\u05FF])|היום\s+בשעה/);
+    if (m) {
+      const d = new Date(now);
+      return { raw: 'היום', iso: iso(d) };
     }
 
     // Numeric M/D or D/M is genuinely ambiguous across locales, so it is kept as

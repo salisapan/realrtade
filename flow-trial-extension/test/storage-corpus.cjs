@@ -50,6 +50,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'pmf-metrics.
 // getClassificationSnapshot() calls into FlowClassificationMetrics — loaded
 // here for the same load-order reason pmf-metrics.js is above.
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'classification-metrics.js'), 'utf8'), sandbox, { filename: 'classification-metrics.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'close-quality-metrics.js'), 'utf8'), sandbox, { filename: 'close-quality-metrics.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8'), sandbox, { filename: 'storage.js' });
 const FlowStorage = vm.runInContext('FlowStorage', sandbox);
 
@@ -740,6 +741,54 @@ async function run() {
     const empty = await FlowStorage.getClassificationSnapshot();
     check('zero recorded classifications returns null rates, not fabricated 0%s',
       empty.totalScanned === 0 && empty.localCoverageRate === null && empty.aiCatchRate === null && empty.totalMissRate === null, empty);
+  }
+
+  console.log('\n--- storage.js: recordCloseQuality() fires success, return, and false-Do-It ---\n');
+  store = {};
+  {
+    const DAY_A = 'Mon Sep 14 2026';
+    const DAY_B = 'Tue Sep 15 2026';
+
+    const success = await FlowStorage.recordCloseQuality({ kind: 'success', messageId: 'm1', day: DAY_A, ts: 1 });
+    check('a full-write success event is stored', success && success.kind === 'success' && success.id === 'm1', success);
+    const successAgain = await FlowStorage.recordCloseQuality({ kind: 'success', messageId: 'm1', day: DAY_A, ts: 2 });
+    check('the same message does not fire a second success', successAgain === null);
+
+    const firstUse = await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: 'm1', day: DAY_A, ts: 1 });
+    check('the first Do It does not fire a return', firstUse === null);
+    const sameDay = await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: 'm2', day: DAY_A, ts: 2 });
+    check('a same-day Do It does not fire a return', sameDay === null);
+    const returned = await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: 'm3', day: DAY_B, ts: 3 });
+    check('Do It on a later day fires one return event', returned && returned.kind === 'return' && returned.day === DAY_B, returned);
+
+    const dismissed = await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 'm4', reason: 'dismiss', day: DAY_B, ts: 4 });
+    check('a dismiss fires a false-Do-It', dismissed && dismissed.kind === 'falseDoIt' && dismissed.reason === 'dismiss', dismissed);
+    const undone = await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 'm5', reason: 'undo', day: DAY_B, ts: 5 });
+    check('an undo fires a false-Do-It', undone && undone.reason === 'undo', undone);
+    const undoneAgain = await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 'm5', reason: 'undo', day: DAY_B, ts: 6 });
+    check('the same message does not fire a second false-Do-It', undoneAgain === null);
+
+    const ignored = await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 'm6', reason: 'quiet-miss', day: DAY_B, ts: 7 });
+    check('a quiet-miss is not recorded', ignored === null);
+    const garbage = await FlowStorage.recordCloseQuality({ kind: 'nope' });
+    check('an unknown kind is ignored', garbage === null);
+
+    const snapshot = await FlowStorage.getCloseQualitySnapshot();
+    check('the snapshot has all three counts', snapshot.success === 1 && snapshot.return === 1 && snapshot.falseDoIt === 2, snapshot);
+    const kinds = snapshot.recent.map((e) => e.kind).sort();
+    check('recent contains the three event kinds', kinds.indexOf('success') !== -1 && kinds.indexOf('return') !== -1 && kinds.indexOf('falseDoIt') !== -1, kinds);
+
+    const persisted = (await FlowStorage.get()).closeQuality;
+    check('the counts survived in chrome.storage, not only the return value',
+      persisted.success === 1 && persisted.return === 1 && persisted.falseDoIt === 2 && persisted.lastDoItDay === DAY_B, persisted);
+  }
+
+  console.log('\n--- storage.js: getCloseQualitySnapshot() on an untouched profile ---\n');
+  store = {};
+  {
+    const empty = await FlowStorage.getCloseQualitySnapshot();
+    check('an untouched profile has three zero counts and no events',
+      empty.success === 0 && empty.return === 0 && empty.falseDoIt === 0 && empty.recent.length === 0, empty);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

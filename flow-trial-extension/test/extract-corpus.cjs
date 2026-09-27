@@ -108,5 +108,54 @@ console.log('\n--- extract.js: an hour that could be either half of the day ---\
   check('"at 9:30" keeps its minutes', FlowExtract.parseTime('at 9:30').minute === 30);
 }
 
+console.log('\n--- extract.js: "next <weekday>" and Hebrew "יום X הבא" are not this week ---\n');
+{
+  // NOW is Friday 2026-09-18. "next Friday" with no "on" in front used to
+  // parse as no date at all, so "a call next Friday at 3pm" stayed silent.
+  // Hebrew "הבא" was matched against a string that ended at the weekday,
+  // so "ביום שני הבא" landed on this Monday.
+  check('"next Friday" with no introducer is the Friday after this one',
+    dateOf('Let us do a call next Friday at 3pm.').iso === '2026-09-25', dateOf('Let us do a call next Friday at 3pm.'));
+  check('"on next Friday" stays the same week-ahead date',
+    dateOf('on next Friday').iso === '2026-09-25', dateOf('on next Friday'));
+  check('Hebrew "ביום שני" from a Friday is the coming Monday',
+    dateOf('פגישה ביום שני בשעה 15:00').iso === '2026-09-21', dateOf('פגישה ביום שני בשעה 15:00'));
+  check('Hebrew "ביום שני הבא" is the Monday after that',
+    dateOf('פגישה ביום שני הבא בשעה 15:00').iso === '2026-09-28', dateOf('פגישה ביום שני הבא בשעה 15:00'));
+  check('"הבאנו" is "we brought", not "next"',
+    dateOf('ביום שני הבאנו את החוזה').iso === '2026-09-21', dateOf('ביום שני הבאנו את החוזה'));
+}
+
+console.log('\n--- extract.js: a stated today/tomorrow is a date; a guessed one is not ---\n');
+{
+  check('"tomorrow" is the next day', dateOf('the invoice is due tomorrow').iso === '2026-09-19', dateOf('the invoice is due tomorrow'));
+  check('"meet today at" is today', dateOf('let us meet today at 3pm').iso === '2026-09-18', dateOf('let us meet today at 3pm'));
+  check('"due today" is today', dateOf('the invoice is due today').iso === '2026-09-18', dateOf('the invoice is due today'));
+  check('a bare "today" on a quote is not a date', dateOf('scope document today') === null, dateOf('scope document today'));
+  check('"as of today" is not a date', dateOf('fully executed as of today') === null, dateOf('fully executed as of today'));
+  check('"the day after tomorrow" is two days out',
+    dateOf('call the day after tomorrow').iso === '2026-09-20', dateOf('call the day after tomorrow'));
+  check('Hebrew "מחר" is tomorrow', dateOf('שיחה מחר בשעה 15:00').iso === '2026-09-19', dateOf('שיחה מחר בשעה 15:00'));
+  check('Hebrew "מחרתיים" is not clipped to "מחר"', dateOf('פגישה מחרתיים').iso === '2026-09-20', dateOf('פגישה מחרתיים'));
+  check('Hebrew "פגישה היום" is today', dateOf('פגישה היום בשעה 10:00').iso === '2026-09-18', dateOf('פגישה היום בשעה 10:00'));
+  check('a bare Hebrew "היום" is not a date', dateOf('המסמך המצורף היום') === null, dateOf('המסמך המצורף היום'));
+  check('Hebrew "למחר" is still tomorrow', dateOf('נתאם למחר').iso === '2026-09-19', dateOf('נתאם למחר'));
+  check('an explicit weekday still wins over "tomorrow" later in the line',
+    dateOf('on Monday, or tomorrow if needed').iso === '2026-09-21', dateOf('on Monday, or tomorrow if needed'));
+}
+
+console.log('\n--- extract.js: Hebrew day-and-month uses the same year window ---\n');
+{
+  check('"21 בספטמבר" in September resolves',
+    dateOf('פגישה ב-21 בספטמבר בשעה 15:00').iso === '2026-09-21', dateOf('פגישה ב-21 בספטמבר בשעה 15:00'));
+  check('"7 בספטמבר" eleven days ago still resolves',
+    dateOf('בתוקף מ-7 בספטמבר').iso === '2026-09-07', dateOf('בתוקף מ-7 בספטמבר'));
+  check('an explicit Hebrew year is taken literally',
+    dateOf('21 בספטמבר 2026').iso === '2026-09-21', dateOf('21 בספטמבר 2026'));
+  const march = dateOf('7 במרץ');
+  check('"7 במרץ" in September does not invent a year', march && march.iso === null && march.ambiguousYear === true, march);
+  check('"31 בספטמבר" is not a date', dateOf('31 בספטמבר') === null, dateOf('31 בספטמבר'));
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

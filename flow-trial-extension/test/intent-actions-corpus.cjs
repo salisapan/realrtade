@@ -54,6 +54,10 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('meeting alone proposes the "schedule" process', process.id === 'schedule', process && process.id);
   check('meeting alone proposes exactly [calendar, task] step ids', JSON.stringify(stepIds(process)) === JSON.stringify(['calendar', 'task']), stepIds(process));
   check('meeting alone proposes exactly [Calendar, Task] connector kinds', JSON.stringify(stepKinds(process)) === JSON.stringify(['calendar', 'googleTask']), stepKinds(process));
+  const calendar = process.steps.find((s) => s.id === 'calendar');
+  check('the calendar step carries the meeting sentence, not only the short title',
+    calendar && /review the contract/i.test(calendar.params.quote) && calendar.params.title !== calendar.params.quote,
+    calendar && calendar.params);
 }
 
 // 2. Meeting invite that ALSO asks for confirmation -> still SCHEDULED_EVENT,
@@ -189,6 +193,63 @@ console.log('--- intent.js: type + entity checks ---\n');
   check('a date-only postponed meeting does not fire SCHEDULED_EVENT', !dateOnlyCancelled || dateOnlyCancelled.type !== FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyCancelled && dateOnlyCancelled.type);
   const dateOnlyRecap = classify('Thanks for the call on Monday, great meeting, glad we synced!', { now });
   check('a date-only recap does not fire SCHEDULED_EVENT', !dateOnlyRecap || dateOnlyRecap.type !== FlowIntent.TYPES.SCHEDULED_EVENT, dateOnlyRecap && dateOnlyRecap.type);
+}
+
+// 3g. A refused or only-maybe meeting that still names a day and a time
+//     must not become a Calendar entry. The noun + date gate used to treat
+//     "I can't do the call on Monday" the same as "let's do the call on
+//     Monday". A real invite, including a question, still has to fire.
+{
+  const now = new Date('2026-09-17T12:00:00Z'); // Thursday
+  const refused = [
+    ['cannot', "I can't do the call on Monday at 3pm, something came up with the contract review."],
+    ["let's not", "Let's not do the call on Monday at 3pm after all regarding the contract."],
+    ['will not', 'We will not be having the meeting on Monday at 3pm to review the contract.'],
+    ['unable', 'Unable to make the call on Monday at 3pm to review the contract.'],
+    ['might', 'We might do a call on Monday at 3pm if the contract is ready for review.'],
+    ['Hebrew cannot', 'לא נוכל לקיים את הפגישה ביום שני בשעה 15:00 לסקירת החוזה.']
+  ];
+  for (const [label, text] of refused) {
+    const intent = classify(text, { now });
+    check('a ' + label + ' meeting does not become a Calendar entry',
+      !intent || intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+  }
+  const stillOn = classify('The call on Monday at 3pm still works, but I can\'t do the Tuesday workshop.', { now });
+  check('a negation about a different day does not hide the real meeting',
+    stillOn && stillOn.type === FlowIntent.TYPES.SCHEDULED_EVENT, stillOn && stillOn.type);
+  const polite = classify('Could you join the call on Monday at 3pm to review the contract?', { now });
+  check('a polite "could you join" invite still fires SCHEDULED_EVENT',
+    polite && polite.type === FlowIntent.TYPES.SCHEDULED_EVENT, polite && polite.type);
+
+  const nextFriday = classify('Let us do a call next Friday at 3pm to review the contract.', { now });
+  check('a bare "next Friday" meeting fires SCHEDULED_EVENT',
+    nextFriday && nextFriday.type === FlowIntent.TYPES.SCHEDULED_EVENT, nextFriday && nextFriday.type);
+  check('a bare "next Friday" lands a week past this Friday',
+    nextFriday && nextFriday.entities && nextFriday.entities.dateIso === '2026-09-25', nextFriday && nextFriday.entities);
+
+  const tomorrow = classify('Let us do a call tomorrow at 3pm to review the contract.', { now });
+  check('a "tomorrow" meeting fires SCHEDULED_EVENT on the next day',
+    tomorrow && tomorrow.type === FlowIntent.TYPES.SCHEDULED_EVENT && tomorrow.entities.dateIso === '2026-09-18' && tomorrow.entities.hour === 15,
+    tomorrow && tomorrow.entities);
+
+  const heNext = classify('נקבע פגישה ביום שני הבא בשעה 15:00 לסקירת החוזה וההסכם.', { now });
+  check('Hebrew "ביום שני הבא" is a meeting on the following Monday',
+    heNext && heNext.type === FlowIntent.TYPES.SCHEDULED_EVENT && heNext.entities.dateIso === '2026-09-28' && heNext.entities.hour === 15,
+    heNext && heNext.entities);
+
+  const heTomorrow = classify('נקבע שיחה מחר בשעה 15:00 לסקירת החוזה וההסכם המלא.', { now });
+  check('Hebrew "מחר" is a meeting tomorrow',
+    heTomorrow && heTomorrow.type === FlowIntent.TYPES.SCHEDULED_EVENT && heTomorrow.entities.dateIso === '2026-09-18',
+    heTomorrow && heTomorrow.entities);
+
+  const heMonth = classify('נקבע פגישה ב-21 בספטמבר בשעה 15:00 לסקירת החוזה.', { now });
+  check('a Hebrew day-and-month meeting resolves that day',
+    heMonth && heMonth.type === FlowIntent.TYPES.SCHEDULED_EVENT && heMonth.entities.dateIso === '2026-09-21',
+    heMonth && heMonth.entities);
+
+  const pitch = classify('Hope this email finds you well. Can we schedule a call tomorrow at 3pm? Our pricing starts at $99/mo.', { now });
+  check('a cold pitch that says "tomorrow" stays silent',
+    !pitch || pitch.type === null, pitch && pitch.type);
 }
 
 // 3f. MEETING_NOUN/MEETING_NOUN_HE's broader event-noun vocabulary, plus a
@@ -802,6 +863,193 @@ console.log('\n--- intent.js: REQUEST fires on a named concrete object, no date/
 
   const smalltalk = classify('Just wanted to say hi and see how you have been doing lately!');
   check('EN: pure greeting/small talk, no handoff at all, stays silent', smalltalk.type === null, smalltalk);
+}
+
+// Personal close types the chip must trust, and the silence cases next to
+// them. Chosen after probing classify() (the path content-gmail.js actually
+// uses) against the three candidate shapes:
+//
+//   1. Dated commitment — an asserted agreement, or a first-person delivery
+//      promise, plus a resolved date. Short mail of this shape scored ~17
+//      (commitment 30 + date 12 − too-short 25) and the chip stayed quiet.
+//   2. Explicit ask to follow up or send a named thing — "could you send the
+//      invoice" already fired; "please follow up … about the invoice" did not,
+//      because HANDOFF never listed "follow up".
+//   3. Confirmed amount — "agreed at $3,900, effective Sep 7" already cleared
+//      50; "Confirming the amount is $4,200" scored 39 and stayed quiet.
+//
+// Silence: hard gates used to ignore solicitation / marketing / calendar
+// boilerplate, so a priced cold pitch and a calendar acceptance both chipped
+// at a negative score. A handoff plus a dollar figure and nothing else did too.
+console.log('\n--- personal close types: dated commitment, explicit ask, confirmed amount ---\n');
+{
+  function planId(text) {
+    return FlowActions.planFor(classify(text), { threadUrl: 'x', hasThreadAttachment: false });
+  }
+
+  const dated = [
+    ['EN agreed + date', 'We agreed to file the amendment by September 21.'],
+    ['EN confirmed + date', 'Confirmed. I will have the report to you by October 14.'],
+    ['EN sender promise + date', 'I will send you the signed contract by Friday, September 18.'],
+    ['HE sender promise + date', 'אני אשלח לך את החוזה עד יום שישי.']
+  ];
+  for (const [label, text] of dated) {
+    const intent = classify(text);
+    const process = planId(text);
+    check(label + ' -> DECISION_TO_LOG at high confidence',
+      intent.type === FlowIntent.TYPES.DECISION_TO_LOG && intent.confidence === 'high',
+      { type: intent.type, confidence: intent.confidence, score: intent.signals && intent.signals.score });
+    check(label + ' is a dated-commitment personal close', intent.personalClose === 'dated-commitment', intent.personalClose);
+    check(label + ' closes with the log-it task, carrying the date',
+      process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.dateIso),
+      process && { id: process.id, dates: process.steps.map((s) => s.params && s.params.dateIso) });
+    // The task title is what Google Tasks shows. "Log this decision" drops
+    // the date the chip already resolved — the close then doesn't name
+    // what it wrote.
+    check(label + ' task title names that date',
+      typeof intent.label === 'string' && intent.label.indexOf('Log this decision') === -1 && /\b[A-Z][a-z]{2} \d{1,2}\b/.test(intent.label),
+      intent.label);
+    const datedTask = process && process.steps.find((s) => s.kind === 'googleTask');
+    check(label + ' task step keeps the sentence the write will quote',
+      Boolean(datedTask && datedTask.params && datedTask.params.what),
+      datedTask && datedTask.params);
+  }
+
+  const datedSilent = [
+    ['promise with no date', 'I will send you the signed contract.'],
+    ['hedged promise', 'I might send the contract by Friday if legal signs off.'],
+    ['agreement with no date', 'We agreed. See you.'],
+    ['negated promise', 'We will not send the contract by Friday, September 18.'],
+    ['question, not a commitment', 'Did we agree to file the amendment by September 21?'],
+    ['past date only', 'We agreed to the terms on March 3, 2020 and that was the end of it.']
+  ];
+  for (const [label, text] of datedSilent) {
+    const intent = classify(text);
+    check('dated commitment stays silent: ' + label, !intent.type, intent.type);
+  }
+
+  const asks = [
+    ['please follow up + invoice', 'Please follow up with Dana about the invoice.'],
+    ['please follow up + date + status', 'Please follow up with the vendor by Friday and send the status update.'],
+    ['question-shaped follow up + invoice', 'Please follow up with Dana about the invoice?'],
+    ['HE follow up + invoice', 'תעקוב אחרי החשבונית בבקשה, זה דחוף מצדנו.'],
+    ['dated confirm ask', 'Could you confirm the $4,200 payment by Friday?']
+  ];
+  for (const [label, text] of asks) {
+    const intent = classify(text);
+    const process = planId(text);
+    check(label + ' -> REQUEST', intent.type === FlowIntent.TYPES.REQUEST, intent.type);
+    check(label + ' is a follow-up-ask personal close', intent.personalClose === 'follow-up-ask', intent.personalClose);
+    check(label + ' closes with reply-track (draft + task)',
+      process && process.id === 'reply-track' && process.steps.some((s) => s.kind === 'gmailDraft') && process.steps.some((s) => s.kind === 'googleTask'),
+      process && process.id);
+    const askDraft = process && process.steps.find((s) => s.kind === 'gmailDraft');
+    check(label + ' draft step names the ask it will write',
+      Boolean(askDraft && askDraft.params && askDraft.params.what),
+      askDraft && askDraft.params);
+  }
+
+  const askSilent = [
+    ['follow up, nothing named', 'Please follow up when you can.'],
+    ['follow up on this', 'Can you follow up on this?'],
+    ['negated follow up', "Please don't follow up with Dana about the invoice."],
+    ['HE follow up, nothing named', 'תעקוב אחרי זה כשתהיה לך דקה פנויה בבקשה.'],
+    ['money alone is not an ask', 'Can you confirm the $4,200?']
+  ];
+  for (const [label, text] of askSilent) {
+    const intent = classify(text);
+    check('explicit ask stays silent: ' + label, !intent.type, { type: intent.type, signals: intent.signals });
+  }
+
+  const amounts = [
+    ['EN confirming a figure', 'Confirming the amount is $4,200 for the year.'],
+    ['HE confirming a figure', 'מאשרים שהסכום הוא 4,200 שקל.'],
+    ['approved fee', 'Approved. The fee is $2,400.']
+  ];
+  for (const [label, text] of amounts) {
+    const intent = classify(text);
+    const process = planId(text);
+    check(label + ' -> DECISION_TO_LOG at high confidence',
+      intent.type === FlowIntent.TYPES.DECISION_TO_LOG && intent.confidence === 'high',
+      { type: intent.type, confidence: intent.confidence, score: intent.signals && intent.signals.score });
+    check(label + ' is a confirmed-amount personal close', intent.personalClose === 'confirmed-amount', intent.personalClose);
+    check(label + ' task carries the amount',
+      process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.amount),
+      process && process.steps.map((s) => s.params && s.params.amount));
+    check(label + ' task title names that figure',
+      typeof intent.label === 'string' && intent.entities && intent.entities.amount && intent.label.indexOf(intent.entities.amount) !== -1,
+      { label: intent.label, amount: intent.entities && intent.entities.amount });
+  }
+
+  const meeting = classify('Let’s do a call Friday, September 18 at 3pm to review the contract.');
+  check('a scheduled meeting is not tagged as a personal close',
+    meeting.type === FlowIntent.TYPES.SCHEDULED_EVENT && !meeting.personalClose,
+    { type: meeting.type, personalClose: meeting.personalClose });
+  const readerCommit = classify('You agreed to send the invoice by Friday, September 18.');
+  check('a reader commitment is not tagged as a personal close',
+    readerCommit.type === FlowIntent.TYPES.COMMITMENT_OF_READER && !readerCommit.personalClose,
+    { type: readerCommit.type, personalClose: readerCommit.personalClose });
+
+  const amountSilent = [
+    ['figure with nothing decided', 'The total came to $4,200.'],
+    ['a quote, not a confirmation', 'Our quote is $12,500 for the work described below in the attached scope document today.'],
+    ['refused figure', 'We do not confirm the $4,200 figure at all.'],
+    ['hedged figure', 'We might confirm the $4,200 next quarter once the board meets to review it.']
+  ];
+  for (const [label, text] of amountSilent) {
+    const intent = classify(text);
+    check('confirmed amount stays silent: ' + label, !intent.type, { type: intent.type, score: intent.signals && intent.signals.score });
+  }
+
+  // Hard gates must not outvote a noise penalty. Each of these chipped before
+  // this pass, at a negative score.
+  const noise = [
+    ['priced cold pitch', 'Hope this email finds you well. Our pricing starts at $99/mo. Can you confirm a time this week?'],
+    ['bump asking for an invoice', 'Just bumping this — could you send the invoice?'],
+    ['circling back on a reader commitment', 'Circling back on the contract. You agreed to send it by Friday.'],
+    ['pitch-shaped confirmation', 'Hope this email finds you well. Confirming we are agreed at $3,900 for the year, effective September 7.'],
+    ['calendar acceptance boilerplate', 'Dana has accepted this invitation. Meeting Friday, September 18 at 3pm.']
+  ];
+  for (const [label, text] of noise) {
+    const intent = classify(text);
+    check('noise stays silent: ' + label, !intent.type, { type: intent.type, score: intent.signals && intent.signals.score });
+  }
+
+  // A real ask that merely says "following up" (not the solicitation phrase
+  // "following up on my last email") must still chip.
+  const realFollow = classify('Just following up — could you share the updated contract?');
+  check('a real follow-up that names a contract still chips as REQUEST', realFollow.type === FlowIntent.TYPES.REQUEST, realFollow.type);
+
+  // Sustained rejection of "decision" mutes the new hard gates the same way
+  // it mutes the other hard-gated types — evidence stays real, the account
+  // has still asked to stop seeing it.
+  const heavyDecision = { decision: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const lightDecision = { decision: { clicks: 0, dismissals: 2, ts: NOW.getTime() } };
+  const stillDated = classify('We agreed to file the amendment by September 21.', { calibrationByType: lightDecision });
+  check('two "decision" dismissals do not suppress a dated commitment', stillDated.type === FlowIntent.TYPES.DECISION_TO_LOG, stillDated.type);
+  const suppressedDate = classify('We agreed to file the amendment by September 21.', { calibrationByType: heavyDecision });
+  check('heavy "decision" dismissals suppress a dated commitment', !suppressedDate.type, suppressedDate.type);
+  const suppressedAmount = classify('Confirming the amount is $4,200 for the year.', { calibrationByType: heavyDecision });
+  check('heavy "decision" dismissals suppress a confirmed amount', !suppressedAmount.type, suppressedAmount.type);
+  const otherType = { request: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
+  const notSuppressed = classify('We agreed to file the amendment by September 21.', { calibrationByType: otherType });
+  check('request-dismissal history does not suppress a dated commitment', notSuppressed.type === FlowIntent.TYPES.DECISION_TO_LOG, notSuppressed.type);
+}
+
+console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');
+{
+  const lines = FlowActions.receiptWrittenLines([
+    { response: { ok: true, written: 'Google Task · due Sep 21' } },
+    { response: { ok: false, written: 'should not appear' } },
+    { response: { ok: true, written: 'Google Task · due Sep 21' } },
+    { response: { ok: true, written: '  Gmail draft · the invoice  ' } },
+    { response: { ok: true, written: '   ' } }
+  ]);
+  check('receipt keeps each successful written line once, trimmed',
+    JSON.stringify(lines) === JSON.stringify(['Google Task · due Sep 21', 'Gmail draft · the invoice']),
+    lines);
+  check('a close with no written field stays quiet',
+    JSON.stringify(FlowActions.receiptWrittenLines([{ response: { ok: true } }])) === '[]');
 }
 
 console.log('\nTOTAL FAILURES:', failures);
