@@ -42,6 +42,19 @@ carried the decision. That is what makes the written record worth having.
 Every path is additive only: it creates one new record and never edits or
 deletes anything that was already there.
 
+**Calendar hold, no Calendar connection.** After that record is written, the
+same Do It click opens a prefilled Google Calendar event template
+(`https://calendar.google.com/calendar/render?action=TEMPLATE`) in a new tab.
+The title, day, amount, quote, and Gmail link come from the judgment already
+on the chip. The extractor names a day, not a clock time, so the hold is
+always 10:00–10:45 in the viewer's calendar timezone. When the email produced
+an ISO date, that day is used. When it did not, the day is the next weekday
+(Monday–Friday, strictly after today) — Friday, Saturday, and Sunday land on
+Monday. Google's page is where the user saves or discards the event. Glance
+does not call the Calendar API, does not add a Calendar permission, and Undo
+does not delete a Calendar event. The receipt says the hold was opened or is
+ready, and that the user still saves it.
+
 ## Local Privacy Shield, and where masked text is allowed to go
 
 Every message the sidebar or the chip ever reads is masked on-device first.

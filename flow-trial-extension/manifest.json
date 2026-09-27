@@ -37,6 +37,7 @@
         "src/docwriter.js",
         "src/docreader.js",
         "src/sidebar.js",
+        "src/calendarHold.js",
         "src/content-gmail.js"
       ],
       "css": [

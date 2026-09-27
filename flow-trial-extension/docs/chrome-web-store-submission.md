@@ -107,10 +107,13 @@ currently open Gmail message reflects a real decision (a commitment, a
 price, a deadline, a stated loss) and, only when the user clicks an
 on-screen button, write a short structured record of that decision into a
 destination the user has explicitly connected (Notion, HubSpot,
-Salesforce, Slack, or Monday.com). It does not do anything else: it does
-not scan the mailbox in bulk, does not act automatically, and does not
-serve any purpose unrelated to turning one open, user-selected email into
-one user-approved record.
+Salesforce, Slack, or Monday.com) and open a prefilled Google Calendar
+event template for the same facts. The user saves or discards that draft
+on Google's page. Glance does not call the Calendar API and does not
+request a Calendar OAuth scope. It does not scan the mailbox in bulk,
+does not act automatically, and does not serve any purpose unrelated to
+turning one open, user-selected email into that user-approved record and
+calendar draft.
 ```
 
 ## Permission justifications (Privacy practices tab)
@@ -121,7 +124,7 @@ Use these verbatim — each is traceable to the exact code that uses it.
 | Permission | Justification |
 |---|---|
 | `storage` | Stores the user's chosen connector, line-of-work profile, sensitivity calibration, and the local activity log — entirely in `chrome.storage.local` on the user's own device (`src/storage.js`). Never synced to a Glance-owned server. |
-| `identity` | Used only for `chrome.identity.launchWebAuthFlow()` to run the standard OAuth authorization-code flow for HubSpot, Salesforce, Slack, and Monday.com (`src/background.js`). The extension never sees the user's Google identity — this is OAuth for the *destination* system the user is connecting, not for Gmail access. |
+| `identity` | Used only for `chrome.identity.launchWebAuthFlow()` to run the standard OAuth authorization-code flow for HubSpot, Salesforce, Slack, and Monday.com (`src/background.js`). The extension never sees the user's Google identity — this is OAuth for the *destination* system the user is connecting, not for Gmail access, and not for Google Calendar. The Calendar hold is a public template URL opened in a tab (`src/calendarHold.js`); it adds no permission. |
 | `host_permissions: https://mail.google.com/*` | The content script (`src/content-gmail.js`) runs only on Gmail to read the open message's visible text, subject, and sender, and to inject the Do It button / sidebar UI. |
 | `host_permissions: https://api.hubapi.com/*` | Direct API calls to write a Note to HubSpot after the user clicks Do It, and to refresh the OAuth token. |
 | `host_permissions: https://api.notion.com/*` | Direct API calls to create a page in the user's chosen Notion database after the user clicks Do It. |
@@ -138,11 +141,11 @@ based on what the code actually does:
 
 | Category | Collected? | Notes |
 |---|---|---|
-| Personally identifiable information | **Yes** | Only the fields the user explicitly approves via Do It (sender name/email, extracted amount/date, one quoted sentence) — sent directly to the destination *they* connected, not to Glance. Draft-It / attachment summary send masked placeholder tokens only, never real PII. |
+| Personally identifiable information | **Yes** | Only the fields the user explicitly approves via Do It (sender name/email, extracted amount/date, one quoted sentence) — sent directly to the destination *they* connected, not to Glance. The same fields are placed in a Google Calendar template URL opened in a new tab; the user saves or discards that draft in Google Calendar, and Glance does not receive it back. Draft-It / attachment summary send masked placeholder tokens only, never real PII. |
 | Health information | No | — |
-| Financial and payment information | **Yes** (narrow) | A monetary amount extracted from the open email, only when the user clicks Do It, sent only to their chosen connector. Masked before reaching Draft-It/attachment summary. |
+| Financial and payment information | **Yes** (narrow) | A monetary amount extracted from the open email, only when the user clicks Do It, sent only to their chosen connector and included in the Calendar template URL they open. Masked before reaching Draft-It/attachment summary. |
 | Authentication information | **Yes** | OAuth tokens for connected destinations, stored only in `chrome.storage.local` on the user's device; never transmitted to or stored by Glance. |
-| Personal communications | **Yes** (narrow) | The open Gmail message's text is read locally to score it; only the fields above (never the full message) ever leave the device, and only on explicit click. |
+| Personal communications | **Yes** (narrow) | The open Gmail message's text is read locally to score it; only the fields above (never the full message) ever leave the device, and only on explicit click — once to the connected destination, and once inside the Calendar template URL the user opens. |
 | Location | No | — |
 | Web history | No | — |
 | User activity | **Yes** (aggregate only) | Anonymous product-usage events (a suggestion appeared/was clicked/dismissed, a write completed) tagged with a random per-install ID, no message content. |

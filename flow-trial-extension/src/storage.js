@@ -7,7 +7,7 @@ const FlowStorage = (() => {
     onboarded: false,
     domainId: null,
     connectorId: null,
-    // { ts, kind: 'shown'|'clicked'|'written'|'undone'|'dismissed', label, messageId, score, signals, where, url, ref }
+    // { ts, kind: 'shown'|'clicked'|'written'|'undone'|'dismissed', label, messageId, score, signals, where, url, ref, calendarDraftOpened }
     log: [],
     seenMessageIds: [],
     // The only thing that learns. Clicks make Flow slightly more willing to

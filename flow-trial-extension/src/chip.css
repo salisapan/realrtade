@@ -32,6 +32,7 @@
 .flow-chip-host {
   all: initial;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   font-family: 'Assistant', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -147,8 +148,11 @@
 .flow-chip.flow-chip-done {
   all: initial;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  max-width: 100%;
+  box-sizing: border-box;
   font-family: inherit;
   cursor: default;
   padding: 9px 14px 9px 10px;
@@ -165,7 +169,7 @@
   box-shadow: 0 0 0 3px rgba(15,166,102,.16), 0 4px 10px -4px rgba(15,102,64,.6);
   color: #fff; font-size: 12px; font-weight: 800; line-height: 1;
 }
-.flow-chip.flow-chip-done .flow-chip-label { color: #0B4F32; font-weight: 700 }
+.flow-chip.flow-chip-done .flow-chip-label { color: #0B4F32; font-weight: 700; white-space: normal; }
 .flow-chip-actions { display: inline-flex; align-items: center; gap: 6px; margin-inline-start: 4px; }
 .flow-chip-link {
   all: initial;
@@ -184,6 +188,19 @@
 }
 .flow-chip-link:hover { background: rgba(15,102,64,.14); border-color: rgba(15,102,64,.5); }
 .flow-chip-link:focus-visible { outline: 2px solid #0F6640; outline-offset: 1px; }
+
+/* Sits on its own row under the receipt. The hold was opened, not saved. */
+.flow-chip-note {
+  all: unset;
+  flex: 1 1 100%;
+  direction: ltr;
+  text-align: left;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #3d4d73;
+}
 
 @keyframes flow-chip-in {
   from { opacity: 0; transform: translateY(-4px); }

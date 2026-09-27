@@ -877,6 +877,19 @@ async function connectorStatus() {
   };
 }
 
+// Same allowlist as FlowCalendarHold.isTemplateUrl. The service worker does
+// not load that classic script. Opening this URL is a tab, not an API call,
+// and it is the only URL this message is allowed to open.
+function isCalendarTemplateUrl(url) {
+  let u;
+  try { u = new URL(url); } catch (e) { return false; }
+  if (u.protocol !== 'https:') return false;
+  if (u.username || u.password) return false;
+  if (u.hostname !== 'calendar.google.com') return false;
+  if (u.pathname !== '/calendar/render') return false;
+  return u.searchParams.get('action') === 'TEMPLATE';
+}
+
 function reply(sendResponse, promise) {
   promise
     .then((r) => sendResponse(r))
@@ -911,6 +924,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     const writer = WRITERS[msg.payload && msg.payload.connectorId];
     if (!writer) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'connector-not-live' }));
     return reply(sendResponse, writer(msg.payload));
+  }
+
+  if (msg.type === 'flow:open-calendar-hold') {
+    if (!isCalendarTemplateUrl(msg.url)) {
+      return reply(sendResponse, Promise.resolve({ ok: false, reason: 'not-a-calendar-template' }));
+    }
+    return reply(sendResponse, chrome.tabs.create({ url: msg.url, active: true }).then(() => ({ ok: true })));
   }
 
   if (msg.type === 'flow:undo-action') {

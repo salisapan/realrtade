@@ -349,6 +349,10 @@
     item.appendChild(top);
 
     if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
+    if (e.calendarDraftOpened && typeof FlowCalendarHold !== 'undefined') {
+      const note = FlowCalendarHold.activityNote(true);
+      if (note) item.appendChild(el('span', 'log-where', note));
+    }
     item.appendChild(el('span', 'when', when(e.ts)));
 
     if (e.kind === 'written' && (e.url || e.ref)) {

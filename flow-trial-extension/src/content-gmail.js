@@ -9,6 +9,11 @@
 // sender span, h2.hP for the subject). If Gmail changes, this degrades to "the
 // chip stops appearing" — never to a crash and never to a wrong write, because
 // judgment only ever reads text and the write path only ever adds a record.
+//
+// After that record lands, the same click opens a Google Calendar TEMPLATE
+// link (src/calendarHold.js) in a new tab. That page is Google's own save
+// form. Glance does not write the event, and it does not add a confirm step
+// of its own before the destination write.
 
 (function flowGmailWatcher() {
   let state = null;
@@ -243,7 +248,7 @@
     else if (f.moneyText) what = 'לתעד סכום של ' + f.moneyText;
     else if (f.dateText) what = 'לתעד תאריך ' + f.dateText;
     else what = 'לתעד את ההחלטה הזו';
-    return 'Flow זיהה: ' + what + (connLabel ? ' ב-' + connLabel : '') + '?';
+    return 'Flow זיהה: ' + what + (connLabel ? ' ב-' + connLabel : '') + FlowCalendarHold.LEAD_SUFFIX + '?';
   }
 
   function injectChip(messageNode, ctx) {
@@ -282,7 +287,7 @@
   // After a successful write the chip stops being a button and becomes a receipt:
   // what was written, where, a link to it, and a way to take it back. A tool that
   // writes to your CRM and then says nothing is a tool nobody trusts twice.
-  function showReceipt(host, ctx, res) {
+  function showReceipt(host, ctx, res, hold) {
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     const icon = el('span', 'flow-chip-done-icon', '✓');
@@ -296,13 +301,33 @@
       view.href = res.url; view.target = '_blank'; view.rel = 'noopener';
       actions.appendChild(view);
     }
+    const calendarUrl = hold && hold.url && FlowCalendarHold.isTemplateUrl(hold.url) ? hold.url : '';
+    if (calendarUrl) {
+      const draft = el('a', 'flow-chip-link', 'Calendar draft');
+      draft.href = calendarUrl; draft.target = '_blank'; draft.rel = 'noopener';
+      actions.appendChild(draft);
+    }
     const undo = el('button', 'flow-chip-link', 'Undo');
     undo.type = 'button';
     undo.addEventListener('click', () => {
       undo.textContent = 'Undoing…';
       chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: ctx.connectorId, ref: res.ref }, (r) => {
         if (r && r.ok) {
-          done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
+          // Undo deletes the destination record only. The Calendar tab is a
+          // draft the user saves themselves, so this line must not say the
+          // event was removed.
+          const undone = calendarUrl
+            ? FlowCalendarHold.undoNote(res.where)
+            : 'Undone — nothing was kept';
+          done.replaceChildren(el('span', 'flow-chip-label', undone));
+          // The draft link is not part of the destination record, so Undo
+          // leaves it in place. Closing it would strand a hold that was
+          // never written.
+          if (calendarUrl) {
+            const again = el('a', 'flow-chip-link', 'Calendar draft');
+            again.href = calendarUrl; again.target = '_blank'; again.rel = 'noopener';
+            done.appendChild(again);
+          }
           FlowStorage.appendLog({ kind: 'undone', label: ctx.result.label, messageId: ctx.messageId });
         } else {
           undo.textContent = 'Undo failed';
@@ -312,7 +337,26 @@
     actions.appendChild(undo);
     done.appendChild(actions);
 
-    host.replaceChildren(done);
+    const pieces = [done];
+    if (calendarUrl) {
+      const note = el('p', 'flow-chip-note', FlowCalendarHold.receiptNote(Boolean(hold.opened)));
+      note.setAttribute('dir', 'ltr');
+      pieces.push(note);
+    }
+    host.replaceChildren.apply(host, pieces);
+  }
+
+  function openCalendarHold(url) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'flow:open-calendar-hold', url }, (r) => {
+          const err = chrome.runtime.lastError;
+          resolve(!err && Boolean(r && r.ok));
+        });
+      } catch (e) {
+        resolve(false);
+      }
+    });
   }
 
   function onDoIt(host, chip, ctx) {
@@ -341,11 +385,32 @@
         // reference (only messageId/result/sender/subject/threadUrl).
         bodyText: (ctx.bodyText || '').slice(0, 20000)
       }
-    }, (response) => {
+    }, async (response) => {
       if (!response) { setChipState(chip, 'flow-chip-error', 'Something went wrong. Try again.'); return; }
       if (response.ok) {
-        showReceipt(host, ctx, response);
-        FlowStorage.appendLog({ kind: 'written', label: ctx.result.label, messageId: ctx.messageId, where: response.where, url: response.url, ref: response.ref, connectorId: state.connectorId });
+        // The destination write already succeeded. A failure to build or open
+        // the template must not hide that receipt or claim the hold opened.
+        let calendar = null;
+        try {
+          const hold = FlowCalendarHold.build({
+            facts: ctx.result && ctx.result.facts,
+            subject: ctx.subject,
+            senderName: ctx.sender && ctx.sender.name,
+            senderEmail: ctx.sender && ctx.sender.email,
+            threadUrl: ctx.threadUrl,
+            now: new Date()
+          });
+          if (FlowCalendarHold.isTemplateUrl(hold.url)) {
+            const opened = await openCalendarHold(hold.url);
+            calendar = { url: hold.url, opened };
+          }
+        } catch (e) {
+          calendar = null;
+        }
+        showReceipt(host, ctx, response, calendar);
+        const entry = { kind: 'written', label: ctx.result.label, messageId: ctx.messageId, where: response.where, url: response.url, ref: response.ref, connectorId: state.connectorId };
+        if (calendar && calendar.opened) entry.calendarDraftOpened = true;
+        FlowStorage.appendLog(entry);
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, connector: state.connectorId } });
         return;
       }
