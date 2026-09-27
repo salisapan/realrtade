@@ -1093,22 +1093,24 @@
       return payload;
     }
 
-    // googleTask — background.js's existing googleTasksWrite(p) predates
-    // actions.js and still expects the old top-level shape (label/facts),
-    // not params. Reusing it unmodified rather than reshaping a write path
-    // that already works.
+    // googleTask — label/facts/entities stay, because the writer still
+    // builds the title and the From/Subject lines from them. params is the
+    // close itself: the date, the amount, and the sentence the chip
+    // planned. The writer prefers those over facts when both are present.
+    const taskEntities = (ctx.intent && ctx.intent.entities)
+      || (action.params && action.params.what ? { what: action.params.what } : null);
     return Object.assign(base, {
       label: action.params.title || action.label,
+      params: {
+        dateIso: action.params.dateIso || null,
+        amount: action.params.amount || null,
+        what: action.params.what || null
+      },
       facts: ctx.intent.facts,
-      // entities.what/requestWhat is the actual quoted sentence Do It was
-      // proposed for — facts alone (amount/date) never carried it, so the
-      // task's own notes (background.js's factLines()) had no way to
-      // include what was actually decided, only metadata about it. Notion's
-      // write path already gets this same intent object and has included a
-      // "Quote" field from it since the original build; Google Tasks never
-      // did, because this field was the one thing buildActionPayload never
-      // forwarded here.
-      entities: ctx.intent.entities,
+      // The quoted sentence. Live clicks still have intent.entities; a Brief
+      // or resurface replay only kept the step, so the sentence rides on
+      // params.what and is reconstructed here when entities are gone.
+      entities: taskEntities,
       senderName: ctx.sender.name,
       senderEmail: ctx.sender.email,
       subject: ctx.subject,
@@ -1279,6 +1281,12 @@
     detail.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
     detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
     done.appendChild(detail);
+
+    // Named from the writer (`response.written`), after the write succeeded.
+    // One line per personal write that landed — the task, the draft, or both.
+    for (const line of FlowActions.receiptWrittenLines(succeeded)) {
+      done.appendChild(el('span', 'flow-chip-written', line));
+    }
 
     const actionsRow = el('span', 'flow-chip-actions');
     for (const r of succeeded) {

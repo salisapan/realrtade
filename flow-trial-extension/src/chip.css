@@ -473,6 +473,22 @@
    unambiguous, and this line is the warmer claim under that word. Same
    green family, lighter weight, so it reads as reassurance rather than
    a second headline. A partial close does not get this line. */
+/* What the close actually wrote — "Google Task · $4,200 · due Sep 21",
+   "Gmail draft · …". Comes from the writer's own `written` field, so it
+   only appears after that write succeeded. Full width, under the process
+   line, so a long ask can wrap instead of overflowing the receipt. */
+.flow-chip-written {
+  all: unset;
+  display: block;
+  flex: 1 1 100%;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0B4F32;
+  white-space: normal;
+}
+
 .flow-chip-first-close {
   all: unset;
   display: block;
