@@ -1056,6 +1056,15 @@
     return Object.assign(base, {
       label: action.params.title || action.label,
       facts: ctx.intent.facts,
+      // entities.what/requestWhat is the actual quoted sentence Do It was
+      // proposed for — facts alone (amount/date) never carried it, so the
+      // task's own notes (background.js's factLines()) had no way to
+      // include what was actually decided, only metadata about it. Notion's
+      // write path already gets this same intent object and has included a
+      // "Quote" field from it since the original build; Google Tasks never
+      // did, because this field was the one thing buildActionPayload never
+      // forwarded here.
+      entities: ctx.intent.entities,
       senderName: ctx.sender.name,
       senderEmail: ctx.sender.email,
       subject: ctx.subject,

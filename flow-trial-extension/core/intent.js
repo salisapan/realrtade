@@ -347,6 +347,17 @@ const FlowIntent = (() => {
     const hasConcreteRequestObject = Boolean(requestWhat) &&
       (REQUESTED_OBJECT.test(requestWhat) || REQUESTED_OBJECT_HE.test(requestWhat));
 
+    // The actual noun REQUESTED_OBJECT/HE matched on ("invoice", "resume",
+    // "NDA"...), not just whether one was present — this is what lets
+    // background.js's Drive auto-attach (gmailDraftWrite) search Drive by
+    // the specific thing being asked for instead of only ever offering the
+    // thread's own existing attachment or a manually-picked file. .exec(),
+    // not .test(), specifically to capture group 1 (every alternative in
+    // both patterns is wrapped in the same outer capturing group).
+    const requestedObjectMatch = requestWhat &&
+      (REQUESTED_OBJECT.exec(requestWhat) || REQUESTED_OBJECT_HE.exec(requestWhat));
+    const requestedObjectTerm = requestedObjectMatch ? requestedObjectMatch[1] : null;
+
     // Every raw signal, independent of which type ends up winning — the
     // decision layer (actions.js) reads this to notice a message is
     // multi-actionable (a meeting invite that ALSO asks for confirmation is
@@ -364,7 +375,7 @@ const FlowIntent = (() => {
     function finish(type, confidence, entities) {
       return {
         type, confidence,
-        entities: Object.assign({ requestWhat }, entities),
+        entities: Object.assign({ requestWhat, requestedObjectTerm }, entities),
         label: shortLabel(type, facts, enrichedFacts), signals, facts
       };
     }

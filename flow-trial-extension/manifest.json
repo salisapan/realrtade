@@ -11,12 +11,14 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
+  },
+  "side_panel": {
+    "default_path": "popup/popup.html"
   },
   "background": {
     "service_worker": "src/background.js",
@@ -58,7 +60,8 @@
   ],
   "permissions": [
     "storage",
-    "identity"
+    "identity",
+    "sidePanel"
   ],
   "host_permissions": [
     "https://mail.google.com/*",
@@ -69,12 +72,12 @@
     "https://theflow-ai.com/*"
   ],
   "oauth2": {
-    "client_id": "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/tasks",
       "https://www.googleapis.com/auth/calendar.events",
       "https://www.googleapis.com/auth/gmail.compose",
-      "https://www.googleapis.com/auth/drive.file"
+      "https://www.googleapis.com/auth/drive.readonly"
     ]
   },
   "content_security_policy": {

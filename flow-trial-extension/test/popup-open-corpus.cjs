@@ -265,6 +265,15 @@ async function run() {
     await new Promise((r) => setTimeout(r, 0));
 
     const input = document.getElementById('recipeImport');
+    // connectorLabel here is stale on purpose — the popup looks up the
+    // LIVE connector's own label from FLOW_CONNECTORS rather than trusting
+    // whatever label an old .glance recipe file happens to carry (see
+    // core/connectors.js: this catalog entry's label was renamed
+    // 'Google Tasks' -> 'Google' so the setup card's title accurately
+    // scopes to what the one sign-in actually grants — Tasks, Calendar,
+    // and Gmail drafts together, not Tasks alone). A recipe exported
+    // before that rename still says the old label; the confirmation text
+    // must show the current one regardless.
     const fakeFile = { text: async () => JSON.stringify({ flowRecipe: 1, connectorId: 'googleTasks', connectorLabel: 'Google Tasks' }) };
     let threw = null;
     try {
@@ -274,7 +283,7 @@ async function run() {
 
     const note = document.getElementById('recipeNote');
     check('it shows a real confirmation, not silence', note.hidden === false);
-    check('the confirmation names the connector, not "undefined"', note.textContent.includes('Google Tasks'), note.textContent);
+    check('the confirmation names the live connector label, not the stale one from the imported recipe', note.textContent.includes('Google') && !note.textContent.includes('Google Tasks'), note.textContent);
     check('it is shown as success, not an error', note.style.color === 'var(--ok)', note.style.color);
   }
 

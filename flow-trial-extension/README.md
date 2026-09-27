@@ -242,14 +242,21 @@ in the repo — nothing to add here unless it's been edited):
 https://www.googleapis.com/auth/tasks
 https://www.googleapis.com/auth/calendar.events
 https://www.googleapis.com/auth/gmail.compose
-https://www.googleapis.com/auth/drive.file
+https://www.googleapis.com/auth/drive.readonly
 ```
 
-`drive.file` is the narrow, per-file scope — it only ever grants access to
-a file the user explicitly opens through the picker, never blanket Drive
-access. There is nothing to add on the consent screen's own Scopes step for
-Testing-mode use; that step only matters once you move toward verification
-for production (see Common pitfalls).
+`drive.readonly` is read access across the whole Drive, not just files
+opened through the picker — Glance needs it because a drafted reply can
+search the account's own Drive by filename/content for a file the email
+asked for and attach it automatically when nothing was already on the
+thread or manually picked (see `driveSearchAttachment` in
+`src/background.js`). It cannot write, rename, or delete anything; the
+narrower `drive.file` scope this product used before only ever covered
+files the picker itself opened. There is nothing to add on the consent
+screen's own Scopes step for Testing-mode use; that step only matters once
+you move toward verification for production (see Common pitfalls —
+`drive.readonly` sits in a stricter verification tier than the other three
+scopes below).
 
 ### 7. Add yourself as a test user
 
@@ -280,8 +287,14 @@ completed verification" blocking screen, not a partial failure.
 - **Production / many real users, later:** `gmail.compose`, `calendar.events`,
   and `tasks` are all Google "sensitive" scopes — fine for Testing and up to
   100 test users with zero review, but a real public launch beyond that
-  eventually needs Google's verification process. Not a blocker for the
-  manual testing this checklist exists for.
+  eventually needs Google's verification process. `drive.readonly` is a
+  step further: read access across a user's whole Drive sits in Google's
+  stricter "restricted scope" tier, not just "sensitive," which in practice
+  means a slower, costlier verification path (up to and including a
+  third-party security assessment) before a wide public launch — confirm
+  the current requirements on Google's own developer documentation before
+  relying on this summary. Not a blocker for the manual testing this
+  checklist exists for.
 
 ## Set up Notion (works immediately, no server, no app review)
 

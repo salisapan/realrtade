@@ -46,7 +46,12 @@
 
 *{box-sizing:border-box}
 body{
-  margin:0; width:352px; color:var(--ink);
+  /* A side panel (this file's only host now — see manifest.json's
+     side_panel key) is a full-height dock the user resizes, not a fixed
+     352px dropdown the old default_popup gave it. width:100% lets it fill
+     whatever width Chrome/the user gives the panel instead of leaving dead
+     margin on one side or clipping content on the other. */
+  margin:0; width:100%; color:var(--ink);
   background:
     radial-gradient(420px 220px at 85% -10%, var(--accent-wash), transparent 60%),
     var(--paper);

@@ -32,8 +32,19 @@
 const FLOW_CONNECTORS = [
   {
     id: 'googleTasks',
-    label: 'Google Tasks',
-    kind: 'Personal to-do',
+    // Labeled 'Google', not 'Google Tasks' — see the accuracy note below.
+    // 'Google Tasks' undersold what the single sign-in this card triggers
+    // actually grants: getGoogleAuthToken() in background.js calls
+    // chrome.identity.getAuthToken with no scopes override, so ONE consent
+    // here covers every scope in manifest.json's oauth2.scopes at once
+    // (tasks, calendar.events, gmail.compose, drive.readonly), not just Tasks.
+    // A card titled 'Google Tasks' with a 'Connect Google Tasks' button
+    // (popup.js builds both directly from this label) read as authorizing
+    // one destination when it was actually authorizing four. 'Google' is
+    // the honest scope of what's being granted; the note below spells out
+    // what each part is actually used for.
+    label: 'Google',
+    kind: 'Tasks, Calendar & Gmail',
     status: 'live',
     auth: 'google',
     // The only connector shown on the MVP setup screen (see popup.js's
@@ -42,7 +53,7 @@ const FLOW_CONNECTORS = [
     // The rest still work (see WRITERS/UNDOERS in background.js) but aren't
     // part of onboarding until the core loop has proven itself.
     mvp: true,
-    note: 'Creates a task — with the amount, the date, and a link back to the email — in a "Glance" list in the Google account you’re already signed into. No token to create, no app to authorize separately: one native Google sign-in.'
+    note: 'One native Google sign-in, covering Tasks, Calendar, and Gmail drafts together — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; and prepares (never sends) draft replies.'
   },
   {
     id: 'notion',

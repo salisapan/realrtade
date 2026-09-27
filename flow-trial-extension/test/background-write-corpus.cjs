@@ -15,11 +15,24 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { Buffer } = require('buffer');
+const { webcrypto } = require('crypto');
 
 const TASKS = 'https://tasks.googleapis.com/tasks/v1';
+const GMAIL = 'https://gmail.googleapis.com/gmail/v1';
+const DRIVE = 'https://www.googleapis.com/drive/v3';
 
 function res(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+// fetchDriveFileAsAttachment (background.js) reads the Drive file-content
+// response via .arrayBuffer(), never .json() — res() above has no such
+// method, so a route standing in for the `?alt=media` download needs its
+// own binary-response shape instead.
+function resBuf(status, text) {
+  const buf = Buffer.from(text, 'utf8');
+  return { ok: status >= 200 && status < 300, status, arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
 }
 
 // Builds a fresh sandbox per case so stored state and call logs never leak
@@ -27,6 +40,7 @@ function res(status, body) {
 function load(opts) {
   opts = opts || {};
   const calls = [];
+  const bodies = [];
   const tokens = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
   let tokenSeq = 0;
@@ -36,6 +50,16 @@ function load(opts) {
     fetch: async (url, options) => {
       const method = (options && options.method) || 'GET';
       calls.push(method + ' ' + String(url).replace(TASKS, '').replace('https://www.googleapis.com/calendar/v3', ''));
+      // Parsed alongside calls (not just method+url) so a case can assert on
+      // what was actually IN the write, not just that a write happened —
+      // the exact gap that let the Quote field go missing without any test
+      // ever catching it (background-write-corpus only ever checked
+      // out.ok/out.ref before this, never the request body itself).
+      if (options && typeof options.body === 'string') {
+        try { bodies.push(JSON.parse(options.body)); } catch (e) { bodies.push(options.body); }
+      } else {
+        bodies.push(null);
+      }
       const auth = options && options.headers && options.headers.Authorization;
       if (auth) tokens.push(String(auth).replace('Bearer ', ''));
       for (const [match, answer] of opts.routes || []) {
@@ -68,14 +92,23 @@ function load(opts) {
       windows: { create: () => {}, onRemoved: { addListener() {} } },
       tabs: { sendMessage: () => {} },
       alarms: { create: () => {}, onAlarm: { addListener() {} } }
-    }
+    },
+    // A bare vm context has no Node/browser globals beyond the ECMAScript
+    // spec ones (encodeURIComponent, unescape, ... are already there) —
+    // btoa/atob/crypto are runtime additions neither V8 nor this sandbox
+    // provide for free. gmailDraftWrite's MIME-building path (buildMimeMessage,
+    // base64UrlEncode, arrayBufferToBase64) needs all three; no writer
+    // tested before it did, which is why they were never here.
+    btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
+    atob: (s) => Buffer.from(s, 'base64').toString('binary'),
+    crypto: webcrypto
   };
   sandbox.self = sandbox;
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8'), sandbox, { filename: 'background.js' });
   return {
-    calls, tokens, stored,
+    calls, bodies, tokens, stored,
     fn: (name) => vm.runInContext(name, sandbox)
   };
 }
@@ -95,6 +128,29 @@ async function attempt(promise) {
   catch (e) { return { ok: false, threw: String((e && e.message) || e) }; }
 }
 
+// Decodes a Gmail drafts.create request's base64url `raw` field back into
+// its plain-text body and (if present) attachment filename, mirroring
+// exactly what buildMimeMessage (background.js) assembled — the only way
+// to assert on what a draft actually SAYS rather than just that the API
+// call happened. Base64url -> raw MIME text -> (if multipart) split on the
+// boundary and base64-decode each part's own body, since buildMimeMessage
+// base64-encodes the text part and the attachment independently of the
+// outer raw-message encoding.
+function decodeDraftRaw(raw) {
+  const mime = Buffer.from(raw.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+  const boundaryMatch = mime.match(/boundary="([^"]+)"/);
+  if (!boundaryMatch) {
+    const b64Body = mime.split('\r\n\r\n').slice(1).join('').replace(/\r\n/g, '');
+    return { body: Buffer.from(b64Body, 'base64').toString('utf8'), attachmentFilename: null };
+  }
+  const segments = mime.split('--' + boundaryMatch[1]);
+  const textPart = segments[1] || '';
+  const bodyB64 = textPart.split('\r\n\r\n').slice(1).join('').replace(/\r\n/g, '');
+  const attachmentPart = segments[2] || '';
+  const filenameMatch = attachmentPart.match(/filename="([^"]*)"/);
+  return { body: Buffer.from(bodyB64, 'base64').toString('utf8'), attachmentFilename: filenameMatch ? filenameMatch[1] : null };
+}
+
 const CONNECTED = { googleTasksAuth: { taskListId: 'LIST_A' } };
 const PAYLOAD = { label: 'Send the signed SOW', facts: {}, senderName: 'Dana', threadUrl: 'https://mail.google.com/x' };
 
@@ -111,6 +167,63 @@ async function run() {
     check('the undo ref names the list it actually wrote to',
       (out.ref || {}).taskListId === 'LIST_A' && (out.ref || {}).taskId === 'task_1', out);
     check('one request, no speculative extra round trips', env.calls.length === 1, env.calls);
+  }
+
+  console.log('\n--- background.js: the task actually carries what was decided, not just metadata ---\n');
+  {
+    // Regression for the exact gap a real user hit: Amount/Date/From/Subject
+    // answer "what kind of thing is this," never "what did the email
+    // actually say" — that's entities.what/requestWhat, forwarded from
+    // content-gmail.js's buildActionPayload only after this fix. Asserting
+    // on the real request body (not just out.ok) is the point: the write
+    // path was "succeeding" the whole time by returning ok:true while
+    // silently omitting the one line that makes the record readable
+    // without reopening Gmail.
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_q' }) }]]
+    });
+    const payload = Object.assign({}, PAYLOAD, {
+      entities: { what: "We're good at $3,900/mo for the 14th floor, signing Monday." }
+    });
+    const out = await attempt(env.fn('googleTasksWrite')(payload));
+    check('the write still succeeds', out.ok === true, out);
+    const notes = (env.bodies[0] || {}).notes || '';
+    check('the notes include a Quote line with the actual decided text',
+      notes.includes('Quote: "We\'re good at $3,900/mo for the 14th floor, signing Monday."'), notes);
+  }
+
+  console.log('\n--- background.js: no quote available — no fabricated Quote line ---\n');
+  {
+    // The common REQUEST/DECISION_TO_LOG case with no entities.what at
+    // all (or ensureRemoteClassification's remote shape, which never sets
+    // entities.what/requestWhat either — see content-gmail.js). factLines()
+    // must not print an empty or placeholder Quote line just because the
+    // key exists on facts/entities with nothing in it.
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_noq' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')(PAYLOAD));
+    check('the write still succeeds', out.ok === true, out);
+    const notes = (env.bodies[0] || {}).notes || '';
+    check('no Quote line appears when there is nothing to quote', !notes.includes('Quote:'), notes);
+  }
+
+  console.log('\n--- background.js: an unusually long quote is trimmed, not truncated mid-word into the API limit blindly ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_long' }) }]]
+    });
+    const longQuote = 'A'.repeat(500);
+    const payload = Object.assign({}, PAYLOAD, { entities: { what: longQuote } });
+    const out = await attempt(env.fn('googleTasksWrite')(payload));
+    check('the write still succeeds', out.ok === true, out);
+    const notes = (env.bodies[0] || {}).notes || '';
+    const quoteLine = notes.split('\n').find((l) => l.startsWith('Quote:')) || '';
+    check('the quote is trimmed well under the 8192-char notes cap, with an ellipsis marking the cut',
+      quoteLine.length < 450 && quoteLine.includes('…'), quoteLine.length);
   }
 
   console.log('\n--- background.js: the user deleted the Glance list ---\n');
@@ -308,6 +421,141 @@ async function run() {
     }));
     check('the write succeeds rather than throwing', out.ok === true, out);
     check('the request actually reached the Calendar API', env.calls.some((c) => c.includes('POST') && c.includes('/calendars/primary/events')), env.calls);
+  }
+
+  console.log('\n--- background.js: gmailDraftWrite — a plain draft with nothing to attach ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_1' }), method: 'POST' }]
+      ]
+    });
+    const out = await attempt(env.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Signed contract',
+      params: { what: 'the signed contract', when: 'Sep 18' }
+    }));
+    check('a draft with nothing to attach still succeeds', out.ok === true, out);
+    check('target reads as a plain draft reply, no attachment claim', out.target === 'a draft reply', out.target);
+    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
+    const decoded = decodeDraftRaw(draftCall.message.raw);
+    check('no attachment filename ends up in the MIME message', decoded.attachmentFilename === null, decoded);
+    check('no auto-find verification note when nothing was ever attached', !decoded.body.includes('found'), decoded.body);
+    // Nobody supplied requestedObjectTerm — Drive must never be searched
+    // speculatively just because a draft is being written.
+    check('Drive is never queried when the request named no object at all', !env.calls.some((c) => c.includes('/drive/v3/')), env.calls);
+  }
+
+  console.log('\n--- background.js: gmailDraftWrite — Drive auto-search finds and attaches the named file ---\n');
+  {
+    // The one path this session added: nothing on the thread, nothing
+    // manually picked, but the email itself named a concrete object
+    // ("the signed contract" -> requestedObjectTerm "contract") — so
+    // driveSearchAttachment gets one real chance to close the loop itself.
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
+        [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [{ id: 'file_1', name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '2048' }] }) }],
+        [/\/drive\/v3\/files\/file_1\?fields=/, { reply: res(200, { name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '2048' }) }],
+        [/\/drive\/v3\/files\/file_1\?alt=media/, { reply: resBuf(200, 'pdf-bytes-here') }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_2' }), method: 'POST' }]
+      ]
+    });
+    const out = await attempt(env.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
+      params: { what: 'the signed contract', when: 'Sep 18', requestedObjectTerm: 'contract' }
+    }));
+    check('the auto-found draft still succeeds', out.ok === true, out);
+    check('Drive was actually searched for the named term', env.calls.some((c) => c.includes('/drive/v3/files?q=') && c.includes('contract')), env.calls);
+    check('target flags the file as unverified, not as a confirmed attachment', out.target.includes('unverified'), out.target);
+    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
+    const decoded = decodeDraftRaw(draftCall.message.raw);
+    check('the auto-found filename actually lands in the MIME attachment', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
+    check('the body carries the "please confirm" verification note for an auto-found file', decoded.body.includes('Contract-Signed.pdf') && decoded.body.includes('confirm'), decoded.body);
+  }
+
+  console.log('\n--- background.js: gmailDraftWrite — Drive search with no match still succeeds, no attachment ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
+        [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [] }) }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_3' }), method: 'POST' }]
+      ]
+    });
+    const out = await attempt(env.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
+      params: { what: 'the resume', requestedObjectTerm: 'resume' }
+    }));
+    check('an empty Drive search still resolves to a successful, plain draft', out.ok === true && out.target === 'a draft reply', out);
+    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
+    const decoded = decodeDraftRaw(draftCall.message.raw);
+    check('no attachment and no fabricated verification note when nothing was found', decoded.attachmentFilename === null && !decoded.body.includes('found'), decoded);
+  }
+
+  console.log('\n--- background.js: gmailDraftWrite — a real thread attachment always outranks a Drive guess ---\n');
+  {
+    // params.includeAttachment + a real attachment the user already saw on
+    // the thread must win outright — Drive is Glance's own guess, and a
+    // guess must never override something the user already had in front of
+    // them. Proven by NOT routing Drive's files.list at all: if
+    // driveSearchAttachment ran anyway, its unrouted call would return a
+    // 500 that gmailDraftWrite's try/catch swallows into "no attachment",
+    // silently masking the real bug — so the call log itself is the
+    // assertion, not just the final attachment.
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_4' }), method: 'POST' }]
+      ]
+    });
+    const out = await attempt(env.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
+      params: { what: 'the signed contract', requestedObjectTerm: 'contract', includeAttachment: true },
+      attachment: { filename: 'from-thread.pdf', mimeType: 'application/pdf', base64: Buffer.from('thread-bytes').toString('base64') }
+    }));
+    check('a real thread attachment still produces a successful draft', out.ok === true, out);
+    check('target reflects a confirmed attachment, not an unverified guess', out.target === 'a draft reply with the attachment', out.target);
+    check('Drive is never queried once a real thread attachment already exists', !env.calls.some((c) => c.includes('/drive/v3/')), env.calls);
+    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
+    const decoded = decodeDraftRaw(draftCall.message.raw);
+    check('the thread attachment\'s own filename is what actually gets attached', decoded.attachmentFilename === 'from-thread.pdf', decoded);
+    check('no "please confirm" note for a thread attachment the user already saw', !decoded.body.includes('confirm'), decoded.body);
+  }
+
+  console.log('\n--- background.js: gmailDraftWrite — an oversized Drive candidate is skipped for the next one ---\n');
+  {
+    // driveSearchAttachment's own size guard (files(...).size from the list
+    // response, before any metadata/content fetch) must skip a too-large
+    // candidate without ever downloading it, then still try the next one —
+    // proven by asserting the oversized file's own id never appears in any
+    // later call, not just that the final attachment is the small one.
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
+        [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [
+          { id: 'file_big', name: 'Contract-4K-Scan.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) },
+          { id: 'file_small', name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '1024' }
+        ] }) }],
+        [/\/drive\/v3\/files\/file_small\?fields=/, { reply: res(200, { name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '1024' }) }],
+        [/\/drive\/v3\/files\/file_small\?alt=media/, { reply: resBuf(200, 'small-pdf-bytes') }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_5' }), method: 'POST' }]
+      ]
+    });
+    const out = await attempt(env.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
+      params: { what: 'the signed contract', requestedObjectTerm: 'contract' }
+    }));
+    check('the write still succeeds once the small candidate is found', out.ok === true, out);
+    check('the oversized candidate is never fetched at all', !env.calls.some((c) => c.includes('file_big') && (c.includes('?fields=') || c.includes('?alt=media'))), env.calls);
+    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
+    const decoded = decodeDraftRaw(draftCall.message.raw);
+    check('the small candidate is the one actually attached', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

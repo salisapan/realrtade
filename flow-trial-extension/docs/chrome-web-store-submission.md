@@ -150,7 +150,7 @@ Use these verbatim — each is traceable to the exact code that uses it.
 | `host_permissions: https://mail.google.com/*` | The content script (`src/content-gmail.js`) runs only on Gmail to read the open message's visible text, subject, and sender, and to inject the Do It button / Morning Brief UI. |
 | `host_permissions: https://tasks.googleapis.com/*` | Direct API calls to create/undo a Google Tasks reminder after the user clicks Do It. |
 | `host_permissions: https://www.googleapis.com/calendar/*` | Direct API calls to create/undo a Google Calendar event after the user clicks Do It. |
-| `host_permissions: https://www.googleapis.com/drive/*` | Direct API calls behind the optional Drive picker, used only when the user explicitly chooses to attach a Drive file to a drafted reply (`drive.file` scope — access is limited to files the user opens through the picker, never blanket Drive access). |
+| `host_permissions: https://www.googleapis.com/drive/*` | Direct, read-only API calls (`drive.readonly` scope — cannot write, rename, or delete anything) used two ways when the user clicks Do It on a message that asks for a file: (1) behind the optional Drive picker, when the user explicitly chooses a file to attach; (2) automatically, when nothing is already attached and nothing was manually picked, Glance searches the account's own Drive by filename/content for a file matching what the email asked for and attaches the best match itself (`driveSearchAttachment` in `src/background.js`). Either way the file only ever lands in a Gmail draft — never sent — and an auto-found file is flagged in the draft's own text as unverified, for the user to confirm before sending. |
 | `host_permissions: https://gmail.googleapis.com/*` | Direct API calls to create/undo a Gmail draft reply after the user clicks Do It. |
 | `host_permissions: https://theflow-ai.com/*` | Calls Glance's own Netlify Functions for the two opt-in AI features (Draft-It, attachment summary), which only ever receive masked placeholder text, and for the anonymous, aggregate-only usage-count pings described below. |
 
@@ -177,6 +177,15 @@ based on what the code actually does:
 | Web history | No | — |
 | User activity | **Yes** (aggregate only) | Anonymous, aggregate product-usage counts only — a suggestion was shown/clicked/dismissed, a write completed, an action was undone, a process closed (and by which method), a connector was set up, Draft-It generated a reply, an attachment was summarised, one ping per day the extension was active, and (at most once per install per calendar week) whether a recurring usage habit had formed — each tagged with a random per-install ID, never message content, never which specific email or record. Full allow-list: `flow-landing/netlify/functions/track-event/track-event.js`'s `ALLOWED_EVENTS`/`PARAM_VALIDATORS`, which reject anything else server-side. |
 | Website content | **Yes** (narrow, as above) | Same as Personal communications — the open message only, never bulk-scanned. |
+
+This table predates the `drive.readonly` scope added for the automatic
+Drive search-and-attach feature (see the permission-justification row
+above) — Drive file names/content read during that search don't map
+cleanly onto any of the categories above (they're neither the Gmail
+message nor page content). Re-check this table against whatever category
+list the live Chrome Web Store Developer Dashboard actually presents at
+submission time — it may have its own "Files and documents" or similar
+category this doc can't predict.
 
 Certification checkboxes this data supports:
 - Not sold to third parties. ✅ (true — see privacy.html "what we do not do")

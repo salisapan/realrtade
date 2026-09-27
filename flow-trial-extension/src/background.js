@@ -130,6 +130,35 @@ function attributionUrl(surface) {
 }
 const ATTRIBUTION_TEXT = 'Logged by Glance — theflow-ai.com/trial';
 
+// Docks the setup/Open/Activity UI to the side of the browser window instead
+// of the small popover a plain default_popup gives — the toolbar icon click
+// now opens the same popup/popup.html content as a persistent side panel
+// (stays open across clicks elsewhere, same shape as Claude's own Cowork
+// panel) rather than a dropdown that vanishes on blur. manifest.json no
+// longer declares action.default_popup at all — once this behavior is set,
+// a default_popup would just be silently unreachable dead weight, so it was
+// removed rather than left stale next to this. This runs unconditionally at
+// service-worker startup, not gated behind onInstalled, so it re-applies
+// every time the service worker wakes up, the same pattern Chrome's own
+// samples use.
+//
+// Guarded, not a bare top-level call: chrome.sidePanel itself (not just
+// setPanelBehavior's promise) can be undefined — an older Chrome build, or
+// any timing edge case in how the new sidePanel permission gets applied.
+// Accessing .setPanelBehavior on undefined throws SYNCHRONOUSLY, and a
+// synchronous throw at the top level of this file stops every line below it
+// from ever running — every chrome.runtime.onMessage handler this file
+// registers (flow:execute-action, flow:classify-remote, flow:undo-action,
+// all of it) would silently never exist. A cosmetic side-panel upgrade must
+// never be able to take the whole write/execution engine down with it.
+try {
+  if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => console.error(error));
+  }
+} catch (error) {
+  console.error('[Glance] chrome.sidePanel.setPanelBehavior unavailable — side panel will not open on click, but the rest of the extension is unaffected', error);
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('popup/popup.html') });
@@ -183,7 +212,24 @@ function humanDateFallback(date) {
   return months[dt.getMonth()] + ' ' + dt.getDate() + (sameYear ? '' : ' ' + dt.getFullYear());
 }
 
+// Longest a quoted sentence gets before the record itself becomes harder to
+// scan than the email it's standing in for — same spirit as the 200-char
+// title caps elsewhere in this file, just roomier since this is a notes
+// field, not a title.
+const QUOTE_MAX_CHARS = 400;
+
 // The lines a human would want to see on the record six months from now.
+// Amount/Date/From/Subject/link answer "what kind of thing is this and
+// where did it come from" — none of them are the actual substance of what
+// was decided. That's entities.what/requestWhat (intent.js's classify()
+// output) — the literal sentence Do It was proposed for. Notion's write
+// path already includes this as its own "Quote" field (see
+// product-architecture.md's worked examples); Google Tasks never did,
+// because buildActionPayload() in content-gmail.js never forwarded
+// `entities` to this write path at all — only `facts`. A task with a
+// title and a date but no quote answers "when" and "how much" while
+// leaving out "what was actually said," which is the one thing that makes
+// the record readable without reopening Gmail.
 function factLines(p) {
   const f = p.facts || {};
   const out = [];
@@ -192,6 +238,12 @@ function factLines(p) {
   if (dateText) out.push(['Date', dateText + (f.date && f.date.iso && f.date.iso !== dateText ? ' (' + f.date.iso + ')' : '')]);
   if (p.senderName || p.senderEmail) out.push(['From', [p.senderName, p.senderEmail && '<' + p.senderEmail + '>'].filter(Boolean).join(' ')]);
   if (p.subject) out.push(['Subject', p.subject]);
+  const e = p.entities || {};
+  const quote = e.what || e.requestWhat;
+  if (quote) {
+    const trimmed = quote.length > QUOTE_MAX_CHARS ? quote.slice(0, QUOTE_MAX_CHARS - 1) + '…' : quote;
+    out.push(['Quote', '"' + trimmed + '"']);
+  }
   return out;
 }
 
@@ -1070,12 +1122,23 @@ function draftGreeting(senderName) {
   return first ? 'Hi ' + first + ',' : 'Hi,';
 }
 
-function draftBodyText(p) {
+// attachment/attachmentSource are optional — every existing caller that
+// passes just `p` still gets the exact same body it always did.
+// attachmentSource === 'auto' is the one case worth a line in the draft
+// itself: 'thread'/'picked' are things the user already saw before Do It
+// was ever clicked, but an auto-found file is Glance's own guess, and a
+// guess that lands in a real, sendable draft with no visible flag is
+// exactly the kind of silent overreach this product's precision-first
+// posture exists to avoid.
+function draftBodyText(p, attachment, attachmentSource) {
   const params = p.params || {};
   const lines = [draftGreeting(p.senderName), ''];
   if (params.what && params.when) lines.push('Following up on: ' + params.what + ' (' + params.when + ')');
   else if (params.what) lines.push('Following up on: ' + params.what);
   else lines.push('Following up on your message below.');
+  if (attachment && attachmentSource === 'auto') {
+    lines.push('', '[Glance found "' + attachment.filename + '" in your Drive and attached it — please confirm it\'s the right file before sending.]');
+  }
   lines.push('', '[Write your reply here]');
   return lines.join('\n');
 }
@@ -1191,6 +1254,12 @@ async function gmailDraftWrite(p) {
 
   const params = p.params || {};
   let attachment = null;
+  // Tracks WHICH of the three tiers below actually supplied the attachment
+  // — 'thread' and 'picked' are things the user already saw and chose;
+  // 'auto' is Glance's own guess (driveSearchAttachment, below), which is
+  // exactly why draftBodyText() only ever adds its "please verify" note
+  // for that one case, not the two the user already vouched for.
+  let attachmentSource = null;
   if (params.includeAttachment && p.attachment && p.attachment.base64) {
     const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
     // Oversized attachments degrade to a plain draft rather than failing the
@@ -1198,6 +1267,7 @@ async function gmailDraftWrite(p) {
     // shape as findThreadId() above.
     if (approxBytes <= GMAIL_ATTACHMENT_MAX_BYTES) {
       attachment = { filename: p.attachment.filename, mimeType: p.attachment.mimeType, base64: p.attachment.base64 };
+      attachmentSource = 'thread';
     }
   }
   // A file the user explicitly picked from Drive takes precedence over a
@@ -1207,13 +1277,27 @@ async function gmailDraftWrite(p) {
   // thread.
   if (!attachment && params.driveFileId) {
     attachment = await fetchDriveFileAsAttachment(params.driveFileId);
+    if (attachment) attachmentSource = 'picked';
+  }
+  // Nobody supplied one — but if the email itself named a specific,
+  // recognizable requested object (core/intent.js's requestedObjectTerm,
+  // e.g. "invoice", "signed NDA", "resume" — the exact noun
+  // REQUESTED_OBJECT/HE matched), this is the one case Glance can try to
+  // close the loop on its own: search this account's own Drive for it.
+  // Both weaker tiers above are things a person already chose; this one
+  // is Glance's own guess, which is exactly why it is the last resort, not
+  // the first, and why draftBodyText() flags it explicitly rather than
+  // presenting it as equally certain.
+  if (!attachment && params.requestedObjectTerm) {
+    attachment = await driveSearchAttachment(params.requestedObjectTerm);
+    if (attachment) attachmentSource = 'auto';
   }
 
   const threadId = await findThreadId(p.senderEmail, p.subject);
   const raw = base64UrlEncode(buildMimeMessage({
     to: toHeaderValue(p.senderEmail, p.senderName),
     subject: draftSubject(p),
-    body: draftBodyText(p),
+    body: draftBodyText(p, attachment, attachmentSource),
     attachment
   }));
 
@@ -1234,7 +1318,9 @@ async function gmailDraftWrite(p) {
   return {
     ok: true,
     where: 'Gmail',
-    target: attachment ? 'a draft reply with the attachment' : 'a draft reply',
+    target: !attachment ? 'a draft reply'
+      : attachmentSource === 'auto' ? 'a draft reply with a file Glance found in Drive (unverified — check it before sending)'
+      : 'a draft reply with the attachment',
     ref: { draftId: draft.id },
     // The Drafts API doesn't return a stable, documented deep link to one
     // specific draft the way Calendar's htmlLink does — linking to the
@@ -1242,6 +1328,47 @@ async function gmailDraftWrite(p) {
     // a guessed URL that might not open the right thing.
     url: 'https://mail.google.com/mail/u/0/#drafts'
   };
+}
+
+// Free-tier best-effort file retrieval: when the email asked for something
+// identifiable and nothing was already on the thread or manually picked
+// (see gmailDraftWrite's three-tier attachment resolution above), Glance
+// searches this account's own Drive for a file whose name or content
+// mentions the requested term and attaches the most recently modified
+// match. Requires the broader drive.readonly scope (manifest.json) — the
+// narrower drive.file scope this product used before only ever covers
+// files this app itself created or the user explicitly opened via the
+// picker, never an arbitrary search across the whole account.
+//
+// "Most recently modified match" is a plain, honest heuristic, not a claim
+// of relevance ranking Drive's own `q` search doesn't expose — this is
+// exactly why the result is never presented as certain: draftBodyText()
+// below always flags it as Glance's own guess, and the one thing that
+// never changes is that the draft still requires the user's own review
+// and send. A Google Workspace-native file (Doc/Sheet/Slide) that matches
+// will fail to download via alt=media (that endpoint only serves binary
+// files) and is silently skipped in favor of the next candidate — a known,
+// accepted gap for this first pass, not a crash.
+async function driveSearchAttachment(term) {
+  try {
+    const escaped = String(term).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const q = "trashed = false and (name contains '" + escaped + "' or fullText contains '" + escaped + "')";
+    const listRes = await googleAuthedFetch(
+      GOOGLE_DRIVE_API,
+      '/files?q=' + encodeURIComponent(q) + '&orderBy=modifiedTime desc&pageSize=5&fields=' + encodeURIComponent('files(id,name,mimeType,size)')
+    );
+    if (!listRes.ok) return null;
+    const { files } = await listRes.json();
+    if (!files || !files.length) return null;
+    for (const f of files) {
+      if (f.size && Number(f.size) > GMAIL_ATTACHMENT_MAX_BYTES) continue;
+      const fetched = await fetchDriveFileAsAttachment(f.id);
+      if (fetched) return fetched;
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
 }
 
 async function gmailDraftUndo(ref) {

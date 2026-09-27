@@ -490,13 +490,33 @@ console.log('\n--- actions.js: labels are short and collision-free ---\n');
   const [calendarStep] = FlowActions.planFor(eventIntent, { threadUrl: 'x', hasThreadAttachment: false }).steps;
   check('Calendar label is short', calendarStep.label === 'Calendar', calendarStep.label);
 
-  const requestIntent = classify('Could you please send me the signed contract by Friday, September 18?');
+  // No named object term here ("confirm by Friday" matches no
+  // REQUESTED_OBJECT/HE entry) — the one request-shaped message in this
+  // corpus that actually exercises the "no attachment, no findable file"
+  // branch. "send me the signed contract" below names "contract", so it
+  // no longer belongs here now that a named object alone (requestedObjectTerm)
+  // is enough to flip mayFindFile true, independent of hasThreadAttachment
+  // — see actions.js's draftAction() and its Drive-search comment.
+  const requestIntent = classify('Could you please confirm by Friday, September 18?');
   const [draftStep, taskStep] = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: false }).steps;
-  check('Draft label without attachment is "Draft reply"', draftStep.label === 'Draft reply', draftStep.label);
+  check('Draft label without attachment or named object is "Draft reply"', draftStep.label === 'Draft reply', draftStep.label);
   check('Task label is "Task"', taskStep.label === 'Task', taskStep.label);
 
   const [draftWithFile] = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: true }).steps;
-  check('Draft label with attachment is "Draft reply + file"', draftWithFile.label === 'Draft reply + file', draftWithFile.label);
+  check('Draft label with a real thread attachment is "Draft reply + file"', draftWithFile.label === 'Draft reply + file', draftWithFile.label);
+
+  // "send me the signed contract" names a concrete object ("contract")
+  // but the thread itself has nothing attached — this is exactly the case
+  // background.js's driveSearchAttachment() exists for: no attachment yet,
+  // but a real chance of finding one in Drive. The label must say so even
+  // before any Drive call happens, since it's what the user sees on the
+  // step pill.
+  const fileNameIntent = classify('Could you please send me the signed contract by Friday, September 18?');
+  check('a named object with no thread attachment sets requestedObjectTerm', typeof fileNameIntent.entities.requestedObjectTerm === 'string' && fileNameIntent.entities.requestedObjectTerm.length > 0, fileNameIntent.entities.requestedObjectTerm);
+  const [draftMayFind] = FlowActions.planFor(fileNameIntent, { threadUrl: 'x', hasThreadAttachment: false }).steps;
+  check('a named object alone (no thread attachment) still labels "Draft reply + file"', draftMayFind.label === 'Draft reply + file', draftMayFind.label);
+  check('a named object alone still sets includeAttachment on the step params', draftMayFind.params.includeAttachment === true, draftMayFind.params);
+  check('a named object alone forwards requestedObjectTerm in step params', draftMayFind.params.requestedObjectTerm === fileNameIntent.entities.requestedObjectTerm, draftMayFind.params.requestedObjectTerm);
 
   const labels = [calendarStep.label, draftStep.label, taskStep.label];
   check('no two pill labels collide', new Set(labels).size === labels.length, labels);

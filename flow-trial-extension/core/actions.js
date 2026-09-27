@@ -65,16 +65,26 @@ const FlowActions = (() => {
     // REQUEST/COMMITMENT_OF_READER unchanged, since their own `what` is
     // already the request/commitment sentence.
     const what = (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && e.requestWhat) ? e.requestWhat : e.what;
+    // A thread attachment isn't the only way this step can end up with a
+    // file: e.requestedObjectTerm (intent.js — the exact noun REQUESTED_
+    // OBJECT/HE matched, e.g. "invoice", "resume") is what lets
+    // background.js's gmailDraftWrite search this account's own Drive for
+    // the thing being asked for when the thread itself has nothing
+    // attached. The label/hint reflect that real possibility too, not just
+    // the thread-attachment case — "Draft reply + file" is honest either
+    // way once background.js resolves which of the two actually happened.
+    const mayFindFile = hasAttachment || Boolean(e.requestedObjectTerm);
     return {
       id: 'draft',
       kind: 'gmailDraft',
-      label: hasAttachment ? 'Draft reply + file' : 'Draft reply',
-      hint: 'Prepare reply draft' + (hasAttachment ? ' with attachment' : ''),
+      label: mayFindFile ? 'Draft reply + file' : 'Draft reply',
+      hint: 'Prepare reply draft' + (mayFindFile ? ' with attachment' : ''),
       params: {
         intentType: intent.type,
         what, when: e.when, amount: e.amount,
         threadUrl: ctx.threadUrl,
-        includeAttachment: hasAttachment
+        includeAttachment: mayFindFile,
+        requestedObjectTerm: e.requestedObjectTerm || null
       }
     };
   }
