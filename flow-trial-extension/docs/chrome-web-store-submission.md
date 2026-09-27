@@ -5,7 +5,7 @@ source (`src/background.js`, `src/privacyShield.js`, `src/sidebar.js`,
 `src/content-gmail.js`) as of this doc's writing — nothing is invented.
 Copy/paste text fields directly into the Developer Dashboard; the checklist
 at the bottom tracks what still needs a human (screenshots, the dashboard
-form itself, and the four connector `CLIENT_ID` placeholders).
+form itself, and the four public client IDs in `config/oauth.public.js`).
 
 ## Store listing text
 
@@ -210,13 +210,14 @@ background/framing), not something to upload as-is.
 - [ ] Composite that screenshot onto a proper 1280×800 or 640×400 canvas.
 - [ ] Capture the other 4 real screenshots above (need a live Gmail account).
 - [ ] Fill in the Developer Dashboard form itself using the text above.
-- [ ] The four connector `CLIENT_ID` placeholders in `src/background.js`
-      (`HUBSPOT_CLIENT_ID`, `SALESFORCE_CLIENT_ID`, `SLACK_CLIENT_ID`,
-      `MONDAY_CLIENT_ID`) are still unset — not a Store-submission blocker
-      (Notion works with zero setup, and each OAuth connector degrades to
-      a clear "Needs setup" state rather than failing silently), but worth
-      finishing before the listing goes live so first-run users on those
-      four connectors aren't stuck.
+- [ ] The four public client IDs in `config/oauth.public.js`
+      (`hubspotClientId`, `salesforceClientId`, `slackClientId`,
+      `mondayClientId`) are still `REPLACE_WITH_*` placeholders. Not a
+      Store-submission blocker (Notion works with zero setup, and each
+      OAuth connector reports itself unconfigured rather than failing
+      silently), but worth finishing before the listing goes live so
+      first-run users on those four connectors aren't stuck. Client
+      secrets stay in Netlify — see `docs/SETUP.md`. Do not invent IDs.
 - [ ] Decide the release strategy: this project's earlier recommendation
       was a dual track — submit to the Web Store for the public listing,
       and keep documenting Load-unpacked in the README for anyone who

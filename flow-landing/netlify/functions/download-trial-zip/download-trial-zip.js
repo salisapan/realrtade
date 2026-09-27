@@ -6,6 +6,11 @@
 // the earlier version of this page linked the zip directly from
 // /downloads/, which meant the "confirm your email first" promise wasn't
 // actually enforced by anything. This closes that gap.
+//
+// The zip is not source. scripts/package_trial_extension.py writes it here
+// during the Netlify build (and in CI). node_bundler = "none" on this
+// function keeps that file next to the handler so __dirname resolves.
+// See flow-trial-extension/docs/SETUP.md.
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +18,27 @@ const path = require('path');
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SITE_URL = 'https://theflow-ai.com';
 const LOG_PREFIX = '[download-trial-zip]';
+const ZIP_NAME = 'flow-trial-extension.zip';
+
+// esbuild's default function bundle does not keep a sibling zip, and
+// __dirname vs process.cwd() differ between `netlify dev` (base directory
+// flow-landing) and the deployed lambda (node_bundler = "none" puts the
+// zip next to this file). Take the first one that exists.
+function resolveZipPath() {
+  const candidates = [
+    path.join(__dirname, ZIP_NAME),
+    path.join(process.cwd(), 'netlify', 'functions', 'download-trial-zip', ZIP_NAME),
+    path.join(process.cwd(), ZIP_NAME)
+  ];
+  for (let i = 0; i < candidates.length; i++) {
+    try {
+      if (fs.existsSync(candidates[i])) return candidates[i];
+    } catch (e) {
+      // Try the next layout.
+    }
+  }
+  return candidates[0];
+}
 
 function verify(email, exp, sig, secret) {
   const expected = crypto.createHmac('sha256', secret).update(email + '|download|' + exp).digest('base64url');
@@ -22,7 +48,7 @@ function verify(email, exp, sig, secret) {
   return crypto.timingSafeEqual(a, b);
 }
 
-function errorPage(message) {
+function errorPage(message, title) {
   return (
     '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Glance</title>' +
@@ -30,7 +56,7 @@ function errorPage(message) {
     '<style>body{margin:0;background:#07090F;color:#EEF2F9;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}' +
     '.card{max-width:420px}.card h1{font-size:1.4rem;margin:0 0 12px}.card p{color:#AEB9D6;line-height:1.6;margin:0 0 24px}' +
     '.card a{display:inline-block;background:#1A4EF5;color:#fff;text-decoration:none;font-weight:700;padding:12px 26px;border-radius:999px}</style>' +
-    '</head><body><div class="card"><h1>This download link isn’t valid</h1><p>' + message + '</p>' +
+    '</head><body><div class="card"><h1>' + (title || 'This download link isn’t valid') + '</h1><p>' + message + '</p>' +
     '<a href="' + SITE_URL + '/trial.html#signup">Request access again</a></div></body></html>'
   );
 }
@@ -70,8 +96,8 @@ exports.handler = async function (event) {
   }
 
   try {
-    const zipPath = path.join(__dirname, 'flow-trial-extension.zip');
-    const bytes = fs.readFileSync(zipPath);
+    const zipPath = resolveZipPath();
+    const bytes = await fs.promises.readFile(zipPath);
     log('serving zip', { email: maskEmail(email), bytes: bytes.length });
     return {
       statusCode: 200,
@@ -87,7 +113,10 @@ exports.handler = async function (event) {
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      body: errorPage('Download is temporarily unavailable. Please try again shortly or contact hello@theflow-ai.com.')
+      body: errorPage(
+        'Download is temporarily unavailable. Please try again shortly or contact hello@theflow-ai.com.',
+        'Download is temporarily unavailable'
+      )
     };
   }
 };

@@ -147,9 +147,11 @@ nothing extracted is silently dropped.
    key without updating this URL.
 3. Under **Scopes**, add `crm.objects.contacts.read` and
    `crm.objects.contacts.write`.
-4. Put the app's **Client ID** into `src/background.js`
-   (`HUBSPOT_CLIENT_ID`, top of the file). It is public, like a GA4
-   measurement ID.
+4. Put the app's **Client ID** into `config/oauth.public.js`
+   (`hubspotClientId`). It is public, like a GA4 measurement ID. Leave
+   `REPLACE_WITH_HUBSPOT_CLIENT_ID` in place until you have the real one.
+   **Do not put the client secret in that file.** The full secret list is
+   `docs/SETUP.md`.
 5. In the Netlify project, set `HUBSPOT_CLIENT_ID` and
    `HUBSPOT_CLIENT_SECRET`. Those back `netlify/functions/hubspot-oauth-exchange`
    and `hubspot-oauth-refresh` — the only two places the secret is ever used.
@@ -172,9 +174,11 @@ plainly rather than failing halfway through a handshake.
    everywhere it's registered.
 3. Under **Selected OAuth Scopes**, add `Manage user data via APIs (api)` and
    `Perform requests at any time (refresh_token, offline_access)`.
-4. Put the app's **Consumer Key** into `src/background.js`
-   (`SALESFORCE_CLIENT_ID`, top of the file). It is public, like a GA4
-   measurement ID.
+4. Put the app's **Consumer Key** into `config/oauth.public.js`
+   (`salesforceClientId`). It is public, like a GA4 measurement ID. Leave
+   `REPLACE_WITH_SALESFORCE_CLIENT_ID` in place until you have the real one.
+   **Do not put the client secret in that file.** The full secret list is
+   `docs/SETUP.md`.
 5. In the Netlify project, set `SALESFORCE_CLIENT_ID` and
    `SALESFORCE_CLIENT_SECRET`. Those back
    `netlify/functions/salesforce-oauth-exchange` and
@@ -196,8 +200,10 @@ Until step 4 is done the popup shows Salesforce as *Needs setup*.
 3. Still under **OAuth & Permissions → Scopes → Bot Token Scopes**, add
    `chat:write` and `chat:write.public`.
 4. Put the app's **Client ID** (Basic Information → App Credentials) into
-   `src/background.js` (`SLACK_CLIENT_ID`, top of the file). It is public,
-   like a GA4 measurement ID.
+   `config/oauth.public.js` (`slackClientId`). It is public, like a GA4
+   measurement ID. Leave `REPLACE_WITH_SLACK_CLIENT_ID` in place until you
+   have the real one. **Do not put the client secret in that file.** The
+   full secret list is `docs/SETUP.md`.
 5. In the Netlify project, set `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET`.
    Those back `netlify/functions/slack-oauth-exchange` — the only place the
    secret is ever used. **The secret must never appear in this repository or
@@ -222,9 +228,11 @@ Until step 4 is done the popup shows Slack as *Needs setup*.
    ```
 3. Under **Scopes**, add `boards:read` and `boards:write` (also grants
    `updates:write`, which the write path uses to attach the fact lines).
-4. Put the app's **Client ID** into `src/background.js`
-   (`MONDAY_CLIENT_ID`, top of the file). It is public, like a GA4
-   measurement ID.
+4. Put the app's **Client ID** into `config/oauth.public.js`
+   (`mondayClientId`). It is public, like a GA4 measurement ID. Leave
+   `REPLACE_WITH_MONDAY_CLIENT_ID` in place until you have the real one.
+   **Do not put the client secret in that file.** The full secret list is
+   `docs/SETUP.md`.
 5. In the Netlify project, set `MONDAY_CLIENT_ID` and `MONDAY_CLIENT_SECRET`.
    Those back `netlify/functions/monday-oauth-exchange` and
    `monday-oauth-refresh` — the only two places the secret is ever used.
@@ -233,6 +241,14 @@ Until step 4 is done the popup shows Slack as *Needs setup*.
    to (open the board — it's the number in the URL after `/boards/`).
 
 Until step 4 is done the popup shows Monday.com as *Needs setup*.
+
+## What a confirmed signup installs
+
+The download after email confirmation is a zip of this folder, built by
+`scripts/package_trial_extension.py` and served by
+`flow-landing/netlify/functions/download-trial-zip`. It is not checked in.
+How Netlify produces it, and which OAuth values the owner still has to
+paste, is `docs/SETUP.md`.
 
 ## Load it locally
 

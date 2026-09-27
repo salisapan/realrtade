@@ -1,10 +1,18 @@
-# Static, self-contained landing page — no build step.
-# In Netlify, the site's "Base directory" is set to flow-landing, so
-# publishing "." deploys this folder exactly as-is.
+# Static landing page. The only build step packages the Glance extension
+# into the confirmed-signup download. The site's "Base directory" in
+# Netlify is flow-landing, so this command runs here and the script walks
+# up to the repo root for flow-trial-extension/. Publishing "." still
+# deploys this folder as-is. See flow-trial-extension/docs/SETUP.md.
 [build]
-  command = ""
+  command = "python3 ../scripts/package_trial_extension.py"
   publish = "."
   functions = "netlify/functions"
 
 [functions]
   directory = "netlify/functions"
+
+# The handler reads flow-trial-extension.zip via __dirname. The default
+# esbuild bundler does not ship that file. Packaging this one function
+# as-is keeps the zip the build command just wrote next to the handler.
+[functions."download-trial-zip"]
+  node_bundler = "none"
