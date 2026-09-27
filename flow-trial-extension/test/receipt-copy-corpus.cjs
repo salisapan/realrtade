@@ -53,11 +53,13 @@ console.log('\n--- receipt-copy: a partial close does not claim it was handled -
   check('two successes out of three still say Undo all', twoOfThree.undoLabel === 'Undo all' && twoOfThree.status === 'Partly handled.', twoOfThree);
 }
 
-console.log('\n--- receipt-copy: empty and garbage input does not invent a close ---\n');
+console.log('\n--- receipt-copy: silence — nothing succeeded, so there is no Handled line ---\n');
 {
-  check('no input is not a close', FlowReceipt.confirmation().status === null && FlowReceipt.confirmation().earlyLine === null);
-  check('null is not a close', FlowReceipt.confirmation(null).status === null);
-  check('zero successes is not Handled', FlowReceipt.confirmation({ succeeded: 0, total: 2, priorCloses: 0 }).status === null);
+  const none = FlowReceipt.confirmation();
+  const zero = FlowReceipt.confirmation({ succeeded: 0, total: 2, priorCloses: 0 });
+  check('silence: no input has no status and no early line', none.status === null && none.earlyLine === null, none);
+  check('silence: null input has no status', FlowReceipt.confirmation(null).status === null);
+  check('silence: zero successes is neither Handled nor Partly handled', zero.status === null && zero.earlyLine === null, zero);
   check('a missing prior-close count is treated as a first close', FlowReceipt.confirmation({ succeeded: 1, total: 1 }).earlyLine === FlowReceipt.EARLY_LINE);
   check('a non-numeric prior-close count is treated as a first close', FlowReceipt.confirmation({ succeeded: 1, total: 1, priorCloses: 'nope' }).earlyLine === FlowReceipt.EARLY_LINE);
   check('more successes than steps is not called a full close', FlowReceipt.confirmation({ succeeded: 3, total: 1, priorCloses: 0 }).full === false);
