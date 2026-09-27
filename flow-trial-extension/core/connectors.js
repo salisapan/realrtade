@@ -48,10 +48,9 @@ const FLOW_CONNECTORS = [
     status: 'live',
     auth: 'google',
     // The only connector shown on the MVP setup screen (see popup.js's
-    // renderConnectors filter) — one destination, no "where should this go"
-    // decision for someone who just wants Glance to catch things for them.
-    // The rest still work (see WRITERS/UNDOERS in background.js) but aren't
-    // part of onboarding until the core loop has proven itself.
+    // renderConnectors filter). Notion is catalog-live (token) but not shown.
+    // HubSpot, Salesforce, Slack, and Monday.com are 'building'; their API
+    // hosts are not in manifest host_permissions. See docs/glance-value-audit.md.
     mvp: true,
     note: 'One native Google sign-in, covering Tasks, Calendar, and Gmail drafts together — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; and prepares (never sends) draft replies.'
   },

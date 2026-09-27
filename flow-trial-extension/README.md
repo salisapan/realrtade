@@ -1,7 +1,7 @@
 # Glance
 
 Glance turns decisions made in your inbox into records in the systems you
-already use — automatically, with no data entry, no rules, no chat. Today
+already use — on one click, with no data entry, no rules, no chat. Today
 it ships as a Chrome extension that watches Gmail passively and, when an
 email actually decides something, puts one `Do It` button next to it that
 writes the record for you. The judgment engine itself knows nothing about
@@ -20,8 +20,10 @@ the full split.
 weighted, named signals — a currency figure, a commitment verb, a dated
 obligation, a direct request, a stated loss — against negative ones like an
 automated sender or mailing-list boilerplate. It speaks only above a threshold
-that moves as you click and dismiss. No email text is sent anywhere to reach
-this decision.
+that moves as you click and dismiss. A local hit sends no email text
+anywhere. If local classification finds no type, one masked-text fallback
+may call `glance-assist` (it needs `ANTHROPIC_API_KEY`); a miss or a missing
+key stays silent.
 
 **Facts are extracted, not just detected.** `core/extract.js` pulls the amount
 (with currency, `k`/`m` suffixes, and a refusal to treat a bare number or a
@@ -66,9 +68,11 @@ once per calendar day, and only on a day something is actually open; with
 nothing pending, nothing renders at all — no empty state, no badge, no
 ritual to dismiss.
 
-**Five real write paths, all undoable.**
+**Google is the live write path** (Tasks, Calendar events via the Calendar API, Gmail drafts) on one `chrome.identity` grant. See “Set up Google” below and `docs/glance-value-audit.md`. The table under this paragraph is catalog code, not what onboarding offers.
 
-| Connector | Auth | What one click does |
+**Other writers in this tree, not on the live chip.** Notion is token-live in `core/connectors.js` and is not shown in setup. HubSpot, Salesforce, Slack, and Monday.com are `building`; their API hosts are not in `manifest.json` `host_permissions`. Undo behavior below is what those functions do if they are reached later.
+
+| Connector | Auth | What the function writes |
 |---|---|---|
 | **Notion** | Internal integration token you create yourself | Creates a page in a database you choose, filling whichever Amount / Date / Email / URL columns that database happens to have, with the quoted sentence and a link back to the Gmail thread in the body. Undo archives it. |
 | **HubSpot** | OAuth (needs the owner to configure an app) | Logs a Note on the Contact matching the sender, with the same fields. Undo deletes it. |
@@ -94,21 +98,27 @@ exactly this reason — hover it for the same claim in one sentence.
 Two different things happen to that masked text after masking, and the
 distinction matters:
 
-- **The passive chip and judgment engine never send anything anywhere.**
-  `core/judgment.js` and `core/extract.js` score plain text entirely on this
-  device — see "What is still deliberately narrow" below. This has not
-  changed.
-- **Draft-It (below) and the attachment X-ray (below) are opt-in tools that
-  do call a real language model** — `netlify/functions/glance-assist/glance-assist.js`,
-  which calls the Anthropic API. They only ever receive the *masked* text:
+- **Local judgment and extract never send anything anywhere.**
+  `core/judgment.js` and `core/extract.js` score plain text on this device.
+  When that local classifier returns no type, the chip may send masked text
+  once to `glance-assist` (`classify`). A local hit does not.
+- **Draft-It and the attachment X-ray are opt-in tools that are not mounted.**
+  They call `netlify/functions/glance-assist/glance-assist.js`, which calls
+  the Anthropic API. They only ever receive the *masked* text:
   the placeholder tokens, never the real names/amounts/dates/emails/phones. The
   token↔real-value map is built and kept in this tab and is never sent
   anywhere; the model is instructed to reuse tokens verbatim, and the real
   values are substituted back in locally, after the round trip, by
-  `FlowPrivacyShield.unmask()`. Anthropic is the only third party either
-  feature's masked text ever reaches.
+  `FlowPrivacyShield.unmask()`. Anthropic is the only third party that
+  masked text reaches, including the classify fallback above.
 
 ## Draft-It (Feature 2)
+
+Not mounted. `content-gmail.js` does not call `mountSidebar()` or
+`wireAttachmentHoverCards()` until `glance-assist` is configured
+(`ANTHROPIC_API_KEY`). The steps below describe the code, not a control on
+screen. The live chip’s Gmail draft is a local skeleton and does not use
+this model.
 
 Click **Draft-It** in the sidebar while a thread is open. Glance harvests the
 open message plus up to 3 prior messages in the same thread, masks all of them
@@ -510,12 +520,11 @@ foundation, not the feature.
 
 - **Gmail only.** The judgment engine takes plain text and knows nothing about
   Gmail; adding a second source surface is a content script, not a rewrite.
-- **The passive judgment engine is not a language model, and sends nothing
-  anywhere.** `core/judgment.js`'s scorer is a transparent, explainable
-  weighting, which is why the popup can show why Glance spoke — this has not
-  changed. Draft-It and the attachment X-ray are separate, opt-in tools that
-  do call a real model with masked-only text; see "Local Privacy Shield,
-  and where masked text is allowed to go" above for exactly where the line is.
+- **The on-device scorer is not a language model.** `core/judgment.js`
+  sends nothing. A local classify miss may send masked text to
+  `glance-assist` once. Draft-It and the attachment X-ray are separate,
+  unmounted tools that would call the same function with masked text; see
+  "Local Privacy Shield" above.
 - **PDF attachments aren't previewable yet.** Only `.docx` is read today —
   see "Attachment X-ray" above.
 - **Not on the Chrome Web Store.** Store submission needs a completed data-use
