@@ -32,6 +32,10 @@
    needs to look premium, so they keep the simpler flat-color treatment this
    file always had.
 
+   Under the closing sentence, one scorer reason (.flow-chip-why) — the
+   highest-weight positive signal, a single line, never the whole vector.
+   It is text, not a second control.
+
    Zero-Prompt is the product's whole premise, and the idle card is built to
    read that way: one sentence, one button. When a message earns more than
    one proposed action, that fact never arrives as a row of pills sitting
@@ -63,6 +67,16 @@
   font-weight: 700;
   line-height: 1.45;
   color: #16214a;
+}
+
+.flow-chip-why {
+  all: unset;
+  display: block;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #3d4d73;
 }
 
 /* The named-process badge: "this is one thing being closed," stated before

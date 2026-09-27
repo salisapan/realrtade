@@ -371,12 +371,18 @@ const FlowIntent = (() => {
       hasMoney: Boolean(facts.money),
       score: s.total, threshold
     };
+    // One sentence for the chip and Activity. Kept off `signals` on purpose:
+    // that object is the flags actions.js already reads (handoff, score,
+    // threshold). Replacing it with the weighted vector would change what a
+    // click does.
+    const why = FlowJudgment.topPositiveWhy(s.signals);
 
     function finish(type, confidence, entities) {
       return {
         type, confidence,
         entities: Object.assign({ requestWhat, requestedObjectTerm }, entities),
-        label: shortLabel(type, facts, enrichedFacts), signals, facts
+        label: shortLabel(type, facts, enrichedFacts), signals, facts,
+        why: why || null
       };
     }
 

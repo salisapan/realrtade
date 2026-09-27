@@ -14,8 +14,9 @@
 // It is not a keyword match. Each signal carries a weight and a reason; the
 // score is their sum, and the chip only appears once the score clears a
 // threshold that moves as you use it. Because every contribution is named, the
-// popup can show you exactly why Flow spoke — which is the difference between a
-// tool you trust and a tool you switch off.
+// chip and Activity can show the single strongest reason — one sentence, not
+// the whole vector. That is the difference between a tool you trust and a
+// tool you switch off.
 //
 // The design bias throughout is toward silence. A false positive costs the user
 // their attention and their trust; a false negative costs one email they would
@@ -532,6 +533,38 @@ const FlowJudgment = (() => {
     return (dismissals - clicks) >= SUPPRESS_MARGIN;
   }
 
+  // The one sentence a person should read. Highest positive weight wins; a
+  // tie keeps the earlier signal. Negatives explain silence, not the chip.
+  function topPositiveWhy(signals) {
+    if (!Array.isArray(signals)) return null;
+    let best = null;
+    for (let i = 0; i < signals.length; i++) {
+      const s = signals[i];
+      if (!s || typeof s.why !== 'string') continue;
+      const why = s.why.trim();
+      if (!why) continue;
+      const weight = typeof s.weight === 'number' ? s.weight : 0;
+      if (weight <= 0) continue;
+      if (!best || weight > best.weight) best = { weight: weight, why: why };
+    }
+    return best ? best.why : null;
+  }
+
+  // The lease sentence from the product spec. A fresh install scores it
+  // above the base threshold, so an empty Activity tab can quote it instead
+  // of only saying that silence is normal. Null when this install's
+  // threshold would stay quiet — the hint must not describe a chip the
+  // scorer would not show.
+  const ACTIVITY_EXAMPLE_TEXT = "We're good at $3,900/mo for the 14th floor, signing Monday.";
+
+  function activityExample(ctx) {
+    const result = evaluate(ACTIVITY_EXAMPLE_TEXT, 'sales', ctx || {});
+    if (!result) return null;
+    const why = topPositiveWhy(result.signals);
+    if (!why) return null;
+    return { quote: ACTIVITY_EXAMPLE_TEXT, why: why };
+  }
+
   // score, newContent, and the HANDOFF pair are exposed for intent.js: the
   // classifier reuses this exact scorer and this exact "is this a request"
   // pattern (same signals, same weights, same tuning against
@@ -539,6 +572,7 @@ const FlowJudgment = (() => {
   // drifting copy of the same judgment.
   return {
     evaluate, factsOnly, neutralTitle, thresholdFrom, applyTypeAdjustment, isTypeSuppressed, score, newContent,
+    topPositiveWhy, activityExample,
     HANDOFF, HANDOFF_HE,
     BASE_THRESHOLD, MIN_THRESHOLD, MAX_THRESHOLD
   };

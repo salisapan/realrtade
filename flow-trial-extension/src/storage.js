@@ -721,7 +721,42 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, DEFAULTS };
+  // Activity is a record of what happened. A `shown` row is the only place a
+  // reason lives until the user clicks, writes, or dismisses — and those
+  // later rows did not used to copy it. Drop `shown` once any later row
+  // exists for the same message, and if that later row has no reason of its
+  // own, lend it the one from `shown` so the why is not thrown away with the
+  // row. A message that was only shown keeps that row. Does not mutate `log`.
+  function activityRows(log) {
+    const entries = Array.isArray(log) ? log.filter((e) => e && e.kind) : [];
+    const whyByMessage = new Map();
+    for (const e of entries) {
+      if (e.kind !== 'shown' || !e.messageId) continue;
+      if (whyByMessage.has(e.messageId)) continue;
+      if (typeof e.why !== 'string' || !e.why.trim()) continue;
+      whyByMessage.set(e.messageId, e.why.trim());
+    }
+    const hasOutcome = new Set();
+    for (const e of entries) {
+      if (e.kind !== 'shown' && e.messageId) hasOutcome.add(e.messageId);
+    }
+    const rows = [];
+    for (const e of entries) {
+      if (e.kind === 'shown') {
+        if (!e.messageId || !hasOutcome.has(e.messageId)) rows.push(e);
+        continue;
+      }
+      if (typeof e.why === 'string' && e.why.trim()) {
+        rows.push(e);
+        continue;
+      }
+      const lent = e.messageId && whyByMessage.get(e.messageId);
+      rows.push(lent ? Object.assign({}, e, { why: lent }) : e);
+    }
+    return rows;
+  }
+
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, activityRows, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

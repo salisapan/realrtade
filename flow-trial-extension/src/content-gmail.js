@@ -585,6 +585,7 @@
       // snapshot discipline injectChip's own ctx already follows.
       FlowStorage.appendLog({
         kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals,
+        ...reasonField(intent),
         process: { id: process.id, name: process.name, steps: process.steps },
         threadUrl: threadUrl(legacyId), sender, subject,
         intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score } },
@@ -810,6 +811,14 @@
     return row;
   }
 
+  // The one scorer sentence, or nothing. Remote classification has no
+  // weighted vector, and a chip with no positive signal stays quiet about
+  // why rather than inventing one.
+  function reasonField(intent) {
+    const why = intent && typeof intent.why === 'string' ? intent.why.trim() : '';
+    return why ? { why: why } : {};
+  }
+
   // Zero-Prompt, deliberately: the idle card is one process badge, one
   // sentence, and one button. actions.js already picked exactly one named
   // process (never a loose action list) — when it has more than one step,
@@ -839,6 +848,9 @@
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
     textEl.appendChild(document.createTextNode(' ' + closingSentence(ctx.process, ctx.intent)));
     host.appendChild(textEl);
+
+    const why = reasonField(ctx.intent).why;
+    if (why) host.appendChild(el('p', 'flow-chip-why', why));
 
     // liveSteps is the mutable working copy Do It actually reads;
     // ctx.process.steps (what actions.js proposed) is left untouched so a
@@ -1278,7 +1290,7 @@
         }
         if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
-          FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
+          FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP, ...reasonField(ctx.intent) });
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
           undo.textContent = 'Some actions couldn’t be undone';
@@ -1322,7 +1334,7 @@
     // real, narrow residual risk (hasTerminalOutcome wouldn't yet know this
     // message is resolved), logged so it's at least visible, not silent.
     await Promise.all(succeeded.map((r) =>
-      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
+      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP, ...reasonField(ctx.intent) })
         .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e))
     ));
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
@@ -1359,7 +1371,7 @@
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
-    FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
+    FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP, ...reasonField(ctx.intent) });
     FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
 
@@ -1418,7 +1430,7 @@
     // down with it via a shared Promise.all rejection, nor skip the
     // tracking/checkBrief() below that a real dismiss still deserves.
     await Promise.all([
-      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP })
+      FlowStorage.appendLog({ kind: 'dismissed', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP, ...reasonField(ctx.intent) })
         .catch((e) => console.error('[Glance] failed to record a dismiss in the activity log', e)),
       FlowStorage.calibrate('dismiss', ctx.intent.type)
         .catch((e) => console.error('[Glance] failed to update precision calibration for a dismiss', e)),
