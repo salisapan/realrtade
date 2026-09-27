@@ -37,6 +37,7 @@
         "core/intent.js",
         "core/actions.js",
         "core/execution-memory.js",
+        "core/close-memory.js",
         "core/pmf-metrics.js",
         "core/classification-metrics.js",
         "core/close-quality-metrics.js",

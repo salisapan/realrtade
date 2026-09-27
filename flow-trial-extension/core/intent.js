@@ -377,12 +377,18 @@ const FlowIntent = (() => {
       score: s.total, threshold
     };
 
-    function finish(type, confidence, entities) {
-      return {
+    // personalClose is set only on the three Trusted Do It gates (an explicit
+    // follow-up or send ask, a dated commitment, a confirmed amount). Other
+    // types stay untagged so personal close memory cannot treat a meeting
+    // or a score-bar decision as one of those closes. Absent on a miss.
+    function finish(type, confidence, entities, personalClose) {
+      const intent = {
         type, confidence,
         entities: Object.assign({ requestWhat, requestedObjectTerm }, entities),
         label: shortLabel(type, facts, enrichedFacts), signals, facts
       };
+      if (personalClose) intent.personalClose = personalClose;
+      return intent;
     }
 
     // The self-calibration outlet for the three hard-gated types below — see
@@ -483,7 +489,7 @@ const FlowIntent = (() => {
         what: whatText(text, REQUEST_PATTERNS) || shortLabel(TYPES.REQUEST, facts, enrichedFacts),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date && facts.date.iso
-      });
+      }, 'follow-up-ask');
     }
 
     // --- 3b. Dated commitment, and a confirmed amount. Hard gates for the ---
@@ -512,7 +518,7 @@ const FlowIntent = (() => {
         what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso
-      });
+      }, 'dated-commitment');
     }
     if (!s.flags.noise && s.flags.commit && facts.money && !s.flags.lost && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
@@ -520,7 +526,7 @@ const FlowIntent = (() => {
         what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date && facts.date.iso
-      });
+      }, 'confirmed-amount');
     }
 
     // Everything below this point is the old, proven "should Glance speak up

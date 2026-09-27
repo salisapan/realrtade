@@ -262,6 +262,8 @@ main{padding:var(--space-5)}
 .memory-insight-txt{font-size:.8rem; color:var(--ink-2); margin:0 0 var(--space-3); line-height:1.5}
 .memory-insight-actions{display:flex; gap:var(--space-2); flex-wrap:wrap}
 .memory-insight-actions .ghost{margin-top:0}
+.close-memory{margin-top:var(--space-5)}
+.close-memory .hint{margin-bottom:var(--space-2)}
 
 /* ---- referral prompt: earns its place after real usage, dismiss forever ---- */
 .referral{
