@@ -60,10 +60,11 @@
   document.title='Flow — Cognitive Workflow Engine';
 })();
 </script>
-<!-- The hero wordmark is this page's LCP element. Preloading it lets the fetch
-     start alongside the stylesheet instead of waiting for CSS to parse and the
-     <img> to be discovered, which is the whole gap between first paint and LCP. -->
-<link rel="preload" as="image" href="/logo.png" fetchpriority="high">
+<!-- The hero wordmark is this page's LCP element. Preloading the WebP lets the
+     fetch start alongside the stylesheet instead of waiting for CSS to parse
+     and the <img> to be discovered. type=image/webp lets a browser that cannot
+     decode it skip the preload and use the PNG fallback in the <picture>. -->
+<link rel="preload" as="image" href="/logo.webp" type="image/webp" fetchpriority="high">
 <link rel="stylesheet" href="/assets/fonts.css">
 <link rel="stylesheet" href="/assets/home.css">
 
@@ -74,7 +75,7 @@
 <header class="nav" id="nav">
   <div class="nav-in">
     <a class="brand" href="#top" aria-label="Flow — Cognitive Workflow Engine">
-      <img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async">
+      <img src="/logo-header.png" width="177" height="78" alt="Flow" decoding="async">
       <span class="desc" data-i18n="nav.desc">Cognitive Workflow Engine</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
@@ -123,7 +124,10 @@
   <section class="hero" id="hero">
     <div class="hero-blobs" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
     <div class="wrap hero-in">
-      <img class="hero-logo reveal in" src="/logo.png" width="880" height="388" alt="Flow — Cognitive Workflow Engine">
+      <picture>
+        <source srcset="/logo.webp" type="image/webp">
+        <img class="hero-logo reveal in" src="/logo.png" width="660" height="291" alt="Flow — Cognitive Workflow Engine" fetchpriority="high" decoding="async">
+      </picture>
       <div class="eyebrow reveal in" data-d="1" style="margin-bottom:16px" data-i18n="hero.eyebrow">SECURE CLOUD · FLOW-EDGE · בפריסה</div>
       <h1 class="reveal in" data-d="1" data-i18n="hero.h1">Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span></h1>
       <p class="lead reveal in" data-d="2" data-i18n="hero.sub">When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve, with no rules to write. Masked cloud, or Flow-Edge on your own infrastructure, is designed into the engagement (roadmap / בפריסה).</p>
@@ -551,7 +555,10 @@ Best,
   <section id="waitlist" class="cta-sec">
     <div class="wrap">
       <div class="cta-box">
-        <img class="logo reveal in" src="/logo.png" width="880" height="388" alt="Flow" loading="lazy" decoding="async">
+        <picture>
+          <source srcset="/logo.webp" type="image/webp">
+          <img class="logo reveal in" src="/logo.png" width="660" height="291" alt="Flow" loading="lazy" decoding="async">
+        </picture>
         <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">GET STARTED</span>
         <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
         <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Two lines. Tell us how you would deploy Flow and we will come back with a real number. Glance is its own product: the Gmail close is the entry wedge, and the same loop grows beyond email.</p>
@@ -1029,7 +1036,7 @@ Best,
     var count=SLIDES.length;
     track.innerHTML=SLIDES.map(function(s){
       return '<a class="ins-cf-card" href="/blog/'+s.slug+'.html">'+
-        '<img src="/blog/img/'+s.slug+'.jpg" alt="" loading="lazy">'+
+        '<picture><source srcset="/blog/img/'+s.slug+'.webp" type="image/webp"><img src="/blog/img/'+s.slug+'.jpg" alt="" loading="lazy" decoding="async"></picture>'+
         '<p class="t">'+s.title+'</p></a>';
     }).join('');
     var cards=Array.prototype.slice.call(track.querySelectorAll('.ins-cf-card'));
@@ -1564,7 +1571,11 @@ Best,
     agColors();
     size();
     prog=rm?1:scrollProg();
-    render();
+    /* Below the fold on a phone, this first frame is main-thread work (a
+       radial gradient per node) during the load window. Paint it now only
+       if the stage is already on screen; the observer below draws the first
+       frame when the visitor actually reaches it. */
+    if(rm || stage.getBoundingClientRect().top < innerHeight + 120) render();
 
     if(rm){
       /* reduced motion: one static frame of the finished graph, no rAF at all */
@@ -1607,23 +1618,35 @@ Best,
     if(rm) return; /* CSS default --beam-a:40deg already gives a static lit border */
     var SPEED=26; /* deg/s — constant, no hover acceleration */
     var items=Array.prototype.map.call(wraps,function(w,i){ return {el:w, angle:(i*137.508)%360}; });
-    var io=new IntersectionObserver(function(es){ es.forEach(function(e){
-      var it=items.filter(function(x){return x.el===e.target;})[0];
-      if(it) it.onScreen=e.isIntersecting;
-    }); },{threshold:0});
-    items.forEach(function(it){ it.onScreen=true; io.observe(it.el); });
-    var last=null;
+    var raf=0, last=null;
     function frame(ts){
       if(last==null) last=ts;
       var dt=Math.min(0.05,(ts-last)/1000); last=ts;
+      var any=false;
       for(var i=0;i<items.length;i++){
         var it=items[i]; if(!it.onScreen) continue;
+        any=true;
         it.angle=(it.angle+SPEED*dt)%360;
         it.el.style.setProperty('--beam-a', it.angle.toFixed(2)+'deg');
       }
-      requestAnimationFrame(frame);
+      raf=any?requestAnimationFrame(frame):0;
     }
-    requestAnimationFrame(frame);
+    function kick(){ if(!raf){ last=null; raf=requestAnimationFrame(frame); } }
+    /* Off until the observer reports them. Starting true kept a rAF loop
+       running for every card, including ones below the fold, from the first
+       line of this script. The CSS default --beam-a still draws a lit border. */
+    if(!('IntersectionObserver' in window)){
+      items.forEach(function(it){ it.onScreen=true; });
+      kick();
+      return;
+    }
+    var io=new IntersectionObserver(function(es){ es.forEach(function(e){
+      var it=items.filter(function(x){return x.el===e.target;})[0];
+      if(!it) return;
+      it.onScreen=e.isIntersecting;
+      if(e.isIntersecting) kick();
+    }); },{threshold:0});
+    items.forEach(function(it){ it.onScreen=false; io.observe(it.el); });
   })();
 
   /* ---------- performance stats: circular carousel (arc layout, counter, nav, autoplay) ---------- */
