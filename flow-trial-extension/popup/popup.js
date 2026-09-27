@@ -613,6 +613,19 @@
     });
   }
   wireReferral();
+  wireClearCloseMemory();
+
+  function wireClearCloseMemory() {
+    const btn = document.getElementById('clearCloseMemory');
+    if (!btn || typeof FlowCloseMemory === 'undefined') return;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      await FlowCloseMemory.clear();
+      const original = btn.textContent;
+      btn.textContent = 'Cleared';
+      setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1600);
+    });
+  }
 
   async function renderLog() {
     const s = await FlowStorage.get();
@@ -656,6 +669,7 @@
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
           if (r && r.ok) {
             await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId });
+            if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(e.messageId);
             await renderLog();
           } else {
             u.textContent = 'Undo failed';

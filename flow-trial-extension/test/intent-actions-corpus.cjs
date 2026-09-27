@@ -838,6 +838,7 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
     check(label + ' -> DECISION_TO_LOG at high confidence',
       intent.type === FlowIntent.TYPES.DECISION_TO_LOG && intent.confidence === 'high',
       { type: intent.type, confidence: intent.confidence, score: intent.signals && intent.signals.score });
+    check(label + ' is a dated-commitment personal close', intent.personalClose === 'dated-commitment', intent.personalClose);
     check(label + ' closes with the log-it task, carrying the date',
       process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.dateIso),
       process && { id: process.id, dates: process.steps.map((s) => s.params && s.params.dateIso) });
@@ -867,6 +868,7 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
     const intent = classify(text);
     const process = planId(text);
     check(label + ' -> REQUEST', intent.type === FlowIntent.TYPES.REQUEST, intent.type);
+    check(label + ' is a follow-up-ask personal close', intent.personalClose === 'follow-up-ask', intent.personalClose);
     check(label + ' closes with reply-track (draft + task)',
       process && process.id === 'reply-track' && process.steps.some((s) => s.kind === 'gmailDraft') && process.steps.some((s) => s.kind === 'googleTask'),
       process && process.id);
@@ -895,10 +897,20 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
     check(label + ' -> DECISION_TO_LOG at high confidence',
       intent.type === FlowIntent.TYPES.DECISION_TO_LOG && intent.confidence === 'high',
       { type: intent.type, confidence: intent.confidence, score: intent.signals && intent.signals.score });
+    check(label + ' is a confirmed-amount personal close', intent.personalClose === 'confirmed-amount', intent.personalClose);
     check(label + ' task carries the amount',
       process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.amount),
       process && process.steps.map((s) => s.params && s.params.amount));
   }
+
+  const meeting = classify('Let’s do a call Friday, September 18 at 3pm to review the contract.');
+  check('a scheduled meeting is not tagged as a personal close',
+    meeting.type === FlowIntent.TYPES.SCHEDULED_EVENT && !meeting.personalClose,
+    { type: meeting.type, personalClose: meeting.personalClose });
+  const readerCommit = classify('You agreed to send the invoice by Friday, September 18.');
+  check('a reader commitment is not tagged as a personal close',
+    readerCommit.type === FlowIntent.TYPES.COMMITMENT_OF_READER && !readerCommit.personalClose,
+    { type: readerCommit.type, personalClose: readerCommit.personalClose });
 
   const amountSilent = [
     ['figure with nothing decided', 'The total came to $4,200.'],

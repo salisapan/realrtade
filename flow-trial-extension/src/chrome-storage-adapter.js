@@ -5,13 +5,12 @@
 // adapter, say) and never touch this file or core/execution-memory.js at
 // all — that's the whole point of the seam.
 //
-// Loaded once, right after execution-memory.js and before anything that
-// might call it (content-gmail.js, popup.js) — see manifest.json's
-// content_scripts order and popup.html's script tags. The call below is
-// the only thing this file does; there is nothing to export.
+// Loaded once, right after execution-memory.js and close-memory.js and
+// before anything that might call them (content-gmail.js, popup.js) — see
+// manifest.json's content_scripts order and popup.html's script tags.
 
-if (typeof FlowExecutionMemory !== 'undefined') {
-  FlowExecutionMemory.setStorageAdapter({
+function glanceLocalAdapter() {
+  return {
     async get(key) {
       const result = await chrome.storage.local.get(key);
       return result[key];
@@ -19,5 +18,17 @@ if (typeof FlowExecutionMemory !== 'undefined') {
     async set(key, value) {
       await chrome.storage.local.set({ [key]: value });
     }
-  });
+  };
+}
+
+if (typeof FlowExecutionMemory !== 'undefined') {
+  FlowExecutionMemory.setStorageAdapter(glanceLocalAdapter());
+}
+
+// Personal close memory uses the same chrome.storage.local seam and a
+// different key (glancePersonalCloseMemory, owned by close-memory.js).
+// Kept off FlowStorage's blob so a metrics or activity-log change can
+// land beside it without rewriting this record.
+if (typeof FlowCloseMemory !== 'undefined') {
+  FlowCloseMemory.setStorageAdapter(glanceLocalAdapter());
 }
