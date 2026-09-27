@@ -92,6 +92,15 @@
   background: rgba(40,70,150,.05);
   border: 1px solid rgba(40,70,150,.12);
 }
+/* Do It from a Brief row replaces the row with the same receipt the chip
+   uses. The row's own blue chrome would otherwise keep framing "Handled."
+   as something still open. */
+.flow-brief-row.flow-chip-settled {
+  display: block;
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
 .flow-brief-row-body {
   display: flex;
   flex-direction: column;

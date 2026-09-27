@@ -635,7 +635,10 @@
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
     top.appendChild(el('span', 'log-label', e.label || '—'));
-    top.appendChild(el('span', 'log-kind ' + e.kind, e.kind));
+    // The stored kind stays 'written' — counters and CSS key off it. The
+    // badge a person reads should say what the chip just said.
+    const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
+    top.appendChild(el('span', 'log-kind ' + e.kind, KIND_LABEL[e.kind] || e.kind));
     item.appendChild(top);
 
     if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
