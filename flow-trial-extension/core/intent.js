@@ -185,7 +185,11 @@ const FlowIntent = (() => {
   // "what" for a REQUEST, not re-tested for detection. A second, narrower
   // copy of "what counts as a request" here previously meant the detected
   // request and the quoted sentence could disagree.
-  const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE];
+  const REQUEST_PATTERNS = [FlowJudgment.HANDOFF, FlowJudgment.HANDOFF_HE, FlowJudgment.FOLLOW_UP_ASK, FlowJudgment.FOLLOW_UP_ASK_HE];
+  // The sentence a dated commitment is quoting — the sender's own delivery
+  // promise, or the agreement word. Used only after REQUEST has already
+  // declined the message, so this doesn't steal an explicit ask.
+  const DATED_COMMIT_PATTERNS = [FlowJudgment.SENDER_PROMISE, FlowJudgment.SENDER_PROMISE_HE, /\b(agreed|approved|confirmed|confirming)\b/i, /(סוכם|אישרנו|מאשרים|מאשר|מאושר)/];
 
   // The other half of REQUEST's evidence bar, alongside hasConcreteAnchor
   // below — a named, tangible thing being asked for. "Could you send that
@@ -309,7 +313,8 @@ const FlowIntent = (() => {
     // naming a concrete object attached is exactly the false-positive shape
     // the scorer's own money-alone penalty already refuses ("A figure
     // alone, with nothing decided").
-    const hasConcreteAnchor = Boolean(facts.money) || Boolean(facts.date && facts.date.iso);
+    const hasResolvedDate = Boolean(facts.date && facts.date.iso);
+    const hasConcreteAnchor = Boolean(facts.money) || hasResolvedDate;
     const isReaderCommit = READER_COMMIT.test(text) || READER_COMMIT_HE.test(text);
 
     // COMMITMENT_OF_READER's second evidentiary path, alongside
@@ -413,7 +418,20 @@ const FlowIntent = (() => {
     const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
     const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
-    if (hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast && !suppressed(TYPES.SCHEDULED_EVENT)) {
+    // s.flags.noise: a pitch fingerprint, mailing-list boilerplate, calendar
+    // acceptance mail, or an automated sender. The score already penalises
+    // these below the bar. Hard gates do not read that total, so without
+    // this they chip on "just bumping this — send the invoice" and on
+    // "Dana has accepted this invitation".
+    //
+    // A gate that matched and was then suppressed must return null here,
+    // not fall through. "You agreed to send the invoice by Friday" is both
+    // a reader commitment AND an asserted "agreed" + date; if the account
+    // has suppressed commitments, the dated-commitment gate below would
+    // otherwise log it as a decision — the same chip, a different label.
+    const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
+    if (eventEvidence && suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
+    if (!s.flags.noise && eventEvidence) {
       return finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
@@ -436,7 +454,9 @@ const FlowIntent = (() => {
     //        than a dated/priced commitment — 'medium' there, matching
     //        REQUEST's own confidence for its equivalent object-only path,
     //        vs 'high' when a real anchor is present.
-    if (isReaderCommit && (hasConcreteAnchor || hasConcreteCommitmentObject) && !suppressed(TYPES.COMMITMENT_OF_READER)) {
+    const readerCommitEvidence = isReaderCommit && (hasConcreteAnchor || hasConcreteCommitmentObject);
+    if (readerCommitEvidence && suppressed(TYPES.COMMITMENT_OF_READER)) return { type: null, signals, facts };
+    if (!s.flags.noise && readerCommitEvidence) {
       return finish(TYPES.COMMITMENT_OF_READER, hasConcreteAnchor ? 'high' : 'medium', {
         who, amount,
         what: commitmentWhat || shortLabel(TYPES.COMMITMENT_OF_READER, facts, enrichedFacts),
@@ -445,20 +465,19 @@ const FlowIntent = (() => {
       });
     }
 
-    // --- 3. REQUEST: an ask directed at the reader (same hard-gate shape, ---
-    //        now with two independent ways to clear it). s.flags.handoff is
-    //        FlowJudgment.score()'s own HANDOFF/HANDOFF_HE test, already
-    //        computed above — reused rather than re-imported, so there is
-    //        exactly one place that pattern is defined. A date/amount
-    //        anchor and a named concrete object are treated as equally
-    //        sufficient evidence, not stacked requirements: "could you
-    //        confirm by Friday" (anchor, no object) and "could you send
-    //        the invoice" (object, no date) are both, on their own, exactly
-    //        the kind of message a human reads once and immediately knows
-    //        what to do with — see judgment-corpus.cjs / this file's own
-    //        earlier miss on "אבקש לקבל ממך את הקבלה", which had neither a
-    //        date nor an amount and was silently dropped before this.
-    if (s.flags.handoff && (hasConcreteAnchor || hasConcreteRequestObject) && !suppressed(TYPES.REQUEST)) {
+    // --- 3. REQUEST: an ask directed at the reader. s.flags.handoff is ---
+    //        FlowJudgment.score()'s own test (HANDOFF / HANDOFF_HE, plus the
+    //        follow-up phrases), reused rather than re-imported. A resolved
+    //        date and a named object are each enough: "could you confirm by
+    //        Friday" and "could you send the invoice" and "please follow up
+    //        with Dana about the invoice". A dollar figure alone is not.
+    //        "Can you confirm the $4,200?" names nothing to send and no day,
+    //        and it is the same shape as a pitch that happens to quote a
+    //        price. The figure still rides along on the task once a date or
+    //        an object is present.
+    const requestEvidence = s.flags.handoff && (hasResolvedDate || hasConcreteRequestObject);
+    if (requestEvidence && suppressed(TYPES.REQUEST)) return { type: null, signals, facts };
+    if (!s.flags.noise && requestEvidence) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || shortLabel(TYPES.REQUEST, facts, enrichedFacts),
@@ -467,13 +486,51 @@ const FlowIntent = (() => {
       });
     }
 
+    // --- 3b. Dated commitment, and a confirmed amount. Hard gates for the ---
+    //        same reason as REQUEST: the evidence is a combination, and the
+    //        generic total misses it. "We agreed to file the amendment by
+    //        September 21" is commitment (30) + date (12) − too-short (25)
+    //        = 17. "Confirming the amount is $4,200" is commitment (30) +
+    //        money (34) − too-short (25) = 39. Both are under BASE_THRESHOLD
+    //        and both are exactly the close a person would track. A sender
+    //        promise ("I will send the contract by Friday") never set
+    //        `commit` at all — COMMIT is agreement language, not a delivery
+    //        verb — so it rides this gate via flags.senderPromise, and only
+    //        when a date actually resolved. No date, no chip.
+    //
+    //        Checked after REQUEST so "please follow up … and send the
+    //        invoice by Friday" stays an ask (reply + task), not a log.
+    //        Noise and a past date stay silent: a pitch that happens to say
+    //        "confirming" is not a close, and a date already behind today
+    //        is not something to put on a task. isTypeSuppressed is the
+    //        same outlet the other hard gates use — this one has no
+    //        threshold to nudge either.
+    const datedCommitment = (s.flags.commit || s.flags.senderPromise) && hasResolvedDate && !s.flags.lost && !isPast;
+    if (!s.flags.noise && datedCommitment && !suppressed(TYPES.DECISION_TO_LOG)) {
+      return finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date.iso
+      });
+    }
+    if (!s.flags.noise && s.flags.commit && facts.money && !s.flags.lost && !suppressed(TYPES.DECISION_TO_LOG)) {
+      return finish(TYPES.DECISION_TO_LOG, 'high', {
+        who, amount,
+        what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      });
+    }
+
     // Everything below this point is the old, proven "should Glance speak up
     // at all" question — reused as-is (same signals, same tuning against
     // test/judgment-corpus.cjs) for the two categories that don't have as
-    // clean an independent evidentiary shape as the three hard-gated types
-    // above. SCHEDULED_EVENT/COMMITMENT_OF_READER/REQUEST above never reach
-    // here — they're hard evidentiary gates, not a score against a moving
-    // bar, so there is no threshold for a per-type history to adjust.
+    // clean an independent evidentiary shape as the hard-gated types
+    // above. SCHEDULED_EVENT/COMMITMENT_OF_READER/REQUEST and the two
+    // personal-close gates above never reach here — they're hard
+    // evidentiary gates, not a score against a moving bar, so there is no
+    // threshold for a per-type history to adjust.
     //
     // Which of the two remaining types this message WOULD become is already
     // fully decided by the same flags DECISION_TO_LOG's own gate below
