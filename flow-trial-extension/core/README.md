@@ -44,6 +44,7 @@ it, not touching the module.
 | `privacyShield.js` | Finds and masks every sensitive span in text before it's allowed to leave the device. |
 | `docreader.js` / `docwriter.js` | Read and write real `.docx` files using only Web Platform APIs (`Blob`, `TextEncoder`/`TextDecoder`, `DecompressionStream`) — no browser-only API, which is why these already run under Node unmodified. |
 | `close-quality-metrics.js` | The three personal-close counts (full-write success, day-level return, dismiss-or-undo false-Do-It) and the false-close rate against the 15% bar. Pure fold over plain events. Persistence stays in `src/storage.js`. |
+| `still-open.js` | The morning list: which personal closes clear the bar (dated promise, explicit follow-up, confirmed amount), the cap of three, the rank, and the shown / Do It / undo / false-close fold. Pure. Soft, FYI, hedge, past, calendar noise, and low-confidence classifications score 0 — the same silence the chip uses. `src/storage.js` persists scan rows and the fold; the Brief and popup only render what `select` returns. |
 
 Notably absent: **storage.js stays in `src/`.** It is Glance's own choice of
 *how* to remember things (`chrome.storage.local`, capped logs, weekly/badge
@@ -177,9 +178,11 @@ A `content-<host>.js` must, at minimum:
    one convention that must be followed exactly, since it's what lets the
    Activity log, and any future per-host precision comparison, attribute
    every outcome to the surface that produced it.
-5. Reuse `FlowBrief`/`FlowWeekly` verbatim for the sticky surfaces, and
-   `FlowStorage.getPending()`/`hasTerminalOutcome()` verbatim for "is this
-   still open" — both are already source-agnostic (point 5 above).
+5. Reuse `FlowBrief`/`FlowWeekly` verbatim for the sticky surfaces.
+   `FlowStorage.getStillOpen()` is the morning list (capped, high-stakes).
+   `getPending()` / `hasTerminalOutcome()` remain the unresolved-shown set
+   the in-thread chip and contextual resurfacing use. Both are
+   source-agnostic.
 6. Call `FlowStorage.consumeDailyActiveTrigger()` /
    `consumeWeeklyHabitTrigger()` the same way `content-gmail.js`'s `init()`
    does, so retention and habit-formation measurement (see

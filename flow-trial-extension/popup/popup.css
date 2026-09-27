@@ -305,5 +305,6 @@ main{padding:var(--space-5)}
 .log-undo-failed{color:var(--err)}
 .when{color:var(--ink-3); font-size:.7rem; display:block; margin-top:4px}
 .log-acts{display:flex; gap:var(--space-2); margin-top:var(--space-3)}
+.log-acts .primary.sm{margin-top:0}
 
 .ftr{padding:var(--space-4) var(--space-5); border-top:1px solid var(--line); font-size:.68rem; color:var(--ink-3); text-align:center; line-height:1.6}

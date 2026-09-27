@@ -51,7 +51,10 @@
     // mountSidebar() is off — see the note at wireAttachmentHoverCards()'s
     // call site in scanReadingPane() for why the whole sidebar surface
     // (badge, Draft-It, attachment X-ray) is cut, not just styled.
-    if (typeof FlowBrief !== 'undefined') checkBrief();
+    if (typeof FlowBrief !== 'undefined') {
+      await checkBrief();
+      await consumeStillOpenHandoff();
+    }
     checkWeeklySummary();
     trackDailyActive();
     trackWeeklyHabit();
@@ -119,10 +122,10 @@
     if (!summary) return; // not due, or due with nothing to report — stay silent either way
     FlowWeekly.showSummary(summary, {
       onOpenList: async () => {
-        // Pending is re-fetched at click time, not reused from whatever was
-        // true when the banner rendered — could be minutes or days later.
-        const pending = await FlowStorage.getPending();
-        if (pending.length) openBriefPanel(pending);
+        // Re-read at click time. This opens the same Still Open list the
+        // morning brief uses, not every unresolved chip.
+        const open = await FlowStorage.getStillOpen();
+        if (open.length) openBriefPanel(open);
       }
     });
   }
@@ -258,10 +261,115 @@
     FlowSidebar.renderDraft('idle', { onDraft: handleDraftIt });
   }
 
+  // Local inbox scan. The rows Gmail has already rendered — subject and
+  // snippet only, judged on this device, never sent anywhere. A row that
+  // clears the Still Open bar is remembered as a compact snapshot so the
+  // morning list can offer Do It without the thread being open. Rows that
+  // miss the bar are not stored. Opening the thread drops the snapshot;
+  // the full message is then judged the same way the chip always was.
+  let lastInboxScan = 0;
+
+  function compactIntent(intent) {
+    const entities = (intent && intent.entities) || {};
+    return {
+      type: intent.type,
+      label: intent.label,
+      confidence: intent.confidence || null,
+      personalClose: intent.personalClose || null,
+      facts: intent.facts || {},
+      entities: {
+        what: entities.what || null,
+        requestWhat: entities.requestWhat || null,
+        requestedObjectTerm: entities.requestedObjectTerm || null,
+        amount: entities.amount || null
+      },
+      signals: { score: intent.signals && intent.signals.score }
+    };
+  }
+
+  function inboxThreadUrl(threadId) {
+    if (!threadId) return null;
+    return 'https://mail.google.com/mail/u/' + accountIndex() + '/#inbox/' + threadId;
+  }
+
+  async function considerInboxRow(row, executionMemory, freshState) {
+    const threadId = row.getAttribute('data-legacy-thread-id') || row.getAttribute('data-thread-id');
+    if (!threadId) return false;
+    const subject = ((row.querySelector('span.bog') || {}).textContent || '').trim();
+    const snippet = ((row.querySelector('span.y2') || {}).textContent || '').replace(/^\s*-\s*/, '').trim();
+    const text = [subject, snippet].filter(Boolean).join('\n');
+    if (text.length < 12) return false;
+    const emailEl = row.querySelector('[email]');
+    const nameEl = row.querySelector('.yP, .zF');
+    const sender = {
+      email: emailEl ? emailEl.getAttribute('email') : null,
+      name: (emailEl && emailEl.getAttribute('name')) || (nameEl && nameEl.textContent.trim()) || null
+    };
+    const intent = FlowIntent.classify(text, {
+      senderEmail: sender.email,
+      senderName: sender.name,
+      calibration: freshState.calibration,
+      calibrationByType: freshState.calibrationByType
+    });
+    if (!intent || !intent.type || typeof FlowStillOpen === 'undefined') return false;
+    // Same silence bar as the in-thread chip. A local 'low', or any
+    // classification shouldShowChip refuses, is not a morning card.
+    if (!FlowIntent.shouldShowChip(intent)) return false;
+    const probe = {
+      messageId: 'scan:' + threadId,
+      threadId: threadId,
+      subject: subject,
+      intent: compactIntent(intent)
+    };
+    if (!FlowStillOpen.scoreOf(probe, Date.now())) return false;
+    if (await personalCloseSaysSilence(intent, threadId, subject)) return false;
+    const threadLink = inboxThreadUrl(threadId);
+    const process = FlowActions.planFor(intent, {
+      threadUrl: threadLink,
+      hasThreadAttachment: false,
+      executionMemory: executionMemory
+    });
+    if (!process) return false;
+    await FlowStorage.upsertStillOpenScan({
+      messageId: 'scan:' + threadId,
+      threadId: threadId,
+      threadUrl: threadLink,
+      sender: sender,
+      subject: subject,
+      ts: Date.now(),
+      app: SOURCE_APP,
+      intent: compactIntent(intent),
+      process: process
+    });
+    return true;
+  }
+
+  async function maybeScanInbox() {
+    if (!watching || !state || !state.onboarded) return;
+    if (typeof FlowIntent === 'undefined' || typeof FlowStillOpen === 'undefined') return;
+    const rows = document.querySelectorAll('tr.zA');
+    if (!rows.length) return;
+    if (Date.now() - lastInboxScan < 60000) return;
+    lastInboxScan = Date.now();
+    const executionMemory = await FlowExecutionMemory.getAll();
+    const freshState = await FlowStorage.get();
+    let noticed = false;
+    const limit = Math.min(rows.length, 25);
+    for (let i = 0; i < limit; i++) {
+      if (await considerInboxRow(rows[i], executionMemory, freshState)) noticed = true;
+    }
+    if (noticed) checkBrief();
+  }
+
   function observe() {
-    observer = new MutationObserver(debounce(scanReadingPane, 400));
+    const onMutate = debounce(() => {
+      maybeScanInbox()
+        .catch((e) => console.error('[Glance] inbox scan failed', e))
+        .then(() => scanReadingPane());
+    }, 400);
+    observer = new MutationObserver(onMutate);
     observer.observe(document.body, { childList: true, subtree: true });
-    scanReadingPane();
+    onMutate();
   }
 
   function debounce(fn, ms) {
@@ -472,7 +580,14 @@
     // its nodes down — not on every debounced mutation inside a thread
     // that's already open, which fires far more often than the underlying
     // pending set could possibly have changed.
-    if (messageChanged) checkContextualResurface(messages, currentContext.messageId);
+    if (messageChanged) {
+      const openedThread = threadIdFrom(message);
+      if (openedThread) {
+        FlowStorage.forgetStillOpenScan(openedThread)
+          .catch((e) => console.error('[Glance] failed to drop an inbox snapshot after the thread was opened', e));
+      }
+      checkContextualResurface(messages, currentContext.messageId);
+    }
     // wireAttachmentHoverCards(message) is off — Draft-It and the attachment
     // X-ray both depend on the same glance-assist backend call, and that call
     // isn't reliably configured yet ("This feature is not configured yet"
@@ -496,6 +611,14 @@
     // "did the user ever take a final action on this message" rather than
     // "have we looked at this message before" — see hasTerminalOutcome for
     // why "seen" alone used to make a rebuilt node's chip unrecoverable.
+    // A Still Open card closed from the inbox snapshot uses scan:<threadId>
+    // as its id, because the inbox row does not carry the open message's
+    // id. Once this thread is actually open, that decision covers the
+    // message too — otherwise Do It here would write the same close again.
+    const openedThreadId = threadIdFrom(message);
+    if (openedThreadId && await FlowStorage.hasTerminalOutcome('scan:' + openedThreadId)) {
+      await FlowStorage.markAlreadyClosed(messageId);
+    }
     if (await FlowStorage.hasTerminalOutcome(messageId)) return;
 
     // ownMessageText (not a bare .innerText) both guards against Gmail
@@ -633,7 +756,7 @@
         kind: 'shown', label: intent.label, messageId, score: intent.signals.score, signals: intent.signals,
         process: { id: process.id, name: process.name, steps: process.steps },
         threadUrl: threadUrl(legacyId), threadId: threadId, sender, subject,
-        intent: { type: intent.type, label: intent.label, facts: intent.facts, signals: { score: intent.signals.score }, personalClose: intent.personalClose || null },
+        intent: compactIntent(intent),
         // Which app this process was noticed in — see this file's own
         // SOURCE_APP constant. getPending()'s entries (and everything built
         // on them: the Brief panel, the popup's Open tab, the badge count)
@@ -791,6 +914,17 @@
   }
 
   chrome.runtime.onMessage.addListener((msg) => {
+    if (msg && msg.type === 'flow:still-open-do-it' && msg.messageId) {
+      runStillOpenDoIt(msg.messageId);
+      return;
+    }
+    if (msg && msg.type === 'flow:still-open-show') {
+      chrome.storage.local.remove('glanceStillOpenOpenBrief');
+      FlowStorage.getStillOpen()
+        .then((open) => { if (open.length) openBriefPanel(open); })
+        .catch((e) => console.error('[Glance] failed to open Still Open from the notification', e));
+      return;
+    }
     if (!msg || msg.type !== 'flow:drive-file-result') return;
     // settle() itself guards against a requestId that's already gone (the
     // open-ack failure path, or DRIVE_PICKER_TIMEOUT_MS already firing) and
@@ -1264,10 +1398,14 @@
     // close cannot say "Handled." and the first three closes cannot
     // replace that word with the longer magic-moment sentence. The
     // sentence, when it applies, is an extra line under the status.
+    const he = /[\u0590-\u05FF]/.test(
+      ((ctx && ctx.subject) || '') + ((ctx && ctx.bodyText) || '') + ((ctx && ctx.intent && ctx.intent.label) || '')
+    );
     const copy = FlowReceipt.confirmation({
       succeeded: succeeded.length,
       total: results.length,
-      priorCloses
+      priorCloses,
+      lang: he ? 'he' : 'en'
     });
 
     const done = el('div', 'flow-chip flow-chip-done');
@@ -1335,6 +1473,10 @@
           // from personal close memory.
           FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: ctx.messageId, reason: 'undo' })
             .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
+          if (ctx.surface === 'still-open') {
+            FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: ctx.messageId })
+              .catch((e) => console.error('[Glance] failed to record a Still Open undo', e));
+          }
         }
         if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', FlowReceipt.undoneLine(wheres)));
@@ -1468,6 +1610,10 @@
     // later one on the same local day, do not increment the counter.
     FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId })
       .catch((e) => console.error('[Glance] failed to record a Do It use for return', e));
+    if (ctx.surface === 'still-open') {
+      FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId })
+        .catch((e) => console.error('[Glance] failed to record a Still Open Do It', e));
+    }
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
@@ -1538,7 +1684,11 @@
       // false-Do-It: dismissing the chip is the reject. The same message
       // from another surface is a no-op inside recordCloseQuality.
       FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: ctx.messageId, reason: 'dismiss' })
-        .catch((e) => console.error('[Glance] failed to record a dismiss as a false-Do-It', e))
+        .catch((e) => console.error('[Glance] failed to record a dismiss as a false-Do-It', e)),
+      ctx.surface === 'still-open'
+        ? FlowStorage.recordStillOpenMetric({ kind: 'falseClose', messageId: ctx.messageId, reason: 'dismiss' })
+          .catch((e) => console.error('[Glance] failed to record a Still Open dismiss', e))
+        : Promise.resolve()
     ]);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
     // See showMultiActionReceipt's own comment on process_closed — a decline
@@ -1547,18 +1697,15 @@
     checkBrief();
   }
 
-  /* --------------------------------------------------- Morning Brief (proactive closing) */
+  /* --------------------------------------------------- Morning Brief (Still Open) */
   //
-  // The one habit-loop surface this extension has: a small, silent-by-default
-  // indicator for processes that were shown and never closed — not a second
-  // "you missed something" alert system, just the same Do It / Dismiss the
-  // live chip already offers, reachable for something that's no longer the
-  // message currently open in Gmail. Zero-Prompt rules apply here exactly as
-  // everywhere else: nothing renders at all when nothing is open, there is no
-  // settings screen, and the daily auto-open (see FlowStorage.
-  // consumeDailyBriefTrigger) is the only thing resembling a ritual — one
-  // real chance per day, never repeated, never forced if there's nothing to
-  // show.
+  // The morning list: at most three personal closes that clear
+  // core/still-open.js (a dated promise, an explicit follow-up, a confirmed
+  // amount). Not every chip that was shown and ignored — a meeting or a
+  // soft nudge never becomes a card here. The in-thread chip is unchanged.
+  // Zero-Prompt: nothing renders when the list is empty, and the daily
+  // auto-open (FlowStorage.consumeDailyBriefTrigger) is one chance per day,
+  // only when there is something to close.
   //
   // Deliberately does NOT expose per-step removal pills the way the live
   // chip's "N steps" toggle does — a dense list of open items is not the
@@ -1669,14 +1816,17 @@
     // name inside its own body the way a named function declaration would.
     const rows = pending.map((entry) => ({
       id: entry.messageId,
-      title: entry.process.name,
+      title: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || entry.process.name,
       subtitle: briefRowSubtitle(entry),
       onDoIt(rowHost, doItBtn) {
         const ctx = ctxFromPendingEntry(entry);
+        ctx.surface = 'still-open';
         onDoIt(rowHost, doItBtn, ctx, ctx.process.steps);
       },
       onDismiss(rowHost) {
-        onDismiss(rowHost, ctxFromPendingEntry(entry));
+        const ctx = ctxFromPendingEntry(entry);
+        ctx.surface = 'still-open';
+        onDismiss(rowHost, ctx);
       }
     }));
     // Re-check on manual close, not just on every resolution inside the
@@ -1700,17 +1850,33 @@
     chrome.runtime.sendMessage({ type: 'flow:pending-count', count: n });
   }
 
+  function publishStillOpenDigest(count) {
+    const text = (typeof FlowStillOpen !== 'undefined') ? FlowStillOpen.notificationText(count) : '';
+    chrome.storage.local.set({
+      glanceStillOpenDigest: { count: count, text: text, updatedAt: Date.now() }
+    });
+  }
+
+  // The morning list, not every unresolved chip. Empty is silence: no
+  // indicator, no badge number, no digest that would ping later. The
+  // in-thread chip does not go through here.
   async function checkBrief() {
     if (!watching) return;
     const freshState = await FlowStorage.get();
     // Same MVP scope gate as the live chip (scanReadingPane) — never
     // resurface something Do It is guaranteed to fail on because the
     // connector it was proposed for isn't the one currently wired up.
-    if (freshState.connectorId && freshState.connectorId !== 'googleTasks') { FlowBrief.hide(); reportPendingCount(0); return; }
+    if (freshState.connectorId && freshState.connectorId !== 'googleTasks') {
+      FlowBrief.hide();
+      reportPendingCount(0);
+      publishStillOpenDigest(0);
+      return;
+    }
 
-    const pending = await FlowStorage.getPending();
-    reportPendingCount(pending.length);
-    if (!pending.length) {
+    const open = await FlowStorage.getStillOpen();
+    reportPendingCount(open.length);
+    publishStillOpenDigest(open.length);
+    if (!open.length) {
       // Don't yank an already-open panel out from under someone the instant
       // the last item in it resolves — they just watched it close and
       // deserve to see that, not have the whole surface vanish under the
@@ -1721,12 +1887,58 @@
       return;
     }
 
-    FlowBrief.show(pending.length, () => openBriefPanel(pending));
+    for (const item of open) {
+      FlowStorage.recordStillOpenMetric({ kind: 'shown', messageId: item.messageId })
+        .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
+    }
+
+    FlowBrief.show(open.length, () => openBriefPanel(open));
 
     // The only thing resembling a daily ritual, and only spent on a day that
     // actually has something to show — see the field's own comment in
-    // storage.js for why an empty day never consumes it.
-    if (await FlowStorage.consumeDailyBriefTrigger()) openBriefPanel(pending);
+    // storage.js for why an empty day never consumes it. Opening the brief
+    // is the morning reach, so the OS notification does not also fire.
+    if (await FlowStorage.consumeDailyBriefTrigger()) {
+      openBriefPanel(open);
+      chrome.storage.local.set({ glanceStillOpenNotifiedDate: new Date().toDateString() });
+    }
+  }
+
+  async function runStillOpenDoIt(messageId) {
+    const open = await FlowStorage.getStillOpen();
+    const entry = open.find((row) => row.messageId === messageId);
+    if (!entry) return;
+    openBriefPanel(open);
+    const ctx = ctxFromPendingEntry(entry);
+    ctx.surface = 'still-open';
+    const escaped = (window.CSS && CSS.escape) ? CSS.escape(messageId) : String(messageId).replace(/"/g, '');
+    const row = document.querySelector('.flow-brief-row[data-message-id="' + escaped + '"]');
+    const btn = row && row.querySelector('.flow-brief-doit');
+    if (row && btn) onDoIt(row, btn, ctx, (entry.process && entry.process.steps) || []);
+  }
+
+  async function consumeStillOpenHandoff() {
+    let got = {};
+    try {
+      got = await chrome.storage.local.get(['glanceStillOpenOpenBrief', 'glanceStillOpenPendingDoIt', 'glanceStillOpenNotifyDismissed']);
+    } catch (e) {
+      return;
+    }
+    if (got.glanceStillOpenNotifyDismissed) {
+      chrome.storage.local.remove('glanceStillOpenNotifyDismissed');
+      FlowStorage.recordStillOpenMetric({ kind: 'notifyDismiss', ts: got.glanceStillOpenNotifyDismissed })
+        .catch((e) => console.error('[Glance] failed to record a notification dismiss', e));
+    }
+    if (got.glanceStillOpenPendingDoIt) {
+      chrome.storage.local.remove('glanceStillOpenPendingDoIt');
+      await runStillOpenDoIt(got.glanceStillOpenPendingDoIt);
+      return;
+    }
+    if (got.glanceStillOpenOpenBrief) {
+      chrome.storage.local.remove('glanceStillOpenOpenBrief');
+      const open = await FlowStorage.getStillOpen();
+      if (open.length) openBriefPanel(open);
+    }
   }
 
   /* ------------------------------------------------------- Feature 2: Draft-It */

@@ -131,6 +131,7 @@ function load(stored, opts) {
   const loadOrder = [
     [CORE, 'domains.js'], [CORE, 'connectors.js'], [CORE, 'extract.js'], [CORE, 'judgment.js'],
     [CORE, 'close-quality-metrics.js'],
+    [CORE, 'still-open.js'],
     [SRC, 'storage.js'],
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],
@@ -155,14 +156,33 @@ function find(node, cls, out) {
   return out;
 }
 
+function isoDaysFromNow(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function datedIntent(iso) {
+  return {
+    type: 'decision',
+    label: 'Send the contract',
+    confidence: 'high',
+    personalClose: 'dated-commitment',
+    facts: { date: { iso: iso } },
+    entities: { what: 'I will send the signed contract' },
+    signals: { score: 80 }
+  };
+}
+
 async function run() {
-  console.log('--- popup.js: Open tab renders every still-open process ---\n');
+  console.log('--- popup.js: Open tab renders the Still Open list, not every unresolved chip ---\n');
   {
-    const proc = { id: 'reply-track', name: 'Reply & Track', steps: [{ id: 'task' }] };
+    const proc = { id: 'log-it', name: 'Log it', steps: [{ id: 'task' }] };
     const stored = {
       log: [
-        { ts: Date.now(), kind: 'shown', messageId: 'm1', process: proc, sender: { name: 'Dana Cole' }, subject: 'Invoice #4', app: 'gmail', threadUrl: 'https://mail.google.com/x/1', intent: { label: 'Log invoice' } },
-        { ts: Date.now(), kind: 'shown', messageId: 'm2', process: proc, sender: { email: 'sam@example.com' }, subject: null, threadUrl: 'https://mail.google.com/x/2', intent: {} }
+        { ts: Date.now(), kind: 'shown', messageId: 'm1', threadId: 't1', process: proc, sender: { name: 'Dana Cole' }, subject: 'Invoice #4', app: 'gmail', threadUrl: 'https://mail.google.com/x/1', intent: datedIntent(isoDaysFromNow(1)) },
+        { ts: Date.now(), kind: 'shown', messageId: 'm2', threadId: 't2', process: proc, sender: { email: 'sam@example.com' }, subject: null, threadUrl: 'https://mail.google.com/x/2', intent: Object.assign(datedIntent(isoDaysFromNow(3)), { label: '' }) },
+        { ts: Date.now(), kind: 'shown', messageId: 'meet', threadId: 't3', process: { id: 'schedule', name: 'Schedule', steps: [{ id: 'calendar' }] }, sender: { name: 'Pat' }, subject: 'Sync', intent: { type: 'event', label: 'Meeting', confidence: 'high' } }
       ]
     };
     const { sandbox, document } = load(stored);
@@ -174,13 +194,14 @@ async function run() {
 
     const host = document.getElementById('open-list');
     const rows = find(host, 'log-item');
-    check('renders one row per pending process', rows.length === 2, rows.length);
+    check('renders one row per Still Open card, and drops the meeting', rows.length === 2, rows.length);
 
     const empty = document.getElementById('open-empty');
     check('the empty state stays hidden when something is open', empty.hidden === true, empty.hidden);
 
     const labels = find(host, 'log-label').map((n) => n.textContent);
-    check('each row shows the process name', labels.every((l) => l === 'Reply & Track'), labels);
+    check('each row shows the one-line why, not a backlog title', labels.every((l) => /^You promised this by /.test(l)), labels);
+    check('each row offers Do It', find(host, 'primary').length === 2, find(host, 'primary').length);
 
     const subtitles = find(host, 'log-where').map((n) => n.textContent);
     check('a row with a name and subject shows both, joined', subtitles.includes('Dana Cole — Invoice #4'), subtitles);
@@ -209,8 +230,8 @@ async function run() {
 
   console.log('\n--- popup.js: Dismiss closes the process for good, DOM-independent ---\n');
   {
-    const proc = { id: 'reply-track', name: 'Reply & Track', steps: [{ id: 'task' }] };
-    const stored = { log: [{ ts: Date.now(), kind: 'shown', messageId: 'm1', process: proc, sender: {}, intent: { label: 'Log it' } }] };
+    const proc = { id: 'log-it', name: 'Log it', steps: [{ id: 'task' }] };
+    const stored = { log: [{ ts: Date.now(), kind: 'shown', messageId: 'm1', threadId: 't1', process: proc, sender: {}, intent: datedIntent(isoDaysFromNow(1)) }] };
     const { sandbox, document, store } = load(stored);
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
     await new Promise((r) => setTimeout(r, 0));
@@ -231,6 +252,38 @@ async function run() {
     check('the dismissal was actually persisted to storage, not just in memory', (store().log || []).some((e) => e.kind === 'dismissed' && e.messageId === 'm1'));
     const quality = store().closeQuality;
     check('dismissing the chip fires one false-Do-It', quality && quality.falseDoIt === 1 && quality.recent[0].kind === 'falseDoIt' && quality.recent[0].reason === 'dismiss', quality);
+    const still = store().stillOpenMetrics;
+    check('dismissing a Still Open card is a false-close', still && still.falseClose === 1 && still.recent.some((e) => e.kind === 'falseClose' && e.reason === 'dismiss'), still);
+  }
+
+  console.log('\n--- popup.js: more than three real closes still render three, and Do It hands off without a second writer ---\n');
+  {
+    const proc = { id: 'log-it', name: 'Log it', steps: [{ id: 'task' }] };
+    const log = [1, 3, 6, 40].map((days, i) => ({
+      ts: Date.now(),
+      kind: 'shown',
+      messageId: 'c' + i,
+      threadId: 'tc' + i,
+      process: proc,
+      sender: { name: 'Dana' },
+      subject: days === 40 ? 'FAR-DEADLINE' : 'Soon ' + i,
+      threadUrl: 'https://mail.google.com/x/' + i,
+      intent: datedIntent(isoDaysFromNow(days))
+    }));
+    const { sandbox, document, store } = load({ log: log });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('open-list');
+    const rows = find(host, 'log-item');
+    check('four qualifying closes render three rows', rows.length === 3, rows.length);
+    const subtitles = find(host, 'log-where').map((n) => n.textContent);
+    check('the far deadline is the one left off', subtitles.every((s) => s.indexOf('FAR-DEADLINE') === -1), subtitles);
+    const doIt = find(host, 'primary')[0];
+    (doIt.listeners.click || []).forEach((fn) => fn());
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    check('Do It with no Gmail tab stores a handoff instead of writing here', store().glanceStillOpenPendingDoIt, store().glanceStillOpenPendingDoIt);
   }
 
   console.log('\n--- popup.js: the referral card offers exporting the real setup, not just a link ---\n');

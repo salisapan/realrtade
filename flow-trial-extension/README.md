@@ -50,21 +50,20 @@ the fact. `actions.js` reads it to order those steps by how often this
 account has kept them, and to stop proposing a step it has net-rejected
 across a real sample size. Nothing in this log ever leaves the device.
 
-**A quiet Morning Brief for what's still open.** `src/brief.js` (rendering)
-and `src/storage.js`'s `getPending()`/`consumeDailyBriefTrigger()` (data)
-together are the one proactive surface Glance has, and it stays inside the
-same Zero-Prompt rules as everything else: a process a chip was shown for,
-and never closed with a Do It or a Dismiss, stays "pending" — that's just
-the existing per-message log's own `hasTerminalOutcome` definition applied
-in bulk, not a second store to keep in sync. When at least one thing is
-pending, a small "N still open" indicator appears (page-level, not
-per-message); clicking it opens a short list, and each row runs Do It /
-Dismiss through the exact same process/Execution Memory machinery the live
-chip uses — reconstructed entirely from the log's own snapshot, so it works
-even for a message that's no longer open in Gmail. It auto-opens at most
-once per calendar day, and only on a day something is actually open; with
-nothing pending, nothing renders at all — no empty state, no badge, no
-ritual to dismiss.
+**A quiet Morning Brief for what's still open.** `core/still-open.js`
+decides the list: at most three personal closes — a dated promise, an
+explicit follow-up, or a confirmed amount — ranked by stakes, explicitness,
+deadline, and confidence. Anything softer (a meeting, a nudge, unread
+noise) stays off it. Fewer than three clear the bar, fewer show; zero is
+silence, not an empty widget to dismiss. `src/brief.js` renders that list.
+The extension popup shows the same cards, each with Do It. Do It still
+writes through the existing Google path and confirms with Handled / טופל
+and Undo. A local inbox scan (subject and snippet already on screen) can
+notice a close before the thread is opened; opening the thread drops that
+snapshot and the full message is judged the usual way. The brief auto-opens
+at most once per calendar day, and only when the list is non-empty. One
+optional morning notification can point at that same list — never one ping
+per item. The in-thread Do It chip is unchanged.
 
 **Five real write paths, all undoable.**
 

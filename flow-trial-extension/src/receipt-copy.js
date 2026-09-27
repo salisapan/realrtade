@@ -17,6 +17,7 @@ const FlowReceipt = (() => {
   const EARLY_CLOSE_LIMIT = 3;
   const EARLY_LINE = 'Nothing else to open, nothing else to check — that’s handled.';
   const STATUS_HANDLED = 'Handled.';
+  const STATUS_HANDLED_HE = 'טופל.';
   const STATUS_PARTIAL = 'Partly handled.';
   // response.where values the Google writers actually return. Anything
   // else stays unnamed — a generic sentence is honest, a dropped
@@ -41,9 +42,10 @@ const FlowReceipt = (() => {
     const total = count(input.total);
     const priorCloses = count(input.priorCloses);
     const full = succeeded > 0 && succeeded === total;
+    const handled = input.lang === 'he' ? STATUS_HANDLED_HE : STATUS_HANDLED;
     return {
       full,
-      status: succeeded === 0 ? null : (full ? STATUS_HANDLED : STATUS_PARTIAL),
+      status: succeeded === 0 ? null : (full ? handled : STATUS_PARTIAL),
       earlyLine: full && priorCloses < EARLY_CLOSE_LIMIT ? EARLY_LINE : null,
       undoLabel: succeeded > 1 ? 'Undo all' : 'Undo'
     };
@@ -121,6 +123,6 @@ const FlowReceipt = (() => {
 
   return {
     confirmation, undoHint, undoneLine, reverseNote,
-    EARLY_CLOSE_LIMIT, EARLY_LINE, STATUS_HANDLED, STATUS_PARTIAL
+    EARLY_CLOSE_LIMIT, EARLY_LINE, STATUS_HANDLED, STATUS_HANDLED_HE, STATUS_PARTIAL
   };
 })();

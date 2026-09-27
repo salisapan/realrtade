@@ -168,7 +168,14 @@ const FlowStorage = (() => {
     // product analytics, and doubling as the referral code in the "copy a
     // link" flow so a share can actually be attributed. Generated once,
     // reused forever; see getInstallId below.
-    installId: null
+    installId: null,
+    // Inbox rows Glance classified locally and has not yet opened as a
+    // thread. Compact snapshots only (no body). The morning list merges
+    // these with unresolved 'shown' entries — see getStillOpen. Capped.
+    stillOpenScan: [],
+    // shown / Do It / undo / false-close for the morning list. Same local
+    // posture as closeQuality. Null until the first event.
+    stillOpenMetrics: null
   };
 
   function get() {
@@ -480,6 +487,97 @@ const FlowStorage = (() => {
     return getPendingFrom(await get());
   }
 
+  // A decision already recorded under a different id for the same matter
+  // (the inbox scan's scan:<threadId> id, once the real message is open).
+  // Adds the id to the resolved set only — it does not count another close.
+  const markAlreadyClosed = serialize(async function markAlreadyClosed(messageId) {
+    if (!messageId) return;
+    const state = await get();
+    if ((state.resolvedMessageIds || []).indexOf(messageId) !== -1) return;
+    await set({
+      resolvedMessageIds: [messageId, ...(state.resolvedMessageIds || [])].slice(0, RESOLVED_CAP)
+    });
+  });
+
+  // How many inbox-row snapshots the morning scan keeps. Older than this
+  // fall off; a thread the user actually opened is remembered via the log
+  // instead, and forgetStillOpenScan drops the row copy at that moment.
+  const STILL_OPEN_SCAN_CAP = 40;
+
+  // Unresolved chip snapshots plus local inbox-scan snapshots, deduped.
+  // A shown entry wins over a scan row for the same message or thread —
+  // the chip saw the full text. Resolved messages are already gone from
+  // getPending; scan rows are filtered here because they are not log entries.
+  function candidatesFromState(state) {
+    const resolved = new Set((state && state.resolvedMessageIds) || []);
+    const pending = getPendingFrom(state).map((entry) => FlowStillOpen.fromLogEntry(entry));
+    const seenMsg = new Set(pending.map((c) => c.messageId).filter(Boolean));
+    const seenThread = new Set(pending.map((c) => c.threadId).filter(Boolean));
+    const scan = [];
+    for (const raw of (state && state.stillOpenScan) || []) {
+      const c = FlowStillOpen.fromLogEntry(raw);
+      if (!c.messageId || resolved.has(c.messageId)) continue;
+      if (seenMsg.has(c.messageId)) continue;
+      if (c.threadId && seenThread.has(c.threadId)) continue;
+      seenMsg.add(c.messageId);
+      if (c.threadId) seenThread.add(c.threadId);
+      scan.push(c);
+    }
+    return pending.concat(scan);
+  }
+
+  // The morning list. Cap, ranking, and silence live in core/still-open.js.
+  // When that module is not loaded this returns nothing — an unfiltered
+  // backlog is not a stand-in for Still Open.
+  async function getStillOpen(now) {
+    if (typeof FlowStillOpen === 'undefined') return [];
+    return FlowStillOpen.select(candidatesFromState(await get()), now || Date.now());
+  }
+
+  // Weekly summary's "still open" count. Hosts that have not loaded
+  // still-open.js keep the older unresolved-shown count so a test sandbox
+  // can exercise the trigger without the morning filter. The extension
+  // always loads the module, and then this number matches the Brief.
+  function stillOpenCountFrom(state, now) {
+    if (typeof FlowStillOpen === 'undefined') return getPendingFrom(state).length;
+    return FlowStillOpen.select(candidatesFromState(state), now || Date.now()).length;
+  }
+
+  const upsertStillOpenScan = serialize(async function upsertStillOpenScan(candidate) {
+    if (!candidate || !candidate.messageId || !candidate.process) return;
+    const state = await get();
+    const scan = (state.stillOpenScan || []).filter((row) => {
+      if (!row) return false;
+      if (row.messageId === candidate.messageId) return false;
+      if (candidate.threadId && row.threadId === candidate.threadId) return false;
+      return true;
+    });
+    scan.unshift(candidate);
+    await set({ stillOpenScan: scan.slice(0, STILL_OPEN_SCAN_CAP) });
+  });
+
+  const forgetStillOpenScan = serialize(async function forgetStillOpenScan(threadId, messageId) {
+    if (!threadId && !messageId) return;
+    const state = await get();
+    const prev = state.stillOpenScan || [];
+    const scan = prev.filter((row) => {
+      if (!row) return false;
+      if (messageId && row.messageId === messageId) return false;
+      if (threadId && row.threadId === threadId) return false;
+      return true;
+    });
+    if (scan.length !== prev.length) await set({ stillOpenScan: scan });
+  });
+
+  const recordStillOpenMetric = serialize(async function recordStillOpenMetric(event) {
+    if (typeof FlowStillOpen === 'undefined') return null;
+    const state = await get();
+    const applied = FlowStillOpen.applyMetric(state.stillOpenMetrics, event || {});
+    if (!applied.changed) return applied.recorded;
+    await set({ stillOpenMetrics: applied.state });
+    return applied.recorded;
+  });
+
   // The one definition of "how many separate decisions has this person
   // actually closed." It lived in the popup as an ad-hoc log filter, got
   // fixed once (count distinct MESSAGES, not rows — one Do It on a
@@ -703,7 +801,7 @@ const FlowStorage = (() => {
     if (!weeklyDue && !returningDue) return null;
 
     const closed = closeCountsFrom(state).week;
-    const open = getPendingFrom(state).length;
+    const open = stillOpenCountFrom(state);
     if (!closed && !open) return null; // nothing to close, nothing waiting — stay silent
 
     await set({ weeklySummaryLastShownTs: now });
@@ -766,7 +864,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, getPending, getPendingFrom, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };
