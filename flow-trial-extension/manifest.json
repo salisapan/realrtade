@@ -39,6 +39,7 @@
         "core/execution-memory.js",
         "core/pmf-metrics.js",
         "core/classification-metrics.js",
+        "core/close-quality-metrics.js",
         "src/chrome-storage-adapter.js",
         "src/storage.js",
         "core/privacyShield.js",

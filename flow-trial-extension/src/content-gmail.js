@@ -1275,6 +1275,11 @@
         if (result.undoneIds.length) {
           FlowExecutionMemory.recordUndo(ctx.process.id, result.undoneIds, ctx.messageId);
           FlowStorage.calibrate('undo', ctx.intent.type);
+          // false-Do-It: the user took back a write that had landed.
+          // Once per message, even if a later step in the chain could not
+          // be undone — any real revert is the reject.
+          FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: ctx.messageId, reason: 'undo' })
+            .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
         }
         if (result.ok) {
           done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
@@ -1321,10 +1326,21 @@
     // the one unacceptable failure. Losing this specific log entry is a
     // real, narrow residual risk (hasTerminalOutcome wouldn't yet know this
     // message is resolved), logged so it's at least visible, not silent.
-    await Promise.all(succeeded.map((r) =>
+    const bookkeeping = succeeded.map((r) =>
       FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
         .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e))
-    ));
+    );
+    // success: every step the chip proposed actually wrote. Partials stay
+    // out — the receipt may still say "Handled." on main for a partial
+    // (PR #33's copy is not on this branch), and this count must not
+    // follow that string. Local only; not a flow:track event.
+    if (typeof FlowCloseQuality !== 'undefined' && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length)) {
+      bookkeeping.push(
+        FlowStorage.recordCloseQuality({ kind: 'success', messageId: ctx.messageId })
+          .catch((e) => console.error('[Glance] failed to record a full-close success', e))
+      );
+    }
+    await Promise.all(bookkeeping);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'write_completed', params: { domain: state.domainId, actionCount: succeeded.length } });
     // The "opened vs closed" funnel pair with chip_shown — fired here and in
     // onDismiss's own decline path, since both are real ways a proposed
@@ -1357,6 +1373,12 @@
     // reads to Execution Memory as a full rejection (onDismiss records it),
     // which is correct: the user saw the whole process and kept none of it.
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
+
+    // return: this is a real Do It use (the guards above already rejected
+    // a stale row and an empty step list). The first one ever, and any
+    // later one on the same local day, do not increment the counter.
+    FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId })
+      .catch((e) => console.error('[Glance] failed to record a Do It use for return', e));
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
@@ -1423,7 +1445,11 @@
       FlowStorage.calibrate('dismiss', ctx.intent.type)
         .catch((e) => console.error('[Glance] failed to update precision calibration for a dismiss', e)),
       FlowExecutionMemory.recordDismiss(ctx.process.id, ctx.process.steps.map((s) => s.id), ctx.messageId)
-        .catch((e) => console.error('[Glance] failed to record a dismiss in Execution Memory', e))
+        .catch((e) => console.error('[Glance] failed to record a dismiss in Execution Memory', e)),
+      // false-Do-It: dismissing the chip is the reject. The same message
+      // from another surface is a no-op inside recordCloseQuality.
+      FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: ctx.messageId, reason: 'dismiss' })
+        .catch((e) => console.error('[Glance] failed to record a dismiss as a false-Do-It', e))
     ]);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
     // See showMultiActionReceipt's own comment on process_closed — a decline
