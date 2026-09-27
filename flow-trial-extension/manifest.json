@@ -48,6 +48,7 @@
         "src/sidebar.js",
         "src/brief.js",
         "src/weekly.js",
+        "src/receipt-copy.js",
         "src/content-gmail.js"
       ],
       "css": [

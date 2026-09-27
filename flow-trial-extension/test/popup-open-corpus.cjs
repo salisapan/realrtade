@@ -412,6 +412,27 @@ async function run() {
     check('the learned-stat line stays hidden with nothing learned yet', el.hidden === true);
   }
 
+  console.log('\n--- popup.js: a written log row reads as Handled and still offers Undo ---\n');
+  {
+    const stored = {
+      log: [
+        { ts: Date.now(), kind: 'written', label: 'Log the invoice', messageId: 'm1', where: 'Google Tasks', url: 'https://tasks.google.com/x', ref: { taskId: 't1' }, connectorId: 'googleTask' },
+        { ts: Date.now() - 1000, kind: 'undone', label: 'Log the invoice', messageId: 'm0' }
+      ]
+    };
+    const { sandbox, document } = load(stored);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const host = document.getElementById('log-list');
+    const kinds = find(host, 'log-kind').map((n) => n.textContent);
+    check('a written row is labeled Handled, not the stored kind', kinds.includes('Handled'), kinds);
+    check('an undone row is labeled Undone', kinds.includes('Undone'), kinds);
+    const undo = find(host, 'ghost').find((n) => n.tagName === 'button' && n.textContent === 'Undo');
+    check('the written row still has an Undo button', Boolean(undo));
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }

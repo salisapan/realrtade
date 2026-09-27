@@ -1183,10 +1183,11 @@
     return 'Closed — ' + joinWithAnd(verbs) + '.';
   }
 
-  // The chip's receipt for a closed process of 1-5 steps: the process name,
-  // a closure-framed summary of what actually happened, a link per
-  // successful write that has one, and a single "Undo all" that reverses
-  // every successful write in the group together. A write that failed
+  // The chip's receipt for a closed process of 1-5 steps: the status word
+  // ("Handled." or "Partly handled."), the process name, a closure-framed
+  // summary of what actually happened, a link per successful write that
+  // has one, and Undo (or "Undo all") that reverses every successful write
+  // in the group together. A write that failed
   // silently contributes nothing to undo; it was never done. A successful
   // undo is recorded to Execution Memory as a rejection of those step kinds
   // — accepted-then-undone is a stronger "don't propose this" signal than a
@@ -1205,45 +1206,30 @@
     // Glance ever closed for this account, before this one" is answered
     // against state prior to this call, not state this same call is about
     // to change. No new UI, no popup — the same receipt every close already
-    // shows, with one extra, concrete line, for however many of the first
-    // few closes actually need it.
-    //
-    // Covers the first THREE closes, not just the very first: the first
-    // close is the moment of discovery, but a new user's trust in "this
-    // actually works" isn't fully earned on one data point — the second
-    // and third closes are what confirm it wasn't a fluke. The line stays
-    // exactly the same across all three rather than escalating or varying
-    // it: repeating the same concrete claim is reinforcement, while three
-    // different lines for three closes a day or two apart would read as a
-    // script, not a system telling the truth about what it just did. From
-    // the fourth close on, the receipt goes back to just closedSummary()
-    // alone — by then the pattern is established and restating it would
-    // cheapen it into a slogan.
+    // shows. The status word is always there. The extra magic-moment line
+    // is only for the first three full closes, under that word, not
+    // instead of it.
     const priorCloses = (await FlowStorage.get()).writeStats.total;
-    const isEarlyClose = priorCloses < 3;
+    // Status word and Undo label live in receipt-copy.js so a partial
+    // close cannot say "Handled." and the first three closes cannot
+    // replace that word with the longer magic-moment sentence. The
+    // sentence, when it applies, is an extra line under the status.
+    const copy = FlowReceipt.confirmation({
+      succeeded: succeeded.length,
+      total: results.length,
+      priorCloses
+    });
 
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
     const icon = el('span', 'flow-chip-done-icon', '✓');
     icon.setAttribute('aria-hidden', 'true');
     done.appendChild(icon);
 
-    // Leads with the human read of what just happened — "handled," full
-    // stop — before the specific, accurate detail underneath it. The old
-    // order put the process-name badge and the verb list first and saved
-    // this feeling for a one-time bonus line on someone's first three
-    // closes only, trailing AFTER that detail; every close now opens the
-    // same reassuring way, every time, for as long as the account exists —
-    // closer to how a person would actually tell you what happened
-    // ("handled — " then the specifics), not a status log read top to
-    // bottom. The first three closes get their own longer, warmer version
-    // of the same lead line (see isEarlyClose below) rather than showing
-    // both and repeating "handled" twice in one receipt.
-    if (isEarlyClose) {
-      done.appendChild(el('span', 'flow-chip-first-close', 'Nothing else to open, nothing else to check — that’s handled.'));
-    } else {
-      done.appendChild(el('span', 'flow-chip-handled', 'Handled.'));
-    }
+    const status = el('span', 'flow-chip-handled' + (copy.full ? '' : ' flow-chip-handled-partial'), copy.status);
+    done.appendChild(status);
+    if (copy.earlyLine) done.appendChild(el('span', 'flow-chip-first-close', copy.earlyLine));
 
     const detail = el('span', 'flow-chip-detail');
     detail.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
@@ -1258,8 +1244,12 @@
       actionsRow.appendChild(view);
     }
 
-    const undo = el('button', 'flow-chip-link', succeeded.length > 1 ? 'Undo all' : 'Undo');
+    const undo = el('button', 'flow-chip-undo', copy.undoLabel);
     undo.type = 'button';
+    undo.setAttribute('aria-label', copy.undoLabel === 'Undo all'
+      ? 'Undo all and remove what was just written'
+      : 'Undo and remove what was just written');
+    let undoNote = null;
     undo.addEventListener('click', () => {
       undo.textContent = 'Undoing…';
       undo.disabled = true;
@@ -1286,8 +1276,14 @@
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
-          undo.textContent = 'Some actions couldn’t be undone';
+          // The button stays Undo. Replacing its label with the failure
+          // sentence hid the only control that can finish the rollback.
+          undo.textContent = copy.undoLabel;
           undo.disabled = false;
+          if (!undoNote) {
+            undoNote = el('span', 'flow-chip-partial-note', 'Some of this couldn’t be undone.');
+            done.appendChild(undoNote);
+          }
         }
       });
     });
@@ -1307,6 +1303,11 @@
       done.appendChild(el('span', 'flow-chip-partial-note', '(' + detail + ')'));
     }
 
+    // The host is still the proposal card (blue frame on the chip, blue
+    // row in the Brief). Drop that chrome so the receipt is the only
+    // thing left on screen — a blue card around "Handled." reads as if
+    // the proposal is still open.
+    host.classList.add('flow-chip-settled');
     host.replaceChildren(done);
 
     // Awaited (and the caller — onDoIt — awaits this whole function) so

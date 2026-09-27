@@ -60,10 +60,12 @@ that demo ever pretending to be their own first real close.
 The surrounding experience has to read as closure, not as an AI feature
 firing:
 
-- **Language**: the receipt already says "Closed — scheduled and tracked,"
-  not "2 actions completed" (see `closedSummary()` in
-  `src/content-gmail.js`) — declarative, past-tense, about the work, not
-  about the tool.
+- **Language**: the receipt leads with "Handled." The line under it is
+  still the work, past tense — "Closed — scheduled and tracked," or that
+  process's own closedLine — not "2 actions completed" (see
+  `closedSummary()` in `src/content-gmail.js` and `FlowReceipt` in
+  `src/receipt-copy.js`). A close where a step did not land says
+  "Partly handled." instead. "Handled." is only a full close.
 - **Undo safety**: every real write ships with an inline Undo right there in
   the receipt (`showMultiActionReceipt`) — closure has to feel safe to trust
   immediately, not something the user has to go verify or manually reverse
@@ -73,18 +75,19 @@ firing:
   succeeds, in the same chip the user is already looking at.
 - **The early-closes line**: `showMultiActionReceipt` checks, before this
   close's own writes land, how many successful closes this account has had
-  before this one (`writeStats.total`). For each of the first three
-  closes — not just the very first — the receipt adds one extra line:
-  "Nothing else to open, nothing else to check — that's handled." The
-  first close is the moment of discovery; trust in "this actually works"
-  isn't fully earned on one data point, and the second and third closes
-  are what confirm it wasn't a fluke. The line stays identical across all
-  three rather than escalating into a growing narrative — repeating the
-  same concrete claim is reinforcement, while three different lines a day
-  or two apart would read as a script. From the fourth close on, the
-  receipt goes back to `closedSummary()` alone — by then the pattern is
-  established, and restating it would turn a genuine realization into a
-  slogan.
+  before this one (`writeStats.total`). For each of the first three *full*
+  closes — not just the very first — the receipt adds one extra line under
+  "Handled.": "Nothing else to open, nothing else to check — that's
+  handled." The first close is the moment of discovery; trust in "this
+  actually works" isn't fully earned on one data point, and the second
+  and third closes are what confirm it wasn't a fluke. The line stays
+  identical across all three rather than escalating into a growing
+  narrative — repeating the same concrete claim is reinforcement, while
+  three different lines a day or two apart would read as a script. From
+  the fourth full close on, that extra line drops. The status word
+  "Handled." stays on every full close after that — it is the confirmation
+  that the write landed, not a slogan that expires. A partial close never
+  gets the extra line, because "nothing else to check" would be false.
 
 This is implemented entirely inside the existing receipt UI. No new screen,
 no popup, no onboarding wizard — the Zero-Prompt rule applies to the Magic
