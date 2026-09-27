@@ -842,6 +842,16 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
     check(label + ' closes with the log-it task, carrying the date',
       process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.dateIso),
       process && { id: process.id, dates: process.steps.map((s) => s.params && s.params.dateIso) });
+    // The task title is what Google Tasks shows. "Log this decision" drops
+    // the date the chip already resolved — the close then doesn't name
+    // what it wrote.
+    check(label + ' task title names that date',
+      typeof intent.label === 'string' && intent.label.indexOf('Log this decision') === -1 && /\b[A-Z][a-z]{2} \d{1,2}\b/.test(intent.label),
+      intent.label);
+    const datedTask = process && process.steps.find((s) => s.kind === 'googleTask');
+    check(label + ' task step keeps the sentence the write will quote',
+      Boolean(datedTask && datedTask.params && datedTask.params.what),
+      datedTask && datedTask.params);
   }
 
   const datedSilent = [
@@ -872,6 +882,10 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
     check(label + ' closes with reply-track (draft + task)',
       process && process.id === 'reply-track' && process.steps.some((s) => s.kind === 'gmailDraft') && process.steps.some((s) => s.kind === 'googleTask'),
       process && process.id);
+    const askDraft = process && process.steps.find((s) => s.kind === 'gmailDraft');
+    check(label + ' draft step names the ask it will write',
+      Boolean(askDraft && askDraft.params && askDraft.params.what),
+      askDraft && askDraft.params);
   }
 
   const askSilent = [
@@ -901,6 +915,9 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
     check(label + ' task carries the amount',
       process && process.id === 'log-it' && process.steps.some((s) => s.kind === 'googleTask' && s.params.amount),
       process && process.steps.map((s) => s.params && s.params.amount));
+    check(label + ' task title names that figure',
+      typeof intent.label === 'string' && intent.entities && intent.entities.amount && intent.label.indexOf(intent.entities.amount) !== -1,
+      { label: intent.label, amount: intent.entities && intent.entities.amount });
   }
 
   const meeting = classify('Let’s do a call Friday, September 18 at 3pm to review the contract.');
@@ -956,6 +973,22 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
   const otherType = { request: { clicks: 0, dismissals: 6, ts: NOW.getTime() } };
   const notSuppressed = classify('We agreed to file the amendment by September 21.', { calibrationByType: otherType });
   check('request-dismissal history does not suppress a dated commitment', notSuppressed.type === FlowIntent.TYPES.DECISION_TO_LOG, notSuppressed.type);
+}
+
+console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');
+{
+  const lines = FlowActions.receiptWrittenLines([
+    { response: { ok: true, written: 'Google Task · due Sep 21' } },
+    { response: { ok: false, written: 'should not appear' } },
+    { response: { ok: true, written: 'Google Task · due Sep 21' } },
+    { response: { ok: true, written: '  Gmail draft · the invoice  ' } },
+    { response: { ok: true, written: '   ' } }
+  ]);
+  check('receipt keeps each successful written line once, trimmed',
+    JSON.stringify(lines) === JSON.stringify(['Google Task · due Sep 21', 'Gmail draft · the invoice']),
+    lines);
+  check('a close with no written field stays quiet',
+    JSON.stringify(FlowActions.receiptWrittenLines([{ response: { ok: true } }])) === '[]');
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -298,7 +298,15 @@ const FlowIntent = (() => {
     const facts = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
     const s = FlowJudgment.score(text, domain, facts);
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
-    const enrichedFacts = Object.assign({}, facts, { lost: s.flags.lost, executed: s.flags.executed, dispute: s.flags.dispute });
+    // dateText is what neutralTitle() uses to name a dated close ("Log
+    // commitment for Sep 21"). extract() only stores date.iso; without this,
+    // every dated commitment's task title fell through to "Log this decision"
+    // even though the chip had already resolved the day. Only a real ISO
+    // date counts — a raw phrase we refused to resolve must not become a title.
+    const enrichedFacts = Object.assign({}, facts, {
+      lost: s.flags.lost, executed: s.flags.executed, dispute: s.flags.dispute,
+      dateText: (facts.date && facts.date.iso) ? humanDateFallback(facts.date) : null
+    });
 
     const who = ctx.senderName || ctx.senderEmail || null;
     const amount = facts.moneyText || null;

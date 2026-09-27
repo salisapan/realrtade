@@ -853,26 +853,78 @@ function googleTaskTitle(p) {
   return identity ? identity + ' — ' + p.label : p.label;
 }
 
-function googleTaskDue(f) {
-  if (!f || !f.date || !f.date.iso) return null;
-  // The Tasks API requires a full RFC3339 timestamp on `due` but only ever
-  // displays and sorts by the date portion — midnight UTC keeps the date
-  // from shifting a day either direction regardless of the signed-in
-  // account's own timezone setting.
-  return f.date.iso + 'T00:00:00.000Z';
+// A date the close is willing to write. Anything else — a month that
+// doesn't exist, a bare phrase — stays off the task. A wrong due date is
+// a worse failure than no due date.
+function isoDateOrNull(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parts = value.split('-').map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return value;
+}
+
+function plannedAmount(p) {
+  const raw = p.params && p.params.amount;
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  return trimmed || null;
+}
+
+// The task step's params are the close. facts are the fallback for a
+// caller that still only has the extracted record. When both name a date,
+// the plan wins — that is the date the chip showed.
+function taskClosePayload(p) {
+  const params = p.params || {};
+  const plannedDue = isoDateOrNull(params.dateIso);
+  const dueIso = plannedDue || isoDateOrNull(p.facts && p.facts.date && p.facts.date.iso);
+  const fromPlan = plannedAmount(p);
+  const amount = fromPlan || ((p.facts && p.facts.moneyText) || null);
+  const entities = Object.assign({}, p.entities);
+  const plannedWhat = typeof params.what === 'string' ? params.what.trim() : '';
+  if (!entities.what && !entities.requestWhat && plannedWhat) entities.what = plannedWhat;
+  const facts = Object.assign({}, p.facts);
+  if (fromPlan) facts.moneyText = fromPlan;
+  if (plannedDue) {
+    facts.date = { iso: plannedDue };
+    delete facts.dateText;
+  }
+  return { dueIso, amount: amount || null, forNotes: Object.assign({}, p, { facts, entities }) };
+}
+
+function taskWrittenLine(dueIso, amount) {
+  const parts = ['Google Task'];
+  if (amount) parts.push(amount);
+  if (dueIso) {
+    const human = humanDateFallback({ iso: dueIso });
+    parts.push('due ' + (human || dueIso));
+  }
+  return parts.join(' · ');
+}
+
+function draftWrittenLine(params) {
+  const what = params && typeof params.what === 'string' ? params.what.replace(/\s+/g, ' ').trim() : '';
+  if (!what) return 'Gmail draft';
+  const short = what.length > 80 ? what.slice(0, 79) + '…' : what;
+  return 'Gmail draft · ' + short;
 }
 
 async function googleTasksWrite(p) {
   const auth = await getGoogleTasksAuth();
   if (!auth) return { ok: false, reason: 'not-connected' };
 
-  const f = p.facts || {};
-  const notesLines = factLines(p);
+  const close = taskClosePayload(p);
+  const notesLines = factLines(close.forNotes);
   if (p.threadUrl) notesLines.push(['Open in Gmail', p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n');
 
   const body = { title: googleTaskTitle(p).slice(0, 1024), notes: notes.slice(0, 8192) };
-  const due = googleTaskDue(f);
+  // Tasks requires a full RFC3339 timestamp on `due` but only displays the
+  // date. Midnight UTC keeps that date from shifting a day in either direction.
+  const due = close.dueIso ? close.dueIso + 'T00:00:00.000Z' : null;
   if (due) body.due = due;
 
   const post = (listId) => googleTasksAuthedFetch('/lists/' + encodeURIComponent(listId) + '/tasks', {
@@ -921,6 +973,10 @@ async function googleTasksWrite(p) {
     ok: true,
     where: 'Google Tasks',
     target: GLANCE_TASK_LIST_TITLE + ' list',
+    // What the receipt says was written. Built from the same due and amount
+    // that went into the request body, so the line cannot name a date or a
+    // figure the task does not have.
+    written: taskWrittenLine(close.dueIso, close.amount),
     // The id actually written to, not the one this function started with —
     // Undo has to delete from the list the task really landed in.
     ref: { taskListId, taskId: task.id },
@@ -1321,6 +1377,7 @@ async function gmailDraftWrite(p) {
     target: !attachment ? 'a draft reply'
       : attachmentSource === 'auto' ? 'a draft reply with a file Glance found in Drive (unverified — check it before sending)'
       : 'a draft reply with the attachment',
+    written: draftWrittenLine(params),
     ref: { draftId: draft.id },
     // The Drafts API doesn't return a stable, documented deep link to one
     // specific draft the way Calendar's htmlLink does — linking to the
