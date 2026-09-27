@@ -32,14 +32,17 @@ const FlowJudgment = (() => {
   // it lives in the sales profile's entityWords where it belongs. Left in this
   // list it handed every cold pitch containing "here's the deal" a full
   // commitment score, which measurably ranked spam above real decisions.
-  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed)\b/i;
+  // Bare "confirm" is a request ("can you confirm the price?"), not a
+  // decision — only "confirmed" / "confirming" count. "you agree" and
+  // "you accept" are the same trap; "we agree" and "I accept" still count.
+  const COMMIT = /\b(we'?re good (?:at|with)|(?<!\byou\s)agreed?(?: to| on)?|confirm(?:ed|ing)|(?<!\byou\s)accept(?:ed)?|we'?ll take|executed)\b/i;
   // An explicit, unambiguous authorisation. These carry more weight than the
   // general list because "Approved — go ahead" is the single most common real
   // decision in business email and it arrives with no money and no date
   // attached, so it has to clear the bar largely on its own.
   const COMMIT_STRONG = /\b(approved?|signed off|sign-off|go ahead|green[- ]?lit|locked in|countersigned|fully executed|signature page attached)\b/i;
   // A decision was made in the other direction.
-  const LOST = /\b(not (?:moving|going) forward|we'?re pulling out|decided to go with (?:someone|another)|going a different direction|no longer interested|cancel(?:ling|led)? the|terminate the|declin(?:e|ed|ing))\b/i;
+  const LOST = /\b(not (?:moving|going) forward|we'?re pulling out|decided to go with (?:someone|another)|going a different direction|no longer interested|cancel(?:ling|led)? the|terminate the|declin(?:e|ed|ing)|not to renew|not renewing|won'?t be renewing|will not be renewing|moving to a different vendor)\b/i;
   // A signature that an agreement completed.
   const EXECUTED = /\b(fully executed|countersigned|signed the (?:agreement|contract)|execution copy|signature page attached)\b/i;
   // Something is owed to somebody by a date.
@@ -55,8 +58,11 @@ const FlowJudgment = (() => {
   // Same phrases, same intent, just the vocabulary an Israeli business inbox
   // actually uses instead of "we're good at" / "approved" / "no longer interested".
   const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?)/;
-  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור)/;
-  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא)/;
+  // "נחתם" / "עותק חתום" are the passive twins of English "fully executed",
+  // which already lives on COMMIT_STRONG. Left only on the weaker executed
+  // list, a signed Hebrew agreement with no dollar amount could not clear 50.
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|נחתם|עותק חתום|ההסכם נחתם)/;
+  const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא נחדש|לא מחדשים|לא לחדש)/;
   const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם)/;
   const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון)/;
   const HANDOFF_HE = /(תוכלו?\s|תוכלי\s|נשמח אם|מחכים ל(?:אישור|תשובה|תגובה)|נדרשת פעולה|אשמח אם תוכל)/;
@@ -110,7 +116,6 @@ const FlowJudgment = (() => {
     if (MARKETING.test(text)) add('marketing', -45, 'Reads like a mailing list, not a person');
     if (SOLICITATION.test(text)) add('solicitation', -55, 'Reads like a cold pitch, not your work');
     if (CALENDAR_NOISE.test(text)) add('calendar', -35, 'Calendar notification boilerplate');
-    if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
     const commitStrong = COMMIT_STRONG.test(text) || COMMIT_STRONG_HE.test(text);
     const commit = commitStrong || COMMIT.test(text) || COMMIT_HE.test(text);
@@ -119,6 +124,22 @@ const FlowJudgment = (() => {
     const obligation = OBLIGATION.test(text) || OBLIGATION_HE.test(text);
     const handoff = HANDOFF.test(text) || HANDOFF_HE.test(text);
     const dispute = DISPUTE.test(text) || DISPUTE_HE.test(text);
+
+    // A length penalty is for a fragment that has not said what happened
+    // ("Thanks!"). "Approved. Go ahead.", a declined candidate, and an
+    // 11-word invoice are not too short to judge — the flat <12 cutoff was
+    // silencing those outright.
+    const decisive = commit || lost || executed || dispute || (facts.money && obligation);
+    if (facts.wordCount < 12 && !decisive) add('too-short', -25, 'Too little text to judge');
+
+    // Money plus "can you confirm…?" used to clear the bar and get labelled
+    // as a confirmed value. A question with no decision already in it is not
+    // one. An invoice that is actually due still has an obligation, so it
+    // is not caught by this.
+    const asking = /\?/.test(text) || /\b(?:please\s+(?:confirm|agree)|(?:can|could|would) you\s+(?:confirm|agree))\b/i.test(text);
+    if (asking && !commit && !lost && !executed && !dispute && !obligation) {
+      add('unsettled', -55, 'Asks a question instead of stating a decision');
+    }
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
     if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
@@ -132,7 +153,11 @@ const FlowJudgment = (() => {
     if (facts.date && obligation) add('deadline', 26, 'Sets a dated obligation: ' + facts.date.raw);
     else if (facts.date) add('date', 12, 'Names a date: ' + facts.date.raw);
     if (handoff) add('handoff', 18, 'Asks you to do something specific');
-    const onDomain = domain.entityWords.test(text);
+    // The subject is part of what the message is about ("Re: Offer",
+    // "Re: Renewal") and is not quoted history. Commitment signals stay on
+    // the body only — a subject line must not invent a decision.
+    const about = facts.subject ? text + '\n' + facts.subject : text;
+    const onDomain = domain.entityWords.test(about);
     if (onDomain) add('domain', 14, 'About ' + domain.entity.toLowerCase());
     if (facts.isReply) add('reply', 8, 'Part of an ongoing thread');
 
@@ -148,22 +173,28 @@ const FlowJudgment = (() => {
   // The threshold is the only thing that learns. Clicking says "more like that",
   // dismissing says "less" — and neither ever asks the user to configure a number.
   //
-  // Dismissals decay with elapsed time, and that is load-bearing rather than a
-  // nicety. Dismissals used to decay only when the user clicked a chip, which
-  // made silence an absorbing state: a few dismissals pushed the threshold above
-  // what any real email could score, no chip could then appear, so no click could
-  // happen, so the threshold never came back down. Flow went quiet permanently
-  // and — because silence is its normal state — the user could not tell the
-  // difference between a calm inbox and a dead extension. Time-based decay means
-  // a quiet week always walks the threshold back toward baseline on its own.
+  // Clicks and dismissals both decay with elapsed time. That is load-bearing
+  // rather than a nicety. Dismissals used to decay only when the user clicked
+  // a chip, which made silence an absorbing state: a few dismissals pushed the
+  // threshold above what any real email could score, no chip could then appear,
+  // so no click could happen, so the threshold never came back down. Flow went
+  // quiet permanently and — because silence is its normal state — the user
+  // could not tell the difference between a calm inbox and a dead extension.
+  // Clicks had the opposite bug on the read path: storage decays both counters
+  // when the next event is recorded, but the live threshold only faded
+  // dismissals. A run of clicks stuck sensitivity at the floor, and a mixed
+  // history got more talkative during a quiet fortnight because the
+  // conservative signal faded and the click count did not. The same half-life
+  // on read is what storage.calibrate already applies on write.
   const DISMISSAL_HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
 
   function thresholdFrom(calibration, now) {
     const c = calibration || {};
     const elapsed = Math.max(0, (now || Date.now()) - (c.ts || 0));
     const decay = c.ts ? Math.pow(0.5, elapsed / DISMISSAL_HALF_LIFE_MS) : 1;
+    const clicks = (c.clicks || 0) * decay;
     const dismissals = (c.dismissals || 0) * decay;
-    const t = BASE_THRESHOLD - (c.clicks || 0) * 4 + dismissals * 6;
+    const t = BASE_THRESHOLD - clicks * 4 + dismissals * 6;
     return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, t));
   }
 
@@ -237,7 +268,8 @@ const FlowJudgment = (() => {
       dateText: humanDate(raw.date),
       automated: raw.automated,
       wordCount: raw.wordCount,
-      isReply: /^re:/i.test(ctx.subject || '')
+      isReply: /^re:/i.test(ctx.subject || ''),
+      subject: ctx.subject || ''
     };
 
     const s = score(text, domain, facts);
