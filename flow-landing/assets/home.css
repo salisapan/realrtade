@@ -196,10 +196,8 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .hero h1{font-size:var(--step-4); letter-spacing:-.02em; margin:4px 0 20px; transform-style:preserve-3d; transition:transform .3s cubic-bezier(.2,.7,.2,1)}
 .hero .lead{margin-bottom:36px}
 .hero-cta{display:flex; align-items:center; gap:20px; flex-wrap:wrap}
-/* Glance gets one subordinate line under the main Flow CTA, not a co-equal
-   button beside it — the hero is Flow's pitch to organizations; Glance is
-   "also try this today, for free" rather than a second product competing
-   for the same first click. */
+/* Glance is its own product in this hero: one Get Glance action, plus a
+   text link to the org path. Flow's Do It stays the primary hero CTA. */
 /* A bordered card, not just a divider line under Flow's own CTA — Glance
    needs to read as a distinct product sitting inside this hero, not as one
    more paragraph continuing Flow's own pitch. The tag/dot above the copy
@@ -209,8 +207,10 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .hero-glance-tag{flex:1 1 100%; display:flex; align-items:center; gap:9px; font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
 .hero-glance-dot{position:relative; width:8px; height:8px; border-radius:50%; background:var(--accent); flex:none}
 .hero-glance-dot::after{content:''; position:absolute; inset:-5px; border-radius:50%; border:1px solid color-mix(in srgb, var(--accent) 45%, transparent)}
-.hero-glance p{margin:0; font-size:.95rem; line-height:1.6; color:var(--muted); flex:1 1 280px}
+.hero-glance p{margin:0; font-size:.95rem; line-height:1.6; color:var(--muted); flex:1 1 100%}
 .hero-glance p b{color:var(--txt-hi); font-weight:600}
+.hero-glance-flow{font-size:.9rem; font-weight:600; color:var(--txt); text-decoration:none; border-bottom:1px solid color-mix(in srgb, var(--txt) 35%, transparent)}
+.hero-glance-flow:hover{color:var(--accent)}
 .hero-foot{margin-top:46px; display:flex; align-items:center; gap:13px; color:var(--muted); font-size:.9rem}
 .hero-foot .dot{width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); flex:0 0 auto}
 .scroll-cue{position:absolute; inset-block-end:26px; inset-inline-start:50%; transform:translateX(-50%); display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--muted); font-family:var(--mono); font-size:.66rem; letter-spacing:.2em; direction:ltr; z-index:3}
