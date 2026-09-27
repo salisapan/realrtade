@@ -68,7 +68,9 @@ const FLOW_DOMAINS = [
     id: 'support',
     label: 'Customer success & support',
     entity: 'Ticket / renewal',
-    entityWords: /\b(ticket|renewal|churn|escalation|refund|complaint|support case|csat|downgrade|cancel(?:lation)?)\b/i,
+    // "renew" / "renewing" are the verb form of the renewal this profile
+    // watches for. The noun alone missed "we are not renewing".
+    entityWords: /\b(ticket|renew(?:al|ing|ed)?|churn|escalation|refund|complaint|support case|csat|downgrade|cancel(?:lation)?)\b/i,
     title(facts) {
       if (facts.lost) return 'Log churn risk';
       if (facts.date && facts.moneyText) return 'Log renewal ' + facts.moneyText + ' due ' + facts.dateText;
@@ -81,7 +83,10 @@ const FLOW_DOMAINS = [
     id: 'hr',
     label: 'Recruiting & hiring',
     entity: 'Candidate / offer',
-    entityWords: /\b(candidate|offer letter|interview|hire|hiring|onboarding|background check|reference check|start date|headcount)\b/i,
+    // "offer" alone, not only "offer letter" — the recruiting example's
+    // subject is "Re: Offer". "offering" does not match; a mailing-list
+    // "special offer" is still killed by the marketing penalty.
+    entityWords: /\b(candidate|offer(?: letter)?|interview|hire|hiring|onboarding|background check|reference check|start date|headcount)\b/i,
     title(facts) {
       if (facts.lost) return 'Log candidate declined';
       if (facts.date && facts.moneyText) return 'Log offer ' + facts.moneyText + ', starts ' + facts.dateText;
