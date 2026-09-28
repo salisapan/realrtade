@@ -20,6 +20,9 @@ actually does. `manifest.json`'s `host_permissions` were narrowed to match
 for the same reason — see `core/connectors.js`'s header comment. Re-widen
 both together (listing copy and host_permissions) if/when those connectors
 rejoin onboarding — not just the code that already exists for them.
+The four non-Google public client IDs live in `config/oauth.public.js` as
+`REPLACE_WITH_*` placeholders (see `docs/SETUP.md`). They are not part of
+this listing. Client secrets stay in Netlify. Do not invent IDs.
 
 ## Store listing text
 
@@ -254,11 +257,11 @@ background/framing), not something to upload as-is.
       after a write are the three that matter most now that the listing
       describes the process/Brief model rather than the five-connector one.
 - [ ] Fill in the Developer Dashboard form itself using the text above.
-- [ ] **`oauth2.client_id` in `manifest.json` is still the placeholder**
-      (`YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com`) — this
-      genuinely IS a Store-submission blocker now, since Google is the only
-      live connector. See `README.md`'s "Set up Google" section for the
-      full Cloud Console walkthrough.
+- [x] **`oauth2.client_id` in `manifest.json` is set.** The
+      `YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com` placeholder
+      is no longer in the manifest, so it is not a Store-submission
+      blocker. See `README.md`'s "Set up Google" section if it needs to be
+      rotated.
 - [x] `privacy.html` checked against this doc's data-usage table and the
       actual `ALLOWED_EVENTS` list. Section 5's "What stays local" and
       "Connection credentials" bullets already covered the Morning
@@ -267,11 +270,15 @@ background/framing), not something to upload as-is.
       allowed events — missing `connector_configured`, `draft_generated`,
       `attachment_summarized`, and `weekly_habit_formed` — fixed to
       enumerate all 11, matching this table's own row above exactly.
-- [ ] The four non-Google connector `CLIENT_ID` placeholders in
-      `src/background.js` (`HUBSPOT_CLIENT_ID`, `SALESFORCE_CLIENT_ID`,
-      `SLACK_CLIENT_ID`, `MONDAY_CLIENT_ID`) are out of scope for this
-      listing entirely now — see this doc's revision note at the top. Leave
-      them unset until that scope is deliberately reopened.
+- [ ] The four non-Google public client IDs in `config/oauth.public.js`
+      (`hubspotClientId`, `salesforceClientId`, `slackClientId`,
+      `mondayClientId`) are still `REPLACE_WITH_*` placeholders. They are
+      out of scope for this listing — see the revision note at the top.
+      `publicClientId()` treats those placeholders as unset, so the
+      connectors report themselves unconfigured and do not open an OAuth
+      window. Leave them unset until that scope is deliberately reopened.
+      Client secrets stay in Netlify — see `docs/SETUP.md`. Do not invent
+      IDs.
 - [ ] Decide the release strategy: this project's earlier recommendation
       was a dual track — submit to the Web Store for the public listing,
       and keep documenting Load-unpacked in the README for anyone who

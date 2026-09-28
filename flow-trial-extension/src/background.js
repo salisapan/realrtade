@@ -24,8 +24,9 @@
 //   registered app whose Client Secret must never ship inside an extension.
 //   Each secret lives only as a Netlify environment variable read by that
 //   connector's own exchange (and, where the platform issues one, refresh)
-//   function; the Client ID constants below are public, in the same way a
-//   GA4 measurement ID is public.
+//   function. The public Client IDs are read from config/oauth.public.js —
+//   the same way a GA4 measurement ID is public — and stay placeholder
+//   strings until the owner pastes real ones. See docs/SETUP.md.
 //
 // Every write path is deliberately additive and conservative: it only ever
 // writes to something that already exists — an existing matching Contact, a
@@ -34,10 +35,9 @@
 // to undo it. Nothing here ever edits or deletes something the user already
 // had.
 
-// TODO(owner): set this to the Client ID from your HubSpot public app
-// (developers.hubspot.com > your app > Auth). Until then the HubSpot connector
-// reports itself unconfigured rather than failing halfway through a handshake.
-const HUBSPOT_CLIENT_ID = 'YOUR_HUBSPOT_CLIENT_ID';
+import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
+
+const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
 const HUBSPOT_AUTH_BASE = 'https://app.hubspot.com/oauth/authorize';
 const HUBSPOT_SCOPES = 'crm.objects.contacts.read crm.objects.contacts.write';
@@ -45,11 +45,7 @@ const HUBSPOT_API = 'https://api.hubapi.com';
 const EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/hubspot-oauth-exchange';
 const REFRESH_URL = 'https://theflow-ai.com/.netlify/functions/hubspot-oauth-refresh';
 
-// TODO(owner): set this to the Consumer Key from your Salesforce Connected App
-// (Setup > App Manager > your app > View > Consumer Key). Until then the
-// Salesforce connector reports itself unconfigured rather than failing
-// halfway through a handshake.
-const SALESFORCE_CLIENT_ID = 'YOUR_SALESFORCE_CLIENT_ID';
+const SALESFORCE_CLIENT_ID = publicClientId(OAUTH_PUBLIC.salesforceClientId);
 // login.salesforce.com is the standard entry point and redirects sandbox/My
 // Domain orgs correctly on its own; instance_url (returned by the token
 // exchange) is what every API call after that actually uses.
@@ -59,11 +55,7 @@ const SALESFORCE_API_VERSION = 'v59.0';
 const SF_EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/salesforce-oauth-exchange';
 const SF_REFRESH_URL = 'https://theflow-ai.com/.netlify/functions/salesforce-oauth-refresh';
 
-// TODO(owner): set this to the Client ID from your Slack App
-// (api.slack.com/apps > your app > Basic Information > App Credentials).
-// Until then the Slack connector reports itself unconfigured rather than
-// failing halfway through a handshake.
-const SLACK_CLIENT_ID = 'YOUR_SLACK_CLIENT_ID';
+const SLACK_CLIENT_ID = publicClientId(OAUTH_PUBLIC.slackClientId);
 const SLACK_AUTH_BASE = 'https://slack.com/oauth/v2/authorize';
 // chat:write.public lets the bot post to public channels without an explicit
 // /invite first — the closest a bot token gets to Notion's zero-friction feel.
@@ -71,11 +63,7 @@ const SLACK_SCOPES = 'chat:write,chat:write.public';
 const SLACK_API = 'https://slack.com/api';
 const SLACK_EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/slack-oauth-exchange';
 
-// TODO(owner): set this to the Client ID from your Monday.com OAuth app
-// (monday.com > Developer > My Apps > your app > OAuth). Until then the
-// Monday.com connector reports itself unconfigured rather than failing
-// halfway through a handshake.
-const MONDAY_CLIENT_ID = 'YOUR_MONDAY_CLIENT_ID';
+const MONDAY_CLIENT_ID = publicClientId(OAUTH_PUBLIC.mondayClientId);
 const MONDAY_AUTH_BASE = 'https://auth.monday.com/oauth2/authorize';
 const MONDAY_API = 'https://api.monday.com/v2';
 const MONDAY_EXCHANGE_URL = 'https://theflow-ai.com/.netlify/functions/monday-oauth-exchange';
@@ -311,7 +299,7 @@ async function hubspotPortalId(token) {
 }
 
 async function connectHubspot() {
-  if (!HUBSPOT_CLIENT_ID || HUBSPOT_CLIENT_ID === 'YOUR_HUBSPOT_CLIENT_ID') {
+  if (!HUBSPOT_CLIENT_ID) {
     throw new Error('HubSpot isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const redirectUri = chrome.identity.getRedirectURL();
@@ -435,7 +423,7 @@ async function saveSalesforceAuth(tokenResponse, extra) {
 }
 
 async function connectSalesforce() {
-  if (!SALESFORCE_CLIENT_ID || SALESFORCE_CLIENT_ID === 'YOUR_SALESFORCE_CLIENT_ID') {
+  if (!SALESFORCE_CLIENT_ID) {
     throw new Error('Salesforce isn’t configured on this build yet — it needs a Consumer Key set by whoever built this extension.');
   }
   const redirectUri = chrome.identity.getRedirectURL();
@@ -562,7 +550,7 @@ async function getSlackAuth() {
 }
 
 async function connectSlack(channel) {
-  if (!SLACK_CLIENT_ID || SLACK_CLIENT_ID === 'YOUR_SLACK_CLIENT_ID') {
+  if (!SLACK_CLIENT_ID) {
     throw new Error('Slack isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const channelId = String(channel || '').trim();
@@ -649,7 +637,7 @@ async function saveMondayAuth(tokenResponse, extra) {
 }
 
 async function connectMonday(boardId) {
-  if (!MONDAY_CLIENT_ID || MONDAY_CLIENT_ID === 'YOUR_MONDAY_CLIENT_ID') {
+  if (!MONDAY_CLIENT_ID) {
     throw new Error('Monday.com isn’t configured on this build yet — it needs a Client ID set by whoever built this extension.');
   }
   const board = String(boardId || '').trim();
@@ -1813,21 +1801,21 @@ async function connectorStatus() {
     },
     hubspot: {
       connected: Boolean(hs),
-      configured: Boolean(HUBSPOT_CLIENT_ID && HUBSPOT_CLIENT_ID !== 'YOUR_HUBSPOT_CLIENT_ID')
+      configured: Boolean(HUBSPOT_CLIENT_ID)
     },
     notion: { connected: Boolean(nt), configured: true, detail: nt ? nt.dbTitle : null },
     salesforce: {
       connected: Boolean(sf),
-      configured: Boolean(SALESFORCE_CLIENT_ID && SALESFORCE_CLIENT_ID !== 'YOUR_SALESFORCE_CLIENT_ID')
+      configured: Boolean(SALESFORCE_CLIENT_ID)
     },
     slack: {
       connected: Boolean(sl),
-      configured: Boolean(SLACK_CLIENT_ID && SLACK_CLIENT_ID !== 'YOUR_SLACK_CLIENT_ID'),
+      configured: Boolean(SLACK_CLIENT_ID),
       detail: sl ? '#' + sl.channelId : null
     },
     monday: {
       connected: Boolean(md),
-      configured: Boolean(MONDAY_CLIENT_ID && MONDAY_CLIENT_ID !== 'YOUR_MONDAY_CLIENT_ID'),
+      configured: Boolean(MONDAY_CLIENT_ID),
       detail: md ? 'Board ' + md.boardId : null
     }
   };

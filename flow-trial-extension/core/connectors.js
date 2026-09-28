@@ -74,7 +74,7 @@ const FLOW_CONNECTORS = [
     kind: 'CRM',
     status: 'building',
     auth: 'oauth',
-    note: 'Logs a real Note on the Contact matching the sender. Needs a HubSpot app Client ID configured by the site owner — see README.'
+    note: 'Logs a real Note on the Contact matching the sender. Needs a HubSpot app Client ID in config/oauth.public.js — see docs/SETUP.md.'
   },
   {
     id: 'salesforce',
@@ -82,7 +82,7 @@ const FLOW_CONNECTORS = [
     kind: 'CRM',
     status: 'building',
     auth: 'oauth',
-    note: 'Logs a Task on the Contact matching the sender. Needs a Salesforce Connected App Consumer Key configured by the site owner — see README.'
+    note: 'Logs a Task on the Contact matching the sender. Needs a Salesforce Connected App Consumer Key in config/oauth.public.js — see docs/SETUP.md.'
   },
   {
     id: 'slack',
@@ -90,7 +90,7 @@ const FLOW_CONNECTORS = [
     kind: 'Team chat',
     status: 'building',
     auth: 'oauth',
-    note: 'Posts one message to a channel you choose, with the amount, the date and the quoted sentence. Needs a Slack App Client ID configured by the site owner — see README.',
+    note: 'Posts one message to a channel you choose, with the amount, the date and the quoted sentence. Needs a Slack App Client ID in config/oauth.public.js — see docs/SETUP.md.',
     fields: [
       { key: 'channel', label: 'Channel ID', placeholder: 'C0123456789', type: 'text' }
     ]
@@ -101,7 +101,7 @@ const FLOW_CONNECTORS = [
     kind: 'Work management',
     status: 'building',
     auth: 'oauth',
-    note: 'Creates one item on a board you choose, with the facts attached as an update. Needs a Monday.com OAuth app Client ID configured by the site owner — see README.',
+    note: 'Creates one item on a board you choose, with the facts attached as an update. Needs a Monday.com OAuth app Client ID in config/oauth.public.js — see docs/SETUP.md.',
     fields: [
       { key: 'board', label: 'Board ID', placeholder: '1234567890', type: 'text' }
     ]

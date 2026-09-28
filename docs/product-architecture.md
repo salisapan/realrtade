@@ -15,7 +15,7 @@
 > Where this section and the detail below disagree, **this section wins**;
 > the rest describes the intended full shape, not what ships today.
 
-Verified in code (`src/connectors.js`, `popup/popup.js`, `manifest.json`):
+Verified in code (`flow-trial-extension/core/connectors.js`, `flow-trial-extension/popup/popup.js`, `flow-trial-extension/manifest.json`):
 
 | | Described below | Actually ships today |
 |---|---|---|

@@ -104,7 +104,7 @@
 
     if (c.status === 'planned') head.appendChild(el('span', 'badge', 'Planned'));
     else if (st.connected) head.appendChild(el('span', 'badge on', 'Connected'));
-    else if (c.status === 'live') head.appendChild(el('span', 'badge live', 'Works now'));
+    else if (c.status === 'live' || st.configured === true) head.appendChild(el('span', 'badge live', 'Works now'));
     else head.appendChild(el('span', 'badge', 'Needs setup'));
     card.appendChild(head);
 
