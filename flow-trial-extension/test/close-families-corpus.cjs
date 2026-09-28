@@ -205,35 +205,39 @@ console.log('\n--- I is not a rescue for a weak judgment ---\n');
   check('that invoice is not family I', weak.closeFamily !== 'I' && !FlowIntent.shouldShowChip(weak), weak.confidence);
 
   const clear = classify('Please draft the contract from our company template and send it to Dana.');
-  const card = FlowCloseFamilies.detailSurface(clear, ['party', 'amount'], null);
-  check('one or two missing fields are a scoped detail-fill',
-    card.surface === 'detail-fill' && card.scope === 'critical-fields' &&
-      card.slots.length === 2 && card.slots[0] === 'party' && card.slots[1] === 'amount' &&
-      card.surface !== 'chat' && !card.chat && !card.prompt && !card.assistant,
+  const four = ['party', 'amount', 'date', 'scope'];
+  const card = FlowCloseFamilies.detailSurface(clear, four, null);
+  check('up to four missing fields are a card',
+    card.surface === 'card' && card.slots.length === 4 && card.surface !== 'chat' && !card.chat && !card.prompt && !card.assistant,
     card);
+  const two = FlowCloseFamilies.detailSurface(clear, ['party', 'amount'], null);
+  check('two missing fields are a card',
+    two.surface === 'card' && two.slots.length === 2 && two.surface !== 'chat' && !two.assistant,
+    two);
   const one = FlowCloseFamilies.detailSurface(clear, ['amount'], null);
-  check('a single missing field is a scoped detail-fill',
-    one.surface === 'detail-fill' && one.scope === 'critical-fields' &&
-      one.slots.length === 1 && one.slots[0] === 'amount' && !one.chat && !one.assistant,
+  check('a single missing field is a card',
+    one.surface === 'card' && one.slots.length === 1 && one.slots[0] === 'amount' && one.surface !== 'chat',
     one);
+  const five = ['party', 'amount', 'date', 'scope', 'term'];
+  const chat = FlowCloseFamilies.detailSurface(clear, five, null);
+  check('more than four missing fields are a scoped chat fill',
+    chat.surface === 'chat' && chat.scope === 'critical-fields' && chat.slots.length === 5 &&
+      !chat.assistant && !chat.prompt && chat.slots.every((s) => typeof s === 'string'),
+    chat);
   const list = FlowCloseFamilies.detailSurface(clear, eight, null);
-  check('more than two missing slots stay silence', list.surface === 'silence' && list.slots.length === 0, list);
-  check('silence is not a chat', list.surface !== 'checklist' && !list.chat && !list.prompt && !list.assistant, list);
-  const three = ['party', 'amount', 'date'];
-  const silenced = FlowCloseFamilies.route(clear, three);
-  check('more than two missing fields is a silence classification',
-    silenced.type === null && silenced.closeFamily == null && !silenced.createWhenMissing && !FlowIntent.shouldShowChip(silenced),
-    silenced);
-  const still = FlowCloseFamilies.route(clear, ['party', 'amount']);
-  check('two missing fields still route create-when-missing',
+  check('eight missing fields stay a named chat fill',
+    list.surface === 'chat' && list.scope === 'critical-fields' && list.slots.length === 8 && !list.assistant && !list.prompt,
+    list);
+  const still = FlowCloseFamilies.route(clear, five);
+  check('more than four missing fields still route create-when-missing',
     still.closeFamily === 'I' && still.createWhenMissing === true && still.type === 'request' && FlowIntent.shouldShowChip(still), still);
   check('that route is not a general chat classification', still.type !== 'chat' && !still.chat, still);
   const classified = FlowIntent.classify(
     'Please draft the contract from our company template and send it to Dana.',
-    { senderEmail: 'dana@meridian.com', now: NOW, calibration: null, missingSlots: three }
+    { senderEmail: 'dana@meridian.com', now: NOW, calibration: null, missingSlots: five }
   );
-  check('classify with more than two missing fields does not route create-when-missing',
-    !FlowIntent.shouldShowChip(classified) && !classified.createWhenMissing && classified.closeFamily == null,
+  check('classify with more than four missing fields still routes create-when-missing',
+    FlowIntent.shouldShowChip(classified) && classified.createWhenMissing === true && classified.closeFamily === 'I' && classified.type === 'request',
     { type: classified.type, family: classified.closeFamily });
   const ready = FlowCloseFamilies.detailSurface(clear, [], null);
   check('no missing slots is one Do It', ready.surface === 'doit', ready);

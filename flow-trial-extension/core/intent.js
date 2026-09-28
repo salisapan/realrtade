@@ -520,9 +520,9 @@ const FlowIntent = (() => {
       }
       return gateCreateWhenMissing(intent);
     }
-    // More than two missing template fields is not a create-when-missing
-    // close. The chip stays down. A detail-fill, when it opens, is only
-    // those remaining critical fields — never a general chat.
+    // A weak create-when-missing judgment stays silent. Field count does
+    // not. Up to four missing fields are a card; more than four is a
+    // chat fill of those names only.
     function gateCreateWhenMissing(intent) {
       if (!intent || !Array.isArray(ctx.missingSlots)) return intent;
       if (typeof FlowCloseFamilies === 'undefined' || !FlowCloseFamilies.route) return intent;
