@@ -35,10 +35,11 @@ scripts/                 Repo-level tooling (e.g. build-glance-engine.sh,
                          which syncs the extension's judgment engine into
                          flow-landing's live in-page demo).
 
-supabase/                Migrations and edge functions for Flow's own
-                         Supabase project (waitlist, the "Almost Missed"
-                         opt-in catches gallery) — backs flow-landing, not
-                         a separate app.
+supabase/                Migrations for the Glance/Flow landing Supabase
+                         project zjquktirlrhbqcnkfaok (waitlist, enterprise
+                         contact leads, the "Almost Missed" catches gallery).
+                         Backs flow-landing. Not the RealTrade project
+                         nlvljclvoguvrnntwufu. See supabase/README.md.
 ```
 
 ## Working on this repo

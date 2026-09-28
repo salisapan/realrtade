@@ -1,5 +1,8 @@
 -- Flow landing page waitlist capture.
--- Apply via `supabase db push` or paste into the Supabase SQL editor.
+-- Project zjquktirlrhbqcnkfaok only — not RealTrade (nlvljclvoguvrnntwufu).
+-- Apply via `supabase db push` or paste into that project's SQL editor.
+-- company, role, website, confirmed_at, ref_code, and public.leads are
+-- added in 20260928170000_landing_lead_schema.sql.
 
 create table if not exists public.waitlist (
   id         uuid primary key default gen_random_uuid(),
