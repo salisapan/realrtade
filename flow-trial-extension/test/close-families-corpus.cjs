@@ -54,7 +54,12 @@ const exemplars = [
   ['G en new slot', 'Can we reschedule the Friday, September 18 at 3pm sync to Thursday, September 24 at 4pm?', 'G', true],
   ['G he new slot', 'אפשר לדחות את הפגישה ליום חמישי בשעה 16:00?', 'G', true],
   ['I en template', 'Please draft the contract from our company template and send it to Dana.', 'I', true],
-  ['I he template', 'אין חוזה בתיקייה. תכין אחד מהתבנית שלנו ותשלח לדנה.', 'I', true]
+  ['I he template', 'אין חוזה בתיקייה. תכין אחד מהתבנית שלנו ותשלח לדנה.', 'I', true],
+  ['I en quote missing', 'We don\'t have a quote for Acme. Please draft one and send it to Dana.', 'I', true],
+  ['I en invoice not on file', 'No invoice on file for this job. Create one and send it.', 'I', true],
+  ['I en letter', 'Please write a letter to Dana and send it.', 'I', true],
+  ['I he quote missing', 'אין הצעת מחיר. תכין אחת ותשלח לדנה.', 'I', true],
+  ['I he invoice missing', 'לא מצאתי את החשבונית. תכין חשבונית ותשלח.', 'I', true]
 ];
 for (const [name, text, family, wantChip] of exemplars) {
   const { intent, show } = chip(text);
@@ -72,6 +77,10 @@ for (const [name, text, family, wantChip] of exemplars) {
   check('I is create-when-missing, not a found file', created.createWhenMissing === true && created.closeFamily === 'I', created.closeFamily);
   const found = classify('Could you send the invoice?');
   check('a file ask stays family A, not I', found.closeFamily === 'A' && !found.createWhenMissing, found.closeFamily);
+  const missingOnly = classify('There is no proposal in the folder.');
+  check('a clear missing asset is create-when-missing, not silence',
+    missingOnly.closeFamily === 'I' && missingOnly.createWhenMissing === true && FlowIntent.shouldShowChip(missingOnly),
+    { type: missingOnly.type, family: missingOnly.closeFamily, show: FlowIntent.shouldShowChip(missingOnly) });
 }
 
 console.log('\n--- H and the other kill cases: silence, not a softer chip ---\n');
@@ -94,7 +103,10 @@ const kills = [
   ['vague reschedule', 'Maybe we should reschedule sometime.'],
   ['vent', "I'm so frustrated with this project, just venting about the invoice."],
   ['vague template', 'Maybe draft something from our template if you get a chance.'],
+  ['vague quote', 'Maybe draft a quote if you get a chance.'],
   ['thoughts', 'Any thoughts on the template when you have a minute?'],
+  ['thoughts proposal', 'Any thoughts on a proposal when you have a minute?'],
+  ['pitch someday', 'Hope this email finds you well. We should have an invoice someday.'],
   ['weak invoice', 'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.'],
   ['retract', 'Could you send the invoice?\nNever mind.'],
   ['quote', ['Sounds good, thanks!', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')]

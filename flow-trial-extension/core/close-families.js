@@ -5,17 +5,19 @@
 // older ask do not. A weak or borderline score is not promoted so a
 // field card or a chat can open — silence is the side of that trade.
 //
-// Family I (create-when-missing) is the only path that may later collect
-// template slots. That collector is not a product surface: at most four
-// named fields on a card, and only when more than four required slots
-// are missing does the checklist (the only "chat") open. It is a named-
-// slot list, not an assistant. Dismiss or unsure returns to silence,
-// then the one Do It. This file does not render that UI and does not
-// write to Drive.
+// Family I (create-when-missing) is a clear asset (quote, proposal,
+// invoice, letter, contract, …) when no safe file is already in hand:
+// the sender says it is missing, or asks to create it. That is a close,
+// not silence. A vague, hedged, or noisy line stays silent. The collector
+// that may follow is not a product surface: at most four named fields on
+// a card, and only when more than four required slots are missing does
+// the checklist (the only "chat") open. It is a named-slot list, not an
+// assistant. Dismiss or unsure returns to silence, then the one Do It.
+// This file does not render that UI and does not create a Doc.
 
 const FlowCloseFamilies = (() => {
-  const FILE_EN = /\b(receipts?|invoices?|quotes?|contracts?|signed pdfs?|passports?(?:\s+scans?)?|insurance forms?|tax (?:docs?|documents?|returns?)|proposals?|decks?|logos?|briefs?|statements?|purchase orders?|POs?|W-?9s?|photo ids?|sows?|ndas?|msas?|amendments?|redlines?)\b/i;
-  const FILE_HE = /(חשבונית מס|חשבונית|הצעת (?:ה)?מחיר|חוזה|הסכם|תעודת (?:ה)?זהות|דרכון|אישור (?:ה)?העברה|דוח|מצגת|לוגו|הזמנת רכש|קבלה|מסמך)/;
+  const FILE_EN = /\b(receipts?|invoices?|quotes?|contracts?|signed pdfs?|passports?(?:\s+scans?)?|insurance forms?|tax (?:docs?|documents?|returns?)|proposals?|decks?|logos?|briefs?|statements?|purchase orders?|POs?|W-?9s?|photo ids?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
+  const FILE_HE = /(חשבונית מס|חשבונית|הצעת (?:ה)?מחיר|חוזה|הסכם|תעודת (?:ה)?זהות|דרכון|אישור (?:ה)?העברה|דוח|מצגת|לוגו|הזמנת רכש|קבלה|מכתב|מסמך)/;
 
   const ASK_EN = /\b(?:please (?:send|forward|share|attach|email)|could you (?:send|forward|share|attach)|can you (?:send|forward|share|attach)|i need (?:the|your|a)|we need (?:the|your|a)|send me (?:the|your|a)|attach (?:the|your)|mind sending)\b/i;
   const ASK_HE = /(?:אפשר לשלוח|בבקשה תשלח|תשלח לי|תעביר לי|צריך את|אשמח לקבל את|נא לשלוח)/;
@@ -28,6 +30,10 @@ const FlowCloseFamilies = (() => {
   const DOC_HE = /(?:מסמך|גיליון|חוזה|הצעה|דוק)/;
   const TEMPLATE_EN = /\b(?:company template|our template|the template)\b/i;
   const TEMPLATE_HE = /(?:תבנית (?:של )?החברה|התבנית שלנו|מהתבנית)/;
+  // Absence of a named asset. "don't have a quote" is missing, not a refusal
+  // to send. "Please don't send" stays a refusal — it does not match here.
+  const NOT_FOUND_EN = /\b(?:don'?t have|do not have|couldn'?t find|could not find|can'?t find|cannot find|didn'?t find|did not find|could not locate|nothing in the (?:folder|drive|files?)|not in the (?:folder|drive|files?)|not on file|no \w+ (?:on file|in the (?:folder|drive|files?))|there is no|there'?s no|we have no)\b/i;
+  const NOT_FOUND_HE = /(?:אין (?!צורך|לחץ)|לא מצאתי|לא נמצא|לא קיים)/;
 
   const MEET_EN = /\b(?:let'?s (?:meet|sync|hop on|jump on)|hop on a call|jump on a call|grab (?:time|\d+)|got \d+ minutes|are you free|free for a|quick sync|find (?:a |some )?time|can we meet)\b/i;
   const MEET_HE = /(?:בוא נקבע|בואי נקבע|יש לך זמן|יש לך רבע שעה|שיחה קצרה|נקפוץ לשיחה|פנוי(?:ה)? לשיחה)/;
@@ -80,6 +86,13 @@ const FlowCloseFamilies = (() => {
     const he = sentence.match(FILE_HE);
     return he ? he[0] : null;
   }
+  // A generic "document" / מסמך is family C (create then send). Family I
+  // needs a named asset: quote, invoice, letter, contract, and the rest.
+  function specificAsset(sentence) {
+    const term = fileTerm(sentence);
+    if (!term || term === 'מסמך') return null;
+    return term;
+  }
 
   function isFileAsk(sentence) {
     if (!FILE_EN.test(sentence) && !FILE_HE.test(sentence)) return false;
@@ -104,8 +117,28 @@ const FlowCloseFamilies = (() => {
     if (/(?:^|\s)שלחת\s/.test(t) && !/תשלח/.test(t)) return true;
     return false;
   }
+  function notFound(sentence) {
+    if (!specificAsset(sentence)) return false;
+    return NOT_FOUND_EN.test(sentence) || NOT_FOUND_HE.test(sentence);
+  }
+  function hasExistingFile(sentence) {
+    // "no invoice on file" is absence. "attached" / "please find" is a file
+    // already in hand, which is a find (family A), not a create.
+    if (notFound(sentence)) return false;
+    return /\b(?:existing|already have|on file|attached|enclosed|please find)\b|הקיים|מצורף|כבר יש/i.test(sentence);
+  }
+  function creating(sentence) {
+    if (CREATE_EN.test(sentence) || CREATE_HE.test(sentence)) return true;
+    // "write" alone is a reply. It counts only next to a named asset.
+    if (/\bwrite\b/i.test(sentence) && specificAsset(sentence)) return true;
+    if (/(?:תכתוב|לכתוב)/.test(sentence) && specificAsset(sentence)) return true;
+    return false;
+  }
   function skipSentence(sentence) {
-    return hedged(sentence) || negated(sentence) || pastDone(sentence) || statusQuestion(sentence);
+    if (hedged(sentence) || pastDone(sentence) || statusQuestion(sentence)) return true;
+    // "We don't have a quote" names a missing asset. "Please don't send" does not.
+    if (negated(sentence) && !notFound(sentence)) return true;
+    return false;
   }
 
   function clockOf(text) {
@@ -159,13 +192,17 @@ const FlowCloseFamilies = (() => {
   }
 
   function matchCreateMissing(sentence, now) {
-    const create = CREATE_EN.test(sentence) || CREATE_HE.test(sentence);
+    if (hasExistingFile(sentence)) return null;
+    const asset = specificAsset(sentence);
     const template = TEMPLATE_EN.test(sentence) || TEMPLATE_HE.test(sentence);
-    if (!create || !template) return null;
-    if (/\b(?:existing|already have|on file|attached)\b|הקיים|מצורף|כבר יש/i.test(sentence)) return null;
+    const produce = creating(sentence);
+    const missing = notFound(sentence);
+    // A named asset that is missing, or that the sender asked to create.
+    // A generic "draft a document" with no asset stays family C.
+    if (!(missing && asset) && !(produce && template) && !(produce && asset)) return null;
     return hit({
       family: 'I', type: 'request', confidence: 'high', personalClose: 'follow-up-ask',
-      what: sentence, requestWhat: sentence, objectTerm: fileTerm(sentence),
+      what: sentence, requestWhat: sentence, objectTerm: asset,
       createWhenMissing: true, date: dateOf(sentence, now), time: clockOf(sentence)
     });
   }
