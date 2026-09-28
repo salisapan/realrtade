@@ -268,6 +268,10 @@
   // miss the bar are not stored. Opening the thread drops the snapshot;
   // the full message is then judged the same way the chip always was.
   let lastInboxScan = 0;
+  // One Drive lookup per open message. Silence has no chip, and Gmail
+  // mutates the thread constantly — without this, a fact ask that did not
+  // match would export the same Sheet on every mutation.
+  const factLookupCache = new Map();
 
   function compactIntent(intent) {
     const entities = (intent && intent.entities) || {};
@@ -313,6 +317,8 @@
       calibrationByType: freshState.calibrationByType
     });
     if (!intent || !intent.type || typeof FlowStillOpen === 'undefined') return false;
+    // A fact ask is not a morning card. The cell has not been checked.
+    if (typeof FlowFactReply !== 'undefined' && FlowFactReply.blocksInbox(intent, text)) return false;
     // Same silence bar as the in-thread chip. A local 'low', or any
     // classification shouldShowChip refuses, is not a morning card.
     if (!FlowIntent.shouldShowChip(intent)) return false;
@@ -664,7 +670,11 @@
     // below a one-line "Sounds good!" reply count toward "is there enough
     // new content to judge" in the first place.
     const text = ownMessageText(message);
-    if (text.length < 20) return; // still rendering, or genuinely nothing new was written
+    // A fact ask can be one short Hebrew sentence ("מה הסכום בגיליון?").
+    // The 20-character floor stays for everything else — this does not
+    // lower the scorer, it only lets a fully-formed fact ask through.
+    const factProbe = (text.length >= 12 && typeof FlowFactReply !== 'undefined') ? FlowFactReply.detect(text) : null;
+    if (text.length < 20 && !factProbe) return; // still rendering, or genuinely nothing new was written
 
     // Seen-ids stay a "we already looked at this message" mark, including
     // when personal-close memory stays quiet below. The 'shown' row is a
@@ -699,7 +709,10 @@
     // file only ever sits at the two ends of that chain: it hands intent.js
     // the raw text, hands actions.js the classified Intent, and later hands
     // background.js one step at a time — it never re-derives what "this is
-    // a request" or "this should become a Calendar event" means.
+    // a request" or "this should become a Calendar event" means. A fact
+    // ask is the one exception: FlowFactReply may replace that intent with
+    // one Sheet cell or Doc paragraph, or stay quiet. It does not replace
+    // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
     let intent = await classifyForChip(text, {
@@ -710,6 +723,24 @@
       calibrationByType: state.calibrationByType,
       attachmentCount: attachments.length
     });
+    // Reply-with-facts. Only when Google is already connected, so the chip
+    // appears after one Sheet cell or Doc paragraph actually matched.
+    // No match → silence, including over a generic reply chip. A meeting
+    // or a dated commitment keeps its own close. The scorer threshold is
+    // not involved.
+    const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
+    const factAsk = factProbe || ((typeof FlowFactReply !== 'undefined') ? FlowFactReply.detect(text) : null);
+    const factOwns = typeof FlowFactReply !== 'undefined' && FlowFactReply.ownsClose(factAsk, intent, usingGoogle);
+    if (factOwns) {
+      let match;
+      if (factLookupCache.has(messageId)) match = factLookupCache.get(messageId);
+      else {
+        match = await resolveReplyFact(factAsk);
+        factLookupCache.set(messageId, match);
+        if (factLookupCache.size > 40) factLookupCache.delete(factLookupCache.keys().next().value);
+      }
+      intent = FlowFactReply.apply(intent, factAsk, { connected: true, match });
+    }
     // The free, local, fixed-pattern classifier found nothing — not the
     // same thing as "there was nothing here." It's a regex corpus, tuned
     // hardest for English; a plainly real request or commitment in Hebrew
@@ -723,7 +754,9 @@
     const localFired = Boolean(intent.type);
     // A local 'low' is a decision to stay quiet, not a miss. The remote
     // fallback is only for when the local pass found nothing at all.
-    if (!intent.type && !intent.googleSilence) intent = await ensureRemoteClassification(text) || intent;
+    // A fact ask Glance already owned, and a Drive close that already chose
+    // silence, are not sent out to be reclassified into a generic reply.
+    if (!intent.type && !intent.googleSilence && !factOwns) intent = await ensureRemoteClassification(text) || intent;
     // Item 4's real-usage telemetry — the empirical answer to "how often is
     // the free local pass actually enough, how often does the one remote
     // fallback rescue what it missed, how often does nothing fire at all,"
@@ -761,7 +794,6 @@
     // (see the comment above this function's earlier connectorId check) —
     // either way, the account isn't actually ready to write to Google, and
     // ensureGoogleAutoConnect() is the one path that can fix that silently.
-    const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
     if (!usingGoogle && !(await ensureGoogleAutoConnect())) return;
 
     let attachFile = null;
@@ -897,6 +929,10 @@
         }
         return 'is drafting a reply to the request' + when + ' and opening a follow-up task.';
       }
+      case 'reply-fact':
+        return e.factValue
+          ? 'is putting ' + e.factValue + ' into a reply draft.'
+          : 'is putting that fact into a reply draft.';
       case 'follow-through':
         return 'is opening a reminder for your commitment' + when + amount + ', with a reply ready.';
       default: // log-it
@@ -1572,6 +1608,32 @@
     return new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:execute-action', payload }, resolve));
   }
 
+  // Drive export stays in the service worker. The match stays here, in
+  // FlowFactReply, so a second cell never becomes a chip. A failed lookup
+  // is silence — the same result as no match.
+  function resolveReplyFact(factAsk) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({
+          type: 'flow:fact-sources',
+          payload: {
+            factLabel: factAsk.factLabel,
+            sourceKind: factAsk.sourceKind,
+            sourceName: factAsk.sourceName
+          }
+        }, (res) => {
+          if (chrome.runtime.lastError || !res || !res.ok || typeof FlowFactReply === 'undefined') {
+            resolve(null);
+            return;
+          }
+          resolve(FlowFactReply.resolve(factAsk, res.sources, { truncated: res.truncated }));
+        });
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  }
+
   // Sequential, not parallel — keeps per-step error handling simple, keeps
   // the receipt's step order predictable, and avoids bursting multiple
   // simultaneous token requests at chrome.identity for what is, in the
@@ -1755,7 +1817,8 @@
     detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
     done.appendChild(detail);
 
-    const undoHint = FlowReceipt.undoHint(wheres);
+    const sole = succeeded.length === 1 ? succeeded[0].response : null;
+    const undoHint = (sole && sole.undoHint) || FlowReceipt.undoHint(wheres);
     // The sentence is the control. A filled pill would be a second Do It.
     const undo = el('button', 'flow-chip-undo', undoHint);
     undo.type = 'button';
@@ -1802,7 +1865,8 @@
           }
         }
         if (result.ok) {
-          done.replaceChildren(el('span', 'flow-chip-label', FlowReceipt.undoneLine(wheres)));
+          const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres);
+          done.replaceChildren(el('span', 'flow-chip-label', undone));
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {

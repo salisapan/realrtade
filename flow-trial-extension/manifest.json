@@ -35,6 +35,7 @@
         "core/extract.js",
         "core/judgment.js",
         "core/google-closes.js",
+        "core/fact-reply.js",
         "core/intent.js",
         "core/file-attach.js",
         "core/actions.js",

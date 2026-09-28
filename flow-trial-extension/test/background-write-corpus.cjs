@@ -66,7 +66,7 @@ function load(opts) {
       if (auth) tokens.push(String(auth).replace('Bearer ', ''));
       for (const [match, answer] of opts.routes || []) {
         if (match.test(String(url)) && (!answer.method || answer.method === method)) {
-          return typeof answer.reply === 'function' ? answer.reply(calls.length) : answer.reply;
+          return typeof answer.reply === 'function' ? answer.reply(calls.length, bodies[bodies.length - 1]) : answer.reply;
         }
       }
       return res(500, { error: { message: 'unrouted: ' + method + ' ' + url } });
@@ -990,6 +990,89 @@ async function run() {
     const callsBefore = env.calls.length;
     check('undo without an event id does not call the API',
       (await undo(null)).ok === false && (await undo({})).ok === false && env.calls.length === callsBefore);
+  }
+
+  console.log('\n--- background.js: reply-with-facts writes one fact and undo deletes the draft ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/users\/me\/threads\?/, { reply: res(200, { threads: [{ id: 'th_fact' }] }) }],
+        [/\/users\/me\/drafts$/, { reply: res(200, { id: 'dr_fact' }), method: 'POST' }],
+        [/\/users\/me\/drafts\/dr_fact$/, { reply: res(204, {}), method: 'DELETE' }]
+      ]
+    });
+    const out = await attempt(env.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com',
+      senderName: 'Dana Cohen',
+      subject: 'Q3',
+      params: { replyFact: true, factLine: 'Q3 total: 12400', includeAttachment: true, requestedObjectTerm: 'invoice' }
+    }));
+    check('a fact reply creates a draft', out.ok === true && out.ref && out.ref.draftId === 'dr_fact' && !out.ref.replyFact && !out.ref.factLine, out);
+    check('the receipt uses the shared draft undo sentence', !out.undoHint && !out.undoneLine, out);
+    const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
+    const decoded = decodeDraftRaw(draftCall.message.raw);
+    check('the draft body is the greeting plus that one fact',
+      decoded.body.indexOf('Hi Dana,') === 0 && decoded.body.indexOf('Q3 total: 12400') !== -1 && decoded.body.indexOf('[Write your reply here]') === -1 && !decoded.attachmentFilename,
+      decoded);
+    check('it does not search Drive or send the message',
+      !env.calls.some((c) => /drive\/v3|\/messages\/send/.test(c)), env.calls);
+    const undo = await attempt(env.fn('gmailDraftUndo')(out.ref));
+    check('undo deletes the draft Glance created',
+      undo.ok === true && env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/drafts/dr_fact')) && !env.calls.some((c) => c.startsWith('PUT ')),
+      env.calls);
+  }
+
+  console.log('\n--- background.js: fact lookup stays silent when Drive has too many files ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/drive\/v3\/files\?/, { reply: res(200, {
+        files: [
+          { id: 'a', name: 'Budget', mimeType: 'application/vnd.google-apps.spreadsheet' },
+          { id: 'b', name: 'Budget 2', mimeType: 'application/vnd.google-apps.spreadsheet' },
+          { id: 'c', name: 'Budget 3', mimeType: 'application/vnd.google-apps.spreadsheet' },
+          { id: 'd', name: 'Budget 4', mimeType: 'application/vnd.google-apps.spreadsheet' }
+        ]
+      }) }]]
+    });
+    const out = await attempt(env.fn('factSources')({ factLabel: 'Q3 total', sourceKind: 'sheet', sourceName: 'budget' }));
+    check('four files is truncated silence', out.ok === true && out.truncated === true && out.sources.length === 0, out);
+    check('it does not export those files', !env.calls.some((c) => /\/export/.test(c)), env.calls);
+    const q = env.calls[0] || '';
+    check('the query is a spreadsheet name search through searchDriveFiles',
+      q.indexOf('spreadsheet') !== -1 && q.indexOf('budget') !== -1 && q.indexOf('fullText') === -1 && q.indexOf('pageSize=100') !== -1 && q.indexOf('corpora=user') !== -1, q);
+  }
+
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/drive\/v3\/files\?/, { reply: res(200, { files: [
+          { id: 'sheet1', name: 'Acme Budget', mimeType: 'application/vnd.google-apps.spreadsheet' }
+        ] }) }],
+        [/\/export\?/, { reply: { ok: true, status: 200, text: async () => 'Item,Value\nQ3 total,12400\n' } }]
+      ]
+    });
+    const out = await attempt(env.fn('factSources')({ factLabel: 'Q3 total', sourceKind: 'sheet', sourceName: 'budget' }));
+    check('one spreadsheet is exported as csv', out.ok === true && out.truncated === false && out.sources.length === 1 && out.sources[0].text.indexOf('12400') !== -1, out);
+    const offline = load({ stored: {}, routes: [] });
+    const disconnected = await attempt(offline.fn('factSources')({ factLabel: 'Q3 total', sourceKind: 'sheet' }));
+    check('fact lookup without Google does not call Drive',
+      disconnected.ok === false && disconnected.reason === 'not-connected' && offline.calls.length === 0,
+      disconnected);
+    const quoted = load({
+      stored: CONNECTED,
+      routes: [[/\/drive\/v3\/files\?/, { reply: res(200, { files: [] }) }]]
+    });
+    await attempt(quoted.fn('factSources')({
+      factLabel: "x' or name contains 'secret",
+      sourceKind: 'sheet',
+      sourceName: "a'b"
+    }));
+    const quotedUrl = decodeURIComponent(quoted.calls[0] || '');
+    check('a quote in the file name stays inside the Drive query literal',
+      quotedUrl.indexOf("a\\'b") !== -1 && quotedUrl.indexOf("name contains 'secret") === -1, quotedUrl);
   }
 
   console.log('\nTOTAL FAILURES:', failures);
