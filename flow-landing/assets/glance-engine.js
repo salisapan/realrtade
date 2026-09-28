@@ -3,7 +3,7 @@
 //   flow-trial-extension/core/extract.js
 //   flow-trial-extension/core/judgment.js
 // Regenerate with: scripts/build-glance-engine.sh
-// Last synced: 2026-09-27
+// Last synced: 2026-09-28
 //
 // This is the exact client-side judgment engine the Glance extension
 // runs — concatenated as-is (no edits) so the live demo on trial.html
@@ -413,39 +413,81 @@ const FlowExtract = (() => {
   // a flight number, a room, or a price as a meeting time, and guessing here
   // would be the same mistake parseDate() above already refuses to make for
   // an ambiguous year.
+  //
+  // An hour that could be either half of the day is not a time. "at 3" and
+  // "בשעה 3" both used to be readable as 03:00; English already refused
+  // that, Hebrew did not, and a 03:00 Calendar event is a wrong close.
+  // A day-part word is the sender stating which half, so that hour is kept.
+  function resolveClock(hour, minute, marker) {
+    let h = hour;
+    if (h > 23 || minute > 59 || h < 0 || minute < 0) return null;
+    if (!marker) {
+      if (h < 8 || h === 12) return null;
+      return { hour: h, minute: minute };
+    }
+    if (marker === 'am' || marker === 'in the morning') {
+      if (h === 12) h = 0;
+      else if (h > 12) return null;
+      return { hour: h, minute: minute };
+    }
+    if (marker === 'pm' || marker === 'in the afternoon') {
+      if (h < 12) h += 12;
+      return h > 23 ? null : { hour: h, minute: minute };
+    }
+    // "בצהריים": noon, or the early afternoon (1-6). 8 בצהריים is not a
+    // phrase this should invent a clock for.
+    if (marker === 'noon-window') {
+      if (h >= 1 && h <= 6) h += 12;
+      else if (h !== 12 && h < 13) return null;
+      return { hour: h, minute: minute };
+    }
+    if (marker === 'in the evening') {
+      if (h === 0 || h === 12) return null;
+      if (h < 12) h += 12;
+      return h > 23 ? null : { hour: h, minute: minute };
+    }
+    // Night splits. 3 בלילה is after midnight. 11 at night is 23:00.
+    // 6 at night could be either, so it stays unresolved.
+    if (marker === 'at night') {
+      if (h === 12) h = 0;
+      else if (h >= 8 && h <= 11) h += 12;
+      else if (!((h >= 1 && h <= 4) || h >= 13)) return null;
+      return { hour: h, minute: minute };
+    }
+    return null;
+  }
+
   function parseTime(text) {
     let m;
 
-    m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+    m = text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|(?:in the|this) (?:morning|afternoon|evening)|at night)?\b/i);
     if (m) {
-      let h = +m[1];
-      const min = m[2] ? +m[2] : 0;
-      const ap = (m[3] || '').toLowerCase();
-      if (ap === 'pm' && h < 12) h += 12;
-      if (ap === 'am' && h === 12) h = 0;
-      if (h > 23 || min > 59) return null;
-      // With no am/pm, an hour that is also a valid afternoon hour says
-      // nothing: "let's meet at 3" in a work email means 15:00 essentially
-      // always, and logging 03:00 puts a meeting in the middle of the night.
-      // 12 is the same problem in the other direction (noon or midnight).
-      // Hours from 13 up are unambiguous, and so are 8-11, which nobody
-      // writes to mean 20:00-23:00 without saying pm. The rest we refuse,
-      // for the same reason parseDate refuses an ambiguous year.
-      if (!ap && (h < 8 || h === 12)) return null;
-      return { raw: m[0], hour: h, minute: min };
+      const marker = (m[3] || '').toLowerCase().replace(/\./g, '').replace(/^this /, 'in the ');
+      const clock = resolveClock(+m[1], m[2] ? +m[2] : 0, marker);
+      if (!clock) return null;
+      return { raw: m[0], hour: clock.hour, minute: clock.minute };
     }
 
     // בשעה/בשעות is an unambiguous "at the hour of" marker — unlike a bare
     // "ב-" prefix (used elsewhere for "on <weekday>"), it is never a room
     // number, a page reference, or anything else. Deliberately no trailing
     // \b for the same reason parseDate()'s Hebrew weekday block has none:
-    // \b never fires next to Hebrew letters.
-    m = text.match(/(?:בשעה|בשעות)\s*(\d{1,2})(?::(\d{2}))?/);
+    // \b never fires next to Hebrew letters. The day-part, when it is
+    // there, has the same Hebrew boundary: it must not be a prefix of a
+    // longer word.
+    const hePart = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
+    m = text.match(new RegExp('(?:בשעה|בשעות)\\s*(\\d{1,2})(?::(\\d{2}))?(?:\\s*(' + hePart + '))?(?![\\u0590-\\u05FF\\d])'));
     if (m) {
-      const h = +m[1];
-      const min = m[2] ? +m[2] : 0;
-      if (h > 23 || min > 59) return null;
-      return { raw: m[0], hour: h, minute: min };
+      const rawPart = (m[3] || '').replace(/["״׳']/g, '');
+      const marker = rawPart === 'בבוקר' ? 'in the morning'
+        : rawPart === 'בצהריים' ? 'noon-window'
+        : (rawPart === 'אחר הצהריים' || rawPart === 'אחר הצהרים' || rawPart === 'אחהצ') ? 'in the afternoon'
+        : rawPart === 'בערב' ? 'in the evening'
+        : rawPart === 'בלילה' ? 'at night'
+        : '';
+      const clock = resolveClock(+m[1], m[2] ? +m[2] : 0, marker);
+      if (!clock) return null;
+      return { raw: m[0], hour: clock.hour, minute: clock.minute };
     }
 
     return null;

@@ -455,10 +455,15 @@ const FlowIntent = (() => {
     // types stay untagged so personal close memory cannot treat a meeting
     // or a score-bar decision as one of those closes. Absent on a miss.
     function finish(type, confidence, entities, personalClose) {
+      // A past day can still sit on facts — "the invoice that was due
+      // March 3, 2024" — but it is not the deadline of this close. The
+      // title, the "when" in the chip sentence, and the task's dateIso
+      // would otherwise file that old day.
+      if (isPast) entities = Object.assign({}, entities, { when: null, dateIso: null });
       const intent = {
         type, confidence,
         entities: Object.assign({ requestWhat, requestedObjectTerm }, entities),
-        label: shortLabel(type, facts, enrichedFacts), signals, facts
+        label: labelFor(type), signals, facts
       };
       if (personalClose) intent.personalClose = personalClose;
       return intent;
@@ -509,6 +514,11 @@ const FlowIntent = (() => {
     // only agreement is contingent does not.
     const contingent = commitmentIsContingent(text);
     const settled = ALREADY_SETTLED.test(text);
+    function labelFor(type) {
+      const source = isPast ? Object.assign({}, facts, { date: null }) : facts;
+      const enriched = isPast ? Object.assign({}, enrichedFacts, { dateText: null }) : enrichedFacts;
+      return shortLabel(type, source, enriched);
+    }
     // s.flags.noise: a pitch fingerprint, mailing-list boilerplate, calendar
     // acceptance mail, or an automated sender. The score already penalises
     // these below the bar. Hard gates do not read that total, so without
@@ -550,7 +560,7 @@ const FlowIntent = (() => {
     if (!blocked && readerCommitEvidence && !isPast) {
       return finish(TYPES.COMMITMENT_OF_READER, hasConcreteAnchor ? 'high' : 'medium', {
         who, amount,
-        what: commitmentWhat || shortLabel(TYPES.COMMITMENT_OF_READER, facts, enrichedFacts),
+        what: commitmentWhat || labelFor(TYPES.COMMITMENT_OF_READER),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date && facts.date.iso
       });
@@ -573,7 +583,7 @@ const FlowIntent = (() => {
     if (!blocked && requestEvidence && !askIsSoft) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
-        what: whatText(text, REQUEST_PATTERNS) || shortLabel(TYPES.REQUEST, facts, enrichedFacts),
+        what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date && facts.date.iso
       }, 'follow-up-ask');
@@ -602,7 +612,7 @@ const FlowIntent = (() => {
     if (!blocked && datedCommitment && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
-        what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
+        what: whatText(text, DATED_COMMIT_PATTERNS) || labelFor(TYPES.DECISION_TO_LOG),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso
       }, 'dated-commitment');
@@ -610,7 +620,7 @@ const FlowIntent = (() => {
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
-        what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
+        what: whatText(text, DATED_COMMIT_PATTERNS) || labelFor(TYPES.DECISION_TO_LOG),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date && facts.date.iso
       }, 'confirmed-amount');
@@ -653,7 +663,7 @@ const FlowIntent = (() => {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, [/\b(agreed|approved|confirmed|executed|declin(?:e|ed|ing))\b/i, /(סוכם|אישרנו|מאשרים|נחתם)/]) ||
-          shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
+          labelFor(TYPES.DECISION_TO_LOG),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date && facts.date.iso
       });
@@ -664,7 +674,7 @@ const FlowIntent = (() => {
     //        silently dropping something the proven scorer already vouched for.
     return finish(TYPES.FOLLOW_UP, 'low', {
       who, amount,
-      what: shortLabel(TYPES.FOLLOW_UP, facts, enrichedFacts),
+      what: labelFor(TYPES.FOLLOW_UP),
       when: humanWhen(facts.date, facts.time),
       dateIso: facts.date && facts.date.iso
     });

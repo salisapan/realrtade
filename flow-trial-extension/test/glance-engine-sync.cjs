@@ -51,6 +51,13 @@ for (const text of dates) {
   check('demo date matches extension: ' + text, JSON.stringify(a) === JSON.stringify(b), { extension: a, demo: b });
 }
 
+const times = ['בשעה 3', 'בשעה 3 אחר הצהריים', 'at 3 in the afternoon', 'at 3pm'];
+for (const text of times) {
+  const a = core.extract.parseTime(text);
+  const b = demo.extract.parseTime(text);
+  check('demo time matches extension: ' + text, JSON.stringify(a) === JSON.stringify(b), { extension: a, demo: b });
+}
+
 const scored = 'Confirming we are agreed at $3,900 for the year. Countersigned copy attached, effective Sep 7.';
 const ctx = { subject: 'Re: Meridian agreement', senderEmail: 'dana@meridian.com', now: NOW, calibration: null };
 const a = core.judgment.evaluate(scored, 'sales', ctx);
