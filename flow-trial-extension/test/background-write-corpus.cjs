@@ -654,6 +654,7 @@ async function run() {
       entities: {},
       senderName: 'Dana',
       threadUrl: 'https://mail.google.com/mail/u/0/#inbox/abc',
+      now: '2026-09-18T12:00:00Z',
       params: {
         dateIso: '2026-09-21',
         what: 'We agreed to file the amendment by September 21.'
@@ -713,6 +714,7 @@ async function run() {
     const out = await attempt(env.fn('googleTasksWrite')({
       label: 'Log commitment for Oct 14',
       facts: { date: { iso: '2026-10-14', raw: 'October 14' }, moneyText: '$4,200' },
+      now: '2026-09-18T12:00:00Z',
       params: { dateIso: '2026-09-21', amount: '$4,200' }
     }));
     const body = env.bodies[0] || {};
@@ -722,6 +724,57 @@ async function run() {
       (body.notes || '').split('Amount:').length === 2, body.notes);
     check('the receipt names both the figure and the planned due date',
       out.written === 'Google Task · $4,200 · due Sep 21', out.written);
+  }
+
+  console.log('\n--- background.js: a past day is not a task due date ---\n');
+  {
+    // "Please send the receipt for the invoice that was due March 3, 2024"
+    // is a current ask. The old day used to ride along on facts and become
+    // the Google Task due date, and the receipt said so.
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_past' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Reply requested',
+      now: '2026-09-18T12:00:00Z',
+      facts: { date: { iso: '2024-03-03', raw: 'March 3, 2024' }, dateText: 'Mar 3, 2024' },
+      entities: { what: 'Please send the receipt for the invoice that was due March 3, 2024.' },
+      params: { dateIso: null, what: 'Please send the receipt for the invoice that was due March 3, 2024.' }
+    }));
+    const body = env.bodies[0] || {};
+    check('a past facts date is not sent as due', !body.due, body.due);
+    check('the notes do not claim that old day as the date', !(body.notes || '').includes('Date:'), body.notes);
+    check('the notes still quote the ask', (body.notes || '').includes('Please send the receipt'), body.notes);
+    check('the receipt does not say the task is due that day', out.written === 'Google Task', out.written);
+  }
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_yday' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Reply requested',
+      now: '2026-09-18T12:00:00Z',
+      facts: {},
+      params: { dateIso: '2026-09-17' }
+    }));
+    check('a planned date already behind today is not sent as due', !(env.bodies[0] || {}).due, env.bodies[0]);
+    check('the receipt does not claim yesterday', out.written === 'Google Task', out.written);
+  }
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_today' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Reply requested',
+      now: '2026-09-18T12:00:00Z',
+      facts: {},
+      params: { dateIso: '2026-09-18' }
+    }));
+    check('a due date of today is still written', (env.bodies[0] || {}).due === '2026-09-18T00:00:00.000Z', env.bodies[0]);
+    check('the receipt names today', out.written === 'Google Task · due Sep 18', out.written);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

@@ -247,6 +247,19 @@ console.log('--- intent.js: type + entity checks ---\n');
     heMonth && heMonth.type === FlowIntent.TYPES.SCHEDULED_EVENT && heMonth.entities.dateIso === '2026-09-21',
     heMonth && heMonth.entities);
 
+  const heBareHour = classify('נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.', { now });
+  check('Hebrew "בשעה 3" does not schedule 03:00',
+    heBareHour && heBareHour.type === FlowIntent.TYPES.SCHEDULED_EVENT && heBareHour.entities.hour === null && heBareHour.entities.dateIso === '2026-09-21',
+    heBareHour && heBareHour.entities);
+  const heAfternoon = classify('נקבע פגישה ביום שני בשעה 3 אחר הצהריים לסקירת החוזה.', { now });
+  check('Hebrew "בשעה 3 אחר הצהריים" is 15:00 that Monday',
+    heAfternoon && heAfternoon.type === FlowIntent.TYPES.SCHEDULED_EVENT && heAfternoon.entities.hour === 15 && heAfternoon.entities.minute === 0 && heAfternoon.entities.dateIso === '2026-09-21',
+    heAfternoon && heAfternoon.entities);
+  const enAfternoon = classify('Let us do a call on Monday at 3 in the afternoon to review the contract.', { now });
+  check('"at 3 in the afternoon" is 15:00 that Monday',
+    enAfternoon && enAfternoon.type === FlowIntent.TYPES.SCHEDULED_EVENT && enAfternoon.entities.hour === 15 && enAfternoon.entities.dateIso === '2026-09-21',
+    enAfternoon && enAfternoon.entities);
+
   const pitch = classify('Hope this email finds you well. Can we schedule a call tomorrow at 3pm? Our pricing starts at $99/mo.', { now });
   check('a cold pitch that says "tomorrow" stays silent',
     !pitch || pitch.type === null, pitch && pitch.type);
@@ -1094,6 +1107,21 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
       type: intent.type, personalClose: intent.personalClose, score: intent.signals && intent.signals.score
     });
     check('show Do It chip: ' + label, FlowIntent.shouldShowChip(intent) === true, intent.confidence);
+  }
+
+  // The ask is current. The March 2024 day is why the invoice was late,
+  // not a deadline to put on the task or in the title.
+  {
+    const pastAsk = classify('Please send the receipt for the invoice that was due March 3, 2024.');
+    check('a past due date is not stored as the close date',
+      pastAsk && !pastAsk.entities.dateIso && !pastAsk.entities.when, pastAsk && pastAsk.entities);
+    check('the task title does not name that old day',
+      pastAsk && !/Mar|March|2024/.test(pastAsk.label), pastAsk && pastAsk.label);
+    const task = FlowActions.planFor(pastAsk, { threadUrl: 'x', hasThreadAttachment: false }).steps.find((s) => s.id === 'task');
+    check('the planned task has no due date', task && !task.params.dateIso, task && task.params);
+    const futureAsk = classify('Could you please send me the signed contract by Friday, September 18?');
+    check('a real future deadline is still the close date',
+      futureAsk && futureAsk.entities.dateIso === '2026-09-18', futureAsk && futureAsk.entities);
   }
 
   // Low confidence is the score-bar catch-all (FOLLOW_UP). It stays that
