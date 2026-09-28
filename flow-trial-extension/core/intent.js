@@ -356,6 +356,11 @@ const FlowIntent = (() => {
   function classify(text, ctx) {
     ctx = ctx || {};
     text = FlowJudgment.newContent(text);
+    // A quoted older ask is not a live close. Family H strips it before
+    // any gate can draft or file it.
+    if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.stripQuotedAsks) {
+      text = FlowCloseFamilies.stripQuotedAsks(text);
+    }
 
     const domain = FLOW_DOMAINS[0]; // no domain picker in the MVP — see connectors.js/popup.js
     const facts = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
@@ -657,6 +662,21 @@ const FlowIntent = (() => {
     if (familyBox.hit && familyBox.hit.family === 'G') {
       const viaMove = fromFamily(familyBox.hit);
       if (viaMove) return viaMove;
+    }
+    // Family H: a later confirmed amount, hold, or promise is the write.
+    // An earlier "please send" must not draft a reply over that close.
+    if (familyBox.hit && !familyBox.hit.suppress && familyBox.hit.what && familyBox.hit.type && familyBox.hit.type !== TYPES.REQUEST) {
+      const at = text.indexOf(familyBox.hit.what);
+      const head = at > 0 ? text.slice(0, at) : '';
+      const earlierAsk = head && (
+        /\b(?:could you|can you|please (?:send|forward|chase)|i need)\b/i.test(head) ||
+        /(?:אפשר לשלוח|בבקשה תשלח|תשלח את|תעקוב)/.test(head) ||
+        /\b(?:got \d+ minutes|are you free|let's meet)\b/i.test(head)
+      );
+      if (earlierAsk) {
+        const viaLatest = fromFamily(familyBox.hit);
+        if (viaLatest && viaLatest.type) return viaLatest;
+      }
     }
     const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
     // A clock time the extractor actually resolved. Missing either field is
