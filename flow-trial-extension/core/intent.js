@@ -474,7 +474,7 @@ const FlowIntent = (() => {
     const familyBox = { hit: null };
     function familyAgrees(type, fam) {
       if (!fam || fam.suppress) return false;
-      if (fam.family === 'A' || fam.family === 'C' || fam.family === 'F' || fam.family === 'I') return type === TYPES.REQUEST;
+      if (fam.family === 'A' || fam.family === 'C' || fam.family === 'F' || fam.family === 'I' || fam.family === 'J') return type === TYPES.REQUEST;
       if (fam.family === 'B') return type === TYPES.REQUEST || type === TYPES.SCHEDULED_EVENT || type === TYPES.DECISION_TO_LOG;
       if (fam.family === 'D' || fam.family === 'G') return type === TYPES.SCHEDULED_EVENT || type === TYPES.DECISION_TO_LOG;
       if (fam.family === 'E') return type === TYPES.DECISION_TO_LOG || type === TYPES.REQUEST;

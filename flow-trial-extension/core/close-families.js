@@ -13,7 +13,9 @@
 // here. Up to four missing critical fields are a card. A chat fill opens
 // only past four, and it names those fields and nothing else. A weak score
 // stays silence. A general chat or an ask-Glance surface is never a
-// classification. This file does not render that UI and does not create a Doc.
+// classification. Family J (reply-with-facts) chips only for one named fact
+// from one Sheet or one Doc. Two facts, two sources, or a hedge stays
+// silence. This file does not render that UI and does not create a Doc.
 
 const FlowCloseFamilies = (() => {
   const FILE_EN = /\b(receipts?|invoices?|quotes?|contracts?|signed pdfs?|passports?(?:\s+scans?)?|insurance forms?|tax (?:docs?|documents?|returns?)|proposals?|decks?|logos?|briefs?|statements?|purchase orders?|POs?|W-?9s?|photo ids?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
@@ -34,6 +36,17 @@ const FlowCloseFamilies = (() => {
   // to send. "Please don't send" stays a refusal — it does not match here.
   const NOT_FOUND_EN = /\b(?:don'?t have|do not have|couldn'?t find|could not find|can'?t find|cannot find|didn'?t find|did not find|could not locate|nothing in the (?:folder|drive|files?)|not in the (?:folder|drive|files?)|not on file|no \w+ (?:on file|in the (?:folder|drive|files?))|there is no|there'?s no|we have no)\b/i;
   const NOT_FOUND_HE = /(?:אין (?!צורך|לחץ)|לא מצאתי|לא נמצא|לא קיים)/;
+
+  // One fact from one Sheet or one Doc. Longest fact phrase first so
+  // "start date" is one fact, not date plus another.
+  const FACT_EN = /\b(?:renewal amounts?|open balances?|start dates?|due dates?|end dates?|renewal dates?|amounts?|balances?|prices?|fees?|totals?|dates?|status(?:es)?|owners?)\b/gi;
+  const FACT_HE = /(?:תאריך ההתחלה|תאריך הסיום|הסכום|סכום|המחיר|מחיר|היתרה|יתרה|הסטטוס|סטטוס|התאריך|תאריך)/g;
+  const FACT_ASK_EN = /\b(?:what(?:'s| is)(?: the)?|how much(?: is(?: the)?)?|reply with the|tell me the)\b/i;
+  const FACT_ASK_HE = /(?:מה ה|מהו ה|כמה|תשיב עם|תגיד לי את)/;
+  const SHEET_EN = /\b(?:spreadsheets?|google sheets?|(?:pricing |tracker )?sheets?)\b/i;
+  const SHEET_HE = /(?:גיליון|גליון)/;
+  const DOC_SRC_EN = /\b(?:google docs?|documents?|docs?)\b/i;
+  const DOC_SRC_HE = /(?:מסמך|דוק)/;
 
   const MEET_EN = /\b(?:let'?s (?:meet|sync|hop on|jump on)|hop on a call|jump on a call|grab (?:time|\d+)|got \d+ minutes|are you free|free for a|quick sync|find (?:a |some )?time|can we meet)\b/i;
   const MEET_HE = /(?:בוא נקבע|בואי נקבע|יש לך זמן|יש לך רבע שעה|שיחה קצרה|נקפוץ לשיחה|פנוי(?:ה)? לשיחה)/;
@@ -289,6 +302,27 @@ const FlowCloseFamilies = (() => {
     });
   }
 
+  function matchCount(re, sentence) {
+    const flags = re.flags.indexOf('g') === -1 ? re.flags + 'g' : re.flags;
+    const found = sentence.match(new RegExp(re.source, flags));
+    return found ? found.length : 0;
+  }
+
+  // Reply-with-facts. One named fact, one source. A second fact or a
+  // second source is silence, not a softer chip. This does not read the
+  // Sheet or the Doc.
+  function matchReplyFact(sentence, now) {
+    if (!FACT_ASK_EN.test(sentence) && !FACT_ASK_HE.test(sentence)) return null;
+    if (matchCount(FACT_EN, sentence) + matchCount(FACT_HE, sentence) !== 1) return null;
+    const sheet = SHEET_EN.test(sentence) || SHEET_HE.test(sentence);
+    const doc = DOC_SRC_EN.test(sentence) || DOC_SRC_HE.test(sentence);
+    if (sheet === doc) return null;
+    return hit({
+      family: 'J', type: 'request', confidence: 'medium', personalClose: 'follow-up-ask',
+      what: sentence, requestWhat: sentence, date: dateOf(sentence, now)
+    });
+  }
+
   function matchFile(sentence, now) {
     if (!isFileAsk(sentence)) return null;
     if (TEMPLATE_EN.test(sentence) || TEMPLATE_HE.test(sentence)) return null;
@@ -355,6 +389,8 @@ const FlowCloseFamilies = (() => {
       if (follow) return follow;
       const file = matchFile(sentence, now);
       if (file) return file;
+      const fact = matchReplyFact(sentence, now);
+      if (fact) return fact;
     }
     return null;
   }

@@ -250,5 +250,38 @@ console.log('\n--- I is not a rescue for a weak judgment ---\n');
   check('unsure confidence does not open fields or chat', borderline.surface === 'silence', borderline);
 }
 
+console.log('\n--- J reply-with-facts: one fact, one Sheet or Doc; else silence ---\n');
+{
+  const passes = [
+    ['J en sheet amount', "What's the renewal amount in the pricing sheet?"],
+    ['J en doc date', 'Please reply with the start date from the SOW doc.'],
+    ['J en balance', 'How much is the open balance in the tracker spreadsheet?'],
+    ['J he sheet amount', 'מה הסכום בגיליון התמחור?'],
+    ['J he doc date', 'תשיב עם תאריך ההתחלה מהמסמך.']
+  ];
+  for (const [name, text] of passes) {
+    const { intent, show } = chip(text);
+    check(name + ' chips', show === true, { type: intent.type, family: intent.closeFamily, conf: intent.confidence });
+    check(name + ' family J', intent.closeFamily === 'J' && intent.type === 'request', { type: intent.type, family: intent.closeFamily });
+  }
+  const quiet = [
+    ['two sources', 'Is the renewal amount in the pricing sheet or in the contract doc?'],
+    ['two facts', "What's the renewal amount and the start date in the pricing sheet?"],
+    ['vague doc', 'Anything useful in the document?'],
+    ['hedge sheet', 'Maybe tell me the amount from the sheet if you have a minute.'],
+    ['he two sources', 'מה הסכום בגיליון או במסמך?'],
+    ['he hedge', 'אולי תבדוק בגיליון מתישהו.'],
+    ['ask glance sheet', 'Hey Glance, can we chat about the amount in the sheet?']
+  ];
+  for (const [name, text] of quiet) {
+    const { intent, show } = chip(text);
+    check('J silence: ' + name, show === false && intent.closeFamily !== 'J', { type: intent.type, family: intent.closeFamily, conf: intent.confidence });
+  }
+  const found = classify('Could you send the invoice?');
+  check('a file ask stays family A, not J', found.closeFamily === 'A' && found.closeFamily !== 'J', found.closeFamily);
+  const weak = classify('Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.');
+  check('the weak invoice is not family J', weak.closeFamily !== 'J' && !FlowIntent.shouldShowChip(weak), weak.confidence);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
