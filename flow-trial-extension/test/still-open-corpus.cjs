@@ -13,7 +13,7 @@ const vm = require('vm');
 const CORE = path.join(__dirname, '..', 'core');
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'intent.js', 'actions.js', 'still-open.js']) {
+for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'still-open.js']) {
   vm.runInContext(fs.readFileSync(path.join(CORE, file), 'utf8'), sandbox, { filename: file });
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);

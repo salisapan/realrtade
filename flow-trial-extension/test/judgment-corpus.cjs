@@ -175,7 +175,23 @@ const CASES = [
 
   { name: 'HE negated commit must not fire (widened lexicon)', domain: 'sales', fire: false,
     subject: 'Re: תקציב',
-    text: 'לא מאשרים את התקציב ולא נחתום על ההסכם.' }
+    text: 'לא מאשרים את התקציב ולא נחתום על ההסכם.' },
+
+  { name: 'COMMIT: you have my OK on a priced contract', domain: 'sales', fire: true,
+    subject: 'Re: contract',
+    text: 'You have my OK on the $18,000 contract, effective Monday, so the team can start the paperwork this week.' },
+
+  { name: 'hedged OK is not a commitment', domain: 'sales', fire: false,
+    subject: 'Re: contract',
+    text: 'We might give you our OK on the $18,000 contract next quarter, once the board has actually met and reviewed the full proposal in detail.' },
+
+  { name: 'HE COMMIT: אאשר a priced contract', domain: 'sales', fire: true,
+    subject: 'Re: חוזה',
+    text: 'אאשר את החוזה על סך 12,000 ש״ח עד יום שני, ואפשר להתקדם עם המסמכים כבר השבוע בלי לחכות לסיבוב נוסף.' },
+
+  { name: 'HE hedged אאשר stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: חוזה',
+    text: 'אולי אאשר את החוזה על סך 12,000 ש״ח בהמשך, אם הדירקטוריון יתכנס ויאשר את כל המסמכים אחרי בדיקה מלאה של ההצעה.' }
 ];
 
 function evaluate(c) {

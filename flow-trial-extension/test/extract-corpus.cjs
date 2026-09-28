@@ -180,5 +180,14 @@ console.log('\n--- extract.js: Hebrew day-and-month uses the same year window --
   check('"31 בספטמבר" is not a date', dateOf('31 בספטמבר') === null, dateOf('31 בספטמבר'));
 }
 
+console.log('\n--- extract.js: a weekday glued to a clock, and end-of-day, are dates ---\n');
+{
+  check('"Thursday at 11" is a day', Boolean(dateOf('Got 20 minutes Thursday at 11am').iso), dateOf('Got 20 minutes Thursday at 11am'));
+  check('"by end of day" is today', dateOf('Please pay the invoice by end of day').iso === '2026-09-18', dateOf('Please pay the invoice by end of day'));
+  check('a bare "end of day report" is not a date', dateOf('the end of day report is attached') === null, dateOf('the end of day report is attached'));
+  check('Hebrew "ליום חמישי" is a day', Boolean(dateOf('אפשר לדחות ליום חמישי בשעה 16:00').iso), dateOf('אפשר לדחות ליום חמישי בשעה 16:00'));
+  check('Hebrew "עד סוף היום" is today', dateOf('יש לשלוח עד סוף היום').iso === '2026-09-18', dateOf('יש לשלוח עד סוף היום'));
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
