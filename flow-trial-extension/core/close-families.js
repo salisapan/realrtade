@@ -5,6 +5,10 @@
 // older ask do not. A weak or borderline score is not promoted so a
 // field card or a chat can open — silence is the side of that trade.
 //
+// Family H is the multi-signal rule. The latest explicit ask is the
+// close. A quoted older ask, a hedged "instead", a withdrawal, two
+// files, or two clocks with no single slot stay silent — no picker.
+//
 // Family I (create-when-missing) is conditional. It chips only when the
 // what is a named asset, that file is missing, and a company template is
 // named — the template the later Do It would use. Any one of those missing
@@ -22,7 +26,7 @@ const FlowCloseFamilies = (() => {
   const FILE_HE = /(חשבונית מס|חשבונית|הצעת (?:ה)?מחיר|חוזה|הסכם|תעודת (?:ה)?זהות|דרכון|אישור (?:ה)?העברה|דוח|מצגת|לוגו|הזמנת רכש|קבלה|מכתב|מסמך)/;
 
   const ASK_EN = /\b(?:please (?:send|forward|share|attach|email)|could you (?:send|forward|share|attach)|can you (?:send|forward|share|attach)|i need (?:the|your|a)|we need (?:the|your|a)|send me (?:the|your|a)|attach (?:the|your)|mind sending)\b/i;
-  const ASK_HE = /(?:אפשר לשלוח|בבקשה תשלח|תשלח לי|תעביר לי|צריך את|אשמח לקבל את|נא לשלוח)/;
+  const ASK_HE = /(?:אפשר לשלוח|בבקשה תשלח|תשלח לי|תשלח את|תעביר לי|תעביר את|צריך את|אשמח לקבל את|נא לשלוח)/;
 
   const CREATE_EN = /\b(?:create|draft|draw up|prepare|put together|spin up)\b/i;
   const CREATE_HE = /(?:תיצור|תכין|ליצור|להכין|לנסח|תנסח)/;
@@ -67,7 +71,7 @@ const FlowCloseFamilies = (() => {
   const HEDGE_EN = /\b(?:maybe|perhaps|possibly|no rush|if possible|tentatively|might|whenever you|if you feel|sometime|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b/i;
   const HEDGE_HE = /(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו)/;
   const NEG_EN = /\b(?:do not|don'?t|never mind|please don'?t)\b/i;
-  const NEG_HE = /(?:אל ת|לא צריך|לא לשלוח|אין צורך לשלוח|לא מאשר)/;
+  const NEG_HE = /(?:אל ת|לא תשלח|לא תעביר|לא צריך|לא לשלוח|אין צורך לשלוח|לא מאשר)/;
   // A past day on the object ("the notes from yesterday") is still a live
   // ask. Only a completed act — already sent, already paid — is silence.
   const PAST_EN = /\b(?:already|i sent|we sent|we paid|i paid|has been sent|was sent|was paid|already paid)\b/i;
@@ -93,11 +97,54 @@ const FlowCloseFamilies = (() => {
     return iso < today;
   }
 
+  function fileTermIn(chunk) {
+    const parts = String(chunk || '').split(/,/);
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const en = parts[i].match(FILE_EN);
+      if (en) return en[1];
+      const he = parts[i].match(FILE_HE);
+      if (he) return he[0];
+    }
+    return null;
+  }
+  // "send the contract instead" names the contract. The first noun in
+  // "never mind the invoice, send the contract instead" is the one dropped.
   function fileTerm(sentence) {
-    const en = sentence.match(FILE_EN);
+    const text = String(sentence || '');
+    const cue = text.search(/\b(?:instead|rather)\b/i);
+    const heCue = text.indexOf('במקום');
+    const idx = cue >= 0 ? cue : heCue;
+    if (idx >= 0) {
+      const picked = fileTermIn(text.slice(idx)) || fileTermIn(text.slice(0, idx));
+      if (picked) return picked;
+    }
+    const en = text.match(FILE_EN);
     if (en) return en[1];
-    const he = sentence.match(FILE_HE);
+    const he = text.match(FILE_HE);
     return he ? he[0] : null;
+  }
+  function distinctFiles(text) {
+    const found = [];
+    function add(re) {
+      const rx = new RegExp(re.source, re.flags.indexOf('g') === -1 ? re.flags + 'g' : re.flags);
+      let m;
+      while ((m = rx.exec(text))) {
+        const term = String(m[1] || m[0]).toLowerCase();
+        if (found.indexOf(term) === -1) found.push(term);
+      }
+    }
+    add(FILE_EN);
+    add(FILE_HE);
+    return found;
+  }
+  function replacementCue(text) {
+    return /\b(?:instead|rather)\b/i.test(text) || String(text || '').indexOf('במקום') !== -1;
+  }
+  // A span in quotation marks is an older ask the sender is citing.
+  // It is not a new close. The words outside the quotes still count.
+  function stripQuotedAsks(text) {
+    const cue = /\b(?:could you|can you|please (?:send|forward|chase|draft)|i need (?:the|your)|we need (?:the|your)|confirming|you have my|we agreed)\b|(?:אפשר לשלוח|בבקשה תשלח|תשלח את|תעביר את|צריך את|אאשר|מאשר|תעקוב)/i;
+    return String(text || '').replace(/["«]([^"»\n]{0,500})["»]/g, (full, inner) => (cue.test(inner) ? ' ' : full));
   }
   // A generic "document" / מסמך is family C (create then send). Family I
   // needs a named asset: quote, invoice, letter, contract, and the rest.
@@ -399,13 +446,78 @@ const FlowCloseFamilies = (() => {
     });
   }
 
+  function closeCue(text) {
+    if (!text) return false;
+    return isFileAsk(text) || ASK_EN.test(text) || ASK_HE.test(text) ||
+      FOLLOW_EN.test(text) || FOLLOW_HE.test(text) ||
+      MEET_EN.test(text) || MEET_HE.test(text) ||
+      MOVE_EN.test(text) || MOVE_HE.test(text) ||
+      CANCEL_EN.test(text) || CANCEL_HE.test(text) ||
+      APPROVE_EN.test(text) || APPROVE_HE.test(text);
+  }
+  function bareWithdrawal(sentence) {
+    const t = String(sentence || '').trim();
+    if (/\b(?:never mind|forget it|disregard|ignore that|scratch that|maybe not)\b/i.test(t)) return true;
+    if (/(?:לא משנה|עזוב|תשכח מזה|אולי לא)/.test(t)) return true;
+    if (/^(?:please\s+)?(?:do not|don'?t)(?:\s+send(?:\s+it)?)?[.!]?\s*$/i.test(t)) return true;
+    if (/^(?:אל תשלח|לא צריך|לא לשלוח)/.test(t)) return true;
+    return false;
+  }
+  function positiveClause(sentence) {
+    const chunks = String(sentence || '').split(/,/);
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      if (skipSentence(chunk)) continue;
+      if (isFileAsk(chunk) || FOLLOW_EN.test(chunk) || FOLLOW_HE.test(chunk) ||
+          MEET_EN.test(chunk) || MEET_HE.test(chunk) ||
+          (APPROVE_EN.test(chunk) || APPROVE_HE.test(chunk)) && !pastDone(chunk)) return true;
+    }
+    return false;
+  }
+  // A later hedge, refusal, or completed act that points at an earlier
+  // ask — or that says "instead" without committing — must not fall
+  // through to that older ask.
+  function withdrawsEarlier(sentence, earlier) {
+    if (!earlier || !String(earlier).trim()) return false;
+    if (positiveClause(sentence)) return false;
+    const soft = hedged(sentence) || negated(sentence) || pastDone(sentence) || bareWithdrawal(sentence);
+    if (!soft && !bareWithdrawal(sentence)) return false;
+    if (replacementCue(sentence)) return true;
+    if (bareWithdrawal(sentence)) return true;
+    const term = fileTerm(sentence);
+    const same = (term && String(earlier).toLowerCase().indexOf(String(term).toLowerCase()) !== -1) ||
+      /\b(?:it|that)\b/i.test(sentence) || /את זה|אותו|אותה/.test(sentence);
+    return same && (hedged(sentence) || negated(sentence) || pastDone(sentence));
+  }
+  function leadingAlternative(sentence) {
+    const t = String(sentence || '').trim();
+    return /^(?:or|either)\b/i.test(t) || /^(?:או|או ש)\s/.test(t);
+  }
+  function ambiguousFiles(text) {
+    if (distinctFiles(text).length < 2) return false;
+    if (replacementCue(text)) return false;
+    return /\b(?:or|either|both|and)\b/i.test(text) || /(?:^|\s)או(?:\s|$)|וגם|גם את|ואת/.test(text);
+  }
+  function ambiguousClocks(text) {
+    if (MOVE_EN.test(text) || MOVE_HE.test(text) || CANCEL_EN.test(text) || CANCEL_HE.test(text)) return false;
+    if (replacementCue(text)) return false;
+    const clocks = String(text || '').match(/\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|בשעה\s*\d{1,2}(?::\d{2})?/gi) || [];
+    if (clocks.length < 2) return false;
+    return MEET_EN.test(text) || MEET_HE.test(text) ||
+      /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text) ||
+      /יום/.test(text);
+  }
+
   function assess(text, facts, ctx) {
     ctx = ctx || {};
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
     else text = String(text || '');
+    text = stripQuotedAsks(text);
     if (!text.trim()) return null;
     if (ctx.blocked) return null;
     if (NOISE_EN.test(text) || NOISE_HE.test(text)) return null;
+    if (ambiguousFiles(text)) return hit({ suppress: true, family: 'H' });
+    if (ambiguousClocks(text)) return hit({ suppress: true, family: 'H' });
     const now = ctx.now;
     if (!facts && typeof FlowExtract !== 'undefined') {
       facts = FlowExtract.extract(text, { now: now, senderEmail: ctx.senderEmail });
@@ -436,7 +548,14 @@ const FlowCloseFamilies = (() => {
     const sentences = splitSentences(text);
     for (let i = sentences.length - 1; i >= 0; i--) {
       const sentence = sentences[i];
-      if ((RETRACT_EN.test(sentence) || RETRACT_HE.test(sentence)) && !isFileAsk(sentence)) {
+      const earlier = sentences.slice(0, i).join(' ');
+      if ((RETRACT_EN.test(sentence) || RETRACT_HE.test(sentence)) && !positiveClause(sentence)) {
+        return hit({ suppress: true, family: 'H' });
+      }
+      if (leadingAlternative(sentence) && closeCue(earlier)) {
+        return hit({ suppress: true, family: 'H' });
+      }
+      if (withdrawsEarlier(sentence, earlier)) {
         return hit({ suppress: true, family: 'H' });
       }
       // A hedged, refused, or already-done move/cancel is not a new event.
@@ -451,8 +570,7 @@ const FlowCloseFamilies = (() => {
       const moved = matchMove(sentence, now);
       if (moved === 'suppress') return hit({ suppress: true, family: 'G' });
       if (moved) return moved;
-      const earlier = sentences.slice(0, i);
-      const created = matchCreateMissing(sentence, now, earlier);
+      const created = matchCreateMissing(sentence, now, sentences.slice(0, i));
       if (created) return created;
       const shared = matchCreateShare(sentence, now);
       if (shared) return shared;
@@ -476,6 +594,7 @@ const FlowCloseFamilies = (() => {
   // wrong close. A past day on the thing being asked for is not this.
   function askBlocked(text) {
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
+    text = stripQuotedAsks(text);
     if (NOISE_EN.test(text) || NOISE_HE.test(text)) return true;
     const cue = /\b(?:can you|could you|would you|please|kindly|send|forward|chase|nudge)\b/i;
     let saw = false;
@@ -526,7 +645,7 @@ const FlowCloseFamilies = (() => {
     return { surface: 'doit', slots: [] };
   }
 
-  return { assess, askBlocked, route, detailSurface, FILE_EN, FILE_HE };
+  return { assess, askBlocked, route, detailSurface, stripQuotedAsks, FILE_EN, FILE_HE };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseFamilies };

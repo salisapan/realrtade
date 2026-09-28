@@ -326,6 +326,11 @@ console.log('\n--- still open: trust-finish silence (A–J) stays off the mornin
     ['two targets', 'Please send the invoice. Put it on the calendar and in the task note.'],
     ['doc comment', 'Please send the contract and leave a doc comment.'],
     ['quoted old ask', ['Sounds good, thanks!', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')],
+    ['inline quoted ask', 'You wrote "Could you send the invoice?"'],
+    ['or two files', 'Please send the invoice or the contract.'],
+    ['hedged instead', 'Could you send the invoice? Maybe send the contract instead.'],
+    ['withdrawal', 'Could you send the invoice? Actually, never mind.'],
+    ['two clocks', 'Got 20 minutes Thursday at 11am? Or Friday at 4pm?'],
     ['weak invoice', 'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.'],
     ['two facts', "What's the renewal amount and the start date in the pricing sheet?"],
     ['hedge sheet', 'Maybe tell me the amount from the sheet if you have a minute.']

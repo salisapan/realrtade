@@ -150,6 +150,163 @@ for (const [name, text] of kills) {
   check('latest ask wins', latest.closeFamily === 'A' && /contract/i.test((latest.entities && latest.entities.what) || ''), latest.entities && latest.entities.what);
 }
 
+console.log('\n--- H multi-signal: latest explicit ask, or silence ---\n');
+{
+  function plan(text) {
+    const intent = classify(text);
+    return {
+      intent,
+      show: FlowIntent.shouldShowChip(intent),
+      process: FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false })
+    };
+  }
+  function kinds(process) {
+    return (process && process.steps || []).map((s) => s.kind);
+  }
+  const positives = [
+    ['H en instead', 'Could you send the invoice? Please send the contract instead.', /contract/i, 'A', 'reply-track'],
+    ['H en later file', 'Could you send the invoice? Please send the contract.', /contract/i, 'A', 'reply-track'],
+    ['H he instead', 'אפשר לשלוח את החשבונית? תשלח את החוזה במקום.', /חוזה/, 'A', 'reply-track'],
+    ['H he later file', 'צריך את החשבונית. תעביר לי את החוזה במקום.', /חוזה/, 'A', 'reply-track'],
+    ['H hedge then clear', 'Maybe send the invoice. Please send the contract.', /contract/i, 'A', 'reply-track'],
+    ['H he hedge then clear', 'אולי תשלח את החשבונית. בבקשה תשלח את החוזה.', /חוזה/, 'A', 'reply-track'],
+    ['H neg then clear', "Please don't send the invoice. Please send the contract.", /contract/i, 'A', 'reply-track'],
+    ['H past then clear', 'I already sent the invoice yesterday. Please send the contract.', /contract/i, 'A', 'reply-track'],
+    ['H chase then file', 'Please chase the vendor about the invoice. Please send the contract instead.', /contract/i, 'A', 'reply-track'],
+    ['H quote then file', 'You wrote "Could you send the invoice?" Please send the contract instead.', /contract/i, 'A', 'reply-track'],
+    ['H he quote then file', 'כתבת "אפשר לשלוח את החשבונית?" תשלח את החוזה במקום.', /חוזה/, 'A', 'reply-track']
+  ];
+  for (const [name, text, whatRe, family, proc] of positives) {
+    const row = plan(text);
+    const what = (row.intent.entities && row.intent.entities.what) || '';
+    check(name + ' chips the later ask',
+      row.show && row.intent.closeFamily === family && whatRe.test(what) && row.process && row.process.id === proc,
+      { type: row.intent.type, family: row.intent.closeFamily, what: what, proc: row.process && row.process.id });
+    check(name + ' does not keep the older object', !/invoice|חשבונית/.test(row.intent.entities && row.intent.entities.requestedObjectTerm || ''),
+      row.intent.entities && row.intent.entities.requestedObjectTerm);
+  }
+  const money = plan('Could you send the invoice? Confirming the fee is $8,750.');
+  check('H later amount is one task, not a draft of the invoice',
+    money.show && money.intent.closeFamily === 'E' && money.intent.personalClose === 'confirmed-amount' &&
+      money.intent.type === 'decision' && money.process && money.process.id === 'log-it' &&
+      kinds(money.process).indexOf('gmailDraft') === -1 && /8,750|8750/.test((money.intent.entities && money.intent.entities.what) || ''),
+    { type: money.intent.type, family: money.intent.closeFamily, close: money.intent.personalClose, proc: money.process && money.process.id, what: money.intent.entities && money.intent.entities.what });
+  const fileAfterMoney = plan('Confirming the fee is $8,750. Could you send the invoice?');
+  check('H later file ask is a draft, not the earlier amount',
+    fileAfterMoney.show && fileAfterMoney.intent.closeFamily === 'A' && fileAfterMoney.process && fileAfterMoney.process.id === 'reply-track' &&
+      /invoice/i.test((fileAfterMoney.intent.entities && fileAfterMoney.intent.entities.what) || ''),
+    { family: fileAfterMoney.intent.closeFamily, proc: fileAfterMoney.process && fileAfterMoney.process.id, what: fileAfterMoney.intent.entities && fileAfterMoney.intent.entities.what });
+  const promise = plan('Could you send the invoice? I will have the redline to you by September 24.');
+  check('H later dated promise is the task',
+    promise.show && promise.intent.closeFamily === 'D' && promise.intent.personalClose === 'dated-commitment' &&
+      promise.process && promise.process.id === 'log-it',
+    { family: promise.intent.closeFamily, close: promise.intent.personalClose, proc: promise.process && promise.process.id });
+  const aside = plan('Could you send the invoice? I might also call Dana tomorrow.');
+  check('H an unrelated aside leaves the explicit ask',
+    aside.show && aside.intent.closeFamily === 'A' && /invoice/i.test((aside.intent.entities && aside.intent.entities.what) || ''),
+    aside.intent.entities && aside.intent.entities.what);
+
+  const hKills = [
+    ['inline quote', 'You wrote "Could you send the invoice?"'],
+    ['he inline quote', 'כתבת "אפשר לשלוח את החשבונית?"'],
+    ['he quoted confirm', 'כתבת "אאשר את החוזה עד יום חמישי."'],
+    ['quoted confirm', 'Dana wrote "Confirming the fee is $8,750."'],
+    ['or files', 'Please send the invoice or the contract.'],
+    ['both files', 'Please send both the invoice and the contract.'],
+    ['and files', 'Please send the invoice and the receipt.'],
+    ['or sentences', 'Could you send the invoice? Or could you send the contract?'],
+    ['he or', 'תשלח את החשבונית או את החוזה.'],
+    ['he and', 'תשלח את החשבונית ואת החוזה.'],
+    ['maybe instead', 'Could you send the invoice? Maybe send the contract instead.'],
+    ['he maybe instead', 'בבקשה תשלח את החשבונית. אולי תשלח את החוזה במקום.'],
+    ['maybe not', 'Could you send the invoice? Maybe not.'],
+    ['please dont', "Could you send the invoice? Please don't."],
+    ['dont send it', "Could you send the invoice? Please don't send it."],
+    ['already sent it', 'Could you send the invoice? I already sent it yesterday.'],
+    ['already sent same', 'Could you send the invoice? I already sent the invoice yesterday.'],
+    ['actually never mind', 'Could you send the invoice? Actually, never mind.'],
+    ['he never mind', 'בבקשה תשלח את החשבונית.\nלא משנה.'],
+    ['two clocks', 'Got 20 minutes Thursday at 11am? Or Friday at 4pm?'],
+    ['two clocks he', 'יש לך רבע שעה ביום חמישי בשעה 16:00 או ביום שישי בשעה 10:00?'],
+    ['reschedule or leave', 'Can we reschedule the Friday, September 18 at 3pm sync to Thursday, September 24 at 4pm? Or leave it?'],
+    ['quote header', ['Thanks.', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')]
+  ];
+  for (const [name, text] of hKills) {
+    const row = plan(text);
+    check('H silence: ' + name, row.show === false, { type: row.intent.type, family: row.intent.closeFamily, what: row.intent.entities && row.intent.entities.what, proc: row.process && row.process.id });
+  }
+
+  const nouns = [
+    ['the invoice', 'the contract'],
+    ['the receipt', 'the quote'],
+    ['the passport scan', 'the signed PDF'],
+    ['the proposal', 'the W-9'],
+    ['the insurance form', 'the tax document']
+  ];
+  const hePairs = [
+    ['החשבונית', 'החוזה'],
+    ['הקבלה', 'הדוח'],
+    ['הצעת המחיר', 'הלוגו'],
+    ['תעודת הזהות', 'אישור ההעברה']
+  ];
+  let hPos = 0, hPosFail = 0, hNeg = 0, hNegFail = 0;
+  function failHPos(text, intent) {
+    hPosFail++;
+    if (hPosFail <= 8) console.log('FAIL H chip', text, intent && intent.closeFamily, intent && intent.entities && intent.entities.what);
+  }
+  function failHNeg(text, intent) {
+    hNegFail++;
+    if (hNegFail <= 8) console.log('FAIL H silence', text, intent && intent.type, intent && intent.closeFamily, intent && intent.entities && intent.entities.what);
+  }
+  for (const [older, newer] of nouns) {
+    const frames = [
+      `Could you send ${older}? Please send ${newer} instead.`,
+      `Please forward ${older}. Please send ${newer} instead.`,
+      `I need ${older} for the file. Can you attach ${newer} instead?`
+    ];
+    for (const text of frames) {
+      const row = plan(text);
+      const what = (row.intent.entities && row.intent.entities.what) || '';
+      if (row.show && row.intent.closeFamily === 'A' && what.toLowerCase().indexOf(newer.toLowerCase()) !== -1) hPos++;
+      else failHPos(text, row.intent);
+    }
+    const kills = [
+      `Please send ${older} or ${newer}.`,
+      `Please send both ${older} and ${newer}.`,
+      `Could you send ${older}? Or could you send ${newer}?`,
+      `Could you send ${older}? Maybe send ${newer} instead.`,
+      `Could you send ${older}? Actually, never mind.`,
+      `Could you send ${older}? I already sent it yesterday.`,
+      `You wrote "Could you send ${older}?"`
+    ];
+    for (const text of kills) {
+      const row = plan(text);
+      if (!row.show) hNeg++;
+      else failHNeg(text, row.intent);
+    }
+  }
+  for (const [older, newer] of hePairs) {
+    const text = `אפשר לשלוח את ${older}? תשלח את ${newer} במקום.`;
+    const row = plan(text);
+    const what = (row.intent.entities && row.intent.entities.what) || '';
+    if (row.show && row.intent.closeFamily === 'A' && what.indexOf(newer.replace(/^ה/, '')) !== -1) hPos++;
+    else failHPos(text, row.intent);
+    const kills = [
+      `תשלח את ${older} או את ${newer}.`,
+      `בבקשה תשלח את ${older}. אולי תשלח את ${newer} במקום.`,
+      `כתבת "אפשר לשלוח את ${older}?"`,
+      `בבקשה תשלח את ${older}.\nלא משנה.`
+    ];
+    for (const kill of kills) {
+      const quiet = plan(kill);
+      if (!quiet.show) hNeg++;
+      else failHNeg(kill, quiet.intent);
+    }
+  }
+  check('H generated latest asks chip the newer file (' + hPos + ')', hPosFail === 0 && hPos >= 15, { hPos, hPosFail });
+  check('H generated choices, quotes, hedges, and withdrawals stay quiet (' + hNeg + ')', hNegFail === 0 && hNeg >= 40, { hNeg, hNegFail });
+}
+
 console.log('\n--- E F G: the close is a task, a draft plus a task, or one calendar change ---\n');
 {
   function plan(text) {
