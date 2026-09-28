@@ -53,8 +53,10 @@ across a real sample size. Nothing in this log ever leaves the device.
 **A quiet Morning Brief for what's still open.** `core/still-open.js`
 decides the list: at most three personal closes — a dated promise, an
 explicit follow-up, or a confirmed amount — ranked by stakes, explicitness,
-deadline, and confidence. Anything softer (a meeting, a nudge, unread
-noise) stays off it. Fewer than three clear the bar, fewer show; zero is
+deadline, and confidence. Anything the chip would leave silent stays off
+it: a hedge, more than one candidate, a weak or unsure score, an ask that
+only survives in the quoted history, newsletter noise, and a fact ask the
+list cannot check. A meeting, a nudge, or unread noise stays off too. Fewer than three clear the bar, fewer show; zero is
 silence, not an empty widget to dismiss. `src/brief.js` renders that list.
 The extension popup shows the same cards, each with Do It. Do It still
 writes through the existing Google path and confirms with Handled / טופל
