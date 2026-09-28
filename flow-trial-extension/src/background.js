@@ -176,6 +176,93 @@ function updateBadge(count) {
   if (n) chrome.action.setBadgeBackgroundColor({ color: '#123ccb' });
 }
 
+// One optional morning OS notification. The text and the count are a
+// snapshot the Gmail tab already published (glanceStillOpenDigest). This
+// file does not re-rank mail. At most one ping per local day, and none
+// when Gmail itself is the active tab — the Brief already opened there.
+// Clicking it asks that tab to open the same list. Dismissing it records
+// a single "annoying" flag the content script folds into Still Open metrics.
+const STILL_OPEN_NOTIFY_ID = 'glance-still-open';
+const STILL_OPEN_DIGEST_MAX_AGE = 36 * 60 * 60 * 1000;
+
+function scheduleStillOpenMorning() {
+  if (!chrome.alarms || !chrome.alarms.create) return;
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0, 0);
+  if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1);
+  try {
+    const created = chrome.alarms.create('glance-still-open-morning', { when: next.getTime() });
+    if (created && created.catch) created.catch((e) => console.error('[Glance] could not schedule the morning list', e));
+  } catch (e) {
+    console.error('[Glance] could not schedule the morning list', e);
+  }
+}
+
+function stillOpenNotificationClick() {
+  chrome.storage.local.set({ glanceStillOpenOpenBrief: true });
+  const openInbox = () => {
+    if (chrome.tabs && chrome.tabs.create) chrome.tabs.create({ url: 'https://mail.google.com/mail/u/0/#inbox' });
+  };
+  if (!chrome.tabs || !chrome.tabs.query) { openInbox(); return; }
+  chrome.tabs.query({ url: 'https://mail.google.com/*' }, (tabs) => {
+    const tab = tabs && tabs[0];
+    if (!tab || tab.id == null) { openInbox(); return; }
+    chrome.tabs.update(tab.id, { active: true });
+    if (tab.windowId != null && chrome.windows && chrome.windows.update) {
+      chrome.windows.update(tab.windowId, { focused: true });
+    }
+    if (chrome.tabs.sendMessage) {
+      chrome.tabs.sendMessage(tab.id, { type: 'flow:still-open-show' }, () => {
+        if (chrome.runtime.lastError) { /* the storage flag opens the list on the next load */ }
+      });
+    }
+  });
+}
+
+async function maybeNotifyStillOpen() {
+  if (!chrome.notifications || !chrome.notifications.create || !chrome.storage || !chrome.tabs) return;
+  const data = await chrome.storage.local.get(['glanceStillOpenDigest', 'glanceStillOpenNotifiedDate']);
+  const digest = data.glanceStillOpenDigest;
+  if (!digest || !digest.count || !digest.text) return;
+  if (Date.now() - (digest.updatedAt || 0) > STILL_OPEN_DIGEST_MAX_AGE) return;
+  const today = new Date().toDateString();
+  if (data.glanceStillOpenNotifiedDate === today) return;
+  const active = await chrome.tabs.query({ active: true, url: 'https://mail.google.com/*' });
+  if (active && active.length) return;
+  await chrome.storage.local.set({ glanceStillOpenNotifiedDate: today });
+  chrome.notifications.create(STILL_OPEN_NOTIFY_ID, {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+    title: 'Glance',
+    message: String(digest.text)
+  });
+}
+
+try {
+  scheduleStillOpenMorning();
+  if (chrome.alarms && chrome.alarms.onAlarm) {
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (!alarm || alarm.name !== 'glance-still-open-morning') return;
+      scheduleStillOpenMorning();
+      maybeNotifyStillOpen().catch((e) => console.error('[Glance] morning notification failed', e));
+    });
+  }
+  if (chrome.notifications && chrome.notifications.onClicked) {
+    chrome.notifications.onClicked.addListener((id) => {
+      if (id !== STILL_OPEN_NOTIFY_ID) return;
+      stillOpenNotificationClick();
+    });
+  }
+  if (chrome.notifications && chrome.notifications.onClosed) {
+    chrome.notifications.onClosed.addListener((id, byUser) => {
+      if (id !== STILL_OPEN_NOTIFY_ID || !byUser) return;
+      chrome.storage.local.set({ glanceStillOpenNotifyDismissed: Date.now() });
+    });
+  }
+} catch (e) {
+  console.error('[Glance] morning Still Open notification is unavailable', e);
+}
+
 /* ------------------------------------------------------------------ shared */
 
 function esc(s) {
@@ -1893,9 +1980,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   // Fire-and-forget, same as flow:track below — the caller already computed
-  // the real number from FlowStorage.getPending().length; this never talks
-  // back, so a slow or missing response can never affect what the sender
-  // does next.
+  // the Still Open count (0–3). This file never re-derives it, and it never
+  // talks back, so a slow or missing response can never affect what the
+  // sender does next.
   if (msg.type === 'flow:pending-count') {
     updateBadge(Number(msg.count) || 0);
     return;

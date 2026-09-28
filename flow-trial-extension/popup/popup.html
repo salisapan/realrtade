@@ -43,9 +43,9 @@
     </section>
 
     <section data-panel="open" class="panel">
-      <p class="hint">Every process Glance has proposed and hasn't heard a decision on yet — the same list the in-Gmail indicator counts, in one place regardless of which thread it came from. Do It still happens from the message itself; from here you can jump to it or decide it doesn't need one.</p>
+      <p class="hint">מה עדיין פתוח · Still open. Up to three things you can close from here — the same list as the morning brief. If nothing is clearly still open, this stays empty.</p>
       <div id="open-list" class="log-list"></div>
-      <p id="open-empty" class="hint" hidden>Nothing open — Glance is caught up.</p>
+      <p id="open-empty" class="hint" hidden>Nothing still open.</p>
     </section>
 
     <section data-panel="log" class="panel">
@@ -54,6 +54,7 @@
         <span class="week-total" id="weekTotal"></span>
       </div>
       <p class="learned-stat" id="closeQuality" hidden title="On this device only. Full close = every proposed step wrote. Return = Do It on a later day. Turned down = the chip was dismissed or the write was undone. False-close = turned down ÷ messages that fully closed or were turned down. The week-1 bar is 15%."></p>
+      <p class="learned-stat" id="stillOpenQuality" hidden title="On this device only. Still Open cards shown, Do It clicks, undos, and false-closes."></p>
       <p class="learned-stat" id="learnedStat" hidden></p>
       <div class="sense" id="sense" hidden>
         <span class="sense-label">Sensitivity</span>
@@ -106,6 +107,7 @@
   <script src="../core/pmf-metrics.js"></script>
   <script src="../core/classification-metrics.js"></script>
   <script src="../core/close-quality-metrics.js"></script>
+  <script src="../core/still-open.js"></script>
   <!-- Wires execution-memory.js and close-memory.js to chrome.storage.local.
        Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../src/chrome-storage-adapter.js"></script>

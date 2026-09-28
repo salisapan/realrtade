@@ -115,5 +115,14 @@ console.log('\n--- receipt-copy: silence — nothing succeeded, so there is no H
   check('more successes than steps is not called a full close', FlowReceipt.confirmation({ succeeded: 3, total: 1, priorCloses: 0 }).full === false);
 }
 
+console.log('\n--- receipt-copy: a Hebrew full close says טופל ---\n');
+{
+  const c = FlowReceipt.confirmation({ succeeded: 1, total: 1, priorCloses: 5, lang: 'he' });
+  check('a full Hebrew close is טופל.', c.status === 'טופל.' && c.full === true, c);
+  check('English stays the default', FlowReceipt.confirmation({ succeeded: 1, total: 1, priorCloses: 5 }).status === 'Handled.');
+  const partial = FlowReceipt.confirmation({ succeeded: 1, total: 2, priorCloses: 0, lang: 'he' });
+  check('a partial close does not say טופל', partial.status === 'Partly handled.', partial);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

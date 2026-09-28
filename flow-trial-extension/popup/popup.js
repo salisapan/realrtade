@@ -328,24 +328,10 @@
   }
 
   /* ---------------------------------------------------------------- open */
-  // The Unified Open Items Surface: every process Glance has proposed and
-  // gotten no decision on yet, from FlowStorage.getPending() — the exact
-  // same source of truth the in-Gmail indicator/panel and the extension-icon
-  // badge already read. This is deliberately the one place that list is
-  // visible independent of which thread (today) or app (Calendar/Drive,
-  // later — see 'app' on each entry) it came from.
-  //
-  // Do It is intentionally NOT offered here. content-gmail.js's own onDoIt/
-  // buildActionPayload needs a live Gmail tab for at least one real path
-  // (fetching an attachment's bytes with the page's own cookies — see its
-  // own comment on why that fetch can't happen anywhere else), and this
-  // product's own rule about a duplicate write being the one failure it
-  // can't absorb means a second, partially-DOM-independent copy of that
-  // ~150-line orchestration living here — drifting from the original the
-  // day either one changes — is a worse outcome than routing "close this"
-  // back through the message it was proposed for. View jumps there directly;
-  // Dismiss (genuinely DOM-independent — see content-gmail.js's own
-  // onDismiss) is safe to offer verbatim.
+  // Still Open, the same list the morning brief shows. Not every unresolved
+  // chip — core/still-open.js already capped and ranked this. Do It is
+  // handed to a Gmail tab so the write stays on content-gmail.js's existing
+  // path (tasks, calendar, draft). There is no second writer here.
 
   function pendingRowSubtitle(entry) {
     const who = (entry.sender && entry.sender.name) || (entry.sender && entry.sender.email) || '';
@@ -353,10 +339,32 @@
     return who && what ? who + ' — ' + what : (what || who);
   }
 
+  async function closeStillOpenFromPopup(entry) {
+    let tabs = [];
+    if (chrome.tabs && chrome.tabs.query) {
+      try { tabs = await chrome.tabs.query({ url: 'https://mail.google.com/*' }); }
+      catch (e) { tabs = []; }
+    }
+    const tab = tabs && tabs[0];
+    if (tab && tab.id != null && chrome.tabs.sendMessage) {
+      const delivered = await new Promise((resolve) => {
+        chrome.tabs.sendMessage(tab.id, { type: 'flow:still-open-do-it', messageId: entry.messageId }, () => {
+          resolve(!chrome.runtime.lastError);
+        });
+      });
+      if (delivered) return;
+    }
+    await chrome.storage.local.set({ glanceStillOpenPendingDoIt: entry.messageId });
+    if (chrome.tabs && chrome.tabs.create) {
+      chrome.tabs.create({ url: entry.threadUrl || 'https://mail.google.com/mail/u/0/#inbox' });
+    }
+  }
+
   function openRow(entry) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    top.appendChild(el('span', 'log-label', entry.process.name));
+    const why = (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || entry.process.name;
+    top.appendChild(el('span', 'log-label', why));
     // 'app' only exists on entries logged after this was added — every
     // entry from before falls back to 'gmail', the only source that has
     // ever existed, rather than showing a blank tag.
@@ -373,6 +381,19 @@
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
 
     const acts = el('div', 'log-acts');
+    const doIt = el('button', 'primary sm');
+    doIt.type = 'button';
+    doIt.appendChild(el('span', 'shell'));
+    doIt.appendChild(el('span', 'ring'));
+    doIt.appendChild(el('span', 'shine'));
+    doIt.appendChild(el('span', 'btn-label', 'Do It'));
+    doIt.addEventListener('click', async () => {
+      doIt.disabled = true;
+      const label = doIt.querySelector('.btn-label');
+      if (label) label.textContent = 'Closing…';
+      await closeStillOpenFromPopup(entry);
+    });
+    acts.appendChild(doIt);
     if (entry.threadUrl) {
       const view = el('a', 'ghost sm', 'View');
       view.href = entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
@@ -394,6 +415,7 @@
       // Same reject as the in-Gmail chip dismiss. Once per message.
       if (entry.messageId) {
         await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: entry.messageId, reason: 'dismiss' });
+        await FlowStorage.recordStillOpenMetric({ kind: 'falseClose', messageId: entry.messageId, reason: 'dismiss' });
       }
       if (typeof FlowExecutionMemory !== 'undefined' && entry.process && entry.process.steps) {
         await FlowExecutionMemory.recordDismiss(entry.process.id, entry.process.steps.map((s) => s.id), entry.messageId);
@@ -408,12 +430,14 @@
   }
 
   async function renderOpen() {
-    const pending = await FlowStorage.getPending();
-    // Keeps the extension-icon badge honest even when the popup is the
-    // first surface opened after a browser restart, before any Gmail tab
-    // has had a chance to recompute it itself — see background.js's
-    // updateBadge comment for why this file never trusts a cached number.
+    const pending = await FlowStorage.getStillOpen();
+    // The badge is the Still Open count, the same number the morning brief
+    // posts. A restart can open this panel before any Gmail tab has run.
     chrome.runtime.sendMessage({ type: 'flow:pending-count', count: pending.length });
+    for (const item of pending) {
+      FlowStorage.recordStillOpenMetric({ kind: 'shown', messageId: item.messageId })
+        .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
+    }
 
     const host = document.getElementById('open-list');
     const empty = document.getElementById('open-empty');
@@ -641,10 +665,21 @@
     node.hidden = false;
   }
 
+  function renderStillOpenQuality(s) {
+    const node = document.getElementById('stillOpenQuality');
+    if (!node) return;
+    if (typeof FlowStillOpen === 'undefined') { node.hidden = true; return; }
+    const line = FlowStillOpen.activityLine(s.stillOpenMetrics || FlowStillOpen.emptyMetrics());
+    if (!line) { node.hidden = true; return; }
+    node.textContent = line;
+    node.hidden = false;
+  }
+
   async function renderLog() {
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderCloseQuality(s);
+    renderStillOpenQuality(s);
     await renderLearned();
     renderSensitivity(s);
     await renderMemoryInsight(s);

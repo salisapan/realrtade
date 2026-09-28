@@ -34,8 +34,8 @@ const FlowBrief = (() => {
     return count === 1 ? '1 thing still open' : count + ' things still open';
   }
 
-  function panelHeadLabel(count) {
-    return count === 1 ? 'This is waiting to be closed' : 'These are waiting to be closed';
+  function panelHeadLabel() {
+    return 'מה עדיין פתוח · Still open';
   }
 
   // Ensures the indicator exists and reflects `count`, wiring onToggle to
@@ -65,6 +65,7 @@ const FlowBrief = (() => {
   function buildRow(row) {
     const wrap = el('div', 'flow-brief-row');
     wrap.setAttribute('dir', 'ltr');
+    if (row.id) wrap.setAttribute('data-message-id', row.id);
 
     const body = el('div', 'flow-brief-row-body');
     body.appendChild(el('span', 'flow-chip-process-name', row.title));
@@ -125,14 +126,11 @@ const FlowBrief = (() => {
     resurfaceHost = null;
   }
 
-  // A brief is a brief. Rows arrive oldest-still-open first (storage.js's
-  // getPending), which is the right order to truncate from the far end of:
-  // the oldest open process is the one most likely to be genuinely forgotten,
-  // and a wall of a hundred rows is a backlog you scroll past, not something
-  // you close. The indicator behind this panel keeps showing the TRUE total —
-  // the count is never the thing that gets rounded down — and the footer
-  // below says plainly how many are not on screen, so the panel never implies
-  // it is showing everything.
+  // A brief is a brief. Rows arrive in the caller's rank order (Still Open
+  // puts the highest stakes × deadline first, and never hands over more
+  // than three). Truncation keeps the front of that list. The indicator
+  // shows the same count the panel was given — Still Open does not keep a
+  // hidden backlog behind a smaller number.
   const PANEL_MAX_ROWS = 12;
 
   function overflowLabel(hidden) {
@@ -152,7 +150,7 @@ const FlowBrief = (() => {
     panelHost.setAttribute('dir', 'ltr');
 
     const head = el('div', 'flow-brief-panel-head');
-    head.appendChild(el('span', 'flow-brief-panel-head-label', panelHeadLabel(rows.length)));
+    head.appendChild(el('span', 'flow-brief-panel-head-label', panelHeadLabel()));
     const close = el('button', 'flow-brief-panel-close', '×');
     close.type = 'button';
     close.setAttribute('aria-label', 'Close');

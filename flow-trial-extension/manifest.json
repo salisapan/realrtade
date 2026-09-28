@@ -41,6 +41,7 @@
         "core/pmf-metrics.js",
         "core/classification-metrics.js",
         "core/close-quality-metrics.js",
+        "core/still-open.js",
         "src/chrome-storage-adapter.js",
         "src/storage.js",
         "core/privacyShield.js",
@@ -64,7 +65,9 @@
   "permissions": [
     "storage",
     "identity",
-    "sidePanel"
+    "sidePanel",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "https://mail.google.com/*",
