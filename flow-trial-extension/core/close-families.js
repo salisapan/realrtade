@@ -5,15 +5,14 @@
 // older ask do not. A weak or borderline score is not promoted so a
 // field card or a chat can open — silence is the side of that trade.
 //
-// Family I (create-when-missing) is a clear asset (quote, proposal,
-// invoice, letter, contract, …) when no safe file is already in hand:
-// the sender says it is missing, or asks to create it. That is a close,
-// not silence. A vague, hedged, or noisy line stays silent. The collector
-// that may follow is not a product surface: at most four named fields on
-// a card, and only when more than four required slots are missing does
-// the checklist (the only "chat") open. It is a named-slot list, not an
-// assistant. Dismiss or unsure returns to silence, then the one Do It.
-// This file does not render that UI and does not create a Doc.
+// Family I (create-when-missing) is conditional. It chips only when the
+// what is a named asset, that file is missing, and a company template is
+// named — the template the later Do It would use. Any one of those missing
+// is silence, including a clear asset with no template (never a blank Doc)
+// and a template with no clear what. A weak score is not promoted to get
+// here. The card that may follow holds at most two named fields. More than
+// that is silence, not a chat. This file does not render that UI and does
+// not create a Doc.
 
 const FlowCloseFamilies = (() => {
   const FILE_EN = /\b(receipts?|invoices?|quotes?|contracts?|signed pdfs?|passports?(?:\s+scans?)?|insurance forms?|tax (?:docs?|documents?|returns?)|proposals?|decks?|logos?|briefs?|statements?|purchase orders?|POs?|W-?9s?|photo ids?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
@@ -191,15 +190,24 @@ const FlowCloseFamilies = (() => {
     return 'suppress';
   }
 
-  function matchCreateMissing(sentence, now) {
+  function templateCue(sentence) {
+    return TEMPLATE_EN.test(sentence) || TEMPLATE_HE.test(sentence);
+  }
+
+  // Clear what + missing file + a template that will exist. All three, or
+  // silence. Creating the named asset from that template is the missing-file
+  // case: there is no safe file to attach. A plain "send the invoice" is not
+  // this, even if a template was mentioned earlier.
+  function matchCreateMissing(sentence, now, earlier) {
     if (hasExistingFile(sentence)) return null;
-    const asset = specificAsset(sentence);
-    const template = TEMPLATE_EN.test(sentence) || TEMPLATE_HE.test(sentence);
-    const produce = creating(sentence);
-    const missing = notFound(sentence);
-    // A named asset that is missing, or that the sender asked to create.
-    // A generic "draft a document" with no asset stays family C.
-    if (!(missing && asset) && !(produce && template) && !(produce && asset)) return null;
+    if (isFileAsk(sentence) && !creating(sentence) && !notFound(sentence)) return null;
+    if (!creating(sentence) && !notFound(sentence) && !templateCue(sentence)) return null;
+    const prior = (earlier || []).filter((s) => !hasExistingFile(s) && !skipSentence(s));
+    const asset = specificAsset(sentence) || prior.map(specificAsset).find(Boolean) || null;
+    const template = templateCue(sentence) || prior.some(templateCue);
+    const missing = notFound(sentence) || prior.some(notFound);
+    const produce = creating(sentence) || prior.some(creating);
+    if (!asset || !template || !(missing || produce)) return null;
     return hit({
       family: 'I', type: 'request', confidence: 'high', personalClose: 'follow-up-ask',
       what: sentence, requestWhat: sentence, objectTerm: asset,
@@ -333,7 +341,8 @@ const FlowCloseFamilies = (() => {
       const moved = matchMove(sentence, now);
       if (moved === 'suppress') return hit({ suppress: true, family: 'G' });
       if (moved) return moved;
-      const created = matchCreateMissing(sentence, now);
+      const earlier = sentences.slice(0, i);
+      const created = matchCreateMissing(sentence, now, earlier);
       if (created) return created;
       const shared = matchCreateShare(sentence, now);
       if (shared) return shared;
@@ -368,8 +377,8 @@ const FlowCloseFamilies = (() => {
   }
 
   // Field collector policy. Not a chat product. Weak intent never opens it.
-  // Chat exists only as a named-slot checklist, and only past four missing
-  // required slots. Fewer than that is a card of those names. Dismiss or
+  // A create-when-missing card holds at most two named fields. More than
+  // two is silence — not a wider card and not a checklist. Dismiss or
   // unsure is silence. The next action after the slots is one Do It.
   function detailSurface(intent, missingSlots, signal) {
     const names = Array.isArray(missingSlots)
@@ -378,8 +387,8 @@ const FlowCloseFamilies = (() => {
     const weak = !intent || !intent.type || intent.confidence === 'low' || intent.confidence === 'unsure';
     if (weak || signal === 'dismiss' || signal === 'unsure') return { surface: 'silence', slots: [] };
     if (intent.closeFamily !== 'I' || !intent.createWhenMissing) return { surface: 'doit', slots: [] };
-    if (names.length > 4) return { surface: 'checklist', slots: names };
-    if (names.length > 0) return { surface: 'card', slots: names.slice(0, 4) };
+    if (names.length > 2) return { surface: 'silence', slots: [] };
+    if (names.length > 0) return { surface: 'card', slots: names };
     return { surface: 'doit', slots: [] };
   }
 

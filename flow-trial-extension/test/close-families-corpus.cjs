@@ -55,11 +55,8 @@ const exemplars = [
   ['G he new slot', 'אפשר לדחות את הפגישה ליום חמישי בשעה 16:00?', 'G', true],
   ['I en template', 'Please draft the contract from our company template and send it to Dana.', 'I', true],
   ['I he template', 'אין חוזה בתיקייה. תכין אחד מהתבנית שלנו ותשלח לדנה.', 'I', true],
-  ['I en quote missing', 'We don\'t have a quote for Acme. Please draft one and send it to Dana.', 'I', true],
-  ['I en invoice not on file', 'No invoice on file for this job. Create one and send it.', 'I', true],
-  ['I en letter', 'Please write a letter to Dana and send it.', 'I', true],
-  ['I he quote missing', 'אין הצעת מחיר. תכין אחת ותשלח לדנה.', 'I', true],
-  ['I he invoice missing', 'לא מצאתי את החשבונית. תכין חשבונית ותשלח.', 'I', true]
+  ['I en quote from template', 'We don\'t have a quote for Acme. Draft one from our company template and send it to Dana.', 'I', true],
+  ['I he invoice from template', 'לא מצאתי את החשבונית. תכין אחת מהתבנית שלנו ותשלח.', 'I', true]
 ];
 for (const [name, text, family, wantChip] of exemplars) {
   const { intent, show } = chip(text);
@@ -78,9 +75,17 @@ for (const [name, text, family, wantChip] of exemplars) {
   const found = classify('Could you send the invoice?');
   check('a file ask stays family A, not I', found.closeFamily === 'A' && !found.createWhenMissing, found.closeFamily);
   const missingOnly = classify('There is no proposal in the folder.');
-  check('a clear missing asset is create-when-missing, not silence',
-    missingOnly.closeFamily === 'I' && missingOnly.createWhenMissing === true && FlowIntent.shouldShowChip(missingOnly),
-    { type: missingOnly.type, family: missingOnly.closeFamily, show: FlowIntent.shouldShowChip(missingOnly) });
+  check('a missing asset with no template stays silence',
+    !FlowIntent.shouldShowChip(missingOnly) && missingOnly.closeFamily !== 'I' && !missingOnly.createWhenMissing,
+    { type: missingOnly.type, family: missingOnly.closeFamily });
+  const noTemplate = classify('We don\'t have a quote for Acme. Please draft one and send it to Dana.');
+  check('clear what and a missing file, without a template, stays silence',
+    !FlowIntent.shouldShowChip(noTemplate) && !noTemplate.createWhenMissing,
+    { type: noTemplate.type, family: noTemplate.closeFamily });
+  const unclear = classify('Please draft something from our company template and send it to Dana.');
+  check('a template with no clear asset stays silence',
+    !FlowIntent.shouldShowChip(unclear) && unclear.closeFamily !== 'I',
+    { type: unclear.type, family: unclear.closeFamily });
 }
 
 console.log('\n--- H and the other kill cases: silence, not a softer chip ---\n');
@@ -107,6 +112,11 @@ const kills = [
   ['thoughts', 'Any thoughts on the template when you have a minute?'],
   ['thoughts proposal', 'Any thoughts on a proposal when you have a minute?'],
   ['pitch someday', 'Hope this email finds you well. We should have an invoice someday.'],
+  ['missing quote no template', 'We don\'t have a quote for Acme. Please draft one and send it to Dana.'],
+  ['invoice not on file no template', 'No invoice on file for this job. Create one and send it.'],
+  ['letter no template', 'Please write a letter to Dana and send it.'],
+  ['he quote no template', 'אין הצעת מחיר. תכין אחת ותשלח לדנה.'],
+  ['unclear template', 'Please draft something from our company template and send it to Dana.'],
   ['weak invoice', 'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.'],
   ['retract', 'Could you send the invoice?\nNever mind.'],
   ['quote', ['Sounds good, thanks!', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')]
@@ -194,10 +204,12 @@ console.log('\n--- I is not a rescue for a weak judgment ---\n');
 
   const clear = classify('Please draft the contract from our company template and send it to Dana.');
   const card = FlowCloseFamilies.detailSurface(clear, ['party', 'amount'], null);
-  check('two missing slots are a card, not chat', card.surface === 'card' && card.slots.length === 2, card);
+  check('one or two missing slots are a card', card.surface === 'card' && card.slots.length === 2, card);
+  const one = FlowCloseFamilies.detailSurface(clear, ['amount'], null);
+  check('a single missing slot is a card', one.surface === 'card' && one.slots.length === 1, one);
   const list = FlowCloseFamilies.detailSurface(clear, eight, null);
-  check('more than four missing slots are a named checklist', list.surface === 'checklist' && list.slots.length === 8, list);
-  check('the checklist is not an assistant', !list.prompt && !list.assistant && list.slots.every((s) => typeof s === 'string'), list);
+  check('more than two missing slots stay silence', list.surface === 'silence' && list.slots.length === 0, list);
+  check('silence is not an assistant', !list.prompt && !list.assistant, list);
   const ready = FlowCloseFamilies.detailSurface(clear, [], null);
   check('no missing slots is one Do It', ready.surface === 'doit', ready);
   const dismissed = FlowCloseFamilies.detailSurface(clear, eight, 'dismiss');
