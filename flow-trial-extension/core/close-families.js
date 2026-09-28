@@ -53,14 +53,14 @@ const FlowCloseFamilies = (() => {
   const COMMIT_EN = /\b(?:i(?:'ll| will) have|i(?:'ll| will) get|on the hook to|i commit to|count on me to|i(?:'ll| will) take care of)\b/i;
   const COMMIT_HE = /(?:מתחייב|מתחייבת|אאשר עד|אחזיר לך|אני על זה)/;
 
-  const APPROVE_EN = /\b(?:you have my (?:ok|okay|approval)|green[- ]?light|formally approved|i approve|we approve|approved\b|confirming|confirmed|ok to proceed)\b/i;
-  const APPROVE_HE = /(?:אאשר|אני מאשר|אני מאשרת|אור ירוק|מאושר מצידי)/;
+  const APPROVE_EN = /\b(?:you have my (?:ok|okay|approval)|green[- ]?light|formally approved|i approve|we approve|approved\b|confirming|confirmed|ok to proceed|paid in full|(?:invoice|fee|payment) is paid)\b/i;
+  const APPROVE_HE = /(?:אאשר|אני מאשר|אני מאשרת|אור ירוק|מאושר מצידי|שול(?:מה|מו|ם)(?![\u0590-\u05FF]))/;
 
-  const FOLLOW_EN = /\b(?:please (?:chase|nudge|ping)|follow up with|send (?:a |the )?reminder|chase the|nudge \w+ about|ping \w+ about)\b/i;
-  const FOLLOW_HE = /(?:תעקוב|בבקשה תעקוב|לעקוב אחרי|תזכיר לי|שלח תזכורת|תבדוק מול)/;
+  const FOLLOW_EN = /\b(?:please (?:chase|nudge|ping)|follow up with|send (?:a |the )?reminder|send \w+ a reminder|please remind|chase up|chase the|nudge \w+ about|ping \w+ about)\b/i;
+  const FOLLOW_HE = /(?:תעקוב|בבקשה תעקוב|לעקוב אחרי|תזכ(?:יר|ירי|ירו)(?![\u0590-\u05FF])|שלח תזכורת|תשלח תזכורת|תבדוק מול)/;
 
   const MOVE_EN = /\b(?:reschedul\w*|postpone|push (?:the |our |this )?(?:call|meeting|sync)|move (?:the |our |this )?(?:call|meeting|sync))\b/i;
-  const MOVE_HE = /(?:לדחות|נדחתה|נדחה|להזיז את ה|נקבע מחדש)/;
+  const MOVE_HE = /(?:לדחות|נדחתה|נדחה|להזיז את ה|תזיז(?:ו|י)? את ה|נקבע מחדש)/;
   const CANCEL_EN = /\b(?:cancel(?:led|ing)?|call(?:ed)? off)\b[^.]{0,48}\b(?:call|meeting|sync|invite|event)\b|\b(?:call|meeting|sync|invite|event)\b[^.]{0,48}\b(?:is |was )?(?:cancelled|called off)\b/i;
   const CANCEL_HE = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת)/;
 
@@ -71,7 +71,7 @@ const FlowCloseFamilies = (() => {
   // A past day on the object ("the notes from yesterday") is still a live
   // ask. Only a completed act — already sent, already paid — is silence.
   const PAST_EN = /\b(?:already|i sent|we sent|we paid|i paid|has been sent|was sent|was paid|already paid)\b/i;
-  const PAST_HE = /(?:כבר|שלחתי|שילמתי|שולמה|שולם|נשלחה אתמול)/;
+  const PAST_HE = /(?:כבר|שלחתי|שילמתי|נשלחה אתמול|שול(?:מה|מו|ם)\s+אתמול)/;
   const RETRACT_EN = /^\s*(?:never mind|forget it|disregard|ignore that)[.!]?\s*$/i;
   const RETRACT_HE = /^\s*(?:עזוב|תשכח מזה|לא משנה)[.!]?\s*$/;
   const NOISE_EN = /\b(?:unsubscribe|newsletter|hope this (?:email )?finds you well|book a demo|free trial|just bumping this|circling back|quick bump|for your information|no action needed|fyi)\b/i;
@@ -181,13 +181,63 @@ const FlowCloseFamilies = (() => {
     return Object.assign({ suppress: false, fileTarget: null, objectTerm: null, personalClose: null, createWhenMissing: false }, partial);
   }
 
+  // "to 4pm" names a new clock without the word "at". Only the replacement
+  // clause uses this — a bare "to 4" elsewhere is not a meeting time.
+  function movedClock(clause) {
+    const parsed = clockOf(clause);
+    if (parsed) return parsed;
+    const to = String(clause || '').match(/\bto\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i);
+    if (!to) return null;
+    let hour = +to[1];
+    const minute = to[2] ? +to[2] : 0;
+    const marker = to[3].toLowerCase().replace(/\./g, '');
+    if (marker === 'pm' && hour < 12) hour += 12;
+    if (marker === 'am' && hour === 12) hour = 0;
+    if (hour > 23 || minute > 59) return null;
+    return { hour: hour, minute: minute, raw: to[0] };
+  }
+  // "מיום שישי" is the slot being left. parseDate accepts ל/ב, not מ.
+  function fromWeekday(text, now) {
+    const found = dateOf(text, now);
+    if (found) return found;
+    const m = String(text || '').match(/(?:מ|ב|ל)יום\s+(ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת)(?![\u0590-\u05FF])/);
+    if (!m || !now) return null;
+    const days = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+    const target = days.indexOf(m[1]);
+    if (target < 0) return null;
+    const d = new Date(now);
+    let delta = (target - d.getDay() + 7) % 7;
+    if (delta === 0) delta = 7;
+    d.setDate(d.getDate() + delta);
+    const pad = (n) => String(n).padStart(2, '0');
+    return { raw: m[0], iso: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) };
+  }
+  function slotsDiffer(aDate, aTime, bDate, bTime) {
+    if (!aDate || !bDate || !aTime || !bTime) return false;
+    return aDate.iso !== bDate.iso || aTime.hour !== bTime.hour || aTime.minute !== bTime.minute;
+  }
+
   function matchMove(sentence, now) {
     const move = MOVE_EN.test(sentence) || MOVE_HE.test(sentence);
     const cancel = CANCEL_EN.test(sentence) || CANCEL_HE.test(sentence);
     if (!move && !cancel) return null;
     const clause = replacementClause(sentence);
-    const date = clause ? dateOf(clause, now) : null;
-    const time = clause ? clockOf(clause) : null;
+    let date = clause ? dateOf(clause, now) : null;
+    const time = clause ? movedClock(clause) : null;
+    const before = clause ? sentence.slice(0, sentence.indexOf(clause)) : sentence;
+    const oldDate = fromWeekday(before, now);
+    const oldTime = clockOf(before);
+    if (!date && time && oldDate) date = oldDate;
+    // Both clocks named, and they differ: move that event. A new clock
+    // with no prior slot stays a hold — there is no event to patch.
+    if (move && date && time && slotsDiffer(oldDate, oldTime, date, time)) {
+      return hit({
+        family: 'G', type: 'event', confidence: 'high', personalClose: 'calendar-move',
+        calendarOp: 'update',
+        what: sentence, requestWhat: sentence,
+        date: date, time: time, fromDate: oldDate, fromTime: oldTime
+      });
+    }
     if (date && time) {
       return hit({
         family: 'G', type: 'event', confidence: 'high', personalClose: 'calendar-hold',
@@ -200,7 +250,19 @@ const FlowCloseFamilies = (() => {
         what: sentence, date: date, time: null
       });
     }
-    // No new slot, or a bare cancel. Inserting an event would be the wrong close.
+    // A cancel that names the slot removes that event. A reschedule with
+    // no new clock does not: inserting or deleting would both be a guess.
+    if (cancel && !move) {
+      const slotDate = fromWeekday(sentence, now);
+      const slotTime = clockOf(sentence);
+      if (slotDate && slotTime) {
+        return hit({
+          family: 'G', type: 'event', confidence: 'high', personalClose: 'calendar-cancel',
+          calendarOp: 'delete',
+          what: sentence, requestWhat: sentence, date: slotDate, time: slotTime
+        });
+      }
+    }
     return 'suppress';
   }
 
@@ -280,6 +342,11 @@ const FlowCloseFamilies = (() => {
     // "Has the fee been confirmed?" is a question, not an approval.
     if (/\?\s*$/.test(sentence)) return null;
     if (!APPROVE_EN.test(sentence) && !APPROVE_HE.test(sentence)) return null;
+    if (/\b(?:about|around|approx(?:imately)?|roughly|circa)\b/i.test(sentence) || /(?:בערך|בסביבות)/.test(sentence)) return null;
+    if (/\b(?:or|between)\b/i.test(sentence) || /(?:^|\s)או(?:\s|$)/.test(sentence)) {
+      const figs = sentence.match(/(?:\$|€|£|₪)\s?\d|\d[\d,]*(?:\.\d+)?\s?(?:שקל|ש״ח|ש"ח)/gi) || [];
+      if (figs.length >= 2) return null;
+    }
     const money = facts && facts.money && facts.money.raw && sentence.indexOf(facts.money.raw) !== -1;
     const file = FILE_EN.test(sentence) || FILE_HE.test(sentence);
     const go = /\b(?:go ahead|proceed|start)\b|אפשר להתחיל|נתקדם/i.test(sentence);
@@ -371,6 +438,14 @@ const FlowCloseFamilies = (() => {
       const sentence = sentences[i];
       if ((RETRACT_EN.test(sentence) || RETRACT_HE.test(sentence)) && !isFileAsk(sentence)) {
         return hit({ suppress: true, family: 'H' });
+      }
+      // A hedged, refused, or already-done move/cancel is not a new event.
+      // skipSentence would walk past it, and the meeting gate would then
+      // insert the old clock.
+      const moveCue = MOVE_EN.test(sentence) || MOVE_HE.test(sentence);
+      const cancelCue = CANCEL_EN.test(sentence) || CANCEL_HE.test(sentence);
+      if ((moveCue || cancelCue) && (hedged(sentence) || negated(sentence) || pastDone(sentence))) {
+        return hit({ suppress: true, family: 'G' });
       }
       if (skipSentence(sentence)) continue;
       const moved = matchMove(sentence, now);

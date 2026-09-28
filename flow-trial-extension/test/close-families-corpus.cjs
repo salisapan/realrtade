@@ -15,6 +15,7 @@ for (const f of ['domains.js', 'extract.js', 'judgment.js', 'close-families.js',
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
 const FlowCloseFamilies = vm.runInContext('FlowCloseFamilies', sandbox);
+const FlowActions = vm.runInContext('FlowActions', sandbox);
 
 const NOW = new Date('2026-09-17T12:00:00Z');
 let failures = 0;
@@ -69,7 +70,15 @@ for (const [name, text, family, wantChip] of exemplars) {
   check('G files the new slot, not Friday',
     moved.entities && moved.entities.dateIso === '2026-09-24' && moved.entities.hour === 16,
     moved.entities);
-  check('G is one calendar hold', moved.personalClose === 'calendar-hold' && moved.type === 'event', moved.personalClose);
+  check('G moves the named event instead of holding a second one',
+    moved.personalClose === 'calendar-move' && moved.type === 'event' &&
+      moved.entities.calendarOp === 'update' &&
+      moved.entities.fromDateIso === '2026-09-18' && moved.entities.fromHour === 15,
+    moved.personalClose);
+  const held = classify('אפשר לדחות את הפגישה ליום חמישי בשעה 16:00?');
+  check('G with only a new slot stays one calendar hold',
+    held.personalClose === 'calendar-hold' && held.entities && held.entities.dateIso === '2026-09-24' && held.entities.hour === 16 && !held.entities.calendarOp,
+    held.personalClose);
   const created = classify('Please draft the contract from our company template and send it to Dana.');
   check('I is create-when-missing, not a found file', created.createWhenMissing === true && created.closeFamily === 'I', created.closeFamily);
   const found = classify('Could you send the invoice?');
@@ -97,6 +106,7 @@ const kills = [
   ['past', 'I already sent the invoice yesterday.'],
   ['past paid', 'Confirming we paid the $4,200 on March 3, 2024.'],
   ['past he', 'החשבונית שולמה אתמול.'],
+  ['past he final mem', 'הסכום שולם אתמול, 4,200 ש״ח.'],
   ['status', 'Did you send the invoice?'],
   ['attached delivery', 'Please find the invoice attached for your records today.'],
   ['noise pitch', 'Hope this email finds you well. Could you send the invoice?'],
@@ -104,8 +114,16 @@ const kills = [
   ['fyi', 'FYI, we agreed to file the amendment by September 21.'],
   ['two targets', 'Please send the invoice. Put it on the calendar and in the task note.'],
   ['doc comment', 'Please send the contract and leave a doc comment.'],
-  ['cancel no new slot', 'Please cancel the Friday, September 18 at 3pm sync.'],
   ['vague reschedule', 'Maybe we should reschedule sometime.'],
+  ['maybe cancel named', 'Maybe cancel the Friday, September 18 at 3pm sync.'],
+  ['dont cancel named', "Please don't cancel the Friday, September 18 at 3pm sync."],
+  ['reschedule no new clock', 'Can we reschedule the Friday, September 18 at 3pm sync to a better week?'],
+  ['find a time', "Let's find a time."],
+  ['maybe chase later', 'Maybe chase the invoice later.'],
+  ['chase nothing named', 'Please chase when you can.'],
+  ['about amount', 'Confirming the fee is about $4,200.'],
+  ['or amount', 'Confirming the amount is $4,200 or $5,000.'],
+  ['already paid he', 'כבר שולם, 4,200 ש״ח.'],
   ['vent', "I'm so frustrated with this project, just venting about the invoice."],
   ['vague template', 'Maybe draft something from our template if you get a chance.'],
   ['vague quote', 'Maybe draft a quote if you get a chance.'],
@@ -130,8 +148,83 @@ for (const [name, text] of kills) {
 {
   const latest = classify('Could you send the invoice? Please send the contract instead.');
   check('latest ask wins', latest.closeFamily === 'A' && /contract/i.test((latest.entities && latest.entities.what) || ''), latest.entities && latest.entities.what);
-  const cancel = classify('Please cancel the Friday, September 18 at 3pm sync.');
-  check('cancel does not file the old Friday event', !(cancel.type === 'event' && cancel.entities && cancel.entities.dateIso === '2026-09-18'), cancel);
+}
+
+console.log('\n--- E F G: the close is a task, a draft plus a task, or one calendar change ---\n');
+{
+  function plan(text) {
+    const intent = classify(text);
+    return {
+      intent,
+      show: FlowIntent.shouldShowChip(intent),
+      process: FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false })
+    };
+  }
+  function kinds(process) {
+    return (process && process.steps || []).map((s) => s.kind);
+  }
+  function googleOnly(process, allowed) {
+    const got = kinds(process);
+    return got.length > 0 && got.every((k) => allowed.indexOf(k) !== -1) &&
+      !got.some((k) => /hubspot|salesforce|notion|slack|monday/i.test(k));
+  }
+  const money = [
+    ['E he paid', 'החשבונית שולמה, 4,200 ש״ח.'],
+    ['E he paid colon', 'הסכום שולם: 4,200 ש״ח.'],
+    ['E en paid in full', 'The invoice is paid in full, $4,200.']
+  ];
+  for (const [name, text] of money) {
+    const row = plan(text);
+    check(name + ' chips as E', row.show && row.intent.closeFamily === 'E' && row.intent.personalClose === 'confirmed-amount', {
+      type: row.intent.type, family: row.intent.closeFamily, close: row.intent.personalClose
+    });
+    check(name + ' is one task', row.process && row.process.id === 'log-it' && googleOnly(row.process, ['googleTask']), kinds(row.process));
+  }
+  const nudges = [
+    ['F he remind', 'תזכיר לדנה לגבי החשבונית.'],
+    ['F en chase up', 'Please chase up the vendor on the contract.'],
+    ['F en reminder', 'Please send Dana a reminder about the contract.']
+  ];
+  for (const [name, text] of nudges) {
+    const row = plan(text);
+    check(name + ' chips as F', row.show && row.intent.closeFamily === 'F' && row.intent.personalClose === 'follow-up-ask', {
+      type: row.intent.type, family: row.intent.closeFamily, close: row.intent.personalClose
+    });
+    check(name + ' is a draft and a task',
+      row.process && row.process.id === 'reply-track' && googleOnly(row.process, ['gmailDraft', 'googleTask']) &&
+        kinds(row.process).indexOf('gmailDraft') !== -1 && kinds(row.process).indexOf('googleTask') !== -1,
+      kinds(row.process));
+  }
+  const cancel = plan('Please cancel the Friday, September 18 at 3pm sync.');
+  check('G cancel removes Friday at 3pm',
+    cancel.show && cancel.intent.closeFamily === 'G' && cancel.intent.personalClose === 'calendar-cancel' &&
+      cancel.intent.entities.calendarOp === 'delete' && cancel.intent.entities.dateIso === '2026-09-18' && cancel.intent.entities.hour === 15,
+    cancel.intent.entities);
+  check('G cancel is one calendar delete',
+    cancel.process && cancel.process.id === 'clear-it' && googleOnly(cancel.process, ['calendar']) &&
+      cancel.process.steps[0].params.calendarOp === 'delete',
+    cancel.process && cancel.process.id);
+  const cancelHe = plan('בבקשה בטל את הפגישה ביום שישי בשעה 15:00.');
+  check('G Hebrew cancel removes Friday at 15:00',
+    cancelHe.show && cancelHe.intent.personalClose === 'calendar-cancel' &&
+      cancelHe.intent.entities.dateIso === '2026-09-18' && cancelHe.intent.entities.hour === 15 &&
+      cancelHe.process && cancelHe.process.id === 'clear-it',
+    cancelHe.intent.entities);
+  const sameDay = plan('Please move the call on Friday, September 18 at 3pm to 4pm.');
+  check('G same-day move patches 3pm to 4pm',
+    sameDay.show && sameDay.intent.personalClose === 'calendar-move' &&
+      sameDay.intent.entities.dateIso === '2026-09-18' && sameDay.intent.entities.hour === 16 &&
+      sameDay.intent.entities.fromDateIso === '2026-09-18' && sameDay.intent.entities.fromHour === 15 &&
+      sameDay.process && sameDay.process.id === 'move-it' && sameDay.process.steps.length === 1 &&
+      sameDay.process.steps[0].params.calendarOp === 'update',
+    sameDay.intent.entities);
+  const moveHe = plan('תזיזו את הפגישה מיום שישי בשעה 15:00 ליום שלישי בשעה 10:00.');
+  check('G Hebrew move patches Friday 15:00 to Tuesday 10:00',
+    moveHe.show && moveHe.intent.personalClose === 'calendar-move' &&
+      moveHe.intent.entities.fromDateIso === '2026-09-18' && moveHe.intent.entities.fromHour === 15 &&
+      moveHe.intent.entities.dateIso === '2026-09-22' && moveHe.intent.entities.hour === 10 &&
+      moveHe.process && moveHe.process.id === 'move-it',
+    moveHe.intent.entities);
 }
 
 console.log('\n--- generated paraphrases (A) and wrapped kills ---\n');

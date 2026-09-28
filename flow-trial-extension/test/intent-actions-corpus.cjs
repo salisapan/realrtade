@@ -100,8 +100,18 @@ console.log('--- intent.js: type + entity checks ---\n');
   ];
   for (const [label, text] of offCases) {
     const intent = classify(text);
-    check('a ' + label + ' meeting does not become a Calendar entry',
-      !intent || intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+    if (label === 'called off') {
+      const process = FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false });
+      const step = process && process.steps[0];
+      check('a called-off meeting with a clock is a delete, not a new event',
+        intent && intent.personalClose === 'calendar-cancel' && intent.entities && intent.entities.calendarOp === 'delete' &&
+          process && process.id === 'clear-it' && process.steps.length === 1 &&
+          step && step.kind === 'calendar' && step.params.calendarOp === 'delete' && step.params.dateIso === '2026-09-18' && step.params.hour === 15,
+        { type: intent && intent.type, close: intent && intent.personalClose, id: process && process.id });
+    } else {
+      check('a ' + label + ' meeting does not become a Calendar entry',
+        !intent || intent.type !== FlowIntent.TYPES.SCHEDULED_EVENT, intent && intent.type);
+    }
   }
 }
 

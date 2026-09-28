@@ -101,6 +101,7 @@ function load(opts) {
     // provide for free. gmailDraftWrite's MIME-building path (buildMimeMessage,
     // base64UrlEncode, arrayBufferToBase64) needs all three; no writer
     // tested before it did, which is why they were never here.
+    URLSearchParams,
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     crypto: webcrypto,
@@ -971,6 +972,118 @@ async function run() {
       params: { title: 'Sync', dateIso: '2026-09-21', hour: 15, minute: 0 }
     }));
     check('a Calendar API error is not a success', apiFail.ok === false && !apiFail.written, apiFail);
+  }
+
+  console.log('\n--- background.js: a named cancel deletes one event, and a named move patches it ---\n');
+  {
+    const start = { dateTime: '2026-09-18T15:00:00+00:00', timeZone: 'UTC' };
+    const end = { dateTime: '2026-09-18T15:30:00+00:00', timeZone: 'UTC' };
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events\?/, { reply: res(200, { items: [{ id: 'ev_sync', summary: 'Friday sync', status: 'confirmed', start: start, end: end }] }) }],
+        [/\/calendars\/primary\/events\/ev_sync$/, { reply: res(204, {}) }]
+      ]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      params: { calendarOp: 'delete', title: 'Hold', dateIso: '2026-09-18', hour: 15, minute: 0, requireTime: true }
+    }));
+    check('a single event at that minute is deleted', out.ok === true && out.ref && out.ref.eventId === 'ev_sync' && out.ref.restore && out.ref.restore.start, out);
+    check('the receipt says the event is off that clock', out.written === 'Calendar · Friday sync · off Sep 18 15:00', out.written);
+    check('delete lists then deletes, and does not insert',
+      env.calls[0].indexOf('GET /calendars/primary/events?') === 0 &&
+        env.calls.some((c) => c === 'DELETE /calendars/primary/events/ev_sync') &&
+        !env.calls.some((c) => c === 'POST /calendars/primary/events'),
+      env.calls);
+    const undoEnv = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_back' }) }]]
+    });
+    const undone = await attempt(undoEnv.fn('googleCalendarUndo')(out.ref));
+    check('undo of a delete posts the saved event back',
+      undone.ok === true && undoEnv.calls.includes('POST /calendars/primary/events') &&
+        undoEnv.bodies[0] && undoEnv.bodies[0].summary === 'Friday sync' && undoEnv.bodies[0].start.dateTime === start.dateTime,
+      { calls: undoEnv.calls, body: undoEnv.bodies[0] });
+  }
+  {
+    const previousStart = { dateTime: '2026-09-18T15:00:00+00:00', timeZone: 'UTC' };
+    const previousEnd = { dateTime: '2026-09-18T15:30:00+00:00', timeZone: 'UTC' };
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/calendars\/primary\/events\?/, { reply: res(200, { items: [{ id: 'ev_move', summary: 'Friday sync', status: 'confirmed', htmlLink: 'https://calendar.google.com/event?eid=move', start: previousStart, end: previousEnd }] }) }],
+        [/\/calendars\/primary\/events\/ev_move$/, { reply: res(200, { id: 'ev_move' }) }]
+      ]
+    });
+    const out = await attempt(env.fn('googleCalendarWrite')({
+      params: {
+        calendarOp: 'update', title: 'Hold',
+        dateIso: '2026-09-24', hour: 16, minute: 0,
+        fromDateIso: '2026-09-18', fromHour: 15, fromMinute: 0,
+        requireTime: true
+      }
+    }));
+    const patchAt = env.calls.findIndex((c) => c.indexOf('PATCH /calendars/primary/events/ev_move') === 0);
+    const patched = env.bodies[patchAt] || {};
+    check('a single event is patched to the new clock', out.ok === true && patchAt >= 0, { out: out, calls: env.calls });
+    check('the patch carries the new start and the 30-minute end',
+      patched.start && patched.start.dateTime === '2026-09-24T16:00:00' && patched.end && patched.end.dateTime === '2026-09-24T16:30:00',
+      patched);
+    check('the receipt names the new time, and undo can restore the old one',
+      out.written === 'Calendar · Friday sync · Sep 24 16:00' && out.ref && out.ref.previousStart && out.ref.previousStart.dateTime === previousStart.dateTime,
+      out);
+    check('an update does not insert a second event', !env.calls.some((c) => c === 'POST /calendars/primary/events'), env.calls);
+    const undoEnv = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events\/ev_move$/, { reply: res(200, { id: 'ev_move' }) }]]
+    });
+    const undone = await attempt(undoEnv.fn('googleCalendarUndo')(out.ref));
+    check('undo of a move patches the previous start back',
+      undone.ok === true && undoEnv.calls[0] === 'PATCH /calendars/primary/events/ev_move' &&
+        undoEnv.bodies[0] && undoEnv.bodies[0].start.dateTime === previousStart.dateTime,
+      { calls: undoEnv.calls, body: undoEnv.bodies[0] });
+  }
+  {
+    const one = (id, minute) => ({
+      id: id, summary: id, status: 'confirmed',
+      start: { dateTime: '2026-09-18T15:' + minute + ':00+00:00' },
+      end: { dateTime: '2026-09-18T16:00:00+00:00' }
+    });
+    const none = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events\?/, { reply: res(200, { items: [] }) }]]
+    });
+    const empty = await attempt(none.fn('googleCalendarWrite')({
+      params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
+    }));
+    check('zero events at that minute is not a write', empty.ok === false && empty.reason === 'not-found' && !empty.written && none.calls.length === 1, { out: empty, calls: none.calls });
+    const two = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events\?/, { reply: res(200, { items: [one('a', '00'), one('b', '00')] }) }]]
+    });
+    const both = await attempt(two.fn('googleCalendarWrite')({
+      params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
+    }));
+    check('two events at that minute are not deleted', both.ok === false && both.reason === 'not-found' && !both.written && two.calls.length === 1, { out: both, calls: two.calls });
+    const other = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events\?/, { reply: res(200, { items: [one('later', '30')] }) }]]
+    });
+    const overlap = await attempt(other.fn('googleCalendarWrite')({
+      params: { calendarOp: 'delete', dateIso: '2026-09-18', hour: 15, minute: 0 }
+    }));
+    check('an event that starts on another minute is not deleted',
+      overlap.ok === false && overlap.reason === 'not-found' && other.calls.length === 1, { out: overlap, calls: other.calls });
+    const missing = load({
+      stored: CONNECTED,
+      routes: [[/\/calendars\/primary\/events/, { reply: res(200, { id: 'should_not' }) }]]
+    });
+    const noFrom = await attempt(missing.fn('googleCalendarWrite')({
+      params: { calendarOp: 'update', dateIso: '2026-09-24', hour: 16, minute: 0 }
+    }));
+    check('an update without the old clock never reaches Calendar',
+      noFrom.ok === false && noFrom.reason === 'invalid' && !noFrom.written && missing.calls.length === 0,
+      { out: noFrom, calls: missing.calls });
   }
 
   console.log('\n--- background.js: Calendar undo deletes the event, and a refusal is not undone ---\n');

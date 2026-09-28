@@ -236,6 +236,32 @@ async function run() {
       subject: SUBJECT
     });
     check('the same thread and the same hold stays silent', again.action === 'silence' && again.via === 'thread', again);
+    const removed = await FlowCloseMemory.recordClose(closeInput({
+      personalClose: 'calendar-cancel',
+      messageId: 'cal-cancel',
+      threadId: 'thread-cancel',
+      targets: ['calendar']
+    }));
+    const removedAgain = await FlowCloseMemory.recall({
+      personalClose: 'calendar-cancel',
+      threadId: 'thread-cancel',
+      subject: SUBJECT
+    });
+    check('a full calendar cancel is remembered and stays quiet',
+      removed && removed.closeType === 'calendar-cancel' && removedAgain.action === 'silence', removedAgain);
+    const shifted = await FlowCloseMemory.recordClose(closeInput({
+      personalClose: 'calendar-move',
+      messageId: 'cal-move',
+      threadId: 'thread-move',
+      targets: ['calendar']
+    }));
+    const shiftedAgain = await FlowCloseMemory.recall({
+      personalClose: 'calendar-move',
+      threadId: 'thread-move',
+      subject: SUBJECT
+    });
+    check('a full calendar move is remembered and stays quiet',
+      shifted && shifted.closeType === 'calendar-move' && shiftedAgain.action === 'silence', shiftedAgain);
     const other = await FlowCloseMemory.recall({
       personalClose: 'dated-commitment',
       threadId: 'thread-cal',
