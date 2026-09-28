@@ -85,10 +85,9 @@
   function renderConnectors() {
     const host = document.getElementById('connector-list');
     host.replaceChildren();
-    // MVP surface is one connector, one decision: sign in, or don't. The rest
-    // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
-    // them wired) but showing four more cards here is exactly the setup
-    // friction the MVP is supposed to have zero of.
+    // MVP surface is one connector: sign in with Google, or don't. Other
+    // catalog entries stay off this screen; the chip does not write to them.
+    // See docs/glance-value-audit.md.
     FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
   }
 

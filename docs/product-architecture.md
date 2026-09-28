@@ -15,23 +15,29 @@
 > Where this section and the detail below disagree, **this section wins**;
 > the rest describes the intended full shape, not what ships today.
 
-Verified in code (`src/connectors.js`, `popup/popup.js`, `manifest.json`):
+Verified in code (`flow-trial-extension/core/connectors.js`, `flow-trial-extension/popup/popup.js`, `flow-trial-extension/manifest.json`, `flow-trial-extension/src/background.js`) against Glance **0.7.0** on `main`. Ranking and the live-loop map: `docs/glance-value-audit.md`.
 
 | | Described below | Actually ships today |
 |---|---|---|
-| Connectors reachable in setup | five (Notion, HubSpot, Salesforce, Slack, Monday.com) | **one** — Google. `connectors.js` marks exactly one entry `mvp: true`; `popup.js` renders only `mvp` connectors. The other five still have working write paths in `background.js`, but no UI reaches them. |
-| Where a Do It lands | the one connector the user chose | **Google Calendar, Google Tasks, or a Gmail draft** — and the user does not choose: `actions.js`'s process model picks per message. |
+| Connectors reachable in setup | five (Notion, HubSpot, Salesforce, Slack, Monday.com) | **one** — Google. `connectors.js` marks exactly one entry `mvp: true`; `popup.js` renders only `mvp` connectors. Notion is catalog `live` (token) and is not shown. HubSpot, Salesforce, Slack, and Monday.com are `building`. Writer functions for those five remain in `background.js`; the Gmail chip does not call them, and their API hosts are not in `host_permissions`, so those fetches cannot succeed in this build. |
+| Where a Do It lands | the one connector the user chose | **Google Calendar (Calendar API), Google Tasks, or a Gmail draft** — the user does not pick among them: `actions.js`'s process model does. One `chrome.identity` grant covers `tasks`, `calendar.events`, `gmail.compose`, and `drive.readonly`. |
 | Setup questions | two ("where may it write", "what work do you do") | **one** — sign in with Google. `popup.js` deliberately leaves `domainId` unset; `judgment.js` falls back to the sales vocabulary. |
 | Sensitivity | — | not a setup input. It self-adjusts from clicks and dismissals; the popup only displays where it landed. |
-| Notion | "works today" | code path works; unreachable from onboarding. |
+| Notion | "works today" | catalog status `live`, auth `token`. Unreachable from onboarding and from the chip. `api.notion.com` is not a host permission. |
 
-Two consequences that bind future work:
+Three consequences that bind future work:
 
 1. **`manifest.json`'s `host_permissions` match the reachable set, not the
    code.** Re-enabling any dormant connector in onboarding means restoring
    its API host in the same change, or its writes fail on a permission error.
-2. **Any copy naming a destination must name the Google three**, until that
-   changes here first.
+2. **Any Glance copy naming a destination must name the Google three**, until
+   that changes here first. Flow (the enterprise product) keeps its own
+   connector and compliance language; do not copy it onto Glance.
+3. **Google Calendar on this build is `googleCalendarWrite`**, a POST to
+   `https://www.googleapis.com/calendar/v3/calendars/primary/events`, with
+   undo via DELETE. A `calendar.google.com/calendar/render?action=TEMPLATE`
+   link is not a stand-in for that writer and must not be described as the
+   product having no Calendar.
 
 ---
 
