@@ -9,6 +9,12 @@
 // close. A quoted older ask, a hedged "instead", a withdrawal, two
 // files, or two clocks with no single slot stay silent — no picker.
 //
+// Family D is a personal hold. A meet or a commitment with one clear
+// clock is one Calendar event. A commitment with one clear day and no
+// clock is one Task. A bare digit hour, a hedge, "find a time", and a
+// past day are not a new hold. Family G (move or cancel) and family H
+// (two clocks, a later ask) still win.
+//
 // Family I (create-when-missing) is conditional. It chips only when the
 // what is a named asset, that file is missing, and a company template is
 // named — the template the later Do It would use. Any one of those missing
@@ -52,10 +58,13 @@ const FlowCloseFamilies = (() => {
   const DOC_SRC_EN = /\b(?:google docs?|documents?|docs?)\b/i;
   const DOC_SRC_HE = /(?:מסמך|דוק)/;
 
-  const MEET_EN = /\b(?:let'?s (?:meet|sync|hop on|jump on)|hop on a call|jump on a call|grab (?:time|\d+)|got \d+ minutes|are you free|free for a|quick sync|find (?:a |some )?time|can we meet)\b/i;
-  const MEET_HE = /(?:בוא נקבע|בואי נקבע|יש לך זמן|יש לך רבע שעה|שיחה קצרה|נקפוץ לשיחה|פנוי(?:ה)? לשיחה)/;
-  const COMMIT_EN = /\b(?:i(?:'ll| will) have|i(?:'ll| will) get|on the hook to|i commit to|count on me to|i(?:'ll| will) take care of)\b/i;
-  const COMMIT_HE = /(?:מתחייב|מתחייבת|אאשר עד|אחזיר לך|אני על זה)/;
+  // "find a time" is not in here. Naming no slot is not a hold.
+  const MEET_EN = /\b(?:let'?s|let us)\s+(?:meet|sync|hop on|jump on|get on)\b|\b(?:hop|jump) on a call\b|\bgrab (?:time|\d+)\b|\bgot \d+ minutes\b|\bare you free\b|\bfree for a\b|\bquick sync\b|\b(?:can|could|would|shall)\s+(?:we|you)\s+meet(?!\s+(?:the\s+)?(?:deadline|requirement|criteria|quota|target|obligation))\b|\b(?:book|block|pencil)\b(?:\s+\w+){0,2}\s+(?:a |the |some )?(?:time|slot)\b/i;
+  const MEET_HE = /(?:בוא נקבע|בואי נקבע|בואו נקבע|יש לך זמן|יש לך רבע שעה|שיחה קצרה|נקפוץ לשיחה|פנוי(?:ה)? לשיחה|(?:^|[^\u0590-\u05FF])נקבע(?! מחדש)(?![\u0590-\u05FF])|ניפגש)/;
+  const COMMIT_EN = /\b(?:i(?:'ll| will) (?:have|get|send|deliver|share|finish|complete|submit|file|pay|return|forward|email|prepare|handle)|on the hook to|i commit to|count on me to|i(?:'ll| will) take care of)\b/i;
+  const COMMIT_HE = /(?:מתחייב|מתחייבת|אאשר עד|אחזיר לך|אני על זה|(?:^|[^\u0590-\u05FF])(?:אשלח|נשלח|אעביר|נעביר|אכין|נכין|אגיש|נגיש|אשלם|נשלם|אחזיר|נחזיר)(?![\u0590-\u05FF]))/;
+  const FIND_TIME_EN = /\bfind (?:a |some )?time\b|\bfind (?:us )?a slot\b/i;
+  const FIND_TIME_HE = /(?:למצוא|נמצא|תמצא|תחפש|נחפש)\s+זמן/;
 
   const APPROVE_EN = /\b(?:you have my (?:ok|okay|approval)|green[- ]?light|formally approved|i approve|we approve|approved\b|confirming|confirmed|ok to proceed|paid in full|(?:invoice|fee|payment) is paid)\b/i;
   const APPROVE_HE = /(?:אאשר|אני מאשר|אני מאשרת|אור ירוק|מאושר מצידי|שול(?:מה|מו|ם)(?![\u0590-\u05FF]))/;
@@ -69,7 +78,7 @@ const FlowCloseFamilies = (() => {
   const CANCEL_HE = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת)/;
 
   const HEDGE_EN = /\b(?:maybe|perhaps|possibly|no rush|if possible|tentatively|might|whenever you|if you feel|sometime|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b/i;
-  const HEDGE_HE = /(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו)/;
+  const HEDGE_HE = /(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו|נראה לי)/;
   const NEG_EN = /\b(?:do not|don'?t|never mind|please don'?t)\b/i;
   const NEG_HE = /(?:אל ת|לא תשלח|לא תעביר|לא צריך|לא לשלוח|אין צורך לשלוח|לא מאשר)/;
   // A past day on the object ("the notes from yesterday") is still a live
@@ -201,17 +210,129 @@ const FlowCloseFamilies = (() => {
     return false;
   }
 
+  // Hebrew clock words, longest first so "אחת עשרה" is not clipped to "אחת".
+  // A word with no day-part is the workday hour (שלוש → 15:00). A bare digit
+  // ("בשעה 3", "at 3") stays unresolved: that form is not a stated half of
+  // the day, and writing 03:00 was the wrong close.
+  const HE_HOUR_WORDS = [
+    ['אחת עשרה', 11], ['אחד עשרה', 11],
+    ['שתיים עשרה', 12], ['שתים עשרה', 12],
+    ['שתיים', 2], ['שתים', 2],
+    ['שלוש', 3], ['ארבע', 4], ['חמש', 5], ['שש', 6],
+    ['שבע', 7], ['שמונה', 8], ['תשע', 9], ['עשר', 10], ['אחת', 1]
+  ];
+  const HE_HOUR_ALT = HE_HOUR_WORDS.map((pair) => pair[0]).join('|');
+
   function clockOf(text) {
     if (typeof FlowExtract === 'undefined' || !FlowExtract.parseTime) return null;
     const time = FlowExtract.parseTime(text);
-    if (!time || !Number.isInteger(time.hour) || !Number.isInteger(time.minute)) return null;
-    return time;
+    if (time && Number.isInteger(time.hour) && Number.isInteger(time.minute)) return time;
+    return hebrewWordClock(text) || bareDayClock(text);
+  }
+  function hebrewWordClock(text) {
+    const part = 'בבוקר|בצהריים|אחר הצהריים|אחר הצהרים|אחה["״׳\']צ|בערב|בלילה';
+    const m = String(text || '').match(new RegExp(
+      '(?:בשעה|בשעות)\\s*(' + HE_HOUR_ALT + ')(\\s+וחצי|\\s+ורבע)?(?:\\s+(' + part + '))?(?![\\u0590-\\u05FF])'
+    ));
+    if (!m) return null;
+    const hour = HE_HOUR_WORDS.find((pair) => pair[0] === m[1]);
+    if (!hour) return null;
+    const minute = m[2] && m[2].indexOf('חצי') !== -1 ? 30 : (m[2] && m[2].indexOf('רבע') !== -1 ? 15 : 0);
+    const spoken = (m[3] || '').replace(/["״׳']/g, '');
+    const hm = hour[1] + ':' + String(minute).padStart(2, '0');
+    let synthetic = null;
+    if (spoken === 'בבוקר') synthetic = 'at ' + hm + ' in the morning';
+    else if (spoken === 'בצהריים') synthetic = 'at ' + hm + 'pm';
+    else if (spoken === 'אחר הצהריים' || spoken === 'אחר הצהרים' || spoken === 'אחהצ') synthetic = 'at ' + hm + ' in the afternoon';
+    else if (spoken === 'בערב') synthetic = 'at ' + hm + ' in the evening';
+    else if (spoken === 'בלילה') synthetic = 'at ' + hm + ' at night';
+    else if (hour[1] >= 1 && hour[1] <= 7) synthetic = 'at ' + hm + 'pm';
+    else if (hour[1] !== 12) synthetic = 'at ' + hm;
+    if (!synthetic) return null;
+    const parsed = FlowExtract.parseTime(synthetic);
+    if (!parsed) return null;
+    return { raw: m[0], hour: parsed.hour, minute: parsed.minute };
+  }
+  function hasDayCue(text) {
+    return /\b(?:tomorrow|today|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text) ||
+      /(?:מחר(?:תיים)?|היום|יום)/.test(String(text || ''));
+  }
+  // "tomorrow 15:00" / "מחר ב-15:00". The day is what makes the digits a
+  // clock. A lone "15:00" is still not one. 3:00 with no half of the day
+  // stays unresolved, same as "at 3".
+  function bareDayClock(text) {
+    if (!hasDayCue(text)) return null;
+    const m = String(text || '').match(/\b(\d{1,2}):(\d{2})\b/);
+    if (!m) return null;
+    const parsed = FlowExtract.parseTime('at ' + m[1] + ':' + m[2]);
+    if (!parsed) return null;
+    return { raw: m[0], hour: parsed.hour, minute: parsed.minute };
+  }
+  function bareAmbiguousHour(text) {
+    if (clockOf(text)) return false;
+    if (/\bat\s+(?:1[0-2]|0?[1-7])(?::[0-5]\d)?\b/i.test(text)) return true;
+    if (/(?:בשעה|בשעות)\s*(?:0?[1-7]|12)(?::[0-5]\d)?(?![\d:])/.test(text)) return true;
+    return false;
+  }
+  function shiftWeekday(now, target, mode) {
+    const d = new Date(now);
+    let delta = (target - d.getDay() + 7) % 7;
+    // "this Friday" said on Friday is today. A bare Friday said on Friday
+    // is the next one. "next" lands a further week out.
+    if (delta === 0) {
+      if (mode !== 'this') delta = 7;
+    } else if (mode === 'next') delta += 7;
+    d.setDate(d.getDate() + delta);
+    const pad = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  }
+  // "יום ג" is Tuesday. The full name ("יום שלישי") is already a date.
+  // A lone "יום ג" with no scheduling word and no clock is not one.
+  function hebrewAbbrevDay(text, now) {
+    if (!now) return null;
+    const letter = '([אבגדהו])';
+    const tail = '(?:[\'׳\u05F3])?(?:\\s+הבא(?![\\u0590-\\u05FF]))?(?![\\u0590-\\u05FF])';
+    const led = String(text || '').match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+' + letter + tail));
+    const clocked = led ? null : String(text || '').match(new RegExp('יום\\s+' + letter + tail + '(?=\\s+בשעה)'));
+    const m = led || clocked;
+    if (!m) return null;
+    const target = 'אבגדהו'.indexOf(m[1]);
+    if (target < 0) return null;
+    const mode = /הבא(?![\u0590-\u05FF])/.test(m[0]) ? 'next' : 'plain';
+    return { raw: m[0], iso: shiftWeekday(now, target, mode) };
+  }
+  function weekdayBeforeHm(text, now) {
+    if (!now) return null;
+    const m = String(text || '').match(/\b(this\s+|next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b(?=\s+\d{1,2}:\d{2})/i);
+    if (!m) return null;
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const target = days.indexOf(m[2].toLowerCase());
+    const flagged = (m[1] || '').toLowerCase();
+    const mode = flagged.indexOf('next') === 0 ? 'next' : (flagged.indexOf('this') === 0 ? 'this' : 'plain');
+    return { raw: m[0], iso: shiftWeekday(now, target, mode) };
   }
   function dateOf(text, now) {
-    if (typeof FlowExtract === 'undefined' || !FlowExtract.parseDate) return null;
-    const date = FlowExtract.parseDate(text, now);
-    if (!date || !date.iso || isPastIso(date.iso, now)) return null;
-    return date;
+    const parsed = (typeof FlowExtract !== 'undefined' && FlowExtract.parseDate) ? FlowExtract.parseDate(text, now) : null;
+    if (parsed && parsed.iso) {
+      if (isPastIso(parsed.iso, now)) return null;
+      return parsed;
+    }
+    const extra = hebrewAbbrevDay(text, now) || weekdayBeforeHm(text, now);
+    if (!extra || !extra.iso || isPastIso(extra.iso, now)) return null;
+    return extra;
+  }
+  function readSlot(text, now) {
+    return { date: dateOf(text, now), time: clockOf(text) };
+  }
+  // "tomorrow 15:00" / "מחר ב-15:00" is the hold. Leftover words are not.
+  function slotShaped(sentence, date, time) {
+    if (!date || !time || !date.raw || !time.raw) return false;
+    let rest = String(sentence || '');
+    rest = rest.split(date.raw).join(' ');
+    rest = rest.split(time.raw).join(' ');
+    rest = rest.replace(/[\s.,!?;:()"'“”׳״\-–—/]+/g, '');
+    rest = rest.replace(/^[בל]+|[בל]+$/g, '');
+    return rest.length === 0;
   }
 
   function replacementClause(sentence) {
@@ -360,16 +481,39 @@ const FlowCloseFamilies = (() => {
   }
 
   function matchHold(sentence, now) {
+    if (FIND_TIME_EN.test(sentence) || FIND_TIME_HE.test(sentence)) return null;
     const meet = MEET_EN.test(sentence) || MEET_HE.test(sentence);
     const commit = COMMIT_EN.test(sentence) || COMMIT_HE.test(sentence);
-    if (!meet && !commit) return null;
+    // "once" / "hoping" withdraw the promise they sit in. A meet in the
+    // same sentence is still a hold. A promise that only exists under
+    // that word is not a task and not a calendar event.
+    if (commit && !meet && /\b(?:hoping|once)\b|(?:מקווה|מקווים)/.test(sentence)) return null;
     const date = dateOf(sentence, now);
     const time = clockOf(sentence);
+    const slot = Boolean(date && time && slotShaped(sentence, date, time));
+    if (!meet && !commit && !slot) return null;
     if (!date) return null;
     if (time) {
+      // A timed promise stays a decision. A meet, or a sentence that is
+      // only the slot, is the event. Both are one calendar hold.
       return hit({
-        family: 'D', type: 'event', confidence: 'high', personalClose: 'calendar-hold',
-        what: sentence, requestWhat: meet ? sentence : null, date: date, time: time
+        family: 'D',
+        type: (commit && !meet) ? 'decision' : 'event',
+        confidence: 'high',
+        personalClose: 'calendar-hold',
+        what: sentence,
+        requestWhat: meet ? sentence : null,
+        date: date,
+        time: time
+      });
+    }
+    // "at 3" / "בשעה 3" named an hour we will not invent. A commitment
+    // still has its day. A meet does not become an all-day hold here.
+    if (bareAmbiguousHour(sentence)) {
+      if (!commit) return null;
+      return hit({
+        family: 'D', type: 'decision', confidence: 'high', personalClose: 'dated-commitment',
+        what: sentence, date: date
       });
     }
     if (commit) {
@@ -501,7 +645,10 @@ const FlowCloseFamilies = (() => {
   function ambiguousClocks(text) {
     if (MOVE_EN.test(text) || MOVE_HE.test(text) || CANCEL_EN.test(text) || CANCEL_HE.test(text)) return false;
     if (replacementCue(text)) return false;
-    const clocks = String(text || '').match(/\b(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)\b|בשעה\s*\d{1,2}(?::\d{2})?/gi) || [];
+    const clocks = String(text || '').match(new RegExp(
+      '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|בשעה\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
+      'gi'
+    )) || [];
     if (clocks.length < 2) return false;
     return MEET_EN.test(text) || MEET_HE.test(text) ||
       /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text) ||
@@ -567,6 +714,10 @@ const FlowCloseFamilies = (() => {
         return hit({ suppress: true, family: 'G' });
       }
       if (skipSentence(sentence)) continue;
+      // "Find a time" names no slot. A later clear hold already returned.
+      if (FIND_TIME_EN.test(sentence) || FIND_TIME_HE.test(sentence)) {
+        return hit({ suppress: true, family: 'D' });
+      }
       const moved = matchMove(sentence, now);
       if (moved === 'suppress') return hit({ suppress: true, family: 'G' });
       if (moved) return moved;
@@ -645,7 +796,7 @@ const FlowCloseFamilies = (() => {
     return { surface: 'doit', slots: [] };
   }
 
-  return { assess, askBlocked, route, detailSurface, stripQuotedAsks, FILE_EN, FILE_HE };
+  return { assess, askBlocked, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseFamilies };

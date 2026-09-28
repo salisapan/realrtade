@@ -533,5 +533,180 @@ console.log('\n--- J reply-with-facts: one fact, one Sheet or Doc; else silence 
   check('the weak invoice is not family J', weak.closeFamily !== 'J' && !FlowIntent.shouldShowChip(weak), weak.confidence);
 }
 
+console.log('\n--- D: a clear clock is one calendar hold; a clear day is one task ---\n');
+{
+  function plan(text) {
+    const intent = classify(text);
+    return {
+      intent,
+      show: FlowIntent.shouldShowChip(intent),
+      process: FlowActions.planFor(intent, { threadUrl: 'x', hasThreadAttachment: false })
+    };
+  }
+  function kinds(process) {
+    return (process && process.steps || []).map((s) => s.kind);
+  }
+  const holds = [
+    ['D tomorrow 15:00', 'tomorrow 15:00', '2026-09-18', 15],
+    ['D he tomorrow 15:00', 'מחר ב-15:00', '2026-09-18', 15],
+    ['D en let us meet', 'Let us meet Tuesday at 3pm.', '2026-09-22', 15],
+    ['D en lets sync', "Let's sync Thursday at 10:00am.", '2026-09-24', 10],
+    ['D he abbrev word hour', 'נקבע ליום ג בשעה שלוש.', '2026-09-22', 15],
+    ['D he abbrev 24h', 'נקבע ליום ג׳ בשעה 15:00.', '2026-09-22', 15],
+    ['D he morning word', 'נקבע ליום ג בשעה שלוש בבוקר.', '2026-09-22', 3],
+    ['D en pencil', 'Pencil a slot Tuesday at 4pm.', '2026-09-22', 16]
+  ];
+  for (const [name, text, iso, hour] of holds) {
+    const row = plan(text);
+    const step = row.process && row.process.steps && row.process.steps[0];
+    check(name + ' is one calendar hold',
+      row.show && row.intent.closeFamily === 'D' && row.intent.personalClose === 'calendar-hold' &&
+        row.intent.entities && row.intent.entities.dateIso === iso && row.intent.entities.hour === hour &&
+        row.process && row.process.id === 'hold' && kinds(row.process).join(',') === 'calendar' &&
+        step && step.params.requireTime === true && step.params.hour === hour && step.params.dateIso === iso,
+      { family: row.intent.closeFamily, close: row.intent.personalClose, date: row.intent.entities && row.intent.entities.dateIso, hour: row.intent.entities && row.intent.entities.hour, proc: row.process && row.process.id, kinds: kinds(row.process) });
+  }
+  const tasks = [
+    ['D en by Friday', "I'll send the contract by Friday.", '2026-09-18'],
+    ['D en next Friday', "I'll send the redline next Friday.", '2026-09-25'],
+    ['D he by Friday', 'אשלח את החוזה עד יום שישי.', '2026-09-18'],
+    ['D he abbrev day', 'אעביר את הדוח עד יום ג.', '2026-09-22']
+  ];
+  for (const [name, text, iso] of tasks) {
+    const row = plan(text);
+    const step = row.process && row.process.steps && row.process.steps[0];
+    check(name + ' is one task on that day',
+      row.show && row.intent.closeFamily === 'D' && row.intent.personalClose === 'dated-commitment' &&
+        row.intent.entities && row.intent.entities.dateIso === iso && row.intent.entities.hour == null &&
+        row.process && row.process.id === 'log-it' && kinds(row.process).join(',') === 'googleTask' &&
+        step && step.params.dateIso === iso,
+      { family: row.intent.closeFamily, close: row.intent.personalClose, date: row.intent.entities && row.intent.entities.dateIso, hour: row.intent.entities && row.intent.entities.hour, proc: row.process && row.process.id, kinds: kinds(row.process) });
+  }
+  const quiet = [
+    ['bare day', 'by Friday'],
+    ['bare he day', 'עד יום שישי.'],
+    ['next week span', "I'll send it next week."],
+    ['he next week span', 'אשלח את זה בשבוע הבא.'],
+    ['maybe day', 'maybe Tuesday'],
+    ['maybe meet', "Maybe let's meet Tuesday at 3pm."],
+    ['he hedge', 'נראה לי מחר.'],
+    ['he hedge hold', 'נראה לי נקבע מחר ב-15:00.'],
+    ['find a time', 'Can we find a time on Thursday?'],
+    ['find a time he', 'בוא נמצא זמן ביום חמישי.'],
+    ['ambiguous hour', "Let's meet Tuesday at 3."],
+    ['past promise', "I'll send it by March 3, 2024."],
+    ['two clocks', "Let's meet Tuesday at 3pm or Thursday at 4pm."],
+    ['two clocks he', 'נקבע ליום ג בשעה שלוש או ליום ה בשעה ארבע.']
+  ];
+  for (const [name, text] of quiet) {
+    const row = plan(text);
+    check('D silence: ' + name, row.show === false, { type: row.intent.type, family: row.intent.closeFamily, hour: row.intent.entities && row.intent.entities.hour });
+  }
+  const bareDigit = plan('נקבע פגישה ביום שני בשעה 3 לסקירת החוזה וההסכם.');
+  check('D a bare digit hour is not written as 03:00',
+    bareDigit.intent.entities && bareDigit.intent.entities.hour == null && bareDigit.intent.personalClose !== 'calendar-hold',
+    bareDigit.intent.entities);
+  const cancel = plan('Please cancel the Friday, September 18 at 3pm sync.');
+  check('D does not steal a G cancel',
+    cancel.show && cancel.intent.closeFamily === 'G' && cancel.intent.personalClose === 'calendar-cancel' && cancel.process && cancel.process.id === 'clear-it',
+    { family: cancel.intent.closeFamily, close: cancel.intent.personalClose });
+  const moved = plan('Can we reschedule the Friday, September 18 at 3pm sync to Thursday, September 24 at 4pm?');
+  check('D does not steal a G move',
+    moved.show && moved.intent.closeFamily === 'G' && moved.intent.personalClose === 'calendar-move' && moved.process && moved.process.id === 'move-it',
+    { family: moved.intent.closeFamily, close: moved.intent.personalClose });
+  const announced = plan("Let's do a call Friday, September 18 at 3pm to review the contract.");
+  check('D leaves a bare announcement on the schedule path',
+    announced.show && announced.intent.personalClose !== 'calendar-hold' && announced.process && announced.process.id === 'schedule',
+    { close: announced.intent.personalClose, proc: announced.process && announced.process.id });
+
+  const lines = FlowActions.receiptWrittenLines([
+    { response: { ok: true, written: 'Calendar · Let us meet Tuesday at 3pm. · Sep 22 15:00' } },
+    { response: { ok: false, written: 'Calendar · should not appear · Sep 22 15:00' } },
+    { response: { ok: true, written: 'Google Task · due Sep 18' } }
+  ]);
+  check('D receipt names the calendar hold and the task that landed',
+    lines.length === 2 && lines[0].indexOf('Calendar') === 0 && lines[1].indexOf('Google Task') === 0,
+    lines);
+  const holdStep = plan("Let's meet Tuesday at 3pm.").process.steps[0];
+  const taskStep = plan("I'll send the contract by Friday.").process.steps[0];
+  check('D undo reverses the calendar write, not a second step', holdStep.kind === 'calendar' && holdStep.params.calendarOp == null, holdStep.kind);
+  check('D undo reverses the task write', taskStep.kind === 'googleTask' && taskStep.params.dateIso === '2026-09-18', taskStep.params);
+
+  const days = ['Tuesday', 'Thursday', 'tomorrow'];
+  const clocks = ['3pm', '10:00am', '4pm'];
+  const frames = [
+    (day, clock) => `Let's meet ${day} at ${clock}.`,
+    (day, clock) => `Let us sync ${day} at ${clock}.`,
+    (day, clock) => `Can we meet ${day} at ${clock}?`
+  ];
+  const heDays = [
+    ['שלישי', '2026-09-22'],
+    ['חמישי', '2026-09-24'],
+    ['שישי', '2026-09-18']
+  ];
+  let pos = 0, posFail = 0, neg = 0, negFail = 0;
+  function failPos(text, row) {
+    posFail++;
+    if (posFail <= 8) console.log('FAIL D chip', text, row.intent && row.intent.closeFamily, row.intent && row.intent.personalClose, row.intent && row.intent.entities && row.intent.entities.hour);
+  }
+  function failNeg(text, row) {
+    negFail++;
+    if (negFail <= 8) console.log('FAIL D silence', text, row.intent && row.intent.type, row.intent && row.intent.closeFamily);
+  }
+  for (const day of days) {
+    for (const clock of clocks) {
+      for (const frame of frames) {
+        const text = frame(day, clock);
+        const row = plan(text);
+        const hour = row.intent.entities && row.intent.entities.hour;
+        if (row.show && row.intent.closeFamily === 'D' && row.intent.personalClose === 'calendar-hold' &&
+            row.process && row.process.id === 'hold' && Number.isInteger(hour) && hour !== 3) pos++;
+        else failPos(text, row);
+      }
+    }
+  }
+  for (const [day, iso] of heDays) {
+    const text = `נקבע ליום ${day} בשעה 16:00.`;
+    const row = plan(text);
+    if (row.show && row.intent.personalClose === 'calendar-hold' && row.intent.entities.dateIso === iso && row.intent.entities.hour === 16 && row.process.id === 'hold') pos++;
+    else failPos(text, row);
+    const word = `ניפגש ביום ${day} בשעה ארבע.`;
+    const spoken = plan(word);
+    if (spoken.show && spoken.intent.personalClose === 'calendar-hold' && spoken.intent.entities.hour === 16 && spoken.process.id === 'hold') pos++;
+    else failPos(word, spoken);
+  }
+  const things = ['contract', 'redline', 'invoice'];
+  for (const thing of things) {
+    const by = plan(`I'll send the ${thing} by Friday.`);
+    if (by.show && by.intent.personalClose === 'dated-commitment' && by.intent.entities.dateIso === '2026-09-18' && by.process.id === 'log-it') pos++;
+    else failPos(`I'll send the ${thing} by Friday.`, by);
+    const next = plan(`I'll deliver the ${thing} next Friday.`);
+    if (next.show && next.intent.personalClose === 'dated-commitment' && next.intent.entities.dateIso === '2026-09-25' && next.process.id === 'log-it') pos++;
+    else failPos(`I'll deliver the ${thing} next Friday.`, next);
+  }
+  const heThings = ['החוזה', 'הדוח', 'החשבונית'];
+  for (const thing of heThings) {
+    const text = `אשלח את ${thing} עד יום שישי.`;
+    const row = plan(text);
+    if (row.show && row.intent.personalClose === 'dated-commitment' && row.intent.entities.dateIso === '2026-09-18' && row.process.id === 'log-it') pos++;
+    else failPos(text, row);
+  }
+  const kills = [];
+  for (const day of days) {
+    kills.push(`Maybe let's meet ${day} at 3pm.`);
+    kills.push(`Can we find a time on ${day}?`);
+    kills.push(`Let's meet ${day} at 3.`);
+  }
+  kills.push("I'll send it next week.", 'נראה לי מחר.', 'עד יום שישי.', 'by Friday', "I'll send it by March 3, 2024.");
+  kills.push('נקבע ליום ג בשעה שלוש או ליום ה בשעה ארבע.');
+  for (const text of kills) {
+    const row = plan(text);
+    if (!row.show) neg++;
+    else failNeg(text, row);
+  }
+  check('D generated timed meets and dated promises chip (' + pos + ')', posFail === 0 && pos >= 30, { pos, posFail });
+  check('D generated hedges, find-a-time, ambiguous hours, and spans stay quiet (' + neg + ')', negFail === 0 && neg >= 12, { neg, negFail });
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
