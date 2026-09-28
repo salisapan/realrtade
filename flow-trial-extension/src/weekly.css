@@ -1,0 +1,89 @@
+/* The Weekly Closing Summary banner — a top-of-page strip, not a corner
+   toast and not a modal. It appears at most a handful of times a month (see
+   storage.js's consumeWeeklySummaryTrigger) so it can afford to sit
+   somewhere genuinely noticeable without becoming a recurring nag; brief.css
+   and chip.css both deliberately sit at the page edges because THEY can
+   appear far more often. */
+
+.flow-weekly-banner {
+  all: initial;
+  position: fixed;
+  inset-block-start: 14px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(560px, calc(100vw - 32px));
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12.5px;
+  padding: 11px 10px 11px 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(240,244,253,.94));
+  border: 1px solid rgba(40,70,150,.22);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7) inset, 0 16px 36px -16px rgba(20,40,100,.4);
+  animation: flow-weekly-in 200ms ease-out;
+}
+
+.flow-weekly-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.flow-weekly-line {
+  color: #16214a;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.flow-weekly-line:first-child { color: #123ccb; }
+
+.flow-weekly-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.flow-weekly-link {
+  all: initial;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: #123ccb;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(18,60,203,.08);
+  white-space: nowrap;
+}
+.flow-weekly-link:hover { background: rgba(18,60,203,.14); }
+.flow-weekly-link:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 2px; }
+
+.flow-weekly-x {
+  all: initial;
+  cursor: pointer;
+  color: #8A93A6;
+  font-size: 15px;
+  line-height: 1;
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.flow-weekly-x:hover { color: #3F4757; background: rgba(0,0,0,.05); }
+.flow-weekly-x:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
+
+@keyframes flow-weekly-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-weekly-banner { animation: none; }
+}
+
+@media (max-width: 520px) {
+  .flow-weekly-banner { flex-direction: column; align-items: stretch; gap: 8px; }
+  .flow-weekly-actions { margin-inline-start: 0; justify-content: space-between; }
+}

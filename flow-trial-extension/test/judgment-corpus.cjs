@@ -18,7 +18,7 @@ const vm = require('vm');
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
 for (const f of ['domains.js', 'extract.js', 'judgment.js']) {
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', f), 'utf8'), sandbox, { filename: f });
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
 }
 // Top-level `const` in a script creates a lexical binding rather than a property
 // on the global object, so read them back by evaluating in the same context.
@@ -100,7 +100,82 @@ const CASES = [
   { name: 'office lease under the finance profile', domain: 'finance', fire: true,
     labelNot: ['offer', 'renewal', 'churn', 'candidate'],
     subject: 'Re: Suite 400 lease',
-    text: 'We are agreed on the office lease for Suite 400 at $3,900 per month, commencing Sep 7. Countersigned copy attached.' }
+    text: 'We are agreed on the office lease for Suite 400 at $3,900 per month, commencing Sep 7. Countersigned copy attached.' },
+
+  // ---- COMMIT/COMMIT_STRONG/LOST/EXECUTED/DISPUTE, broadened per the
+  //      "as broad as possible, staying entirely local" request. Every case
+  //      below uses a phrasing that did NOT exist in the corpus before this
+  //      widening. Domain words (contract, proposal, purchase order) are
+  //      included deliberately — LOST alone (46) and DISPUTE alone (28) both
+  //      sit under the 50-point account-wide threshold with no other signal
+  //      present, exactly as their ORIGINAL, unwidened phrasings always did;
+  //      this isn't new behavior, it's why every case in this file that
+  //      relies on one of those two signals alone already paired it with a
+  //      domain match or a dated/priced anchor. ----
+  { name: 'COMMIT: "sounds good" + contract renewal', domain: 'sales', fire: true,
+    subject: 'Re: renewal',
+    text: "Sounds good, let's move forward with the $45,000 contract renewal starting Monday." },
+
+  { name: 'COMMIT: "works for us" + contract', domain: 'sales', fire: true,
+    subject: 'Re: contract',
+    text: 'That works for us — please proceed with the $30,000 contract starting next week.' },
+
+  { name: 'COMMIT_STRONG: "authorized" + purchase order', domain: 'sales', fire: true,
+    subject: 'Re: PO',
+    text: 'This is authorized — please proceed with the $50,000 purchase order effective Monday.' },
+
+  { name: 'COMMIT_STRONG: "formally approved" + contract', domain: 'sales', fire: true,
+    subject: 'Re: contract approval',
+    text: 'The $60,000 contract has been formally approved, effective immediately, starting Monday.' },
+
+  { name: 'LOST: "decided to pass" on a proposal', domain: 'sales', fire: true,
+    subject: 'Re: proposal',
+    text: "We've decided to pass on this proposal after careful consideration, but thank you so much for your time." },
+
+  { name: 'LOST: "not the right fit" for a proposal', domain: 'sales', fire: true,
+    subject: 'Re: proposal',
+    text: 'Unfortunately, after reviewing your proposal internally, this is not the right fit for us at this time.' },
+
+  { name: 'EXECUTED: "signed and returned"', domain: 'legal', fire: true,
+    subject: 'Re: contract',
+    text: 'The contract has been signed and returned, fully executed as of today.' },
+
+  { name: 'DISPUTE: "billing discrepancy" on a contract renewal invoice', domain: 'finance', fire: true,
+    subject: 'Re: invoice',
+    text: 'There is a billing discrepancy of $1,200 on our contract renewal invoice, the amount charged does not match the proposal we received.' },
+
+  { name: 'DISPUTE: "duplicate charge" + handoff', domain: 'finance', fire: true,
+    subject: 'Re: statement',
+    text: 'We noticed a duplicate charge on our contract renewal statement this month, please investigate and confirm.' },
+
+  { name: 'HE COMMIT: נשמע טוב + חוזה', domain: 'sales', fire: true,
+    subject: 'Re: חוזה',
+    text: 'נשמע טוב, נתקדם עם החוזה על סך 45,000 שקל החל מיום שני.' },
+
+  { name: 'HE COMMIT_STRONG: אושר רשמית + חוזה', domain: 'sales', fire: true,
+    subject: 'Re: אישור',
+    text: 'החוזה אושר רשמית על סך 60,000 שקל, החל מיום שני.' },
+
+  { name: 'HE LOST: לא מתאים לנו + חוזה', domain: 'sales', fire: true,
+    subject: 'Re: חוזה',
+    text: 'לאחר בדיקת החוזה שלכם, לצערנו זה לא מתאים לנו כרגע, אך אנחנו מעריכים את ההצעה שלכם.' },
+
+  { name: 'HE DISPUTE: חיוב יתר + חידוש חוזה', domain: 'finance', fire: true,
+    subject: 'Re: חשבונית',
+    text: 'שמנו לב לחיוב יתר של 500 שקל בחשבונית חידוש החוזה שקיבלנו מכם, הסכום לא תואם למה שסיכמנו.' },
+
+  // ---- precision: the widened lexicons must still respect negation/hedging ----
+  { name: 'negated commit must not fire (widened lexicon)', domain: 'sales', fire: false,
+    subject: 'Re: budget',
+    text: 'We do NOT approve the budget and will not sign the contract.' },
+
+  { name: 'hedged commit must not fire (widened lexicon)', domain: 'sales', fire: false,
+    subject: 'Re: budget',
+    text: 'We might approve the budget next quarter, but nothing is confirmed yet.' },
+
+  { name: 'HE negated commit must not fire (widened lexicon)', domain: 'sales', fire: false,
+    subject: 'Re: תקציב',
+    text: 'לא מאשרים את התקציב ולא נחתום על ההסכם.' }
 ];
 
 function evaluate(c) {
@@ -141,12 +216,142 @@ console.log('  same, 2 quiet weeks on:  threshold', t2w.toFixed(1));
 if (!(t2w < tNow)) { console.log('  FAIL: threshold did not recover'); failures++; }
 else console.log('  ok    recovers toward baseline on its own');
 
+// The mirror image, and the one that was actually broken: clicks were never
+// decayed at read time, so an engaged user who hit the six-click cap pinned the
+// threshold to MIN_THRESHOLD permanently — still there a year later. Someone
+// who used Flow hard and then took a month off came back to the most eager
+// version of it that exists, and dismissing could not walk it back, because
+// dismissals faded while the clicks holding the floor down did not.
+console.log('\nCalibration recovery (clicks must decay too, not just dismissals):');
+const clicked = { clicks: 6, dismissals: 0, ts: NOW.getTime() };
+const cNow = FlowJudgment.thresholdFrom(clicked, NOW.getTime());
+const c90d = FlowJudgment.thresholdFrom(clicked, NOW.getTime() + 90 * 864e5);
+console.log('  after 6 clicks:          threshold', cNow.toFixed(1));
+console.log('  same, 90 quiet days on:  threshold', c90d.toFixed(1));
+if (!(cNow <= FlowJudgment.MIN_THRESHOLD)) { console.log('  FAIL: clicks no longer lower the bar at all'); failures++; }
+else if (!(c90d > cNow)) { console.log('  FAIL: threshold stayed pinned at the floor'); failures++; }
+else if (Math.abs(c90d - FlowJudgment.BASE_THRESHOLD) > 0.5) { console.log('  FAIL: did not return to baseline, landed at ' + c90d.toFixed(1)); failures++; }
+else console.log('  ok    an eager profile relaxes back to baseline when unused');
+
 // A past bare date must not be silently rewritten into the future.
 console.log('\nAmbiguous past date must not invent a future year:');
 const pastDate = FlowExtract.extract('The March 3 kickoff already happened.', { now: NOW }).date;
 console.log('  parsed:', JSON.stringify(pastDate));
 if (pastDate && pastDate.iso) { console.log('  FAIL: invented ISO date ' + pastDate.iso); failures++; }
 else console.log('  ok    kept the sender\'s words, emitted no ISO date');
+
+// Hebrew quote headers ("בתאריך ... כתב/ה:" or "בתאריך ... מאת X:") must be
+// stripped the same way the English "On ... wrote:" header already is —
+// the gap this session's quoted-text fix closes. Checked directly against
+// newContent() rather than through the full scorer, since the point here
+// is "was the boundary found," not "did this particular Hebrew sentence
+// clear the threshold."
+console.log('\nHebrew quote header ("בתאריך ... כתב:") is stripped like the English one:');
+const heQuoted = [
+  'מעולה, תודה!',
+  '',
+  'בתאריך יום ב׳, 1 בספט׳ 2025 בשעה 9:41 מאת דנה כהן <dana@meridian.com> כתבה:',
+  '> סוכם על 3,900$ לשנה.',
+  '> ההסכם נחתם, בתוקף מ-7 בספטמבר.'
+].join('\n');
+const heNewOnly = FlowJudgment.newContent(heQuoted);
+console.log('  kept:', JSON.stringify(heNewOnly));
+if (heNewOnly.includes('נחתם') || heNewOnly.includes('סוכם') || heNewOnly.includes('בתאריך')) {
+  console.log('  FAIL: quoted Hebrew content (or the quote header itself) leaked past the cut');
+  failures++;
+} else if (!heNewOnly.includes('מעולה')) {
+  console.log('  FAIL: the genuine new content was stripped along with the quote');
+  failures++;
+} else {
+  console.log('  ok    kept only the sender\'s new line, dropped the quoted history');
+}
+
+// The Outlook-style Hebrew "מאת:/נשלח:" header block must be stripped the
+// same way its English "From:/Sent:" equivalent already is.
+console.log('\nHebrew Outlook header ("מאת:"/"נשלח:") is stripped like the English one:');
+const heOutlook = [
+  'בסדר, אפשר להתקדם.',
+  '',
+  'מאת: דנה כהן <dana@meridian.com>',
+  'נשלח: יום שני, 1 בספטמבר 2025 9:41',
+  'אל: ישראל ישראלי',
+  'נושא: הסכם מרידיאן',
+  '',
+  'סוכם על 3,900$ לשנה.'
+].join('\n');
+const heOutlookNewOnly = FlowJudgment.newContent(heOutlook);
+console.log('  kept:', JSON.stringify(heOutlookNewOnly));
+if (heOutlookNewOnly.includes('סוכם')) {
+  console.log('  FAIL: quoted content leaked past the מאת:/נשלח: header');
+  failures++;
+} else {
+  console.log('  ok    kept only the sender\'s new line, dropped the quoted history');
+}
+
+// The inverted-fact regression. Every trigger used to be tested against the
+// whole message with a bare .test(), which cannot tell agreement from refusal:
+// "We do NOT approve the $40,000" scored 59 and produced "Log $40,000 agreed",
+// identical to the genuine approval. Writing the opposite of what the sender
+// wrote is worse than writing nothing, so these must stay silent — while the
+// two SPEAK cases guard the other edge, that suppression stays per-sentence
+// and a real approval is not lost because something unrelated was negated
+// later in the same message.
+console.log('\nNegation, hedging and questions must not read as decisions:');
+{
+  const ctx = { now: NOW, subject: 'Re: Contract', senderEmail: 'dana@acme.com' };
+  const cases = [
+    ['speak',  'a plain approval',            'We approve the $40,000 and will sign Monday, so please send the paperwork over today.'],
+    ['speak',  'approval, negation elsewhere','We approved the $40,000 budget for the pilot. Separately, I will not be able to make the Tuesday sync.'],
+    ['speak',  'a genuine walk-away',         'Thanks for the proposal, but we are not moving forward with the renewal this year after all.'],
+    ['silent', 'an explicit refusal',         'We do NOT approve the $40,000 and will not sign anything before the board reviews it.'],
+    ['silent', '"cannot"',                    'We cannot approve the $40,000 at this time, as the budget has not been released yet.'],
+    ['silent', '"unable to"',                 'We are unable to approve the $40,000 until the new fiscal year opens in October.'],
+    ['silent', 'a conditional',               'If we approve the $40,000 we would sign Monday, but nothing has been decided internally yet.'],
+    ['silent', 'a tentative maybe',           'We might approve the $40,000 next quarter depending on how the pilot numbers come back.'],
+    ['silent', 'a question',                  'Would you approve the $40,000 and sign Monday, or do you need more time to review?'],
+    ['silent', 'a hypothetical',              'Suppose we approved the $40,000 for the pilot — would that actually work on your side?']
+  ];
+  for (const [expect, label, text] of cases) {
+    const r = FlowJudgment.evaluate(text, 'sales', ctx);
+    const ok = expect === 'speak' ? !!r : !r;
+    if (!ok) {
+      failures++;
+      console.log('  FAIL  ' + label + ' -> ' + (r ? 'spoke "' + r.label + '" (' + r.score + ')' : 'stayed silent') + ', expected ' + expect);
+    } else {
+      console.log('  ok    ' + label.padEnd(28) + (r ? 'speaks: "' + r.label + '"' : 'silent'));
+    }
+  }
+}
+
+// Precision/harm audit: applyTypeAdjustment layers a bounded, per-intent-type
+// correction on top of the account-wide threshold. Tested in isolation from
+// storage.js's calibrate() (which produces the {clicks, dismissals, ts}
+// shape this consumes) so a bug in either half fails at the layer it's
+// actually in.
+console.log('\napplyTypeAdjustment: a per-type history nudges the gating threshold, bounded and reversible:');
+{
+  const base = 50;
+  const noHistory = FlowJudgment.applyTypeAdjustment(base, undefined, NOW.getTime());
+  if (noHistory !== base) { failures++; console.log('  FAIL  no calibrationByType entry should be a no-op, got', noHistory); }
+  else console.log('  ok    no history -> threshold unchanged (' + noHistory + ')');
+
+  const dismissed = FlowJudgment.applyTypeAdjustment(base, { clicks: 0, dismissals: 6, ts: NOW.getTime() }, NOW.getTime());
+  if (!(dismissed > base)) { failures++; console.log('  FAIL  heavy per-type dismissals should raise the bar above base, got', dismissed); }
+  else console.log('  ok    6 recent dismissals for this type -> quieter bar (' + dismissed + ' > ' + base + ')');
+
+  const clicked = FlowJudgment.applyTypeAdjustment(base, { clicks: 6, dismissals: 0, ts: NOW.getTime() }, NOW.getTime());
+  if (!(clicked < base)) { failures++; console.log('  FAIL  heavy per-type clicks should lower the bar below base, got', clicked); }
+  else console.log('  ok    6 recent clicks for this type -> more proactive (' + clicked + ' < ' + base + ')');
+
+  const capped = FlowJudgment.applyTypeAdjustment(FlowJudgment.MAX_THRESHOLD - 2, { clicks: 0, dismissals: 6, ts: NOW.getTime() }, NOW.getTime());
+  if (capped > FlowJudgment.MAX_THRESHOLD) { failures++; console.log('  FAIL  adjustment must never push past MAX_THRESHOLD, got', capped); }
+  else console.log('  ok    clamped at MAX_THRESHOLD even when base is already near the ceiling (' + capped + ')');
+
+  const oldTs = NOW.getTime() - 90 * 24 * 60 * 60 * 1000; // 90 days ago, well past the 7-day half-life
+  const decayed = FlowJudgment.applyTypeAdjustment(base, { clicks: 0, dismissals: 6, ts: oldTs }, NOW.getTime());
+  if (!(decayed < dismissed)) { failures++; console.log('  FAIL  old dismissals should have decayed toward no effect, got', decayed, 'vs fresh', dismissed); }
+  else console.log('  ok    a 90-day-old dismissal run has mostly decayed away (' + decayed + ' vs fresh ' + dismissed + ')');
+}
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

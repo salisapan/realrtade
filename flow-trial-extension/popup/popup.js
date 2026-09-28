@@ -1,18 +1,47 @@
-// The popup is the only configuration surface, and it is deliberately two
-// questions long: where may Glance write, and what kind of work is this. There is
-// no rule builder here and there never will be — that is the product boundary.
+// The popup is the only configuration surface, and it is deliberately one
+// question long: sign in, or don't. There is no rule builder here and there
+// never will be — that is the product boundary. It used to also ask "what
+// kind of work do you do" to steer domain-specific vocabulary; that's gone
+// from onboarding (see wireSave()'s comment) — one fewer decision between
+// installing and Glance actually doing something.
 
 (async function popupInit() {
   let status = await send({ type: 'flow:connector-status' });
   let state = await FlowStorage.get();
+  // Declared here, not next to renderMemoryInsight/wireMemoryInsight further
+  // down, because it has to be. `let` bindings are live from the top of
+  // their function's scope but stay in the temporal dead zone until their
+  // own statement runs — and renderMemoryInsight (called from inside
+  // renderLog, called on the very next line below) reads this variable
+  // before execution would ever reach its old declaration site further down
+  // this same function body. That's not a hypothetical: it threw
+  // "Cannot access 'currentInsight' before initialization" on every single
+  // popup open, which aborted renderLog() partway through — silently
+  // breaking the Activity tab's memory-insight card, referral prompt, and
+  // the log list itself, every time, since nothing after the throwing
+  // await in this function ever ran.
+  let currentInsight = null;
+
+  // Same relocation, same reason, one variable over: STEP_NOUNS is a
+  // `const`, but a `const` is exactly as dead-zoned as a `let` until its own
+  // statement runs — it does not matter that this one is never reassigned.
+  // renderMemoryInsight (called from renderLog, called two lines below)
+  // only reaches STEP_NOUNS after its own `if (!currentInsight) return`
+  // guard, which is why this stayed hidden even after the currentInsight
+  // fix above: it only throws once there is an actual insight to show, not
+  // on every popup open — silently breaking the Activity tab (and, later,
+  // the "Learned" stat right above it) the first time Execution Memory
+  // finally had something to say, rather than the first time anyone opened
+  // the popup.
+  const STEP_NOUNS = { calendar: 'the Calendar step', draft: 'the draft reply step', task: 'the Task step' };
 
   wireTabs();
   wireSave();
   wireRecipe();
   renderConnectors();
-  renderDomains();
   renderStatusPill();
   await renderLog();
+  await renderOpen();
 
   function send(msg) {
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
@@ -23,6 +52,16 @@
     if (cls) n.className = cls;
     if (text != null) n.textContent = text;
     return n;
+  }
+
+  // A .primary button's visible text lives in its .btn-label span, not the
+  // button's own textContent — the shell/ring/shine spans are siblings of
+  // that text, and `btn.textContent = ...` would silently delete all three
+  // of them along with whatever was there before. Falls back to plain
+  // textContent for a .ghost button, which has no such spans.
+  function setBtnLabel(btn, text) {
+    const label = btn.querySelector('.btn-label');
+    if (label) label.textContent = text; else btn.textContent = text;
   }
 
   async function refresh() {
@@ -46,7 +85,11 @@
   function renderConnectors() {
     const host = document.getElementById('connector-list');
     host.replaceChildren();
-    FLOW_CONNECTORS.forEach((c) => host.appendChild(connectorCard(c)));
+    // MVP surface is one connector, one decision: sign in, or don't. The rest
+    // of FLOW_CONNECTORS still work (background.js's WRITERS/UNDOERS keep
+    // them wired) but showing four more cards here is exactly the setup
+    // friction the MVP is supposed to have zero of.
+    FLOW_CONNECTORS.filter((c) => c.mvp).forEach((c) => host.appendChild(connectorCard(c)));
   }
 
   function connectorCard(c) {
@@ -110,10 +153,22 @@
     }
 
     const ready = st.configured !== false;
-    const btn = el('button', (ready ? 'primary sm' : 'ghost wide'), 'Connect ' + c.label);
+    // Only the ready (primary/.doit-style) button gets the shell/ring/shine
+    // spans — .ghost.wide (missing OAuth config, MVP-inert) stays a plain
+    // outlined pill, same distinction the marketing site draws between its
+    // .doit button and everything else.
+    const btn = el('button', ready ? 'primary sm' : 'ghost wide');
+    if (ready) {
+      btn.appendChild(el('span', 'shell'));
+      btn.appendChild(el('span', 'ring'));
+      btn.appendChild(el('span', 'shine'));
+      btn.appendChild(el('span', 'btn-label', 'Connect ' + c.label));
+    } else {
+      btn.textContent = 'Connect ' + c.label;
+    }
     btn.type = 'button';
     btn.addEventListener('click', async () => {
-      btn.disabled = true; btn.textContent = 'Connecting…'; err.hidden = true;
+      btn.disabled = true; setBtnLabel(btn, 'Connecting…'); err.hidden = true;
       const msg = { type: 'flow:connect', connectorId: c.id };
       Object.keys(inputs).forEach((k) => { msg[k] = inputs[k].value; });
       const res = await send(msg);
@@ -122,7 +177,7 @@
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {
-        btn.disabled = false; btn.textContent = 'Connect ' + c.label;
+        btn.disabled = false; setBtnLabel(btn, 'Connect ' + c.label);
         err.textContent = (res && res.error) || 'Connection failed.';
         err.hidden = false;
       }
@@ -132,29 +187,10 @@
     return card;
   }
 
-  /* ------------------------------------------------------------- domains */
-
-  function renderDomains() {
-    const host = document.getElementById('domain-list');
-    host.replaceChildren();
-    FLOW_DOMAINS.forEach((d) => {
-      const label = el('label', 'opt');
-      const input = el('input');
-      input.type = 'radio'; input.name = 'domain'; input.value = d.id;
-      input.checked = state.domainId ? state.domainId === d.id : d.id === 'sales';
-      const txt = el('span', 'txt');
-      txt.appendChild(el('span', 'name', d.label));
-      txt.appendChild(el('span', 'kind', d.entity));
-      label.append(input, txt);
-      host.appendChild(label);
-    });
-  }
-
   /* ---------------------------------------------------------------- save */
 
   function wireSave() {
     document.getElementById('save').addEventListener('click', async () => {
-      const domain = document.querySelector('input[name="domain"]:checked');
       const connected = Object.keys(status || {}).filter((k) => status[k].connected);
       const note = document.getElementById('saved-note');
       if (!connected.length) {
@@ -164,7 +200,13 @@
       }
       await FlowStorage.set({
         onboarded: true,
-        domainId: domain ? domain.value : 'sales',
+        // domainId deliberately left unset: judgment.js's evaluate() falls
+        // back to FLOW_DOMAINS[0] whenever it's missing or unmatched, and
+        // that fallback already produces a good generic label (neutralTitle)
+        // for any text that isn't literally sales vocabulary — so there's
+        // nothing this question was buying a doctor, a lawyer, or a guide
+        // that the universal commit/obligation/date/money signals don't
+        // already cover on their own.
         connectorId: connected.includes(state.connectorId) ? state.connectorId : connected[0]
       });
       state = await FlowStorage.get();
@@ -174,10 +216,20 @@
   }
 
   /* --------------------------------------------------------------- recipe */
-  // A recipe is a shareable "how someone else set Glance up" — literally just
-  // the two picks on this screen. It never carries a token, a log entry, or
-  // anything Glance wrote, so passing a .glance file around is as safe as
-  // describing your setup in a Slack message.
+  // A recipe is a shareable "how someone else set Glance up" — never a
+  // token, a log entry, or anything Glance wrote, so passing a .glance file
+  // around is as safe as describing your setup in a Slack message.
+  //
+  // Domain (FLOW_DOMAINS) used to be a live onboarding question here too —
+  // it isn't anymore (see wireSave()'s own comment: domainId is now
+  // deliberately left unset, and judgment.js falls back to FLOW_DOMAINS[0]
+  // whenever it's missing). A recipe exported today therefore carries only
+  // connectorId, the one thing Setup still actually asks. Import still
+  // honors a domainId from an OLDER recipe if one is present — that field
+  // isn't meaningless, just no longer collected — but never requires it:
+  // gating the whole import on a field the current product doesn't even
+  // offer a way to set was rejecting every recipe this product can produce
+  // today as "not a valid Glance recipe."
 
   function noteRecipe(text, ok) {
     const note = document.getElementById('recipeNote');
@@ -186,24 +238,31 @@
     note.hidden = false;
   }
 
+  // Pulled out of wireRecipe()'s click handler so the referral card below
+  // can trigger the exact same export — same file shape, same download,
+  // same confirmation copy — instead of a second export path that could
+  // quietly drift from this one.
+  function exportRecipe() {
+    const domain = state.domainId ? FLOW_DOMAINS.find((d) => d.id === state.domainId) : null;
+    const connector = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
+    const recipe = { flowRecipe: 1, connectorId: connector ? connector.id : null, connectorLabel: connector ? connector.label : null };
+    // Only included when this account actually has one set — see this
+    // section's header comment for why fabricating a default here (every
+    // export used to claim domainId:'sales' whether or not that was ever
+    // chosen) was its own small state-truthfulness bug.
+    if (domain) { recipe.domainId = domain.id; recipe.domainLabel = domain.label; }
+    const blob = new Blob([JSON.stringify(recipe, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glance-recipe' + (connector ? '-' + connector.id : '') + (domain ? '-' + domain.id : '') + '.glance';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function wireRecipe() {
     document.getElementById('recipeExport').addEventListener('click', () => {
-      const domain = FLOW_DOMAINS.find((d) => d.id === state.domainId) || FLOW_DOMAINS.find((d) => d.id === 'sales');
-      const connector = FLOW_CONNECTORS.find((c) => c.id === state.connectorId);
-      const recipe = {
-        flowRecipe: 1,
-        domainId: domain.id,
-        domainLabel: domain.label,
-        connectorId: connector ? connector.id : null,
-        connectorLabel: connector ? connector.label : null
-      };
-      const blob = new Blob([JSON.stringify(recipe, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'glance-recipe-' + domain.id + (connector ? '-' + connector.id : '') + '.glance';
-      a.click();
-      URL.revokeObjectURL(url);
+      exportRecipe();
       noteRecipe('Recipe exported. Anyone can drop this file into their own Glance to match your setup.', true);
     });
 
@@ -219,21 +278,38 @@
         return;
       }
       // Only ever read two known string fields off the parsed JSON — never
-      // trust or store anything else a file could contain.
+      // trust or store anything else a file could contain. Accept the file
+      // if EITHER is present and recognized; today's own export only ever
+      // sets connectorId (see this section's header comment), so requiring
+      // domainId too rejected every recipe this product can currently
+      // produce.
+      const wantedConnector = FLOW_CONNECTORS.find((c) => c.id === parsed.connectorId);
       const validDomain = FLOW_DOMAINS.find((d) => d.id === parsed.domainId);
-      if (!validDomain) {
+      if (!wantedConnector && !validDomain) {
         noteRecipe('That file isn’t a valid Glance recipe.', false);
         return;
       }
-      await FlowStorage.set({ domainId: validDomain.id });
+      if (validDomain) await FlowStorage.set({ domainId: validDomain.id });
       state = await FlowStorage.get();
-      renderDomains();
-      const wantedConnector = FLOW_CONNECTORS.find((c) => c.id === parsed.connectorId);
+      // There is no domain picker left in this UI to re-render (see this
+      // section's header comment) — a call here used to reference a
+      // renderDomains() that had already been deleted along with that
+      // picker, throwing before either noteRecipe() below ever ran. Every
+      // import silently did nothing visible, whether or not the storage
+      // write itself (above) actually succeeded.
+      const what = validDomain && wantedConnector ? validDomain.label + ' + ' + wantedConnector.label
+        : validDomain ? validDomain.label
+        : wantedConnector.label;
+      // mvp is the same bar renderConnectors() uses to decide which cards
+      // this Setup screen actually shows — pointing at "Connect X above"
+      // for one of the four dormant connectors would be the exact dead-end
+      // this pass's own connector-error fix (background.js) exists to
+      // avoid, just reached from a different door.
       const alreadyConnected = wantedConnector && status && status[wantedConnector.id] && status[wantedConnector.id].connected;
-      if (wantedConnector && !alreadyConnected) {
-        noteRecipe('Loaded — ' + validDomain.label + '. Connect ' + wantedConnector.label + ' above to match it exactly, or use whatever you already have.', true);
+      if (wantedConnector && wantedConnector.mvp && !alreadyConnected) {
+        noteRecipe('Loaded — ' + what + '. Connect ' + wantedConnector.label + ' above to match it exactly, or use whatever you already have.', true);
       } else {
-        noteRecipe('Loaded — ' + validDomain.label + '. Click Save & start to apply it.', true);
+        noteRecipe('Loaded — ' + what + '. Click Save & start to apply it.', true);
       }
     });
   }
@@ -246,8 +322,104 @@
         document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
         document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === tab.dataset.tab));
         if (tab.dataset.tab === 'log') await renderLog();
+        if (tab.dataset.tab === 'open') await renderOpen();
       });
     });
+  }
+
+  /* ---------------------------------------------------------------- open */
+  // The Unified Open Items Surface: every process Glance has proposed and
+  // gotten no decision on yet, from FlowStorage.getPending() — the exact
+  // same source of truth the in-Gmail indicator/panel and the extension-icon
+  // badge already read. This is deliberately the one place that list is
+  // visible independent of which thread (today) or app (Calendar/Drive,
+  // later — see 'app' on each entry) it came from.
+  //
+  // Do It is intentionally NOT offered here. content-gmail.js's own onDoIt/
+  // buildActionPayload needs a live Gmail tab for at least one real path
+  // (fetching an attachment's bytes with the page's own cookies — see its
+  // own comment on why that fetch can't happen anywhere else), and this
+  // product's own rule about a duplicate write being the one failure it
+  // can't absorb means a second, partially-DOM-independent copy of that
+  // ~150-line orchestration living here — drifting from the original the
+  // day either one changes — is a worse outcome than routing "close this"
+  // back through the message it was proposed for. View jumps there directly;
+  // Dismiss (genuinely DOM-independent — see content-gmail.js's own
+  // onDismiss) is safe to offer verbatim.
+
+  function pendingRowSubtitle(entry) {
+    const who = (entry.sender && entry.sender.name) || (entry.sender && entry.sender.email) || '';
+    const what = entry.subject || (entry.intent && entry.intent.label) || '';
+    return who && what ? who + ' — ' + what : (what || who);
+  }
+
+  function openRow(entry) {
+    const item = el('div', 'log-item');
+    const top = el('div', 'log-top');
+    top.appendChild(el('span', 'log-label', entry.process.name));
+    // 'app' only exists on entries logged after this was added — every
+    // entry from before falls back to 'gmail', the only source that has
+    // ever existed, rather than showing a blank tag.
+    top.appendChild(el('span', 'log-kind', (entry.app || 'gmail').toUpperCase()));
+    item.appendChild(top);
+
+    const subtitle = pendingRowSubtitle(entry);
+    if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
+    // "Make unresolved processes harder to forget" — an item open for three
+    // weeks used to look identical to one from ten minutes ago in this
+    // list. Same when()/.when the Activity tab's own logRow() already uses,
+    // reused rather than a second age-formatting rule, on entry.ts —
+    // appendLog stamps every row with ts unconditionally, 'shown' included.
+    if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
+
+    const acts = el('div', 'log-acts');
+    if (entry.threadUrl) {
+      const view = el('a', 'ghost sm', 'View');
+      view.href = entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
+      acts.appendChild(view);
+    }
+    const dismiss = el('button', 'ghost sm', 'Dismiss');
+    dismiss.type = 'button';
+    dismiss.addEventListener('click', async () => {
+      dismiss.disabled = true; dismiss.textContent = 'Dismissing…';
+      // The exact same storage/module calls content-gmail.js's own
+      // onDismiss makes, verbatim — no DOM, no background.js round trip.
+      await FlowStorage.appendLog({
+        kind: 'dismissed',
+        label: (entry.intent && entry.intent.label) || entry.process.name,
+        messageId: entry.messageId,
+        score: entry.signals && entry.signals.score
+      });
+      await FlowStorage.calibrate('dismiss');
+      // Same reject as the in-Gmail chip dismiss. Once per message.
+      if (entry.messageId) {
+        await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: entry.messageId, reason: 'dismiss' });
+      }
+      if (typeof FlowExecutionMemory !== 'undefined' && entry.process && entry.process.steps) {
+        await FlowExecutionMemory.recordDismiss(entry.process.id, entry.process.steps.map((s) => s.id), entry.messageId);
+      }
+      chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_dismissed', params: { domain: state.domainId } });
+      chrome.runtime.sendMessage({ type: 'flow:track', event: 'process_closed', params: { domain: state.domainId, method: 'dismissed' } });
+      await renderOpen();
+    });
+    acts.appendChild(dismiss);
+    item.appendChild(acts);
+    return item;
+  }
+
+  async function renderOpen() {
+    const pending = await FlowStorage.getPending();
+    // Keeps the extension-icon badge honest even when the popup is the
+    // first surface opened after a browser restart, before any Gmail tab
+    // has had a chance to recompute it itself — see background.js's
+    // updateBadge comment for why this file never trusts a cached number.
+    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: pending.length });
+
+    const host = document.getElementById('open-list');
+    const empty = document.getElementById('open-empty');
+    host.replaceChildren();
+    empty.hidden = pending.length > 0;
+    pending.forEach((entry) => host.appendChild(openRow(entry)));
   }
 
   function when(ts) {
@@ -279,17 +451,118 @@
   // The product is deliberately silent between chips, and a silent tool is
   // easy to forget you installed. This is the one place that answers "is it
   // actually doing anything" without turning into a notification.
+  // Both numbers come from storage.js's writeCountsFrom — the single
+  // definition, sitting next to the data. They used to be derived here from
+  // the 200-entry activity log, which made "all-time" GO DOWN as old rows
+  // were evicted (one Do It appends up to five 'written' rows, so ~40
+  // multi-step closes rolled the whole window) and undercounted "this week"
+  // for anyone closing more in a week than the log could hold. A counter that
+  // shrinks is not a rounding error — it is the product stating something it
+  // knows is false.
   function renderWeekStat(s) {
     const wrap = document.getElementById('weekStat');
-    const written = (s.log || []).filter((e) => e.kind === 'written');
-    if (!written.length) { wrap.hidden = true; return; }
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const thisWeek = written.filter((e) => e.ts >= weekAgo).length;
-    document.getElementById('weekCount').textContent = thisWeek;
+    const counts = FlowStorage.writeCountsFrom(s);
+    if (!counts.total) { wrap.hidden = true; return; }
+    document.getElementById('weekCount').textContent = counts.week;
     document.getElementById('weekLabel').textContent = ' logged this week';
-    document.getElementById('weekTotal').textContent = written.length + ' all-time';
+    document.getElementById('weekTotal').textContent = counts.total + ' all-time';
     wrap.hidden = false;
   }
+
+  // Compounding value made visible: how many (process, step) preferences
+  // Execution Memory has actually learned and acted on for this account —
+  // not a raw click count (weekStat above already shows that), but real
+  // adjustments to what Glance proposes next. Reuses FlowActions.isNetRejected()
+  // rather than a second definition of "learned," so this claim can never
+  // disagree with the exact math applyMemory() uses to actually demote a
+  // step. A step the person explicitly pinned counts too — that is still
+  // Glance's behavior having adapted for this account, the correction just
+  // came from a direct answer instead of an inference (see recordPin's own
+  // comment in execution-memory.js). Zero is a real, common state (a new
+  // install, or one that has never removed or pinned a step) and stays
+  // hidden rather than announcing "0 things learned," which would read as
+  // the product failing at the one thing this line exists to reassure
+  // about — see the Magic Moment's own "nothing to prove yet" precedent.
+  async function renderLearned() {
+    const wrap = document.getElementById('learnedStat');
+    if (typeof FlowExecutionMemory === 'undefined' || typeof FlowActions === 'undefined') { wrap.hidden = true; return; }
+    const mem = await FlowExecutionMemory.getAll();
+    let count = 0;
+    for (const processId of Object.keys(mem)) {
+      const steps = (mem[processId] && mem[processId].steps) || {};
+      for (const stepKind of Object.keys(steps)) {
+        const s = steps[stepKind];
+        if ((s.pinned || 0) > 0 || FlowActions.isNetRejected(s)) count++;
+      }
+    }
+    if (!count) { wrap.hidden = true; return; }
+    wrap.textContent = 'Glance has adjusted ' + count + (count === 1 ? ' thing' : ' things') + ' about how it works for you.';
+    wrap.hidden = false;
+  }
+
+  // STEP_NOUNS lives near currentInsight at the top of this function now —
+  // see the comment there for why.
+
+  // Execution Memory made visible: at most one insight shown at a time
+  // (never a pile of things to review), and only ever for a (process, step)
+  // combo that (a) actions.js's own applyMemory() is already demoting for a
+  // real reason and (b) hasn't already gotten a real answer from this
+  // person. Confirming or rejecting both close it permanently — this is a
+  // one-time correction opportunity, not a recurring setting.
+  // (currentInsight itself is declared at the top of popupInit — see that
+  // declaration's own comment for why it can't live here.)
+
+  async function renderMemoryInsight(s) {
+    const wrap = document.getElementById('memoryInsight');
+    if (typeof FlowExecutionMemory === 'undefined' || typeof FlowActions === 'undefined') { wrap.hidden = true; return; }
+
+    const mem = await FlowExecutionMemory.getAll();
+    const seen = new Set(s.memoryInsightsSeen || []);
+    currentInsight = null;
+
+    outer:
+    for (const processId of Object.keys(mem)) {
+      const catalogEntry = FlowActions.PROCESS_CATALOG[processId];
+      if (!catalogEntry) continue;
+      for (const stepKind of catalogEntry.stepKinds) {
+        if (stepKind === catalogEntry.anchor) continue; // never surfaced — see actions.js's own anchor comment
+        const key = processId + ':' + stepKind;
+        if (seen.has(key)) continue;
+        if (FlowActions.isNetRejected(mem[processId].steps[stepKind])) {
+          currentInsight = { processId, stepKind, key, processName: catalogEntry.name };
+          break outer;
+        }
+      }
+    }
+
+    if (!currentInsight) { wrap.hidden = true; return; }
+
+    document.getElementById('memoryInsightText').textContent =
+      'Glance noticed you usually remove ' + (STEP_NOUNS[currentInsight.stepKind] || 'a step') +
+      ' in ' + currentInsight.processName + ' processes — keep it that way?';
+    wrap.hidden = false;
+  }
+
+  function wireMemoryInsight() {
+    document.getElementById('memoryInsightConfirm').addEventListener('click', async () => {
+      if (!currentInsight) return;
+      await FlowStorage.markMemoryInsightSeen(currentInsight.key);
+      document.getElementById('memoryInsight').hidden = true;
+      currentInsight = null;
+    });
+    document.getElementById('memoryInsightReject').addEventListener('click', async () => {
+      if (!currentInsight) return;
+      // The one real lever here: pin the step so actions.js's applyMemory()
+      // stops demoting it, regardless of whatever removed/undone counts
+      // came before — a direct "no" outranks the inference that produced
+      // this card in the first place.
+      await FlowExecutionMemory.recordPin(currentInsight.processId, currentInsight.stepKind);
+      await FlowStorage.markMemoryInsightSeen(currentInsight.key);
+      document.getElementById('memoryInsight').hidden = true;
+      currentInsight = null;
+    });
+  }
+  wireMemoryInsight();
 
   // Earns its place after real usage rather than nagging on first open —
   // three real writes is evidence Glance is actually working for this person,
@@ -297,8 +570,13 @@
   // Dismissing it is permanent; it never reappears once the user has said no.
   function renderReferral(s) {
     const wrap = document.getElementById('referral');
-    const written = (s.log || []).filter((e) => e.kind === 'written');
-    if (s.referralDismissed || written.length < 3) { wrap.hidden = true; return; }
+    // Distinct messages, via the same storage.js counter the stat row above
+    // uses. This gate used to count raw 'written' rows, so ONE Do It on a
+    // three-step process satisfied "three real writes" by itself — asking
+    // someone to recommend the product after a single click is precisely the
+    // nag the three-write threshold exists to avoid.
+    const total = FlowStorage.writeCountsFrom(s).total;
+    if (s.referralDismissed || total < 3) { wrap.hidden = true; return; }
     wrap.hidden = false;
   }
 
@@ -323,13 +601,53 @@
         btn.textContent = 'https://theflow-ai.com/trial.html';
       }
     });
+    // The same real, working setup this account already has, exported as
+    // the exact .glance file the Setup tab's own Export button produces
+    // (see exportRecipe()) — a teammate imports it and matches this
+    // connector in one drop, no separate onboarding conversation. This
+    // is a second path inside the SAME earned-trust card rather than a
+    // second dismissible surface: two independent "tell someone" prompts
+    // stacking after the same threshold would read as being asked twice.
+    document.getElementById('referralExportRecipe').addEventListener('click', () => {
+      const btn = document.getElementById('referralExportRecipe');
+      exportRecipe();
+      const original = btn.textContent;
+      btn.textContent = 'Exported';
+      setTimeout(() => { btn.textContent = original; }, 1800);
+    });
   }
   wireReferral();
+  wireClearCloseMemory();
+
+  function wireClearCloseMemory() {
+    const btn = document.getElementById('clearCloseMemory');
+    if (!btn || typeof FlowCloseMemory === 'undefined') return;
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      await FlowCloseMemory.clear();
+      const original = btn.textContent;
+      btn.textContent = 'Cleared';
+      setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1600);
+    });
+  }
+
+  function renderCloseQuality(s) {
+    const node = document.getElementById('closeQuality');
+    if (!node) return;
+    if (typeof FlowCloseQuality === 'undefined') { node.hidden = true; return; }
+    const line = FlowCloseQuality.activityLine(FlowCloseQuality.computeSnapshot(s.closeQuality));
+    if (!line) { node.hidden = true; return; }
+    node.textContent = line;
+    node.hidden = false;
+  }
 
   async function renderLog() {
     const s = await FlowStorage.get();
     renderWeekStat(s);
+    renderCloseQuality(s);
+    await renderLearned();
     renderSensitivity(s);
+    await renderMemoryInsight(s);
     renderReferral(s);
     const host = document.getElementById('log-list');
     const empty = document.getElementById('log-empty');
@@ -345,7 +663,10 @@
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
     top.appendChild(el('span', 'log-label', e.label || '—'));
-    top.appendChild(el('span', 'log-kind ' + e.kind, e.kind));
+    // The stored kind stays 'written' — counters and CSS key off it. The
+    // badge a person reads should say what the chip just said.
+    const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
+    top.appendChild(el('span', 'log-kind ' + e.kind, KIND_LABEL[e.kind] || e.kind));
     item.appendChild(top);
 
     if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
@@ -366,6 +687,10 @@
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
           if (r && r.ok) {
             await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId });
+            if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(e.messageId);
+            if (e.messageId) {
+              await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+            }
             await renderLog();
           } else {
             u.textContent = 'Undo failed';

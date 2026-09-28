@@ -1,6 +1,7 @@
 -- "Almost Missed" gallery — anonymous, opt-in submissions of real catches
--- from missed-deadline.html. Apply via `supabase db push` or paste into the
--- Supabase SQL editor.
+-- from missed-deadline.html. Project zjquktirlrhbqcnkfaok only — not
+-- RealTrade (nlvljclvoguvrnntwufu). Apply via `supabase db push` or paste
+-- into that project's SQL editor.
 --
 -- What can land in this table: a domain id, an engine-generated headline
 -- built only from structured extracted facts (amount, date — the same

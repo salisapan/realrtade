@@ -29,11 +29,14 @@ ZIP_PATH = (
 
 IMPORT_RE = re.compile(r"""(?:import|export)\s+(?:[^'"\n]+?\s+from\s+)?['"](\.[^'"]+)['"]""")
 HTML_REF_RE = re.compile(r"""(?:src|href)\s*=\s*['"]([^'"]+)['"]""", re.I)
+GETURL_RE = re.compile(r"""chrome\.runtime\.getURL\(\s*['"]([^'"]+)['"]\s*\)""")
 HARDCODED_CLIENT_ID_RE = re.compile(
     r"""(?:HUBSPOT|SALESFORCE|SLACK|MONDAY)_CLIENT_ID\s*=\s*['"]YOUR_"""
 )
+# YOUR_* / REPLACE_WITH_* are named placeholders, not credentials. A real
+# secret assignment still fails the build.
 SECRET_ASSIGNMENT_RE = re.compile(
-    r"""(?:CLIENT_SECRET|API_KEY|BEGIN (?:RSA |OPENSSH )?PRIVATE KEY)\s*[:=]\s*['"][^'"]+['"]""",
+    r"""(?:CLIENT_SECRET|API_KEY|BEGIN (?:RSA |OPENSSH )?PRIVATE KEY)\s*[:=]\s*['"](?!(?:YOUR_|REPLACE_WITH_))[^'"]+['"]""",
     re.I,
 )
 
@@ -90,7 +93,43 @@ def html_local_refs(html_path: Path) -> list[Path]:
 
 def module_imports(js_path: Path) -> list[Path]:
     text = js_path.read_text(encoding="utf-8")
-    return [resolve_relative(js_path, spec) for spec in IMPORT_RE.findall(text)]
+    # import specifiers are relative to the module. chrome.runtime.getURL
+    # paths are relative to the extension root.
+    imported = [resolve_relative(js_path, spec) for spec in IMPORT_RE.findall(text)]
+    opened = [resolve_relative(EXTENSION_ROOT / "manifest.json", spec) for spec in GETURL_RE.findall(text)]
+    return imported + opened
+
+
+def manifest_pages(manifest: dict) -> list[str]:
+    """Extension pages the manifest names, besides content scripts and the worker."""
+    pages: list[str] = []
+    action = manifest.get("action") or {}
+    if action.get("default_popup"):
+        pages.append(action["default_popup"])
+    side_panel = manifest.get("side_panel") or {}
+    if side_panel.get("default_path"):
+        pages.append(side_panel["default_path"])
+    options_ui = manifest.get("options_ui") or {}
+    if options_ui.get("page"):
+        pages.append(options_ui["page"])
+    if isinstance(manifest.get("options_page"), str):
+        pages.append(manifest["options_page"])
+    if isinstance(manifest.get("devtools_page"), str):
+        pages.append(manifest["devtools_page"])
+    overrides = manifest.get("chrome_url_overrides") or {}
+    if isinstance(overrides, dict):
+        pages.extend(value for value in overrides.values() if isinstance(value, str))
+    sandbox = manifest.get("sandbox") or {}
+    pages.extend(page for page in (sandbox.get("pages") or []) if isinstance(page, str))
+    for group in manifest.get("web_accessible_resources") or []:
+        resources = group.get("resources") if isinstance(group, dict) else []
+        for resource in resources:
+            if not isinstance(resource, str):
+                continue
+            if "*" in resource:
+                die(f"web_accessible_resources glob {resource!r} is not expanded into the install zip")
+            pages.append(resource)
+    return pages
 
 
 def collect() -> dict[str, Path]:
@@ -117,11 +156,10 @@ def collect() -> dict[str, Path]:
     for icon in (manifest.get("icons") or {}).values():
         referenced.append(EXTENSION_ROOT / icon)
     action = manifest.get("action") or {}
-    popup = action.get("default_popup")
-    if popup:
-        referenced.append(EXTENSION_ROOT / popup)
     for icon in (action.get("default_icon") or {}).values():
         referenced.append(EXTENSION_ROOT / icon)
+    for page in manifest_pages(manifest):
+        referenced.append(EXTENSION_ROOT / page)
     worker = (manifest.get("background") or {}).get("service_worker")
     if not worker:
         die("manifest.json has no background.service_worker")

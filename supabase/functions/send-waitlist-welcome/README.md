@@ -1,9 +1,18 @@
 # Waitlist welcome email — setup
 
-Sends a real welcome email the moment someone joins the waitlist, via
-Resend. This function is written and ready; it needs a few one-time
-manual steps in your Supabase and Resend dashboards to go live (this
-sandbox has no credentials for either, so these can't be run for you).
+Not the live signup path. theflow-ai.com stores rows and sends mail through
+the Netlify functions (`submit-waitlist`, `send-confirmation`,
+`confirm-signup`). Deploying this edge function is not required for the
+waitlist or `public.leads` to work.
+
+If you do deploy it, link **Glance / Flow landing** project
+`zjquktirlrhbqcnkfaok`. Do not link RealTrade `nlvljclvoguvrnntwufu`.
+See `supabase/README.md`.
+
+Sends a welcome email when a row is inserted into `public.waitlist`, via
+Resend. It needs a few one-time manual steps in the Supabase and Resend
+dashboards (this sandbox has no credentials for either, so these can't be
+run for you).
 
 ## 1. Create a Resend account and get an API key
 
@@ -19,8 +28,12 @@ sandbox has no credentials for either, so these can't be run for you).
 
 ## 2. Add the API key as an Edge Function secret
 
-Using the Supabase CLI (from the repo root, once linked to your project
-with `supabase link`):
+Using the Supabase CLI (from the repo root, once linked to the landing
+project — not RealTrade):
+
+```bash
+supabase link --project-ref zjquktirlrhbqcnkfaok
+```
 
 ```bash
 supabase secrets set RESEND_API_KEY=re_your_key_here
