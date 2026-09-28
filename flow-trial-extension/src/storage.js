@@ -133,6 +133,16 @@ const FlowStorage = (() => {
       falseDoItIds: [],
       recent: []
     },
+    // Trusted closes per week, and silence decisions by reason code.
+    // Counts and ids only — see core/quiet-metrics.js and
+    // docs/quiet-metrics.md. No message text.
+    quietMetrics: {
+      weeks: {},
+      handled: [],
+      silenceIds: [],
+      silenceWeeks: {},
+      silenceTotal: {}
+    },
     // One local calendar-day string (Date#toDateString, matching every
     // other daily flag in this file) per day this install was ever active
     // in a watched tab — the actual history retention/habit measurement
@@ -700,21 +710,58 @@ const FlowStorage = (() => {
   // falseDoIt also needs `reason`: 'dismiss' | 'undo'. Day defaults to
   // today's local calendar day — the same Date#toDateString() key the
   // return definition uses. Nothing here leaves the device.
+  // One queue for quietMetrics. recordCloseQuality and recordSilence both
+  // write that key; two queues would let one set() drop the other's week.
+  const writeQuiet = serialize(async function writeQuiet(mutator) {
+    if (typeof FlowQuietMetrics === 'undefined') return null;
+    const state = await get();
+    const current = state.quietMetrics || FlowQuietMetrics.emptyState();
+    const next = mutator(current);
+    if (JSON.stringify(current) !== JSON.stringify(next)) await set({ quietMetrics: next });
+    return next;
+  });
+
   const recordCloseQuality = serialize(async function recordCloseQuality(event) {
     if (!event || (event.kind !== 'success' && event.kind !== 'doIt' && event.kind !== 'falseDoIt')) return null;
     const state = await get();
     const current = state.closeQuality || FlowCloseQuality.emptyState();
+    const ts = event.ts || Date.now();
     const applied = FlowCloseQuality.applyEvent(current, {
       kind: event.kind,
       messageId: event.messageId,
       reason: event.reason,
       day: event.day || new Date().toDateString(),
-      ts: event.ts || Date.now()
+      ts: ts
     });
     if (JSON.stringify(current) !== JSON.stringify(applied.state)) {
       await set({ closeQuality: applied.state });
     }
+    // Trusted close: the same full write (Handled.) and the same Undo.
+    // A dismiss is a false-Do-It and is not an Undo of a write.
+    if (event.kind === 'success') {
+      await writeQuiet((s) => FlowQuietMetrics.noteHandled(s, { messageId: event.messageId, ts: ts }));
+    } else if (event.kind === 'falseDoIt' && event.reason === 'undo') {
+      await writeQuiet((s) => FlowQuietMetrics.noteUndo(s, { messageId: event.messageId }));
+    }
     return applied.recorded;
+  });
+
+  // One silence decision. reason is a code from FlowQuietMetrics.REASONS.
+  // A body, a subject, or an unknown string is not stored.
+  const recordSilence = serialize(async function recordSilence(event) {
+    if (!event || typeof FlowQuietMetrics === 'undefined') return false;
+    const ts = event.ts || Date.now();
+    let counted = false;
+    await writeQuiet((current) => {
+      const next = FlowQuietMetrics.noteSilence(current, {
+        messageId: event.messageId,
+        reason: event.reason,
+        ts: ts
+      });
+      counted = JSON.stringify(current) !== JSON.stringify(next);
+      return next;
+    });
+    return counted;
   });
 
   // The three counts plus the recent event list, for the Activity tab and
@@ -722,6 +769,13 @@ const FlowStorage = (() => {
   // getPmfSnapshot — not an org dashboard and not a network call.
   async function getCloseQualitySnapshot() {
     return FlowCloseQuality.computeSnapshot((await get()).closeQuality);
+  }
+
+  // Trusted closes for the current local week, plus silence by reason.
+  // Same console-and-Activity posture as getCloseQualitySnapshot.
+  async function getQuietSnapshot(now) {
+    if (typeof FlowQuietMetrics === 'undefined') return null;
+    return FlowQuietMetrics.snapshot((await get()).quietMetrics, now || Date.now());
   }
 
   // Shared by every "at most once per calendar day (local time)" flag this
@@ -864,7 +918,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

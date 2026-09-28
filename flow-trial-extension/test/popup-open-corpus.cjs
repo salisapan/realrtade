@@ -132,6 +132,7 @@ function load(stored, opts) {
     [CORE, 'domains.js'], [CORE, 'connectors.js'], [CORE, 'extract.js'], [CORE, 'judgment.js'],
     [CORE, 'google-closes.js'], [CORE, 'fact-reply.js'], [CORE, 'close-families.js'], [CORE, 'intent.js'],
     [CORE, 'close-quality-metrics.js'],
+    [CORE, 'quiet-metrics.js'],
     [CORE, 'still-open.js'],
     [SRC, 'storage.js'],
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
@@ -476,6 +477,27 @@ async function run() {
 
     const el = document.getElementById('learnedStat');
     check('the learned-stat line stays hidden with nothing learned yet', el.hidden === true);
+    check('trusted closes stay hidden until a full write exists', document.getElementById('quietMetrics').hidden === true);
+  }
+
+  console.log('\n--- popup.js: Activity shows trusted closes and silence reasons ---\n');
+  {
+    const probe = load({});
+    const Quiet = vm.runInContext('FlowQuietMetrics', probe.sandbox);
+    const now = Date.now();
+    let quietMetrics = Quiet.noteHandled(Quiet.emptyState(), { messageId: 'm1', ts: now });
+    quietMetrics = Quiet.noteSilence(quietMetrics, { messageId: 's1', reason: 'family', ts: now });
+    const { sandbox, document } = load({ quietMetrics: quietMetrics });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    const node = document.getElementById('quietMetrics');
+    check('the quiet line is shown once a trusted close and a silence exist', node.hidden === false, node.textContent);
+    check('it names this week\'s trusted closes, Undo, and the reason code',
+      node.textContent.indexOf('Trusted closes 1 this week') !== -1 &&
+      node.textContent.indexOf('Undo 0') !== -1 &&
+      node.textContent.indexOf('family 1') !== -1 &&
+      node.textContent.indexOf('m1') === -1, node.textContent);
   }
 
   console.log('\n--- popup.js: a written log row reads as Handled and still offers Undo ---\n');

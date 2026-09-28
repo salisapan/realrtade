@@ -569,11 +569,21 @@ const FlowIntent = (() => {
     const infoOrNoise = INFO_ONLY.test(text) || EXTRA_NOISE.test(text);
     const blocked = s.flags.noise || infoOrNoise;
     const askIsSoft = Boolean(requestWhat) && SOFT_ASK.test(requestWhat);
+    // Names a silence the chip path already chose. It does not add a
+    // return. quietHint is used only where classify already returned
+    // type null with no type of its own.
+    let quietHint = blocked ? 'noise' : (askIsSoft ? 'hedge' : null);
+    function stayQuiet(code, extra) {
+      const row = { type: null, signals: signals, facts: facts, quiet: code };
+      if (extra) Object.assign(row, extra);
+      return row;
+    }
     // "once" / "hoping" only withdraw the commitment sentence they sit in.
     // A plain agreement in the next sentence still counts. A message whose
     // only agreement is contingent does not.
     const contingent = commitmentIsContingent(text);
     const settled = ALREADY_SETTLED.test(text);
+    if (!quietHint && (contingent || settled)) quietHint = 'hedge';
     familyBox.hit = (typeof FlowCloseFamilies !== 'undefined' && !blocked && !askIsSoft && !settled)
       ? FlowCloseFamilies.assess(text, facts, { now: ctx.now, senderEmail: ctx.senderEmail })
       : null;
@@ -621,7 +631,7 @@ const FlowIntent = (() => {
     // A family veto (cancel with no new slot, two file targets, a retraction,
     // a doc comment we cannot write) is silence. A reschedule that names
     // one new slot is that slot, not the old time the event gate would file.
-    if (familyBox.hit && familyBox.hit.suppress) return { type: null, signals, facts };
+    if (familyBox.hit && familyBox.hit.suppress) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.family === 'G') {
       const viaMove = fromFamily(familyBox.hit);
       if (viaMove) return viaMove;
@@ -660,16 +670,16 @@ const FlowIntent = (() => {
         return { type: null, signals: signals, facts: facts, googleWait: { fileTerm: google.wait } };
       }
       if (google && google.silence) {
-        return { type: null, signals: signals, facts: facts, googleSilence: true };
+        return stayQuiet('google', { googleSilence: true });
       }
       if (google && google.close) {
         const g = google.close;
         const hold = g.personalClose === 'file-on-hold';
         if (hold && suppressed(TYPES.SCHEDULED_EVENT)) {
-          return { type: null, signals: signals, facts: facts, googleSilence: true };
+          return stayQuiet('calibrated', { googleSilence: true });
         }
         if (!hold && suppressed(TYPES.DECISION_TO_LOG)) {
-          return { type: null, signals: signals, facts: facts, googleSilence: true };
+          return stayQuiet('calibrated', { googleSilence: true });
         }
         const entities = {
           who: who,
@@ -692,7 +702,7 @@ const FlowIntent = (() => {
       }
     }
 
-    if (eventEvidence && suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
+    if (eventEvidence && suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
     function holdEntities() {
       return {
         who, amount,
@@ -713,7 +723,7 @@ const FlowIntent = (() => {
       // an already-stated meeting stay the schedule processes.
       const meetingHold = Boolean(clock) && (explicitMeetingAsk || s.flags.commit || s.flags.senderPromise);
       if (meetingHold) {
-        if (suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
+        if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
         return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
       }
       return finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
@@ -731,7 +741,7 @@ const FlowIntent = (() => {
     // instead of holding the time. Only the explicit-ask phrase, and only
     // with a resolved clock time.
     if (!blocked && explicitMeetingAsk && !hasMeetingNoun) {
-      if (suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
+      if (suppressed(TYPES.SCHEDULED_EVENT)) return stayQuiet('calibrated');
       return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
     }
 
@@ -748,7 +758,7 @@ const FlowIntent = (() => {
     //        REQUEST's own confidence for its equivalent object-only path,
     //        vs 'high' when a real anchor is present.
     const readerCommitEvidence = isReaderCommit && (hasConcreteAnchor || hasConcreteCommitmentObject);
-    if (readerCommitEvidence && suppressed(TYPES.COMMITMENT_OF_READER)) return { type: null, signals, facts };
+    if (readerCommitEvidence && suppressed(TYPES.COMMITMENT_OF_READER)) return stayQuiet('calibrated');
     if (!blocked && readerCommitEvidence && !isPast) {
       return finish(TYPES.COMMITMENT_OF_READER, hasConcreteAnchor ? 'high' : 'medium', {
         who, amount,
@@ -771,9 +781,10 @@ const FlowIntent = (() => {
     // A past date is not an anchor. "Please send the receipt" still chips
     // when it names the receipt; the old due date is not what made it real.
     const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject);
-    if (requestEvidence && suppressed(TYPES.REQUEST)) return { type: null, signals, facts };
-    if (!blocked && requestEvidence && !askIsSoft &&
-        !(typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text))) {
+    if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
+    const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
+    if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
+    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
@@ -802,6 +813,8 @@ const FlowIntent = (() => {
     //        same outlet the other hard gates use — this one has no
     //        threshold to nudge either.
     const datedCommitment = (s.flags.commit || s.flags.senderPromise) && hasResolvedDate && !s.flags.lost && !isPast && !contingent;
+    if (!blocked && datedCommitment && suppressed(TYPES.DECISION_TO_LOG)) quietHint = 'calibrated';
+    if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && suppressed(TYPES.DECISION_TO_LOG)) quietHint = 'calibrated';
     if (!blocked && datedCommitment && !suppressed(TYPES.DECISION_TO_LOG)) {
       const committed = {
         who, amount,
@@ -852,17 +865,18 @@ const FlowIntent = (() => {
     // A soft ask is not an obligation just because a figure and a date
     // pushed the total over the bar. A real decision in another sentence
     // already returned above.
-    if (infoOrNoise) return { type: null, signals, facts };
-    if (askIsSoft && !isDecision) return { type: null, signals, facts };
+    if (infoOrNoise) return stayQuiet('noise');
+    if (askIsSoft && !isDecision) return stayQuiet('hedge');
     if (s.total < gatingThreshold) {
       const via = fromFamily(familyBox.hit);
       if (via) return via;
+      if (quietHint) return stayQuiet(quietHint);
       return { type: null, signals, facts };
     }
     // "hoping" / "once" and an already-paid figure clear the bar without
     // being an open close. Silence is the side of that trade.
-    if (isDecision && contingent) return { type: null, signals, facts };
-    if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return { type: null, signals, facts };
+    if (isDecision && contingent) return stayQuiet('hedge');
+    if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return stayQuiet('hedge');
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (isDecision) {

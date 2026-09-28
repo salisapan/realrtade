@@ -54,6 +54,7 @@
         <span class="week-total" id="weekTotal"></span>
       </div>
       <p class="learned-stat" id="closeQuality" hidden title="On this device only. Full close = every proposed step wrote. Return = Do It on a later day. Turned down = the chip was dismissed or the write was undone. False-close = turned down ÷ messages that fully closed or were turned down. The week-1 bar is 15%."></p>
+      <p class="learned-stat" id="quietMetrics" hidden title="On this device only. Trusted closes this week = Do It, every step wrote, the receipt said Handled, and that write was not Undone. Silence is a reason code (noise, hedge, family, low, google, calibrated, memory, file, fact), not the mail."></p>
       <p class="learned-stat" id="stillOpenQuality" hidden title="On this device only. Still Open cards shown, Do It clicks, undos, and false-closes."></p>
       <p class="learned-stat" id="learnedStat" hidden></p>
       <div class="sense" id="sense" hidden>
@@ -106,6 +107,7 @@
   <script src="../core/pmf-metrics.js"></script>
   <script src="../core/classification-metrics.js"></script>
   <script src="../core/close-quality-metrics.js"></script>
+  <script src="../core/quiet-metrics.js"></script>
   <!-- Still Open rejudges stored rows against the same silence bar as the
        chip. These four have to load before still-open.js runs select(). -->
   <script src="../core/google-closes.js"></script>

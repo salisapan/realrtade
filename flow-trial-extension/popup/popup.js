@@ -665,6 +665,16 @@
     node.hidden = false;
   }
 
+  function renderQuiet(s) {
+    const node = document.getElementById('quietMetrics');
+    if (!node) return;
+    if (typeof FlowQuietMetrics === 'undefined') { node.hidden = true; return; }
+    const line = FlowQuietMetrics.activityLine(FlowQuietMetrics.snapshot(s.quietMetrics));
+    if (!line) { node.hidden = true; return; }
+    node.textContent = line;
+    node.hidden = false;
+  }
+
   function renderStillOpenQuality(s) {
     const node = document.getElementById('stillOpenQuality');
     if (!node) return;
@@ -679,6 +689,7 @@
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderCloseQuality(s);
+    renderQuiet(s);
     renderStillOpenQuality(s);
     await renderLearned();
     renderSensitivity(s);
