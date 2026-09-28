@@ -350,31 +350,28 @@
 .flow-chip.flow-chip-warn    { background: #8A5A00; }
 .flow-chip.flow-chip-error   { background: #A32F22; }
 
-/* The receipt state: what was written, where, and how to take it back. A
-   glass card in the same family as the idle card above (light gradient,
-   soft border, soft shadow) rather than a flat solid-color block — the
-   flat block was the one piece of this UI that still looked like a plain
-   HTML alert next to the rest of the site's glass language. */
+/* The receipt state: what was written, and how to take it back. Flat on
+   purpose. A glass shine or a filled Undo pill reads as a second Do It
+   and fights the one line that matters: Handled, then the record. */
 .flow-chip.flow-chip-done {
   all: initial;
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 12px;
   font-family: inherit;
   cursor: default;
-  padding: 9px 14px 9px 10px;
+  padding: 12px 14px;
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255,255,255,.95) 0%, rgba(234,247,240,.92) 100%);
-  border: 1px solid rgba(15,102,64,.28);
-  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.85), inset 0 -8px 18px rgba(15,102,64,.08),
-              0 10px 26px -16px rgba(15,102,64,.35);
+  background: #f3faf6;
+  border: 1px solid rgba(15,102,64,.22);
+  box-shadow: none;
 }
 .flow-chip-done-icon {
   flex: none; width: 20px; height: 20px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  background: linear-gradient(180deg, #17a866, #0F6640);
-  box-shadow: 0 0 0 3px rgba(15,166,102,.16), 0 4px 10px -4px rgba(15,102,64,.6);
+  background: #0F6640;
+  box-shadow: none;
   color: #fff; font-size: 12px; font-weight: 800; line-height: 1;
 }
 .flow-chip.flow-chip-done .flow-chip-label { color: #0B4F32; font-weight: 700 }
@@ -412,44 +409,57 @@
 }
 .flow-chip-detail .flow-chip-label { font-size: 12.5px; }
 
-.flow-chip-actions { display: inline-flex; flex: 1 1 100%; align-items: center; gap: 6px; margin-inline-start: 4px; }
+.flow-chip-actions {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin-top: 2px;
+}
 .flow-chip-link {
   all: initial;
+  display: inline-block;
   font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
   color: #0F6640;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
-  padding: 5px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(15,102,64,.35);
-  background: rgba(15,102,64,.06);
-  line-height: 1;
-  transition: background .15s, border-color .15s;
+  padding: 6px 0;
+  min-height: 32px;
+  line-height: 1.35;
+  background: none;
+  border: none;
 }
-.flow-chip-link:hover { background: rgba(15,102,64,.14); border-color: rgba(15,102,64,.5); }
-.flow-chip-link:focus-visible { outline: 2px solid #0F6640; outline-offset: 1px; }
+.flow-chip-link:hover { color: #083d26; }
+.flow-chip-link:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
 
-/* Undo is the one control on the receipt that changes what was just
-   written. View stays the quiet outline above; Undo is filled so the two
-   cannot be read as the same kind of link. It is not a second Do It —
-   Do It keeps the blue shell/ring/shine, and this stays in the receipt's
-   own green. */
+/* Undo is not a second Do It. Do It keeps shell/ring/shine. This is the
+   sentence that names the record, as a text control, so the receipt has
+   one hierarchy: Handled, what landed, how to take it back. */
 .flow-chip-undo {
   all: initial;
+  display: inline-block;
+  max-width: 100%;
   font-family: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0B4F32;
   cursor: pointer;
-  padding: 6px 12px;
-  border-radius: 999px;
-  border: 1px solid #0B4F32;
-  background: linear-gradient(180deg, #17a866, #0F6640);
-  line-height: 1;
+  padding: 6px 0;
+  min-height: 32px;
+  border: none;
+  background: none;
+  border-radius: 0;
+  line-height: 1.35;
+  text-align: start;
+  white-space: normal;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
-.flow-chip-undo:hover { filter: brightness(1.06); }
+.flow-chip-undo:hover { color: #083d26; }
 .flow-chip-undo:disabled { opacity: .65; cursor: default; }
 .flow-chip-undo:focus-visible { outline: 2px solid #0F6640; outline-offset: 2px; }
 
@@ -483,27 +493,55 @@
   flex: 1 1 100%;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
+  font-weight: 600;
+  line-height: 1.4;
   color: #0B4F32;
   white-space: normal;
 }
 
-/* The sentence under Undo. Same weight as the written line so "what
-   landed" and "how to take it back" are read together. Amber only
-   after a reverse that did not finish — the button itself stays Undo. */
+/* Shown only after a reverse that did not finish. The control itself
+   goes back to the word Undo; this line is the honest remainder, not
+   a second headline. */
 .flow-chip-undo-hint {
   all: unset;
   display: block;
   flex: 1 1 100%;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
-  color: #0B4F32;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #8A5A00;
   white-space: normal;
 }
+.flow-chip-undo-hint[hidden] { display: none; }
 .flow-chip-undo-failed { color: #8A5A00; }
+
+@media (prefers-color-scheme: dark) {
+  .flow-chip.flow-chip-done {
+    background: #102118;
+    border-color: rgba(155, 231, 196, .28);
+  }
+  .flow-chip-handled,
+  .flow-chip-written,
+  .flow-chip-undo,
+  .flow-chip.flow-chip-done .flow-chip-label { color: #d8f3e4; }
+  .flow-chip-undo:hover,
+  .flow-chip-link:hover { color: #f3faf6; }
+  .flow-chip-link,
+  .flow-chip-first-close { color: #9be7c4; }
+  .flow-chip-done-icon { background: #1f8f5a; }
+  .flow-chip.flow-chip-done .flow-chip-process-name {
+    color: #9be7c4;
+    background: rgba(155, 231, 196, .12);
+    border-color: rgba(155, 231, 196, .28);
+  }
+  .flow-chip-handled-partial,
+  .flow-chip-undo-hint,
+  .flow-chip-undo-failed,
+  .flow-chip-partial-note { color: #f0c36a; }
+  .flow-chip-undo:focus-visible,
+  .flow-chip-link:focus-visible { outline-color: #9be7c4; }
+}
 
 .flow-chip-first-close {
   all: unset;
