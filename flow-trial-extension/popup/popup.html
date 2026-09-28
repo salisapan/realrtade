@@ -97,16 +97,21 @@
   <script src="../core/extract.js"></script>
   <script src="../core/judgment.js"></script>
   <script src="../src/storage.js"></script>
-  <!-- actions.js exposes PROCESS_CATALOG/isNetRejected as static reads with
-       no call into planFor()/processFor() from the popup, so it loads fine
-       here without intent.js (which those two functions reference, but only
-       inside function bodies the popup never executes). -->
+  <!-- actions.js exposes PROCESS_CATALOG/isNetRejected as static reads.
+       planFor() is not called from the popup. intent.js is loaded above
+       so the Open list can rejudge a stored row. -->
   <script src="../core/actions.js"></script>
   <script src="../core/execution-memory.js"></script>
   <script src="../core/close-memory.js"></script>
   <script src="../core/pmf-metrics.js"></script>
   <script src="../core/classification-metrics.js"></script>
   <script src="../core/close-quality-metrics.js"></script>
+  <!-- Still Open rejudges stored rows against the same silence bar as the
+       chip. These four have to load before still-open.js runs select(). -->
+  <script src="../core/google-closes.js"></script>
+  <script src="../core/fact-reply.js"></script>
+  <script src="../core/close-families.js"></script>
+  <script src="../core/intent.js"></script>
   <script src="../core/still-open.js"></script>
   <!-- Wires execution-memory.js and close-memory.js to chrome.storage.local.
        Must load after both, and after close-quality-metrics.js, before popup.js. -->

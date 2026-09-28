@@ -130,6 +130,7 @@ function load(stored, opts) {
   // the real extension.
   const loadOrder = [
     [CORE, 'domains.js'], [CORE, 'connectors.js'], [CORE, 'extract.js'], [CORE, 'judgment.js'],
+    [CORE, 'google-closes.js'], [CORE, 'fact-reply.js'], [CORE, 'close-families.js'], [CORE, 'intent.js'],
     [CORE, 'close-quality-metrics.js'],
     [CORE, 'still-open.js'],
     [SRC, 'storage.js'],
@@ -182,7 +183,12 @@ async function run() {
       log: [
         { ts: Date.now(), kind: 'shown', messageId: 'm1', threadId: 't1', process: proc, sender: { name: 'Dana Cole' }, subject: 'Invoice #4', app: 'gmail', threadUrl: 'https://mail.google.com/x/1', intent: datedIntent(isoDaysFromNow(1)) },
         { ts: Date.now(), kind: 'shown', messageId: 'm2', threadId: 't2', process: proc, sender: { email: 'sam@example.com' }, subject: null, threadUrl: 'https://mail.google.com/x/2', intent: Object.assign(datedIntent(isoDaysFromNow(3)), { label: '' }) },
-        { ts: Date.now(), kind: 'shown', messageId: 'meet', threadId: 't3', process: { id: 'schedule', name: 'Schedule', steps: [{ id: 'calendar' }] }, sender: { name: 'Pat' }, subject: 'Sync', intent: { type: 'event', label: 'Meeting', confidence: 'high' } }
+        { ts: Date.now(), kind: 'shown', messageId: 'meet', threadId: 't3', process: { id: 'schedule', name: 'Schedule', steps: [{ id: 'calendar' }] }, sender: { name: 'Pat' }, subject: 'Sync', intent: { type: 'event', label: 'Meeting', confidence: 'high' } },
+        { ts: Date.now(), kind: 'shown', messageId: 'hedge', threadId: 't4', process: proc, sender: { name: 'Ada' }, subject: 'Maybe send the invoice if you feel like it.', intent: { type: 'request', label: 'Maybe send the invoice', confidence: 'high', personalClose: 'follow-up-ask', entities: { what: 'Maybe send the invoice if you feel like it.', requestWhat: 'Maybe send the invoice if you feel like it.' }, facts: {} } },
+        { ts: Date.now(), kind: 'shown', messageId: 'news', threadId: 't5', process: proc, sender: { name: 'Ada' }, subject: 'Hope this email finds you well. Could you send the invoice?', intent: { type: 'request', label: 'Could you send the invoice?', confidence: 'high', personalClose: 'follow-up-ask', entities: { what: 'Hope this email finds you well. Could you send the invoice?' }, facts: {} } },
+        { ts: Date.now(), kind: 'shown', messageId: 'multi', threadId: 't6', process: proc, sender: { name: 'Ada' }, subject: 'Please send the invoice. Put it on the calendar and in the task note.', intent: { type: 'request', label: 'Send the invoice', confidence: 'high', personalClose: 'follow-up-ask', entities: { what: 'Please send the invoice. Put it on the calendar and in the task note.' }, facts: {} } },
+        { ts: Date.now(), kind: 'shown', messageId: 'quote', threadId: 't7', process: proc, sender: { name: 'Ada' }, subject: 'Sounds good, thanks!', text: 'Sounds good, thanks!\n\nOn Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:\n> Could you send the invoice?', intent: { type: 'request', label: 'Could you send the invoice?', confidence: 'high', personalClose: 'follow-up-ask', entities: { what: 'Could you send the invoice?', requestWhat: 'Could you send the invoice?' }, facts: {} } },
+        { ts: Date.now(), kind: 'shown', messageId: 'unsure', threadId: 't8', process: proc, sender: { name: 'Ada' }, subject: 'Please send the invoice.', intent: { type: 'request', label: 'Send the invoice', confidence: 'unsure', personalClose: 'follow-up-ask', entities: { what: 'Please send the invoice.' }, facts: {} } }
       ]
     };
     const { sandbox, document } = load(stored);
@@ -194,7 +200,7 @@ async function run() {
 
     const host = document.getElementById('open-list');
     const rows = find(host, 'log-item');
-    check('renders one row per Still Open card, and drops the meeting', rows.length === 2, rows.length);
+    check('renders the two dated closes and drops the meeting, hedge, newsletter, multi-target, quoted ask, and unsure row', rows.length === 2, rows.length);
 
     const empty = document.getElementById('open-empty');
     check('the empty state stays hidden when something is open', empty.hidden === true, empty.hidden);

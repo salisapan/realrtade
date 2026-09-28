@@ -13,7 +13,7 @@ const vm = require('vm');
 const CORE = path.join(__dirname, '..', 'core');
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js', 'still-open.js']) {
+for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'fact-reply.js', 'close-families.js', 'intent.js', 'actions.js', 'still-open.js']) {
   vm.runInContext(fs.readFileSync(path.join(CORE, file), 'utf8'), sandbox, { filename: file });
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
@@ -47,11 +47,34 @@ function candidate(text, id) {
     threadUrl: 'https://mail.google.com/mail/u/0/#all/' + id,
     sender: { name: 'Dana', email: 'dana@example.com' },
     subject: text.slice(0, 80),
+    text: text,
     ts: NOW,
     app: 'gmail',
     intent: intent,
     process: process
   };
+}
+
+// A stored snapshot that still claims a personal close. The morning list
+// has to drop it when the current chip would stay silent — the tag is
+// not newer than the silence bar.
+function staleClose(text, id) {
+  const row = candidate(text, id);
+  const prior = row.intent && typeof row.intent === 'object' ? row.intent : {};
+  row.intent = {
+    type: prior.type || 'request',
+    label: prior.label || 'Send it',
+    confidence: 'high',
+    personalClose: prior.personalClose || 'follow-up-ask',
+    closeFamily: prior.closeFamily || null,
+    facts: prior.facts || {},
+    entities: Object.assign({ what: text, requestWhat: text }, prior.entities || {}),
+    signals: prior.signals || { score: 80 }
+  };
+  if (!row.process || !row.process.steps || !row.process.steps.length) {
+    row.process = { id: 'reply-track', steps: [{ id: 'task' }] };
+  }
+  return row;
 }
 
 function ids(list) {
@@ -285,6 +308,111 @@ console.log('\n--- still open: same thread collapses to one card ---\n');
   const picked = FlowStillOpen.select([a, b], NOW);
   check('two closes in one thread become one card', picked.length === 1, ids(picked));
   check('the higher-ranked close is the one kept', picked[0].messageId === 'b', ids(picked));
+}
+
+console.log('\n--- still open: trust-finish silence (A–J) stays off the morning list ---\n');
+{
+  // The same classes the chip refuses after the trust finish: hedge,
+  // more than one candidate, a weak / low / unsure score, an ask that
+  // lives only in the quoted history, and newsletter noise. A stored
+  // personalClose tag does not put them back.
+  const kills = [
+    ['hedge maybe', 'Maybe send the invoice if you feel like it.'],
+    ['hedge might', 'I might send the contract by Friday, September 18.'],
+    ['hedge he', 'אולי תשלח את החוזה מתישהו.'],
+    ['newsletter', 'Hope this email finds you well. Could you send the invoice?'],
+    ['bump', 'Just bumping this — could you send the invoice?'],
+    ['fyi wrap', 'FYI, we agreed to file the amendment by September 21.'],
+    ['two targets', 'Please send the invoice. Put it on the calendar and in the task note.'],
+    ['doc comment', 'Please send the contract and leave a doc comment.'],
+    ['quoted old ask', ['Sounds good, thanks!', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')],
+    ['weak invoice', 'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.'],
+    ['two facts', "What's the renewal amount and the start date in the pricing sheet?"],
+    ['hedge sheet', 'Maybe tell me the amount from the sheet if you have a minute.']
+  ];
+  const rows = kills.map(([id, text]) => staleClose(text, id));
+  const picked = FlowStillOpen.select(rows, NOW);
+  check('trust-finish silence produces an empty morning list', picked.length === 0, ids(picked));
+  rows.forEach((row) => {
+    check('stale tag still scores 0: ' + row.messageId, FlowStillOpen.scoreOf(row, NOW) === 0, {
+      type: row.intent && row.intent.type,
+      family: row.intent && row.intent.closeFamily,
+      confidence: row.intent && row.intent.confidence,
+      score: FlowStillOpen.scoreOf(row, NOW)
+    });
+  });
+
+  const unsure = {
+    messageId: 'unsure',
+    threadId: 't-unsure',
+    subject: 'Please send the invoice.',
+    text: 'Please send the invoice.',
+    ts: NOW,
+    intent: {
+      type: 'request',
+      label: 'Send the invoice',
+      confidence: 'unsure',
+      personalClose: 'follow-up-ask',
+      facts: {},
+      entities: { what: 'Please send the invoice.', requestWhat: 'Please send the invoice.' }
+    },
+    process: { id: 'reply-track', steps: [{ id: 'task' }] }
+  };
+  const low = {
+    messageId: 'low',
+    threadId: 't-low',
+    subject: 'Please send the invoice.',
+    text: 'Please send the invoice.',
+    ts: NOW,
+    intent: {
+      type: 'request',
+      label: 'Send the invoice',
+      confidence: 'low',
+      personalClose: 'follow-up-ask',
+      facts: {},
+      entities: { what: 'Please send the invoice.', requestWhat: 'Please send the invoice.' }
+    },
+    process: { id: 'reply-track', steps: [{ id: 'task' }] }
+  };
+  check('unsure confidence is not a morning card', FlowStillOpen.scoreOf(unsure, NOW) === 0 && FlowStillOpen.select([unsure], NOW).length === 0);
+  check('low confidence is not a morning card', FlowStillOpen.scoreOf(low, NOW) === 0 && FlowStillOpen.select([low], NOW).length === 0);
+
+  // One fact from one Sheet chips in the open thread. The morning list
+  // has no cell to check, so it stays off — same as the inbox scan.
+  const fact = candidate("What's the renewal amount in the pricing sheet?", 'fact');
+  if (!fact.process) fact.process = { id: 'reply-track', steps: [{ id: 'task' }] };
+  check('a fact ask does not become a morning card', FlowStillOpen.select([fact], NOW).length === 0, {
+    type: fact.intent && fact.intent.type,
+    family: fact.intent && fact.intent.closeFamily,
+    score: FlowStillOpen.scoreOf(fact, NOW)
+  });
+
+  const kept = [
+    candidate('I will send you the signed contract by Friday, September 18.', 'dated'),
+    candidate('Please follow up with Dana about the invoice.', 'ask'),
+    candidate('Confirming the amount is $4,200 for the year.', 'amount'),
+    candidate('Could you send the invoice?', 'file'),
+    candidate('I will have the redline to you by September 24.', 'redline'),
+    candidate('I will send the contract by Friday, September 18. I might also call.', 'aside'),
+    candidate([
+      'I will send you the signed contract by Friday, September 18.',
+      '',
+      'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:',
+      '> Could you send the invoice?'
+    ].join('\n'), 'reply-on-quote')
+  ];
+  kept.forEach((row) => {
+    const alone = FlowStillOpen.select([row], NOW);
+    check('clear close still shows: ' + row.messageId, alone.length === 1 && alone[0].messageId === row.messageId, {
+      type: row.intent && row.intent.type,
+      kind: FlowStillOpen.closeKind(row.intent),
+      score: FlowStillOpen.scoreOf(row, NOW)
+    });
+    const beside = FlowStillOpen.select(rows.concat([unsure, low, fact, row]), NOW);
+    check('clear close survives beside silence: ' + row.messageId,
+      ids(beside).indexOf(row.messageId) !== -1 && beside.length === 1,
+      ids(beside));
+  });
 }
 
 console.log('\nTOTAL FAILURES:', failures);

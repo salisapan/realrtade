@@ -12,6 +12,13 @@
 // tag stay off the list. A short list is the product. An empty list is
 // a win: never pad up to the cap.
 //
+// The trust-finish silence bar (families A–J) is a zero factor, same as
+// a missed stake. Hedge, more than one candidate, a weak / low / unsure
+// score, an ask that lives only in the quoted history, and newsletter
+// noise do not get a card — even when an older snapshot still carries
+// a personalClose tag. A fact ask stays off too: the morning list has
+// no Sheet or Doc cell to check. Wrong card over silence.
+//
 // Rank = stakes × explicitness × recency-of-deadline × confidence.
 // Any factor of 0 drops the candidate. The cap is 3. Fewer pass, fewer
 // show.
@@ -29,12 +36,19 @@ const FlowStillOpen = (() => {
 
   // Soft stakes. A tagged close that is really a nudge, a newsletter, or
   // an unread count does not get a card — silence, not a weaker card.
-  const SOFT = /\b(unread|newsletter|no action needed|just (?:checking|circling|bumping)|fyi|for your information)\b/i;
-  const SOFT_HE = /(אין צורך בפעולה|לידיעה בלבד|ניוזלטר|לא נקרא)/;
+  // The family module is the bar when it is loaded. These patterns are
+  // the same classes, so a host that only has this file still omits them.
+  const SOFT = /\b(unread|newsletter|no action needed|just (?:checking|circling|bumping)|fyi|for your information|hope this (?:email )?finds you well|unsubscribe|book a demo|free trial|circling back|quick bump)\b/i;
+  const SOFT_HE = /(אין צורך בפעולה|לידיעה בלבד|ניוזלטר|לא נקרא|לידיעתך)/;
+  const HEDGE = /\b(?:maybe|perhaps|possibly|no rush|if possible|tentatively|might|whenever you|if you feel|sometime|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו)/i;
+  const ASK_CUE = /\b(?:can you|could you|would you|please|kindly|send|forward|chase|nudge|will send|agreed|confirming)\b|(?:תשלח|בבקשה|סוכם|מאשר)/;
 
   function closeKind(intent) {
     if (!intent || typeof intent !== 'object') return null;
-    if (intent.type === 'event') return null;
+    if (!intent.type || intent.type === 'event' || intent.type === 'fact') return null;
+    if (intent.googleSilence || intent.googleWait) return null;
+    if (intent.closeFamily === 'J') return null;
+    if (intent.confidence === 'low' || intent.confidence === 'unsure') return null;
     if (PERSONAL_KINDS.indexOf(intent.personalClose) !== -1) return intent.personalClose;
     // The user's own dated promise. intent.js leaves personalClose unset
     // on this type so close-memory does not treat a reminder as a matter
@@ -57,6 +71,113 @@ const FlowStillOpen = (() => {
   function isSoft(item) {
     const text = blob(item);
     return SOFT.test(text) || SOFT_HE.test(text);
+  }
+
+  function clockOf(now) {
+    if (now instanceof Date) return now;
+    if (typeof now === 'number') return new Date(now);
+    return new Date();
+  }
+
+  // The sentence the chip would judge. A stored snapshot may only have
+  // the subject and the quoted close; a scan that kept the message
+  // passes it as item.text.
+  function evidenceText(item) {
+    if (item && typeof item.text === 'string' && item.text.trim()) return item.text;
+    return blob(item);
+  }
+
+  function sentencesOf(text) {
+    return String(text || '').split(/(?<=[.!?;])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+  }
+
+  // Every ask in the message is hedged, or the message is newsletter
+  // noise. One clean sentence keeps the close — "I might also call"
+  // after a dated promise is not this.
+  function localAskBlocked(text) {
+    if (SOFT.test(text) || SOFT_HE.test(text)) return true;
+    let saw = false;
+    let open = false;
+    const sentences = sentencesOf(text);
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      if (!ASK_CUE.test(sentence)) continue;
+      saw = true;
+      if (!HEDGE.test(sentence)) open = true;
+    }
+    return saw && !open;
+  }
+
+  // Two places to put one file, or a doc comment we cannot write.
+  // Same silence as family B when close-families.js is not on the page.
+  function localMulti(text) {
+    const cal = /\b(?:on the calendar|calendar invite|calendar note)\b|ביומן/i.test(text);
+    const task = /\b(?:on the task|in the task note|task note|as a task)\b|במשימה/i.test(text);
+    const doc = /\b(?:docs? comment|comment on the doc)\b|הערה במסמך/i.test(text);
+    const file = /\b(?:send|forward|attach|שלח|תשלח)\b/i.test(text);
+    const places = (cal ? 1 : 0) + (task ? 1 : 0) + (doc ? 1 : 0);
+    if (doc && file) return true;
+    return places > 1 && file;
+  }
+
+  function freshIntent(text, item, now) {
+    if (!text || typeof FlowIntent === 'undefined' || !FlowIntent.classify) return null;
+    return FlowIntent.classify(text, {
+      now: clockOf(now),
+      senderEmail: item && item.sender && item.sender.email
+    });
+  }
+
+  // True when this row would stay silent on the chip, or it is a fact
+  // ask the morning list cannot check. A personalClose tag does not win.
+  function silenceClass(item, now) {
+    const intent = (item && item.intent) || {};
+    if (intent.googleSilence || intent.googleWait) return true;
+    if (intent.confidence === 'low' || intent.confidence === 'unsure') return true;
+    if (intent.closeFamily === 'J' || intent.type === 'fact') return true;
+
+    const text = evidenceText(item);
+    if (!text) return false;
+
+    let judged = text;
+    if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) {
+      const fresh = FlowJudgment.newContent(text);
+      if (!String(fresh || '').trim()) return true;
+      if (fresh !== String(text).trim()) {
+        const again = freshIntent(fresh, item, now);
+        const headIsClose = again && again.type &&
+          (!FlowIntent.shouldShowChip || FlowIntent.shouldShowChip(again)) &&
+          closeKind(again);
+        if (!headIsClose) return true;
+        judged = fresh;
+      }
+    }
+
+    const blocked = (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked)
+      ? FlowCloseFamilies.askBlocked(judged)
+      : localAskBlocked(judged);
+    if (blocked) return true;
+
+    if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.assess) {
+      const hit = FlowCloseFamilies.assess(judged, intent.facts || null, {
+        now: clockOf(now),
+        senderEmail: item && item.sender && item.sender.email
+      });
+      if (hit && hit.suppress) return true;
+    } else if (localMulti(judged)) return true;
+
+    if (typeof FlowFactReply !== 'undefined' && FlowFactReply.blocksInbox && FlowFactReply.blocksInbox(intent, judged)) return true;
+
+    // Full message: the current classifier is the bar, not the snapshot.
+    if (item && typeof item.text === 'string' && item.text.trim()) {
+      const again = freshIntent(item.text, item, now);
+      if (!again || !again.type) return true;
+      if (again.googleSilence || again.googleWait) return true;
+      if (again.confidence === 'low' || again.confidence === 'unsure') return true;
+      if (typeof FlowIntent !== 'undefined' && FlowIntent.shouldShowChip && !FlowIntent.shouldShowChip(again)) return true;
+      if (!closeKind(again)) return true;
+    }
+    return false;
   }
 
   function hasHebrew(item) {
@@ -124,6 +245,7 @@ const FlowStillOpen = (() => {
     const intent = item.intent;
     const kind = closeKind(intent);
     if (!kind) return 0;
+    if (silenceClass(item, now)) return 0;
     if (isSoft(item)) return 0;
     const stakes = STAKES[kind] || 0;
     const explicit = explicitness(intent);
@@ -143,6 +265,7 @@ const FlowStillOpen = (() => {
       threadUrl: entry.threadUrl || null,
       sender: entry.sender || {},
       subject: entry.subject || '',
+      text: entry.text || '',
       ts: entry.ts || 0,
       app: entry.app || 'gmail',
       intent: intent,
