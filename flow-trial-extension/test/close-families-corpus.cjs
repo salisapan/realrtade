@@ -117,6 +117,8 @@ const kills = [
   ['letter no template', 'Please write a letter to Dana and send it.'],
   ['he quote no template', 'אין הצעת מחיר. תכין אחת ותשלח לדנה.'],
   ['unclear template', 'Please draft something from our company template and send it to Dana.'],
+  ['ask glance', 'Hey Glance, can we chat about what to do with this thread?'],
+  ['general chat', 'Let\'s chat and you can ask me whatever you need about the quote.'],
   ['weak invoice', 'Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.'],
   ['retract', 'Could you send the invoice?\nNever mind.'],
   ['quote', ['Sounds good, thanks!', '', 'On Mon, Sep 1, 2025 at 9:41 AM Dana Cole <dana@meridian.com> wrote:', '> Could you send the invoice?'].join('\n')]
@@ -204,9 +206,16 @@ console.log('\n--- I is not a rescue for a weak judgment ---\n');
 
   const clear = classify('Please draft the contract from our company template and send it to Dana.');
   const card = FlowCloseFamilies.detailSurface(clear, ['party', 'amount'], null);
-  check('one or two missing slots are a card', card.surface === 'card' && card.slots.length === 2, card);
+  check('one or two missing fields are a scoped detail-fill',
+    card.surface === 'detail-fill' && card.scope === 'critical-fields' &&
+      card.slots.length === 2 && card.slots[0] === 'party' && card.slots[1] === 'amount' &&
+      card.surface !== 'chat' && !card.chat && !card.prompt && !card.assistant,
+    card);
   const one = FlowCloseFamilies.detailSurface(clear, ['amount'], null);
-  check('a single missing slot is a card', one.surface === 'card' && one.slots.length === 1, one);
+  check('a single missing field is a scoped detail-fill',
+    one.surface === 'detail-fill' && one.scope === 'critical-fields' &&
+      one.slots.length === 1 && one.slots[0] === 'amount' && !one.chat && !one.assistant,
+    one);
   const list = FlowCloseFamilies.detailSurface(clear, eight, null);
   check('more than two missing slots stay silence', list.surface === 'silence' && list.slots.length === 0, list);
   check('silence is not a chat', list.surface !== 'checklist' && !list.chat && !list.prompt && !list.assistant, list);
@@ -217,7 +226,8 @@ console.log('\n--- I is not a rescue for a weak judgment ---\n');
     silenced);
   const still = FlowCloseFamilies.route(clear, ['party', 'amount']);
   check('two missing fields still route create-when-missing',
-    still.closeFamily === 'I' && still.createWhenMissing === true && FlowIntent.shouldShowChip(still), still);
+    still.closeFamily === 'I' && still.createWhenMissing === true && still.type === 'request' && FlowIntent.shouldShowChip(still), still);
+  check('that route is not a general chat classification', still.type !== 'chat' && !still.chat, still);
   const classified = FlowIntent.classify(
     'Please draft the contract from our company template and send it to Dana.',
     { senderEmail: 'dana@meridian.com', now: NOW, calibration: null, missingSlots: three }

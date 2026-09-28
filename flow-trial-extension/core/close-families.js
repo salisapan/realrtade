@@ -10,9 +10,10 @@
 // named — the template the later Do It would use. Any one of those missing
 // is silence, including a clear asset with no template (never a blank Doc)
 // and a template with no clear what. A weak score is not promoted to get
-// here. The card that may follow holds at most two named fields. More than
-// two missing fields is a silence classification: no chip and no chat box.
-// This file does not render that UI and does not create a Doc.
+// here. At most two remaining critical fields may open a scoped detail-fill.
+// That fill names those fields and nothing else. More than two is a silence
+// classification. A general chat or an ask-Glance surface is never a
+// classification. This file does not render that UI and does not create a Doc.
 
 const FlowCloseFamilies = (() => {
   const FILE_EN = /\b(receipts?|invoices?|quotes?|contracts?|signed pdfs?|passports?(?:\s+scans?)?|insurance forms?|tax (?:docs?|documents?|returns?)|proposals?|decks?|logos?|briefs?|statements?|purchase orders?|POs?|W-?9s?|photo ids?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
@@ -387,7 +388,8 @@ const FlowCloseFamilies = (() => {
   }
 
   // Create-when-missing routes only at two missing fields or fewer.
-  // More than two is silence. There is no chat surface.
+  // More than two is silence. The route is still a request close, never
+  // a general chat classification.
   function route(intent, missingSlots) {
     if (!intent || !intent.type) return silenceClassification();
     if (intent.closeFamily !== 'I' || !intent.createWhenMissing) return intent;
@@ -396,8 +398,11 @@ const FlowCloseFamilies = (() => {
     return intent;
   }
 
-  // Card policy for a route that already cleared the field gate. At most
-  // two named fields. Dismiss or unsure is silence. Then one Do It.
+  // Fields, then a scoped fill. Silence wins first: a weak score, a
+  // dismiss, or more than two missing fields never opens a surface.
+  // One or two remaining critical fields are a detail-fill of those
+  // names only. No assistant, no free prompt, no ask-Glance chat.
+  // Zero missing fields is one Do It.
   function detailSurface(intent, missingSlots, signal) {
     const names = namedSlots(missingSlots);
     const weak = !intent || !intent.type || intent.confidence === 'low' || intent.confidence === 'unsure';
@@ -407,7 +412,7 @@ const FlowCloseFamilies = (() => {
       if (intent.closeFamily === 'I') return { surface: 'silence', slots: [] };
       return { surface: 'doit', slots: [] };
     }
-    if (names.length > 0) return { surface: 'card', slots: names };
+    if (names.length > 0) return { surface: 'detail-fill', scope: 'critical-fields', slots: names };
     return { surface: 'doit', slots: [] };
   }
 
