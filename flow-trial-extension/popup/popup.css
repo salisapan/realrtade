@@ -301,7 +301,7 @@ main{padding:var(--space-5)}
 .log-kind.written{background:var(--ok-wash); color:var(--ok)}
 .log-kind.clicked{background:var(--accent-wash); color:var(--accent)}
 .log-where{display:block; color:var(--ink-2); font-size:.76rem; margin-top:3px}
-.log-undo-note{display:block; color:var(--ok); font-size:.76rem; font-weight:600; margin-top:6px; line-height:1.4}
+.log-undo-note{display:block; color:var(--ink-2); font-size:.76rem; font-weight:600; margin-top:6px; line-height:1.4}
 .log-undo-failed{color:var(--err)}
 .when{color:var(--ink-3); font-size:.7rem; display:block; margin-top:4px}
 .log-acts{display:flex; gap:var(--space-2); margin-top:var(--space-3)}

@@ -1434,19 +1434,21 @@
     detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
     done.appendChild(detail);
 
+    const undoHint = FlowReceipt.undoHint(wheres);
+    // The sentence is the control. A filled pill would be a second Do It.
+    const undo = el('button', 'flow-chip-undo', undoHint);
+    undo.type = 'button';
+    const hint = el('span', 'flow-chip-undo-hint');
+    hint.hidden = true;
+
     const actionsRow = el('span', 'flow-chip-actions');
+    actionsRow.appendChild(undo);
     for (const r of succeeded) {
       if (!r.response.url) continue;
       const view = el('a', 'flow-chip-link', succeeded.length > 1 ? 'View ' + r.response.where : 'View');
       view.href = r.response.url; view.target = '_blank'; view.rel = 'noopener';
       actionsRow.appendChild(view);
     }
-
-    const undoHint = FlowReceipt.undoHint(wheres);
-    const undo = el('button', 'flow-chip-undo', copy.undoLabel);
-    undo.type = 'button';
-    undo.setAttribute('aria-label', undoHint);
-    const hint = el('span', 'flow-chip-undo-hint', undoHint);
     undo.addEventListener('click', () => {
       undo.textContent = 'Undoing…';
       undo.disabled = true;
@@ -1494,13 +1496,12 @@
           });
           undo.textContent = copy.undoLabel;
           undo.disabled = false;
-          undo.setAttribute('aria-label', note);
+          hint.hidden = false;
           hint.textContent = note;
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
         }
       });
     });
-    actionsRow.appendChild(undo);
     done.appendChild(actionsRow);
     done.appendChild(hint);
 
