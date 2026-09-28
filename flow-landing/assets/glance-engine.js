@@ -331,6 +331,23 @@ const FlowExtract = (() => {
       return { raw: m[0], iso: iso(d) };
     }
 
+    // "Thursday at 11" / "this Friday at 3pm". The clock is what makes the
+    // bare weekday a day rather than a signature line that just says Monday.
+    // "this Friday" said on Friday is today; a bare Friday said on Friday
+    // is the following one, same rule as "by Friday".
+    m = text.match(new RegExp('\\b(this\\s+|next\\s+)?(' + DAYS.join('|') + ')\\b(?=\\s+at\\s+\\d)', 'i'));
+    if (m) {
+      const target = DAYS.indexOf(m[2].toLowerCase());
+      const d = new Date(now);
+      let delta = (target - d.getDay() + 7) % 7;
+      const flagged = (m[1] || '').toLowerCase();
+      if (delta === 0) {
+        if (flagged.indexOf('this') !== 0) delta = 7;
+      } else if (flagged.indexOf('next') === 0) delta += 7;
+      d.setDate(d.getDate() + delta);
+      return { raw: m[0], iso: iso(d) };
+    }
+
     // Hebrew equivalent of the "by/on <weekday>" block above — "עד יום שני"
     // (by Monday), "ביום רביעי" (on Wednesday), "לא יאוחר מיום חמישי" (no
     // later than Thursday). Requires the same scheduling-word guard so a
@@ -348,7 +365,7 @@ const FlowExtract = (() => {
     // it never fired and "next Monday" was filed on this Monday. הבא must
     // not be a prefix of a longer word ("הבאנו", "we brought") — there is
     // no \b after Hebrew, so the lookahead is the boundary.
-    m = text.match(new RegExp('(?:עד|ב-?|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')(?:\\s+הבא(?![\\u0590-\\u05FF]))?'));
+    m = text.match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')(?:\\s+הבא(?![\\u0590-\\u05FF]))?'));
     if (m) {
       const target = DAYS_HE.indexOf(m[1]);
       const d = new Date(now);
@@ -382,6 +399,13 @@ const FlowExtract = (() => {
       const d = new Date(now);
       return { raw: m[0], iso: iso(d) };
     }
+    // "by EOD" / "due end of day" is today. A bare "end of day report"
+    // has no deadline word, so it is not a date.
+    m = text.match(/\b(?:by|before|due|until|no later than)\s+(?:the\s+)?(?:eod|end of day|close of business|cob)\b/i);
+    if (m) {
+      const d = new Date(now);
+      return { raw: m[0], iso: iso(d) };
+    }
 
     // מחרתיים before מחר so the longer word is not clipped. ל? covers
     // למחר ("for tomorrow"). אתמול stays unresolved: a past day is not
@@ -395,6 +419,11 @@ const FlowExtract = (() => {
       return { raw: m[1], iso: iso(d) };
     }
     m = text.match(/(?:פגישה|שיחה|עד)\s+היום(?![\u0590-\u05FF])|היום\s+בשעה/);
+    if (m) {
+      const d = new Date(now);
+      return { raw: 'היום', iso: iso(d) };
+    }
+    m = text.match(/(?:עד|לפני)\s+סוף\s+היום(?![\u0590-\u05FF])/);
     if (m) {
       const d = new Date(now);
       return { raw: 'היום', iso: iso(d) };
@@ -581,7 +610,7 @@ const FlowJudgment = (() => {
   // assertedIn's per-sentence negation/hedge/question check (unlike
   // HANDOFF/HANDOFF_HE above and LOST/LOST_HE below, which are bare
   // .test() and documented separately for exactly that reason).
-  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed|sounds good|works for (?:us|me)|happy to (?:move forward|proceed)|let'?s proceed|we'?re on board|consider it done|that works (?:for us|for me)?|agreed upon|in agreement|we concur|we'?re aligned|you have our agreement)\b/i;
+  const COMMIT = /\b(we'?re good (?:at|with)|agreed?(?: to| on)?|confirm(?:ed|ing)?|accept(?:ed)?|we'?ll take|executed|sounds good|works for (?:us|me)|happy to (?:move forward|proceed)|let'?s proceed|we'?re on board|consider it done|that works (?:for us|for me)?|agreed upon|in agreement|we concur|we'?re aligned|you have our agreement|you have my (?:ok|okay|approval)|give you our ok|i commit to|on the hook to|count on me to)\b/i;
   // An explicit, unambiguous authorisation. These carry more weight than the
   // general list because "Approved — go ahead" is the single most common real
   // decision in business email and it arrives with no money and no date
@@ -608,7 +637,7 @@ const FlowJudgment = (() => {
   // addition below was verified against the full negative-test corpus in
   // test/intent-actions-corpus.cjs (vague asks, cold pitches, small talk)
   // before being kept.
-  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|let (?:us|me) know)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
+  const HANDOFF = /\b(can you|could you|would you (?:be able to|mind)|would it be possible (?:for you )?to|I was hoping you could|please (?:can you |could you )?(?:send|update|confirm|review|approve|handle|process|arrange|ensure|provide|forward|share|submit|sign|upload|prepare|finalize|resend|reply|respond|schedule|pay|remit|wire|settle|let (?:us|me) know)|kindly (?:send|confirm|provide|forward|arrange|review|update|advise|pay|remit)|(?:we|I)(?:'d| would) appreciate (?:it )?if you|requesting (?:that )?you|asking you to|your (?:help|assistance|input|guidance) (?:is|would be) (?:needed|appreciated|required)|(?:we|I) need your (?:approval|confirmation|feedback|input|help|sign-?off)|need(?:s|ed)? you to|waiting on (?:your|you)|over to you|action required|at your earliest convenience)\b/i;
   // A disagreement about money.
   const DISPUTE = /\b(doesn'?t match|does not match|discrepan(?:cy|t)|billing error|double[- ]charged|overcharged|undercharged|incorrect (?:amount|invoice)|dispute|wrong amount|billing discrepancy|invoice error|charged incorrectly|duplicate charge|unauthorized charge)\b/i;
 
@@ -628,7 +657,7 @@ const FlowJudgment = (() => {
   // below threshold. Same false-positive-adjacent bug class this file's
   // NEG_BEFORE_HE/HEDGE_HE header comments already document — found here by
   // the same "run the negative corpus before committing" discipline.
-  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה)/;
+  const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה|אאשר|מתחייב|מתחייבת)/;
   const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל)/;
   const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא הולכים על זה|בחרנו באופציה אחרת|בחרנו בספק אחר|לצערנו לא נוכל|אנחנו לא ממשיכים איתכם|ירדנו מהעניין|החלטנו לוותר|לא מתאים לנו|הולכים על ספק אחר|פורשים מההסכם|לא נמשיך בתהליך)/;
   const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם|חתמתי על|נחתם וסגור|חתום ומאושר|נשלח חתום|העותק החתום מצורף|העסקה נסגרה|הניירת הושלמה)/;
@@ -662,7 +691,7 @@ const FlowJudgment = (() => {
   // HANDOFF on purpose — these go through directedAsk() below (negation and
   // a hedge sitting in front of the phrase still kill them) instead of
   // HANDOFF's bare .test(), which cannot see "please don't follow up".
-  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up)\b/i;
+  const FOLLOW_UP_ASK = /\b(?:please follow(?:\s*|-)?up|follow up (?:with|on)|need you to follow up|please (?:chase|nudge|ping)|send (?:a |the )?reminder)\b/i;
   const FOLLOW_UP_ASK_HE = /(?:^|\s)בבקשה\s+תעק(?:וב|בי|בו)|(?:^|\s)לעקוב\s+אחרי|(?:^|\s)תעק(?:וב|בי|בו)\s+אחרי/;
   // A first-person delivery promise. Not a COMMIT word ("agreed",
   // "approved") and not a reader reminder ("you agreed to") — "I will send

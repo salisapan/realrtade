@@ -469,12 +469,28 @@ const FlowIntent = (() => {
     // ask to meet at a clock time). A bare meeting announcement stays
     // untagged so personal close memory cannot treat it as one of those
     // closes. Absent on a miss.
+    // Family metadata is filled in after the hit is known. Declared here
+    // so finish() can read it; assigned once the soft/settled gates exist.
+    const familyBox = { hit: null };
+    function familyAgrees(type, fam) {
+      if (!fam || fam.suppress) return false;
+      if (fam.family === 'A' || fam.family === 'C' || fam.family === 'F' || fam.family === 'I' || fam.family === 'J') return type === TYPES.REQUEST;
+      if (fam.family === 'B') return type === TYPES.REQUEST || type === TYPES.SCHEDULED_EVENT || type === TYPES.DECISION_TO_LOG;
+      if (fam.family === 'D' || fam.family === 'G') return type === TYPES.SCHEDULED_EVENT || type === TYPES.DECISION_TO_LOG;
+      if (fam.family === 'E') return type === TYPES.DECISION_TO_LOG || type === TYPES.REQUEST;
+      return false;
+    }
     function finish(type, confidence, entities, personalClose, googleClose) {
       // A past day can still sit on facts — "the invoice that was due
       // March 3, 2024" — but it is not the deadline of this close. The
       // title, the "when" in the chip sentence, and the task's dateIso
-      // would otherwise file that old day.
-      if (isPast) entities = Object.assign({}, entities, { when: null, dateIso: null });
+      // would otherwise file that old day. A family that resolved a
+      // different, future day (a reschedule's new slot) keeps that day.
+      const famDate = entities && entities.dateIso;
+      const factIso = facts.date && facts.date.iso;
+      if (isPast && (!famDate || famDate === factIso)) {
+        entities = Object.assign({}, entities, { when: null, dateIso: null });
+      }
       const intent = {
         type, confidence,
         entities: Object.assign({ requestWhat, requestedObjectTerm }, entities),
@@ -482,7 +498,35 @@ const FlowIntent = (() => {
       };
       if (personalClose) intent.personalClose = personalClose;
       if (googleClose) intent.googleClose = googleClose;
-      return intent;
+      const fam = familyBox.hit;
+      if (familyAgrees(type, fam)) {
+        intent.closeFamily = fam.family;
+        if (fam.fileTarget) intent.fileTarget = fam.fileTarget;
+        if (fam.createWhenMissing) intent.createWhenMissing = true;
+        // Latest clear ask wins. The request pattern quotes the first
+        // handoff sentence; a later sentence that the family walk kept
+        // ("send the contract instead") is the close, including the file
+        // the draft would look up.
+        if (fam.what) {
+          const current = intent.entities.what || '';
+          const famAt = text.indexOf(fam.what);
+          const curAt = current ? text.indexOf(current) : -1;
+          if (famAt > curAt) {
+            intent.entities.what = fam.what;
+            if (fam.requestWhat) intent.entities.requestWhat = fam.requestWhat;
+            if (fam.objectTerm) intent.entities.requestedObjectTerm = fam.objectTerm;
+          }
+        }
+      }
+      return gateCreateWhenMissing(intent);
+    }
+    // A weak create-when-missing judgment stays silent. Field count does
+    // not. Up to four missing fields are a card; more than four is a
+    // chat fill of those names only.
+    function gateCreateWhenMissing(intent) {
+      if (!intent || !Array.isArray(ctx.missingSlots)) return intent;
+      if (typeof FlowCloseFamilies === 'undefined' || !FlowCloseFamilies.route) return intent;
+      return FlowCloseFamilies.route(intent, ctx.missingSlots);
     }
 
     // The self-calibration outlet for the three hard-gated types below — see
@@ -530,6 +574,34 @@ const FlowIntent = (() => {
     // only agreement is contingent does not.
     const contingent = commitmentIsContingent(text);
     const settled = ALREADY_SETTLED.test(text);
+    familyBox.hit = (typeof FlowCloseFamilies !== 'undefined' && !blocked && !askIsSoft && !settled)
+      ? FlowCloseFamilies.assess(text, facts, { now: ctx.now, senderEmail: ctx.senderEmail })
+      : null;
+    function fromFamily(fam) {
+      if (!fam || fam.suppress) return null;
+      if (suppressed(fam.type)) return null;
+      const date = fam.date || null;
+      const time = fam.time || null;
+      if (date && date.iso && isPastDate(date.iso, ctx.now)) return null;
+      const entities = {
+        who, amount,
+        what: fam.what,
+        requestWhat: fam.requestWhat || null,
+        requestedObjectTerm: fam.objectTerm || null,
+        when: humanWhen(date, time),
+        dateIso: date && date.iso
+      };
+      if (time && Number.isInteger(time.hour)) {
+        entities.hour = time.hour;
+        entities.minute = time.minute;
+      }
+      const intent = finish(fam.type, fam.confidence, entities, fam.personalClose || null);
+      if (!intent || !intent.type) return intent;
+      intent.closeFamily = fam.family;
+      if (fam.fileTarget) intent.fileTarget = fam.fileTarget;
+      if (fam.createWhenMissing) intent.createWhenMissing = true;
+      return gateCreateWhenMissing(intent);
+    }
     function labelFor(type) {
       const source = isPast ? Object.assign({}, facts, { date: null }) : facts;
       const enriched = isPast ? Object.assign({}, enrichedFacts, { dateText: null }) : enrichedFacts;
@@ -546,6 +618,14 @@ const FlowIntent = (() => {
     // a reader commitment AND an asserted "agreed" + date; if the account
     // has suppressed commitments, the dated-commitment gate below would
     // otherwise log it as a decision — the same chip, a different label.
+    // A family veto (cancel with no new slot, two file targets, a retraction,
+    // a doc comment we cannot write) is silence. A reschedule that names
+    // one new slot is that slot, not the old time the event gate would file.
+    if (familyBox.hit && familyBox.hit.suppress) return { type: null, signals, facts };
+    if (familyBox.hit && familyBox.hit.family === 'G') {
+      const viaMove = fromFamily(familyBox.hit);
+      if (viaMove) return viaMove;
+    }
     const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
     // A clock time the extractor actually resolved. Missing either field is
     // not a time we may invent — date-only meetings stay all-day events on
@@ -692,7 +772,8 @@ const FlowIntent = (() => {
     // when it names the receipt; the old due date is not what made it real.
     const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return { type: null, signals, facts };
-    if (!blocked && requestEvidence && !askIsSoft) {
+    if (!blocked && requestEvidence && !askIsSoft &&
+        !(typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text))) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),
@@ -773,7 +854,11 @@ const FlowIntent = (() => {
     // already returned above.
     if (infoOrNoise) return { type: null, signals, facts };
     if (askIsSoft && !isDecision) return { type: null, signals, facts };
-    if (s.total < gatingThreshold) return { type: null, signals, facts };
+    if (s.total < gatingThreshold) {
+      const via = fromFamily(familyBox.hit);
+      if (via) return via;
+      return { type: null, signals, facts };
+    }
     // "hoping" / "once" and an already-paid figure clear the bar without
     // being an open close. Silence is the side of that trade.
     if (isDecision && contingent) return { type: null, signals, facts };
@@ -793,6 +878,12 @@ const FlowIntent = (() => {
     // --- 5. FOLLOW_UP: cleared the bar (a dated obligation, usually) but ---
     //        doesn't fit a sharper category — the safe catch-all rather than
     //        silently dropping something the proven scorer already vouched for.
+    //        A clear family close is not this catch-all. A payable invoice
+    //        with no family cue stays low, and low does not show a chip.
+    {
+      const via = fromFamily(familyBox.hit);
+      if (via) return via;
+    }
     return finish(TYPES.FOLLOW_UP, 'low', {
       who, amount,
       what: labelFor(TYPES.FOLLOW_UP),

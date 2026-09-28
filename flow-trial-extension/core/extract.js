@@ -224,6 +224,23 @@ const FlowExtract = (() => {
       return { raw: m[0], iso: iso(d) };
     }
 
+    // "Thursday at 11" / "this Friday at 3pm". The clock is what makes the
+    // bare weekday a day rather than a signature line that just says Monday.
+    // "this Friday" said on Friday is today; a bare Friday said on Friday
+    // is the following one, same rule as "by Friday".
+    m = text.match(new RegExp('\\b(this\\s+|next\\s+)?(' + DAYS.join('|') + ')\\b(?=\\s+at\\s+\\d)', 'i'));
+    if (m) {
+      const target = DAYS.indexOf(m[2].toLowerCase());
+      const d = new Date(now);
+      let delta = (target - d.getDay() + 7) % 7;
+      const flagged = (m[1] || '').toLowerCase();
+      if (delta === 0) {
+        if (flagged.indexOf('this') !== 0) delta = 7;
+      } else if (flagged.indexOf('next') === 0) delta += 7;
+      d.setDate(d.getDate() + delta);
+      return { raw: m[0], iso: iso(d) };
+    }
+
     // Hebrew equivalent of the "by/on <weekday>" block above — "עד יום שני"
     // (by Monday), "ביום רביעי" (on Wednesday), "לא יאוחר מיום חמישי" (no
     // later than Thursday). Requires the same scheduling-word guard so a
@@ -241,7 +258,7 @@ const FlowExtract = (() => {
     // it never fired and "next Monday" was filed on this Monday. הבא must
     // not be a prefix of a longer word ("הבאנו", "we brought") — there is
     // no \b after Hebrew, so the lookahead is the boundary.
-    m = text.match(new RegExp('(?:עד|ב-?|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')(?:\\s+הבא(?![\\u0590-\\u05FF]))?'));
+    m = text.match(new RegExp('(?:עד|ב-?|ל|לא יאוחר מ-?)\\s*יום\\s+(' + DAYS_HE.join('|') + ')(?:\\s+הבא(?![\\u0590-\\u05FF]))?'));
     if (m) {
       const target = DAYS_HE.indexOf(m[1]);
       const d = new Date(now);
@@ -275,6 +292,13 @@ const FlowExtract = (() => {
       const d = new Date(now);
       return { raw: m[0], iso: iso(d) };
     }
+    // "by EOD" / "due end of day" is today. A bare "end of day report"
+    // has no deadline word, so it is not a date.
+    m = text.match(/\b(?:by|before|due|until|no later than)\s+(?:the\s+)?(?:eod|end of day|close of business|cob)\b/i);
+    if (m) {
+      const d = new Date(now);
+      return { raw: m[0], iso: iso(d) };
+    }
 
     // מחרתיים before מחר so the longer word is not clipped. ל? covers
     // למחר ("for tomorrow"). אתמול stays unresolved: a past day is not
@@ -288,6 +312,11 @@ const FlowExtract = (() => {
       return { raw: m[1], iso: iso(d) };
     }
     m = text.match(/(?:פגישה|שיחה|עד)\s+היום(?![\u0590-\u05FF])|היום\s+בשעה/);
+    if (m) {
+      const d = new Date(now);
+      return { raw: 'היום', iso: iso(d) };
+    }
+    m = text.match(/(?:עד|לפני)\s+סוף\s+היום(?![\u0590-\u05FF])/);
     if (m) {
       const d = new Date(now);
       return { raw: 'היום', iso: iso(d) };
