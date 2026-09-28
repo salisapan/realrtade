@@ -106,7 +106,7 @@ function load(opts) {
   sandbox.self = sandbox;
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8'), sandbox, { filename: 'background.js' });
+  vm.runInContext(require('./load-background.cjs').backgroundScript(), sandbox, { filename: 'background.js' });
   return {
     calls, bodies, tokens, stored,
     fn: (name) => vm.runInContext(name, sandbox)
