@@ -28,20 +28,22 @@ const FlowFileAttach = (() => {
     { id: 'passport', creatable: false, en: /\bpassports?\b/gi, he: /דרכון/g, enLabel: 'passport', heLabel: 'דרכון', synonym: ['passport', 'דרכון'] },
     { id: 'id-scan', creatable: false, en: /\b(?:photo ids?|id scans?|ids?|identity cards?|driver'?s licen[cs]es?)\b/gi, he: /תעודת (?:ה)?זהות/g, enLabel: 'ID', heLabel: 'תעודת זהות', synonym: ['identity', 'license', 'תעודת זהות', 'זהות'] },
     { id: 'insurance', creatable: false, en: /\binsurance (?:form|certificate|policy)\b/gi, he: /טופס ביטוח|פוליסת?\s+(?:ה)?ביטוח/g, enLabel: 'insurance form', heLabel: 'טופס ביטוח', synonym: ['insurance', 'ביטוח', 'פוליסה', 'פוליסת'] },
-    { id: 'tax-form', creatable: false, en: /\b(?:w-?9s?|w-?2s?|1099s?|tax returns?|tax documents?|tax docs?)\b/gi, he: /טופס מס|אישור מס/g, enLabel: 'tax form', heLabel: 'טופס מס', synonym: ['w-9', 'w9', '1099', 'טופס מס', 'אישור מס'] },
+    { id: 'tax-form', creatable: false, en: /\b(?:w-?9s?|w-?2s?|1099s?|tax returns?|tax documents?|tax docs?|tax forms?)\b/gi, he: /טופס (?:ה)?מס|אישור (?:ה)?מס/g, enLabel: 'tax form', heLabel: 'טופס מס', synonym: ['w-9', 'w9', '1099', 'tax form', 'טופס מס', 'טופס המס', 'אישור מס'] },
     { id: 'po', creatable: false, en: /\b(?:purchase orders?|pos?)\b/gi, he: /הזמנת רכש/g, enLabel: 'purchase order', heLabel: 'הזמנת רכש', synonym: ['purchase', 'הזמנת', 'רכש'] },
     { id: 'deck', creatable: false, en: /\b(?:decks?|presentations?|slides?)\b/gi, he: /מצגת/g, enLabel: 'deck', heLabel: 'מצגת', synonym: ['deck', 'presentation', 'slides', 'מצגת'] },
     { id: 'logo', creatable: false, en: /\blogos?\b/gi, he: /לוגו/g, enLabel: 'logo', heLabel: 'לוגו', synonym: ['logo', 'לוגו'] },
     { id: 'transfer', creatable: false, en: /\b(?:transfer (?:confirmation|receipt)|proof of (?:payment|transfer))\b/gi, he: /אישור (?:ה)?העברה/g, enLabel: 'transfer confirmation', heLabel: 'אישור העברה', synonym: ['transfer', 'העברה', 'אישור העברה', 'אישור ההעברה'] },
-    { id: 'report', creatable: false, en: /\breports?\b/gi, he: /דו"ח|דוח/g, enLabel: 'report', heLabel: 'דוח', synonym: ['report', 'דוח'] },
+    { id: 'report', creatable: false, en: /\breports?\b/gi, he: /דו["״]ח|דוח/g, enLabel: 'report', heLabel: 'דוח', synonym: ['report', 'דוח', 'דו"ח'] },
     { id: 'signed-copy', creatable: false, en: /\bsigned (?:pdf|copy|scan)\b/gi, he: /עותק חתום|מסמך חתום/g, enLabel: 'signed copy', heLabel: 'עותק חתום', synonym: ['signed', 'חתום'] }
   ];
 
-const NEED_EN = /\b(?:please\s+(?:send|attach|forward|share|resend|provide|email)|(?:can|could|would)\s+you\s+(?:please\s+)?(?:send|attach|forward|share|resend|provide|email)|mind\s+sending|(?:sending|send|attach|forward|share|resend)\s+(?:me\s+)?(?:the|your|our|a|an|that)|(?:i|we)\s+need\s+(?:the|your|our|a|an)|(?:can|could)\s+i\s+(?:get|have)\s+(?:the|your|a|an))\b/i;
-const NEED_HE = /(?:תשלח(?:י|ו)?|לשלוח|שלח(?:י|ו)?(?:\s+לי)?|תצרף(?:ו|י)?|צרף(?:ו|י)?|אשמח\s+לקבל|אפשר\s+לקבל|תעביר(?:י|ו)?\s+לי|אבקש\s+לקבל|צריכים?\s+את|נשמח\s+לקבל)/;
+  const NEED_EN = /\b(?:please\s+(?:send|attach|forward|share|resend|provide|email|enclose)|(?:can|could|would)\s+you\s+(?:please\s+)?(?:send|attach|forward|share|resend|provide|email)|would\s+you\s+mind\s+(?:sending|attaching|forwarding|sharing|emailing)|mind\s+(?:sending|forwarding|emailing|sharing)|kindly\s+(?:send|attach|forward|share|resend|provide|email)|(?:sending|send|attach|forward|share|resend|email)\s+(?:me\s+|us\s+|over\s+)?(?:the|your|our|a|an|that)|(?:i|we)\s+(?:still\s+|also\s+)?need\s+(?:you\s+to\s+(?:send|forward|attach|share|email)\s+)?(?:a\s+copy\s+of\s+)?(?:the|your|our|a|an)|(?:can|could)\s+i\s+(?:please\s+)?(?:get|have)\s+(?:a\s+copy\s+of\s+)?(?:the|your|a|an)|be\s+able\s+to\s+(?:send|forward|share|attach|email|resend|provide)|if\s+you\s+could\s+(?:please\s+)?(?:send|forward|share|attach|email|resend|provide)|pass\s+along\s+(?:the|your|a|an))\b/i;
+  // צריך uses a final kaf; צריכה and צריכים use a regular kaf. One optional
+  // letter cannot spell both. שלח is bounded so אשלח (a promise) is not a need.
+  const NEED_HE = /(?:תשלח(?:י|ו)?|לשלוח|להעביר|לצרף|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי)?|תצר(?:ף|פי|פו)|צר(?:ף|פי|פו)|תעביר(?:י|ו)?(?:\s+לי)?|אשמח\s+לקבל|אפשר\s+(?:לקבל|לצרף)|אבקש\s+לקבל|(?:צריך|צריכה|צריכים)\s+את|נשמח\s+לקבל|מבקש(?:ת|ים)?\s+לשלוח|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרף))/;
   const NEG_EN = /\b(?:do not|don't|no need to)\s+(?:send|attach|forward|share|resend|provide)\b/i;
   const NEG_HE = /(?:אל\s+תשלח|אין\s+צורך|לא\s+צריך\s+לשלוח|בלי\s+לצרף)/;
-  const HEDGE = /\b(?:maybe|perhaps|possibly|if you want|if you feel like|no rush)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם בא לך/i;
+  const HEDGE = /\b(?:maybe|perhaps|possibly|if you want|if you feel like|no rush|any chance|not sure which|whichever)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם בא לך|לא בטוח(?:ה)?\s+איז|איזה\s+קובץ|איזו\s+חשבונית|יש סיכוי/i;
   const FYI = /\b(?:fyi|for your information|no action needed|no reply needed)\b|לידיעה|אין צורך בפעולה/i;
   const ALREADY = /\b(?:i|we)\s+(?:already\s+)?(?:sent|attached|forwarded|shared)\b|\b(?:please\s+find|find)\s+attached\b|מצורף|שלחתי|צירפתי/i;
 
@@ -153,6 +155,56 @@ const NEED_HE = /(?:תשלח(?:י|ו)?|לשלוח|שלח(?:י|ו)?(?:\s+לי)?|�
     return Array.from(byId.values());
   }
 
+  function sentencesOf(body) {
+    const parts = String(body || '').split(/(?<=[.!?;])\s+|\n+/).map((s) => s.trim()).filter(Boolean);
+    return parts.length ? parts : [String(body || '').trim()].filter(Boolean);
+  }
+
+  // "the invoices" names more than one file. "slides" is one deck.
+  function askedPlural(hit, sentence) {
+    if (!hit || hit.he) return false;
+    const word = sentence.slice(hit.index, hit.index + hit.length);
+    if (/^(?:slides|series)$/i.test(word)) return false;
+    return /s$/i.test(word) && !/ss$/i.test(word);
+  }
+
+  // Two nouns are one file when the sentence links them ("signed PDF of
+  // the contract") or replaces one with the other ("the receipt instead").
+  // or / and / both / או / וגם stay two files.
+  function narrowHits(sentence, hits) {
+    if (hits.length < 2) return hits;
+    if (/\b(?:and|or|both|plus)\b|(?:^|\s)או(?:\s|$)|וגם|ואת|גם את/i.test(sentence)) return hits;
+    const cue = sentence.search(/\b(?:instead|rather)\b/i);
+    const heCue = sentence.lastIndexOf('במקום');
+    const idx = cue >= 0 ? cue : heCue;
+    if (idx >= 0) {
+      const after = hits.filter((h) => h.index >= idx);
+      const before = hits.filter((h) => h.index < idx);
+      if (after.length === 1) return after;
+      if (!after.length && before.length === 1) return before;
+    }
+    if (/\bof the\b/i.test(sentence) || /של\s+ה/.test(sentence)) {
+      const signed = hits.filter((h) => h.obj.id === 'signed-copy');
+      if (signed.length === 1) return signed;
+    }
+    return hits;
+  }
+
+  // The latest sentence that actually asks is the file. An earlier noun
+  // that is not itself the ask does not make a second candidate.
+  function pickAsk(body) {
+    const list = sentencesOf(body);
+    for (let i = list.length - 1; i >= 0; i--) {
+      const sentence = list[i];
+      if (!NEED_EN.test(sentence) && !NEED_HE.test(sentence)) continue;
+      const hits = narrowHits(sentence, collectHits(sentence));
+      if (!hits.length) continue;
+      if (hits.length !== 1 || askedPlural(hits[0], sentence)) return { block: true };
+      return { hit: hits[0] };
+    }
+    return null;
+  }
+
   // ignore: not a file ask, leave the other closes alone.
   // block: it is about a file, but not one clear object — no chip.
   // clear: one object, one need.
@@ -160,13 +212,13 @@ const NEED_HE = /(?:תשלח(?:י|ו)?|לשלוח|שלח(?:י|ו)?(?:\s+לי)?|�
     const body = fresh(text);
     const hits = collectHits(body);
     if (!hits.length) return { kind: 'ignore' };
-    const needs = NEED_EN.test(body) || NEED_HE.test(body);
     if (NEG_EN.test(body) || NEG_HE.test(body) || HEDGE.test(body) || FYI.test(body)) {
       return { kind: 'block', reason: 'unclear' };
     }
-    if (!needs) return { kind: 'ignore' };
-    if (hits.length !== 1) return { kind: 'block', reason: 'unclear' };
-    const hit = hits[0];
+    const picked = pickAsk(body);
+    if (!picked) return { kind: 'ignore' };
+    if (picked.block) return { kind: 'block', reason: 'unclear' };
+    const hit = picked.hit;
     const lang = hit.he ? 'he' : 'en';
     const label = lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel;
     return {

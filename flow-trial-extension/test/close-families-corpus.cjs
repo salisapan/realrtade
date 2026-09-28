@@ -386,21 +386,29 @@ console.log('\n--- E F G: the close is a task, a draft plus a task, or one calen
 
 console.log('\n--- generated paraphrases (A) and wrapped kills ---\n');
 {
-  const nouns = ['the receipt', 'the invoice', 'the quote', 'the contract', 'the signed PDF', 'the passport scan', 'the insurance form', 'the tax document', 'the proposal', 'the deck', 'the logo', 'the brief', 'the statement', 'the purchase order', 'the W-9'];
+  const nouns = ['the receipt', 'the invoice', 'the quote', 'the quotation', 'the contract', 'the signed PDF', 'the passport scan', 'the insurance form', 'the insurance certificate', 'the tax document', 'the tax form', 'the proposal', 'the deck', 'the slides', 'the logo', 'the brief', 'the statement', 'the report', 'the purchase order', 'the W-9', 'the transfer confirmation', 'the ID'];
   const frames = [
     (n) => `Could you send ${n}?`,
     (n) => `Please forward ${n} when you get a chance.`,
     (n) => `I need ${n} for the file.`,
     (n) => `Can you attach ${n}?`,
     (n) => `Mind sending ${n}?`,
-    (n) => `We need ${n} back today.`
+    (n) => `We need ${n} back today.`,
+    (n) => `Kindly send ${n}.`,
+    (n) => `Please provide ${n}.`,
+    (n) => `Could you email me ${n}?`,
+    (n) => `We still need ${n}.`,
+    (n) => `Would you mind forwarding ${n}?`
   ];
-  const heNouns = ['החשבונית', 'הקבלה', 'החוזה', 'תעודת הזהות', 'אישור ההעברה', 'הדוח', 'הצעת המחיר', 'הלוגו'];
+  const heNouns = ['החשבונית', 'הקבלה', 'החוזה', 'תעודת הזהות', 'אישור ההעברה', 'הדוח', 'הצעת המחיר', 'הלוגו', 'המצגת', 'הבריף', 'הדרכון'];
   const heFrames = [
     (n) => `אפשר לשלוח את ${n}?`,
     (n) => `בבקשה תשלח את ${n}.`,
     (n) => `צריך את ${n}.`,
-    (n) => `תעביר לי את ${n}.`
+    (n) => `תעביר לי את ${n}.`,
+    (n) => `תוכל לשלוח את ${n}?`,
+    (n) => `נשמח לקבל את ${n}.`,
+    (n) => `אבקש לקבל את ${n}.`
   ];
   let pos = 0, posFail = 0, neg = 0, negFail = 0;
   function failPos(text, intent) {
@@ -531,6 +539,112 @@ console.log('\n--- J reply-with-facts: one fact, one Sheet or Doc; else silence 
   check('a file ask stays family A, not J', found.closeFamily === 'A' && found.closeFamily !== 'J', found.closeFamily);
   const weak = classify('Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.');
   check('the weak invoice is not family J', weak.closeFamily !== 'J' && !FlowIntent.shouldShowChip(weak), weak.confidence);
+}
+
+console.log('\n--- A densify: real need language chips; unclear, plural, and multi-file stay quiet ---\n');
+{
+  function plan(text) {
+    const intent = classify(text);
+    return {
+      intent,
+      show: FlowIntent.shouldShowChip(intent),
+      process: FlowActions.planFor(intent, {
+        threadUrl: 'x',
+        hasThreadAttachment: false,
+        attachFile: { id: 'file-1', name: 'Receipt-March.pdf', mimeType: 'application/pdf' }
+      })
+    };
+  }
+  const positives = [
+    ['A kindly', 'Kindly send the receipt for the March payment.', /receipt/i],
+    ['A provide w9', 'Please provide the W-9.', /W-?9/i],
+    ['A can I get', 'Can I get a copy of the invoice?', /invoice/i],
+    ['A still need', 'We still need the signed PDF.', /signed PDF/i],
+    ['A quotation', 'Would you send the quotation?', /quotation/i],
+    ['A mind forward', 'Would you mind forwarding the quote?', /quote/i],
+    ['A drivers', "Please attach a scan of the driver's license.", /licen[cs]e/i],
+    ['A insurance cert', 'Please send the insurance certificate.', /insurance certificate/i],
+    ['A tax form', 'Please send the tax form.', /tax form/i],
+    ['A transfer', 'Could you attach the transfer confirmation?', /transfer confirmation/i],
+    ['A signed of', 'Please send the signed PDF of the contract.', /signed PDF/i],
+    ['A report', 'Could you share the report with me?', /report/i],
+    ['A appreciate', "I'd appreciate it if you could send the contract.", /contract/i],
+    ['A proof', 'Can you pass along the proof of payment?', /proof of payment/i],
+    ['A slides', 'Could you send the slides from last week?', /slides/i],
+    ['A id', 'Please send a copy of the ID.', /\bID\b/],
+    ['A instead', 'No invoice on file. Please send the receipt instead.', /receipt/i],
+    ['A he tuchal', 'תוכל בבקשה לשלוח לי את החשבונית?', /חשבונית/],
+    ['A he tatzrifi', 'תצרפי את הלוגו בבקשה.', /לוגו/],
+    ['A he nismach', 'נשמח לקבל את אישור ההעברה.', /אישור ההעברה/],
+    ['A he efshar', 'אפשר לקבל את הצעת המחיר המעודכנת?', /הצעת המחיר/],
+    ['A he taaviri', 'תעבירי לי את אישור ההעברה.', /אישור ההעברה/],
+    ['A he shilchi', 'שלחי לי בבקשה את החוזה החתום.', /חוזה/],
+    ['A he policy', 'אבקש לקבל את פוליסת הביטוח.', /ביטוח/],
+    ['A he tzrichim', 'צריכים את חשבונית המס עבור התשלום.', /חשבונית/],
+    ['A he darkon', 'אשמח לקבל צילום של הדרכון.', /דרכון/],
+    ['A he mas', 'נא לשלוח את טופס המס.', /טופס המס/],
+    ['A he brief', 'תשלח לי בבקשה את הבריף.', /בריף/],
+    ['A he doch', 'תוכל לשלוח את הדו״ח?', /דו/],
+    ['A he letzaref', 'אפשר לצרף את המצגת למייל?', /מצגת/]
+  ];
+  for (const [name, text, term] of positives) {
+    const row = plan(text);
+    const what = (row.intent.entities && row.intent.entities.what) || '';
+    check(name + ' chips as A',
+      row.show && row.intent.closeFamily === 'A' && row.intent.personalClose === 'follow-up-ask' && !row.intent.createWhenMissing && term.test(what),
+      { type: row.intent.type, family: row.intent.closeFamily, what });
+  }
+  const quiet = [
+    ['any chance', 'Any chance you can send the proposal?'],
+    ['not sure which', 'Not sure which invoice — please send the March one.'],
+    ['plural', 'Please send the invoices.'],
+    ['or', 'Could you send the invoice or the receipt?'],
+    ['both', 'Please send both the contract and the NDA.'],
+    ['and', 'Could you send the proposal and the brief?'],
+    ['he or', 'תשלח את החשבונית או את הקבלה.'],
+    ['he vegam', 'בבקשה תשלח את הדוח וגם את הלוגו.'],
+    ['he which', 'לא בטוח איזו חשבונית, תשלח אחת.'],
+    ['vent', "The invoice is a mess, just venting."],
+    ['shoot', 'Can you shoot me the logo?'],
+    ['drop', 'Could you drop the logo on the email?'],
+    ['bare policy', 'אשמח לקבל את הפוליסה.'],
+    ['no verb', 'היי, אפשר את המצגת?'],
+    ['he plural', 'תשלח את החשבוניות.'],
+    ['promise', "I'll send the contract."],
+    ['promise he', 'אשלח את החוזה.']
+  ];
+  for (const [name, text] of quiet) {
+    const row = plan(text);
+    check('A silence: ' + name, row.show === false && row.intent.closeFamily !== 'I', {
+      type: row.intent.type, family: row.intent.closeFamily
+    });
+  }
+  const vagueDocs = plan('Please send the documents when you can.');
+  check('unclear documents are not family A and not a create',
+    vagueDocs.intent.closeFamily !== 'A' && vagueDocs.intent.closeFamily !== 'I' && !vagueDocs.intent.createWhenMissing,
+    { type: vagueDocs.intent.type, family: vagueDocs.intent.closeFamily });
+  const dated = plan("I'll send the contract by Friday.");
+  check('A does not steal a dated promise', dated.show && dated.intent.closeFamily === 'D' && dated.intent.personalClose === 'dated-commitment', dated.intent.closeFamily);
+  const chase = plan('Please chase the vendor about the report.');
+  check('A does not steal a chase', chase.show && chase.intent.closeFamily === 'F', chase.intent.closeFamily);
+  const created = plan('Please draft the contract from our company template and send it to Dana.');
+  check('A does not steal a template create', created.show && created.intent.closeFamily === 'I' && created.intent.createWhenMissing === true, created.intent.closeFamily);
+  const found = plan('Kindly send the receipt.');
+  const drafts = (found.process && found.process.steps || []).filter((step) => step.kind === 'gmailDraft');
+  check('A is one draft carrying the one file',
+    found.show && found.process && found.process.id === 'reply-track' && drafts.length === 1 &&
+      drafts[0].params.includeAttachment === true && drafts[0].params.attachSource === 'found' &&
+      drafts[0].params.driveFileName === 'Receipt-March.pdf' && drafts[0].params.driveFileId === 'file-1',
+    drafts.map((step) => step.params));
+  const lines = FlowActions.receiptWrittenLines([
+    { response: { ok: true, written: 'Gmail draft · Kindly send the receipt.' } },
+    { response: { ok: false, written: 'Gmail draft · should not appear' } },
+    { response: { ok: true, written: 'Google Task · Send the receipt' } }
+  ]);
+  check('A receipt names the draft that landed',
+    lines.length === 2 && lines[0].indexOf('Gmail draft') === 0 && lines[1].indexOf('Google Task') === 0,
+    lines);
+  check('A undo is the draft write', drafts[0].kind === 'gmailDraft', drafts[0].kind);
 }
 
 console.log('\n--- D: a clear clock is one calendar hold; a clear day is one task ---\n');

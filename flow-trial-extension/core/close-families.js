@@ -15,6 +15,14 @@
 // past day are not a new hold. Family G (move or cancel) and family H
 // (two clocks, a later ask) still win.
 //
+// Family A is one file the sender is asking to be put on the mail.
+// A clear need, in English or Hebrew, names one object (receipt, invoice,
+// quote, contract, signed PDF, ID, passport, insurance, tax form, proposal,
+// deck, logo, brief, statement, purchase order, W-9, and the same asks
+// in Hebrew). A plural, a hedge, "not sure which", or two files with
+// or/and/both stays silence. Family H still owns that multi-file case.
+// Family I is not a rescue when the object is unclear.
+//
 // Family I (create-when-missing) is conditional. It chips only when the
 // what is a named asset, that file is missing, and a company template is
 // named — the template the later Do It would use. Any one of those missing
@@ -28,11 +36,13 @@
 // silence. This file does not render that UI and does not create a Doc.
 
 const FlowCloseFamilies = (() => {
-  const FILE_EN = /\b(receipts?|invoices?|quotes?|contracts?|signed pdfs?|passports?(?:\s+scans?)?|insurance forms?|tax (?:docs?|documents?|returns?)|proposals?|decks?|logos?|briefs?|statements?|purchase orders?|POs?|W-?9s?|photo ids?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
-  const FILE_HE = /(חשבונית מס|חשבונית|הצעת (?:ה)?מחיר|חוזה|הסכם|תעודת (?:ה)?זהות|דרכון|אישור (?:ה)?העברה|דוח|מצגת|לוגו|הזמנת רכש|קבלה|מכתב|מסמך)/;
+  const FILE_EN = /\b(receipts?|invoices?|quotations?|quotes?|contracts?|signed (?:pdfs?|cop(?:y|ies)|scans?)|passports?(?:\s+scans?)?|insurance (?:forms?|certificates?|polic(?:y|ies))|tax (?:docs?|documents?|returns?|forms?)|proposals?|decks?|slides?|presentations?|logos?|briefs?|statements?|reports?|purchase orders?|POs?|W-?9s?|transfer confirmations?|proof of (?:payment|transfer)|driver'?s licen[cs]es?|identity cards?|photo ids?|IDs?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
+  const FILE_HE = /(חשבונית מס|חשבונית|הצעת (?:ה)?מחיר|חוזה|הסכם|תעודת (?:ה)?זהות|דרכון|אישור (?:ה)?העברה|טופס (?:ה)?מס|אישור (?:ה)?מס|פוליסת?\s*(?:ה)?ביטוח|טופס ביטוח|דו["״]ח|דוח|מצגת|לוגו|בריף|הזמנת רכש|קבלה|מכתב|מסמך)/;
 
-  const ASK_EN = /\b(?:please (?:send|forward|share|attach|email)|could you (?:send|forward|share|attach)|can you (?:send|forward|share|attach)|i need (?:the|your|a)|we need (?:the|your|a)|send me (?:the|your|a)|attach (?:the|your)|mind sending)\b/i;
-  const ASK_HE = /(?:אפשר לשלוח|בבקשה תשלח|תשלח לי|תשלח את|תעביר לי|תעביר את|צריך את|אשמח לקבל את|נא לשלוח)/;
+  const ASK_EN = /\b(?:please (?:send|forward|share|attach|email|resend|provide|enclose)|(?:can|could|would) you (?:please )?(?:send|forward|share|attach|email|resend|provide)|would you mind (?:sending|forwarding|sharing|emailing|attaching)|kindly (?:send|forward|share|attach|email|resend|provide)|(?:i|we) (?:still |also )?need (?:you to (?:send|forward|attach|share|email) )?(?:a copy of )?(?:the|your|our|a|an)|(?:can|could) i (?:please )?(?:get|have) (?:a copy of )?(?:the|your|a|an)|send me (?:the|your|a)|attach (?:the|your)|mind (?:sending|forwarding|emailing|sharing)|be able to (?:send|forward|share|attach|email|resend|provide)|if you could (?:please )?(?:send|forward|share|attach|email|resend|provide)|pass along (?:the|your|a|an))\b/i;
+  // שלח / להעביר need a non-letter before them so אשלח and אעביר (a promise)
+  // are not read as an ask to find a file.
+  const ASK_HE = /(?:אפשר\s+(?:לשלוח|לקבל|לצרף)|בבקשה\s+תשלח|תשלח(?:י|ו)?(?:\s+לי|\s+את)|תעביר(?:י|ו)?(?:\s+לי|\s+את)|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי|\s+את)|תצר(?:ף|פי|פו)|(?:^|[^\u0590-\u05FF])לצרף|(?:צריך|צריכה|צריכים)\s+את|אשמח\s+לקבל|אבקש\s+לקבל|נשמח\s+לקבל|נא\s+(?:לשלוח|לצרף)|מבקש(?:ת|ים)?\s+ל(?:שלוח|קבל|צרף)|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרף)|(?:^|[^\u0590-\u05FF])להעביר)/;
 
   const CREATE_EN = /\b(?:create|draft|draw up|prepare|put together|spin up)\b/i;
   const CREATE_HE = /(?:תיצור|תכין|ליצור|להכין|לנסח|תנסח)/;
@@ -77,8 +87,8 @@ const FlowCloseFamilies = (() => {
   const CANCEL_EN = /\b(?:cancel(?:led|ing)?|call(?:ed)? off)\b[^.]{0,48}\b(?:call|meeting|sync|invite|event)\b|\b(?:call|meeting|sync|invite|event)\b[^.]{0,48}\b(?:is |was )?(?:cancelled|called off)\b/i;
   const CANCEL_HE = /(?:בטל את ה|לבטל את ה|הפגישה מבוטלת|השיחה מבוטלת)/;
 
-  const HEDGE_EN = /\b(?:maybe|perhaps|possibly|no rush|if possible|tentatively|might|whenever you|if you feel|sometime|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b/i;
-  const HEDGE_HE = /(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו|נראה לי)/;
+  const HEDGE_EN = /\b(?:maybe|perhaps|possibly|no rush|if possible|tentatively|might|whenever you|if you feel|sometime|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works|any chance|not sure which|whichever)\b/i;
+  const HEDGE_HE = /(?:אולי|ייתכן|אם אפשר|אין לחץ|מתישהו|נראה לי|לא בטוח(?:ה)?\s+איז|איזה\s+קובץ|איזו\s+חשבונית|יש סיכוי)/;
   const NEG_EN = /\b(?:do not|don'?t|never mind|please don'?t)\b/i;
   const NEG_HE = /(?:אל ת|לא תשלח|לא תעביר|לא צריך|לא לשלוח|אין צורך לשלוח|לא מאשר)/;
   // A past day on the object ("the notes from yesterday") is still a live
@@ -581,9 +591,21 @@ const FlowCloseFamilies = (() => {
     });
   }
 
+  // "the invoices" is more than one file. A trailing s on the English
+  // object is that plural. "slides" is one deck. Hebrew plurals do not
+  // use this suffix, so they are not guessed here.
+  function pluralEnglishFile(sentence) {
+    const en = String(sentence || '').match(FILE_EN);
+    if (!en) return false;
+    const word = en[1];
+    if (/^(?:slides|series)$/i.test(word)) return false;
+    return /s$/i.test(word) && !/ss$/i.test(word);
+  }
+
   function matchFile(sentence, now) {
     if (!isFileAsk(sentence)) return null;
     if (TEMPLATE_EN.test(sentence) || TEMPLATE_HE.test(sentence)) return null;
+    if (pluralEnglishFile(sentence)) return 'suppress';
     return hit({
       family: 'A', type: 'request', confidence: 'medium', personalClose: 'follow-up-ask',
       what: sentence, requestWhat: sentence, objectTerm: fileTerm(sentence), date: dateOf(sentence, now)
@@ -732,6 +754,7 @@ const FlowCloseFamilies = (() => {
       const follow = matchFollow(sentence, now);
       if (follow) return follow;
       const file = matchFile(sentence, now);
+      if (file === 'suppress') return hit({ suppress: true, family: 'A' });
       if (file) return file;
       const fact = matchReplyFact(sentence, now);
       if (fact) return fact;
