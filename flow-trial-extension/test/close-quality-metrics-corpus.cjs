@@ -118,9 +118,44 @@ console.log('\n--- snapshot and Activity line ---\n');
   check('the snapshot reports all three counts', snap.success === 1 && snap.return === 1 && snap.falseDoIt === 1, snap);
   const kinds = (snap.recent || []).map((e) => e.kind).sort();
   check('recent holds one event for each of the three cases', kinds.join(',') === 'falseDoIt,return,success', kinds);
-  check('the Activity line names the three counts',
-    FlowCloseQuality.activityLine(snap) === 'Full closes 1 · Returns 1 · Turned down 1',
+  check('the Activity line names the three counts and the false-close rate',
+    FlowCloseQuality.activityLine(snap) === 'Full closes 1 · Returns 1 · Turned down 1 · False-close 50%',
     FlowCloseQuality.activityLine(snap));
+  check('one success and one dismiss is a 50% false-close, over the 15% bar',
+    snap.falseCloseRate === 0.5 && snap.falseCloseWithinBar === false, snap);
+}
+
+console.log('\n--- false-close rate: undo and dismiss, measured against 15% ---\n');
+{
+  check('the week-1 bar is 15%', FlowCloseQuality.FALSE_CLOSE_BAR === 0.15);
+  check('nothing judged yet is not a rate', FlowCloseQuality.falseCloseRate(FlowCloseQuality.emptyState()) === null);
+
+  let stuck = FlowCloseQuality.emptyState();
+  for (let i = 1; i <= 6; i++) {
+    stuck = FlowCloseQuality.applyEvent(stuck, { kind: 'success', messageId: 's' + i, day: DAY_A, ts: i }).state;
+  }
+  stuck = FlowCloseQuality.applyEvent(stuck, { kind: 'falseDoIt', messageId: 'd1', reason: 'dismiss', day: DAY_B, ts: 9 }).state;
+  const under = FlowCloseQuality.computeSnapshot(stuck);
+  check('6 full closes and 1 dismiss is 1/7, within 15%',
+    Math.abs(under.falseCloseRate - (1 / 7)) < 1e-9 && under.falseCloseWithinBar === true, under.falseCloseRate);
+
+  let over = FlowCloseQuality.emptyState();
+  for (let i = 1; i <= 5; i++) {
+    over = FlowCloseQuality.applyEvent(over, { kind: 'success', messageId: 's' + i, day: DAY_A, ts: i }).state;
+  }
+  over = FlowCloseQuality.applyEvent(over, { kind: 'falseDoIt', messageId: 'd1', reason: 'undo', day: DAY_B, ts: 9 }).state;
+  const above = FlowCloseQuality.computeSnapshot(over);
+  check('5 full closes and 1 undo is 1/6, over 15%',
+    Math.abs(above.falseCloseRate - (1 / 6)) < 1e-9 && above.falseCloseWithinBar === false, above.falseCloseRate);
+
+  let both = FlowCloseQuality.applyEvent(FlowCloseQuality.emptyState(), { kind: 'success', messageId: 'm1', day: DAY_A, ts: 1 }).state;
+  both = FlowCloseQuality.applyEvent(both, { kind: 'falseDoIt', messageId: 'm1', reason: 'undo', day: DAY_A, ts: 2 }).state;
+  const undone = FlowCloseQuality.computeSnapshot(both);
+  check('a full close that is later undone is one false close, not two messages',
+    undone.falseCloseRate === 1 && undone.success === 1 && undone.falseDoIt === 1, undone);
+  check('the line states that rate',
+    FlowCloseQuality.activityLine(undone) === 'Full closes 1 · Returns 0 · Turned down 1 · False-close 100%',
+    FlowCloseQuality.activityLine(undone));
 }
 
 console.log('\n--- dayKey matches the local calendar day storage.js already uses ---\n');

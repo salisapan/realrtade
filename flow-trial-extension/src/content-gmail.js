@@ -560,6 +560,8 @@
     // nothing, times out, or the backend isn't configured — same "just
     // don't show a chip" contract the local path already follows.
     const localFired = Boolean(intent.type);
+    // A local 'low' is a decision to stay quiet, not a miss. The remote
+    // fallback is only for when the local pass found nothing at all.
     if (!intent.type) intent = await ensureRemoteClassification(text) || intent;
     // Item 4's real-usage telemetry — the empirical answer to "how often is
     // the free local pass actually enough, how often does the one remote
@@ -572,7 +574,7 @@
     // for the dedup rule that keeps a re-scanned open message from being
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
-    if (!intent.type) return;
+    if (!FlowIntent.shouldShowChip(intent)) return;
 
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;

@@ -11,4 +11,6 @@ read it. The Activity tab shows the line when any count is above zero.
 | **return** | The user used Do It again on a later local calendar day (`Date#toDateString()`). Using Do It means the click that starts a close, after the already-closed and empty-step guards. The first Do It is not a return. More than one Do It on the same day counts once. |
 | **false-Do-It** | The user rejected the chip: they dismissed it, or they undid a write that had landed. Once per message. A full write that is later undone counts as both a success and a false-Do-It. |
 
-The Activity line reads `Full closes N · Returns N · Turned down N`.
+The Activity line reads `Full closes N · Returns N · Turned down N · False-close P%`.
+
+**False-close rate** is turned-down messages ÷ messages the user actually judged. Judged means a full write or a dismiss/undo. A full write that is later undone counts once, as false. The week-1 bar is 15% (`FALSE_CLOSE_BAR`). The rate is null until something has been judged. Dismiss and undo are the only reject reasons; both already flow through `recordCloseQuality`. No other surface reads the rate.

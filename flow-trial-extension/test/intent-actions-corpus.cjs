@@ -1093,7 +1093,21 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     check('show Do It: ' + label, intent.type === type && (intent.personalClose || null) === personalClose, {
       type: intent.type, personalClose: intent.personalClose, score: intent.signals && intent.signals.score
     });
+    check('show Do It chip: ' + label, FlowIntent.shouldShowChip(intent) === true, intent.confidence);
   }
+
+  // Low confidence is the score-bar catch-all (FOLLOW_UP). It stays that
+  // existing type — this PR does not add a close type — and it does not
+  // show a chip. A payable invoice with no hard gate is the case.
+  const unsure = classify('Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.');
+  check('a score-bar obligation stays the existing follow-up type',
+    unsure.type === FlowIntent.TYPES.FOLLOW_UP && unsure.confidence === 'low' && !unsure.personalClose, unsure);
+  check('low confidence does not show a Do It chip', FlowIntent.shouldShowChip(unsure) === false, unsure.confidence);
+  check('silence is not a chip', FlowIntent.shouldShowChip({ type: null }) === false);
+  check('remote classification is not this bar', FlowIntent.shouldShowChip({ type: 'request', confidence: 'remote' }) === true);
+  const typeIds = Object.keys(FlowIntent.TYPES).map((k) => FlowIntent.TYPES[k]).sort();
+  check('intent types stay the existing five',
+    JSON.stringify(typeIds) === JSON.stringify(['commitment', 'decision', 'event', 'followup', 'request']), typeIds);
 }
 
 console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');

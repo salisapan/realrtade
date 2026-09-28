@@ -670,7 +670,19 @@ const FlowIntent = (() => {
     });
   }
 
-  return { TYPES, classify };
+  // The chip shows only when Glance is sure. 'low' is FOLLOW_UP, the
+  // score-bar catch-all: a payable invoice with no hard gate. Wrong Do It
+  // hurts more than silence, so that confidence does not show a chip.
+  // 'medium' and 'high' are the existing hard gates (a dated commitment,
+  // an explicit follow-up, a confirmed amount, a meeting, a reader
+  // commitment). 'remote' is the separate fallback and is not this bar.
+  // This does not add a close type.
+  function shouldShowChip(intent) {
+    if (!intent || !intent.type) return false;
+    return intent.confidence !== 'low';
+  }
+
+  return { TYPES, classify, shouldShowChip };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };
