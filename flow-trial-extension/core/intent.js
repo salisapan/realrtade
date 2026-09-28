@@ -114,7 +114,11 @@ const FlowIntent = (() => {
     'good (?:speaking|talking|chatting) with you',
     "it was (?:great|good|nice) (?:to (?:meet|speak|talk|chat)|meeting you|speaking with you|chatting)",
     'enjoyed (?:our|the) (?:call|meeting|chat|conversation)',
-    'glad (?:we|to have) (?:synced|caught up|connected|spoke|talked)'
+    'glad (?:we|to have) (?:synced|caught up|connected|spoke|talked)',
+    // "The call was on Monday" resolves Monday forward. The meeting already
+    // happened; "was on" is the tense cue EVENT_RECAP's thank-you list misses.
+    '(?:the |our )?(?:call|meeting|sync|chat) was on',
+    'already had (?:the |our )?(?:call|meeting|sync|chat)'
   ].join('|'), 'i');
   const EVENT_RECAP_HE = /(תודה על ה(?:שיחה|פגישה)|היה נעים (?:לדבר|להיפגש)|שמחתי שדיברנו|נהניתי מ(?:השיחה|הפגישה)|תודה שהתפניתם?|היה כיף לדבר|נעים היה להכיר)/;
 
@@ -290,6 +294,38 @@ const FlowIntent = (() => {
     return FlowJudgment.neutralTitle(enrichedFacts); // DECISION_TO_LOG and FOLLOW_UP
   }
 
+  // The sender said not to act. A dated agreement or a figure underneath
+  // is context, not a close. Hard gates never read the score, so "FYI, we
+  // agreed…" chipped at 17.
+  const INFO_ONLY = /\b(?:fyi|for your information|no action (?:needed|required|necessary)|no reply needed|no need to (?:reply|respond|do anything)|informational only|for visibility only|for (?:your )?awareness|looping you(?: in)? for (?:visibility|awareness))\b|(?:^|\s)(?:לידיעתך|לידיעה בלבד|אין צורך בפעולה|אין צורך להגיב)/i;
+  // Bumps and calendar-acceptance mail the existing noise list does not
+  // name. "Just following up — could you share the contract" is not in
+  // here; that ask still chips.
+  const EXTRA_NOISE = /\b(?:quick bump|friendly bump|bumping this|just a nudge|accepted invitation|invitation accepted|updated invitation|event reminder|calendar reminder|automated reminder|your response:\s*accepted)\b|^\s*accepted\s*:|^\s*reminder:\s*(?:meeting|sync|call)\b/im;
+  // Uncertainty on the ask itself. Deliberately not "would", "could", or
+  // "if you could" — those are how a real request is written, and the
+  // corpus keeps them. "when you get a chance" stays a request.
+  const SOFT_ASK = /\b(?:maybe|perhaps|possibly|no rush|whenever you|when convenient|at your leisure|if possible|if you want|if it helps|just a nudge|optional)\b|(?:^|\s)אולי/i;
+  // A commitment that is still conditional. "once" and "hoping" are not in
+  // judgment.js's HEDGE, so assertedIn still counted them as decided.
+  const CONTINGENT = /\b(?:hoping|once)\b|(?:^|\s)(?:מקווה|מקווים)/i;
+  // The figure was already settled. Logging it again is a false close.
+  const ALREADY_SETTLED = /\b(?:already paid|we paid|was paid|(?:the )?file is closed|back in [A-Za-z]+ \d{4})\b/i;
+  const COMMIT_SENTENCE = /\b(?:agree[ds]?|approved|confirm(?:ed|ing)?)\b|(?:סוכם|אישרנו|מאשרים|מאשר|מאושר)/i;
+
+  function commitmentIsContingent(text) {
+    if (!CONTINGENT.test(text)) return false;
+    let saw = false;
+    let plain = false;
+    for (const s of String(text || '').split(/(?<=[.!?;])\s+|\n+/)) {
+      const hits = COMMIT_SENTENCE.test(s) || FlowJudgment.SENDER_PROMISE.test(s) || FlowJudgment.SENDER_PROMISE_HE.test(s);
+      if (!hits) continue;
+      saw = true;
+      if (!CONTINGENT.test(s)) plain = true;
+    }
+    return saw && !plain;
+  }
+
   function classify(text, ctx) {
     ctx = ctx || {};
     text = FlowJudgment.newContent(text);
@@ -321,8 +357,9 @@ const FlowIntent = (() => {
     // The soft hedge is narrower than judgment.js's HEDGE on purpose.
     // "could" and "if" are how real invites are written ("could you join
     // the call Monday if you're free"). "might" / "maybe" / "אולי" are not,
-    // and filing those is a confident mistake.
-    const MEETING_SOFT = /\b(?:might|maybe|perhaps|possibly|tentatively)\b|(?:^|\s)(?:אולי|ייתכן)/;
+    // and filing those is a confident mistake. The flag is case-insensitive
+    // because "Maybe" and "Tentatively" open the sentence.
+    const MEETING_SOFT = /\b(?:might|maybe|perhaps|possibly|tentatively)\b|(?:^|\s)(?:אולי|ייתכן)/i;
     function meetingAsserted(pattern) {
       const sentences = String(text || '').split(/(?<=[.!?;])\s+|\n+/);
       for (const s of sentences) {
@@ -460,6 +497,18 @@ const FlowIntent = (() => {
     const calledOff = s.flags.lost || EVENT_CALLED_OFF.test(text) || EVENT_CALLED_OFF_HE.test(text);
     const isRecap = EVENT_RECAP.test(text) || EVENT_RECAP_HE.test(text);
     const isPast = isPastDate(facts.date && facts.date.iso, ctx.now);
+    // infoOrNoise is the same veto as s.flags.noise, for phrasings the
+    // scorer's own list does not name yet (FYI, a quick bump, "Accepted:").
+    // It also stops the score path below: a FYI wrapped around a strong
+    // approval would otherwise clear 50 after the hard gates declined.
+    const infoOrNoise = INFO_ONLY.test(text) || EXTRA_NOISE.test(text);
+    const blocked = s.flags.noise || infoOrNoise;
+    const askIsSoft = Boolean(requestWhat) && SOFT_ASK.test(requestWhat);
+    // "once" / "hoping" only withdraw the commitment sentence they sit in.
+    // A plain agreement in the next sentence still counts. A message whose
+    // only agreement is contingent does not.
+    const contingent = commitmentIsContingent(text);
+    const settled = ALREADY_SETTLED.test(text);
     // s.flags.noise: a pitch fingerprint, mailing-list boilerplate, calendar
     // acceptance mail, or an automated sender. The score already penalises
     // these below the bar. Hard gates do not read that total, so without
@@ -473,7 +522,7 @@ const FlowIntent = (() => {
     // otherwise log it as a decision — the same chip, a different label.
     const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
     if (eventEvidence && suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
-    if (!s.flags.noise && eventEvidence) {
+    if (!blocked && eventEvidence) {
       return finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
@@ -498,7 +547,7 @@ const FlowIntent = (() => {
     //        vs 'high' when a real anchor is present.
     const readerCommitEvidence = isReaderCommit && (hasConcreteAnchor || hasConcreteCommitmentObject);
     if (readerCommitEvidence && suppressed(TYPES.COMMITMENT_OF_READER)) return { type: null, signals, facts };
-    if (!s.flags.noise && readerCommitEvidence) {
+    if (!blocked && readerCommitEvidence && !isPast) {
       return finish(TYPES.COMMITMENT_OF_READER, hasConcreteAnchor ? 'high' : 'medium', {
         who, amount,
         what: commitmentWhat || shortLabel(TYPES.COMMITMENT_OF_READER, facts, enrichedFacts),
@@ -517,9 +566,11 @@ const FlowIntent = (() => {
     //        and it is the same shape as a pitch that happens to quote a
     //        price. The figure still rides along on the task once a date or
     //        an object is present.
-    const requestEvidence = s.flags.handoff && (hasResolvedDate || hasConcreteRequestObject);
+    // A past date is not an anchor. "Please send the receipt" still chips
+    // when it names the receipt; the old due date is not what made it real.
+    const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return { type: null, signals, facts };
-    if (!s.flags.noise && requestEvidence) {
+    if (!blocked && requestEvidence && !askIsSoft) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || shortLabel(TYPES.REQUEST, facts, enrichedFacts),
@@ -547,8 +598,8 @@ const FlowIntent = (() => {
     //        is not something to put on a task. isTypeSuppressed is the
     //        same outlet the other hard gates use — this one has no
     //        threshold to nudge either.
-    const datedCommitment = (s.flags.commit || s.flags.senderPromise) && hasResolvedDate && !s.flags.lost && !isPast;
-    if (!s.flags.noise && datedCommitment && !suppressed(TYPES.DECISION_TO_LOG)) {
+    const datedCommitment = (s.flags.commit || s.flags.senderPromise) && hasResolvedDate && !s.flags.lost && !isPast && !contingent;
+    if (!blocked && datedCommitment && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
@@ -556,7 +607,7 @@ const FlowIntent = (() => {
         dateIso: facts.date.iso
       }, 'dated-commitment');
     }
-    if (!s.flags.noise && s.flags.commit && facts.money && !s.flags.lost && !suppressed(TYPES.DECISION_TO_LOG)) {
+    if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, DATED_COMMIT_PATTERNS) || shortLabel(TYPES.DECISION_TO_LOG, facts, enrichedFacts),
@@ -586,7 +637,16 @@ const FlowIntent = (() => {
     const gatingThreshold = FlowJudgment.applyTypeAdjustment(
       threshold, ctx.calibrationByType && ctx.calibrationByType[likelyType], ctx.now
     );
+    // A soft ask is not an obligation just because a figure and a date
+    // pushed the total over the bar. A real decision in another sentence
+    // already returned above.
+    if (infoOrNoise) return { type: null, signals, facts };
+    if (askIsSoft && !isDecision) return { type: null, signals, facts };
     if (s.total < gatingThreshold) return { type: null, signals, facts };
+    // "hoping" / "once" and an already-paid figure clear the bar without
+    // being an open close. Silence is the side of that trade.
+    if (isDecision && contingent) return { type: null, signals, facts };
+    if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return { type: null, signals, facts };
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (isDecision) {
