@@ -1036,6 +1036,80 @@ console.log('\n--- personal close types: dated commitment, explicit ask, confirm
   check('request-dismissal history does not suppress a dated commitment', notSuppressed.type === FlowIntent.TYPES.DECISION_TO_LOG, notSuppressed.type);
 }
 
+// Google-loop silence. Probed against classify() — the path the chip uses.
+// These cleared a hard gate while the score sat under 50 (or, for a settled
+// payment, just over it) and would have shown a Do It. The three Trusted
+// shapes on the other side of the same line must still show.
+console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
+{
+  const mustSilence = [
+    ['soft maybe + invoice', 'Could you maybe send the invoice when you have a moment?'],
+    ['soft no rush + follow up', 'No rush — please follow up with Dana about the invoice.'],
+    ['soft whenever + file', 'Whenever you can, could you send the file?'],
+    ['soft if possible + invoice', 'If possible, could you send the invoice?'],
+    ['soft optional follow up', 'Optional: please follow up with Dana about the invoice if you want.'],
+    ['soft Hebrew maybe + invoice', 'אולי תוכל לשלוח את החשבונית?'],
+    ['soft maybe + priced future ask', 'Could you maybe send the $4,200 invoice by October 2 for the contract renewal we discussed with the vendor last week?'],
+    ['FYI dated agreement', 'FYI, we agreed to file the amendment by September 21.'],
+    ['FYI confirmed amount', 'FYI the amount is confirmed at $4,200 for the year.'],
+    ['no action + amount', 'No action needed — confirming the amount is $4,200.'],
+    ['informational only + amount', 'This is informational only. Confirming the amount is $4,200.'],
+    ['visibility only + date', 'For visibility only, we agreed to file the amendment by September 21.'],
+    ['no reply + date', 'Looping you in for visibility. We agreed to file the amendment by September 21. No need to reply.'],
+    ['Hebrew FYI + date', 'לידיעתך, סוכם שנגיש את התיקון עד 21 בספטמבר.'],
+    ['Hebrew no action + amount', 'אין צורך בפעולה. מאשרים שהסכום הוא 4,200 שקל.'],
+    ['hedge once legal', 'I will send the signed contract by Friday once legal approves it.'],
+    ['hedge hoping to agree', 'We are hoping to agree on $4,200 by September 21.'],
+    ['past call worded as already held', 'The call was on Monday at 3pm.'],
+    ['past meeting already had', 'We already had the meeting on Tuesday at 10am.'],
+    ['past reader commitment', 'You agreed to send the invoice on March 3, 2020.'],
+    ['past payment confirmation', 'Confirming we paid the $4,200 on March 3, 2024.'],
+    ['closed file, amount recalled', 'We confirmed the $4,200 back in March 2024 and that file is closed.'],
+    ['maybe meeting', 'Maybe we could do a call Friday, September 18 at 3pm?'],
+    ['tentative meeting', 'Tentatively booking a call Friday, September 18 at 3pm.'],
+    ['calendar accepted line', 'Accepted: Weekly sync — Friday, September 18 at 3pm.'],
+    ['calendar invitation accepted', 'Invitation accepted. The meeting is Friday, September 18 at 3pm.'],
+    ['calendar event reminder', 'Event reminder: Sync Friday, September 18 at 3pm.'],
+    ['calendar automated reminder', 'This is an automated reminder for your meeting on Friday, September 18 at 3pm.'],
+    ['calendar response accepted', 'Your response: Accepted. Friday, September 18 at 3pm.'],
+    ['quick bump + invoice', 'Quick bump: please send the invoice.']
+  ];
+  for (const [label, text] of mustSilence) {
+    const intent = classify(text);
+    check('silence: ' + label, !intent.type, { type: intent.type, confidence: intent.confidence, score: intent.signals && intent.signals.score });
+  }
+
+  const mustShow = [
+    ['dated commitment', 'We agreed to deliver the countersigned amendment by October 2.', FlowIntent.TYPES.DECISION_TO_LOG, 'dated-commitment'],
+    ['Hebrew dated commitment', 'סוכם שנגיש את התיקון עד 2 באוקטובר.', FlowIntent.TYPES.DECISION_TO_LOG, 'dated-commitment'],
+    ['explicit follow-up', 'Please follow up with Dana about the outstanding invoice.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['confirmed amount', 'Confirming the fee is $8,750.', FlowIntent.TYPES.DECISION_TO_LOG, 'confirmed-amount'],
+    ['polite ask, not a soft one', 'Please send the invoice when you get a chance.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['reader reminder, not a calendar notice', 'As a reminder, you agreed to send the invoice by Friday, September 18.', FlowIntent.TYPES.COMMITMENT_OF_READER, null],
+    ['current ask that mentions a past due date', 'Please send the receipt for the invoice that was due March 3, 2024.', FlowIntent.TYPES.REQUEST, 'follow-up-ask']
+  ];
+  for (const [label, text, type, personalClose] of mustShow) {
+    const intent = classify(text);
+    check('show Do It: ' + label, intent.type === type && (intent.personalClose || null) === personalClose, {
+      type: intent.type, personalClose: intent.personalClose, score: intent.signals && intent.signals.score
+    });
+    check('show Do It chip: ' + label, FlowIntent.shouldShowChip(intent) === true, intent.confidence);
+  }
+
+  // Low confidence is the score-bar catch-all (FOLLOW_UP). It stays that
+  // existing type — this PR does not add a close type — and it does not
+  // show a chip. A payable invoice with no hard gate is the case.
+  const unsure = classify('Please find invoice INV-2041 attached for $12,500. Payment is payable net 30, due October 14.');
+  check('a score-bar obligation stays the existing follow-up type',
+    unsure.type === FlowIntent.TYPES.FOLLOW_UP && unsure.confidence === 'low' && !unsure.personalClose, unsure);
+  check('low confidence does not show a Do It chip', FlowIntent.shouldShowChip(unsure) === false, unsure.confidence);
+  check('silence is not a chip', FlowIntent.shouldShowChip({ type: null }) === false);
+  check('remote classification is not this bar', FlowIntent.shouldShowChip({ type: 'request', confidence: 'remote' }) === true);
+  const typeIds = Object.keys(FlowIntent.TYPES).map((k) => FlowIntent.TYPES[k]).sort();
+  check('intent types stay the existing five',
+    JSON.stringify(typeIds) === JSON.stringify(['commitment', 'decision', 'event', 'followup', 'request']), typeIds);
+}
+
 console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');
 {
   const lines = FlowActions.receiptWrittenLines([

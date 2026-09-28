@@ -131,12 +131,35 @@ const FlowCloseQuality = (() => {
     return { state: next, recorded: null };
   }
 
+  // Still Open week-1 bar: false closes / messages the user actually
+  // judged. A message is judged when it fully wrote, or the user turned
+  // the chip down (dismiss or undo). A full write that is later undone
+  // is one message and it counts as false — the success row stays, and
+  // it is not a second message in the denominator. Returns do not enter
+  // this ratio. Null when nothing has been judged yet; a readout of 0%
+  // would invent a measurement.
+  const FALSE_CLOSE_BAR = 0.15;
+
+  function falseCloseRate(state) {
+    const successIds = (state && state.successIds) || [];
+    const falseIds = (state && state.falseDoItIds) || [];
+    const seen = Object.create(null);
+    for (let i = 0; i < successIds.length; i++) seen[successIds[i]] = true;
+    for (let i = 0; i < falseIds.length; i++) seen[falseIds[i]] = true;
+    const judged = Object.keys(seen).length;
+    if (!judged) return null;
+    return falseIds.length / judged;
+  }
+
   function computeSnapshot(state) {
     const next = clone(state);
+    const rate = falseCloseRate(next);
     return {
       success: next.success,
       return: next.return,
       falseDoIt: next.falseDoIt,
+      falseCloseRate: rate,
+      falseCloseWithinBar: rate == null ? null : rate <= FALSE_CLOSE_BAR,
       lastDoItDay: next.lastDoItDay,
       recent: next.recent
     };
@@ -151,10 +174,14 @@ const FlowCloseQuality = (() => {
     const returned = snapshot.return || 0;
     const falseDoIt = snapshot.falseDoIt || 0;
     if (!success && !returned && !falseDoIt) return '';
-    return 'Full closes ' + success + ' · Returns ' + returned + ' · Turned down ' + falseDoIt;
+    let line = 'Full closes ' + success + ' · Returns ' + returned + ' · Turned down ' + falseDoIt;
+    if (snapshot.falseCloseRate != null) {
+      line += ' · False-close ' + Math.round(snapshot.falseCloseRate * 100) + '%';
+    }
+    return line;
   }
 
-  return { emptyState, isFullWrite, dayKey, applyEvent, computeSnapshot, activityLine, RECENT_CAP, ID_CAP };
+  return { emptyState, isFullWrite, dayKey, applyEvent, computeSnapshot, falseCloseRate, activityLine, FALSE_CLOSE_BAR, RECENT_CAP, ID_CAP };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseQuality };
