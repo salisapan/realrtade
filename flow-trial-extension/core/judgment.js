@@ -27,6 +27,10 @@ const FlowJudgment = (() => {
   // ahead" with no figure and no date — while the old scorer let cold pitches
   // through. The cold-pitch penalty below is what buys the headroom to sit at 50.
   const BASE_THRESHOLD = 50;
+  // Strong authorisations have to clear this bar on their own. 42 is the
+  // weight; the gap up to BASE_THRESHOLD is added only when nothing else
+  // positive is present (see score), so a reply bonus is not required.
+  const STRONG_WEIGHT = 42;
   const MIN_THRESHOLD = 38;
   // Capped where a genuine decision can still clear it. Higher than this and a
   // run of dismissals mutes Flow outright, which is indistinguishable from a
@@ -93,7 +97,12 @@ const FlowJudgment = (() => {
   // NEG_BEFORE_HE/HEDGE_HE header comments already document — found here by
   // the same "run the negative corpus before committing" discipline.
   const COMMIT_HE = /(סוכם|אישרנו|מאשרים|מקובל עלינו|סגרנו|בסדר מבחינתנו|מאשר(?:ת|ים)?|מסכימים|מסכימה|מסכים|הוחלט ש|סגור מבחינתנו|בסדר גמור|מקובל עליי?נו?|נשמע טוב|נשמח להתקדם|בואו נתקדם|אנחנו בעניין|רואים בזה סגור|תואמים|יש לנו הסכמה|אאשר|מתחייב|מתחייבת|שול(?:מה|מו|ם)(?![\u0590-\u05FF]))/;
-  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל)/;
+  // "נחתם" is the passive twin of English "countersigned" / "fully executed",
+  // which already sit on COMMIT_STRONG. Left only on the weaker executed
+  // list, "ההסכם נחתם" cannot clear 50: executed is 26, and a short note
+  // also eats the length penalty. "עותק חתום" stays off this list — it is
+  // the document someone asks you to send, not the fact that it was signed.
+  const COMMIT_STRONG_HE = /(מאושר|יש אישור|אפשר להתקדם|קיבלנו אישור|חתמנו|ניתן אישור|אושר|האישור התקבל|אור ירוק|קיבלנו את האישור|אפשר לצאת לדרך|ההזמנה אושרה|מאושר סופית|אושר רשמית|קיבל אישור סופי|יצא אישור|האישור הסופי התקבל|נחתם|ההסכם נחתם)/;
   const LOST_HE = /(לא ממשיכים|פורשים מ|לא מעוניינים יותר|מבטלים את ה|ירדנו מזה|החלטנו שלא|לא הולכים על זה|בחרנו באופציה אחרת|בחרנו בספק אחר|לצערנו לא נוכל|אנחנו לא ממשיכים איתכם|ירדנו מהעניין|החלטנו לוותר|לא מתאים לנו|הולכים על ספק אחר|פורשים מההסכם|לא נמשיך בתהליך)/;
   const EXECUTED_HE = /(נחתם|חתמנו על ההסכם|עותק חתום|ההסכם נחתם|חתמתי על|נחתם וסגור|חתום ומאושר|נשלח חתום|העותק החתום מצורף|העסקה נסגרה|הניירת הושלמה)/;
   const OBLIGATION_HE = /(דדליין|לא יאוחר מ|יש לשלם עד|פג תוקף|עד לתאריך|מועד אחרון|עד סוף החודש|יש להעביר עד|נדרש לשלם עד|יש להשלים עד|יש להגיש עד|נדרש להשלים עד|התשלום נדרש עד|יש לסיים עד)/;
@@ -293,8 +302,10 @@ const FlowJudgment = (() => {
     for (const s of String(text || '').split(SENTENCE_SPLIT)) {
       const m = s.match(pattern);
       if (!m) continue;
-      // A question asks for a decision; it does not record one.
+      // A question asks for a decision; it does not record one. "האם"
+      // is the Hebrew question particle and often arrives without "?".
       if (/\?\s*$/.test(s.trim())) continue;
+      if (/(?:^|\s)האם\s/.test(s)) continue;
       if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
       const before = s.slice(0, m.index);
       if (isNegatedBefore(before)) continue;
@@ -323,6 +334,126 @@ const FlowJudgment = (() => {
   const anyOf = (text, pats, fn) => pats.some((p) => fn(text, p));
   const testsIn = (text, p) => p.test(text);
 
+  // Bare confirm / agree / accept / approve. Real closes still use these
+  // words ("I confirm", "we agree", "the proposal is accepted", "Approved").
+  // A reader-directed request uses the same words and is not a close
+  // ("can you agree", "please confirm", "do you accept", "אתה מסכים").
+  // The optional " to" / " on" in COMMIT is part of the match ("agree to"),
+  // so the head word is what decides bare vs phrase. "we're good at" does
+  // not start with one of these verbs.
+  const BARE_DECISION_WORD = /^(?:confirm(?:ed|ing)?|agree[ds]?|accept(?:ed|s)?|approv(?:e|ed))(?:\s|$)/i;
+  const BARE_DECISION_HE = /^(?:מאשר(?:ת|ים)?|מסכימה|מסכימים|מסכים|מאושר)/;
+  // Rightmost request cue before a decision word. "האם" is a question
+  // particle and withdraws every decision after it, the way "?" already
+  // does. The others withdraw only the bare verbs above, so "countersigned"
+  // and "we're good" in the same note still count.
+  const READER_CUE_RES = [
+    { re: /\b(?:(?:can|could|would|will) you|please|kindly|do you|(?:asking|requesting) you to|need you to)\b/gi, kind: 'ask' },
+    { re: /\byou\s+(?=agree[ds]?|accept(?:ed|s)?|confirm)/gi, kind: 'ask' },
+    { re: /בבקשה|אנא|(?:^|\s)נא(?=\s)/g, kind: 'ask' },
+    { re: /(?:^|\s)האם(?=\s)/g, kind: 'whether' },
+    { re: /(?:^|\s)אתה(?=\s)|(?:^|\s)אתם(?=\s)|(?:^|\s)אתן(?=\s)|(?:^|\s)את(?=\s+מ(?:אשר|סכימ))/g, kind: 'ask' }
+  ];
+
+  function isBareDecision(word) {
+    return BARE_DECISION_WORD.test(word) || BARE_DECISION_HE.test(word);
+  }
+
+  function cuesBefore(sentence, index) {
+    const cues = [];
+    for (const spec of READER_CUE_RES) {
+      const re = new RegExp(spec.re.source, spec.re.flags);
+      let found;
+      while ((found = re.exec(sentence))) {
+        if (!found[0]) { re.lastIndex += 1; continue; }
+        if (found.index < index) cues.push({ index: found.index, text: found[0], kind: spec.kind });
+      }
+    }
+    cues.sort((a, b) => a.index - b.index);
+    return cues;
+  }
+
+  // True when this match is the reader being asked to decide, not the
+  // sender deciding. "We agree, please send the contract" keeps "agree":
+  // the request cue sits after it. "Please confirm we are agreed" drops
+  // both verbs: "please" leads, and "confirm" sits between it and "agreed",
+  // so the "we" there is the content of the ask.
+  function decisionSuppressed(sentence, m) {
+    const cues = cuesBefore(sentence, m.index);
+    if (!cues.length) return false;
+    if (cues.some((c) => c.kind === 'whether')) return true;
+    if (!isBareDecision(m[0])) return false;
+    const cue = cues[cues.length - 1];
+    const between = sentence.slice(cue.index + cue.text.length, m.index);
+    const before = sentence.slice(0, m.index);
+    const speaker = /\b(?:we(?:'re|\s+are|\s+have)?|i(?:'m|\s+am|\s+have)?)\s+$/i.test(before)
+      || /(?:^|\s)(?:אני|אנחנו)\s+$/.test(before);
+    const requestVerbBetween = /\b(?:confirm(?:ed|ing)?|agree[ds]?|accept(?:ed|s)?|approv(?:e|ed)|please|kindly)\b/i.test(between)
+      || /(?:בבקשה|אנא|האם|מאשר|מסכימ)/.test(between);
+    if (speaker && !requestVerbBetween) return false;
+    return true;
+  }
+
+  // "nothing is confirmed yet" names the decision in order to say it has
+  // not been made. "not" already covers "do NOT approve"; "nothing" does
+  // not contain a free-standing "not", so it never reached that window.
+  function bareWithdrawn(sentence, m) {
+    if (!isBareDecision(m[0])) return false;
+    const before = sentence.slice(Math.max(0, m.index - 48), m.index);
+    const after = sentence.slice(m.index + m[0].length, m.index + m[0].length + 16);
+    if (/\b(?:nothing|nobody|no one|not yet|yet to be)\b/i.test(before)) return true;
+    if (/^\s*(?:yet|nothing)\b/i.test(after)) return true;
+    return false;
+  }
+
+  function eachMatch(sentence, pattern, visit) {
+    const re = new RegExp(pattern.source, pattern.flags.indexOf('g') === -1 ? pattern.flags + 'g' : pattern.flags);
+    let found;
+    while ((found = re.exec(sentence))) {
+      if (!found[0]) { re.lastIndex += 1; continue; }
+      if (visit(found)) return true;
+    }
+    return false;
+  }
+
+  // Same per-sentence hedge / negation / question test as assertedIn, plus
+  // the reader-ask bar above. Used only for commitment patterns. Executed
+  // and obligation stay on assertedIn: "please confirm the invoice is
+  // payable" is still an obligation.
+  function assertedCommit(text, pattern) {
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      if (/\?\s*$/.test(s.trim())) continue;
+      if (HEDGE.test(s) || HEDGE_HE.test(s)) continue;
+      const hit = eachMatch(s, pattern, (found) => {
+        if (isNegatedBefore(s.slice(0, found.index))) return false;
+        if (bareWithdrawn(s, found)) return false;
+        if (decisionSuppressed(s, found)) return false;
+        return true;
+      });
+      if (hit) return true;
+    }
+    return false;
+  }
+
+  const COMMIT_MENTION_PATS = [COMMIT, COMMIT_HE, COMMIT_STRONG, COMMIT_STRONG_HE];
+
+  // Every commitment word in the note is a reader being asked to decide.
+  // "We do NOT approve" is not this — the word is a refusal, and the
+  // negated penalty below is what keeps the figure from reading as a close.
+  function commitMentionsAreReaderAsks(text) {
+    let saw = false;
+    for (const s of String(text || '').split(SENTENCE_SPLIT)) {
+      for (const pattern of COMMIT_MENTION_PATS) {
+        const open = eachMatch(s, pattern, (found) => {
+          saw = true;
+          return !decisionSuppressed(s, found);
+        });
+        if (open) return false;
+      }
+    }
+    return saw;
+  }
+
   function score(text, domain, facts) {
     const signals = [];
     const add = (id, weight, why) => signals.push({ id, weight, why });
@@ -343,9 +474,10 @@ const FlowJudgment = (() => {
     if (marketing) add('marketing', -45, 'Reads like a mailing list, not a person');
     if (solicitation) add('solicitation', -55, 'Reads like a cold pitch, not your work');
     if (calendarNoise) add('calendar', -35, 'Calendar notification boilerplate');
-    if (facts.wordCount < 12) add('too-short', -25, 'Too little text to judge');
 
-    // A commitment counts only where a sentence actually states it. The
+    // A commitment counts only where a sentence actually states it. Bare
+    // confirm/agree/accept in a reader-directed ask do not — assertedCommit
+    // drops those and keeps "we agree" / "I confirm" / "Approved". The
     // "mentioned" forms are kept alongside so the difference between the two
     // can be scored: a message that talks about approving without approving is
     // not neutral evidence, it is evidence AGAINST acting.
@@ -354,8 +486,13 @@ const FlowJudgment = (() => {
     const EXEC_PATS = [EXECUTED, EXECUTED_HE];
     const OBLIG_PATS = [OBLIGATION, OBLIGATION_HE];
 
-    const commitStrong = anyOf(text, STRONG_PATS, assertedIn);
-    const commit = commitStrong || anyOf(text, COMMIT_PATS, assertedIn);
+    const commitStrong = anyOf(text, STRONG_PATS, assertedCommit);
+    const commit = commitStrong || anyOf(text, COMMIT_PATS, assertedCommit);
+    // A length penalty is for a fragment that has not said what happened
+    // ("Thanks!", an empty reply). "Approved. Go ahead." and "מאושר. אפשר
+    // להתקדם." are short because the decision is the whole note — the flat
+    // <12 cutoff was silencing them. Weaker commitments stay under it.
+    if (facts.wordCount < 12 && !commitStrong) add('too-short', -25, 'Too little text to judge');
     const commitMentioned = anyOf(text, COMMIT_PATS, testsIn);
     const executed = anyOf(text, EXEC_PATS, assertedIn);
     const executedMentioned = anyOf(text, EXEC_PATS, testsIn);
@@ -370,7 +507,7 @@ const FlowJudgment = (() => {
     const senderPromise = anyOf(text, [SENDER_PROMISE, SENDER_PROMISE_HE], assertedIn);
 
     if (facts.money) add('money', 34, 'States a figure: ' + facts.moneyText);
-    if (commitStrong) add('commitment', 42, 'Someone authorised something outright');
+    if (commitStrong) add('commitment', STRONG_WEIGHT, 'Someone authorised something outright');
     else if (commit) add('commitment', 30, 'Someone committed to something');
     // Weighted to clear threshold alongside a domain match on its own — a lost
     // deal is exactly the kind of news worth logging without needing a second,
@@ -384,6 +521,13 @@ const FlowJudgment = (() => {
     const onDomain = domain.entityWords.test(text);
     if (onDomain) add('domain', 14, 'About ' + domain.entity.toLowerCase());
     if (facts.isReply) add('reply', 8, 'Part of an ongoing thread');
+    // COMMIT_STRONG is 42, eight under the bar, so "Approved. Go ahead."
+    // only cleared when a reply bonus happened to be present. The chip
+    // path does not set that bonus. A plain authorisation has to clear
+    // on its own — that is why this list is weighted above a normal commit.
+    if (commitStrong && !signals.some((s) => s.weight > 0 && s.id !== 'commitment')) {
+      add('bare-strong', BASE_THRESHOLD - STRONG_WEIGHT, 'States the authorisation on its own');
+    }
 
     // A message with a number and nothing else decided is a quote, not a decision.
     // Requiring a second signal alongside money is what keeps price lists quiet.
@@ -395,8 +539,17 @@ const FlowJudgment = (() => {
     // bonus — 56 against a threshold of 50 — so it would clear the bar anyway
     // and be labelled from the money alone, which reads "Log $40,000 agreed".
     // A denied or merely-contemplated commitment has to push the other way.
-    if (!commit && commitMentioned) add('negated', -34, 'Names a decision the sentence does not actually make');
-    else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
+    if (!commit && commitMentioned) {
+      // "please confirm" next to a real dispute, a signed agreement, or a
+      // due invoice is the ask, not a denied decision. The other signal
+      // stands. A confirm/agree request with only a figure and a date does
+      // not: money + handoff + domain clears 50 and the label reads
+      // "Log $3,900 confirmed".
+      const readerAsk = commitMentionsAreReaderAsks(text);
+      const standsBeside = readerAsk && (lost || executed || dispute || obligation);
+      if (!standsBeside && readerAsk) add('unsettled', -55, 'Asks you to confirm or agree, which is not a decision');
+      else if (!standsBeside) add('negated', -34, 'Names a decision the sentence does not actually make');
+    } else if (!executed && executedMentioned) add('negated', -34, 'Names an agreement the sentence does not actually execute');
 
     const total = signals.reduce((sum, s) => sum + s.weight, 0);
     return { total, signals, flags: { commit, lost, executed, obligation, handoff, dispute, onDomain, senderPromise, noise } };

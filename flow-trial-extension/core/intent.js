@@ -319,6 +319,21 @@ const FlowIntent = (() => {
   // "if you could" — those are how a real request is written, and the
   // corpus keeps them. "when you get a chance" stays a request.
   const SOFT_ASK = /\b(?:maybe|perhaps|possibly|no rush|whenever you|when convenient|at your leisure|if possible|if you want|if it helps|just a nudge|optional)\b|(?:^|\s)אולי/i;
+  // "Can you agree to the proposal by Monday" is a handoff plus a date, so
+  // the request gate would draft it as a follow-up close. Agreeing is the
+  // decision the reader has not made. "Could you confirm the payment by
+  // Friday" stays a request: it names the work, not a yes to the deal.
+  // "confirm whether" asks which way it went; it does not record one.
+  function readerDecisionAsk(text) {
+    const raw = String(text || '');
+    if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
+    if (/\b(?:please|kindly|do you)\s+(?:agree|accept)\b/i.test(raw)) return true;
+    if (/\bconfirm\b/i.test(raw) && /\bwhether\b/i.test(raw)) return true;
+    if (/\b(?:please|kindly)\s+confirm\b/i.test(raw) && /\bagree[ds]?\b/i.test(raw)) return true;
+    if (/(?:^|\s)האם\s/.test(raw) && /מסכימ/.test(raw)) return true;
+    if (/(?:^|\s)אתה\s+מסכים/.test(raw) || /(?:^|\s)אתם\s+מסכימים/.test(raw)) return true;
+    return false;
+  }
   // A commitment that is still conditional. "once" and "hoping" are not in
   // judgment.js's HEDGE, so assertedIn still counted them as decided.
   const CONTINGENT = /\b(?:hoping|once)\b|(?:^|\s)(?:מקווה|מקווים)/i;
@@ -842,7 +857,9 @@ const FlowIntent = (() => {
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
-    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk) {
+    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text)) {
+      quietHint = quietHint || 'hedge';
+    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),

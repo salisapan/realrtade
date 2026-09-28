@@ -337,6 +337,14 @@ console.log('\n--- E F G: the close is a task, a draft plus a task, or one calen
     });
     check(name + ' is one task', row.process && row.process.id === 'log-it' && googleOnly(row.process, ['googleTask']), kinds(row.process));
   }
+  const notApproval = [
+    ['E nothing confirmed yet', 'Nothing is confirmed yet on the $3,900 proposal, and the team is still reviewing the draft with legal before anyone signs.'],
+    ['E not yet confirmed', 'The $4,800 annual fee is not yet confirmed, and legal is still reading the draft.']
+  ];
+  for (const [name, text] of notApproval) {
+    const row = plan(text);
+    check(name + ' stays quiet', !row.show, { type: row.intent.type, family: row.intent.closeFamily, close: row.intent.personalClose });
+  }
   const nudges = [
     ['F he remind', 'תזכיר לדנה לגבי החשבונית.'],
     ['F en chase up', 'Please chase up the vendor on the contract.'],

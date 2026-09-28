@@ -191,7 +191,93 @@ const CASES = [
 
   { name: 'HE hedged אאשר stays quiet', domain: 'sales', fire: false,
     subject: 'Re: חוזה',
-    text: 'אולי אאשר את החוזה על סך 12,000 ש״ח בהמשך, אם הדירקטוריון יתכנס ויאשר את כל המסמכים אחרי בדיקה מלאה של ההצעה.' }
+    text: 'אולי אאשר את החוזה על סך 12,000 ש״ח בהמשך, אם הדירקטוריון יתכנס ויאשר את כל המסמכים אחרי בדיקה מלאה של ההצעה.' },
+
+  // ---- confirm / agree / accept requests are not closes ----
+  // A reader-directed ask names the decision it wants. It does not record
+  // one. The short forms are the product examples; the longer forms carry
+  // enough money, date, and handoff points to clear 50 if "confirm"/"agree"
+  // were still scored as a commitment.
+  { name: 'confirm request with a question mark stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: proposal',
+    text: 'Can you confirm whether the proposal at $3,900 still works?' },
+
+  { name: 'longer confirm request without a decision stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: proposal',
+    text: 'Can you confirm whether the proposal at $3,900 still works for the client this quarter.' },
+
+  { name: 'agree request without a question mark stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: proposal',
+    text: 'Can you agree to the $3,900 proposal by Monday.' },
+
+  { name: 'longer agree request stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: proposal',
+    text: 'Can you agree to the $3,900 proposal by Monday and send the updated schedule to the team this week.' },
+
+  { name: 'please investigate and confirm stays quiet', domain: 'finance', fire: false,
+    subject: 'Re: ledger',
+    text: 'please investigate and confirm.' },
+
+  { name: 'longer please-confirm stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: contract',
+    text: 'Please investigate the contract ledger and confirm the $3,900 posting once you have looked through it this week.' },
+
+  { name: 'please confirm we are agreed is still a request', domain: 'sales', fire: false,
+    subject: 'Re: contract',
+    text: 'Please confirm we are agreed at $3,900 for the annual contract before anyone sends the paperwork out.' },
+
+  { name: 'please accept a priced proposal stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: proposal',
+    text: 'Please accept the $18,000 proposal by Monday and route it to the legal team for the paperwork this week.' },
+
+  { name: 'do you agree stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: proposal',
+    text: 'Do you agree to the $3,900 proposal for the annual contract.' },
+
+  { name: 'nothing confirmed yet stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: proposal',
+    text: 'Nothing is confirmed yet on the $3,900 proposal, and the team is still reviewing the draft with legal before anyone signs.' },
+
+  { name: 'HE reader agrees-question stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: הצעה',
+    text: 'האם אתה מסכים להצעה על סך 3,900 שקל עד יום שני, לפני שמישהו שולח את המסמכים.' },
+
+  { name: 'HE you-agree statement is not our close', domain: 'sales', fire: false,
+    subject: 'Re: הצעה',
+    text: 'אתה מסכים להצעה על סך 3,900 שקל עד יום שני, והצוות מחכה לתשובה לפני ששולחים מסמכים.' },
+
+  // Real closes: speaker commitments, strong authorisation, signed paper.
+  { name: 'we agree to a price', domain: 'sales', fire: true,
+    subject: 'Re: contract',
+    text: 'We agree to $4,800 for the annual contract, effective September 7.' },
+
+  { name: 'I confirm a priced proposal', domain: 'sales', fire: true,
+    subject: 'Re: proposal',
+    text: 'I confirm the $3,900 proposal, effective September 7, so the team can start the paperwork this week.' },
+
+  { name: 'short strong approval still clears', domain: 'ops', fire: true,
+    subject: 'Re: migration plan',
+    text: 'Approved. Go ahead.' },
+
+  { name: 'empty short text stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: lunch',
+    text: 'Thanks!' },
+
+  { name: 'blank text stays quiet', domain: 'sales', fire: false,
+    subject: 'Re: lunch',
+    text: '' },
+
+  { name: 'HE strong approval still clears', domain: 'sales', fire: true,
+    subject: 'Re: חוזה',
+    text: 'מאושר. אפשר להתקדם.' },
+
+  { name: 'HE agreement was signed', domain: 'sales', fire: true,
+    subject: 'Re: הסכם',
+    text: 'ההסכם נחתם, עותק חתום מצורף.' },
+
+  { name: 'we agree, then a confirm request, still a close', domain: 'sales', fire: true,
+    subject: 'Re: contract',
+    text: 'We are agreed on the $4,800 annual contract, effective September 7. Please confirm receipt of the countersigned copy by Friday.' }
 ];
 
 function evaluate(c) {

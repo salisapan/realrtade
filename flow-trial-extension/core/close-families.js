@@ -542,6 +542,11 @@ const FlowCloseFamilies = (() => {
     if (pastDone(sentence)) return null;
     // "Has the fee been confirmed?" is a question, not an approval.
     if (/\?\s*$/.test(sentence)) return null;
+    // "Nothing is confirmed yet" names the word in order to withdraw it.
+    // "nothing" is not in NEG_EN, so the approval regex used to log the figure.
+    if (/\bnothing(?:\s+\w+){0,4}\s+(?:confirm(?:ed|ing)?|approv(?:e|ed)|agree[ds]?|accept(?:ed)?)\b/i.test(sentence)) return null;
+    if (/\b(?:confirmed|confirming|approved|agreed|accepted)\s+yet\b/i.test(sentence)) return null;
+    if (/\bnot yet\s+(?:\w+\s+){0,3}(?:confirm(?:ed|ing)?|approv(?:e|ed)|agree[ds]?|accept(?:ed)?)\b/i.test(sentence)) return null;
     if (!APPROVE_EN.test(sentence) && !APPROVE_HE.test(sentence)) return null;
     if (/\b(?:about|around|approx(?:imately)?|roughly|circa)\b/i.test(sentence) || /(?:בערך|בסביבות)/.test(sentence)) return null;
     if (/\b(?:or|between)\b/i.test(sentence) || /(?:^|\s)או(?:\s|$)/.test(sentence)) {
