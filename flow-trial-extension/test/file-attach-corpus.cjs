@@ -52,7 +52,49 @@ const ASKS = [
   ['HE ID', 'תצרף בבקשה צילום של תעודת הזהות.'],
   ['HE transfer', 'נשמח לקבל את אישור ההעברה.'],
   ['HE report', 'תוכלי לשלוח לי את הדוח העדכני?'],
-  ['HE insurance', 'אבקש לקבל את פוליסת הביטוח.']
+  ['HE insurance', 'אבקש לקבל את פוליסת הביטוח.'],
+  ['EN kindly receipt', 'Kindly send the receipt for the March payment.'],
+  ['EN provide W-9', 'Please provide the W-9.'],
+  ['EN can I get', 'Can I get a copy of the invoice?'],
+  ['EN still need signed', 'We still need the signed PDF.'],
+  ['EN resend statement', 'Please resend the statement.'],
+  ['EN email deck', 'Could you email me the deck?'],
+  ['EN quotation', 'Would you send the quotation?'],
+  ['EN mind forward', 'Would you mind forwarding the quote?'],
+  ['EN drivers license', "Please attach a scan of the driver's license."],
+  ['EN insurance certificate', 'Please send the insurance certificate.'],
+  ['EN tax form', 'Please send the tax form.'],
+  ['EN transfer', 'Could you attach the transfer confirmation?'],
+  ['EN signed copy', 'Please send the signed copy.'],
+  ['EN signed of contract', 'Please send the signed PDF of the contract.'],
+  ['EN report', 'Could you share the report with me?'],
+  ['EN appreciate', "I'd appreciate it if you could send the contract."],
+  ['EN proof of payment', 'Can you pass along the proof of payment?'],
+  ['EN enclose brief', 'Please enclose the brief.'],
+  ['EN slides', 'Could you send the slides from last week?'],
+  ['EN ID', 'Please send a copy of the ID.'],
+  ['EN identity card', 'Please send the identity card.'],
+  ['HE tuchal', 'תוכל בבקשה לשלוח לי את החשבונית?'],
+  ['HE tatzrif', 'תצרף בבקשה צילום של תעודת הזהות.'],
+  ['HE tatzrifi', 'תצרפי את הלוגו בבקשה.'],
+  ['HE nismach', 'נשמח לקבל את אישור ההעברה.'],
+  ['HE avakesh', 'אבקש לקבל את הקבלה על דמי התיווך.'],
+  ['HE efshar lekabel', 'אפשר לקבל את הצעת המחיר המעודכנת?'],
+  ['HE efshar letzaref', 'אפשר לצרף את המצגת למייל?'],
+  ['HE na letzaref', 'נא לצרף את תעודת הזהות.'],
+  ['HE taaviri', 'תעבירי לי את אישור ההעברה.'],
+  ['HE shilchi', 'שלחי לי בבקשה את החוזה החתום.'],
+  ['HE tzrichim', 'צריכים את חשבונית המס עבור התשלום.'],
+  ['HE tzricha', 'צריכה את הקבלה.'],
+  ['HE tzrich singular', 'צריך את הצעת המחיר.'],
+  ['HE darkon', 'אשמח לקבל צילום של הדרכון.'],
+  ['HE mas', 'נא לשלוח את טופס המס.'],
+  ['HE brief', 'תשלח לי בבקשה את הבריף.'],
+  ['HE doch quote', 'תוכל לשלוח את הדו"ח?'],
+  ['HE doch gershayim', 'תוכל לשלוח את הדו״ח?'],
+  ['HE mevakesh', 'מבקש לשלוח את חשבונית המס.'],
+  ['HE tuchlu', 'תוכלו להעביר את אישור ההעברה?'],
+  ['EN instead receipt', 'No invoice on file. Please send the receipt instead.']
 ];
 
 console.log('\n--- file-attach: clear ask, one object, HE+EN ---\n');
@@ -69,11 +111,33 @@ const BLOCKS = [
   ['two objects he', 'תשלח לי את החשבונית וגם את החוזה.'],
   ['negation', "Please don't send the invoice, we already have it."],
   ['negation he', 'אין צורך לשלוח את הקבלה.'],
-  ['fyi', 'FYI, the invoice is in the folder. No action needed.']
+  ['fyi', 'FYI, the invoice is in the folder. No action needed.'],
+  ['any chance', 'Any chance you can send the proposal?'],
+  ['not sure which', 'Not sure which invoice you mean.'],
+  ['plural invoices', 'Please send the invoices.'],
+  ['or en', 'Could you send the invoice or the contract?'],
+  ['both en', 'Please send both the proposal and the brief.'],
+  ['and en', 'Could you send the invoice and the contract?'],
+  ['or he', 'תשלח את החשבונית או את הקבלה.'],
+  ['vegam', 'תשלח לי את החשבונית וגם את החוזה.'],
+  ['which he', 'לא בטוח איזו חשבונית, תשלח אחת.']
 ];
 for (const [name, text] of BLOCKS) {
   const gated = FlowFileAttach.gate(text);
   check(name + ' does not become a file chip', gated.kind === 'block', gated);
+}
+const NOT_AN_ASK = [
+  ['shoot the logo', 'Can you shoot me the logo?'],
+  ['drop the logo', 'Could you drop the logo on the email?'],
+  ['that file', 'Can you send that file over?'],
+  ['the documents', 'Please send the documents when you can.'],
+  ['bare policy', 'אשמח לקבל את הפוליסה.'],
+  ['no send verb', 'היי, אפשר את המצגת?'],
+  ['hebrew plural invoices', 'תשלח את החשבוניות.']
+];
+for (const [name, text] of NOT_AN_ASK) {
+  const gated = FlowFileAttach.gate(text);
+  check(name + ' is not a file ask', gated.kind === 'ignore', gated);
 }
 check('already sent is not an ask', FlowFileAttach.gate('I attached the invoice for your records. Thanks!').kind === 'ignore');
 check('vague send-that is not an ask', FlowFileAttach.gate('Can you send that over when you get a chance?').kind === 'ignore');
@@ -196,6 +260,47 @@ console.log('\n--- file-attach: ≤4 fields on the card; >4 is a named-slot chec
   check('a card missing one required value does not create', missing.stay === true && !missing.ready, missing);
   const dodge = FlowFileAttach.fillAll(handoff.fields, { number: 'not sure', forWhat: 'Retainer' });
   check('unsure inside the card does not create', dodge.silence === true && dodge.create === false, dodge);
+}
+
+console.log('\n--- file-attach: one linked file attaches; a plural or a second file does not create ---\n');
+{
+  const signed = FlowFileAttach.gate('Please send the signed PDF of the contract.');
+  check('signed PDF of the contract is one file', signed.kind === 'clear' && signed.ask.id === 'signed-copy' && signed.ask.creatable === false, signed);
+  const decision = FlowFileAttach.decide(signed.ask, [
+    file('plain', 'Contract.pdf'),
+    file('signed', 'Contract-Signed.pdf')
+  ], {}, 'Please send the signed PDF of the contract.');
+  check('the signed file is the one attach', decision.action === 'attach' && decision.file.id === 'signed', decision);
+  const missing = FlowFileAttach.decide(signed.ask, [], {}, 'Please send the signed PDF of the contract.');
+  check('a missing signed PDF is not created', missing.action === 'silence' && missing.reason === 'none', missing);
+}
+{
+  const instead = FlowFileAttach.gate('No invoice on file. Please send the receipt instead.');
+  check('instead keeps the receipt, not the invoice', instead.kind === 'clear' && instead.ask.id === 'receipt', instead);
+  const decision = FlowFileAttach.decide(instead.ask, [
+    file('inv', 'Invoice-1042.pdf'),
+    file('rec', 'Receipt-March.pdf')
+  ], {}, 'No invoice on file. Please send the receipt instead.');
+  check('the receipt is the file that would be attached', decision.action === 'attach' && decision.file.id === 'rec', decision);
+}
+{
+  const text = 'Could you send the passport scan?';
+  const ask = FlowFileAttach.gate(text).ask;
+  const decision = FlowFileAttach.decide(ask, [file('t', 'Passport Template.pdf')], {}, text);
+  check('a passport template is not a created passport', decision.action === 'silence' && decision.reason === 'none', decision);
+}
+{
+  const text = 'Please send the insurance certificate.';
+  const ask = FlowFileAttach.gate(text).ask;
+  const decision = FlowFileAttach.decide(ask, [file('t', 'Insurance Template.pdf')], {}, text);
+  check('an insurance form is not created from a template', decision.action === 'silence', decision);
+}
+{
+  const text = 'נא לשלוח את טופס המס.';
+  const ask = FlowFileAttach.gate(text).ask;
+  check('Hebrew tax form is one ask', ask && ask.id === 'tax-form' && ask.creatable === false, ask);
+  const decision = FlowFileAttach.decide(ask, [file('t', 'תבנית מס')], {}, text);
+  check('a tax form with no safe file stays silence', decision.action === 'silence', decision);
 }
 
 console.log('\n--- file-attach: Drive query escapes quotes and stays on the asked term ---\n');
