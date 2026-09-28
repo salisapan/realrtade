@@ -1138,20 +1138,64 @@ function nextDateIso(dateIso) {
   return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
 }
 
+// A date the close is willing to write. A month that doesn't exist, or a
+// bare phrase, must not become an event on the wrong day.
+function calendarIsoDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parts = value.split('-').map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return value;
+}
+
+function calendarClockPart(value, max) {
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max) return value;
+  if (typeof value === 'string' && /^\d{1,2}$/.test(value)) {
+    const n = Number(value);
+    if (n >= 0 && n <= max) return n;
+  }
+  return null;
+}
+
+// Both fields absent → all-day is allowed (the schedule process). One
+// field present, or either field out of range → not a time we may write.
+function calendarClock(hour, minute) {
+  const hourAbsent = hour == null || hour === '';
+  const minuteAbsent = minute == null || minute === '';
+  if (hourAbsent && minuteAbsent) return { absent: true };
+  const h = calendarClockPart(hour, 23);
+  const m = calendarClockPart(minute, 59);
+  if (h == null || m == null) return { invalid: true };
+  return { hour: h, minute: m };
+}
+
+function calendarWhenLabel(dateIso, clock) {
+  const human = humanDateFallback({ iso: dateIso }) || dateIso;
+  if (!clock || clock.absent) return human;
+  const pad = (n) => String(n).padStart(2, '0');
+  return human + ' ' + pad(clock.hour) + ':' + pad(clock.minute);
+}
+
 async function googleCalendarWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   const params = p.params || {};
-  if (!params.dateIso) {
-    return { ok: false, reason: 'error', error: 'Missing a date for this event.' };
+  const dateIso = calendarIsoDate(params.dateIso);
+  if (!dateIso) {
+    return { ok: false, reason: 'invalid', error: 'Missing a real date for this event.' };
+  }
+  const clock = calendarClock(params.hour, params.minute);
+  if (clock.invalid || (params.requireTime && clock.absent)) {
+    return { ok: false, reason: 'invalid', error: 'Missing a real time for this event.' };
   }
   // A meeting the email names a day for but never a clock time — "let's
   // meet Tuesday" — is real, unambiguous evidence a person would act on
-  // immediately, exactly like intent.js's own REQUEST evidence widening a
-  // few commits back. This used to error out entirely rather than create
-  // anything; now it creates a genuine all-day Calendar entry (Google's own
-  // {date} shape, no {dateTime}/{timeZone}) instead of guessing a time that
-  // was never stated.
-  const hasTime = params.hour != null && params.minute != null;
+  // immediately. That path creates a genuine all-day Calendar entry
+  // (Google's own {date} shape, no {dateTime}/{timeZone}) rather than
+  // guessing a time that was never stated. A calendar hold sets
+  // requireTime and never takes this branch.
 
   const timeZone = localTimeZone();
   const descriptionLines = [];
@@ -1162,17 +1206,19 @@ async function googleCalendarWrite(p) {
   if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);
   descriptionLines.push(ATTRIBUTION_TEXT + ' — ' + attributionUrl('calendar'));
 
+  const summary = String(params.title || 'Hold').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Hold';
   const body = {
-    summary: String(params.title || 'Meeting').slice(0, 200),
+    summary: summary,
     description: descriptionLines.join('\n')
   };
-  if (hasTime) {
-    body.start = { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute), timeZone };
-    body.end = { dateTime: calendarDateTime(params.dateIso, params.hour, params.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone };
+  if (!clock.absent) {
+    body.start = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute), timeZone };
+    body.end = { dateTime: calendarDateTime(dateIso, clock.hour, clock.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone };
   } else {
-    body.start = { date: params.dateIso };
-    body.end = { date: nextDateIso(params.dateIso) };
+    body.start = { date: dateIso };
+    body.end = { date: nextDateIso(dateIso) };
   }
+  const whenLabel = calendarWhenLabel(dateIso, clock);
 
   const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events', {
     method: 'POST',
@@ -1185,10 +1231,18 @@ async function googleCalendarWrite(p) {
     throw new Error('Calendar event creation failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
   }
   const event = await res.json();
+  // A 200 with no id is not an event we can undo, so it is not a success
+  // the receipt may name.
+  if (!event || typeof event.id !== 'string' || !event.id) {
+    return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
+  }
   return {
     ok: true,
     where: 'Google Calendar',
     target: 'your calendar',
+    // Built from the summary and the start that were posted, so the
+    // receipt cannot name a title or a time the event does not have.
+    written: 'Calendar · ' + summary + ' · ' + whenLabel,
     ref: { eventId: event.id },
     // htmlLink is a real field the Calendar API documents and always
     // returns on a created event — unlike the Gmail draft link below, this
@@ -1203,7 +1257,10 @@ async function googleCalendarUndo(ref) {
     method: 'DELETE'
   });
   // 410 Gone is Calendar's own "already deleted" — as final as a 404 anywhere else.
-  return { ok: res.ok || res.status === 404 || res.status === 410 };
+  // Anything else (403, 500, a still-present event) is not undone. The
+  // receipt must not say it was.
+  if (res.ok || res.status === 404 || res.status === 410) return { ok: true };
+  return { ok: false };
 }
 
 /* ------------------------------------------------------------- Gmail Draft */

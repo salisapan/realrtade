@@ -41,7 +41,9 @@ const FlowIntent = (() => {
   // time, this is what earns SCHEDULED_EVENT. Any one of the three alone is
   // not enough: "let's talk about the budget" (noun, no date/time) or
   // "the report is due at 3pm Friday" (date+time, no meeting noun — that's
-  // a deadline, not an event) must not become a calendar entry.
+  // a deadline, not an event) must not become a SCHEDULED_EVENT. A personal
+  // commitment that names a clock time is a different close (calendar-hold
+  // below): a hold on the calendar, not a meeting classification.
   //
   // The trailing negative lookahead is a real, pre-existing bug fix found
   // while broadening this list, not new behavior invented for the sake of
@@ -60,6 +62,17 @@ const FlowIntent = (() => {
   // rather than a blanket reordering of which gate wins.
   const MEETING_NOUN = /\b(meeting|call|sync|check-?in|appointment|session|interview|demo|walkthrough|consultation|stand-?up|retro(?:spective)?|workshop|webinar|huddle|kick-?off|town hall|office hours|one-on-one|strategy session|planning session|deposition|hearing|mediation|panel discussion)\b(?!\s+(?:recording|notes|transcript|minutes|summary|recap|feedback|materials|slides|deck|agenda))/i;
   const MEETING_NOUN_HE = /(פגישה|שיחה|ראיון|סנכרון|תיאום|ייעוץ|הדגמה|מפגש|ועידה|שיחת טלפון|פגישת עבודה|שיחת זום|שיחת וידאו|עמידה יומית|רטרו(?:ספקטיבה)?|סדנה|וובינר|תדרוך|כנס פתיחה|היכרות עם הצוות|שימוע|גישור|דיון בפאנל)(?!\s*(?:הקלטה|הקלטת|הערות|תמליל|פרוטוקול|סיכום|חומרים|מצגת|סדר יום))/;
+
+  // An explicit ask to meet, narrower than HANDOFF. "Could you please
+  // confirm you can make it" is a confirm ask on a meeting that is already
+  // stated (schedule-confirm). "Can you schedule a call" / "could you meet
+  // Friday at 3" is the meeting itself. "meet the deadline" is not a meeting.
+  const EXPLICIT_MEETING_ASK = new RegExp([
+    '\\b(?:can|could|would)\\s+(?:you|we)\\s+meet(?!\\s+(?:the\\s+)?(?:deadline|requirement|criteria|quota|target|obligation))\\b',
+    '\\b(?:can|could|would)\\s+(?:you|we)\\s+(?:schedule|set up|book)\\b',
+    '\\bplease\\s+(?:schedule|set up|book|put)\\b'
+  ].join('|'), 'i');
+  const EXPLICIT_MEETING_ASK_HE = /(?:בבקשה\s+תקבע(?:ו|י)?\s+פגישה|אפשר\s+לקבוע\s+פגישה)/;
 
   // "This is not happening at the time this message names."
   //
@@ -450,10 +463,12 @@ const FlowIntent = (() => {
       score: s.total, threshold
     };
 
-    // personalClose is set only on the three Trusted Do It gates (an explicit
-    // follow-up or send ask, a dated commitment, a confirmed amount). Other
-    // types stay untagged so personal close memory cannot treat a meeting
-    // or a score-bar decision as one of those closes. Absent on a miss.
+    // personalClose is set only on the Trusted Do It gates: an explicit
+    // follow-up or send ask, a dated commitment, a confirmed amount, and a
+    // calendar hold (a commitment that names a clock time, or an explicit
+    // ask to meet at a clock time). A bare meeting announcement stays
+    // untagged so personal close memory cannot treat it as one of those
+    // closes. Absent on a miss.
     function finish(type, confidence, entities, personalClose) {
       // A past day can still sit on facts — "the invoice that was due
       // March 3, 2024" — but it is not the deadline of this close. The
@@ -531,8 +546,42 @@ const FlowIntent = (() => {
     // has suppressed commitments, the dated-commitment gate below would
     // otherwise log it as a decision — the same chip, a different label.
     const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
+    // A clock time the extractor actually resolved. Missing either field is
+    // not a time we may invent — date-only meetings stay all-day events on
+    // the existing schedule process, and date-only commitments stay tasks.
+    const clock = facts.time && Number.isInteger(facts.time.hour) && Number.isInteger(facts.time.minute) &&
+      facts.time.hour >= 0 && facts.time.hour <= 23 && facts.time.minute >= 0 && facts.time.minute <= 59
+      ? facts.time : null;
+    // "if you're free" / "maybe" is not a time the sender has actually
+    // asked to hold. A missed chip costs one click; an event at a time
+    // that was only floated costs a wrong hour on the calendar.
+    const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b/i.test(text);
+    const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge &&
+      (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
     if (eventEvidence && suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
+    function holdEntities() {
+      return {
+        who, amount,
+        what: whatText(text, [EXPLICIT_MEETING_ASK, EXPLICIT_MEETING_ASK_HE]) ||
+          whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) ||
+          whatText(text, DATED_COMMIT_PATTERNS) || 'Hold',
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date.iso,
+        hour: facts.time.hour,
+        minute: facts.time.minute
+      };
+    }
     if (!blocked && eventEvidence) {
+      // A meeting that is also a timed commitment, or an explicit ask to
+      // meet at that clock time, is the calendar-hold personal close: one
+      // event, not the schedule process's extra reminder task. A bare
+      // announcement ("let's do a call Friday at 3") and a confirm ask on
+      // an already-stated meeting stay the schedule processes.
+      const meetingHold = Boolean(clock) && (explicitMeetingAsk || s.flags.commit || s.flags.senderPromise);
+      if (meetingHold) {
+        if (suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
+        return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
+      }
       return finish(TYPES.SCHEDULED_EVENT, facts.time ? 'high' : 'medium', {
         who, amount,
         what: whatText(text, [MEETING_NOUN, MEETING_NOUN_HE]) || 'Meeting',
@@ -541,6 +590,15 @@ const FlowIntent = (() => {
         hour: facts.time ? facts.time.hour : null,
         minute: facts.time ? facts.time.minute : null
       });
+    }
+
+    // "Could you meet Friday at 3pm" names no meeting noun, so the event
+    // gate above never saw it, and REQUEST below would draft a reply
+    // instead of holding the time. Only the explicit-ask phrase, and only
+    // with a resolved clock time.
+    if (!blocked && explicitMeetingAsk && !hasMeetingNoun) {
+      if (suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
+      return finish(TYPES.SCHEDULED_EVENT, 'high', holdEntities(), 'calendar-hold');
     }
 
     // --- 2. COMMITMENT_OF_READER: hard gate (regex + one of two evidence ---
@@ -610,12 +668,21 @@ const FlowIntent = (() => {
     //        threshold to nudge either.
     const datedCommitment = (s.flags.commit || s.flags.senderPromise) && hasResolvedDate && !s.flags.lost && !isPast && !contingent;
     if (!blocked && datedCommitment && !suppressed(TYPES.DECISION_TO_LOG)) {
-      return finish(TYPES.DECISION_TO_LOG, 'high', {
+      const committed = {
         who, amount,
         what: whatText(text, DATED_COMMIT_PATTERNS) || labelFor(TYPES.DECISION_TO_LOG),
         when: humanWhen(facts.date, facts.time),
         dateIso: facts.date.iso
-      }, 'dated-commitment');
+      };
+      // A clock time makes the close a calendar hold. A date alone stays a
+      // task (dated-commitment). "The report is due at 3pm" never reaches
+      // here — it has no agreement word and no sender promise.
+      if (clock) {
+        committed.hour = facts.time.hour;
+        committed.minute = facts.time.minute;
+        return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'calendar-hold');
+      }
+      return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
     }
     if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {

@@ -1,5 +1,5 @@
 // Regression corpus for core/close-memory.js — Glance's local personal
-// close memory. A successful Trusted Do It (one of the three personal
+// close memory. A successful Trusted Do It (one of the personal
 // closes, every attempted write ok) leaves a compact record. A later
 // message that clearly continues that same matter stays quiet. Anything
 // less clear leaves the chip alone.
@@ -92,14 +92,14 @@ async function run() {
     check('a full trusted write is remembered', stored && stored.closeType === 'follow-up-ask', stored);
     check('the record keeps the thread id', stored.threadId === 'thread-1', stored.threadId);
     check('targets collapse to tasks and draft, in first-seen order', JSON.stringify(stored.targets) === JSON.stringify(['draft', 'tasks']), stored.targets);
-    check('notion is a remembered target and calendar is not', JSON.stringify(
+    check('calendar, notion, and tasks are remembered, in first-seen order', JSON.stringify(
       (await FlowCloseMemory.recordClose(closeInput({
         messageId: 'msg-notion',
-        personalClose: 'dated-commitment',
+        personalClose: 'calendar-hold',
         threadId: 'thread-notion',
-        targets: ['calendar', 'notion', 'notion', 'googleTask']
+        targets: ['calendar', 'notion', 'notion', 'googleTask', 'not-a-target']
       }))).targets
-    ) === JSON.stringify(['notion', 'tasks']));
+    ) === JSON.stringify(['calendar', 'notion', 'tasks']));
     check('the timestamp is kept', stored.timestamp === '2026-09-27T12:00:00.000Z', stored.timestamp);
 
     const blob = JSON.stringify(await FlowCloseMemory.getAll());
@@ -218,6 +218,38 @@ async function run() {
     const afterClear = await FlowCloseMemory.getAll();
     const recalled = await FlowCloseMemory.recall({ personalClose: 'follow-up-ask', threadId: 't39', subject: SUBJECT });
     check('clear removes every close', afterClear.length === 0 && recalled.action === 'none', afterClear.length);
+  }
+
+  console.log('\n--- close-memory.js: a calendar hold on this thread stays quiet the next time ---\n');
+  resetAdapter();
+  {
+    const stored = await FlowCloseMemory.recordClose(closeInput({
+      personalClose: 'calendar-hold',
+      messageId: 'cal-1',
+      threadId: 'thread-cal',
+      targets: ['calendar']
+    }));
+    check('a full calendar hold is remembered', stored && stored.closeType === 'calendar-hold' && JSON.stringify(stored.targets) === JSON.stringify(['calendar']), stored);
+    const again = await FlowCloseMemory.recall({
+      personalClose: 'calendar-hold',
+      threadId: 'thread-cal',
+      subject: SUBJECT
+    });
+    check('the same thread and the same hold stays silent', again.action === 'silence' && again.via === 'thread', again);
+    const other = await FlowCloseMemory.recall({
+      personalClose: 'dated-commitment',
+      threadId: 'thread-cal',
+      subject: SUBJECT
+    });
+    check('a different close type on that thread is not silenced', other.action === 'none', other);
+    const partial = await FlowCloseMemory.recordClose(closeInput({
+      personalClose: 'calendar-hold',
+      fullWrite: false,
+      messageId: 'cal-partial',
+      threadId: 'thread-partial',
+      targets: ['calendar']
+    }));
+    check('a calendar hold that did not fully write is not remembered', partial === null);
   }
 
   console.log('\n--- close-memory.js: parallel records both land ---\n');

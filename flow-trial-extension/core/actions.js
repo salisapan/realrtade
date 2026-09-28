@@ -35,6 +35,11 @@ const FlowActions = (() => {
   const DEMOTE_THRESHOLD = 3;
 
   function calendarAction(intent, e, ctx) {
+    // A calendar hold's title is the sentence being closed. The schedule
+    // processes keep the short "Meeting Sep 18" label — that path is a
+    // meeting, and the sentence can be the whole invite.
+    const hold = intent.personalClose === 'calendar-hold';
+    const title = (hold ? (e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
     return {
       id: 'calendar',
       kind: 'calendar',
@@ -45,16 +50,18 @@ const FlowActions = (() => {
       label: 'Calendar',
       hint: 'Add to Calendar: ' + (intent.label || 'Meeting'),
       params: {
-        // intent.label, not entities.what — what is the full quoted
-        // sentence (can run to hundreds of characters), fine for a task's
-        // notes field but not for an event title.
-        title: (intent.label || e.what || 'Meeting').slice(0, 200),
+        title: String(title).slice(0, 200),
         dateIso: e.dateIso, hour: e.hour, minute: e.minute,
         // The sentence the event is about. The title stays short ("Meeting
         // Sep 18 15:00"); without this, View opens a Calendar event that
         // never says what was scheduled. "Meeting" is the classifier's
-        // fallback when no sentence was found — not a quote.
-        quote: (e.what && e.what !== 'Meeting') ? String(e.what).slice(0, 400) : null,
+        // fallback when no sentence was found — not a quote. A hold's
+        // fallback title is "Hold", which is the same kind of placeholder.
+        quote: (e.what && e.what !== 'Meeting' && e.what !== 'Hold') ? String(e.what).slice(0, 400) : null,
+        // A hold was only proposed because a clock time resolved. The
+        // writer must not fall back to an all-day event if that time is
+        // missing by the time Do It runs.
+        requireTime: hold,
         threadUrl: ctx.threadUrl
       }
     };
@@ -145,6 +152,19 @@ const FlowActions = (() => {
   // table processFor() selects from, instead of a second, hand-copied list
   // that could quietly drift out of sync with it.
   const PROCESS_CATALOG = {
+    // personalClose `calendar-hold` only. One Google Calendar event.
+    // A commitment with a resolved date and a clock time, or an explicit
+    // ask to meet at a clock time. A date with no clock time stays log-it
+    // (a Google Task). An ask that is not a meeting stays reply-track
+    // (a Gmail draft, plus a follow-up task). A bare meeting announcement
+    // stays schedule / schedule-confirm.
+    'hold': {
+      name: 'Hold It',
+      closingLine: 'Putting this on your calendar.',
+      closedLine: 'On your calendar.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
     'schedule-confirm': {
       name: 'Schedule & Confirm',
       // "replying to confirm" / "confirmed" would both overclaim: the draft
@@ -201,7 +221,9 @@ const FlowActions = (() => {
   function processFor(intent) {
     const sig = intent.signals || {};
     let id;
-    if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
+    if (intent.personalClose === 'calendar-hold') {
+      id = 'hold';
+    } else if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
       id = sig.handoff ? 'schedule-confirm' : 'schedule';
     } else if (intent.type === FlowIntent.TYPES.REQUEST) {
       id = 'reply-track';
