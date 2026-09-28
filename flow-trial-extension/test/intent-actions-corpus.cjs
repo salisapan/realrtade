@@ -579,18 +579,22 @@ console.log('\n--- actions.js: labels are short and collision-free ---\n');
   const [draftWithFile] = FlowActions.planFor(requestIntent, { threadUrl: 'x', hasThreadAttachment: true }).steps;
   check('Draft label with a real thread attachment is "Draft reply + file"', draftWithFile.label === 'Draft reply + file', draftWithFile.label);
 
-  // "send me the signed contract" names a concrete object ("contract")
-  // but the thread itself has nothing attached — this is exactly the case
-  // background.js's driveSearchAttachment() exists for: no attachment yet,
-  // but a real chance of finding one in Drive. The label must say so even
-  // before any Drive call happens, since it's what the user sees on the
-  // step pill.
+  // A named object is evidence for the ask. It is not, by itself, a file
+  // Glance has already chosen. "+ file" appears only once a single
+  // high-confidence Drive match is passed in as attachFile — promising
+  // an attachment before that match is how the wrong file gets drafted.
   const fileNameIntent = classify('Could you please send me the signed contract by Friday, September 18?');
   check('a named object with no thread attachment sets requestedObjectTerm', typeof fileNameIntent.entities.requestedObjectTerm === 'string' && fileNameIntent.entities.requestedObjectTerm.length > 0, fileNameIntent.entities.requestedObjectTerm);
   const [draftMayFind] = FlowActions.planFor(fileNameIntent, { threadUrl: 'x', hasThreadAttachment: false }).steps;
-  check('a named object alone (no thread attachment) still labels "Draft reply + file"', draftMayFind.label === 'Draft reply + file', draftMayFind.label);
-  check('a named object alone still sets includeAttachment on the step params', draftMayFind.params.includeAttachment === true, draftMayFind.params);
-  check('a named object alone forwards requestedObjectTerm in step params', draftMayFind.params.requestedObjectTerm === fileNameIntent.entities.requestedObjectTerm, draftMayFind.params.requestedObjectTerm);
+  check('a named object alone does not promise an attachment', draftMayFind.label === 'Draft reply', draftMayFind.label);
+  check('a named object alone does not set includeAttachment', draftMayFind.params.includeAttachment === false, draftMayFind.params);
+  check('a named object alone still forwards requestedObjectTerm', draftMayFind.params.requestedObjectTerm === fileNameIntent.entities.requestedObjectTerm, draftMayFind.params.requestedObjectTerm);
+  const [draftFound] = FlowActions.planFor(fileNameIntent, {
+    threadUrl: 'x',
+    hasThreadAttachment: false,
+    attachFile: { id: 'file_1', name: 'Contract-Signed.pdf', mimeType: 'application/pdf' }
+  }).steps;
+  check('a resolved file labels the step as a reply with that file', draftFound.label === 'Draft reply + file' && draftFound.params.driveFileId === 'file_1' && draftFound.params.attachSource === 'found', draftFound.params);
 
   const labels = [calendarStep.label, draftStep.label, taskStep.label];
   check('no two pill labels collide', new Set(labels).size === labels.length, labels);

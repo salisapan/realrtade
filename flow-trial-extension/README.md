@@ -234,7 +234,7 @@ which is the single most common way this gets half-configured:
 
 ### 6. Confirm the scopes match
 
-`manifest.json`'s `oauth2.scopes` should already list all four (this ships
+`manifest.json`'s `oauth2.scopes` should already list all five (this ships
 in the repo — nothing to add here unless it's been edited):
 
 ```
@@ -242,20 +242,21 @@ https://www.googleapis.com/auth/tasks
 https://www.googleapis.com/auth/calendar.events
 https://www.googleapis.com/auth/gmail.compose
 https://www.googleapis.com/auth/drive.readonly
+https://www.googleapis.com/auth/drive.file
 ```
 
-`drive.readonly` is read access across the whole Drive, not just files
-opened through the picker — Glance needs it because a drafted reply can
-search the account's own Drive by filename/content for a file the email
-asked for and attach it automatically when nothing was already on the
-thread or manually picked (see `driveSearchAttachment` in
-`src/background.js`). It cannot write, rename, or delete anything; the
-narrower `drive.file` scope this product used before only ever covered
-files the picker itself opened. There is nothing to add on the consent
-screen's own Scopes step for Testing-mode use; that step only matters once
-you move toward verification for production (see Common pitfalls —
-`drive.readonly` sits in a stricter verification tier than the other three
-scopes below).
+`drive.readonly` is read access across the whole Drive. When an open
+message clearly asks for one file, Glance searches the account's own
+Drive (hundreds of files, ranked — see `searchDriveFiles` in
+`src/background.js` and `core/file-attach.js`) and attaches only a single
+high-confidence match to an unsent Gmail draft. `drive.file` is used only
+when that search has no safe match and exactly one company template for
+the same object exists: Do It uploads a new file made from that template
+and, on Undo, deletes that new file. It does not rename, browse, or edit
+the rest of Drive. There is nothing to add on the consent screen's own
+Scopes step for Testing-mode use; that step only matters once you move
+toward verification for production (see Common pitfalls — `drive.readonly`
+sits in a stricter verification tier than the other scopes below).
 
 ### 7. Add yourself as a test user
 

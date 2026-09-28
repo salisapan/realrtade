@@ -1355,8 +1355,16 @@ function draftBodyText(p, attachment, attachmentSource) {
   if (params.what && params.when) lines.push('Following up on: ' + params.what + ' (' + params.when + ')');
   else if (params.what) lines.push('Following up on: ' + params.what);
   else lines.push('Following up on your message below.');
-  if (attachment && attachmentSource === 'auto') {
-    lines.push('', '[Glance found "' + attachment.filename + '" in your Drive and attached it — please confirm it\'s the right file before sending.]');
+  if (attachment && (attachmentSource === 'found' || attachmentSource === 'template')) {
+    lines.push('', 'Attached: ' + attachment.filename);
+    if (attachmentSource === 'template') {
+      const fields = params.fields || [];
+      for (const field of fields) {
+        if (field && field.label && String(field.value || '').trim()) {
+          lines.push(String(field.label) + ': ' + String(field.value).replace(/[\r\n]+/g, ' ').trim());
+        }
+      }
+    }
   }
   lines.push('', '[Write your reply here]');
   return lines.join('\n');
@@ -1436,6 +1444,52 @@ function arrayBufferToBase64(buf) {
   return btoa(binary);
 }
 
+// Docs, Sheets, and Slides are not byte files. alt=media 404s on them;
+// export is the read that produces something a Gmail draft can hold.
+const DRIVE_EXPORT = {
+  'application/vnd.google-apps.document': { mime: 'application/pdf', ext: '.pdf' },
+  'application/vnd.google-apps.spreadsheet': { mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', ext: '.xlsx' },
+  'application/vnd.google-apps.presentation': { mime: 'application/pdf', ext: '.pdf' }
+};
+
+function driveExportPlan(mimeType) {
+  return DRIVE_EXPORT[mimeType] || null;
+}
+
+function withExportExtension(name, ext) {
+  const base = String(name || 'file').replace(/\.[A-Za-z0-9]{1,8}$/, '');
+  if (!ext) return base;
+  return base + (ext.charAt(0) === '.' ? ext : '.' + ext);
+}
+
+// One page is a hundred files. Four pages is the cap: enough to rank a
+// real Drive, not a five-file sample, and not an unbounded crawl.
+const DRIVE_SEARCH_PAGE_SIZE = 100;
+const DRIVE_SEARCH_MAX_FILES = 400;
+
+// q is the already-escaped Drive query from core/file-attach.js. A failed
+// page returns null rather than a short list — ranking a partial page is
+// how a second, unseen invoice becomes "the only match".
+async function searchDriveFiles(q) {
+  if (!q) return null;
+  const files = [];
+  let pageToken = '';
+  while (files.length < DRIVE_SEARCH_MAX_FILES) {
+    let path = '/files?q=' + encodeURIComponent(q)
+      + '&pageSize=' + DRIVE_SEARCH_PAGE_SIZE
+      + '&corpora=user&fields=' + encodeURIComponent('nextPageToken,files(id,name,mimeType,size,modifiedTime)');
+    if (pageToken) path += '&pageToken=' + encodeURIComponent(pageToken);
+    const res = await googleAuthedFetch(GOOGLE_DRIVE_API, path);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const batch = data.files || [];
+    for (let i = 0; i < batch.length && files.length < DRIVE_SEARCH_MAX_FILES; i++) files.push(batch[i]);
+    if (!data.nextPageToken) break;
+    pageToken = data.nextPageToken;
+  }
+  return files;
+}
+
 // Drive files are fetched here, not by content-gmail.js, because reading a
 // Drive file needs the same OAuth bearer token every other Google write in
 // this file already holds — there is no reason to round-trip a base64
@@ -1450,16 +1504,24 @@ async function fetchDriveFileAsAttachment(driveFileId) {
     const meta = await metaRes.json();
     if (meta.size && Number(meta.size) > GMAIL_ATTACHMENT_MAX_BYTES) return null;
 
-    const contentRes = await googleAuthedFetch(GOOGLE_DRIVE_API, '/files/' + encodeURIComponent(driveFileId) + '?alt=media');
+    const exported = driveExportPlan(meta.mimeType);
+    // A Docs/Sheets/Slides file has no bytes at alt=media. Export it.
+    // Anything else in the google-apps family (a folder, a form) is not
+    // an attachment, and inventing an empty file for it is not a close.
+    if (!exported && String(meta.mimeType || '').indexOf('application/vnd.google-apps.') === 0) return null;
+    const contentPath = exported
+      ? '/files/' + encodeURIComponent(driveFileId) + '/export?mimeType=' + encodeURIComponent(exported.mime)
+      : '/files/' + encodeURIComponent(driveFileId) + '?alt=media';
+    const contentRes = await googleAuthedFetch(GOOGLE_DRIVE_API, contentPath);
     if (!contentRes.ok) return null;
     const buf = await contentRes.arrayBuffer();
     // Declared size can be absent or wrong; the actual byte count is the
     // real guard — same policy as content-gmail.js's own attachment fetch.
-    if (buf.byteLength > GMAIL_ATTACHMENT_MAX_BYTES) return null;
+    if (buf.byteLength > GMAIL_ATTACHMENT_MAX_BYTES || buf.byteLength === 0) return null;
 
     return {
-      filename: meta.name || 'attachment',
-      mimeType: meta.mimeType || 'application/octet-stream',
+      filename: exported ? withExportExtension(meta.name, exported.ext) : (meta.name || 'attachment'),
+      mimeType: exported ? exported.mime : (meta.mimeType || 'application/octet-stream'),
       base64: arrayBufferToBase64(buf)
     };
   } catch (e) {
@@ -1473,11 +1535,12 @@ async function gmailDraftWrite(p) {
 
   const params = p.params || {};
   let attachment = null;
-  // Tracks WHICH of the three tiers below actually supplied the attachment
-  // — 'thread' and 'picked' are things the user already saw and chose;
-  // 'auto' is Glance's own guess (driveSearchAttachment, below), which is
-  // exactly why draftBodyText() only ever adds its "please verify" note
-  // for that one case, not the two the user already vouched for.
+  let createdFileId = null;
+  // 'thread' and 'picked' are files the user already saw. 'found' is the
+  // one file core/file-attach.js already ranked as the only high-confidence
+  // match — this writer does not search again and does not substitute a
+  // different file if that one cannot be read. 'template' is a new file
+  // made from an existing company template, never a blank document.
   let attachmentSource = null;
   if (params.includeAttachment && p.attachment && p.attachment.base64) {
     const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
@@ -1489,27 +1552,27 @@ async function gmailDraftWrite(p) {
       attachmentSource = 'thread';
     }
   }
-  // A file the user explicitly picked from Drive takes precedence over a
-  // thread attachment neither of them chose — this only ever runs when the
-  // thread-attachment branch above found nothing to attach, so a picked
-  // file is never silently dropped in favor of one auto-guessed from the
-  // thread.
+  // Create-when-missing: copy an existing template into a new file, then
+  // attach that copy. Refuses when a required field is empty — a blank
+  // document is not this close. The company template itself is never
+  // modified or deleted.
+  if (!attachment && params.templateId) {
+    const fields = Array.isArray(params.fields) ? params.fields : [];
+    const incomplete = !fields.length || fields.some((field) => !field || !String(field.value || '').trim());
+    if (incomplete) return { ok: false, reason: 'error', error: 'Missing a fact the template needs.' };
+    const made = await materializeFromTemplate(params.templateId, params.copyTitle || params.what);
+    if (!made) return { ok: false, reason: 'error', error: 'Could not prepare a file from that template.' };
+    attachment = made.attachment;
+    createdFileId = made.createdFileId;
+    attachmentSource = 'template';
+  }
+  // A resolved Drive file (the one high-confidence match, or a file the
+  // user picked). If it cannot be read, stop — do not search for a
+  // substitute and do not send a draft that claims the file is attached.
   if (!attachment && params.driveFileId) {
     attachment = await fetchDriveFileAsAttachment(params.driveFileId);
-    if (attachment) attachmentSource = 'picked';
-  }
-  // Nobody supplied one — but if the email itself named a specific,
-  // recognizable requested object (core/intent.js's requestedObjectTerm,
-  // e.g. "invoice", "signed NDA", "resume" — the exact noun
-  // REQUESTED_OBJECT/HE matched), this is the one case Glance can try to
-  // close the loop on its own: search this account's own Drive for it.
-  // Both weaker tiers above are things a person already chose; this one
-  // is Glance's own guess, which is exactly why it is the last resort, not
-  // the first, and why draftBodyText() flags it explicitly rather than
-  // presenting it as equally certain.
-  if (!attachment && params.requestedObjectTerm) {
-    attachment = await driveSearchAttachment(params.requestedObjectTerm);
-    if (attachment) attachmentSource = 'auto';
+    if (!attachment) return { ok: false, reason: 'error', error: 'Could not attach that file.' };
+    attachmentSource = params.attachSource === 'found' ? 'found' : 'picked';
   }
 
   const threadId = await findThreadId(p.senderEmail, p.subject);
@@ -1527,8 +1590,12 @@ async function gmailDraftWrite(p) {
     method: 'POST',
     body: JSON.stringify({ message })
   });
-  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  if (res.status === 401 || res.status === 403) {
+    if (createdFileId) await deleteDriveFile(createdFileId);
+    return { ok: false, reason: 'not-connected' };
+  }
   if (!res.ok) {
+    if (createdFileId) await deleteDriveFile(createdFileId);
     let detail = '';
     try { detail = ((await res.json()).error || {}).message || ''; } catch (e) { /* body already consumed or not JSON */ }
     throw new Error('Gmail draft creation failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
@@ -1538,10 +1605,10 @@ async function gmailDraftWrite(p) {
     ok: true,
     where: 'Gmail',
     target: !attachment ? 'a draft reply'
-      : attachmentSource === 'auto' ? 'a draft reply with a file Glance found in Drive (unverified — check it before sending)'
+      : attachmentSource === 'template' ? 'a draft reply with a file prepared from your template'
       : 'a draft reply with the attachment',
     written: draftWrittenLine(params),
-    ref: { draftId: draft.id },
+    ref: createdFileId ? { draftId: draft.id, createdFileId } : { draftId: draft.id },
     // The Drafts API doesn't return a stable, documented deep link to one
     // specific draft the way Calendar's htmlLink does — linking to the
     // Drafts folder itself is the honest version of "go see it" rather than
@@ -1550,44 +1617,64 @@ async function gmailDraftWrite(p) {
   };
 }
 
-// Free-tier best-effort file retrieval: when the email asked for something
-// identifiable and nothing was already on the thread or manually picked
-// (see gmailDraftWrite's three-tier attachment resolution above), Glance
-// searches this account's own Drive for a file whose name or content
-// mentions the requested term and attaches the most recently modified
-// match. Requires the broader drive.readonly scope (manifest.json) — the
-// narrower drive.file scope this product used before only ever covers
-// files this app itself created or the user explicitly opened via the
-// picker, never an arbitrary search across the whole account.
-//
-// "Most recently modified match" is a plain, honest heuristic, not a claim
-// of relevance ranking Drive's own `q` search doesn't expose — this is
-// exactly why the result is never presented as certain: draftBodyText()
-// below always flags it as Glance's own guess, and the one thing that
-// never changes is that the draft still requires the user's own review
-// and send. A Google Workspace-native file (Doc/Sheet/Slide) that matches
-// will fail to download via alt=media (that endpoint only serves binary
-// files) and is silently skipped in favor of the next candidate — a known,
-// accepted gap for this first pass, not a crash.
-async function driveSearchAttachment(term) {
+// Reads the template (export for a Doc/Sheet/Slide, bytes otherwise) and
+// uploads a new file this app created. drive.file can create and later
+// delete that copy. The template id is only ever read.
+async function materializeFromTemplate(templateId, title) {
   try {
-    const escaped = String(term).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    const q = "trashed = false and (name contains '" + escaped + "' or fullText contains '" + escaped + "')";
-    const listRes = await googleAuthedFetch(
-      GOOGLE_DRIVE_API,
-      '/files?q=' + encodeURIComponent(q) + '&orderBy=modifiedTime desc&pageSize=5&fields=' + encodeURIComponent('files(id,name,mimeType,size)')
-    );
-    if (!listRes.ok) return null;
-    const { files } = await listRes.json();
-    if (!files || !files.length) return null;
-    for (const f of files) {
-      if (f.size && Number(f.size) > GMAIL_ATTACHMENT_MAX_BYTES) continue;
-      const fetched = await fetchDriveFileAsAttachment(f.id);
-      if (fetched) return fetched;
-    }
-    return null;
+    const metaRes = await googleAuthedFetch(GOOGLE_DRIVE_API, '/files/' + encodeURIComponent(templateId) + '?fields=name,mimeType,size');
+    if (!metaRes.ok) return null;
+    const meta = await metaRes.json();
+    const exported = driveExportPlan(meta.mimeType);
+    if (!exported && String(meta.mimeType || '').indexOf('application/vnd.google-apps.') === 0) return null;
+    if (!exported && meta.size && Number(meta.size) > GMAIL_ATTACHMENT_MAX_BYTES) return null;
+    const contentPath = exported
+      ? '/files/' + encodeURIComponent(templateId) + '/export?mimeType=' + encodeURIComponent(exported.mime)
+      : '/files/' + encodeURIComponent(templateId) + '?alt=media';
+    const contentRes = await googleAuthedFetch(GOOGLE_DRIVE_API, contentPath);
+    if (!contentRes.ok) return null;
+    const buf = await contentRes.arrayBuffer();
+    if (buf.byteLength > GMAIL_ATTACHMENT_MAX_BYTES || buf.byteLength === 0) return null;
+    const ext = exported ? exported.ext : ((String(meta.name || '').match(/\.[A-Za-z0-9]{1,8}$/) || [''])[0]);
+    const filename = withExportExtension(title || meta.name || 'file', ext);
+    const mimeType = exported ? exported.mime : (meta.mimeType || 'application/octet-stream');
+    const createdFileId = await uploadDriveCopy(filename, mimeType, buf);
+    if (!createdFileId) return null;
+    return { createdFileId, attachment: { filename, mimeType, base64: arrayBufferToBase64(buf) } };
   } catch (e) {
     return null;
+  }
+}
+
+async function uploadDriveCopy(name, mimeType, buf) {
+  const boundary = 'flow_upload_' + Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+  const meta = JSON.stringify({ name: name, mimeType: mimeType });
+  const preamble = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n';
+  const ending = '\r\n--' + boundary + '--';
+  const head = new TextEncoder().encode(preamble);
+  const tail = new TextEncoder().encode(ending);
+  const bytes = new Uint8Array(buf);
+  const body = new Uint8Array(head.length + bytes.length + tail.length);
+  body.set(head, 0);
+  body.set(bytes, head.length);
+  body.set(tail, head.length + bytes.length);
+  const res = await googleAuthedFetch('https://www.googleapis.com/upload/drive/v3', '/files?uploadType=multipart', {
+    method: 'POST',
+    headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+    body
+  });
+  if (!res.ok) return null;
+  const created = await res.json();
+  return created && created.id ? created.id : null;
+}
+
+async function deleteDriveFile(fileId) {
+  if (!fileId) return false;
+  try {
+    const res = await googleAuthedFetch(GOOGLE_DRIVE_API, '/files/' + encodeURIComponent(fileId), { method: 'DELETE' });
+    return res.ok || res.status === 404;
+  } catch (e) {
+    return false;
   }
 }
 
@@ -1596,7 +1683,11 @@ async function gmailDraftUndo(ref) {
   const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts/' + encodeURIComponent(ref.draftId), {
     method: 'DELETE'
   });
-  return { ok: res.ok || res.status === 404 };
+  if (!(res.ok || res.status === 404)) return { ok: false };
+  // The draft carried a file this close created. Undo removes that file
+  // too. It never deletes the template the copy was made from.
+  if (ref.createdFileId && !(await deleteDriveFile(ref.createdFileId))) return { ok: false };
+  return { ok: true };
 }
 
 /* ------------------------------------------------------ Google Drive picker */
@@ -2026,6 +2117,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:classify-remote') {
     return reply(sendResponse, classifyViaBackend(msg.payload || {}));
+  }
+
+  if (msg.type === 'flow:search-drive') {
+    return reply(sendResponse, (async () => {
+      if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+      const files = await searchDriveFiles(msg.query);
+      if (!files) return { ok: false, reason: 'error' };
+      return { ok: true, files };
+    })());
   }
 
   if (msg.type === 'flow:open-drive-picker') {

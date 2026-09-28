@@ -699,6 +699,13 @@
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
     if (!FlowIntent.shouldShowChip(intent)) return;
 
+    // A file-shaped message that is not one clear object (two files, a
+    // hedge, a "don't send") must not become a Do It. Other closes are
+    // left alone — this only stops a REQUEST chip that would otherwise
+    // offer to attach or draft around an unclear file.
+    const fileGate = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' };
+    if (fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) return;
+
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
     // Execution Memory is fetched once here, not once per process — which
@@ -706,12 +713,6 @@
     // and actions.js's planFor() does the per-process lookup itself from
     // this same full blob.
     const executionMemory = await FlowExecutionMemory.getAll();
-    const process = FlowActions.planFor(intent, {
-      threadUrl: threadUrl(legacyId),
-      hasThreadAttachment: Boolean(attachment),
-      executionMemory
-    });
-    if (!process) return; // defensive only — every catalog entry has at least an anchor step
 
     // Same matter, already fully closed: stay quiet. Checked before the
     // Google connect prompt so a continuation never asks for access, and
@@ -727,6 +728,38 @@
     // ensureGoogleAutoConnect() is the one path that can fix that silently.
     const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
     if (!usingGoogle && !(await ensureGoogleAutoConnect())) return;
+
+    let attachFile = null;
+    if (fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
+      const searched = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.query) }, resolve);
+      });
+      const decision = FlowFileAttach.decide(fileGate.ask, searched && searched.ok ? searched.files : null, {
+        senderName: sender.name,
+        amount: intent.entities && intent.entities.amount,
+        when: intent.entities && intent.entities.when
+      }, text);
+      // No single file, and no single template: stay quiet. A conflict
+      // is the same silence — never a second guess, never a blank doc.
+      if (!decision || decision.action === 'silence') return;
+      if (decision.action === 'create') {
+        injectCreateCard(message, {
+          messageId, intent, sender, subject, attachment, attachments,
+          threadUrl: threadUrl(legacyId), threadId, bodyText: text,
+          ask: fileGate.ask, decision
+        });
+        return;
+      }
+      attachFile = decision.file;
+    }
+
+    const process = FlowActions.planFor(intent, {
+      threadUrl: threadUrl(legacyId),
+      hasThreadAttachment: Boolean(attachment),
+      executionMemory,
+      attachFile
+    });
+    if (!process) return; // defensive only — every catalog entry has at least an anchor step
 
     injectChip(message, {
       messageId, intent, process, sender, subject, attachment, attachments,
@@ -816,8 +849,15 @@
         return 'is scheduling the meeting' + when + ', drafting a reply to confirm, and opening a follow-up task.';
       case 'schedule':
         return 'is scheduling the meeting' + when + ' and opening a reminder to prepare.';
-      case 'reply-track':
+      case 'reply-track': {
+        const draft = (process.steps || []).find((step) => step.kind === 'gmailDraft');
+        const foundName = draft && draft.params && draft.params.attachSource === 'found' && draft.params.driveFileName;
+        if (foundName) {
+          const alsoTask = (process.steps || []).some((step) => step.kind === 'googleTask');
+          return 'is attaching ' + foundName + ' to a reply draft' + (alsoTask ? ' and opening a follow-up task.' : '.');
+        }
         return 'is drafting a reply to the request' + when + ' and opening a follow-up task.';
+      }
       case 'follow-through':
         return 'is opening a reminder for your commitment' + when + amount + ', with a reply ready.';
       default: // log-it
@@ -992,6 +1032,116 @@
     return row;
   }
 
+  // Create-when-missing. One line, and either up to four named fields or
+  // one named slot at a time when more than four facts are still missing.
+  // There is no free prompt. Dismiss, or an answer that isn't the fact,
+  // removes the card and does not create a file.
+  function injectCreateCard(messageNode, ctx) {
+    if (messageNode.querySelector('.flow-chip-host')) return;
+    const ask = ctx.ask;
+    const decision = ctx.decision;
+    let fields = (decision.fields || []).map((field) => ({ id: field.id, label: field.label, value: field.value || '' }));
+
+    const host = el('div', 'flow-chip-host');
+    host.setAttribute('dir', 'ltr');
+    const textEl = el('p', 'flow-chip-text');
+    textEl.appendChild(sparkleIcon());
+    textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
+    textEl.appendChild(document.createTextNode(' ' + (decision.line || ask.line)));
+    host.appendChild(textEl);
+    const fieldsHost = el('div', 'flow-chip-fields');
+    host.appendChild(fieldsHost);
+
+    const action = { id: 'draft', kind: 'gmailDraft', label: 'Draft reply + file', params: {} };
+    const cardCtx = Object.assign({}, ctx, {
+      process: {
+        id: 'reply-track',
+        name: 'Reply & Track',
+        closedLine: 'Drafted, with the file attached.',
+        steps: [action]
+      }
+    });
+
+    const mainRow = el('div', 'flow-chip-main-row');
+    mainRow.setAttribute('dir', 'ltr');
+    const dismiss = el('button', 'flow-chip-dismiss', '×');
+    dismiss.type = 'button';
+    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, cardCtx); });
+    mainRow.appendChild(dismiss);
+
+    const chip = el('button', 'flow-chip');
+    chip.type = 'button';
+    chip.appendChild(el('span', 'shell'));
+    chip.appendChild(el('span', 'ring'));
+    chip.appendChild(el('span', 'shine'));
+    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    mainRow.appendChild(chip);
+    host.appendChild(mainRow);
+
+    function paint() {
+      fieldsHost.replaceChildren();
+      const view = FlowFileAttach.present(fields);
+      for (const field of view.filled || []) {
+        fieldsHost.appendChild(el('p', 'flow-chip-field-line', field.label + ': ' + field.value));
+      }
+      const slots = view.mode === 'slots' && view.slot ? [view.slot] : (view.mode === 'card' ? view.slots : []);
+      for (const slot of slots) {
+        const row = el('label', 'flow-chip-field');
+        row.appendChild(el('span', 'flow-chip-field-label', slot.label));
+        const input = el('input', 'flow-chip-field-input');
+        input.type = 'text';
+        input.name = slot.id;
+        input.setAttribute('aria-label', slot.label);
+        input.maxLength = 160;
+        input.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          chip.click();
+        });
+        row.appendChild(input);
+        fieldsHost.appendChild(row);
+      }
+    }
+
+    let busy = false;
+    async function onCreate() {
+      if (busy) return;
+      const view = FlowFileAttach.present(fields);
+      let step;
+      if (view.mode === 'slots') {
+        const input = fieldsHost.querySelector('input');
+        step = FlowFileAttach.fillSlot(fields, view.slot.id, input ? input.value : '');
+      } else if (view.mode === 'card') {
+        const values = {};
+        fieldsHost.querySelectorAll('input').forEach((input) => { values[input.name] = input.value; });
+        step = FlowFileAttach.fillAll(fields, values);
+      } else {
+        step = { ready: true, fields };
+      }
+      if (step.silence) { onDismiss(host, cardCtx); return; }
+      if (step.stay) return;
+      fields = step.fields || fields;
+      const ready = step.ready || (step.present && step.present.mode === 'ready');
+      if (!ready) { paint(); return; }
+      busy = true;
+      action.params = {
+        what: ask.label,
+        templateId: decision.template.id,
+        copyTitle: FlowFileAttach.copyTitle(ask, fields),
+        fields: fields.map((field) => ({ id: field.id, label: field.label, value: field.value })),
+        attachSource: 'template'
+      };
+      setChipState(chip, 'flow-chip-pending', 'Working…');
+      const results = await runActionsSequentially([action], cardCtx);
+      await showMultiActionReceipt(host, chip, cardCtx, results);
+    }
+
+    chip.addEventListener('click', () => { onCreate(); });
+    paint();
+    messageNode.insertBefore(host, messageNode.firstChild);
+  }
+
   // Zero-Prompt, deliberately: the idle card is one process badge, one
   // sentence, and one button. actions.js already picked exactly one named
   // process (never a loose action list) — when it has more than one step,
@@ -1061,7 +1211,7 @@
         // when it actually wants one. Google-ecosystem-only, same as every
         // other write path here: the choice is between this thread's own
         // attachment(s) and a single file picked from Drive, nothing else.
-        if (step.kind === 'gmailDraft' && step.params && step.params.includeAttachment) {
+        if (step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId) {
           attachChooser = buildAttachChooser(step, ctx);
           pillRow.appendChild(attachChooser);
         }
