@@ -1371,14 +1371,21 @@ function draftGreeting(senderName) {
 
 // attachment/attachmentSource are optional — every existing caller that
 // passes just `p` still gets the exact same body it always did.
-// attachmentSource === 'auto' is the one case worth a line in the draft
-// itself: 'thread'/'picked' are things the user already saw before Do It
-// was ever clicked, but an auto-found file is Glance's own guess, and a
-// guess that lands in a real, sendable draft with no visible flag is
-// exactly the kind of silent overreach this product's precision-first
-// posture exists to avoid.
+// attachmentSource === 'found' or 'template' is the one case worth a line
+// in the draft itself: 'thread'/'picked' are things the user already saw
+// before Do It was ever clicked, but an auto-found file is Glance's own
+// guess, and a guess that lands in a real, sendable draft with no visible
+// flag is exactly the kind of silent overreach this product's
+// precision-first posture exists to avoid.
+// A share-link draft is the file sentence plus the link. A reply-with-facts
+// draft is the greeting plus that one fact. Neither one is a rewrite, and
+// the user still sends.
 function draftBodyText(p, attachment, attachmentSource, shareUrl) {
   const params = p.params || {};
+  if (params.replyFact && !params.shareLink) {
+    const factLine = String(params.factLine || '').replace(/[\r\n]+/g, ' ').trim();
+    return [draftGreeting(p.senderName), '', factLine].join('\n');
+  }
   const lines = [draftGreeting(p.senderName), ''];
   if (shareUrl) {
     lines.push(params.what || 'The file is ready.');
@@ -1500,9 +1507,10 @@ function withExportExtension(name, ext) {
 const DRIVE_SEARCH_PAGE_SIZE = 100;
 const DRIVE_SEARCH_MAX_FILES = 400;
 
-// q is the already-escaped Drive query from core/file-attach.js. A failed
-// page returns null rather than a short list — ranking a partial page is
-// how a second, unseen invoice becomes "the only match".
+// q is an already-escaped Drive query (file attach, or a fact lookup built
+// here from structured label/kind/name — never a raw q from the page). A
+// failed page returns null rather than a short list — ranking a partial
+// page is how a second, unseen file becomes "the only match".
 async function searchDriveFiles(q) {
   if (!q) return null;
   const files = [];
@@ -1562,6 +1570,61 @@ async function fetchDriveFileAsAttachment(driveFileId) {
   }
 }
 
+// Reply-with-facts reads a Sheet or Doc through the Drive export endpoint.
+// drive.readonly already covers that. No spreadsheets scope, no picker,
+// and this function does not decide the match — it only returns the few
+// candidate texts. Listing goes through searchDriveFiles. More than three
+// files, a failed page, or a file too large to prove it holds a single
+// cell is truncated so the caller stays silent.
+const FACT_SHEET_MIME = 'application/vnd.google-apps.spreadsheet';
+const FACT_DOC_MIME = 'application/vnd.google-apps.document';
+const FACT_EXPORT_MAX = 200000;
+const FACT_FILE_CAP = 3;
+
+function driveQuote(value) {
+  return String(value || '').replace(/[\r\n\u0000]/g, ' ').replace(/\\/g, '\\\\').replace(/'/g, "\\'").trim().slice(0, 80);
+}
+
+async function factSources(ask) {
+  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const factLabel = driveQuote(ask && ask.factLabel);
+  const sourceName = driveQuote(ask && ask.sourceName);
+  const kind = ask && (ask.sourceKind === 'sheet' || ask.sourceKind === 'doc') ? ask.sourceKind : null;
+  if (factLabel.length < 2 || !kind) return { ok: true, sources: [], truncated: false };
+  const mime = kind === 'doc'
+    ? "mimeType = '" + FACT_DOC_MIME + "'"
+    : "mimeType = '" + FACT_SHEET_MIME + "'";
+  const needle = sourceName || factLabel;
+  const field = sourceName ? 'name' : 'fullText';
+  const q = 'trashed = false and ' + mime + ' and ' + field + " contains '" + needle + "'";
+  try {
+    const files = await searchDriveFiles(q);
+    if (files === null) return { ok: false, reason: 'error' };
+    if (!files.length) return { ok: true, sources: [], truncated: false };
+    // More than a few files is not a sample we export and pick from.
+    if (files.length > FACT_FILE_CAP) return { ok: true, sources: [], truncated: true };
+    const sources = [];
+    for (const f of files) {
+      const isSheet = f.mimeType === FACT_SHEET_MIME;
+      const isDoc = f.mimeType === FACT_DOC_MIME;
+      if (!isSheet && !isDoc) continue;
+      const exportType = isSheet ? 'text/csv' : 'text/plain';
+      const exp = await googleAuthedFetch(
+        GOOGLE_DRIVE_API,
+        '/files/' + encodeURIComponent(f.id) + '/export?mimeType=' + encodeURIComponent(exportType)
+      );
+      if (!exp.ok || typeof exp.text !== 'function') return { ok: true, sources: [], truncated: true };
+      const text = await exp.text();
+      if (typeof text !== 'string' || text.length > FACT_EXPORT_MAX) return { ok: true, sources: [], truncated: true };
+      sources.push({ id: f.id, name: f.name || '', kind: isSheet ? 'sheet' : 'doc', text });
+    }
+    if (!sources.length) return { ok: true, sources: [], truncated: true };
+    return { ok: true, sources, truncated: false };
+  } catch (e) {
+    return { ok: false, reason: 'error' };
+  }
+}
+
 async function gmailDraftWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
@@ -1571,6 +1634,16 @@ async function gmailDraftWrite(p) {
   if (params.shareLink) {
     if (!shareUrl) return { ok: false, reason: 'unclear', error: 'No file link to share.' };
   }
+  // One fact into the shared draft POST. Undo deletes that draft. Never an
+  // attachment, never a send, and never a second Drive search that could
+  // swap the fact the chip already showed. A share-link draft is not this.
+  if (params.replyFact && !params.shareLink) {
+    const factLine = String(params.factLine || '').replace(/[\r\n]+/g, ' ').trim();
+    if (!factLine || factLine.length > 180) {
+      return { ok: false, reason: 'invalid', error: 'No single fact to insert.' };
+    }
+    params.factLine = factLine;
+  }
   let attachment = null;
   let createdFileId = null;
   // 'thread' and 'picked' are files the user already saw. 'found' is the
@@ -1579,7 +1652,7 @@ async function gmailDraftWrite(p) {
   // different file if that one cannot be read. 'template' is a new file
   // made from an existing company template, never a blank document.
   let attachmentSource = null;
-  if (!params.shareLink && params.includeAttachment && p.attachment && p.attachment.base64) {
+  if (!params.shareLink && !params.replyFact && params.includeAttachment && p.attachment && p.attachment.base64) {
     const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
     // Oversized attachments degrade to a plain draft rather than failing the
     // whole action — the same "still useful, just not everything asked for"
@@ -1590,9 +1663,9 @@ async function gmailDraftWrite(p) {
     }
   }
   // A share-link draft (a Doc, Sheet, or saved file this same click
-  // already created) does not search Drive and does not attach a second
-  // file. Family A attach stays on the branches below.
-  if (!params.shareLink) {
+  // already created) and a one-fact reply do not search Drive and do not
+  // attach a second file. Family A attach stays on the branches below.
+  if (!params.shareLink && !params.replyFact) {
     // Create-when-missing: copy an existing template into a new file, then
     // attach that copy. Refuses when a required field is empty — a blank
     // document is not this close. The company template itself is never
@@ -2274,6 +2347,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       ? getGoogleAuthToken(false).then(removeCachedGoogleAuthToken).catch(() => {})
       : Promise.resolve();
     return reply(sendResponse, extra.then(() => chrome.storage.local.remove(key)).then(() => ({ ok: true })));
+  }
+
+  if (msg.type === 'flow:fact-sources') {
+    return reply(sendResponse, factSources(msg.payload || {}));
   }
 
   if (msg.type === 'flow:execute-action') {

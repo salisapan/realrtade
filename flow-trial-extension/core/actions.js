@@ -68,6 +68,26 @@ const FlowActions = (() => {
   }
 
   function draftAction(intent, e, ctx, hasAttachment) {
+    // Reply-with-facts: the draft is the one fact, nothing else. No
+    // attachment search, no "write your reply here", no task beside it.
+    if (intent.type === 'fact' || (intent.signals && intent.signals.factReply)) {
+      const factLine = e.factLine ? String(e.factLine).replace(/[\r\n]+/g, ' ').trim() : '';
+      if (!factLine) return null;
+      return {
+        id: 'draft',
+        kind: 'gmailDraft',
+        label: 'Reply draft',
+        hint: 'Insert ' + (e.factValue || 'the fact') + ' into a reply draft',
+        params: {
+          intentType: 'fact',
+          replyFact: true,
+          what: factLine,
+          factLine: factLine,
+          factValue: e.factValue || null,
+          includeAttachment: false
+        }
+      };
+    }
     // For the SCHEDULED_EVENT + handoff combined process (a meeting invite
     // that also asks the reader to confirm), entities.what is the MEETING
     // sentence — the right title for the Calendar step above, but not what
@@ -128,6 +148,7 @@ const FlowActions = (() => {
     const step = kind === 'calendar' ? calendarAction(intent, e, ctx)
       : kind === 'draft' ? draftAction(intent, e, ctx, hasAttachment)
       : taskAction(intent, e, ctx);
+    if (!step) return null;
     // Explicit dependency slot: null for every step in today's catalog,
     // since Calendar/Draft/Task each write independently from the same
     // source intent/entities rather than from one another's results — there
@@ -206,6 +227,15 @@ const FlowActions = (() => {
       anchor: 'task',
       stepKinds: ['task', 'draft']
     },
+    // One trusted Sheet cell or Doc paragraph, inserted into a reply draft.
+    // The user still sends. No task, no attachment, no second step.
+    'reply-fact': {
+      name: 'Reply with it',
+      closingLine: 'Putting this fact into a reply draft.',
+      closedLine: 'The fact is in a reply draft.',
+      anchor: 'draft',
+      stepKinds: ['draft']
+    },
     // DECISION_TO_LOG / FOLLOW_UP — the chip's original job, narrowed to
     // its own named process rather than a type-less default.
     'log-it': {
@@ -255,7 +285,9 @@ const FlowActions = (() => {
   function processFor(intent) {
     const sig = intent.signals || {};
     let id;
-    if (intent.personalClose === 'calendar-hold') {
+    if (intent.type === 'fact' || (intent.signals && intent.signals.factReply)) {
+      id = 'reply-fact';
+    } else if (intent.personalClose === 'calendar-hold') {
       id = 'hold';
     } else if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
       id = sig.handoff ? 'schedule-confirm' : 'schedule';
