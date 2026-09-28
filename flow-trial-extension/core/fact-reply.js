@@ -351,6 +351,7 @@ const FlowFactReply = (() => {
     if (!opts.match) {
       return {
         type: null,
+        quiet: 'fact',
         signals: (intent && intent.signals) || {},
         facts: (intent && intent.facts) || {}
       };

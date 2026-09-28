@@ -768,14 +768,24 @@
     // for the dedup rule that keeps a re-scanned open message from being
     // counted twice.
     FlowStorage.recordClassificationOutcome(messageId, localFired ? 'local' : (intent.type ? 'ai' : 'miss'));
-    if (!FlowIntent.shouldShowChip(intent)) return;
+    if (!FlowIntent.shouldShowChip(intent)) {
+      // Named silence only. An ordinary miss stays the classification
+      // counter above — it is not given a reason it did not earn.
+      const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
+        || (factOwns && !intent.type ? 'fact' : null);
+      recordSilence(messageId, reason);
+      return;
+    }
 
     // A file-shaped message that is not one clear object (two files, a
     // hedge, a "don't send") must not become a Do It. Other closes are
     // left alone — this only stops a REQUEST chip that would otherwise
     // offer to attach or draft around an unclear file.
     const fileGate = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' };
-    if (fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) return;
+    if (fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) {
+      recordSilence(messageId, 'file');
+      return;
+    }
     // Execution Memory is fetched once here, not once per process — which
     // process this message needs isn't known until after classification,
     // and actions.js's planFor() does the per-process lookup itself from
@@ -785,7 +795,10 @@
     // Same matter, already fully closed: stay quiet. Checked before the
     // Google connect prompt so a continuation never asks for access, and
     // before 'shown' is logged so it never becomes an open Brief row.
-    if (await personalCloseSaysSilence(intent, threadId, subject)) return;
+    if (await personalCloseSaysSilence(intent, threadId, subject)) {
+      recordSilence(messageId, 'memory');
+      return;
+    }
 
     // The one moment this account is ever asked for Google access at all —
     // right here, after judgment has already found a real Do It moment on
@@ -808,7 +821,10 @@
       }, text);
       // No single file, and no single template: stay quiet. A conflict
       // is the same silence — never a second guess, never a blank doc.
-      if (!decision || decision.action === 'silence') return;
+      if (!decision || decision.action === 'silence') {
+        recordSilence(messageId, 'file');
+        return;
+      }
       if (decision.action === 'create') {
         injectCreateCard(message, {
           messageId, intent, sender, subject, attachment, attachments,
@@ -1602,6 +1618,13 @@
       // option names, never sent anywhere as free text by this action kind.
       bodyText: (ctx.bodyText || '').slice(0, 20000)
     });
+  }
+
+  // A reason code and a message id. recordSilence drops anything else.
+  function recordSilence(messageId, reason) {
+    if (!messageId || !reason || typeof FlowStorage.recordSilence !== 'function') return;
+    FlowStorage.recordSilence({ messageId: messageId, reason: reason })
+      .catch((e) => console.error('[Glance] failed to record a silence decision', e));
   }
 
   function sendExecuteAction(payload) {

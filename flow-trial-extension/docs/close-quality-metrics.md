@@ -13,4 +13,6 @@ read it. The Activity tab shows the line when any count is above zero.
 
 The Activity line reads `Full closes N · Returns N · Turned down N · False-close P%`.
 
+Trusted closes per week and silence-by-reason are a separate fold (`docs/quiet-metrics.md`). A full write here is the same Handled event that fold counts, and an Undo here is the same Undo that removes it from the trusted count.
+
 **False-close rate** is turned-down messages ÷ messages the user actually judged. Judged means a full write or a dismiss/undo. A full write that is later undone counts once, as false. The week-1 bar is 15% (`FALSE_CLOSE_BAR`). The rate is null until something has been judged. Dismiss and undo are the only reject reasons; both already flow through `recordCloseQuality`. No other surface reads the rate.

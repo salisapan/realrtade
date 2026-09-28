@@ -45,6 +45,7 @@
         "core/pmf-metrics.js",
         "core/classification-metrics.js",
         "core/close-quality-metrics.js",
+        "core/quiet-metrics.js",
         "core/still-open.js",
         "src/chrome-storage-adapter.js",
         "src/storage.js",

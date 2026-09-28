@@ -51,6 +51,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'pmf-metrics.
 // here for the same load-order reason pmf-metrics.js is above.
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'classification-metrics.js'), 'utf8'), sandbox, { filename: 'classification-metrics.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'close-quality-metrics.js'), 'utf8'), sandbox, { filename: 'close-quality-metrics.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'quiet-metrics.js'), 'utf8'), sandbox, { filename: 'quiet-metrics.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8'), sandbox, { filename: 'storage.js' });
 const FlowStorage = vm.runInContext('FlowStorage', sandbox);
 
@@ -781,6 +782,41 @@ async function run() {
     const persisted = (await FlowStorage.get()).closeQuality;
     check('the counts survived in chrome.storage, not only the return value',
       persisted.success === 1 && persisted.return === 1 && persisted.falseDoIt === 2 && persisted.lastDoItDay === DAY_B, persisted);
+  }
+
+  console.log('\n--- storage.js: trusted closes / week and silence reasons ---\n');
+  store = {};
+  {
+    const now = Date.now();
+    const success = await FlowStorage.recordCloseQuality({ kind: 'success', messageId: 't1', ts: now });
+    check('a full write is still a close-quality success', success && success.kind === 'success', success);
+    const snap = await FlowStorage.getQuietSnapshot(now);
+    check('that full write is one trusted close this week and no Undo',
+      snap.trusted.trusted === 1 && snap.trusted.handled === 1 && snap.trusted.undone === 0 && snap.trusted.undoRate === 0, snap.trusted);
+
+    await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 't1', reason: 'undo', ts: now });
+    const undone = await FlowStorage.getQuietSnapshot(now);
+    check('Undo removes the trusted close and keeps the handled count',
+      undone.trusted.trusted === 0 && undone.trusted.handled === 1 && undone.trusted.undone === 1, undone.trusted);
+
+    const dismissed = await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 't2', reason: 'dismiss', ts: now });
+    const afterDismiss = await FlowStorage.getQuietSnapshot(now);
+    check('dismissing a chip is not an Undo of a trusted close',
+      dismissed && dismissed.reason === 'dismiss' && afterDismiss.trusted.undone === 1, afterDismiss.trusted);
+
+    const counted = await FlowStorage.recordSilence({ messageId: 's1', reason: 'hedge', ts: now });
+    const repeat = await FlowStorage.recordSilence({ messageId: 's1', reason: 'noise', ts: now });
+    const prose = await FlowStorage.recordSilence({ messageId: 's2', reason: 'Please send the invoice to dana@x.com', ts: now });
+    const quiet = await FlowStorage.getQuietSnapshot(now);
+    check('one hedge silence is stored, and a repeat is not a second decision',
+      counted === true && repeat === false && quiet.silenceWeek.total === 1 && quiet.silenceWeek.byReason.hedge === 1, quiet.silenceWeek);
+    const raw = JSON.stringify(await FlowStorage.get());
+    check('a mail body is not a reason code and is not stored',
+      prose === false && raw.indexOf('dana@') === -1 && raw.indexOf('invoice') === -1);
+
+    const line = vm.runInContext('FlowQuietMetrics', sandbox).activityLine(quiet);
+    check('Activity can read trusted closes and the silence reason from the snapshot',
+      line.indexOf('Trusted closes 0 this week') !== -1 && line.indexOf('Undo 1') !== -1 && line.indexOf('hedge 1') !== -1, line);
   }
 
   console.log('\n--- storage.js: getCloseQualitySnapshot() on an untouched profile ---\n');
