@@ -11,8 +11,8 @@
 // is silence, including a clear asset with no template (never a blank Doc)
 // and a template with no clear what. A weak score is not promoted to get
 // here. The card that may follow holds at most two named fields. More than
-// that is silence, not a chat. This file does not render that UI and does
-// not create a Doc.
+// two missing fields is a silence classification: no chip and no chat box.
+// This file does not render that UI and does not create a Doc.
 
 const FlowCloseFamilies = (() => {
   const FILE_EN = /\b(receipts?|invoices?|quotes?|contracts?|signed pdfs?|passports?(?:\s+scans?)?|insurance forms?|tax (?:docs?|documents?|returns?)|proposals?|decks?|logos?|briefs?|statements?|purchase orders?|POs?|W-?9s?|photo ids?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
@@ -376,23 +376,42 @@ const FlowCloseFamilies = (() => {
     return saw && !open;
   }
 
-  // Field collector policy. Not a chat product. Weak intent never opens it.
-  // A create-when-missing card holds at most two named fields. More than
-  // two is silence — not a wider card and not a checklist. Dismiss or
-  // unsure is silence. The next action after the slots is one Do It.
-  function detailSurface(intent, missingSlots, signal) {
-    const names = Array.isArray(missingSlots)
+  function namedSlots(missingSlots) {
+    return Array.isArray(missingSlots)
       ? missingSlots.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim())
       : [];
+  }
+
+  function silenceClassification() {
+    return { type: null, confidence: null, closeFamily: null, createWhenMissing: false };
+  }
+
+  // Create-when-missing routes only at two missing fields or fewer.
+  // More than two is silence. There is no chat surface.
+  function route(intent, missingSlots) {
+    if (!intent || !intent.type) return silenceClassification();
+    if (intent.closeFamily !== 'I' || !intent.createWhenMissing) return intent;
+    if (intent.confidence === 'low' || intent.confidence === 'unsure') return silenceClassification();
+    if (namedSlots(missingSlots).length > 2) return silenceClassification();
+    return intent;
+  }
+
+  // Card policy for a route that already cleared the field gate. At most
+  // two named fields. Dismiss or unsure is silence. Then one Do It.
+  function detailSurface(intent, missingSlots, signal) {
+    const names = namedSlots(missingSlots);
     const weak = !intent || !intent.type || intent.confidence === 'low' || intent.confidence === 'unsure';
     if (weak || signal === 'dismiss' || signal === 'unsure') return { surface: 'silence', slots: [] };
-    if (intent.closeFamily !== 'I' || !intent.createWhenMissing) return { surface: 'doit', slots: [] };
-    if (names.length > 2) return { surface: 'silence', slots: [] };
+    const routed = route(intent, names);
+    if (!routed.type || routed.closeFamily !== 'I' || !routed.createWhenMissing) {
+      if (intent.closeFamily === 'I') return { surface: 'silence', slots: [] };
+      return { surface: 'doit', slots: [] };
+    }
     if (names.length > 0) return { surface: 'card', slots: names };
     return { surface: 'doit', slots: [] };
   }
 
-  return { assess, askBlocked, detailSurface, FILE_EN, FILE_HE };
+  return { assess, askBlocked, route, detailSurface, FILE_EN, FILE_HE };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseFamilies };

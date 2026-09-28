@@ -518,7 +518,14 @@ const FlowIntent = (() => {
           }
         }
       }
-      return intent;
+      return gateCreateWhenMissing(intent);
+    }
+    // More than two missing template fields is not a create-when-missing
+    // close. The chip stays down. No chat box collects the rest.
+    function gateCreateWhenMissing(intent) {
+      if (!intent || !Array.isArray(ctx.missingSlots)) return intent;
+      if (typeof FlowCloseFamilies === 'undefined' || !FlowCloseFamilies.route) return intent;
+      return FlowCloseFamilies.route(intent, ctx.missingSlots);
     }
 
     // The self-calibration outlet for the three hard-gated types below — see
@@ -588,10 +595,11 @@ const FlowIntent = (() => {
         entities.minute = time.minute;
       }
       const intent = finish(fam.type, fam.confidence, entities, fam.personalClose || null);
+      if (!intent || !intent.type) return intent;
       intent.closeFamily = fam.family;
       if (fam.fileTarget) intent.fileTarget = fam.fileTarget;
       if (fam.createWhenMissing) intent.createWhenMissing = true;
-      return intent;
+      return gateCreateWhenMissing(intent);
     }
     function labelFor(type) {
       const source = isPast ? Object.assign({}, facts, { date: null }) : facts;

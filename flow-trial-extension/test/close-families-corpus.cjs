@@ -209,7 +209,22 @@ console.log('\n--- I is not a rescue for a weak judgment ---\n');
   check('a single missing slot is a card', one.surface === 'card' && one.slots.length === 1, one);
   const list = FlowCloseFamilies.detailSurface(clear, eight, null);
   check('more than two missing slots stay silence', list.surface === 'silence' && list.slots.length === 0, list);
-  check('silence is not an assistant', !list.prompt && !list.assistant, list);
+  check('silence is not a chat', list.surface !== 'checklist' && !list.chat && !list.prompt && !list.assistant, list);
+  const three = ['party', 'amount', 'date'];
+  const silenced = FlowCloseFamilies.route(clear, three);
+  check('more than two missing fields is a silence classification',
+    silenced.type === null && silenced.closeFamily == null && !silenced.createWhenMissing && !FlowIntent.shouldShowChip(silenced),
+    silenced);
+  const still = FlowCloseFamilies.route(clear, ['party', 'amount']);
+  check('two missing fields still route create-when-missing',
+    still.closeFamily === 'I' && still.createWhenMissing === true && FlowIntent.shouldShowChip(still), still);
+  const classified = FlowIntent.classify(
+    'Please draft the contract from our company template and send it to Dana.',
+    { senderEmail: 'dana@meridian.com', now: NOW, calibration: null, missingSlots: three }
+  );
+  check('classify with more than two missing fields does not route create-when-missing',
+    !FlowIntent.shouldShowChip(classified) && !classified.createWhenMissing && classified.closeFamily == null,
+    { type: classified.type, family: classified.closeFamily });
   const ready = FlowCloseFamilies.detailSurface(clear, [], null);
   check('no missing slots is one Do It', ready.surface === 'doit', ready);
   const dismissed = FlowCloseFamilies.detailSurface(clear, eight, 'dismiss');
