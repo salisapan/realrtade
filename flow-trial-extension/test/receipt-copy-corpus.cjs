@@ -53,6 +53,56 @@ console.log('\n--- receipt-copy: a partial close does not claim it was handled -
   check('two successes out of three still say Undo all', twoOfThree.undoLabel === 'Undo all' && twoOfThree.status === 'Partly handled.', twoOfThree);
 }
 
+console.log('\n--- receipt-copy: Undo names the record it removes ---\n');
+{
+  check('one Google Task says Undo removes that task',
+    FlowReceipt.undoHint(['Google Tasks']) === 'Undo removes the Google Task.');
+  check('a draft and a task, in the order they landed, say Undo all',
+    FlowReceipt.undoHint(['Gmail', 'Google Tasks']) === 'Undo all removes the Gmail draft and the Google Task.');
+  check('three records keep each “the” and a final and',
+    FlowReceipt.undoHint(['Google Calendar', 'Gmail', 'Google Tasks']) === 'Undo all removes the Calendar event, the Gmail draft, and the Google Task.');
+  check('a Calendar event is named the same way',
+    FlowReceipt.undoHint(['Google Calendar']) === 'Undo removes the Calendar event.');
+  check('the same destination twice is still one kind of record',
+    FlowReceipt.undoHint(['Google Tasks', 'Google Tasks']) === 'Undo removes the Google Task.');
+  check('a destination this receipt does not name stays generic',
+    FlowReceipt.undoHint(['Slack']) === 'Undo removes what was just written.');
+  check('a named write beside one this receipt does not name stays generic',
+    FlowReceipt.undoHint(['Google Tasks', 'Slack']) === 'Undo all removes what was just written.');
+  check('two unnamed destinations stay a generic Undo all',
+    FlowReceipt.undoHint(['Slack', 'Notion']) === 'Undo all removes what was just written.');
+  check('nothing named still tells the person Undo removes the write',
+    FlowReceipt.undoHint([]) === 'Undo removes what was just written.' && FlowReceipt.undoHint(null) === 'Undo removes what was just written.');
+}
+
+console.log('\n--- receipt-copy: a finished undo names what was removed ---\n');
+{
+  check('one task says that task was removed',
+    FlowReceipt.undoneLine(['Google Tasks']) === 'Undone — the Google Task was removed.');
+  check('a draft and a task both get named',
+    FlowReceipt.undoneLine(['Gmail', 'Google Tasks']) === 'Undone — the Gmail draft and the Google Task were removed.');
+  check('an unnamed write still says nothing was kept',
+    FlowReceipt.undoneLine(['Slack']) === 'Undone — nothing was kept.' && FlowReceipt.undoneLine() === 'Undone — nothing was kept.');
+}
+
+console.log('\n--- receipt-copy: a failed reverse is honest about what is still there ---\n');
+{
+  check('the only task, and Undo did not move it',
+    FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: 'Google Tasks' }) === 'Still there — the Google Task was not removed.');
+  check('one unnamed write that did not move',
+    FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: 'Slack' }) === 'Still there — Undo didn’t remove it.');
+  check('several writes and nothing moved — do not say only the first one',
+    FlowReceipt.reverseNote({ reversed: 0, remaining: 2, keptWhere: 'Google Tasks' }) === 'Still there — nothing was removed.');
+  check('one record left after a partial reverse names it and asks to finish',
+    FlowReceipt.reverseNote({ reversed: 1, remaining: 1, keptWhere: 'Gmail' }) === 'The Gmail draft is still there. Undo again to remove it.');
+  check('more than one left does not pretend only one remains',
+    FlowReceipt.reverseNote({ reversed: 1, remaining: 2, keptWhere: 'Gmail' }) === 'Not all of it is gone. Undo again to remove what’s left.');
+  check('no input does not claim a partial undo',
+    FlowReceipt.reverseNote() === 'Still there — nothing was removed.' && FlowReceipt.reverseNote(null) === 'Still there — nothing was removed.');
+  check('the old "some of this" sentence is not what a failed reverse says',
+    FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: 'Google Tasks' }).indexOf('Some of this') === -1);
+}
+
 console.log('\n--- receipt-copy: silence — nothing succeeded, so there is no Handled line ---\n');
 {
   const none = FlowReceipt.confirmation();

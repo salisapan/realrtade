@@ -1189,7 +1189,9 @@
       const result = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: r.action.kind, ref: r.response.ref }, resolve);
       });
-      if (!result || !result.ok) return { ok: false, undoneIds, failedAt: r.action };
+      if (!result || !result.ok) {
+        return { ok: false, undoneIds, failedAt: r.action, keptWhere: (r.response && r.response.where) || null };
+      }
       undoneIds.push(r.action.id);
     }
     return { ok: true, undoneIds, failedAt: null };
@@ -1279,16 +1281,20 @@
     done.appendChild(status);
     if (copy.earlyLine) done.appendChild(el('span', 'flow-chip-first-close', copy.earlyLine));
 
+    // What landed, before the process badge. The written line is the
+    // record ("Google Task · due Sep 21") — the same record Undo removes.
+    const wheres = [];
+    for (const r of succeeded) {
+      if (r.response && r.response.where) wheres.push(r.response.where);
+    }
+    for (const line of FlowActions.receiptWrittenLines(succeeded)) {
+      done.appendChild(el('span', 'flow-chip-written', line));
+    }
+
     const detail = el('span', 'flow-chip-detail');
     detail.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
     detail.appendChild(el('span', 'flow-chip-label', closedSummary(succeeded, ctx)));
     done.appendChild(detail);
-
-    // Named from the writer (`response.written`), after the write succeeded.
-    // One line per personal write that landed — the task, the draft, or both.
-    for (const line of FlowActions.receiptWrittenLines(succeeded)) {
-      done.appendChild(el('span', 'flow-chip-written', line));
-    }
 
     const actionsRow = el('span', 'flow-chip-actions');
     for (const r of succeeded) {
@@ -1298,12 +1304,11 @@
       actionsRow.appendChild(view);
     }
 
+    const undoHint = FlowReceipt.undoHint(wheres);
     const undo = el('button', 'flow-chip-undo', copy.undoLabel);
     undo.type = 'button';
-    undo.setAttribute('aria-label', copy.undoLabel === 'Undo all'
-      ? 'Undo all and remove what was just written'
-      : 'Undo and remove what was just written');
-    let undoNote = null;
+    undo.setAttribute('aria-label', undoHint);
+    const hint = el('span', 'flow-chip-undo-hint', undoHint);
     undo.addEventListener('click', () => {
       undo.textContent = 'Undoing…';
       undo.disabled = true;
@@ -1332,23 +1337,30 @@
             .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
         }
         if (result.ok) {
-          done.replaceChildren(el('span', 'flow-chip-label', 'Undone — nothing was kept'));
+          done.replaceChildren(el('span', 'flow-chip-label', FlowReceipt.undoneLine(wheres)));
           FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
           // The button stays Undo. Replacing its label with the failure
           // sentence hid the only control that can finish the rollback.
+          // The hint under it says what is still there — "some of this"
+          // was a lie when nothing had moved.
+          const note = FlowReceipt.reverseNote({
+            reversed: result.undoneIds.length,
+            remaining: succeeded.length - result.undoneIds.length,
+            keptWhere: result.keptWhere
+          });
           undo.textContent = copy.undoLabel;
           undo.disabled = false;
-          if (!undoNote) {
-            undoNote = el('span', 'flow-chip-partial-note', 'Some of this couldn’t be undone.');
-            done.appendChild(undoNote);
-          }
+          undo.setAttribute('aria-label', note);
+          hint.textContent = note;
+          hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
         }
       });
     });
     actionsRow.appendChild(undo);
     done.appendChild(actionsRow);
+    done.appendChild(hint);
 
     // A partial success (some steps didn't complete) has to say which ones
     // and why, not just how many — "1 of 2 didn't complete" leaves the user

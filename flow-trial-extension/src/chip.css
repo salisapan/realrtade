@@ -475,19 +475,35 @@
    a second headline. A partial close does not get this line. */
 /* What the close actually wrote — "Google Task · $4,200 · due Sep 21",
    "Gmail draft · …". Comes from the writer's own `written` field, so it
-   only appears after that write succeeded. Full width, under the process
-   line, so a long ask can wrap instead of overflowing the receipt. */
+   only appears after that write succeeded. Full width, directly under
+   Handled, so the record is read before the process badge. */
 .flow-chip-written {
   all: unset;
   display: block;
   flex: 1 1 100%;
   font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   line-height: 1.35;
   color: #0B4F32;
   white-space: normal;
 }
+
+/* The sentence under Undo. Same weight as the written line so "what
+   landed" and "how to take it back" are read together. Amber only
+   after a reverse that did not finish — the button itself stays Undo. */
+.flow-chip-undo-hint {
+  all: unset;
+  display: block;
+  flex: 1 1 100%;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0B4F32;
+  white-space: normal;
+}
+.flow-chip-undo-failed { color: #8A5A00; }
 
 .flow-chip-first-close {
   all: unset;

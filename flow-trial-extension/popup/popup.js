@@ -674,16 +674,22 @@
 
     if (e.kind === 'written' && (e.url || e.ref)) {
       const acts = el('div', 'log-acts');
+      let undoNote = null;
       if (e.url) {
         const a = el('a', 'ghost sm', 'View');
         a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
         acts.appendChild(a);
       }
       if (e.ref) {
+        const hintLine = FlowReceipt.undoHint(e.where ? [e.where] : []);
         const u = el('button', 'ghost sm', 'Undo');
         u.type = 'button';
+        u.setAttribute('aria-label', hintLine);
+        const note = el('span', 'log-undo-note', hintLine);
+        undoNote = note;
         u.addEventListener('click', async () => {
           u.textContent = 'Undoing…';
+          u.disabled = true;
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
           if (r && r.ok) {
             await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId });
@@ -693,12 +699,20 @@
             }
             await renderLog();
           } else {
-            u.textContent = 'Undo failed';
+            // Same contract as the chip: the button stays Undo, and the
+            // line under it says the record is still there.
+            const line = FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
+            u.textContent = 'Undo';
+            u.disabled = false;
+            u.setAttribute('aria-label', line);
+            note.textContent = line;
+            note.className = 'log-undo-note log-undo-failed';
           }
         });
         acts.appendChild(u);
       }
       item.appendChild(acts);
+      if (undoNote) item.appendChild(undoNote);
     }
     return item;
   }
