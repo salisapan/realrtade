@@ -53,7 +53,8 @@ const CORE = path.join(__dirname, '..', 'core');
 const SRC = path.join(__dirname, '..', 'src');
 const POPUP = path.join(__dirname, '..', 'popup');
 
-function load(stored) {
+function load(stored, opts) {
+  opts = opts || {};
   const byId = new Map();
   const document = {
     getElementById(id) {
@@ -97,6 +98,11 @@ function load(stored) {
         // popup.js's only two-way call is flow:connector-status; everything
         // else (flow:pending-count, flow:track) is fire-and-forget in the
         // real extension too, so an empty reply is a faithful stub.
+        // flow:undo-action is the exception the Activity row waits on.
+        if (msg && msg.type === 'flow:undo-action') {
+          if (cb) cb({ ok: opts.undoOk !== false });
+          return;
+        }
         if (cb) cb(msg && msg.type === 'flow:connector-status' ? {} : { ok: true });
       }
     }
@@ -127,7 +133,8 @@ function load(stored) {
     [CORE, 'close-quality-metrics.js'],
     [SRC, 'storage.js'],
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
-    [SRC, 'chrome-storage-adapter.js']
+    [SRC, 'chrome-storage-adapter.js'],
+    [SRC, 'receipt-copy.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -431,6 +438,31 @@ async function run() {
     check('an undone row is labeled Undone', kinds.includes('Undone'), kinds);
     const undo = find(host, 'ghost').find((n) => n.tagName === 'button' && n.textContent === 'Undo');
     check('the written row still has an Undo button', Boolean(undo));
+    const hint = find(host, 'log-undo-note').map((n) => n.textContent);
+    check('the row says Undo removes the Google Task', hint.indexOf('Undo removes the Google Task.') !== -1, hint);
+  }
+
+  console.log('\n--- popup.js: a failed Undo keeps the button and says the record is still there ---\n');
+  {
+    const stored = {
+      log: [
+        { ts: Date.now(), kind: 'written', label: 'Log the invoice', messageId: 'm1', where: 'Google Tasks', url: 'https://tasks.google.com/x', ref: { taskId: 't1' }, connectorId: 'googleTask' }
+      ]
+    };
+    const { sandbox, document } = load(stored, { undoOk: false });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+
+    const host = document.getElementById('log-list');
+    const undo = find(host, 'ghost').find((n) => n.tagName === 'button' && n.textContent === 'Undo');
+    check('Undo is there before the click', Boolean(undo));
+    undo.listeners.click[0]();
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    check('a failed reverse leaves the button labeled Undo', undo.textContent === 'Undo', undo.textContent);
+    const note = find(host, 'log-undo-note').map((n) => n.textContent);
+    check('the note says the Google Task is still there', note.indexOf('Still there — the Google Task was not removed.') !== -1, note);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

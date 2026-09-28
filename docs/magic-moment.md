@@ -69,7 +69,9 @@ firing:
 - **Undo safety**: every real write ships with an inline Undo right there in
   the receipt (`showMultiActionReceipt`) — closure has to feel safe to trust
   immediately, not something the user has to go verify or manually reverse
-  elsewhere first.
+  elsewhere first. The line under the button names the record ("Undo removes
+  the Google Task."). A reverse that did not finish says the record is still
+  there, and the button stays Undo.
 - **Timing**: nothing about the receipt is delayed, batched, or deferred to
   a summary later — the confirmation appears the instant the write actually
   succeeds, in the same chip the user is already looking at.
