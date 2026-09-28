@@ -283,6 +283,7 @@
         requestedObjectTerm: entities.requestedObjectTerm || null,
         amount: entities.amount || null
       },
+      googleClose: intent.googleClose || null,
       signals: { score: intent.signals && intent.signals.score }
     };
   }
@@ -515,6 +516,39 @@
     }).catch(() => {});
   }
 
+  async function readCompanyTemplate() {
+    try {
+      const bag = await chrome.storage.local.get('glanceCompanyTemplate');
+      return (bag && bag.glanceCompanyTemplate) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function driveFindOne(term) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'flow:drive-find-one', term: term }, (res) => {
+        resolve(res && res.match ? res.match : 'unknown');
+      });
+    });
+  }
+
+  // A Drive / Doc / Sheet close has to know whether exactly one file
+  // already matches before the chip can claim "didn't find it". The
+  // check is one name lookup, not a picker and not a Drive browser.
+  async function classifyForChip(text, base) {
+    const template = await readCompanyTemplate();
+    const ctx = Object.assign({}, base, { companyTemplate: template });
+    let intent = FlowIntent.classify(text, ctx);
+    if (intent && intent.googleWait && intent.googleWait.fileTerm) {
+      const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
+      if (!usingGoogle) await ensureGoogleAutoConnect();
+      const match = await driveFindOne(intent.googleWait.fileTerm);
+      intent = FlowIntent.classify(text, Object.assign({}, ctx, { fileMatch: match }));
+    }
+    return intent || { type: null };
+  }
+
   async function scanReadingPane() {
     if (!watching) return;
     const main = document.querySelector('div[role="main"]');
@@ -666,11 +700,15 @@
     // the raw text, hands actions.js the classified Intent, and later hands
     // background.js one step at a time — it never re-derives what "this is
     // a request" or "this should become a Calendar event" means.
-    let intent = FlowIntent.classify(text, {
+    const attachments = allRealAttachments(message);
+    const attachment = attachments[0] || null;
+    let intent = await classifyForChip(text, {
       senderEmail: sender.email,
       senderName: sender.name,
+      subject: subject,
       calibration: state.calibration,
-      calibrationByType: state.calibrationByType
+      calibrationByType: state.calibrationByType,
+      attachmentCount: attachments.length
     });
     // The free, local, fixed-pattern classifier found nothing — not the
     // same thing as "there was nothing here." It's a regex corpus, tuned
@@ -685,7 +723,7 @@
     const localFired = Boolean(intent.type);
     // A local 'low' is a decision to stay quiet, not a miss. The remote
     // fallback is only for when the local pass found nothing at all.
-    if (!intent.type) intent = await ensureRemoteClassification(text) || intent;
+    if (!intent.type && !intent.googleSilence) intent = await ensureRemoteClassification(text) || intent;
     // Item 4's real-usage telemetry — the empirical answer to "how often is
     // the free local pass actually enough, how often does the one remote
     // fallback rescue what it missed, how often does nothing fire at all,"
@@ -705,9 +743,6 @@
     // offer to attach or draft around an unclear file.
     const fileGate = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.gate(text) : { kind: 'ignore' };
     if (fileGate.kind === 'block' && intent.type === FlowIntent.TYPES.REQUEST) return;
-
-    const attachments = allRealAttachments(message);
-    const attachment = attachments[0] || null;
     // Execution Memory is fetched once here, not once per process — which
     // process this message needs isn't known until after classification,
     // and actions.js's planFor() does the per-process lookup itself from
@@ -842,6 +877,10 @@
     const e = intent.entities || {};
     const when = e.when ? ', ' + e.when : '';
     const amount = e.amount ? ', ' + e.amount : '';
+    const g = intent && intent.googleClose;
+    if (g && (process.id === 'create-missing' || process.id === 'file-it' || process.id === 'file-on-hold' || process.id === 'file-on-task')) {
+      return g.lang === 'he' ? g.cardLineHe : g.cardLine;
+    }
     switch (process.id) {
       case 'hold':
         return 'is putting this on your calendar' + when + '.';
@@ -898,6 +937,9 @@
     } else if (kind === 'gmailDraft') {
       svg.appendChild(svgEl('rect', { x: 2, y: 3.5, width: 12, height: 9, rx: 1.5 }));
       svg.appendChild(svgEl('polyline', { points: '2.5,4 8,9 13.5,4' }));
+    } else if (kind === 'driveDoc' || kind === 'driveSheet' || kind === 'driveFile') {
+      svg.appendChild(svgEl('path', { d: 'M4 1.5 H9 L12.5 5 V14.5 H4 Z' }));
+      svg.appendChild(svgEl('polyline', { points: '9,1.5 9,5 12.5,5' }));
     } else { // googleTask
       svg.appendChild(svgEl('rect', { x: 2.5, y: 2.5, width: 11, height: 11, rx: 2.5 }));
       svg.appendChild(svgEl('polyline', { points: '5,8.2 7,10.2 11,5.8' }));
@@ -1150,6 +1192,87 @@
   // always closes the full process either way; opening the toggle is
   // purely for someone who wants to look before confirming, or prune one
   // step out — a real control, not the headline of the interaction.
+  function readSlotFills(host) {
+    const fills = {};
+    host.querySelectorAll('[data-slot]').forEach((input) => {
+      const name = input.getAttribute('data-slot');
+      const value = String(input.value || '').trim();
+      if (name && value) fills[name] = value.slice(0, 200);
+    });
+    return fills;
+  }
+
+  // Fields when at most four slots are missing. The checklist opens only
+  // when more than four are still empty, and it only names those slots.
+  function mountGoogleDetail(host, ctx) {
+    const old = host.querySelector('.flow-chip-slots');
+    if (old) old.remove();
+    const g = ctx.intent && ctx.intent.googleClose;
+    if (!g || typeof FlowGoogleCloses === 'undefined' || g.copyAttachment) {
+      delete host.dataset.collectorOpen;
+      return;
+    }
+    const plan = FlowGoogleCloses.cardPlan(g);
+    host.dataset.glanceMode = plan.mode;
+    if (plan.chat) host.dataset.collectorOpen = '1';
+    else delete host.dataset.collectorOpen;
+    if (plan.mode === 'ready') return;
+    const box = el('div', 'flow-chip-slots');
+    if (plan.mode === 'fields') {
+      for (const name of plan.fields) {
+        const label = el('label', 'flow-chip-field');
+        label.appendChild(el('span', 'flow-chip-field-name', name));
+        const input = el('input', 'flow-chip-field-input');
+        input.type = 'text';
+        input.setAttribute('data-slot', name);
+        input.setAttribute('aria-label', name);
+        input.maxLength = 200;
+        label.appendChild(input);
+        box.appendChild(label);
+      }
+    } else if (plan.chat) {
+      const heading = (plan.chatLine || '').indexOf('חסר') === 0 ? 'חסר' : 'Still needed';
+      box.appendChild(el('p', 'flow-chip-slot-line', heading));
+      const list = el('ul', 'flow-chip-slot-list');
+      for (const name of plan.chatSlots || []) {
+        list.appendChild(el('li', 'flow-chip-slot-item', name));
+      }
+      box.appendChild(list);
+      const input = el('input', 'flow-chip-slot-reply');
+      input.type = 'text';
+      input.setAttribute('aria-label', plan.chatLine || heading);
+      const first = (plan.chatSlots || [])[0] || '';
+      input.placeholder = first ? (first + ':') : '';
+      input.maxLength = 400;
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        e.stopPropagation();
+        applySlotTurn(host, ctx, input.value);
+      });
+      box.appendChild(input);
+    }
+    const main = host.querySelector('.flow-chip-main-row');
+    if (main) host.insertBefore(box, main);
+    else host.appendChild(box);
+  }
+
+  function applySlotTurn(host, ctx, reply) {
+    const g = ctx.intent && ctx.intent.googleClose;
+    if (!g) return;
+    const result = FlowGoogleCloses.acceptTurn(g, reply, Number(host.dataset.slotTurns || '0'));
+    if (result.ignore) return;
+    if (result.silence) {
+      host.remove();
+      return;
+    }
+    g.filled = result.filled;
+    g.missing = result.missing;
+    g.chat = result.mode === 'chat';
+    host.dataset.slotTurns = String(result.turns);
+    mountGoogleDetail(host, ctx);
+  }
+
   function injectChip(messageNode, ctx) {
     if (messageNode.querySelector('.flow-chip-host')) return;
 
@@ -1170,6 +1293,7 @@
     textEl.appendChild(sparkleIcon());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
     textEl.appendChild(document.createTextNode(' ' + closingSentence(ctx.process, ctx.intent)));
+    if (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang === 'he') textEl.setAttribute('dir', 'auto');
     host.appendChild(textEl);
 
     // liveSteps is the mutable working copy Do It actually reads;
@@ -1254,6 +1378,7 @@
 
     host.appendChild(mainRow);
     if (pillRow) host.appendChild(pillRow);
+    mountGoogleDetail(host, ctx);
 
     messageNode.insertBefore(host, messageNode.firstChild);
   }
@@ -1267,6 +1392,7 @@
     if (!response) return 'Something went wrong. Try again.';
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
+    if (response.reason === 'unclear') return response.error || 'Nothing was written.';
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
     if (response.skipped) return 'Skipped — an earlier step in this process didn’t complete.';
     return response.error || 'Couldn’t complete that action.';
@@ -1349,11 +1475,34 @@
   // attachment URLs, so fetching the bytes has to happen here, not in
   // background.js — everything else about the shape background.js's
   // gmailDraftWrite(p) expects is assembled below, per action.kind.
-  async function buildActionPayload(action, ctx) {
+  async function buildActionPayload(action, ctx, prior) {
     const base = { connectorId: action.kind, threadUrl: ctx.threadUrl };
+    const priorUrl = prior && prior.url;
+
+    if (action.kind === 'driveDoc' || action.kind === 'driveSheet') {
+      const built = ctx.googleBuilt;
+      if (!built || built.blank) return null;
+      return Object.assign(base, {
+        params: {
+          title: built.title,
+          html: action.kind === 'driveDoc' ? built.html : null,
+          csv: action.kind === 'driveSheet' ? built.csv : null
+        }
+      });
+    }
+
+    if (action.kind === 'driveFile') {
+      const only = ctx.attachments && ctx.attachments.length === 1 ? ctx.attachments[0] : null;
+      if (!only) return null;
+      const fetched = await fetchAttachmentBase64(only);
+      if (!fetched) return null;
+      return Object.assign(base, { attachment: fetched, params: { copyAttachment: true } });
+    }
 
     if (action.kind === 'calendar') {
-      return Object.assign(base, { params: action.params });
+      const params = Object.assign({}, action.params);
+      if (params.shareLink && priorUrl) params.shareUrl = priorUrl;
+      return Object.assign(base, { params: params });
     }
 
     if (action.kind === 'gmailDraft') {
@@ -1362,6 +1511,15 @@
       // both stay undefined and this falls back to exactly the old
       // single-attachment behaviour: the thread's first real attachment.
       const { selectedAttachment, driveFileId, driveFileName, driveMimeType, ...cleanParams } = action.params;
+      if (cleanParams.shareLink) {
+        if (!priorUrl) return null;
+        return Object.assign(base, {
+          params: Object.assign({}, cleanParams, { shareUrl: priorUrl, shareLink: true, includeAttachment: false, requestedObjectTerm: null }),
+          senderEmail: ctx.sender.email,
+          senderName: ctx.sender.name,
+          subject: ctx.subject
+        });
+      }
       const payload = Object.assign(base, {
         params: driveFileId ? Object.assign({}, cleanParams, { driveFileId, driveFileName, driveMimeType }) : cleanParams,
         senderEmail: ctx.sender.email,
@@ -1392,7 +1550,8 @@
       params: {
         dateIso: action.params.dateIso || null,
         amount: action.params.amount || null,
-        what: action.params.what || null
+        what: action.params.what || null,
+        fileTerm: action.params.fileTerm || null
       },
       facts: ctx.intent.facts,
       // The quoted sentence. Live clicks still have intent.entities; a Brief
@@ -1422,11 +1581,9 @@
   // see actions.js's buildStep). A step whose dependency didn't succeed is
   // never attempted — it's recorded as skipped so the receipt can say so
   // honestly, instead of quietly running a write that presumes a result
-  // that never happened. Today's catalog gives every step `dependsOn: null`
-  // (Calendar/Draft/Task each write independently from the same source
-  // facts), so this branch is inert in practice — but the chain is treated
-  // as one ordered, atomic unit either way, and the mechanism is real for
-  // the day a step does need one.
+  // that never happened. A draft that only exists to share a Drive link
+  // depends on the file step; if that file was not created, the draft
+  // is not created either.
   //
   // onStepDone(result, doneCount, total), when given, fires once per step
   // (success, failure, or skip) as it resolves — this is what lets the chip
@@ -1435,15 +1592,24 @@
   async function runActionsSequentially(actions, ctx, onStepDone) {
     const results = [];
     const okIds = new Set();
+    const okById = new Map();
     for (const action of actions) {
       let result;
       if (action.dependsOn && !okIds.has(action.dependsOn)) {
         result = { action, response: { ok: false, skipped: true, reason: 'dependency-failed' } };
       } else {
-        const payload = await buildActionPayload(action, ctx);
-        const response = await sendExecuteAction(payload);
-        if (response && response.ok) okIds.add(action.id);
-        result = { action, response };
+        const prior = action.dependsOn ? okById.get(action.dependsOn) : null;
+        const payload = await buildActionPayload(action, ctx, prior && prior.response);
+        if (!payload) {
+          result = { action, response: { ok: false, reason: 'unclear' } };
+        } else {
+          const response = await sendExecuteAction(payload);
+          result = { action, response };
+          if (response && response.ok) {
+            okIds.add(action.id);
+            okById.set(action.id, result);
+          }
+        }
       }
       results.push(result);
       if (onStepDone) onStepDone(result, results.length, actions.length);
@@ -1490,7 +1656,10 @@
   const STEP_DONE_VERB = {
     calendar: 'scheduled',
     gmailDraft: 'drafted a reply',
-    googleTask: 'set a reminder'
+    googleTask: 'set a reminder',
+    driveDoc: 'wrote the doc',
+    driveSheet: 'wrote the sheet',
+    driveFile: 'saved the file'
   };
 
   function joinWithAnd(items) {
@@ -1757,6 +1926,18 @@
     // reads to Execution Memory as a full rejection (onDismiss records it),
     // which is correct: the user saw the whole process and kept none of it.
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
+    if (host.dataset.collectorOpen === '1') return;
+    if (ctx.intent && ctx.intent.googleClose && !ctx.intent.googleClose.copyAttachment && typeof FlowGoogleCloses !== 'undefined') {
+      const fills = readSlotFills(host);
+      const built = FlowGoogleCloses.artifactBody(ctx.intent.googleClose, fills);
+      if (!built || built.blank) {
+        const empty = host.querySelector('.flow-chip-field-input');
+        if (empty) empty.focus();
+        return;
+      }
+      ctx.slotFills = fills;
+      ctx.googleBuilt = built;
+    }
 
     // return: this is a real Do It use (the guards above already rejected
     // a stale row and an empty step list). The first one ever, and any

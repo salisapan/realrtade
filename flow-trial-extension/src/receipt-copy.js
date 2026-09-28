@@ -25,7 +25,10 @@ const FlowReceipt = (() => {
   const PLACE_NOUN = {
     'Google Tasks': 'Google Task',
     'Gmail': 'Gmail draft',
-    'Google Calendar': 'Calendar event'
+    'Google Calendar': 'Calendar event',
+    'Google Docs': 'Doc',
+    'Google Sheets': 'Sheet',
+    'Google Drive': 'Drive file'
   };
 
   function count(n) {

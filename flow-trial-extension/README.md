@@ -249,14 +249,38 @@ https://www.googleapis.com/auth/drive.file
 message clearly asks for one file, Glance searches the account's own
 Drive (hundreds of files, ranked — see `searchDriveFiles` in
 `src/background.js` and `core/file-attach.js`) and attaches only a single
-high-confidence match to an unsent Gmail draft. `drive.file` is used only
-when that search has no safe match and exactly one company template for
-the same object exists: Do It uploads a new file made from that template
-and, on Undo, deletes that new file. It does not rename, browse, or edit
-the rest of Drive. There is nothing to add on the consent screen's own
-Scopes step for Testing-mode use; that step only matters once you move
-toward verification for production (see Common pitfalls — `drive.readonly`
-sits in a stricter verification tier than the other scopes below).
+high-confidence match to an unsent Gmail draft. If that search has no
+safe match and exactly one company template file for the same object
+exists, Do It uploads a new file made from that template and attaches it.
+Undo deletes that new file. It does not rename, browse, or edit the rest
+of Drive.
+
+The same `drive.file` upload is how a create-and-share close writes a
+Doc, Sheet, or saved attachment Glance itself owns (a quote, proposal,
+invoice, letter, decision log, a new amount sheet, or the one file on
+the message). Those closes share the new file's link on the draft, or
+place one already-found file on a calendar hold or a task. They do not
+run a second attach search. Undo deletes the file this close created,
+through the same delete the template copy uses.
+
+This build does not request `drive` (full), `documents`, or
+`spreadsheets`. A Docs comment on a file Glance did not create would
+need the restricted `drive` scope, so that ask stays silent.
+
+A prepare/draft close stays silent unless `chrome.storage.local` already
+holds `glanceCompanyTemplate` — one template object, or
+`{ templates: [...] }`, each with `artifact`, `kind` (`doc` or `sheet`),
+and `name`. There is no template setup tour. No template means no Doc.
+Missing details stay on that same close card. Four or fewer empty slots
+are fields on the card, and chat stays closed. More than four opens a
+short checklist that only names those slots and accepts two replies at
+most. A reply that is not those slots, a dismiss, or a second reply that
+still leaves more than four empty is silence: nothing is created.
+
+There is nothing to add on the consent screen's own Scopes step for
+Testing-mode use; that step only matters once you move toward verification
+for production (see Common pitfalls — `drive.readonly` sits in a stricter
+verification tier than the other scopes below).
 
 ### 7. Add yourself as a test user
 
@@ -287,7 +311,8 @@ completed verification" blocking screen, not a partial failure.
 - **Production / many real users, later:** `gmail.compose`, `calendar.events`,
   and `tasks` are all Google "sensitive" scopes — fine for Testing and up to
   100 test users with zero review, but a real public launch beyond that
-  eventually needs Google's verification process. `drive.readonly` is a
+  eventually needs Google's verification process. `drive.file` is
+  non-sensitive (files this app creates). `drive.readonly` is a
   step further: read access across a user's whole Drive sits in Google's
   stricter "restricted scope" tier, not just "sensitive," which in practice
   means a slower, costlier verification path (up to and including a

@@ -606,6 +606,69 @@
   100% { box-shadow: 0 0 8px rgba(59,116,255,.3), inset 0 0 0 1px rgba(255,255,255,.24), inset 0 0 7px rgba(47,91,216,.38); }
 }
 
+/* Missing slots on a Drive/Doc/Sheet close. At most four fields. The
+   checklist below is not a chat product: it only names the slots still
+   required, and it is not rendered when four or fewer are missing. */
+.flow-chip-slots {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.flow-chip-slots .flow-chip-field {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.flow-chip-field-name {
+  all: unset;
+  flex: 0 0 72px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #3d4d7a;
+  text-transform: lowercase;
+}
+.flow-chip-slots .flow-chip-field-input,
+.flow-chip-slot-reply {
+  all: unset;
+  flex: 1;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(40, 70, 150, .2);
+  background: rgba(255, 255, 255, .9);
+  font: inherit;
+  font-size: 13px;
+  color: #16214a;
+}
+.flow-chip-slot-line {
+  all: unset;
+  display: block;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: #3d4d7a;
+}
+.flow-chip-slot-list {
+  all: unset;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.flow-chip-slot-item {
+  all: unset;
+  font-size: 12px;
+  font-weight: 650;
+  color: #3d4d7a;
+}
+.flow-chip-slot-item::before {
+  content: "· ";
+}
+
 @media (prefers-reduced-motion: reduce) {
   .flow-chip-host { animation: none; }
   .flow-chip:hover { transform: none; }

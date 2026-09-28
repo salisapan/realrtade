@@ -34,6 +34,7 @@
         "core/connectors.js",
         "core/extract.js",
         "core/judgment.js",
+        "core/google-closes.js",
         "core/intent.js",
         "core/file-attach.js",
         "core/actions.js",
