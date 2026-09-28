@@ -364,6 +364,14 @@ const FlowIntent = (() => {
 
     const domain = FLOW_DOMAINS[0]; // no domain picker in the MVP — see connectors.js/popup.js
     const facts = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
+    // "tomorrow 15:00", "מחר ב-15:00", "יום ג", "בשעה שלוש". The extractor
+    // keeps a bare digit hour unresolved. These are the same clocks, said
+    // the way a hold is actually written.
+    if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.readSlot) {
+      const slot = FlowCloseFamilies.readSlot(text, ctx.now);
+      if (slot && slot.time && !facts.time) facts.time = slot.time;
+      if (slot && slot.date && slot.date.iso && !(facts.date && facts.date.iso)) facts.date = slot.date;
+    }
     const s = FlowJudgment.score(text, domain, facts);
     const threshold = FlowJudgment.thresholdFrom(ctx.calibration, ctx.now);
     // dateText is what neutralTitle() uses to name a dated close ("Log
@@ -391,7 +399,7 @@ const FlowIntent = (() => {
     // the call Monday if you're free"). "might" / "maybe" / "אולי" are not,
     // and filing those is a confident mistake. The flag is case-insensitive
     // because "Maybe" and "Tentatively" open the sentence.
-    const MEETING_SOFT = /\b(?:might|maybe|perhaps|possibly|tentatively)\b|(?:^|\s)(?:אולי|ייתכן)/i;
+    const MEETING_SOFT = /\b(?:might|maybe|perhaps|possibly|tentatively)\b|(?:^|\s)(?:אולי|ייתכן|נראה לי)/i;
     function meetingAsserted(pattern) {
       const sentences = String(text || '').split(/(?<=[.!?;])\s+|\n+/);
       for (const s of sentences) {
@@ -663,6 +671,14 @@ const FlowIntent = (() => {
       const viaMove = fromFamily(familyBox.hit);
       if (viaMove) return viaMove;
     }
+    // A clear family D hold or dated promise is that write. The meeting
+    // gate would otherwise file "let's sync Tuesday at 3pm" as a calendar
+    // event plus a reminder task.
+    if (familyBox.hit && familyBox.hit.family === 'D' &&
+        (familyBox.hit.personalClose === 'calendar-hold' || familyBox.hit.personalClose === 'dated-commitment')) {
+      const viaHold = fromFamily(familyBox.hit);
+      if (viaHold) return viaHold;
+    }
     // Family H: a later confirmed amount, hold, or promise is the write.
     // An earlier "please send" must not draft a reply over that close.
     if (familyBox.hit && !familyBox.hit.suppress && familyBox.hit.what && familyBox.hit.type && familyBox.hit.type !== TYPES.REQUEST) {
@@ -688,7 +704,7 @@ const FlowIntent = (() => {
     // "if you're free" / "maybe" is not a time the sender has actually
     // asked to hold. A missed chip costs one click; an event at a time
     // that was only floated costs a wrong hour on the calendar.
-    const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b/i.test(text);
+    const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b|נראה לי/i.test(text);
     const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
 
