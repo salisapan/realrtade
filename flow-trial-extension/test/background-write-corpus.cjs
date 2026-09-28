@@ -57,6 +57,8 @@ function load(opts) {
       // out.ok/out.ref before this, never the request body itself).
       if (options && typeof options.body === 'string') {
         try { bodies.push(JSON.parse(options.body)); } catch (e) { bodies.push(options.body); }
+      } else if (options && options.body instanceof Uint8Array) {
+        bodies.push(Buffer.from(options.body).toString('latin1'));
       } else {
         bodies.push(null);
       }
@@ -101,7 +103,8 @@ function load(opts) {
     // tested before it did, which is why they were never here.
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
-    crypto: webcrypto
+    crypto: webcrypto,
+    TextEncoder, Uint8Array
   };
   sandbox.self = sandbox;
   sandbox.globalThis = sandbox;
@@ -482,17 +485,12 @@ async function run() {
     check('Drive is never queried when the request named no object at all', !env.calls.some((c) => c.includes('/drive/v3/')), env.calls);
   }
 
-  console.log('\n--- background.js: gmailDraftWrite — Drive auto-search finds and attaches the named file ---\n');
+  console.log('\n--- background.js: gmailDraftWrite — a resolved file is attached; a bare term is not a search ---\n');
   {
-    // The one path this session added: nothing on the thread, nothing
-    // manually picked, but the email itself named a concrete object
-    // ("the signed contract" -> requestedObjectTerm "contract") — so
-    // driveSearchAttachment gets one real chance to close the loop itself.
     const env = load({
       stored: CONNECTED,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
-        [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [{ id: 'file_1', name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '2048' }] }) }],
         [/\/drive\/v3\/files\/file_1\?fields=/, { reply: res(200, { name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '2048' }) }],
         [/\/drive\/v3\/files\/file_1\?alt=media/, { reply: resBuf(200, 'pdf-bytes-here') }],
         [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_2' }), method: 'POST' }]
@@ -500,35 +498,78 @@ async function run() {
     });
     const out = await attempt(env.fn('gmailDraftWrite')({
       senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
-      params: { what: 'the signed contract', when: 'Sep 18', requestedObjectTerm: 'contract' }
+      params: { what: 'the signed contract', when: 'Sep 18', driveFileId: 'file_1', attachSource: 'found' }
     }));
-    check('the auto-found draft still succeeds', out.ok === true, out);
-    check('Drive was actually searched for the named term', env.calls.some((c) => c.includes('/drive/v3/files?q=') && c.includes('contract')), env.calls);
-    check('target flags the file as unverified, not as a confirmed attachment', out.target.includes('unverified'), out.target);
+    check('the resolved file still produces a draft', out.ok === true, out);
+    check('target names a real attachment, not an unverified guess', out.target === 'a draft reply with the attachment', out.target);
+    check('the writer does not run a fresh Drive search when the file id is already known', !env.calls.some((c) => c.includes('/drive/v3/files?q=')), env.calls);
     const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
     const decoded = decodeDraftRaw(draftCall.message.raw);
-    check('the auto-found filename actually lands in the MIME attachment', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
-    check('the body carries the "please confirm" verification note for an auto-found file', decoded.body.includes('Contract-Signed.pdf') && decoded.body.includes('confirm'), decoded.body);
+    check('the resolved filename lands in the MIME attachment', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
+    check('the body names the attached file', decoded.body.includes('Attached: Contract-Signed.pdf'), decoded.body);
+
+    const termOnly = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_term' }), method: 'POST' }]
+      ]
+    });
+    const plain = await attempt(termOnly.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
+      params: { what: 'the resume', requestedObjectTerm: 'resume' }
+    }));
+    check('a named term without a resolved file does not search Drive', plain.ok === true && plain.target === 'a draft reply' && !termOnly.calls.some((c) => c.includes('/drive/v3/')), { out: plain, calls: termOnly.calls });
   }
 
-  console.log('\n--- background.js: gmailDraftWrite — Drive search with no match still succeeds, no attachment ---\n');
+  console.log('\n--- background.js: a Google Doc match is exported, not downloaded as media ---\n');
   {
     const env = load({
       stored: CONNECTED,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
-        [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [] }) }],
-        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_3' }), method: 'POST' }]
+        [/\/drive\/v3\/files\/doc_1\?fields=/, { reply: res(200, { name: 'Invoice', mimeType: 'application/vnd.google-apps.document' }) }],
+        [/\/drive\/v3\/files\/doc_1\/export/, { reply: resBuf(200, 'pdf-from-doc') }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_doc' }), method: 'POST' }]
       ]
     });
     const out = await attempt(env.fn('gmailDraftWrite')({
-      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
-      params: { what: 'the resume', requestedObjectTerm: 'resume' }
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Invoice',
+      params: { what: 'the invoice', driveFileId: 'doc_1', attachSource: 'found' }
     }));
-    check('an empty Drive search still resolves to a successful, plain draft', out.ok === true && out.target === 'a draft reply', out);
+    check('a Doc export still attaches', out.ok === true, out);
+    check('the Doc is exported as PDF', env.calls.some((c) => c.includes('/files/doc_1/export') && c.includes('application%2Fpdf')), env.calls);
+    check('alt=media is not used for a Google Doc', !env.calls.some((c) => c.includes('doc_1') && c.includes('alt=media')), env.calls);
     const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
     const decoded = decodeDraftRaw(draftCall.message.raw);
-    check('no attachment and no fabricated verification note when nothing was found', decoded.attachmentFilename === null && !decoded.body.includes('found'), decoded);
+    check('the exported PDF name is what gets attached', decoded.attachmentFilename === 'Invoice.pdf', decoded);
+  }
+
+  console.log('\n--- background.js: searchDriveFiles pages across hundreds of files and fails closed ---\n');
+  {
+    let page = 0;
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/drive\/v3\/files\?q=/, { reply: () => {
+        page += 1;
+        if (page === 1) {
+          const files = [];
+          for (let i = 0; i < 100; i++) files.push({ id: 'p1_' + i, name: 'Notes-' + i + '.txt', mimeType: 'text/plain', size: '10' });
+          return res(200, { nextPageToken: 'tok2', files });
+        }
+        return res(200, { files: [{ id: 'inv', name: 'Invoice-1042.pdf', mimeType: 'application/pdf', size: '20' }] });
+      } }]]
+    });
+    const files = await attempt(env.fn('searchDriveFiles')("trashed = false and name contains 'invoice'"));
+    check('both pages are read', Array.isArray(files) && files.length === 101 && files[100].id === 'inv', files && files.length);
+    check('the second request carries the page token', env.calls.some((c) => c.includes('pageToken=tok2')), env.calls);
+    check('page size is 100, not a top-five sample', env.calls.some((c) => c.includes('pageSize=100')), env.calls);
+    const broken = load({
+      stored: CONNECTED,
+      routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, {}) }]]
+    });
+    const failed = await attempt(broken.fn('searchDriveFiles')("trashed = false and name contains 'invoice'"));
+    check('a failed search is null, not an empty "no match"', failed === null, failed);
   }
 
   console.log('\n--- background.js: gmailDraftWrite — a real thread attachment always outranks a Drive guess ---\n');
@@ -536,8 +577,8 @@ async function run() {
     // params.includeAttachment + a real attachment the user already saw on
     // the thread must win outright — Drive is Glance's own guess, and a
     // guess must never override something the user already had in front of
-    // them. Proven by NOT routing Drive's files.list at all: if
-    // driveSearchAttachment ran anyway, its unrouted call would return a
+    // them. Proven by NOT routing Drive's files.list at all: if a Drive
+    // lookup ran anyway, its unrouted call would return a
     // 500 that gmailDraftWrite's try/catch swallows into "no attachment",
     // silently masking the real bug — so the call log itself is the
     // assertion, not just the final attachment.
@@ -562,35 +603,64 @@ async function run() {
     check('no "please confirm" note for a thread attachment the user already saw', !decoded.body.includes('confirm'), decoded.body);
   }
 
-  console.log('\n--- background.js: gmailDraftWrite — an oversized Drive candidate is skipped for the next one ---\n');
+  console.log('\n--- background.js: a resolved file that cannot be read does not become a plain success ---\n');
   {
-    // driveSearchAttachment's own size guard (files(...).size from the list
-    // response, before any metadata/content fetch) must skip a too-large
-    // candidate without ever downloading it, then still try the next one —
-    // proven by asserting the oversized file's own id never appears in any
-    // later call, not just that the final attachment is the small one.
     const env = load({
       stored: CONNECTED,
       routes: [
         [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
-        [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [
-          { id: 'file_big', name: 'Contract-4K-Scan.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) },
-          { id: 'file_small', name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '1024' }
-        ] }) }],
-        [/\/drive\/v3\/files\/file_small\?fields=/, { reply: res(200, { name: 'Contract-Signed.pdf', mimeType: 'application/pdf', size: '1024' }) }],
-        [/\/drive\/v3\/files\/file_small\?alt=media/, { reply: resBuf(200, 'small-pdf-bytes') }],
-        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_5' }), method: 'POST' }]
+        [/\/drive\/v3\/files\/file_big\?fields=/, { reply: res(200, { name: 'Contract-4K-Scan.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) }) }]
       ]
     });
     const out = await attempt(env.fn('gmailDraftWrite')({
       senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Following up',
-      params: { what: 'the signed contract', requestedObjectTerm: 'contract' }
+      params: { what: 'the signed contract', driveFileId: 'file_big', attachSource: 'found' }
     }));
-    check('the write still succeeds once the small candidate is found', out.ok === true, out);
-    check('the oversized candidate is never fetched at all', !env.calls.some((c) => c.includes('file_big') && (c.includes('?fields=') || c.includes('?alt=media'))), env.calls);
+    check('an oversized resolved file fails the write', out.ok === false, out);
+    check('no draft is created for a file that was not attached', !env.calls.some((c) => c.includes('/users/me/drafts')), env.calls);
+    check('the oversized bytes are never downloaded', !env.calls.some((c) => c.includes('alt=media')), env.calls);
+  }
+
+  console.log('\n--- background.js: create-when-missing copies a template, attaches it, and undo deletes both ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/gmail\/v1\/users\/me\/threads\?/, { reply: res(200, { threads: [] }) }],
+        [/\/drive\/v3\/files\/tpl\?fields=/, { reply: res(200, { name: 'Invoice Template', mimeType: 'application/vnd.google-apps.document' }) }],
+        [/\/drive\/v3\/files\/tpl\/export/, { reply: resBuf(200, 'template-pdf-bytes') }],
+        [/\/upload\/drive\/v3\/files\?uploadType=multipart/, { reply: res(200, { id: 'copy_1' }), method: 'POST' }],
+        [/\/gmail\/v1\/users\/me\/drafts$/, { reply: res(200, { id: 'draft_tpl' }), method: 'POST' }]
+      ]
+    });
+    const out = await attempt(env.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Invoice',
+      params: {
+        what: 'invoice',
+        templateId: 'tpl',
+        copyTitle: 'invoice — Dana — 1042',
+        fields: [
+          { id: 'billTo', label: 'Bill to', value: 'Dana' },
+          { id: 'number', label: 'Invoice number', value: '1042' }
+        ]
+      }
+    }));
+    check('a template handoff creates a draft', out.ok === true && out.target.includes('template'), out);
+    check('the new file id is on the undo ref', out.ref && out.ref.createdFileId === 'copy_1' && out.ref.draftId === 'draft_tpl', out.ref);
+    const upload = env.bodies.find((b) => typeof b === 'string' && b.includes('"name"') && b.includes('1042'));
+    check('the uploaded file is named from the filled facts', Boolean(upload) && upload.includes('Dana'), upload && upload.slice(0, 220));
+    check('the template itself is exported, not replaced', env.calls.some((c) => c.includes('/files/tpl/export')) && !env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/files/tpl')), env.calls);
     const draftCall = env.bodies[env.calls.findIndex((c) => c.includes('POST') && c.includes('/users/me/drafts'))];
     const decoded = decodeDraftRaw(draftCall.message.raw);
-    check('the small candidate is the one actually attached', decoded.attachmentFilename === 'Contract-Signed.pdf', decoded);
+    check('the prepared file is the draft attachment', decoded.attachmentFilename === 'invoice — Dana — 1042.pdf', decoded);
+    check('the draft body carries the filled fields', decoded.body.includes('Bill to: Dana') && decoded.body.includes('Invoice number: 1042'), decoded.body);
+
+    const empty = load({ stored: CONNECTED, routes: [] });
+    const refused = await attempt(empty.fn('gmailDraftWrite')({
+      senderEmail: 'dana@meridian.com', senderName: 'Dana', subject: 'Invoice',
+      params: { templateId: 'tpl', fields: [{ id: 'number', label: 'Invoice number', value: '  ' }] }
+    }));
+    check('an empty required field does not create a file or a draft', refused.ok === false && empty.calls.length === 0, { out: refused, calls: empty.calls });
   }
 
   console.log('\n--- background.js: Gmail draft undo deletes that draft, and a missing one is already undone ---\n');
@@ -607,6 +677,19 @@ async function run() {
       (await attempt(undo({ draftId: 'draft_1' }))).ok === true
       && env.calls.some((c) => c.startsWith('DELETE ') && c.includes('/users/me/drafts/draft_1')),
       env.calls);
+    const withFile = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/users\/me\/drafts\/draft_tpl$/, { reply: res(204, {}) }],
+        [/\/drive\/v3\/files\/copy_1$/, { reply: res(204, {}) }]
+      ]
+    });
+    const both = await attempt(withFile.fn('gmailDraftUndo')({ draftId: 'draft_tpl', createdFileId: 'copy_1' }));
+    check('undo of a template close deletes the draft and the created file',
+      both.ok === true
+      && withFile.calls.some((c) => c.startsWith('DELETE ') && c.includes('/drafts/draft_tpl'))
+      && withFile.calls.some((c) => c.startsWith('DELETE ') && c.includes('/files/copy_1')),
+      withFile.calls);
     check('an already-deleted draft still counts as undone',
       (await attempt(undo({ draftId: 'gone' }))).ok === true);
     check('a draft undo without an id does not guess',

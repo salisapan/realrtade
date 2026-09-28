@@ -77,15 +77,15 @@ const FlowActions = (() => {
     // REQUEST/COMMITMENT_OF_READER unchanged, since their own `what` is
     // already the request/commitment sentence.
     const what = (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && e.requestWhat) ? e.requestWhat : e.what;
-    // A thread attachment isn't the only way this step can end up with a
-    // file: e.requestedObjectTerm (intent.js — the exact noun REQUESTED_
-    // OBJECT/HE matched, e.g. "invoice", "resume") is what lets
-    // background.js's gmailDraftWrite search this account's own Drive for
-    // the thing being asked for when the thread itself has nothing
-    // attached. The label/hint reflect that real possibility too, not just
-    // the thread-attachment case — "Draft reply + file" is honest either
-    // way once background.js resolves which of the two actually happened.
-    const mayFindFile = hasAttachment || Boolean(e.requestedObjectTerm);
+    // A named noun in the email is not permission to attach whatever Drive
+    // search returns. The file is attached only when the caller already
+    // resolved exactly one high-confidence match (core/file-attach.js) and
+    // passed it in as ctx.attachFile. A thread attachment the user can
+    // already see is the other honest case. Anything else stays a plain
+    // reply draft — promising "+ file" before that match exists is how a
+    // wrong file gets onto a sendable draft.
+    const found = ctx.attachFile && ctx.attachFile.id ? ctx.attachFile : null;
+    const mayFindFile = hasAttachment || Boolean(found);
     return {
       id: 'draft',
       kind: 'gmailDraft',
@@ -96,7 +96,11 @@ const FlowActions = (() => {
         what, when: e.when, amount: e.amount,
         threadUrl: ctx.threadUrl,
         includeAttachment: mayFindFile,
-        requestedObjectTerm: e.requestedObjectTerm || null
+        requestedObjectTerm: e.requestedObjectTerm || null,
+        driveFileId: found ? found.id : null,
+        driveFileName: found ? found.name : null,
+        driveMimeType: found ? found.mimeType : null,
+        attachSource: found ? 'found' : null
       }
     };
   }

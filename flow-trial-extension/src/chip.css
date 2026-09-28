@@ -556,6 +556,45 @@
   opacity: .85;
 }
 
+.flow-chip-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.flow-chip-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #16214a;
+}
+
+.flow-chip-field-label {
+  flex: 0 0 auto;
+  min-width: 7.5em;
+}
+
+.flow-chip-field-input {
+  flex: 1 1 auto;
+  font: inherit;
+  font-weight: 500;
+  color: #16214a;
+  background: #fff;
+  border: 1px solid rgba(40, 70, 150, .22);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.flow-chip-field-line {
+  all: unset;
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #16214a;
+}
+
 @keyframes flow-chip-in {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }

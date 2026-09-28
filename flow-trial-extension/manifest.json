@@ -35,6 +35,7 @@
         "core/extract.js",
         "core/judgment.js",
         "core/intent.js",
+        "core/file-attach.js",
         "core/actions.js",
         "core/execution-memory.js",
         "core/close-memory.js",
@@ -74,6 +75,7 @@
     "https://tasks.googleapis.com/*",
     "https://www.googleapis.com/calendar/*",
     "https://www.googleapis.com/drive/*",
+    "https://www.googleapis.com/upload/drive/*",
     "https://gmail.googleapis.com/*",
     "https://theflow-ai.com/*"
   ],
@@ -83,7 +85,8 @@
       "https://www.googleapis.com/auth/tasks",
       "https://www.googleapis.com/auth/calendar.events",
       "https://www.googleapis.com/auth/gmail.compose",
-      "https://www.googleapis.com/auth/drive.readonly"
+      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/drive.file"
     ]
   },
   "content_security_policy": {
