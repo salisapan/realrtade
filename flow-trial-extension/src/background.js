@@ -1191,9 +1191,100 @@ function calendarWhenLabel(dateIso, clock) {
   return human + ' ' + pad(clock.hour) + ':' + pad(clock.minute);
 }
 
+function slotStamp(dateIso, hour, minute, addMinutes) {
+  const [y, m, d] = dateIso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d, hour, minute + (addMinutes || 0), 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  const iso = dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+  const wall = calendarDateTime(iso, dt.getHours(), dt.getMinutes());
+  const off = -dt.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  const abs = Math.abs(off);
+  return wall + sign + pad(Math.floor(abs / 60)) + ':' + pad(abs % 60);
+}
+
+function eventsStartingAt(items, dateIso, hour, minute) {
+  const prefix = dateIso + 'T' + String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0');
+  return (items || []).filter((ev) => {
+    if (!ev || ev.status === 'cancelled' || typeof ev.id !== 'string' || !ev.id) return false;
+    const start = ev.start && ev.start.dateTime;
+    return typeof start === 'string' && start.indexOf(prefix) === 0;
+  });
+}
+
+// Update or delete one event that already starts at the named clock.
+// Zero matches, or more than one, is not a write: the receipt must not
+// claim a calendar change that did not happen. A new event is never inserted
+// on this path.
+async function googleCalendarChange(p, op) {
+  const params = p.params || {};
+  const targetDate = calendarIsoDate(params.dateIso);
+  const targetClock = calendarClock(params.hour, params.minute);
+  if (!targetDate || !targetClock || targetClock.absent || targetClock.invalid) {
+    return { ok: false, reason: 'invalid', error: 'Missing a real time for this change.' };
+  }
+  const lookupDate = op === 'update' ? calendarIsoDate(params.fromDateIso) : targetDate;
+  const lookupClock = op === 'update' ? calendarClock(params.fromHour, params.fromMinute) : targetClock;
+  if (!lookupDate || !lookupClock || lookupClock.absent || lookupClock.invalid) {
+    return { ok: false, reason: 'invalid', error: 'Missing the time to change.' };
+  }
+  const query = new URLSearchParams({
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '5',
+    timeZone: localTimeZone(),
+    timeMin: slotStamp(lookupDate, lookupClock.hour, lookupClock.minute, 0),
+    timeMax: slotStamp(lookupDate, lookupClock.hour, lookupClock.minute, 1)
+  });
+  const listed = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events?' + query.toString(), { method: 'GET' });
+  if (listed.status === 401 || listed.status === 403) return { ok: false, reason: 'not-connected' };
+  if (!listed.ok) return { ok: false, reason: 'not-found' };
+  const matches = eventsStartingAt((await listed.json()).items, lookupDate, lookupClock.hour, lookupClock.minute);
+  if (matches.length !== 1) return { ok: false, reason: 'not-found' };
+  const ev = matches[0];
+  const summary = String(ev.summary || params.title || 'Hold').replace(/\s+/g, ' ').trim().slice(0, 200) || 'Hold';
+  if (op === 'delete') {
+    const restore = { summary: ev.summary || summary, start: ev.start, end: ev.end };
+    if (ev.description) restore.description = ev.description;
+    if (ev.location) restore.location = ev.location;
+    const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events/' + encodeURIComponent(ev.id), { method: 'DELETE' });
+    if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+    if (!res.ok && res.status !== 404 && res.status !== 410) return { ok: false, reason: 'not-found' };
+    return {
+      ok: true,
+      where: 'Google Calendar',
+      target: 'your calendar',
+      written: 'Calendar · ' + summary + ' · off ' + calendarWhenLabel(lookupDate, lookupClock),
+      ref: { eventId: ev.id, restore: restore }
+    };
+  }
+  const timeZone = localTimeZone();
+  const next = {
+    start: { dateTime: calendarDateTime(targetDate, targetClock.hour, targetClock.minute), timeZone: timeZone },
+    end: { dateTime: calendarDateTime(targetDate, targetClock.hour, targetClock.minute, CALENDAR_DEFAULT_DURATION_MIN), timeZone: timeZone }
+  };
+  const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events/' + encodeURIComponent(ev.id), {
+    method: 'PATCH',
+    body: JSON.stringify(next)
+  });
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  if (!res.ok) return { ok: false, reason: 'not-found' };
+  return {
+    ok: true,
+    where: 'Google Calendar',
+    target: 'your calendar',
+    written: 'Calendar · ' + summary + ' · ' + calendarWhenLabel(targetDate, targetClock),
+    ref: { eventId: ev.id, previousStart: ev.start, previousEnd: ev.end },
+    url: (ev.htmlLink || null)
+  };
+}
+
 async function googleCalendarWrite(p) {
   if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
   const params = p.params || {};
+  if (params.calendarOp === 'delete' || params.calendarOp === 'update') {
+    return googleCalendarChange(p, params.calendarOp);
+  }
   const dateIso = calendarIsoDate(params.dateIso);
   if (!dateIso) {
     return { ok: false, reason: 'invalid', error: 'Missing a real date for this event.' };
@@ -1280,7 +1371,24 @@ async function googleCalendarWrite(p) {
 }
 
 async function googleCalendarUndo(ref) {
-  if (!ref || !ref.eventId) return { ok: false };
+  if (!ref) return { ok: false };
+  if (ref.restore && ref.restore.start) {
+    const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events', {
+      method: 'POST',
+      body: JSON.stringify(ref.restore)
+    });
+    if (res.ok) return { ok: true };
+    return { ok: false };
+  }
+  if (ref.previousStart && ref.eventId) {
+    const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events/' + encodeURIComponent(ref.eventId), {
+      method: 'PATCH',
+      body: JSON.stringify({ start: ref.previousStart, end: ref.previousEnd })
+    });
+    if (res.ok) return { ok: true };
+    return { ok: false };
+  }
+  if (!ref.eventId) return { ok: false };
   const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events/' + encodeURIComponent(ref.eventId), {
     method: 'DELETE'
   });

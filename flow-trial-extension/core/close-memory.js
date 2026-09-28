@@ -41,7 +41,7 @@ const FlowCloseMemory = (() => {
   const STORAGE_KEY = 'glancePersonalCloseMemory';
   const MAX_CLOSES = 40;
   const MIN_SPECIFIC_SUBJECT = 12;
-  const PERSONAL_CLOSE_TYPES = ['dated-commitment', 'confirmed-amount', 'follow-up-ask', 'calendar-hold', 'create-missing', 'drive-file', 'file-on-hold', 'file-on-task'];
+  const PERSONAL_CLOSE_TYPES = ['dated-commitment', 'confirmed-amount', 'follow-up-ask', 'calendar-hold', 'calendar-cancel', 'calendar-move', 'create-missing', 'drive-file', 'file-on-hold', 'file-on-task'];
   const TRUSTED = new Set(PERSONAL_CLOSE_TYPES);
 
   // Connector kinds the live chip actually writes, plus the compact names

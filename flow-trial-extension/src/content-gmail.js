@@ -932,6 +932,10 @@
     switch (process.id) {
       case 'hold':
         return 'is putting this on your calendar' + when + '.';
+      case 'clear-it':
+        return 'is taking this off your calendar' + when + '.';
+      case 'move-it':
+        return 'is moving this on your calendar' + when + '.';
       case 'schedule-confirm':
         return 'is scheduling the meeting' + when + ', drafting a reply to confirm, and opening a follow-up task.';
       case 'schedule':

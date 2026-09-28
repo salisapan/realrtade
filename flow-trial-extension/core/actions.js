@@ -38,8 +38,12 @@ const FlowActions = (() => {
     // A calendar hold's title is the sentence being closed. The schedule
     // processes keep the short "Meeting Sep 18" label — that path is a
     // meeting, and the sentence can be the whole invite.
-    const hold = intent.personalClose === 'calendar-hold';
+    const mutate = e.calendarOp === 'delete' || e.calendarOp === 'update';
+    const hold = intent.personalClose === 'calendar-hold' || mutate;
     const title = (hold ? (e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
+    const hint = e.calendarOp === 'delete' ? 'Remove from Calendar: '
+      : e.calendarOp === 'update' ? 'Move on Calendar: '
+      : 'Add to Calendar: ';
     return {
       id: 'calendar',
       kind: 'calendar',
@@ -48,10 +52,14 @@ const FlowActions = (() => {
       // only surfaced at all once someone opens the step list). The full
       // description still exists, as `hint`, for the step's title/aria-label.
       label: 'Calendar',
-      hint: 'Add to Calendar: ' + (intent.label || 'Meeting'),
+      hint: hint + (intent.label || 'Meeting'),
       params: {
         title: String(title).slice(0, 200),
         dateIso: e.dateIso, hour: e.hour, minute: e.minute,
+        calendarOp: mutate ? e.calendarOp : null,
+        fromDateIso: e.calendarOp === 'update' ? e.fromDateIso : null,
+        fromHour: e.calendarOp === 'update' ? e.fromHour : null,
+        fromMinute: e.calendarOp === 'update' ? e.fromMinute : null,
         // The sentence the event is about. The title stays short ("Meeting
         // Sep 18 15:00"); without this, View opens a Calendar event that
         // never says what was scheduled. "Meeting" is the classifier's
@@ -61,7 +69,7 @@ const FlowActions = (() => {
         // A hold was only proposed because a clock time resolved. The
         // writer must not fall back to an all-day event if that time is
         // missing by the time Do It runs.
-        requireTime: hold,
+        requireTime: hold || mutate,
         threadUrl: ctx.threadUrl
       }
     };
@@ -190,6 +198,23 @@ const FlowActions = (() => {
       anchor: 'calendar',
       stepKinds: ['calendar']
     },
+    // A named slot that is cancelled. One delete, after the writer finds
+    // exactly one event at that time. Not a new event.
+    'clear-it': {
+      name: 'Clear It',
+      closingLine: 'Taking this off your calendar.',
+      closedLine: 'Off your calendar.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
+    // A named slot moved to a different named clock. One update.
+    'move-it': {
+      name: 'Move It',
+      closingLine: 'Moving this on your calendar.',
+      closedLine: 'Moved on your calendar.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
     'schedule-confirm': {
       name: 'Schedule & Confirm',
       // "replying to confirm" / "confirmed" would both overclaim: the draft
@@ -287,6 +312,10 @@ const FlowActions = (() => {
     let id;
     if (intent.type === 'fact' || (intent.signals && intent.signals.factReply)) {
       id = 'reply-fact';
+    } else if (intent.personalClose === 'calendar-cancel') {
+      id = 'clear-it';
+    } else if (intent.personalClose === 'calendar-move') {
+      id = 'move-it';
     } else if (intent.personalClose === 'calendar-hold') {
       id = 'hold';
     } else if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {

@@ -323,7 +323,21 @@ const FlowIntent = (() => {
   // judgment.js's HEDGE, so assertedIn still counted them as decided.
   const CONTINGENT = /\b(?:hoping|once)\b|(?:^|\s)(?:מקווה|מקווים)/i;
   // The figure was already settled. Logging it again is a false close.
-  const ALREADY_SETTLED = /\b(?:already paid|we paid|was paid|(?:the )?file is closed|back in [A-Za-z]+ \d{4})\b/i;
+  const ALREADY_SETTLED = /\b(?:already paid|we paid|was paid|(?:the )?file is closed|back in [A-Za-z]+ \d{4})\b|כבר\s+שול(?:מה|מו|ם|מ)|שול(?:מה|מו|ם)\s+אתמול|שילמתי/i;
+  // Two figures joined by "or", or a figure the sender marked as approximate.
+  // The largest number is not a decision when the sender has not picked one.
+  function amountIsAmbiguous(text) {
+    const raw = String(text || '');
+    if (/\b(?:about|around|approx(?:imately)?|roughly|circa)\b/i.test(raw)) return true;
+    if (/(?:בערך|בסביבות)/.test(raw)) return true;
+    const figs = raw.match(/(?:\$|€|£|₪)\s?\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?\s?(?:שקל(?:ים)?|ש(?:״|")?ח|USD|ILS|NIS)/gi) || [];
+    const vals = [];
+    for (const fig of figs) {
+      const n = parseFloat(String(fig).replace(/[^\d.]/g, ''));
+      if (!Number.isNaN(n) && vals.indexOf(n) === -1) vals.push(n);
+    }
+    return vals.length >= 2 && (/\b(?:or|between)\b/i.test(raw) || /(?:^|\s)או(?:\s|$)/.test(raw));
+  }
   const COMMIT_SENTENCE = /\b(?:agree[ds]?|approved|confirm(?:ed|ing)?)\b|(?:סוכם|אישרנו|מאשרים|מאשר|מאושר)/i;
 
   function commitmentIsContingent(text) {
@@ -605,6 +619,14 @@ const FlowIntent = (() => {
         entities.hour = time.hour;
         entities.minute = time.minute;
       }
+      if (fam.calendarOp === 'delete' || fam.calendarOp === 'update') entities.calendarOp = fam.calendarOp;
+      if (fam.fromDate && fam.fromDate.iso) {
+        entities.fromDateIso = fam.fromDate.iso;
+        if (fam.fromTime && Number.isInteger(fam.fromTime.hour)) {
+          entities.fromHour = fam.fromTime.hour;
+          entities.fromMinute = fam.fromTime.minute;
+        }
+      }
       const intent = finish(fam.type, fam.confidence, entities, fam.personalClose || null);
       if (!intent || !intent.type) return intent;
       intent.closeFamily = fam.family;
@@ -814,7 +836,7 @@ const FlowIntent = (() => {
     //        threshold to nudge either.
     const datedCommitment = (s.flags.commit || s.flags.senderPromise) && hasResolvedDate && !s.flags.lost && !isPast && !contingent;
     if (!blocked && datedCommitment && suppressed(TYPES.DECISION_TO_LOG)) quietHint = 'calibrated';
-    if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && suppressed(TYPES.DECISION_TO_LOG)) quietHint = 'calibrated';
+    if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && suppressed(TYPES.DECISION_TO_LOG)) quietHint = 'calibrated';
     if (!blocked && datedCommitment && !suppressed(TYPES.DECISION_TO_LOG)) {
       const committed = {
         who, amount,
@@ -832,7 +854,7 @@ const FlowIntent = (() => {
       }
       return finish(TYPES.DECISION_TO_LOG, 'high', committed, 'dated-commitment');
     }
-    if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !suppressed(TYPES.DECISION_TO_LOG)) {
+    if (!blocked && !contingent && !settled && !isPast && s.flags.commit && facts.money && !s.flags.lost && !amountIsAmbiguous(text) && !suppressed(TYPES.DECISION_TO_LOG)) {
       return finish(TYPES.DECISION_TO_LOG, 'high', {
         who, amount,
         what: whatText(text, DATED_COMMIT_PATTERNS) || labelFor(TYPES.DECISION_TO_LOG),
@@ -877,6 +899,7 @@ const FlowIntent = (() => {
     // being an open close. Silence is the side of that trade.
     if (isDecision && contingent) return stayQuiet('hedge');
     if (isDecision && settled && (isPast || !(facts.date && facts.date.iso))) return stayQuiet('hedge');
+    if (isDecision && facts.money && amountIsAmbiguous(text)) return stayQuiet('hedge');
 
     // --- 4. DECISION_TO_LOG: an outcome someone reported — the chip's original job. ---
     if (isDecision) {
