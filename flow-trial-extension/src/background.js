@@ -84,9 +84,9 @@ const GOOGLE_TASKS_CLIENT_ID_PLACEHOLDER = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.goo
 const GOOGLE_TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
 const GLANCE_TASK_LIST_TITLE = 'Glance';
 // Calendar and Gmail share the exact same OAuth grant as Tasks — one
-// chrome.identity token, requested with all three scopes from
+// chrome.identity token, requested with every scope in
 // manifest.json's oauth2.scopes at once — so there is one "connect Google"
-// step for the whole execution layer, not three.
+// step for the whole execution layer.
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const GOOGLE_DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -1018,8 +1018,20 @@ async function googleTasksWrite(p) {
   const auth = await getGoogleTasksAuth();
   if (!auth) return { ok: false, reason: 'not-connected' };
 
+  const taskParams = p.params || {};
+  const taskFileTerm = taskParams.fileTerm ? String(taskParams.fileTerm).trim() : '';
+  let taskFile = null;
+  if (taskFileTerm) {
+    const found = await driveFindOneByName(taskFileTerm);
+    if (!found || found.match !== 'one' || !found.file || !found.file.url) {
+      return { ok: false, reason: 'unclear', error: 'No single file to note on the task.' };
+    }
+    taskFile = found.file;
+  }
+
   const close = taskClosePayload(p);
   const notesLines = factLines(close.forNotes);
+  if (taskFile) notesLines.push(['File', taskFile.name + '\n' + taskFile.url]);
   if (p.threadUrl) notesLines.push(['Open in Gmail', p.threadUrl]);
   const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n');
 
@@ -1197,12 +1209,28 @@ async function googleCalendarWrite(p) {
   // guessing a time that was never stated. A calendar hold sets
   // requireTime and never takes this branch.
 
+  const paramsFile = params.fileTerm ? String(params.fileTerm).trim() : '';
+  const shareUrl = googleShareUrl(params.shareUrl);
+  if (params.shareLink && !shareUrl && !paramsFile) {
+    return { ok: false, reason: 'unclear', error: 'No file link for this event.' };
+  }
+  let linkedFile = null;
+  if (paramsFile) {
+    const found = await driveFindOneByName(paramsFile);
+    if (!found || found.match !== 'one' || !found.file || !found.file.url) {
+      return { ok: false, reason: 'unclear', error: 'No single file to put on the event.' };
+    }
+    linkedFile = found.file;
+  }
+
   const timeZone = localTimeZone();
   const descriptionLines = [];
   // The sentence Do It actually closed, so the event View opens is the
   // same fact the chip proposed — not only a title and an attribution line.
   const quote = params.quote ? String(params.quote).replace(/[\r\n]+/g, ' ').trim() : '';
   if (quote) descriptionLines.push(quote.slice(0, QUOTE_MAX_CHARS));
+  if (linkedFile) descriptionLines.push('File: ' + linkedFile.name + '\n' + linkedFile.url);
+  if (shareUrl) descriptionLines.push(shareUrl);
   if (p.threadUrl) descriptionLines.push('Open in Gmail: ' + p.threadUrl);
   descriptionLines.push(ATTRIBUTION_TEXT + ' — ' + attributionUrl('calendar'));
 
@@ -1349,9 +1377,14 @@ function draftGreeting(senderName) {
 // guess that lands in a real, sendable draft with no visible flag is
 // exactly the kind of silent overreach this product's precision-first
 // posture exists to avoid.
-function draftBodyText(p, attachment, attachmentSource) {
+function draftBodyText(p, attachment, attachmentSource, shareUrl) {
   const params = p.params || {};
   const lines = [draftGreeting(p.senderName), ''];
+  if (shareUrl) {
+    lines.push(params.what || 'The file is ready.');
+    lines.push(shareUrl);
+    return lines.join('\n');
+  }
   if (params.what && params.when) lines.push('Following up on: ' + params.what + ' (' + params.when + ')');
   else if (params.what) lines.push('Following up on: ' + params.what);
   else lines.push('Following up on your message below.');
@@ -1534,6 +1567,10 @@ async function gmailDraftWrite(p) {
   if (!p.senderEmail) return { ok: false, reason: 'error', error: 'No sender address to reply to.' };
 
   const params = p.params || {};
+  const shareUrl = googleShareUrl(params.shareUrl);
+  if (params.shareLink) {
+    if (!shareUrl) return { ok: false, reason: 'unclear', error: 'No file link to share.' };
+  }
   let attachment = null;
   let createdFileId = null;
   // 'thread' and 'picked' are files the user already saw. 'found' is the
@@ -1542,7 +1579,7 @@ async function gmailDraftWrite(p) {
   // different file if that one cannot be read. 'template' is a new file
   // made from an existing company template, never a blank document.
   let attachmentSource = null;
-  if (params.includeAttachment && p.attachment && p.attachment.base64) {
+  if (!params.shareLink && params.includeAttachment && p.attachment && p.attachment.base64) {
     const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
     // Oversized attachments degrade to a plain draft rather than failing the
     // whole action — the same "still useful, just not everything asked for"
@@ -1552,34 +1589,39 @@ async function gmailDraftWrite(p) {
       attachmentSource = 'thread';
     }
   }
-  // Create-when-missing: copy an existing template into a new file, then
-  // attach that copy. Refuses when a required field is empty — a blank
-  // document is not this close. The company template itself is never
-  // modified or deleted.
-  if (!attachment && params.templateId) {
-    const fields = Array.isArray(params.fields) ? params.fields : [];
-    const incomplete = !fields.length || fields.some((field) => !field || !String(field.value || '').trim());
-    if (incomplete) return { ok: false, reason: 'error', error: 'Missing a fact the template needs.' };
-    const made = await materializeFromTemplate(params.templateId, params.copyTitle || params.what);
-    if (!made) return { ok: false, reason: 'error', error: 'Could not prepare a file from that template.' };
-    attachment = made.attachment;
-    createdFileId = made.createdFileId;
-    attachmentSource = 'template';
-  }
-  // A resolved Drive file (the one high-confidence match, or a file the
-  // user picked). If it cannot be read, stop — do not search for a
-  // substitute and do not send a draft that claims the file is attached.
-  if (!attachment && params.driveFileId) {
-    attachment = await fetchDriveFileAsAttachment(params.driveFileId);
-    if (!attachment) return { ok: false, reason: 'error', error: 'Could not attach that file.' };
-    attachmentSource = params.attachSource === 'found' ? 'found' : 'picked';
+  // A share-link draft (a Doc, Sheet, or saved file this same click
+  // already created) does not search Drive and does not attach a second
+  // file. Family A attach stays on the branches below.
+  if (!params.shareLink) {
+    // Create-when-missing: copy an existing template into a new file, then
+    // attach that copy. Refuses when a required field is empty — a blank
+    // document is not this close. The company template itself is never
+    // modified or deleted.
+    if (!attachment && params.templateId) {
+      const fields = Array.isArray(params.fields) ? params.fields : [];
+      const incomplete = !fields.length || fields.some((field) => !field || !String(field.value || '').trim());
+      if (incomplete) return { ok: false, reason: 'error', error: 'Missing a fact the template needs.' };
+      const made = await materializeFromTemplate(params.templateId, params.copyTitle || params.what);
+      if (!made) return { ok: false, reason: 'error', error: 'Could not prepare a file from that template.' };
+      attachment = made.attachment;
+      createdFileId = made.createdFileId;
+      attachmentSource = 'template';
+    }
+    // A resolved Drive file (the one high-confidence match, or a file the
+    // user picked). If it cannot be read, stop — do not search for a
+    // substitute and do not send a draft that claims the file is attached.
+    if (!attachment && params.driveFileId) {
+      attachment = await fetchDriveFileAsAttachment(params.driveFileId);
+      if (!attachment) return { ok: false, reason: 'error', error: 'Could not attach that file.' };
+      attachmentSource = params.attachSource === 'found' ? 'found' : 'picked';
+    }
   }
 
   const threadId = await findThreadId(p.senderEmail, p.subject);
   const raw = base64UrlEncode(buildMimeMessage({
     to: toHeaderValue(p.senderEmail, p.senderName),
     subject: draftSubject(p),
-    body: draftBodyText(p, attachment, attachmentSource),
+    body: draftBodyText(p, attachment, attachmentSource, shareUrl),
     attachment
   }));
 
@@ -1638,18 +1680,152 @@ async function materializeFromTemplate(templateId, title) {
     const ext = exported ? exported.ext : ((String(meta.name || '').match(/\.[A-Za-z0-9]{1,8}$/) || [''])[0]);
     const filename = withExportExtension(title || meta.name || 'file', ext);
     const mimeType = exported ? exported.mime : (meta.mimeType || 'application/octet-stream');
-    const createdFileId = await uploadDriveCopy(filename, mimeType, buf);
-    if (!createdFileId) return null;
-    return { createdFileId, attachment: { filename, mimeType, base64: arrayBufferToBase64(buf) } };
+    const created = await uploadDriveCopy(filename, mimeType, buf);
+    if (!created || !created.id) return null;
+    return { createdFileId: created.id, attachment: { filename, mimeType, base64: arrayBufferToBase64(buf) } };
   } catch (e) {
     return null;
   }
 }
 
-async function uploadDriveCopy(name, mimeType, buf) {
+// Name-token match for family B and for the "is there already a file?"
+// check before a template create. This does not download or attach.
+// Family A attach is searchDriveFiles plus core/file-attach.js.
+// Zero hits or two-plus hits is not a file this close may use.
+function driveNameHits(files, term) {
+  function tokens(value) {
+    return String(value || '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  }
+  const needle = tokens(term);
+  if (!needle.length || needle.join('').length < 2) return [];
+  const hits = [];
+  for (const file of files || []) {
+    if (!file || file.trashed) continue;
+    const name = tokens(file.name);
+    let found = false;
+    for (let i = 0; i <= name.length - needle.length; i++) {
+      let same = true;
+      for (let j = 0; j < needle.length; j++) {
+        if (name[i + j] !== needle[j]) { same = false; break; }
+      }
+      if (same) { found = true; break; }
+    }
+    if (found) hits.push(file);
+  }
+  return hits;
+}
+
+function driveFileUrl(file) {
+  const id = file && file.id;
+  if (!id) return null;
+  const mime = String((file && file.mimeType) || '');
+  if (mime === 'application/vnd.google-apps.document') return 'https://docs.google.com/document/d/' + id + '/edit';
+  if (mime === 'application/vnd.google-apps.spreadsheet') return 'https://docs.google.com/spreadsheets/d/' + id + '/edit';
+  if (mime === 'application/vnd.google-apps.presentation') return 'https://docs.google.com/presentation/d/' + id + '/edit';
+  return 'https://drive.google.com/file/d/' + id + '/view';
+}
+
+async function driveFindOneByName(term) {
+  try {
+    if (!(await googleConnected())) return { match: 'unknown' };
+    const needle = String(term || '').trim();
+    if (needle.length < 2) return { match: 'unknown' };
+    const escaped = needle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const q = "trashed = false and name contains '" + escaped + "'";
+    const files = await searchDriveFiles(q);
+    if (!files) return { match: 'unknown' };
+    const hits = driveNameHits(files, needle);
+    if (hits.length !== 1) return { match: hits.length === 0 ? 'none' : 'many' };
+    const file = hits[0];
+    return {
+      match: 'one',
+      file: { id: file.id, name: file.name, mimeType: file.mimeType || '', url: driveFileUrl(file) }
+    };
+  } catch (e) {
+    return { match: 'unknown' };
+  }
+}
+
+function decodeBase64(b64) {
+  const bin = atob(String(b64 || '').replace(/\s/g, ''));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function driveFileResult(file, where, written) {
+  if (!file || typeof file.id !== 'string' || !file.id) {
+    return { ok: false, reason: 'error', error: 'Drive did not confirm the file.' };
+  }
+  return {
+    ok: true,
+    where: where,
+    target: file.name || 'a file',
+    written: written,
+    ref: { fileId: file.id },
+    url: file.webViewLink || driveFileUrl(file)
+  };
+}
+
+function safeDriveTitle(value) {
+  const title = String(value || 'Glance').replace(/[\r\n]+/g, ' ').trim().slice(0, 120);
+  return title || 'Glance';
+}
+
+async function googleDriveCreateDoc(p) {
+  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const params = p.params || {};
+  const html = typeof params.html === 'string' ? params.html.trim() : '';
+  if (!html || html.length < 20) return { ok: false, reason: 'unclear', error: 'Nothing to put in the doc.' };
+  const title = safeDriveTitle(params.title);
+  const created = await uploadDriveCopy(title, 'application/vnd.google-apps.document', new TextEncoder().encode(html), 'text/html; charset=UTF-8');
+  if (created && created.notConnected) return { ok: false, reason: 'not-connected' };
+  if (!created || !created.id) return { ok: false, reason: 'error', error: 'Drive did not confirm the file.' };
+  return driveFileResult(created, 'Google Docs', 'Doc · ' + (created.name || title));
+}
+
+async function googleDriveCreateSheet(p) {
+  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const params = p.params || {};
+  const csv = typeof params.csv === 'string' ? params.csv.trim() : '';
+  if (!csv || csv.indexOf('\n') === -1) return { ok: false, reason: 'unclear', error: 'Nothing to put in the sheet.' };
+  const title = safeDriveTitle(params.title);
+  const created = await uploadDriveCopy(title, 'application/vnd.google-apps.spreadsheet', new TextEncoder().encode(csv), 'text/csv; charset=UTF-8');
+  if (created && created.notConnected) return { ok: false, reason: 'not-connected' };
+  if (!created || !created.id) return { ok: false, reason: 'error', error: 'Drive did not confirm the file.' };
+  return driveFileResult(created, 'Google Sheets', 'Sheet · ' + (created.name || title));
+}
+
+async function googleDriveCopyFile(p) {
+  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const attachment = p.attachment;
+  if (!attachment || !attachment.base64) return { ok: false, reason: 'unclear', error: 'No single attachment to save.' };
+  const approxBytes = Math.floor((attachment.base64.length * 3) / 4);
+  if (approxBytes > GMAIL_ATTACHMENT_MAX_BYTES) return { ok: false, reason: 'unclear', error: 'That attachment is too large to save.' };
+  const name = safeDriveTitle(attachment.filename || 'attachment');
+  const mime = String(attachment.mimeType || 'application/octet-stream').split(';')[0].trim() || 'application/octet-stream';
+  const created = await uploadDriveCopy(name, mime, decodeBase64(attachment.base64));
+  if (created && created.notConnected) return { ok: false, reason: 'not-connected' };
+  if (!created || !created.id) return { ok: false, reason: 'error', error: 'Drive did not confirm the file.' };
+  return driveFileResult(created, 'Google Drive', 'Drive · ' + (created.name || name));
+}
+
+async function googleDriveTrash(ref) {
+  if (!ref || !ref.fileId) return { ok: false };
+  return { ok: await deleteDriveFile(ref.fileId) };
+}
+
+function googleShareUrl(value) {
+  if (typeof value !== 'string') return null;
+  if (!/^https:\/\/(?:docs|drive)\.google\.com\//.test(value)) return null;
+  return value;
+}
+
+async function uploadDriveCopy(name, mimeType, buf, mediaType) {
+  const contentType = mediaType || mimeType;
   const boundary = 'flow_upload_' + Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
   const meta = JSON.stringify({ name: name, mimeType: mimeType });
-  const preamble = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + boundary + '\r\nContent-Type: ' + mimeType + '\r\n\r\n';
+  const preamble = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + boundary + '\r\nContent-Type: ' + contentType + '\r\n\r\n';
   const ending = '\r\n--' + boundary + '--';
   const head = new TextEncoder().encode(preamble);
   const tail = new TextEncoder().encode(ending);
@@ -1658,14 +1834,17 @@ async function uploadDriveCopy(name, mimeType, buf) {
   body.set(head, 0);
   body.set(bytes, head.length);
   body.set(tail, head.length + bytes.length);
-  const res = await googleAuthedFetch('https://www.googleapis.com/upload/drive/v3', '/files?uploadType=multipart', {
+  const res = await googleAuthedFetch('https://www.googleapis.com/upload/drive/v3', '/files?uploadType=multipart&fields=' + encodeURIComponent('id,name,webViewLink,mimeType'), {
     method: 'POST',
     headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
     body
   });
+  if (res.status === 401 || res.status === 403) return { notConnected: true };
   if (!res.ok) return null;
   const created = await res.json();
-  return created && created.id ? created.id : null;
+  if (!created || !created.id) return null;
+  if (!created.webViewLink) created.webViewLink = driveFileUrl(created);
+  return created;
 }
 
 async function deleteDriveFile(fileId) {
@@ -2013,12 +2192,14 @@ async function classifyViaBackend(payload) {
 const WRITERS = {
   hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
-  calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite
+  calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
+  driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
-  calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo
+  calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
+  driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash
 };
 
 async function connectorStatus() {
@@ -2126,6 +2307,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (!files) return { ok: false, reason: 'error' };
       return { ok: true, files };
     })());
+  }
+
+  if (msg.type === 'flow:drive-find-one') {
+    return reply(sendResponse, driveFindOneByName(msg.term));
   }
 
   if (msg.type === 'flow:open-drive-picker') {

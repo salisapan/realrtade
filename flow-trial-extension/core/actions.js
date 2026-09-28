@@ -219,6 +219,36 @@ const FlowActions = (() => {
       closedLine: 'Logged and tracked.',
       anchor: 'task',
       stepKinds: ['task']
+    },
+    // Google Drive / Doc / Sheet closes. The anchor is the file itself.
+    // Memory may not drop it; a close with no file is not a close.
+    'file-on-hold': {
+      name: 'Hold it',
+      closingLine: 'Putting the file on your calendar.',
+      closedLine: 'On your calendar, with the file.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
+    'file-on-task': {
+      name: 'Note it',
+      closingLine: 'Noting the file on the task.',
+      closedLine: 'On the task, with the file.',
+      anchor: 'task',
+      stepKinds: ['task']
+    },
+    'file-it': {
+      name: 'File it',
+      closingLine: 'Saving the attached file to Drive.',
+      closedLine: 'Saved to Drive, link drafted.',
+      anchor: 'file',
+      stepKinds: ['file', 'draft']
+    },
+    'create-missing': {
+      name: 'Draft it',
+      closingLine: "Didn't find it — draft from template.",
+      closedLine: 'Drafted from the template, link ready.',
+      anchor: 'doc',
+      stepKinds: ['doc', 'sheet', 'calendar', 'draft']
     }
   };
 
@@ -286,9 +316,140 @@ const FlowActions = (() => {
   // process id (FlowExecutionMemory.getAll()'s own shape) — fetched once by
   // content-gmail.js per scan, not per process, since which process this
   // message needs isn't known until after classification.
+  function withThread(step, ctx) {
+    if (step.params && ctx.threadUrl) step.params.threadUrl = ctx.threadUrl;
+    return step;
+  }
+
+  // A Drive / Doc / Sheet close planned by google-closes.js. One process,
+  // reversible writes only. The draft shares the link of the file this
+  // same click created; it does not search Drive (that search belongs to
+  // the find-and-attach path).
+  function planGoogle(intent, ctx) {
+    const g = intent.googleClose;
+    if (!g) return null;
+    const e = intent.entities || {};
+    if (g.personalClose === 'file-on-hold') {
+      return {
+        id: 'file-on-hold',
+        name: 'Hold it',
+        closingLine: g.cardLine,
+        closedLine: 'On your calendar, with the file.',
+        steps: [withThread({
+          id: 'calendar',
+          kind: 'calendar',
+          label: 'Calendar',
+          hint: 'Add to Calendar with the file',
+          dependsOn: null,
+          params: {
+            title: String(e.what || g.fileTerm || 'Hold').slice(0, 200),
+            dateIso: e.dateIso,
+            hour: e.hour,
+            minute: e.minute,
+            quote: e.what || null,
+            requireTime: true,
+            fileTerm: g.fileTerm
+          }
+        }, ctx)]
+      };
+    }
+    if (g.personalClose === 'file-on-task') {
+      return {
+        id: 'file-on-task',
+        name: 'Note it',
+        closingLine: g.cardLine,
+        closedLine: 'On the task, with the file.',
+        steps: [withThread({
+          id: 'task',
+          kind: 'googleTask',
+          label: 'Task',
+          hint: 'Task note with the file',
+          dependsOn: null,
+          params: {
+            title: e.what || g.fileTerm,
+            dateIso: e.dateIso,
+            amount: e.amount,
+            what: e.what || null,
+            fileTerm: g.fileTerm
+          }
+        }, ctx)]
+      };
+    }
+    if (g.personalClose === 'drive-file') {
+      const fileStep = {
+        id: 'file',
+        kind: 'driveFile',
+        label: 'Drive',
+        hint: 'Save the attached file',
+        dependsOn: null,
+        params: { copyAttachment: true, googleClose: g }
+      };
+      const draftStep = {
+        id: 'draft',
+        kind: 'gmailDraft',
+        label: 'Draft link',
+        hint: 'Draft a reply with the file link',
+        dependsOn: 'file',
+        params: { what: g.cardLine, shareLink: true, includeAttachment: false, requestedObjectTerm: null }
+      };
+      return {
+        id: 'file-it',
+        name: 'File it',
+        closingLine: g.cardLine,
+        closedLine: 'Saved to Drive, link drafted.',
+        steps: [fileStep, draftStep]
+      };
+    }
+    if (g.personalClose !== 'create-missing') return null;
+    const createId = g.kind === 'sheet' ? 'sheet' : 'doc';
+    const createKind = g.kind === 'sheet' ? 'driveSheet' : 'driveDoc';
+    const steps = [{
+      id: createId,
+      kind: createKind,
+      label: g.kind === 'sheet' ? 'Sheet' : 'Doc',
+      hint: g.templateName || 'Create from the template',
+      dependsOn: null,
+      params: { googleClose: g }
+    }];
+    if (g.destination === 'calendar') {
+      steps.push(withThread({
+        id: 'calendar',
+        kind: 'calendar',
+        label: 'Calendar',
+        hint: 'Add to Calendar with the new file',
+        dependsOn: createId,
+        params: {
+          title: String(e.what || g.cardLine || 'Hold').slice(0, 200),
+          dateIso: e.dateIso,
+          hour: e.hour,
+          minute: e.minute,
+          quote: e.what || null,
+          requireTime: true,
+          shareLink: true
+        }
+      }, ctx));
+    }
+    steps.push({
+      id: 'draft',
+      kind: 'gmailDraft',
+      label: 'Draft link',
+      hint: 'Draft a reply with the file link',
+      dependsOn: createId,
+      params: { what: g.cardLine, shareLink: true, includeAttachment: false, requestedObjectTerm: null }
+    });
+    return {
+      id: 'create-missing',
+      name: 'Draft it',
+      closingLine: g.cardLine,
+      closedLine: 'Drafted from the template, link ready.',
+      steps: steps
+    };
+  }
+
   function planFor(intent, ctx) {
     ctx = ctx || {};
     if (!intent || !intent.type) return null;
+    if (intent.googleClose) return planGoogle(intent, ctx);
 
     const e = intent.entities || {};
     const hasAttachment = Boolean(ctx.hasThreadAttachment);

@@ -37,7 +37,8 @@ const FLOW_CONNECTORS = [
     // actually grants: getGoogleAuthToken() in background.js calls
     // chrome.identity.getAuthToken with no scopes override, so ONE consent
     // here covers every scope in manifest.json's oauth2.scopes at once
-    // (tasks, calendar.events, gmail.compose, drive.readonly), not just Tasks.
+    // (tasks, calendar.events, gmail.compose, drive.readonly, drive.file),
+    // not just Tasks.
     // A card titled 'Google Tasks' with a 'Connect Google Tasks' button
     // (popup.js builds both directly from this label) read as authorizing
     // one destination when it was actually authorizing four. 'Google' is
@@ -53,7 +54,7 @@ const FLOW_CONNECTORS = [
     // The rest still work (see WRITERS/UNDOERS in background.js) but aren't
     // part of onboarding until the core loop has proven itself.
     mvp: true,
-    note: 'One native Google sign-in, covering Tasks, Calendar, and Gmail drafts together — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; and prepares (never sends) draft replies.'
+    note: 'One native Google sign-in, covering Tasks, Calendar, Gmail drafts, and Drive files Glance itself creates — since a single email might need any of them, not a separate authorization per feature. Glance creates a task with the amount, the date, and a link back to the email in a "Glance" list; schedules real Calendar events for meetings; prepares (never sends) draft replies; and, when the close is a file, creates that Doc, Sheet, or Drive file from what the email already says. Undo removes it.'
   },
   {
     id: 'notion',

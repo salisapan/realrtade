@@ -469,7 +469,7 @@ const FlowIntent = (() => {
     // ask to meet at a clock time). A bare meeting announcement stays
     // untagged so personal close memory cannot treat it as one of those
     // closes. Absent on a miss.
-    function finish(type, confidence, entities, personalClose) {
+    function finish(type, confidence, entities, personalClose, googleClose) {
       // A past day can still sit on facts — "the invoice that was due
       // March 3, 2024" — but it is not the deadline of this close. The
       // title, the "when" in the chip sentence, and the task's dateIso
@@ -481,6 +481,7 @@ const FlowIntent = (() => {
         label: labelFor(type), signals, facts
       };
       if (personalClose) intent.personalClose = personalClose;
+      if (googleClose) intent.googleClose = googleClose;
       return intent;
     }
 
@@ -558,6 +559,59 @@ const FlowIntent = (() => {
     const meetingAskHedge = /\b(?:might|maybe|perhaps|if you(?:'re| are) (?:free|available)|if (?:that|this|it) works)\b/i.test(text);
     const explicitMeetingAsk = Boolean(clock) && hasResolvedDate && !calledOff && !isRecap && !isPast && !meetingAskHedge &&
       (EXPLICIT_MEETING_ASK.test(text) || EXPLICIT_MEETING_ASK_HE.test(text));
+
+    // Drive / Doc / Sheet closes. Silence here is a decision, not a miss:
+    // the remote fallback must not turn it into a different chip. A wait
+    // means the language is clear and the host still has to check Drive
+    // for exactly one file before the chip can exist.
+    if (typeof FlowGoogleCloses !== 'undefined') {
+      const google = FlowGoogleCloses.consider({
+        text: text,
+        blocked: blocked,
+        amount: amount,
+        dateIso: hasResolvedDate ? facts.date.iso : null,
+        dateText: enrichedFacts.dateText,
+        hasClock: Boolean(clock),
+        template: ctx.companyTemplate || null,
+        fileMatch: ctx.fileMatch || null,
+        attachmentCount: ctx.attachmentCount == null ? null : ctx.attachmentCount
+      });
+      if (google && google.wait) {
+        return { type: null, signals: signals, facts: facts, googleWait: { fileTerm: google.wait } };
+      }
+      if (google && google.silence) {
+        return { type: null, signals: signals, facts: facts, googleSilence: true };
+      }
+      if (google && google.close) {
+        const g = google.close;
+        const hold = g.personalClose === 'file-on-hold';
+        if (hold && suppressed(TYPES.SCHEDULED_EVENT)) {
+          return { type: null, signals: signals, facts: facts, googleSilence: true };
+        }
+        if (!hold && suppressed(TYPES.DECISION_TO_LOG)) {
+          return { type: null, signals: signals, facts: facts, googleSilence: true };
+        }
+        const entities = {
+          who: who,
+          amount: amount,
+          what: g.what || g.cardLine,
+          when: humanWhen(facts.date, facts.time),
+          dateIso: hasResolvedDate ? facts.date.iso : null
+        };
+        if (hold && clock) {
+          entities.hour = clock.hour;
+          entities.minute = clock.minute;
+        }
+        return finish(
+          hold ? TYPES.SCHEDULED_EVENT : TYPES.DECISION_TO_LOG,
+          'high',
+          entities,
+          g.personalClose,
+          g
+        );
+      }
+    }
+
     if (eventEvidence && suppressed(TYPES.SCHEDULED_EVENT)) return { type: null, signals, facts };
     function holdEntities() {
       return {
