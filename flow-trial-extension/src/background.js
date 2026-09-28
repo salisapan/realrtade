@@ -874,13 +874,33 @@ function plannedAmount(p) {
   return trimmed || null;
 }
 
+// The calendar day of the write, in local time — the same comparison
+// intent.js uses for "this date is already behind today". p.now is only
+// how tests pin that day; a real Do It uses the clock at write time.
+function localTodayIso(now) {
+  const parsed = now ? new Date(now) : new Date();
+  const n = Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  const pad = (v) => String(v).padStart(2, '0');
+  return n.getFullYear() + '-' + pad(n.getMonth() + 1) + '-' + pad(n.getDate());
+}
+
+function dueForTask(value, now) {
+  const iso = isoDateOrNull(value);
+  if (!iso) return null;
+  if (iso < localTodayIso(now)) return null;
+  return iso;
+}
+
 // The task step's params are the close. facts are the fallback for a
-// caller that still only has the extracted record. When both name a date,
-// the plan wins — that is the date the chip showed.
+// caller that still only has the extracted record. When both name a date
+// that is still ahead (or today), the plan wins — that is the date the
+// chip showed. A day already behind today is not a due date from either
+// source. A wrong due date is a worse failure than no due date.
 function taskClosePayload(p) {
   const params = p.params || {};
-  const plannedDue = isoDateOrNull(params.dateIso);
-  const dueIso = plannedDue || isoDateOrNull(p.facts && p.facts.date && p.facts.date.iso);
+  const plannedDue = dueForTask(params.dateIso, p.now);
+  const factsDue = dueForTask(p.facts && p.facts.date && p.facts.date.iso, p.now);
+  const dueIso = plannedDue || factsDue;
   const fromPlan = plannedAmount(p);
   const amount = fromPlan || ((p.facts && p.facts.moneyText) || null);
   const entities = Object.assign({}, p.entities);
@@ -888,8 +908,15 @@ function taskClosePayload(p) {
   if (!entities.what && !entities.requestWhat && plannedWhat) entities.what = plannedWhat;
   const facts = Object.assign({}, p.facts);
   if (fromPlan) facts.moneyText = fromPlan;
-  if (plannedDue) {
-    facts.date = { iso: plannedDue };
+  // Notes follow the due that will actually be written. A past day that
+  // was only mentioned (an old invoice date on a current ask) is not a
+  // Date line, and a dateText left over from that day must not survive
+  // once the due itself was refused.
+  if (dueIso) {
+    facts.date = { iso: dueIso };
+    delete facts.dateText;
+  } else {
+    delete facts.date;
     delete facts.dateText;
   }
   return { dueIso, amount: amount || null, forNotes: Object.assign({}, p, { facts, entities }) };

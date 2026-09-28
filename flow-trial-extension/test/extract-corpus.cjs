@@ -106,6 +106,29 @@ console.log('\n--- extract.js: an hour that could be either half of the day ---\
   check('"at 9" resolves to 09:00', FlowExtract.parseTime('at 9').hour === 9);
   check('"at 15:00" resolves to 15:00', FlowExtract.parseTime('at 15:00').hour === 15);
   check('"at 9:30" keeps its minutes', FlowExtract.parseTime('at 9:30').minute === 30);
+  // A half-day word is the sender stating the hour. "at 3" stays refused;
+  // "at 3 in the afternoon" and "at 3 p.m." are 15:00, not an all-day guess
+  // and not 03:00.
+  check('"at 3 in the afternoon" is 15:00', FlowExtract.parseTime('meet at 3 in the afternoon').hour === 15);
+  check('"at 3 this afternoon" is 15:00', FlowExtract.parseTime('call at 3 this afternoon').hour === 15);
+  check('"at 3 p.m." is 15:00', FlowExtract.parseTime('at 3 p.m.').hour === 15);
+  check('"at 7 in the morning" is 07:00', FlowExtract.parseTime('at 7 in the morning').hour === 7);
+  check('"at 8 in the evening" is 20:00', FlowExtract.parseTime('at 8 in the evening').hour === 20);
+  check('"at 11 at night" is 23:00', FlowExtract.parseTime('at 11 at night').hour === 23);
+  check('"at 3 at night" is 03:00, which was stated', FlowExtract.parseTime('at 3 at night').hour === 3);
+  check('"at 6 at night" is refused', FlowExtract.parseTime('at 6 at night') === null);
+  // Hebrew used to keep the bare hour, so "בשעה 3" became a 03:00 Calendar
+  // event. Same refusal as English unless a day-part word pins it.
+  check('Hebrew "בשעה 3" is refused', FlowExtract.parseTime('פגישה בשעה 3') === null);
+  check('Hebrew "בשעה 3:00" is refused', FlowExtract.parseTime('בשעה 3:00') === null);
+  check('Hebrew "בשעה 15:00" is 15:00', FlowExtract.parseTime('בשעה 15:00').hour === 15 && FlowExtract.parseTime('בשעה 15:00').minute === 0);
+  check('Hebrew "בשעה 9" is 09:00', FlowExtract.parseTime('בשעה 9').hour === 9);
+  check('Hebrew "בשעה 3 אחר הצהריים" is 15:00', FlowExtract.parseTime('בשעה 3 אחר הצהריים').hour === 15);
+  check('Hebrew "בשעה 3 אחה״צ" is 15:00', FlowExtract.parseTime('בשעה 3 אחה״צ').hour === 15);
+  check('Hebrew "בשעה 9 בערב" is 21:00', FlowExtract.parseTime('בשעה 9 בערב').hour === 21);
+  check('Hebrew "בשעה 7 בבוקר" is 07:00', FlowExtract.parseTime('בשעה 7 בבוקר').hour === 7);
+  check('Hebrew "בשעה 3 בלילה" is 03:00, which was stated', FlowExtract.parseTime('בשעה 3 בלילה').hour === 3);
+  check('Hebrew "בשעה 6 בלילה" is refused', FlowExtract.parseTime('בשעה 6 בלילה') === null);
 }
 
 console.log('\n--- extract.js: "next <weekday>" and Hebrew "יום X הבא" are not this week ---\n');
