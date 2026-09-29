@@ -18,3 +18,11 @@
 [functions."download-trial-zip"]
   node_bundler = "none"
   included_files = ["netlify/functions/download-trial-zip/flow-trial-extension.zip"]
+
+# Clean slug for the Glance BragJack trust page. The file stays .html,
+# matching the rest of flow-landing. This rewrite serves it at the
+# extensionless path even if Pretty URLs are off in the Netlify UI.
+[[redirects]]
+  from = "/solutions/browser-ai-agent-extension-hijack"
+  to = "/solutions/browser-ai-agent-extension-hijack.html"
+  status = 200
