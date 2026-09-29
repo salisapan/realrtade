@@ -752,11 +752,12 @@
     // nothing, times out, or the backend isn't configured — same "just
     // don't show a chip" contract the local path already follows.
     const localFired = Boolean(intent.type);
-    // A local 'low' is a decision to stay quiet, not a miss. The remote
-    // fallback is only for when the local pass found nothing at all.
-    // A fact ask Glance already owned, and a Drive close that already chose
-    // silence, are not sent out to be reclassified into a generic reply.
-    if (!intent.type && !intent.googleSilence && !factOwns) intent = await ensureRemoteClassification(text) || intent;
+    // A local 'low' is a decision to stay quiet, not a miss. A named quiet
+    // (noise, hedge, family, calibrated, google) is the same decision.
+    // The remote router is only for when the local pass found nothing at
+    // all — it must not be asked to overturn a silence. A fact ask Glance
+    // already owned is not sent out to be reclassified into a generic reply.
+    if (!intent.type && !intent.quiet && !intent.googleSilence && !factOwns) intent = await ensureRemoteClassification(text) || intent;
     // Item 4's real-usage telemetry — the empirical answer to "how often is
     // the free local pass actually enough, how often does the one remote
     // fallback rescue what it missed, how often does nothing fire at all,"

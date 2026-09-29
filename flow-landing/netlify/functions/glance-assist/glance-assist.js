@@ -20,14 +20,16 @@
 // reaches for only when that local pass returns no classification at all
 // (see content-gmail.js's ensureRemoteClassification), not on every
 // message. Even then it only ever sees masked placeholders, never raw PII.
-// Anthropic (api.anthropic.com) is the only third party this data reaches.
-// Unlike Flow (built for organizations handling regulated, sensitive data,
-// where content never leaving the device is a hard guarantee), Glance has
-// never made that same promise — this masked round trip is the deliberate,
-// disclosed boundary for what it does send, not a departure from an
-// existing one.
+// model-router.js picks the provider per action (Anthropic, xAI, Gemini;
+// OpenAI mini only as Gemini's stand-in for summaries) and masks again
+// before every call. Classify stays on Sonnet then Grok; it is never sent
+// to Gemini or OpenAI. Unlike Flow (built for organizations handling
+// regulated, sensitive data, where content never leaving the device is a
+// hard guarantee), Glance has never made that same promise — this masked
+// round trip is the deliberate, disclosed boundary for what it does send,
+// not a departure from an existing one.
 //
-// Deliberately raw `fetch()` rather than @anthropic-ai/sdk: every function in
+// Deliberately raw `fetch()` rather than a provider SDK: every function in
 // this directory (see package.json — "type": "commonjs", zero dependencies)
 // is intentionally dependency-free so Netlify's per-function bundling never
 // needs a build step. Introducing the first npm dependency this directory
@@ -36,15 +38,8 @@
 // to add a build step for.
 
 const crypto = require('crypto');
+const { callRoutedLlm, silenceResult } = require('./model-router.js');
 
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
-const ANTHROPIC_VERSION = '2023-06-01';
-// TODO(owner): pick the model this feature should actually run in production.
-// claude-opus-5 is used here as the safe, most-capable default; for a
-// synchronous, click-and-wait sidebar action, a faster/cheaper model
-// (e.g. a Sonnet-tier model) may be the better tradeoff once this is live —
-// swap the string below, nothing else in this file depends on which model it is.
-const MODEL = 'claude-opus-5';
 const LOG_PREFIX = '[glance-assist]';
 
 const LIMITS = { threadEntry: 6000, entries: 4, attachmentText: 20000 };
@@ -63,52 +58,6 @@ function rateLimited(key, now) {
 
 function clean(value, max) {
   return String(value == null ? '' : value).trim().slice(0, max);
-}
-
-async function callClaude(system, userText, maxTokens) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    const err = new Error('ANTHROPIC_API_KEY not configured');
-    err.configMissing = true;
-    throw err;
-  }
-
-  const res = await fetch(ANTHROPIC_API, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': ANTHROPIC_VERSION,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      // Low effort: this drafts a short reply or summarizes one attachment
-      // from already-masked, already-extracted text — not a multi-step
-      // reasoning task — and it backs a synchronous "wait for it" sidebar
-      // action where latency matters more than depth here.
-      output_config: { effort: 'low' },
-      system,
-      messages: [{ role: 'user', content: userText }]
-    })
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    const err = new Error('Anthropic API error ' + res.status + (detail ? ': ' + detail.slice(0, 300) : ''));
-    err.status = res.status;
-    throw err;
-  }
-
-  const data = await res.json();
-  if (data.stop_reason === 'refusal') {
-    const err = new Error('The model declined to complete this request.');
-    err.refusal = true;
-    throw err;
-  }
-  const textBlock = (data.content || []).find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('No text in model response');
-  return textBlock.text.trim();
 }
 
 // ---- Feature 2: Draft-It ---------------------------------------------------
@@ -153,8 +102,8 @@ async function draftReply(payload) {
     .join('\n\n');
 
   const system = lang === 'he' ? DRAFT_SYSTEM_HE : DRAFT_SYSTEM_EN;
-  const draftText = await callClaude(system, threadText, 1200);
-  return { draftText };
+  const out = await callRoutedLlm({ action: 'draft-reply', system, userText: threadText, maxTokens: 1200 });
+  return { draftText: out.text, route: out.route };
 }
 
 // ---- Feature 3: attachment summarization -----------------------------------
@@ -181,8 +130,20 @@ async function summarizeAttachment(payload) {
   const text = clean(payload.maskedText, LIMITS.attachmentText);
   if (!text) throw badRequest('No attachment text provided.');
 
-  const raw = await callClaude(SUMMARY_SYSTEM, text, 500);
-  const parsed = safeParseJson(raw);
+  // A response that is not the summary JSON is not a summary. The router
+  // tries the next provider; if none produce one, this throws 502 rather
+  // than returning the attachment text or a sentence we made up.
+  const out = await callRoutedLlm({
+    action: 'summarize-attachment',
+    system: SUMMARY_SYSTEM,
+    userText: text,
+    maxTokens: 500,
+    accept: (raw) => {
+      const parsed = safeParseJson(raw);
+      return Boolean(parsed && typeof parsed.summary === 'string' && parsed.summary.trim());
+    }
+  });
+  const parsed = safeParseJson(out.text);
   if (!parsed || typeof parsed.summary !== 'string') {
     const err = new Error('Could not parse a summary from the model response.');
     err.status = 502;
@@ -195,7 +156,7 @@ async function summarizeAttachment(payload) {
     ['Financial Value', e.financialValue || '—'],
     ['Governing Law', e.governingLaw || '—']
   ];
-  return { summary: parsed.summary, entities };
+  return { summary: parsed.summary, entities, route: out.route };
 }
 
 // ---- Feature 0: remote classification fallback -----------------------------
@@ -206,7 +167,10 @@ async function summarizeAttachment(payload) {
 // cost) because most English business email already clears it reliably.
 // This action exists for the messages it can't reach: content-gmail.js
 // calls it only as a fallback, when the local classifier returns
-// { type: null }, and only for masked text — same privacy contract as
+// { type: null } and did not choose silence (a quiet reason, a low score,
+// a Drive close that stayed quiet). The router runs that same local pass
+// again and will not send a quiet message to a model. Masked text only —
+// same privacy contract as
 // Draft-It and attachment summarization above, not a new one. Glance (unlike
 // Flow) has never promised email content stays on-device end to end; this
 // is that boundary made concrete rather than assumed.
@@ -262,14 +226,21 @@ async function classify(payload) {
 
   const today = new Date().toISOString().slice(0, 10);
   const system = CLASSIFY_SYSTEM_TEMPLATE.replace('{today}', today);
-  const raw = await callClaude(system, (lang === 'he' ? '[Hebrew email]\n' : '') + text, 300);
-  const result = safeParseClassification(raw);
-  if (!result) {
-    const err = new Error('Could not parse a classification from the model response.');
-    err.status = 502;
-    throw err;
-  }
-  return result;
+  // judgeText is the message alone. The router runs local judgment on it
+  // before any provider: a quiet decision comes back { type: null } and
+  // Sonnet is not asked to overturn it. A miss that no provider can parse
+  // is the same silence — never a type we invented to fill the gap.
+  const out = await callRoutedLlm({
+    action: 'classify',
+    system,
+    judgeText: text,
+    userText: (lang === 'he' ? '[Hebrew email]\n' : '') + text,
+    maxTokens: 300,
+    accept: (raw) => safeParseClassification(raw) !== null
+  });
+  if (out.silence || out.local) return { result: out.result, route: out.route || null };
+  const result = safeParseClassification(out.text);
+  return { result: result || silenceResult(), route: out.route || null };
 }
 
 function badRequest(message) {
@@ -305,27 +276,27 @@ exports.handler = async function (event) {
   try {
     if (action === 'draft-reply') {
       const result = await draftReply(payload);
-      log('draft generated', { entries: (payload.entries || []).length, lang: payload.lang });
+      log('draft generated', { entries: (payload.entries || []).length, lang: payload.lang, provider: result.route && result.route.provider, model: result.route && result.route.model });
       return { statusCode: 200, body: JSON.stringify({ ok: true, draftText: result.draftText }) };
     }
     if (action === 'summarize-attachment') {
       const result = await summarizeAttachment(payload);
-      log('attachment summarized');
+      log('attachment summarized', { provider: result.route && result.route.provider, model: result.route && result.route.model });
       return { statusCode: 200, body: JSON.stringify({ ok: true, summary: result.summary, entities: result.entities }) };
     }
     if (action === 'classify') {
       const result = await classify(payload);
-      log('classified', { lang: payload.lang, type: result.type });
-      return { statusCode: 200, body: JSON.stringify({ ok: true, result }) };
+      log('classified', { lang: payload.lang, type: result.result.type, provider: result.route && result.route.provider, model: result.route && result.route.model });
+      return { statusCode: 200, body: JSON.stringify({ ok: true, result: result.result }) };
     }
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid action' }) };
   } catch (err) {
     if (err.configMissing) {
-      logErr('ANTHROPIC_API_KEY not configured');
+      logErr('no LLM provider configured');
       return { statusCode: 500, body: JSON.stringify({ error: 'This feature is not configured yet. Please email hello@theflow-ai.com.' }) };
     }
-    if (err.refusal) {
-      logErr('model refused');
+    if (err.pii || err.refusal) {
+      logErr(err.pii ? 'blocked unmasked contact details' : 'model refused');
       return { statusCode: 422, body: JSON.stringify({ error: 'Could not complete that request.' }) };
     }
     logErr(action + ' failed', String(err.message || err));

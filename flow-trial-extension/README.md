@@ -95,19 +95,21 @@ exactly this reason — hover it for the same claim in one sentence.
 Two different things happen to that masked text after masking, and the
 distinction matters:
 
-- **The passive chip and judgment engine never send anything anywhere.**
-  `core/judgment.js` and `core/extract.js` score plain text entirely on this
-  device — see "What is still deliberately narrow" below. This has not
-  changed.
-- **Draft-It (below) and the attachment X-ray (below) are opt-in tools that
-  do call a real language model** — `netlify/functions/glance-assist/glance-assist.js`,
-  which calls the Anthropic API. They only ever receive the *masked* text:
-  the placeholder tokens, never the real names/amounts/dates/emails/phones. The
-  token↔real-value map is built and kept in this tab and is never sent
-  anywhere; the model is instructed to reuse tokens verbatim, and the real
-  values are substituted back in locally, after the round trip, by
-  `FlowPrivacyShield.unmask()`. Anthropic is the only third party either
-  feature's masked text ever reaches.
+- **The judgment engine never sends anything anywhere.** `core/judgment.js`
+  and `core/extract.js` score plain text entirely on this device. A quiet
+  decision (noise, a hedge, a low-confidence catch-all, a Drive close that
+  stayed silent) stays on the device. The chip asks the masked classifier
+  only when that local pass found nothing and did not choose silence.
+- **Draft-It, the attachment X-ray, and that one classify fallback call a
+  routed model** — `netlify/functions/glance-assist/glance-assist.js`. They
+  only ever receive masked text: placeholder tokens, never the real
+  names, amounts, dates, emails, or phones. The token↔real-value map stays
+  in this tab; the server masks again before any provider; the model is
+  told to reuse tokens verbatim; `FlowPrivacyShield.unmask()` puts the real
+  values back locally. Drafts use Anthropic Haiku or xAI Grok-fast.
+  Summaries use Gemini Flash (OpenAI mini only if Gemini is missing or its
+  circuit is open), then Haiku or Grok-fast. Classification uses Anthropic
+  Sonnet, then a stronger Grok, and is never sent to Gemini or OpenAI.
 
 ## Draft-It (Feature 2)
 
@@ -476,18 +478,26 @@ paste, is `docs/SETUP.md`.
 
 ## Set up Draft-It / Attachment X-ray (needs the site owner)
 
-Both features share one Netlify function and one environment variable:
+Both features, and the masked classify fallback, share one Netlify function.
+Set these environment variables on the Netlify project (the extension never
+sees them):
 
-1. In the Netlify project, set `ANTHROPIC_API_KEY` to a real Anthropic API
-   key. `netlify/functions/glance-assist/glance-assist.js` is the only file
-   that reads it, and it is never sent to, or readable from, the extension.
-2. That's it — no extension-side configuration, no OAuth, no new
-   `host_permissions` (the function lives on `theflow-ai.com`, already
-   covered by the extension's existing host permission for the other five
-   connectors' Netlify functions).
+1. `ANTHROPIC_API_KEY` — Haiku for drafts and summary fallback, Sonnet for
+   classification.
+2. `XAI_API_KEY` — Grok-fast as the other draft/summary model, Grok-strong
+   as the classify fallback.
+3. `GEMINI_API_KEY` — Gemini Flash, the primary attachment summarizer.
+4. `OPENAI_API_KEY` — optional. Used only to summarize an attachment when
+   Gemini's key is missing or Gemini's circuit is open. Never used for
+   drafts or classification.
 
-Until step 1 is done, Draft-It and the attachment X-ray show "This feature is
-not configured yet" rather than failing silently or half-completing a request.
+No extension-side configuration, no OAuth, no new `host_permissions` (the
+function lives on `theflow-ai.com`, already covered by the extension's
+existing host permission).
+
+Until a provider is set for the action, Draft-It and the attachment X-ray
+show "This feature is not configured yet" rather than failing silently or
+half-completing a request. A classify miss with no usable model stays silent.
 
 ## Layout
 
@@ -557,9 +567,10 @@ foundation, not the feature.
 - **The passive judgment engine is not a language model, and sends nothing
   anywhere.** `core/judgment.js`'s scorer is a transparent, explainable
   weighting, which is why the popup can show why Glance spoke — this has not
-  changed. Draft-It and the attachment X-ray are separate, opt-in tools that
-  do call a real model with masked-only text; see "Local Privacy Shield,
-  and where masked text is allowed to go" above for exactly where the line is.
+  changed. A miss, and only a miss, may use the masked classify fallback.
+  Draft-It and the attachment X-ray are separate tools that call a routed
+  model with masked-only text; see "Local Privacy Shield, and where masked
+  text is allowed to go" above for exactly where the line is.
 - **PDF attachments aren't previewable yet.** Only `.docx` is read today —
   see "Attachment X-ray" above.
 - **Not on the Chrome Web Store.** Store submission needs a completed data-use
