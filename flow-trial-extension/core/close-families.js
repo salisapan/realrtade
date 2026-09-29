@@ -23,21 +23,36 @@
 // or/and/both stays silence. Family H still owns that multi-file case.
 // Family I is not a rescue when the object is unclear.
 //
+// Family B is one named file placed on one target: the calendar (with a
+// day) or the task. "Add the invoice to the calendar Thursday at 4pm" is
+// that compound, including when the verb is add / put / include rather
+// than send. Two targets, a doc comment, a plural, a generic "file" or
+// "document", a calendar with no day, a hedge, or a completed act stay
+// silence. A meeting with no file is not this family.
+//
+// Family C is create, then share or send, of one document, sheet, or deck.
+// Both halves have to be in the sentence. A blank doc or two artifacts
+// stay silence. A create with no send is not this close, and a send with
+// no create is not this close either. A named company template is family
+// I, not this.
+//
 // Family I (create-when-missing) is conditional. It chips only when the
 // what is a named asset, that file is missing, and a company template is
 // named — the template the later Do It would use. Any one of those missing
 // is silence, including a clear asset with no template (never a blank Doc)
-// and a template with no clear what. A weak score is not promoted to get
-// here. Up to four missing critical fields are a card. A chat fill opens
-// only past four, and it names those fields and nothing else. A weak score
-// stays silence. A general chat or an ask-Glance surface is never a
-// classification. Family J (reply-with-facts) chips only for one named fact
-// from one Sheet or one Doc. Two facts, two sources, or a hedge stays
-// silence. This file does not render that UI and does not create a Doc.
+// and a template with no clear what. It is not a rescue for an unclear
+// file ask, a generic document, or a blank doc that happens to name a
+// template. A weak score is not promoted to get here. Up to four missing
+// critical fields are a card. A chat fill opens only past four, and it
+// names those fields and nothing else. A weak score stays silence. A
+// general chat or an ask-Glance surface is never a classification. Family
+// J (reply-with-facts) chips only for one named fact from one Sheet or one
+// Doc. Two facts, two sources, or a hedge stays silence. This file does
+// not render that UI and does not create a Doc.
 
 const FlowCloseFamilies = (() => {
   const FILE_EN = /\b(receipts?|invoices?|quotations?|quotes?|contracts?|signed (?:pdfs?|cop(?:y|ies)|scans?)|passports?(?:\s+scans?)?|insurance (?:forms?|certificates?|polic(?:y|ies))|tax (?:docs?|documents?|returns?|forms?)|proposals?|decks?|slides?|presentations?|logos?|briefs?|statements?|reports?|purchase orders?|POs?|W-?9s?|transfer confirmations?|proof of (?:payment|transfer)|driver'?s licen[cs]es?|identity cards?|photo ids?|IDs?|sows?|ndas?|msas?|amendments?|redlines?|letters?)\b/i;
-  const FILE_HE = /(חשבונית מס|חשבונית|הצעת (?:ה)?מחיר|חוזה|הסכם|תעודת (?:ה)?זהות|דרכון|אישור (?:ה)?העברה|טופס (?:ה)?מס|אישור (?:ה)?מס|פוליסת?\s*(?:ה)?ביטוח|טופס ביטוח|דו["״]ח|דוח|מצגת|לוגו|בריף|הזמנת רכש|קבלה|מכתב|מסמך)/;
+  const FILE_HE = /(חשבונית מס|חשבונית|הצעת (?:ה)?מחיר|הצעה|חוזה|הסכם|תעודת (?:ה)?זהות|דרכון|אישור (?:ה)?העברה|טופס (?:ה)?מס|אישור (?:ה)?מס|פוליסת?\s*(?:ה)?ביטוח|טופס ביטוח|דו["״]ח|דוח|מצגת|לוגו|בריף|הזמנת רכש|קבלה|מכתב|מסמך)/;
 
   const ASK_EN = /\b(?:please (?:send|forward|share|attach|email|resend|provide|enclose)|(?:can|could|would) you (?:please )?(?:send|forward|share|attach|email|resend|provide)|would you mind (?:sending|forwarding|sharing|emailing|attaching)|kindly (?:send|forward|share|attach|email|resend|provide)|(?:i|we) (?:still |also )?need (?:you to (?:send|forward|attach|share|email) )?(?:a copy of )?(?:the|your|our|a|an)|(?:can|could) i (?:please )?(?:get|have) (?:a copy of )?(?:the|your|a|an)|send me (?:the|your|a)|attach (?:the|your)|mind (?:sending|forwarding|emailing|sharing)|be able to (?:send|forward|share|attach|email|resend|provide)|if you could (?:please )?(?:send|forward|share|attach|email|resend|provide)|pass along (?:the|your|a|an))\b/i;
   // שלח / להעביר need a non-letter before them so אשלח and אעביר (a promise)
@@ -45,9 +60,15 @@ const FlowCloseFamilies = (() => {
   const ASK_HE = /(?:אפשר\s+(?:לשלוח|לקבל|לצרף)|בבקשה\s+תשלח|תשלח(?:י|ו)?(?:\s+לי|\s+את)|תעביר(?:י|ו)?(?:\s+לי|\s+את)|(?:^|[^\u0590-\u05FF])שלח(?:י|ו)?(?:\s+לי|\s+את)|תצר(?:ף|פי|פו)|(?:^|[^\u0590-\u05FF])לצרף|(?:צריך|צריכה|צריכים)\s+את|אשמח\s+לקבל|אבקש\s+לקבל|נשמח\s+לקבל|נא\s+(?:לשלוח|לצרף)|מבקש(?:ת|ים)?\s+ל(?:שלוח|קבל|צרף)|תוכל(?:י|ו)?(?:\s+בבקשה)?\s+(?:לשלוח|להעביר|לצרף)|(?:^|[^\u0590-\u05FF])להעביר)/;
 
   const CREATE_EN = /\b(?:create|draft|draw up|prepare|put together|spin up)\b/i;
-  const CREATE_HE = /(?:תיצור|תכין|ליצור|להכין|לנסח|תנסח)/;
-  const SHARE_EN = /\b(?:send|share|attach|forward)\b/i;
+  const CREATE_HE = /(?:תיצור|תכין|ליצור|להכין|לנסח|תנסח|תכתוב|לכתוב)/;
+  // "write a document" / "make a sheet" is a create. "write the amount" is not.
+  const CREATE_LOOSE_EN = /\b(?:write|make)\s+(?:up\s+)?(?:a|an|the)\s+(?:short\s+|new\s+)?(?:\w+\s+){0,2}(?:google\s+doc|document|spreadsheet|sheet|deck|doc)\b/i;
+  const SHARE_EN = /\b(?:send|share|attach|forward|email|pass(?:\s+it)?\s+along)\b/i;
   const SHARE_HE = /(?:שלח|תשלח|שתף|לשתף|תשתף)/;
+  const PLACE_EN = /\b(?:add|put|include|place|note)\b/i;
+  // ו before the verb is "and" (ותוסיף). Final ם is the ם in תשים, not מ.
+  const PLACE_HE = /(?:^|[^\u0590-\u05FF]|ו)(?:תוסיף|להוסיף|נוסיף|תשים|תשימי|תשימו|לשים|תציין|תצייני|תציינו)(?![\u0590-\u05FF])/;
+  const BLANK_HE = /(?:^|[^\u0590-\u05FF])ריק(?:ה|ים)?(?![\u0590-\u05FF])/;
   const DOC_EN = /\b(?:doc|document|sheet|spreadsheet|deck|google doc|sow|contract|proposal)\b/i;
   const DOC_HE = /(?:מסמך|גיליון|חוזה|הצעה|דוק)/;
   const TEMPLATE_EN = /\b(?:company template|our template|the template)\b/i;
@@ -101,8 +122,8 @@ const FlowCloseFamilies = (() => {
   const NOISE_HE = /(?:לידיעתך|אין צורך בפעולה|ניוזלטר)/;
   const VENT_EN = /\b(?:so frustrated|ridiculous|just venting|this is a mess)\b/i;
 
-  const TARGET_CAL = /\b(?:on the calendar|in the (?:calendar |event |invite )?description|calendar invite|calendar note)\b|בתיאור (?:האירוע|הפגישה)|ביומן/i;
-  const TARGET_TASK = /\b(?:on the task|in the task note|task note|as a task)\b|במשימה|בפתק המשימה/i;
+  const TARGET_CAL = /\b(?:(?:on(?:to)?|to|in) the calendar|in the (?:calendar |event |invite )?description|calendar invite|calendar note)\b|בתיאור (?:האירוע|הפגישה)|[בל]יומן/i;
+  const TARGET_TASK = /\b(?:(?:on|to|in) the task|in the task note|task note|as a task)\b|במשימה|בפתק המשימה|כמשימה/i;
   const TARGET_DOC = /\b(?:docs? comment|comment on the doc)\b|הערה במסמך|בתגובה למסמך/i;
 
   function splitSentences(text) {
@@ -212,6 +233,41 @@ const FlowCloseFamilies = (() => {
     if (/\bwrite\b/i.test(sentence) && specificAsset(sentence)) return true;
     if (/(?:תכתוב|לכתוב)/.test(sentence) && specificAsset(sentence)) return true;
     return false;
+  }
+  // A generic document/sheet create ("write a short document", "make a
+  // sheet") is family C's verb. "write the amount" is not a create.
+  function createVerb(sentence) {
+    return CREATE_EN.test(sentence) || CREATE_HE.test(sentence) || CREATE_LOOSE_EN.test(sentence);
+  }
+  function placing(text) {
+    return PLACE_EN.test(text) || PLACE_HE.test(text);
+  }
+  function blankDoc(sentence) {
+    const text = String(sentence || '');
+    if (/\bblank\b/i.test(text) && (DOC_EN.test(text) || FILE_EN.test(text) || CREATE_EN.test(text) || CREATE_LOOSE_EN.test(text))) return true;
+    if (BLANK_HE.test(text) && (DOC_HE.test(text) || FILE_HE.test(text) || CREATE_HE.test(text))) return true;
+    return false;
+  }
+  // One create-then-share. A document and a spreadsheet in the same
+  // sentence is two artifacts, which is silence.
+  function tooManyDocs(sentence) {
+    const text = String(sentence || '');
+    const found = [];
+    const re = /\b(google docs?|spreadsheets?|documents?|decks?|sheets?|docs?|sows?|contracts?|proposals?)\b/gi;
+    let m;
+    while ((m = re.exec(text))) {
+      let term = m[1].toLowerCase();
+      if (term.indexOf('google doc') === 0) term = 'doc';
+      else term = term.replace(/s$/, '');
+      if (found.indexOf(term) === -1) found.push(term);
+    }
+    const he = [];
+    const heRe = /מסמך|גיליון|דוק|חוזה|הצעה|מצגת/g;
+    let h;
+    while ((h = heRe.exec(text))) {
+      if (he.indexOf(h[0]) === -1) he.push(h[0]);
+    }
+    return found.length + he.length >= 2;
   }
   function skipSentence(sentence) {
     if (hedged(sentence) || pastDone(sentence) || statusQuestion(sentence)) return true;
@@ -453,6 +509,7 @@ const FlowCloseFamilies = (() => {
   // case: there is no safe file to attach. A plain "send the invoice" is not
   // this, even if a template was mentioned earlier.
   function matchCreateMissing(sentence, now, earlier) {
+    if (blankDoc(sentence) || (earlier || []).some(blankDoc)) return null;
     if (hasExistingFile(sentence)) return null;
     if (isFileAsk(sentence) && !creating(sentence) && !notFound(sentence)) return null;
     if (!creating(sentence) && !notFound(sentence) && !templateCue(sentence)) return null;
@@ -470,10 +527,12 @@ const FlowCloseFamilies = (() => {
   }
 
   function matchCreateShare(sentence, now) {
-    const create = CREATE_EN.test(sentence) || CREATE_HE.test(sentence);
+    const create = createVerb(sentence);
     const share = SHARE_EN.test(sentence) || SHARE_HE.test(sentence);
     const doc = DOC_EN.test(sentence) || DOC_HE.test(sentence);
     if (!create || !share || !doc) return null;
+    // A blank doc is not a close. Two artifacts are not one close.
+    if (blankDoc(sentence) || tooManyDocs(sentence)) return 'suppress';
     if (TEMPLATE_EN.test(sentence) || TEMPLATE_HE.test(sentence)) return null;
     return hit({
       family: 'C', type: 'request', confidence: 'medium', personalClose: 'follow-up-ask',
@@ -699,24 +758,39 @@ const FlowCloseFamilies = (() => {
     facts = facts || {};
 
     const kinds = targetKind(text);
-    const fileSomewhere = isFileAsk(text) || ((FILE_EN.test(text) || FILE_HE.test(text)) && (ASK_EN.test(text) || ASK_HE.test(text)));
+    const named = specificAsset(text);
+    const asked = isFileAsk(text) || (named && (ASK_EN.test(text) || ASK_HE.test(text)));
+    const fileSomewhere = Boolean(named) && (asked || placing(text));
+    // "Put the file on the calendar" names no asset. Silence, rather than
+    // a hold at that clock. A real meeting with no file never enters here.
+    const genericObject = /\b(?:files?|documents?|docs?|attachments?)\b/i.test(text) || /(?:הקובץ|המסמך|הקבצים|המסמכים)/.test(text);
+    if (kinds.length && !named && genericObject && (placing(text) || ASK_EN.test(text) || ASK_HE.test(text))) {
+      return hit({ suppress: true, family: 'B' });
+    }
     if (kinds.length > 1 && fileSomewhere) return hit({ suppress: true, family: 'B' });
     if (kinds.length === 1 && fileSomewhere && !hedged(text) && !negated(text) && !pastDone(text)) {
       if (kinds[0] === 'doc') return hit({ suppress: true, family: 'B' });
+      if (pluralEnglishFile(text)) return hit({ suppress: true, family: 'B' });
       const date = dateOf(text, now);
       const time = clockOf(text);
       if (kinds[0] === 'calendar' && !date) return hit({ suppress: true, family: 'B' });
-      if (kinds[0] === 'calendar') {
+      // A clock is the hold. A day with no clock is not an all-day guess.
+      // A separate "please send the invoice" in the same note can still be
+      // family A. A place-only line with no clock stays silence.
+      if (kinds[0] === 'calendar' && !time) {
+        if (!isFileAsk(text)) return hit({ suppress: true, family: 'B' });
+      } else if (kinds[0] === 'calendar') {
         return hit({
-          family: 'B', type: 'event', confidence: time ? 'high' : 'medium',
-          personalClose: time ? 'calendar-hold' : null, fileTarget: 'calendar',
-          what: text, requestWhat: text, objectTerm: fileTerm(text), date: date, time: time
+          family: 'B', type: 'event', confidence: 'high',
+          personalClose: 'calendar-hold', fileTarget: 'calendar',
+          what: text, requestWhat: text, objectTerm: named, date: date, time: time
+        });
+      } else {
+        return hit({
+          family: 'B', type: 'decision', confidence: 'high', personalClose: null, fileTarget: 'task',
+          what: text, objectTerm: named, date: date
         });
       }
-      return hit({
-        family: 'B', type: 'decision', confidence: 'high', personalClose: null, fileTarget: 'task',
-        what: text, objectTerm: fileTerm(text), date: date
-      });
     }
 
     const sentences = splitSentences(text);
@@ -741,6 +815,8 @@ const FlowCloseFamilies = (() => {
         return hit({ suppress: true, family: 'G' });
       }
       if (skipSentence(sentence)) continue;
+      // A blank doc is never a create, with or without a template.
+      if (blankDoc(sentence)) return hit({ suppress: true, family: templateCue(sentence) ? 'I' : 'C' });
       // "Find a time" names no slot. A later clear hold already returned.
       if (FIND_TIME_EN.test(sentence) || FIND_TIME_HE.test(sentence)) {
         return hit({ suppress: true, family: 'D' });
@@ -751,6 +827,7 @@ const FlowCloseFamilies = (() => {
       const created = matchCreateMissing(sentence, now, sentences.slice(0, i));
       if (created) return created;
       const shared = matchCreateShare(sentence, now);
+      if (shared === 'suppress') return hit({ suppress: true, family: 'C' });
       if (shared) return shared;
       const held = matchHold(sentence, now);
       if (held) return held;

@@ -1,6 +1,8 @@
 // Families A–I. Clear HE+EN paraphrases chip. Hedge, negation, past,
-// noise, and a quoted older ask stay silent. Family I never promotes a
-// weak score into fields or chat.
+// noise, and a quoted older ask stay silent. Family B is one named file
+// on one calendar or one task. Family C is create, then share. Family I
+// never promotes a weak score into fields or chat, and it never rescues
+// a blank doc or a missing template.
 //
 // Run: node test/close-families-corpus.cjs
 
@@ -828,6 +830,269 @@ console.log('\n--- D: a clear clock is one calendar hold; a clear day is one tas
   }
   check('D generated timed meets and dated promises chip (' + pos + ')', posFail === 0 && pos >= 30, { pos, posFail });
   check('D generated hedges, find-a-time, ambiguous hours, and spans stay quiet (' + neg + ')', negFail === 0 && neg >= 12, { neg, negFail });
+}
+
+console.log('\n--- B C I densify: one clear compound chips; unsure stays quiet ---\n');
+{
+  function plan(text) {
+    const intent = classify(text);
+    return { intent, show: FlowIntent.shouldShowChip(intent) };
+  }
+  const bCalendar = [
+    ['B add on', 'Please add the invoice on the calendar for September 24 at 4pm.', /invoice/i, '2026-09-24', 16],
+    ['B add to', 'Please add the receipt to the calendar for September 24 at 4pm.', /receipt/i, '2026-09-24', 16],
+    ['B put invite', 'Find the contract and add it to the calendar invite for Thursday at 11am.', /contract/i, '2026-09-24', 11],
+    ['B include desc', 'Please include the quote in the calendar description for September 24 at 4pm.', /quote/i, '2026-09-24', 16],
+    ['B place note', 'Please place the brief on the calendar note for September 24 at 4pm.', /brief/i, '2026-09-24', 16],
+    ['B he find', 'תמצא את החשבונית ותוסיף אותה ביומן ליום חמישי בשעה 16:00.', /חשבונית/, '2026-09-24', 16],
+    ['B he liyoman', 'תוסיף את החוזה ליומן ליום חמישי בשעה 16:00.', /חוזה/, '2026-09-24', 16]
+  ];
+  for (const [name, text, term, iso, hour] of bCalendar) {
+    const row = plan(text);
+    const what = (row.intent.entities && row.intent.entities.requestedObjectTerm) || '';
+    check(name + ' is one file on the calendar',
+      row.show && row.intent.closeFamily === 'B' && row.intent.fileTarget === 'calendar' &&
+        row.intent.personalClose === 'calendar-hold' && !row.intent.createWhenMissing &&
+        term.test(what) && row.intent.entities.dateIso === iso && row.intent.entities.hour === hour,
+      { family: row.intent.closeFamily, target: row.intent.fileTarget, close: row.intent.personalClose, what, date: row.intent.entities && row.intent.entities.dateIso, hour: row.intent.entities && row.intent.entities.hour });
+  }
+  const bTask = [
+    ['B put task', 'Could you put the receipt in the task note?', /receipt/i],
+    ['B note w9', 'Kindly note the W-9 in the task note.', /W-?9/i],
+    ['B as task', 'Please note the insurance certificate as a task.', /insurance certificate/i],
+    ['B add task', 'Please add the receipt as a task for September 24.', /receipt/i],
+    ['B he tasim', 'בבקשה תשים את הקבלה במשימה.', /קבלה/],
+    ['B he petek', 'אפשר להוסיף את החשבונית בפתק המשימה?', /חשבונית/],
+    ['B he task', 'בבקשה תשלח את החשבונית. תוסיף אותה במשימה.', /חשבונית/],
+    ['B he send then cal', 'בבקשה תשלח את הקבלה. תוסיף אותה ביומן ליום חמישי בשעה 16:00.', /קבלה/]
+  ];
+  for (const [name, text, term] of bTask) {
+    const row = plan(text);
+    const what = (row.intent.entities && row.intent.entities.requestedObjectTerm) || '';
+    const target = name === 'B he send then cal' ? 'calendar' : 'task';
+    check(name + ' is one file on the ' + target,
+      row.show && row.intent.closeFamily === 'B' && row.intent.fileTarget === target && !row.intent.createWhenMissing && term.test(what),
+      { family: row.intent.closeFamily, target: row.intent.fileTarget, what, type: row.intent.type });
+  }
+  const bQuiet = [
+    ['plural', 'Please add the invoices to the calendar for September 24 at 4pm.'],
+    ['generic file', 'Please put the file on the calendar for September 24 at 4pm.'],
+    ['generic doc', 'Please add the document to the calendar for September 24 at 4pm.'],
+    ['no day', 'Please add the invoice on the calendar.'],
+    ['no clock', 'Please add the invoice to the calendar for September 24.'],
+    ['two targets', 'Please add the invoice to the calendar and in the task note for September 24 at 4pm.'],
+    ['doc comment', 'Please send the contract and leave a doc comment.'],
+    ['or', 'Please add the invoice or the receipt to the calendar for September 24 at 4pm.'],
+    ['hedge', 'Maybe add the invoice to the calendar for September 24 at 4pm.'],
+    ['negation', "Please don't add the invoice to the calendar for September 24 at 4pm."],
+    ['already', 'I already put the invoice on the calendar for September 24 at 4pm.'],
+    ['he hedge', 'אולי תוסיף את החשבונית ביומן ליום חמישי בשעה 16:00.'],
+    ['he or', 'תוסיף את החשבונית או את הקבלה ביומן ליום חמישי בשעה 16:00.'],
+    ['he no day', 'תוסיף את החשבונית ביומן.']
+  ];
+  for (const [name, text] of bQuiet) {
+    const row = plan(text);
+    check('B silence: ' + name, row.show === false && row.intent.closeFamily !== 'I', {
+      type: row.intent.type, family: row.intent.closeFamily
+    });
+  }
+  const sync = plan('Please put the sync on the calendar for September 24 at 4pm.');
+  check('a meeting with no file stays a hold, not family B',
+    sync.show && sync.intent.closeFamily !== 'B' && sync.intent.personalClose === 'calendar-hold',
+    { family: sync.intent.closeFamily, close: sync.intent.personalClose });
+  const sendThenUndated = plan('Please send the invoice. Add it on the calendar for September 24.');
+  check('a file ask survives a calendar mention that has no clock',
+    sendThenUndated.show && sendThenUndated.intent.closeFamily === 'A' && !sendThenUndated.intent.createWhenMissing,
+    { family: sendThenUndated.intent.closeFamily });
+
+  const cPos = [
+    ['C write email', 'Write a short document and email it to Dana today.'],
+    ['C make sheet', 'Please make a spreadsheet and share it with Dana today.'],
+    ['C pass along', 'Please prepare a short document and pass it along to Dana today.'],
+    ['C draft send', 'Please draft a short document and send it to Dana today.'],
+    ['C draw forward', 'Please draw up a proposal and forward it to Dana today.'],
+    ['C spin deck', 'Please spin up a deck and send it to Dana.'],
+    ['C he write', 'תכתוב מסמך ותשלח אותו לדנה היום.'],
+    ['C he create', 'תיצור מסמך ותשלח אותו לדנה היום.'],
+    ['C he sheet', 'להכין גיליון ולשתף עם דנה.'],
+    ['C he proposal', 'תנסח הצעה ותשתף אותה עם דנה.']
+  ];
+  for (const [name, text] of cPos) {
+    const row = plan(text);
+    check(name + ' is create then share',
+      row.show && row.intent.closeFamily === 'C' && row.intent.personalClose === 'follow-up-ask' && !row.intent.createWhenMissing,
+      { family: row.intent.closeFamily, close: row.intent.personalClose, type: row.intent.type });
+  }
+  const cQuiet = [
+    ['create only', 'Please draft a document.'],
+    ['blank', 'Please draft a blank document and send it.'],
+    ['two', 'Please create a document and a spreadsheet and send both.'],
+    ['hedge', 'Maybe draft a document and send it to Dana.'],
+    ['negation', "Please don't draft a document and send it."],
+    ['he blank', 'תכין מסמך ריק ותשלח אותו.'],
+    ['he two', 'תכין מסמך וגם גיליון ותשלח את שניהם.'],
+    ['he create only', 'תכין מסמך.'],
+    ['he hedge', 'אולי תכין מסמך ותשלח.']
+  ];
+  for (const [name, text] of cQuiet) {
+    const row = plan(text);
+    check('C silence: ' + name, row.show === false && row.intent.closeFamily !== 'I' && !row.intent.createWhenMissing, {
+      type: row.intent.type, family: row.intent.closeFamily
+    });
+  }
+  const sendOnly = plan('Please send the document to Dana.');
+  check('a send with no create is not family C',
+    sendOnly.intent.closeFamily !== 'C' && !sendOnly.intent.createWhenMissing,
+    { type: sendOnly.intent.type, family: sendOnly.intent.closeFamily });
+  const templateSteal = plan('Please draft the contract from our company template and send it to Dana.');
+  check('a template create is family I, not C',
+    templateSteal.show && templateSteal.intent.closeFamily === 'I' && templateSteal.intent.createWhenMissing === true,
+    templateSteal.intent.closeFamily);
+
+  const iPos = [
+    ['I contract', 'Please draft the contract from our company template and send it to Dana.', /contract/i],
+    ['I quote missing', "We don't have a quote for Acme. Draft one from our company template and send it to Dana.", /quote/i],
+    ['I invoice template', 'Please prepare the invoice using the company template and send it to Dana.', /invoice/i],
+    ['I letter', "Couldn't find the letter. Please draft it from the template and send it to Dana.", /letter/i],
+    ['I brief', 'Nothing in the folder for the brief. Put one together from our template and send it.', /brief/i],
+    ['I proposal', 'Please prepare the proposal from the company template and send it.', /proposal/i],
+    ['I sow', 'Please draw up the SOW using our template and forward it to Dana.', /sow/i],
+    ['I produce', 'Please draft the contract from our company template.', /contract/i],
+    ['I he folder', 'אין חוזה בתיקייה. תכין אחד מהתבנית שלנו ותשלח לדנה.', /חוזה/],
+    ['I he offer', 'אין את ההצעה בתיקייה. תכין אחת מהתבנית שלנו ותשלח.', /הצעה/],
+    ['I he invoice', 'לא מצאתי את החשבונית. תכין אחת מהתבנית שלנו ותשלח.', /חשבונית/],
+    ['I he letter', 'בבקשה תנסח את המכתב מהתבנית שלנו ותשלח.', /מכתב/]
+  ];
+  for (const [name, text, term] of iPos) {
+    const row = plan(text);
+    const entities = row.intent.entities || {};
+    const what = [entities.requestedObjectTerm || '', entities.what || ''].join(' ');
+    check(name + ' is create-when-missing',
+      row.show && row.intent.closeFamily === 'I' && row.intent.createWhenMissing === true &&
+        row.intent.personalClose === 'follow-up-ask' && term.test(what),
+      { family: row.intent.closeFamily, create: row.intent.createWhenMissing, what: what.slice(0, 80) });
+  }
+  const iQuiet = [
+    ['no template', "We don't have a quote for Acme. Please draft one and send it to Dana."],
+    ['invoice no template', 'Please draft an invoice and send it to Dana.'],
+    ['no asset', 'Please draft something from our company template and send it to Dana.'],
+    ['generic doc', 'Please draft a document from the company template and send it to Dana today.'],
+    ['blank named', 'Please draft a blank contract from our company template and send it.'],
+    ['blank he', 'תכין חוזה ריק מהתבנית שלנו ותשלח.'],
+    ['missing only', 'There is no proposal in the folder.'],
+    ['hedge', 'Maybe draft the contract from our company template and send it.'],
+    ['attached', 'The contract is attached. Please draft another from our company template and send it.'],
+    ['two assets', 'Please draft the contract and the proposal from our company template and send them.'],
+    ['he no template', 'אין הצעת מחיר. תכין אחת ותשלח לדנה.'],
+    ['any chance', 'Any chance you could draft the invoice from our template?']
+  ];
+  for (const [name, text] of iQuiet) {
+    const row = plan(text);
+    check('I silence: ' + name, row.show === false && !row.intent.createWhenMissing && row.intent.closeFamily !== 'I', {
+      type: row.intent.type, family: row.intent.closeFamily
+    });
+  }
+  const found = plan('Could you send the invoice?');
+  check('I does not rescue a file ask', found.show && found.intent.closeFamily === 'A' && !found.intent.createWhenMissing, found.intent.closeFamily);
+  const unsure = FlowCloseFamilies.detailSurface(
+    { type: 'request', confidence: 'unsure', closeFamily: 'I', createWhenMissing: true },
+    ['party', 'amount'],
+    null
+  );
+  check('unsure create-when-missing stays silence', unsure.surface === 'silence' && unsure.slots.length === 0, unsure);
+  const low = FlowCloseFamilies.route(
+    { type: 'request', confidence: 'low', closeFamily: 'I', createWhenMissing: true },
+    ['party']
+  );
+  check('a low score does not open create-when-missing', !low.type && !low.createWhenMissing, low);
+  const card = FlowCloseFamilies.detailSurface(
+    { type: 'request', confidence: 'high', closeFamily: 'I', createWhenMissing: true },
+    ['party', 'amount', 'title', 'date'],
+    null
+  );
+  check('four missing fields stay a card', card.surface === 'card' && card.slots.length === 4, card);
+  const chat = FlowCloseFamilies.detailSurface(
+    { type: 'request', confidence: 'high', closeFamily: 'I', createWhenMissing: true },
+    ['party', 'amount', 'title', 'date', 'what'],
+    null
+  );
+  check('past four fields is a chat fill of those names', chat.surface === 'chat' && chat.scope === 'critical-fields' && chat.slots.length === 5, chat);
+
+  const nouns = ['invoice', 'receipt', 'quote', 'contract', 'proposal', 'brief'];
+  const calFrames = [
+    (n) => `Please add the ${n} to the calendar for September 24 at 4pm.`,
+    (n) => `Please put the ${n} on the calendar for September 24 at 4pm.`
+  ];
+  const taskFrames = [
+    (n) => `Please put the ${n} in the task note.`,
+    (n) => `Please add the ${n} as a task.`
+  ];
+  let pos = 0;
+  let posFail = 0;
+  let neg = 0;
+  let negFail = 0;
+  function failPos(text, row) {
+    posFail++;
+    if (posFail <= 8) console.log('FAIL BCI chip', text, row.intent && row.intent.closeFamily, row.intent && row.intent.fileTarget);
+  }
+  for (const noun of nouns) {
+    for (const frame of calFrames) {
+      const row = plan(frame(noun));
+      if (row.show && row.intent.closeFamily === 'B' && row.intent.fileTarget === 'calendar' && row.intent.personalClose === 'calendar-hold') pos++;
+      else failPos(frame(noun), row);
+    }
+    for (const frame of taskFrames) {
+      const row = plan(frame(noun));
+      if (row.show && row.intent.closeFamily === 'B' && row.intent.fileTarget === 'task') pos++;
+      else failPos(frame(noun), row);
+    }
+  }
+  const heNouns = ['החשבונית', 'הקבלה', 'החוזה'];
+  for (const noun of heNouns) {
+    const cal = plan(`תוסיף את ${noun} ביומן ליום חמישי בשעה 16:00.`);
+    if (cal.show && cal.intent.closeFamily === 'B' && cal.intent.fileTarget === 'calendar' && cal.intent.personalClose === 'calendar-hold') pos++;
+    else failPos(noun + ' cal', cal);
+    const task = plan(`תוסיף את ${noun} במשימה.`);
+    if (task.show && task.intent.closeFamily === 'B' && task.intent.fileTarget === 'task') pos++;
+    else failPos(noun + ' task', task);
+  }
+  for (const verb of ['send', 'share', 'forward', 'email']) {
+    const row = plan(`Please draft a short document and ${verb} it to Dana today.`);
+    if (row.show && row.intent.closeFamily === 'C' && !row.intent.createWhenMissing) pos++;
+    else failPos('C ' + verb, row);
+  }
+  for (const verb of ['draft', 'create', 'prepare']) {
+    const row = plan(`Please ${verb} a short document and send it to Dana today.`);
+    if (row.show && row.intent.closeFamily === 'C' && !row.intent.createWhenMissing) pos++;
+    else failPos('C ' + verb, row);
+  }
+  for (const asset of ['contract', 'quote', 'proposal', 'invoice', 'letter']) {
+    const row = plan(`Please draft the ${asset} from our company template and send it to Dana.`);
+    const what = (row.intent.entities && row.intent.entities.requestedObjectTerm) || '';
+    if (row.show && row.intent.closeFamily === 'I' && row.intent.createWhenMissing && new RegExp(asset, 'i').test(what)) pos++;
+    else failPos('I ' + asset, row);
+    const missing = plan(`There is no ${asset} in the folder.`);
+    if (!missing.show && missing.intent.closeFamily !== 'I') neg++;
+    else { negFail++; if (negFail <= 8) console.log('FAIL BCI silence', asset, missing.intent && missing.intent.closeFamily); }
+  }
+  const quietGen = [
+    'Please add the invoices to the calendar for September 24 at 4pm.',
+    'Please put the file on the calendar for September 24 at 4pm.',
+    'Maybe add the contract to the calendar for September 24 at 4pm.',
+    'Please draft a blank document and send it.',
+    'Please create a document and a spreadsheet and send both.',
+    'Please draft a document from the company template and send it.',
+    'Please draft a blank contract from our company template and send it.',
+    'אולי תוסיף את החוזה ביומן ליום חמישי בשעה 16:00.',
+    'תכין מסמך ריק ותשלח אותו.'
+  ];
+  for (const text of quietGen) {
+    const row = plan(text);
+    if (!row.show && row.intent.closeFamily !== 'I') neg++;
+    else { negFail++; if (negFail <= 8) console.log('FAIL BCI silence', text, row.intent && row.intent.closeFamily); }
+  }
+  check('B C I generated compounds chip (' + pos + ')', posFail === 0 && pos >= 40, { pos, posFail });
+  check('B C I generated doubt stays quiet (' + neg + ')', negFail === 0 && neg >= 10, { neg, negFail });
 }
 
 console.log('\nTOTAL FAILURES:', failures);
