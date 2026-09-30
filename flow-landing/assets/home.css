@@ -146,7 +146,8 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .mobile-menu a:hover{color:var(--accent-2)}
 /* Privacy/Terms render like every other top-level menu link — previously
    singled out with a smaller, dimmer, side-by-side treatment. */
-.mobile-menu-legal{display:flex; flex-direction:column; align-items:center; gap:2px; margin-block-start:4px}
+.mobile-menu-legal{display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center; align-items:center; gap:2px 20px; max-width:340px; margin:18px auto 0; padding-top:16px; border-top:1px solid var(--line)}
+.mobile-menu nav .mobile-menu-legal a{font-size:.95rem; font-weight:500; opacity:.72; padding:6px 0}
 /* skip link */
 .skip{position:fixed; inset-block-start:8px; inset-inline-start:8px; z-index:80; padding:10px 16px; border-radius:10px; background:var(--accent); color:#fff; font-family:var(--disp); font-weight:600; transform:translateY(-160%); transition:transform .2s}
 .skip:focus{transform:none}
@@ -663,7 +664,13 @@ canvas.terrain-canvas.show{opacity:1}
    docs/design-principles.md, "the more foundational one leads"), not because
    of an oversight. */
 .cta-paths{display:grid; gap:18px; width:100%; max-width:760px; margin:6px 0 22px; text-align:start; align-items:start}
-@media (min-width:760px){ .cta-paths{grid-template-columns:1fr 1fr} }
+@media (min-width:760px){ .cta-paths{grid-template-columns:minmax(0,560px); justify-content:center} }
+.cta-solo{margin:0 0 18px; font-size:.95rem; color:var(--muted); text-align:center}
+.cta-solo a{color:var(--txt-hi); font-weight:600; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line)}
+.cta-solo a:hover{text-decoration-color:var(--cat); color:var(--cat)}
+#how .grid-3, #trust .grid-3{margin-top:8px}
+#trust .trust-note{margin-top:34px; text-align:center}
+#trust .card{text-align:start}
 .cta-path{
   display:flex; flex-direction:column; gap:8px; padding:24px 26px; border-radius:20px;
   border:1px solid var(--line); background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
