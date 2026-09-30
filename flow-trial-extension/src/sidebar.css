@@ -1,9 +1,15 @@
-/* Injected sidebar pane + floating attachment card. Same isolation approach as
-   chip.css: namespaced under .flow-sb-*, sized/spaced with CSS logical
-   properties (inset-inline-*, margin-inline-*, text-align: start/end) rather
-   than left/right, so a host whose own `dir` is "rtl" (a Hebrew draft, a
-   Hebrew attachment summary) never breaks the layout — only the content
-   direction flips, not this file. */
+/* Injected sidebar pane + floating attachment card. Same isolation approach,
+   and now the same light-glass visual family, as chip.css: namespaced under
+   .flow-sb-*, sized/spaced with CSS logical properties (inset-inline-*,
+   margin-inline-*, text-align: start/end) rather than left/right, so a host
+   whose own `dir` is "rtl" (a Hebrew draft, a Hebrew attachment summary)
+   never breaks the layout — only the content direction flips, not this file.
+
+   Was a dark (#10141F) panel — the one piece of injected UI that didn't
+   match the rest of the product, sitting as a persistent dark rectangle over
+   Gmail's own light chrome regardless of what state it was in. Rebuilt on
+   the same light gradient/soft-border/soft-shadow language as the chip and
+   its receipt state. */
 
 .flow-sb-host {
   all: initial;
@@ -29,21 +35,21 @@
   align-self: flex-end;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(180deg, #0F6640, #0B4F32);
-  color: #DFF3E8;
+  background: linear-gradient(180deg, #17a866, #0F6640);
+  color: #fff;
   border-radius: 999px;
   padding: 7px 12px 7px 10px;
   font-weight: 700;
   font-size: 11.5px;
-  box-shadow: 0 1px 0 rgba(255,255,255,.14) inset, 0 8px 18px -10px rgba(15,102,64,.7);
+  box-shadow: 0 1px 0 rgba(255,255,255,.3) inset, 0 8px 18px -10px rgba(15,102,64,.55);
   cursor: default;
 }
 .flow-sb-shield-icon {
   width: 14px;
   height: 14px;
   flex: none;
-  fill: #38D98A;
-  stroke: #38D98A;
+  fill: #DFF3E8;
+  stroke: #DFF3E8;
 }
 .flow-sb-badge-label { white-space: nowrap; }
 
@@ -53,14 +59,15 @@
   inset-block-start: calc(100% + 8px);
   inset-inline-end: 0;
   width: 240px;
-  background: #10141F;
-  color: #C9D0DE;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(240,244,253,.94));
+  color: #3A4560;
   font-family: inherit;
   font-size: 11.5px;
   line-height: 1.5;
   padding: 10px 12px;
   border-radius: 10px;
-  box-shadow: 0 12px 30px -10px rgba(0,0,0,.6);
+  border: 1px solid rgba(40,70,150,.16);
+  box-shadow: 0 12px 30px -10px rgba(20,40,100,.35);
   opacity: 0;
   visibility: hidden;
   transform: translateY(-4px);
@@ -77,22 +84,22 @@
 /* ---- shared section chrome ---------------------------------------------- */
 
 .flow-sb-section {
-  background: #10141F;
-  border: 1px solid rgba(150,166,204,.16);
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(240,244,253,.9));
+  border: 1px solid rgba(40,70,150,.16);
   border-radius: 14px;
   padding: 14px;
-  box-shadow: 0 16px 40px -26px rgba(0,0,0,.7);
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 10px 26px -16px rgba(20,40,100,.35);
 }
 .flow-sb-section-head {
   font-weight: 700;
   font-size: 11px;
   letter-spacing: .08em;
   text-transform: uppercase;
-  color: #8891A4;
+  color: #5B6785;
   margin-block-end: 10px;
 }
-.flow-sb-muted { color: #8891A4; font-size: 12.5px; }
-.flow-sb-error { color: #FF8A80; font-size: 12.5px; margin-block-end: 8px; }
+.flow-sb-muted { color: #5B6785; font-size: 12.5px; }
+.flow-sb-error { color: #B23A26; font-size: 12.5px; margin-block-end: 8px; }
 
 .flow-sb-btn {
   all: initial;
@@ -102,34 +109,33 @@
   font-family: inherit;
   font-size: 12.5px;
   font-weight: 700;
-  color: #C9D0DE;
-  background: rgba(150,166,204,.12);
-  border: 1px solid rgba(150,166,204,.24);
+  color: #16214a;
+  background: rgba(40,70,150,.08);
+  border: 1px solid rgba(40,70,150,.24);
   border-radius: 9px;
   padding: 8px 14px;
   cursor: pointer;
   text-align: center;
 }
-.flow-sb-btn:hover { background: rgba(150,166,204,.2); }
-.flow-sb-btn:focus-visible { outline: 2px solid #93B3FF; outline-offset: 1px; }
+.flow-sb-btn:hover { background: rgba(40,70,150,.14); }
+.flow-sb-btn:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
 
 .flow-sb-btn-primary {
   background: linear-gradient(180deg, #2E63FF, #1A4EF5);
   color: #fff;
   border-color: transparent;
-  box-shadow: 0 1px 0 rgba(255,255,255,.22) inset, 0 8px 20px -10px rgba(26,78,245,.8);
+  box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, 0 8px 20px -10px rgba(26,78,245,.55);
 }
-.flow-sb-btn-primary:hover { filter: brightness(1.07); background: linear-gradient(180deg, #2E63FF, #1A4EF5); }
-.flow-sb-btn-wide { display: flex; width: 100%; white-space: normal; line-height: 1.3; padding-block: 11px; }
+.flow-sb-btn-primary:hover { filter: brightness(1.06); background: linear-gradient(180deg, #2E63FF, #1A4EF5); }
 
 /* ---- Feature 2: Draft-It -------------------------------------------------- */
 
 .flow-sb-draft-text {
-  background: rgba(150,166,204,.08);
-  border: 1px solid rgba(150,166,204,.16);
+  background: rgba(40,70,150,.05);
+  border: 1px solid rgba(40,70,150,.14);
   border-radius: 10px;
   padding: 10px 12px;
-  color: #C9D0DE;
+  color: #16214a;
   font-size: 12.5px;
   white-space: pre-wrap;
   max-height: 220px;
@@ -140,44 +146,6 @@
 .flow-sb-draft-actions { display: flex; gap: 8px; }
 .flow-sb-draft-actions .flow-sb-btn { flex: 1; }
 
-/* ---- Feature 4: Next-Step CRM + doc orchestrator -------------------------- */
-
-.flow-sb-receipt {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  color: #DFF3E8;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.flow-sb-receipt-label { flex: 1 1 auto; min-width: 0; }
-.flow-sb-link {
-  all: initial;
-  font-family: inherit;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #93B3FF;
-  text-decoration: none;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(147,179,255,.3);
-}
-.flow-sb-link:hover { background: rgba(147,179,255,.12); }
-
-.flow-sb-upsell {
-  margin-block-start: 14px;
-  padding-block-start: 14px;
-  border-block-start: 1px dashed rgba(150,166,204,.24);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: start;
-}
-.flow-sb-upsell-text { margin: 0; color: #C9D0DE; font-size: 12px; line-height: 1.55; }
-.flow-sb-upsell .flow-sb-btn-primary { align-self: flex-start; text-decoration: none; padding-inline: 16px; }
-
 /* ---- Feature 3: floating attachment X-ray card ---------------------------- */
 
 .flow-sb-floatcard {
@@ -186,20 +154,20 @@
   z-index: 2147483001;
   width: 280px;
   max-width: calc(100vw - 24px);
-  background: #10141F;
-  color: #C9D0DE;
-  border: 1px solid rgba(150,166,204,.2);
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(240,244,253,.9));
+  color: #16214a;
+  border: 1px solid rgba(40,70,150,.16);
   border-radius: 12px;
   padding: 12px 14px;
   font-family: 'Assistant', system-ui, -apple-system, sans-serif;
   font-size: 12.5px;
   line-height: 1.5;
-  box-shadow: 0 20px 50px -16px rgba(0,0,0,.75);
+  box-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 16px 40px -18px rgba(20,40,100,.4);
   text-align: start;
 }
 .flow-sb-floatcard-summary {
   font-weight: 700;
-  color: #EEF2F9;
+  color: #16214a;
   margin-block-end: 10px;
 }
 .flow-sb-entity-table { display: grid; gap: 6px; }
@@ -207,12 +175,12 @@
   display: flex;
   gap: 10px;
   justify-content: space-between;
-  border-block-start: 1px solid rgba(150,166,204,.14);
+  border-block-start: 1px solid rgba(40,70,150,.12);
   padding-block-start: 6px;
 }
 .flow-sb-entity-row:first-child { border-block-start: 0; padding-block-start: 0; }
-.flow-sb-entity-key { color: #8891A4; flex: none; }
-.flow-sb-entity-val { color: #EEF2F9; text-align: end; overflow-wrap: anywhere; }
+.flow-sb-entity-key { color: #5B6785; flex: none; }
+.flow-sb-entity-val { color: #16214a; text-align: end; overflow-wrap: anywhere; }
 
 @media (max-width: 720px) {
   .flow-sb-host { inset-inline-end: 10px; inset-block-start: 76px; width: 270px; }

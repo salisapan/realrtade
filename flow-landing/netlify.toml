@@ -1,10 +1,28 @@
-# Static, self-contained landing page — no build step.
-# In Netlify, the site's "Base directory" is set to flow-landing, so
-# publishing "." deploys this folder exactly as-is.
+# Static landing page. The only build step packages the Glance extension
+# into the confirmed-signup download. The site's "Base directory" in
+# Netlify is flow-landing, so this command runs here and the script walks
+# up to the repo root for flow-trial-extension/. Publishing "." still
+# deploys this folder as-is. See flow-trial-extension/docs/SETUP.md.
 [build]
-  command = ""
+  command = "python3 ../scripts/package_trial_extension.py"
   publish = "."
   functions = "netlify/functions"
 
 [functions]
   directory = "netlify/functions"
+
+# The handler reads flow-trial-extension.zip via __dirname. The default
+# esbuild bundler does not ship that file, and node_bundler = "none"
+# only ships the handler plus included_files — not the rest of the
+# directory. The path is relative to this folder (the Netlify base).
+[functions."download-trial-zip"]
+  node_bundler = "none"
+  included_files = ["netlify/functions/download-trial-zip/flow-trial-extension.zip"]
+
+# Clean slug for the Glance BragJack trust page. The file stays .html,
+# matching the rest of flow-landing. This rewrite serves it at the
+# extensionless path even if Pretty URLs are off in the Netlify UI.
+[[redirects]]
+  from = "/solutions/browser-ai-agent-extension-hijack"
+  to = "/solutions/browser-ai-agent-extension-hijack.html"
+  status = 200

@@ -2,8 +2,17 @@
 // from the per-message "Do It" chip in content-gmail.js. The chip answers
 // "does this specific message decide something"; the sidebar is where the
 // broader, message-scoped tools live: the Privacy Shield status, the
-// Draft-It box (Feature 2), the attachment X-ray hover card (Feature 3), and
-// the CRM + document orchestrator action (Feature 4).
+// Draft-It box (Feature 2), and the attachment X-ray hover card (Feature 3).
+//
+// There used to be a fourth section here — a second, independent "Do It: Log
+// to CRM & Generate Next Step Document" button (Feature 4) that ran its own
+// separate write to whatever CRM was connected, plus a local .docx download.
+// It duplicated the chip's own write (the chip already logs the message; this
+// ran a second, independent judgment pass and could write a second row for
+// the same email if both were clicked) and its document generation was never
+// more useful than a filled-in receipt. Removed rather than fixed — the chip
+// is the one polished, correct path for "log this," and this panel should
+// only hold things that aren't already covered by it.
 //
 // Bi-directional layout: every section sets its own `dir` from the content
 // it is actually showing (a Hebrew draft renders rtl; the English badge/label
@@ -20,9 +29,6 @@
 
 const FlowSidebar = (() => {
   const HOST_ID = 'flow-sidebar-host';
-  // Off until the upsell has a calmer placement — see the comment at its
-  // one call site below for why it's paused rather than deleted.
-  const UPSELL_ENABLED = false;
   let host = null;
   let els = {};
 
@@ -80,12 +86,8 @@ const FlowSidebar = (() => {
     draftSection.hidden = true;
     host.appendChild(draftSection);
 
-    const nextStepSection = el('div', 'flow-sb-section flow-sb-nextstep');
-    nextStepSection.hidden = true;
-    host.appendChild(nextStepSection);
-
     document.body.appendChild(host);
-    els = { host, badge, draftSection, nextStepSection };
+    els = { host, badge, draftSection };
     return host;
   }
 
@@ -154,83 +156,6 @@ const FlowSidebar = (() => {
     if (els.draftSection) { els.draftSection.hidden = true; els.draftSection.replaceChildren(); }
   }
 
-  // ---- Feature 4: Next-Step CRM + Document orchestrator -------------------
-
-  // state: 'idle' | 'working' | 'done' | 'error'
-  function renderNextStep(state, opts) {
-    if (!els.nextStepSection) return;
-    opts = opts || {};
-    els.nextStepSection.hidden = false;
-    els.nextStepSection.replaceChildren();
-
-    if (state === 'idle') {
-      const btn = el('button', 'flow-sb-btn flow-sb-btn-primary flow-sb-btn-wide',
-        'Do It: Log to ' + (opts.connectorLabel || 'CRM') + ' & Generate Next Step Document');
-      btn.type = 'button';
-      btn.addEventListener('click', () => opts.onRun && opts.onRun());
-      els.nextStepSection.appendChild(btn);
-      return;
-    }
-
-    if (state === 'working') {
-      els.nextStepSection.appendChild(el('div', 'flow-sb-muted', 'Logging and generating your document…'));
-      return;
-    }
-
-    if (state === 'error') {
-      els.nextStepSection.appendChild(el('div', 'flow-sb-error', opts.message || 'Something went wrong.'));
-      const retry = el('button', 'flow-sb-btn', 'Try again');
-      retry.type = 'button';
-      retry.addEventListener('click', () => opts.onRun && opts.onRun());
-      els.nextStepSection.appendChild(retry);
-      return;
-    }
-
-    if (state === 'done') {
-      const receipt = el('div', 'flow-sb-receipt');
-      receipt.appendChild(el('span', 'flow-sb-receipt-label', 'Logged to ' + (opts.where || 'CRM') + ' · document downloaded'));
-      if (opts.url) {
-        const view = el('a', 'flow-sb-link', 'View record');
-        view.href = opts.url; view.target = '_blank'; view.rel = 'noopener';
-        receipt.appendChild(view);
-      }
-      if (opts.onUndo) {
-        const undo = el('button', 'flow-sb-link', 'Undo');
-        undo.type = 'button';
-        undo.addEventListener('click', opts.onUndo);
-        receipt.appendChild(undo);
-      }
-      els.nextStepSection.appendChild(receipt);
-
-      // The Flow upsell (Feature 4 §3) is disabled for now — see
-      // UPSELL_ENABLED below. Firing a sales pitch in the same breath as
-      // "here's your record" contradicts the product's own quiet-by-design
-      // promise (docs/product-architecture.md §1.7: "not a notifier — going
-      // quiet is the system working correctly") and reads as a bait-and-
-      // switch the moment someone is watching the success state, not
-      // reading the popup later. Revisit with a calmer placement (the
-      // popup's own activity log, not an inline pitch after every write)
-      // before turning this back on.
-      if (UPSELL_ENABLED) {
-        const upsell = el('div', 'flow-sb-upsell');
-        upsell.setAttribute('dir', isRTLText(opts.upsellLocale) ? 'rtl' : 'ltr');
-        upsell.appendChild(el('p', 'flow-sb-upsell-text',
-          'Glance successfully updated ' + (opts.where || 'your CRM') + ' and generated your next-step document in 1 click! ' +
-          'Want this entire loop automated in the background across your desktop legacy apps without clicking “Do It” every time?'));
-        const apply = el('a', 'flow-sb-btn flow-sb-btn-primary', 'Apply for Flow Pilot Program');
-        apply.href = 'https://theflow-ai.com/contact.html?ref=glance_nextstep_upsell';
-        apply.target = '_blank';
-        apply.rel = 'noopener';
-        upsell.appendChild(apply);
-        els.nextStepSection.appendChild(upsell);
-      }
-    }
-  }
-
-  function hideNextStep() {
-    if (els.nextStepSection) { els.nextStepSection.hidden = true; els.nextStepSection.replaceChildren(); }
-  }
-
   // ---- Feature 3: floating attachment hover card ---------------------------
   // Not part of the fixed sidebar panel — it has to track the pointer's own
   // position over an attachment chip, which is a different placement problem
@@ -287,7 +212,6 @@ const FlowSidebar = (() => {
   return {
     mount, unmount,
     renderDraft, hideDraft,
-    renderNextStep, hideNextStep,
     showFloatingCard, hideFloatingCard,
     isRTLText
   };

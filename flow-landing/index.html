@@ -64,6 +64,7 @@
      start alongside the stylesheet instead of waiting for CSS to parse and the
      <img> to be discovered, which is the whole gap between first paint and LCP. -->
 <link rel="preload" as="image" href="/logo.png" fetchpriority="high">
+<link rel="stylesheet" href="/assets/fonts.css">
 <link rel="stylesheet" href="/assets/home.css">
 
 <div class="progress" id="progress" aria-hidden="true"></div>
@@ -121,7 +122,7 @@
       <img class="hero-logo reveal in" src="/logo.png" width="880" height="388" alt="Flow — Cognitive Workflow Engine">
       <div class="eyebrow reveal in" data-d="1" style="margin-bottom:16px" data-i18n="hero.eyebrow">FOR TEAMS WITH SENSITIVE DATA</div>
       <h1 class="reveal in" data-d="1" data-i18n="hero.h1">Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span></h1>
-      <p class="lead reveal in" data-d="2" data-i18n="hero.sub">When a deal closes, a contract is signed, or a case is approved, Flow updates your files and the rest of your stack automatically — no rules to write. Sensitive data is masked before anything is processed, and high-risk steps wait for your approval.</p>
+      <p class="lead reveal in" data-d="2" data-i18n="hero.sub">When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve — no rules to write. Sensitive data is masked before anything is processed.</p>
       <div class="hero-cta reveal in" data-d="3">
         <span class="magnetic"><a class="doit lg breathe" href="#waitlist" data-ga="hero_doit"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Do It</span></a></span>
       </div>
@@ -479,7 +480,7 @@ Best,
     'foot.contact':{en:'Contact',he:'צור קשר'},
     'hero.eyebrow':{en:'FOR TEAMS WITH SENSITIVE DATA',he:'לצוותים עם מידע רגיש'},
     'hero.h1':{en:'Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span>',he:'ביצוע אוטונומי.<br><span class="chrome-text">בתנאים שלכם.</span>'},
-    'hero.sub':{en:'When a deal closes, a contract is signed, or a case is approved, Flow updates your files and the rest of your stack automatically — no rules to write. Sensitive data is masked before anything is processed, and high-risk steps wait for your approval.',he:'כשעסקה נסגרת, חוזה נחתם או תיק מאושר, Flow מעדכן את הקבצים ואת שאר המערכות שלכם אוטומטית — בלי חוקים לכתוב. מידע רגיש ממוסך לפני כל עיבוד, ופעולות בסיכון גבוה ממתינות לאישור שלכם.'},
+    'hero.sub':{en:'When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve — no rules to write. Sensitive data is masked before anything is processed.',he:'כשעסקה נסגרת, חוזה נחתם או תיק מאושר, Flow מציע את העדכון לקבצים ולשאר המערכות שלכם, וכותב אותו ברגע שתאשרו — בלי חוקים לכתוב. מידע רגיש ממוסך לפני כל עיבוד.'},
     'hero.cta1':{en:'Do It',he:'עשו את זה'},
     'hero.cta3':{en:'See how it works',he:'איך זה עובד'},
     'nav.cta':{en:'Do It',he:'עשו את זה'},

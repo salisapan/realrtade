@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Deploy AI automation under HIPAA: masked processing or fully local Flow-Edge, audit logging, and human approval gates for clinical and administrative workflows.">
+<meta name="description" content="AI automation under HIPAA with human approval gates for clinical and administrative workflows. Fully local Flow-Edge and audit logging are a deployment offer (roadmap / בפריסה), not live today.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/solutions/healthcare.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -15,29 +15,28 @@
 <title>AI Workflow Automation for Healthcare — Flow</title>
 <meta property="og:type" content="website">
 <meta property="og:title" content="AI Workflow Automation for Healthcare — Flow">
-<meta property="og:description" content="Deploy AI automation under HIPAA: masked processing or fully local Flow-Edge, audit logging, and human approval gates for clinical and administrative workflows.">
+<meta property="og:description" content="AI automation under HIPAA with human approval gates for clinical and administrative workflows. Fully local Flow-Edge and audit logging are a deployment offer (roadmap / בפריסה), not live today.">
 <meta property="og:url" content="https://theflow-ai.com/solutions/healthcare.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="AI Workflow Automation for Healthcare — Flow">
-<meta name="twitter:description" content="Deploy AI automation under HIPAA: masked processing or fully local Flow-Edge, audit logging, and human approval gates for clinical and administrative workflows.">
+<meta name="twitter:description" content="AI automation under HIPAA with human approval gates for clinical and administrative workflows. Fully local Flow-Edge and audit logging are a deployment offer (roadmap / בפריסה), not live today.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Healthcare","item":"https://theflow-ai.com/solutions/healthcare.html"}]}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts.css">
 <style>
 
 :root{
   --bg:#FFFFFF; --bg2:#F5F9FF; --panel:#F7FAFF; --line:rgba(20,44,100,.12);
-  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3B74FF;
+  --txt:#242B3D; --txt-hi:#0A0E18; --muted:#5B6478; --accent:#2452D9; --accent-2:#3568E5;
   --navy:#07090F; --cat:#1A4EF5;
   --sans:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --disp:'Rubik',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   --serif:'Assistant',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
 }
 :root[data-theme="dark"]{
+  --cat:#6E9BFF;
   --bg:#07090F; --bg2:#0A0E18; --panel:#0E1322; --line:rgba(150,166,204,.16);
   --txt:#C9D0DE; --txt-hi:#EEF2F9; --muted:#8891A4; --accent:#3B74FF; --accent-2:#6E9BFF;
 }
@@ -75,7 +74,11 @@ article a{color:var(--accent-2)}
 footer.site{margin-top:60px; padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--muted); font-size:.86rem}
 footer.site a{color:var(--muted)}
 
-.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--cat); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+/* A focus affordance has to be unmistakable in both themes, so it carries
+   its own pair rather than riding --cat — which is tuned for TEXT colour
+   and, once given a readable dark-theme value, left white-on-blue here at
+   2.69:1. This pair measures 8.1:1 either way. */
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 .lead{font-size:1.16rem; color:var(--txt); margin:0 0 26px}
 .cards{display:grid; gap:16px; margin:26px 0 32px}
@@ -144,16 +147,17 @@ footer.site a{color:var(--muted)}
     <h1 class="title">AI automation for healthcare.</h1>
     
     <article>
-<p class="lead">PHI does not get to leave the boundary because a vendor's roadmap says so. Flow deploys in a masked secure cloud &mdash; or entirely inside your own infrastructure &mdash; so automation is possible without renegotiating your HIPAA posture.</p>
+<p class="note">Flow is in pre-release. Flow-Edge and the audit trail are part of the deployment offer (roadmap / בפריסה) &mdash; not capabilities marked live today. For status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
+<p class="lead">PHI does not get to leave the boundary because a vendor's future plan says so. Masked secure cloud and fully local deployment are paths designed into the engagement (roadmap / בפריסה) &mdash; not live toggles today.</p>
 
 <h2>The constraint</h2>
 <p>Healthcare organizations are not short of automatable work: prior authorization packets, referral intake, claims correspondence, chart summarization for administrative review, cross-state licensure checks in telehealth. What they are short of is a way to automate any of it without routing protected health information through a system whose retention and subprocessor behavior cannot be fully accounted for in a BAA.</p>
 
 <h2>How Flow addresses it</h2>
 <ul>
-<li><b>Fully local deployment.</b> With Flow-Edge, PHI never crosses your network boundary. This is the deployment model for organizations whose policy simply prohibits external processing.</li>
-<li><b>Masking before processing.</b> In the cloud model, identifiers are detected and masked before any data is processed.</li>
-<li><b>Append-only audit trail.</b> Every observation, proposal, approval, and execution is recorded &mdash; the evidence base for an OCR inquiry or an internal investigation.</li>
+<li><b>Fully local deployment (Flow-Edge) &mdash; roadmap / בפריסה.</b> When policy requires that PHI not leave the network, this is the deployment path designed into the engagement &mdash; not a live cloud toggle today. It is the path for organizations whose policy prohibits external processing.</li>
+<li><b>Masking before processing &mdash; roadmap / בפריסה.</b> In the masked-cloud model, identifiers are designed to be detected and masked before processing. Deployment status is closed in the engagement, not a live toggle today.</li>
+<li><b>Immutable audit trail &mdash; roadmap / בפריסה.</b> For regulated deployments, an append-only log is planned: what was observed, what was proposed, who approved it, and what was executed. Not a live product toggle today; closed in the engagement. That record is the evidence base an OCR inquiry or an internal investigation would need.</li>
 <li><b>Human approval on high-risk actions.</b> Clinical and billing consequences do not get automated away silently.</li>
 </ul>
 

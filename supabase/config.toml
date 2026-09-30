@@ -1,1 +1,20 @@
-project_id = "nlvljclvoguvrnntwufu"
+# Glance / Flow landing database (theflow-ai.com).
+#
+# Remote project ref: zjquktirlrhbqcnkfaok
+# API URL the Netlify functions call:
+#   https://zjquktirlrhbqcnkfaok.supabase.co
+#
+# This file used to name nlvljclvoguvrnntwufu. That ref is RealTrade, a
+# different product. Do not link this directory to it and do not push
+# these migrations there.
+#
+# `project_id` is the remote ref this directory belongs to. The Supabase
+# CLI does not read it as the link target by itself. Before `supabase db push`:
+#
+#   supabase link --project-ref zjquktirlrhbqcnkfaok
+#
+# Confirm the dashboard URL contains zjquktirlrhbqcnkfaok, then push.
+# See supabase/README.md for the SQL-editor alternative and the Netlify
+# env vars the lead path needs. No secrets belong in this file.
+
+project_id = "zjquktirlrhbqcnkfaok"

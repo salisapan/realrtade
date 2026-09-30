@@ -7,6 +7,34 @@
 > Flow's security/compliance guarantees, or make Flow look like a
 > self-serve download — stop and ask before shipping it.
 
+## 0a. Current shipping scope (read this before trusting anything below)
+
+> Added after an audit found this document describing a product the code no
+> longer matches — and, because this file is the hard constraint, watched
+> that error propagate into `trial.html`, `pricing.html` and `terms.html`.
+> Where this section and the detail below disagree, **this section wins**;
+> the rest describes the intended full shape, not what ships today.
+
+Verified in code (`flow-trial-extension/core/connectors.js`, `flow-trial-extension/popup/popup.js`, `flow-trial-extension/manifest.json`):
+
+| | Described below | Actually ships today |
+|---|---|---|
+| Connectors reachable in setup | five (Notion, HubSpot, Salesforce, Slack, Monday.com) | **one** — Google. `connectors.js` marks exactly one entry `mvp: true`; `popup.js` renders only `mvp` connectors. The other five still have working write paths in `background.js`, but no UI reaches them. |
+| Where a Do It lands | the one connector the user chose | **Google Calendar, Google Tasks, or a Gmail draft** — and the user does not choose: `actions.js`'s process model picks per message. |
+| Setup questions | two ("where may it write", "what work do you do") | **one** — sign in with Google. `popup.js` deliberately leaves `domainId` unset; `judgment.js` falls back to the sales vocabulary. |
+| Sensitivity | — | not a setup input. It self-adjusts from clicks and dismissals; the popup only displays where it landed. |
+| Notion | "works today" | code path works; unreachable from onboarding. |
+
+Two consequences that bind future work:
+
+1. **`manifest.json`'s `host_permissions` match the reachable set, not the
+   code.** Re-enabling any dormant connector in onboarding means restoring
+   its API host in the same change, or its writes fail on a permission error.
+2. **Any copy naming a destination must name the Google three**, until that
+   changes here first.
+
+---
+
 ## 0. One engine, two products, three offerings
 
 Every offering runs the same underlying idea: **watch a moment, recognize
@@ -215,8 +243,9 @@ be redirected to offering #3, not sold Pro with an asterisk.
 
 ### 2.4 Status
 
-Not yet built. `pricing.html`'s `Notify Me` button is a `mailto:` link,
-not a checkout — there is no Stripe integration yet, and the specific
+Not yet built. `pricing.html`'s `Notify Me` button is a real double
+opt-in waitlist form (Supabase + `send-confirmation`), not a checkout —
+there is no Stripe integration yet, and the specific
 feature set above is a proposal, not a committed spec, pending the
 product owner's sign-off on which of these ship first.
 
@@ -346,3 +375,150 @@ look at a `$14/mo` Pro price and conclude that is what they are buying.
 Never let Trial/Pro copy imply security or compliance guarantees it
 doesn't have; never let Flow (core) read as "the same download, just
 bigger."
+
+---
+
+## 5. Playing Field Definition
+
+> Added by the product owner, 2026-09-18. Version 1.0. This section is the
+> strategic frame everything above sits inside: §§0-4 describe *what* the
+> three offerings are and how they're priced and deployed; this section
+> defines *why* — the specific, narrow game being played, and the hard
+> boundaries that keep the product from drifting into a different one. Like
+> §4's rule, this is a hard constraint on future feature and copy work, not
+> a style note. Its own internal numbering (5.1-5.9) is scoped to this
+> section only and does not renumber §§1-4 above, which other documents
+> (`CLAUDE.md`) reference directly by number.
+
+### 5.1 The Game We Are Playing
+
+We are not building:
+- Another AI email assistant
+- Another chatbot
+- Another general-purpose agent
+- Another legal research tool
+- Another productivity dashboard
+
+We are building:
+
+> **The most reliable system in the world at turning human intention into closed execution — silently, precisely, and with almost zero user effort.**
+
+Core principle (non-negotiable):
+
+**"You intend — we execute."**
+
+The user should feel that important things simply get closed, not that they received helpful suggestions.
+
+### 5.2 What "Winning" Looks Like
+
+We win when users experience the following:
+
+- They stop worrying about things falling through the cracks.
+- They develop a daily habit of trusting the system to surface and close open loops.
+- The system becomes more useful the longer they use it (personal Execution Memory).
+- They feel the product is private, precise, and respectful of their attention.
+- Clicking "Do It" feels like resolution, not like creating more work.
+
+We lose when:
+- The product becomes noisy.
+- The product requires management.
+- The product makes confident mistakes.
+- The product feels like "just another AI helper".
+
+### 5.3 Hard Boundaries (What We Explicitly Reject)
+
+**We will NOT compete on:**
+- General intelligence or frontier model performance
+- Legal research depth or case law analysis
+- Writing quality or long-form generation
+- Broad computer-use / full desktop control
+- Building a new email client
+- Heavy configuration or rule builders
+- Chat interfaces as the primary interaction
+
+**We will NOT prioritize:**
+- High recall at the expense of precision
+- Features that require the user to prompt or manage the system
+- Expanding to many platforms before mastering one deeply
+- Network effects that compromise privacy
+
+### 5.4 The Core Playing Field (Where We Must Be Best-in-Class)
+
+We must be the clear leader in the following combination:
+
+| Dimension                    | Our Standard                                      | Why It Matters |
+|-----------------------------|---------------------------------------------------|----------------|
+| **Precision**               | Prefer silence over a wrong action                | Trust is everything |
+| **Zero-Prompt UX**          | Silent by default. Appears only when relevant     | Attention is sacred |
+| **Process-level execution** | Closes short, meaningful loops — not single tasks | Real value |
+| **Local-first judgment**    | Core decisioning happens on-device when possible  | Privacy + speed + trust |
+| **Personal Execution Memory** | Learns how *this* user closes things             | Compounding advantage |
+| **Reversibility**           | Every action is undoable                          | Reduces fear of automation |
+| **Proactive closing**       | Surfaces unclosed intentions (Morning Brief etc.) | Creates habit & stickiness |
+
+This combination is our moat.
+No single feature is the moat — the tight integration of all of them is.
+
+### 5.5 Strategic Positioning
+
+**Against big labs (OpenAI, Anthropic, Google):**
+They win on general capability and research.
+We win on reliable, narrow, high-stakes execution of professional intentions with extreme respect for the user's attention and privacy.
+
+**Against email assistants (Superhuman, Shortwave, alfred_, Lindy, etc.):**
+Most of them help the user process email faster or draft better.
+We aim to make large parts of the follow-through disappear.
+
+**Against RPA / traditional automation:**
+They are brittle and require setup.
+We aim for intention-driven, adaptive, low-setup execution.
+
+### 5.6 Product North Star Metrics
+
+We measure success by:
+
+1. **Closure Rate** — % of detected intentions that reach a closed state
+2. **Trust Rate** — % of Do It actions that are not undone
+3. **Return Habit** — How often users engage with proactive surfaces (Morning Brief etc.)
+4. **Silence Quality** — How rarely we show something the user dismisses
+5. **Learning Usefulness** — Whether Execution Memory improves future suggestions
+
+Vanity metrics (raw number of actions suggested, model size, number of integrations) are secondary.
+
+### 5.7 Expansion Rules
+
+We expand only when the core is strong:
+
+1. First: Become excellent at closing intentions inside Gmail + Google ecosystem.
+2. Then: Add sticky proactive layers (Morning Brief + habit loops).
+3. Then: Make Execution Memory visible and valuable.
+4. Then: Expand to Outlook (critical for enterprise verticals).
+5. Only later: Deeper vertical intelligence or team-level network effects.
+
+Never expand horizontally before the core loop is clearly winning on precision + stickiness.
+
+### 5.8 Decision Filter (Use on Every Feature)
+
+Before building anything, ask:
+
+1. Does this move us closer to "You intend — we execute"?
+2. Does it increase the user's feeling that things get closed?
+3. Does it protect or improve precision and silence?
+4. Does it respect Zero-Prompt principles?
+5. Does it create compounding value over time (memory, habit, trust)?
+
+For the detailed, code-grounded version of this same filter — useful when
+an answer above is genuinely ambiguous, or a "no" needs explaining rather
+than just asserting — see `docs/decision-filter.md`.
+
+If the answer to most of these is "no" — do not build it.
+
+### 5.9 Final Statement
+
+We are not trying to be the smartest AI.
+We are trying to be the most trustworthy system at turning intention into reality with almost no friction.
+
+That is a hard, narrow, and valuable game.
+If we become the best in the world at this specific game, we have a path to a category-defining company.
+
+Everything else is noise.

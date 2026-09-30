@@ -1,25 +1,35 @@
-// Masked-LLM backend for the Glance Chrome extension's Draft-It (Feature 2)
-// and Attachment X-ray (Feature 3) sidebar tools.
+// Masked-LLM backend for the Glance Chrome extension: Draft-It (Feature 2),
+// Attachment X-ray (Feature 3), and — since this file's 'classify' action
+// was added — a remote fallback for the passive "Do It" chip's own local
+// classifier when it finds nothing.
 //
-// The extension's src/privacyShield.js masks names, companies, monetary
+// The extension's core/privacyShield.js masks names, companies, monetary
 // amounts, and dates BEFORE any text reaches this function — this function
 // (and the model it calls) only ever sees placeholder tokens like
 // [CLIENT_NAME_1], never the real values. The token <-> real-value map never
 // leaves the browser tab that built it, so a real name/amount/date is never
 // reconstructed anywhere but the user's own device: this function receives
-// masked text, the model drafts a reply or summary using the same masked
-// tokens, and the extension's privacyShield.unmask() substitutes real values
-// back in locally, after the round trip, using a map only it holds.
+// masked text, the model drafts a reply, summary, or classification using
+// the same masked tokens, and the extension's privacyShield.unmask()
+// substitutes real values back in locally, after the round trip, using a
+// map only it holds.
 //
-// This is a deliberate, visible change to how this product describes itself:
-// judgment.js and extract.js (the free, always-on part of the extension)
-// still send nothing anywhere. This function is opt-in — the Draft-It and
-// attachment-preview buttons in the sidebar, not the passive "Do It" chip —
-// and even then, only ever sees masked placeholders, never raw PII. Anthropic
-// (api.anthropic.com) is the only third party this data reaches; see the
-// project's README for how this is described to users.
+// judgment.js and extract.js (the free, always-on local classifier) still
+// send nothing anywhere for every message they can classify on their own —
+// most English business email. This function is what the passive chip
+// reaches for only when that local pass returns no classification at all
+// (see content-gmail.js's ensureRemoteClassification), not on every
+// message. Even then it only ever sees masked placeholders, never raw PII.
+// model-router.js picks the provider per action (Anthropic, xAI, Gemini;
+// OpenAI mini only as Gemini's stand-in for summaries) and masks again
+// before every call. Classify stays on Sonnet then Grok; it is never sent
+// to Gemini or OpenAI. Unlike Flow (built for organizations handling
+// regulated, sensitive data, where content never leaving the device is a
+// hard guarantee), Glance has never made that same promise — this masked
+// round trip is the deliberate, disclosed boundary for what it does send,
+// not a departure from an existing one.
 //
-// Deliberately raw `fetch()` rather than @anthropic-ai/sdk: every function in
+// Deliberately raw `fetch()` rather than a provider SDK: every function in
 // this directory (see package.json — "type": "commonjs", zero dependencies)
 // is intentionally dependency-free so Netlify's per-function bundling never
 // needs a build step. Introducing the first npm dependency this directory
@@ -28,15 +38,8 @@
 // to add a build step for.
 
 const crypto = require('crypto');
+const { callRoutedLlm, silenceResult } = require('./model-router.js');
 
-const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
-const ANTHROPIC_VERSION = '2023-06-01';
-// TODO(owner): pick the model this feature should actually run in production.
-// claude-opus-5 is used here as the safe, most-capable default; for a
-// synchronous, click-and-wait sidebar action, a faster/cheaper model
-// (e.g. a Sonnet-tier model) may be the better tradeoff once this is live —
-// swap the string below, nothing else in this file depends on which model it is.
-const MODEL = 'claude-opus-5';
 const LOG_PREFIX = '[glance-assist]';
 
 const LIMITS = { threadEntry: 6000, entries: 4, attachmentText: 20000 };
@@ -55,52 +58,6 @@ function rateLimited(key, now) {
 
 function clean(value, max) {
   return String(value == null ? '' : value).trim().slice(0, max);
-}
-
-async function callClaude(system, userText, maxTokens) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    const err = new Error('ANTHROPIC_API_KEY not configured');
-    err.configMissing = true;
-    throw err;
-  }
-
-  const res = await fetch(ANTHROPIC_API, {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'anthropic-version': ANTHROPIC_VERSION,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      // Low effort: this drafts a short reply or summarizes one attachment
-      // from already-masked, already-extracted text — not a multi-step
-      // reasoning task — and it backs a synchronous "wait for it" sidebar
-      // action where latency matters more than depth here.
-      output_config: { effort: 'low' },
-      system,
-      messages: [{ role: 'user', content: userText }]
-    })
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    const err = new Error('Anthropic API error ' + res.status + (detail ? ': ' + detail.slice(0, 300) : ''));
-    err.status = res.status;
-    throw err;
-  }
-
-  const data = await res.json();
-  if (data.stop_reason === 'refusal') {
-    const err = new Error('The model declined to complete this request.');
-    err.refusal = true;
-    throw err;
-  }
-  const textBlock = (data.content || []).find((b) => b.type === 'text');
-  if (!textBlock) throw new Error('No text in model response');
-  return textBlock.text.trim();
 }
 
 // ---- Feature 2: Draft-It ---------------------------------------------------
@@ -145,8 +102,8 @@ async function draftReply(payload) {
     .join('\n\n');
 
   const system = lang === 'he' ? DRAFT_SYSTEM_HE : DRAFT_SYSTEM_EN;
-  const draftText = await callClaude(system, threadText, 1200);
-  return { draftText };
+  const out = await callRoutedLlm({ action: 'draft-reply', system, userText: threadText, maxTokens: 1200 });
+  return { draftText: out.text, route: out.route };
 }
 
 // ---- Feature 3: attachment summarization -----------------------------------
@@ -173,8 +130,20 @@ async function summarizeAttachment(payload) {
   const text = clean(payload.maskedText, LIMITS.attachmentText);
   if (!text) throw badRequest('No attachment text provided.');
 
-  const raw = await callClaude(SUMMARY_SYSTEM, text, 500);
-  const parsed = safeParseJson(raw);
+  // A response that is not the summary JSON is not a summary. The router
+  // tries the next provider; if none produce one, this throws 502 rather
+  // than returning the attachment text or a sentence we made up.
+  const out = await callRoutedLlm({
+    action: 'summarize-attachment',
+    system: SUMMARY_SYSTEM,
+    userText: text,
+    maxTokens: 500,
+    accept: (raw) => {
+      const parsed = safeParseJson(raw);
+      return Boolean(parsed && typeof parsed.summary === 'string' && parsed.summary.trim());
+    }
+  });
+  const parsed = safeParseJson(out.text);
   if (!parsed || typeof parsed.summary !== 'string') {
     const err = new Error('Could not parse a summary from the model response.');
     err.status = 502;
@@ -187,7 +156,91 @@ async function summarizeAttachment(payload) {
     ['Financial Value', e.financialValue || '—'],
     ['Governing Law', e.governingLaw || '—']
   ];
-  return { summary: parsed.summary, entities };
+  return { summary: parsed.summary, entities, route: out.route };
+}
+
+// ---- Feature 0: remote classification fallback -----------------------------
+//
+// core/judgment.js + core/intent.js are the free, always-on, fully local
+// path — a fixed regex/keyword corpus, not real language understanding. It
+// stays the default for every message (no network call, no latency, no
+// cost) because most English business email already clears it reliably.
+// This action exists for the messages it can't reach: content-gmail.js
+// calls it only as a fallback, when the local classifier returns
+// { type: null } and did not choose silence (a quiet reason, a low score,
+// a Drive close that stayed quiet). The router runs that same local pass
+// again and will not send a quiet message to a model. Masked text only —
+// same privacy contract as
+// Draft-It and attachment summarization above, not a new one. Glance (unlike
+// Flow) has never promised email content stays on-device end to end; this
+// is that boundary made concrete rather than assumed.
+const CLASSIFY_TYPES = ['request', 'commitment', 'event', 'decision', 'followup', null];
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// {today} is substituted per-request — see classify() below. Without an
+// anchor date, "next Tuesday" / "עד יום שלישי הבא" has no fixed point to
+// resolve against, and the model has no other way to know what day it is.
+const CLASSIFY_SYSTEM_TEMPLATE =
+  'Today\'s date is {today} (YYYY-MM-DD). You classify a single business email into ' +
+  'exactly one decision type, or none. ' +
+  'You will be given text with sensitive entities already replaced by placeholder ' +
+  'tokens like [CLIENT_NAME_1], [COMPANY_A], [CURRENCY_VAL_1], [DATE_1], [EMAIL_1], [PHONE_1]. ' +
+  'Respond with ONLY a JSON object, no other text, shaped exactly like: ' +
+  '{"type": "request"|"commitment"|"event"|"decision"|"followup"|null, ' +
+  '"who": "...", "what": "...", "when": "...", "dateIso": "YYYY-MM-DD or empty string", ' +
+  '"amount": "...", "requestWhat": "..."}. ' +
+  'Definitions: "request" = someone is asking the reader to do something specific. ' +
+  '"commitment" = the reader themselves committed to doing something. ' +
+  '"event" = a specific meeting or scheduled event is being set or confirmed. ' +
+  '"decision" = a decision, agreement, or figure was confirmed and should be logged. ' +
+  '"followup" = a follow-up action is needed but does not fit the other four. ' +
+  'Use null only when the email is informational, automated, a newsletter, a cold ' +
+  'pitch, or otherwise does not call for any of the above. ' +
+  '"when" is the date/deadline as the email itself phrases it (e.g. "next Tuesday", ' +
+  '"עד יום שלישי"); "dateIso" is that same date resolved against today\'s date above, ' +
+  'in YYYY-MM-DD form — empty string if the email states no date at all. ' +
+  'Use the placeholder tokens verbatim wherever a real entity would appear in who/what/' +
+  'requestWhat/amount — never invent a name, amount, date, or detail the email does not ' +
+  'state. Use an empty string for any field the email does not give you.';
+
+function safeParseClassification(text) {
+  const parsed = safeParseJson(text);
+  if (!parsed || typeof parsed !== 'object') return null;
+  if (!CLASSIFY_TYPES.includes(parsed.type)) return null;
+  const dateIso = clean(parsed.dateIso, 10);
+  return {
+    type: parsed.type,
+    who: clean(parsed.who, 200),
+    what: clean(parsed.what, 500),
+    when: clean(parsed.when, 100),
+    dateIso: ISO_DATE_RE.test(dateIso) ? dateIso : null,
+    amount: clean(parsed.amount, 100),
+    requestWhat: clean(parsed.requestWhat, 300)
+  };
+}
+
+async function classify(payload) {
+  const lang = payload.lang === 'he' ? 'he' : 'en';
+  const text = clean(payload.maskedText, LIMITS.threadEntry);
+  if (!text) throw badRequest('No message text provided.');
+
+  const today = new Date().toISOString().slice(0, 10);
+  const system = CLASSIFY_SYSTEM_TEMPLATE.replace('{today}', today);
+  // judgeText is the message alone. The router runs local judgment on it
+  // before any provider: a quiet decision comes back { type: null } and
+  // Sonnet is not asked to overturn it. A miss that no provider can parse
+  // is the same silence — never a type we invented to fill the gap.
+  const out = await callRoutedLlm({
+    action: 'classify',
+    system,
+    judgeText: text,
+    userText: (lang === 'he' ? '[Hebrew email]\n' : '') + text,
+    maxTokens: 300,
+    accept: (raw) => safeParseClassification(raw) !== null
+  });
+  if (out.silence || out.local) return { result: out.result, route: out.route || null };
+  const result = safeParseClassification(out.text);
+  return { result: result || silenceResult(), route: out.route || null };
 }
 
 function badRequest(message) {
@@ -223,22 +276,27 @@ exports.handler = async function (event) {
   try {
     if (action === 'draft-reply') {
       const result = await draftReply(payload);
-      log('draft generated', { entries: (payload.entries || []).length, lang: payload.lang });
+      log('draft generated', { entries: (payload.entries || []).length, lang: payload.lang, provider: result.route && result.route.provider, model: result.route && result.route.model });
       return { statusCode: 200, body: JSON.stringify({ ok: true, draftText: result.draftText }) };
     }
     if (action === 'summarize-attachment') {
       const result = await summarizeAttachment(payload);
-      log('attachment summarized');
+      log('attachment summarized', { provider: result.route && result.route.provider, model: result.route && result.route.model });
       return { statusCode: 200, body: JSON.stringify({ ok: true, summary: result.summary, entities: result.entities }) };
+    }
+    if (action === 'classify') {
+      const result = await classify(payload);
+      log('classified', { lang: payload.lang, type: result.result.type, provider: result.route && result.route.provider, model: result.route && result.route.model });
+      return { statusCode: 200, body: JSON.stringify({ ok: true, result: result.result }) };
     }
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid action' }) };
   } catch (err) {
     if (err.configMissing) {
-      logErr('ANTHROPIC_API_KEY not configured');
+      logErr('no LLM provider configured');
       return { statusCode: 500, body: JSON.stringify({ error: 'This feature is not configured yet. Please email hello@theflow-ai.com.' }) };
     }
-    if (err.refusal) {
-      logErr('model refused');
+    if (err.pii || err.refusal) {
+      logErr(err.pii ? 'blocked unmasked contact details' : 'model refused');
       return { statusCode: 422, body: JSON.stringify({ error: 'Could not complete that request.' }) };
     }
     logErr(action + ' failed', String(err.message || err));

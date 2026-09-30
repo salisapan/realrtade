@@ -25,9 +25,7 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Glance","item":"https://theflow-ai.com/trial.html"},{"@type":"ListItem","position":3,"name":"Inbox Scan","item":"https://theflow-ai.com/missed-deadline.html"}]}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Inbox Scan by Glance","url":"https://theflow-ai.com/missed-deadline.html","applicationCategory":"BusinessApplication","operatingSystem":"Any","browserRequirements":"Requires JavaScript","description":"A free browser-only tool that runs the Glance judgment engine on an email you paste, showing which decisions it would have caught and filed. The analysis runs entirely on the visitor's device; no email text is transmitted.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700;800&family=Assistant:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/fonts.css">
 <style>
 /* ================================================================
    Tokens — copied verbatim from trial.html so this page's surfaces,
@@ -39,7 +37,7 @@
    ================================================================ */
 :root{
   --bg:#FFFFFF; --surface:#FFFFFF; --surface-2:#F3F6FC; --surface-3:#EAEFFA;
-  --ink:#0B0F1A; --ink-2:#454E63; --ink-3:#7B8398;
+  --ink:#0B0F1A; --ink-2:#454E63; --ink-3:#666C7E;
   --line:rgba(20,44,100,.11); --line-2:rgba(20,44,100,.20);
   --accent:#1A4EF5; --accent-ink:#0F37C6; --accent-wash:#EAF0FF;
   --ok:#166B44; --ok-wash:#E3F3EA;
@@ -67,7 +65,7 @@
 }
 :root[data-theme="dark"]{
   --bg:#07090F; --surface:#10141D; --surface-2:#141924; --surface-3:#1A2130;
-  --ink:#EEF2F9; --ink-2:#AEB9D6; --ink-3:#7A879F;
+  --ink:#EEF2F9; --ink-2:#AEB9D6; --ink-3:#98A3BA;
   --line:#212A3B; --line-2:#2C3852;
   --accent:#3B74FF; --accent-ink:#93B3FF; --accent-wash:#111C3A;
   --ok:#5FD39B; --ok-wash:#0F2019;
@@ -112,7 +110,7 @@ header.site nav{display:flex; align-items:center; flex-wrap:wrap; justify-conten
 .mobile-nav a:hover{color:#6E9BFF}
 .mobile-nav-legal{margin-top:12px; display:flex; gap:18px}
 .mobile-nav-legal a{font-size:.95rem; font-weight:600; color:#7A879F}
-.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:var(--accent); color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
+.skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 footer.site{padding:30px 0 60px; text-align:center; font-family:var(--sans); color:var(--ink-3); font-size:.86rem; border-top:1px solid var(--line); margin-top:var(--space-8)}
 footer.site a{color:var(--ink-3)}
@@ -473,7 +471,7 @@ kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); bord
 
     <section class="closing" aria-labelledby="cta-h">
       <h2 id="cta-h">That was one email. Your inbox does this every day.</h2>
-      <p>Glance sits quietly in Gmail and only speaks when something is actually decided — then writes it to Notion, HubSpot, Salesforce, Slack or Monday.com in one click, always reversible.</p>
+      <p>Glance sits quietly in Gmail and only speaks when something is actually decided — then writes it to your Google Calendar, Tasks or a draft reply in one click, always reversible.</p>
       <span class="magnetic"><a class="doit" href="/trial.html" data-ga="scan_closing_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Glance &mdash; free</a></span>
       <p class="fineprint">Free to start. No credit card. Judgment stays on your machine, exactly as it did on this page.</p>
     </section>
@@ -746,7 +744,7 @@ kbd{font-family:var(--mono); font-size:.78rem; background:var(--surface-3); bord
     if(analysis.caught){
       write.appendChild(document.createTextNode('One click would file '));
       write.appendChild(el('b',null,analysis.label));
-      write.appendChild(document.createTextNode(' into your Notion database or CRM — with the amount, the date, that quoted sentence and a link back to the email. Undo removes it.'));
+      write.appendChild(document.createTextNode(' into your Google Calendar, Tasks or a draft reply — with the amount, the date, that quoted sentence and a link back to the email. Undo removes it.'));
     } else {
       write.appendChild(document.createTextNode('No button, no notification, no record. '));
       write.appendChild(el('b',null,'Silence is the default'));

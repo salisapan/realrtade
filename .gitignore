@@ -11,11 +11,18 @@ node_modules
 dist
 dist-ssr
 *.local
+__pycache__/
+*.pyc
 
 # Environment files — never commit real secrets
 .env
 .env.*
 !.env.example
+
+# Built by scripts/package_trial_extension.py at Netlify build and in CI.
+# A committed copy goes stale relative to flow-trial-extension/.
+flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip
+flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip.partial
 
 # Editor directories and files
 .vscode/*

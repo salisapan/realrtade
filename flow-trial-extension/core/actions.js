@@ -1,0 +1,547 @@
+// The decision layer: given a classified Intent (from intent.js), a little
+// context about the message (thread URL, attachment), and this account's
+// own Execution Memory (execution-memory.js), decides on ONE short,
+// named PROCESS to close the intention — never a loose pile of
+// independent actions. Execution lives in background.js; this file only
+// ever returns a plan for the chip to render and, on click, hand to
+// background.js one step at a time.
+//
+// "You intend — we execute": a process is what a person would describe as
+// one outcome ("scheduled, confirmed, and a follow-up is set"), not three
+// separate things that happen to have appeared together. planFor()
+// returns { id, name, closingLine, steps } or null — never a bare array —
+// specifically so nothing downstream can drift back into treating this as
+// an unrelated grab-bag of pills.
+//
+// This is the middle of the three-layer split the spec requires
+// (Classification -> Decision -> Execution). Adding a platform later
+// (Outlook, WhatsApp) means adding new step kinds here and a matching
+// executor in background.js — this file's shape does not change.
+//
+// Each step also carries an explicit `dependsOn` (a prior step's id, or
+// null — see buildStep below) — the process is an atomic, ordered chain,
+// not an unordered set, and content-gmail.js's sequencer/rollback
+// (runActionsSequentially / rollbackChain) is built to honor that ordering
+// rather than assume steps are independent just because today's catalog
+// happens to make them so.
+
+const FlowActions = (() => {
+  const MAX_ACTIONS = 5;
+  // A step this process has been actively rejected on (removed before
+  // confirming, or accepted and then undone) more often than kept, across
+  // at least this many real occurrences, stops being proposed by default.
+  // Below this sample size a couple of removals reads as noise, not
+  // preference — one dismissal on a novel process is not a verdict.
+  const DEMOTE_THRESHOLD = 3;
+
+  function calendarAction(intent, e, ctx) {
+    // A calendar hold's title is the sentence being closed. The schedule
+    // processes keep the short "Meeting Sep 18" label — that path is a
+    // meeting, and the sentence can be the whole invite.
+    const mutate = e.calendarOp === 'delete' || e.calendarOp === 'update';
+    const hold = intent.personalClose === 'calendar-hold' || mutate;
+    const title = (hold ? (e.what || intent.label) : (intent.label || e.what)) || (hold ? 'Hold' : 'Meeting');
+    const hint = e.calendarOp === 'delete' ? 'Remove from Calendar: '
+      : e.calendarOp === 'update' ? 'Move on Calendar: '
+      : 'Add to Calendar: ';
+    return {
+      id: 'calendar',
+      kind: 'calendar',
+      // Short — this is a collapsed-by-default step label, not the whole
+      // sentence describing the step (see content-gmail.js's injectChip:
+      // only surfaced at all once someone opens the step list). The full
+      // description still exists, as `hint`, for the step's title/aria-label.
+      label: 'Calendar',
+      hint: hint + (intent.label || 'Meeting'),
+      params: {
+        title: String(title).slice(0, 200),
+        dateIso: e.dateIso, hour: e.hour, minute: e.minute,
+        calendarOp: mutate ? e.calendarOp : null,
+        fromDateIso: e.calendarOp === 'update' ? e.fromDateIso : null,
+        fromHour: e.calendarOp === 'update' ? e.fromHour : null,
+        fromMinute: e.calendarOp === 'update' ? e.fromMinute : null,
+        // The sentence the event is about. The title stays short ("Meeting
+        // Sep 18 15:00"); without this, View opens a Calendar event that
+        // never says what was scheduled. "Meeting" is the classifier's
+        // fallback when no sentence was found — not a quote. A hold's
+        // fallback title is "Hold", which is the same kind of placeholder.
+        quote: (e.what && e.what !== 'Meeting' && e.what !== 'Hold') ? String(e.what).slice(0, 400) : null,
+        // A hold was only proposed because a clock time resolved. The
+        // writer must not fall back to an all-day event if that time is
+        // missing by the time Do It runs.
+        requireTime: hold || mutate,
+        threadUrl: ctx.threadUrl
+      }
+    };
+  }
+
+  function draftAction(intent, e, ctx, hasAttachment) {
+    // Reply-with-facts: the draft is the one fact, nothing else. No
+    // attachment search, no "write your reply here", no task beside it.
+    if (intent.type === 'fact' || (intent.signals && intent.signals.factReply)) {
+      const factLine = e.factLine ? String(e.factLine).replace(/[\r\n]+/g, ' ').trim() : '';
+      if (!factLine) return null;
+      return {
+        id: 'draft',
+        kind: 'gmailDraft',
+        label: 'Reply draft',
+        hint: 'Insert ' + (e.factValue || 'the fact') + ' into a reply draft',
+        params: {
+          intentType: 'fact',
+          replyFact: true,
+          what: factLine,
+          factLine: factLine,
+          factValue: e.factValue || null,
+          includeAttachment: false
+        }
+      };
+    }
+    // For the SCHEDULED_EVENT + handoff combined process (a meeting invite
+    // that also asks the reader to confirm), entities.what is the MEETING
+    // sentence — the right title for the Calendar step above, but not what
+    // this draft should be replying to. entities.requestWhat (set by
+    // intent.js whenever a handoff signal is present, independent of which
+    // type won) is the actual ask; falling back to entities.what keeps
+    // REQUEST/COMMITMENT_OF_READER unchanged, since their own `what` is
+    // already the request/commitment sentence.
+    const what = (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT && e.requestWhat) ? e.requestWhat : e.what;
+    // A named noun in the email is not permission to attach whatever Drive
+    // search returns. The file is attached only when the caller already
+    // resolved exactly one high-confidence match (core/file-attach.js) and
+    // passed it in as ctx.attachFile. A thread attachment the user can
+    // already see is the other honest case. Anything else stays a plain
+    // reply draft — promising "+ file" before that match exists is how a
+    // wrong file gets onto a sendable draft.
+    const found = ctx.attachFile && ctx.attachFile.id ? ctx.attachFile : null;
+    const mayFindFile = hasAttachment || Boolean(found);
+    return {
+      id: 'draft',
+      kind: 'gmailDraft',
+      label: mayFindFile ? 'Draft reply + file' : 'Draft reply',
+      hint: 'Prepare reply draft' + (mayFindFile ? ' with attachment' : ''),
+      params: {
+        intentType: intent.type,
+        what, when: e.when, amount: e.amount,
+        threadUrl: ctx.threadUrl,
+        includeAttachment: mayFindFile,
+        requestedObjectTerm: e.requestedObjectTerm || null,
+        driveFileId: found ? found.id : null,
+        driveFileName: found ? found.name : null,
+        driveMimeType: found ? found.mimeType : null,
+        attachSource: found ? 'found' : null
+      }
+    };
+  }
+
+  function taskAction(intent, e, ctx) {
+    return {
+      id: 'task',
+      kind: 'googleTask',
+      label: 'Task',
+      hint: 'Create task: ' + (intent.label || e.what || intent.type),
+      params: {
+        title: intent.label || e.what,
+        dateIso: e.dateIso,
+        amount: e.amount,
+        // The sentence this close is about. The writer quotes it even when
+        // the later caller only still has the step (a Brief replay stores
+        // steps, and used to drop intent.entities).
+        what: e.what || null,
+        threadUrl: ctx.threadUrl
+      }
+    };
+  }
+
+  function buildStep(kind, intent, e, ctx, hasAttachment) {
+    const step = kind === 'calendar' ? calendarAction(intent, e, ctx)
+      : kind === 'draft' ? draftAction(intent, e, ctx, hasAttachment)
+      : taskAction(intent, e, ctx);
+    if (!step) return null;
+    // Explicit dependency slot: null for every step in today's catalog,
+    // since Calendar/Draft/Task each write independently from the same
+    // source intent/entities rather than from one another's results — there
+    // is no real "step B needs step A's output" case yet. The field exists
+    // so a step that DOES need a prior step's result (e.g. a future draft
+    // that quotes the calendar invite it was scheduled against) has
+    // somewhere real to declare it, and so content-gmail.js's executor
+    // (runActionsSequentially) and its rollback (rollbackChain) have
+    // something concrete to honor rather than being retrofitted later.
+    step.dependsOn = null;
+    return step;
+  }
+
+  // ---------------------------------------------------------------- catalog
+  //
+  // A small, fixed library of named, closing-oriented processes — not a
+  // rules engine, and deliberately not extensible from outside this file.
+  // `anchor` is the one step Execution Memory below may never demote or
+  // reorder: it's the concrete evidence the process exists on at all (a
+  // real date+time for a schedule process, the ask itself for a reply) —
+  // memory bias only ever touches the secondary steps around it.
+  //
+  // Exported as-is (see the return statement below) so anything that needs
+  // to describe a process's fixed shape from just its id — popup.js's
+  // Execution Memory insight card, most notably — reads the exact same
+  // table processFor() selects from, instead of a second, hand-copied list
+  // that could quietly drift out of sync with it.
+  const PROCESS_CATALOG = {
+    // personalClose `calendar-hold` only. One Google Calendar event.
+    // A commitment with a resolved date and a clock time, or an explicit
+    // ask to meet at a clock time. A date with no clock time stays log-it
+    // (a Google Task). An ask that is not a meeting stays reply-track
+    // (a Gmail draft, plus a follow-up task). A bare meeting announcement
+    // stays schedule / schedule-confirm.
+    'hold': {
+      name: 'Hold It',
+      closingLine: 'Putting this on your calendar.',
+      closedLine: 'On your calendar.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
+    // A named slot that is cancelled. One delete, after the writer finds
+    // exactly one event at that time. Not a new event.
+    'clear-it': {
+      name: 'Clear It',
+      closingLine: 'Taking this off your calendar.',
+      closedLine: 'Off your calendar.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
+    // A named slot moved to a different named clock. One update.
+    'move-it': {
+      name: 'Move It',
+      closingLine: 'Moving this on your calendar.',
+      closedLine: 'Moved on your calendar.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
+    'schedule-confirm': {
+      name: 'Schedule & Confirm',
+      // "replying to confirm" / "confirmed" would both overclaim: the draft
+      // step (gmailDraftWrite, background.js) only ever creates a Gmail
+      // draft — never sends — as a deliberate safety choice, never on the
+      // user's behalf without their own review. Saying "confirmed" here
+      // would tell the user this process already sent something it
+      // didn't, which is the one thing worse than an honest "still needs
+      // you to hit send": believing it's done when it isn't.
+      closingLine: 'Scheduling this, drafting a reply to confirm, and setting a follow-up.',
+      closedLine: 'Scheduled, drafted, and tracked.',
+      anchor: 'calendar',
+      stepKinds: ['calendar', 'draft', 'task']
+    },
+    'schedule': {
+      name: 'Schedule It',
+      closingLine: 'Scheduling this and setting a reminder to prepare.',
+      closedLine: 'Scheduled, with a reminder set.',
+      anchor: 'calendar',
+      stepKinds: ['calendar', 'task']
+    },
+    'reply-track': {
+      name: 'Reply & Track',
+      closingLine: 'Drafting your reply and tracking it as a task.',
+      // Same accuracy fix as schedule-confirm above: the draft step never
+      // sends, so "Replied" claimed a step this process doesn't take.
+      closedLine: 'Drafted and tracked.',
+      anchor: 'draft',
+      stepKinds: ['draft', 'task']
+    },
+    'follow-through': {
+      name: 'Follow Through',
+      closingLine: 'Setting a reminder to follow through, with a reply ready.',
+      closedLine: 'Reminder set, reply ready.',
+      anchor: 'task',
+      stepKinds: ['task', 'draft']
+    },
+    // One trusted Sheet cell or Doc paragraph, inserted into a reply draft.
+    // The user still sends. No task, no attachment, no second step.
+    'reply-fact': {
+      name: 'Reply with it',
+      closingLine: 'Putting this fact into a reply draft.',
+      closedLine: 'The fact is in a reply draft.',
+      anchor: 'draft',
+      stepKinds: ['draft']
+    },
+    // DECISION_TO_LOG / FOLLOW_UP — the chip's original job, narrowed to
+    // its own named process rather than a type-less default.
+    'log-it': {
+      name: 'Log It',
+      closingLine: 'Logging this so it stays tracked.',
+      // "Logged." alone read thinner than every sibling closedLine here
+      // (all the others state two things that happened) now that this
+      // string is actually shown in the receipt — see content-gmail.js's
+      // closedSummary(). "and tracked" also matches reply-track's own
+      // vocabulary for the same underlying step (a Google Task).
+      closedLine: 'Logged and tracked.',
+      anchor: 'task',
+      stepKinds: ['task']
+    },
+    // Google Drive / Doc / Sheet closes. The anchor is the file itself.
+    // Memory may not drop it; a close with no file is not a close.
+    'file-on-hold': {
+      name: 'Hold it',
+      closingLine: 'Putting the file on your calendar.',
+      closedLine: 'On your calendar, with the file.',
+      anchor: 'calendar',
+      stepKinds: ['calendar']
+    },
+    'file-on-task': {
+      name: 'Note it',
+      closingLine: 'Noting the file on the task.',
+      closedLine: 'On the task, with the file.',
+      anchor: 'task',
+      stepKinds: ['task']
+    },
+    'file-it': {
+      name: 'File it',
+      closingLine: 'Saving the attached file to Drive.',
+      closedLine: 'Saved to Drive, link drafted.',
+      anchor: 'file',
+      stepKinds: ['file', 'draft']
+    },
+    'create-missing': {
+      name: 'Draft it',
+      closingLine: "Didn't find it — draft from template.",
+      closedLine: 'Drafted from the template, link ready.',
+      anchor: 'doc',
+      stepKinds: ['doc', 'sheet', 'calendar', 'draft']
+    }
+  };
+
+  function processFor(intent) {
+    const sig = intent.signals || {};
+    let id;
+    if (intent.type === 'fact' || (intent.signals && intent.signals.factReply)) {
+      id = 'reply-fact';
+    } else if (intent.personalClose === 'calendar-cancel') {
+      id = 'clear-it';
+    } else if (intent.personalClose === 'calendar-move') {
+      id = 'move-it';
+    } else if (intent.personalClose === 'calendar-hold') {
+      id = 'hold';
+    } else if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
+      id = sig.handoff ? 'schedule-confirm' : 'schedule';
+    } else if (intent.type === FlowIntent.TYPES.REQUEST) {
+      id = 'reply-track';
+    } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
+      id = 'follow-through';
+    } else {
+      id = 'log-it';
+    }
+    return Object.assign({ id }, PROCESS_CATALOG[id]);
+  }
+
+  // ----------------------------------------------------------- memory bias
+  //
+  // A step is net-rejected once it's been removed-or-undone more often than
+  // accepted, across a real sample size — below DEMOTE_THRESHOLD a couple of
+  // removals reads as noise, not preference, and one dismissal on a novel
+  // process is not a verdict. `pinned` overrides this unconditionally: it's
+  // set only by an explicit "No, keep proposing it" click on the popup's
+  // Execution Memory insight card (see FlowExecutionMemory.recordPin) — a
+  // human's direct answer to a direct question always outranks the
+  // algorithm's own inference from indirect signals.
+  //
+  // Exported (see the return statement below) so that same insight card can
+  // ask "is this actually being demoted right now" using the identical
+  // predicate applyMemory acts on, rather than a second copy of this math
+  // that could silently disagree with what the live chip is really doing.
+  function isNetRejected(stats) {
+    if (!stats || stats.pinned) return false;
+    const rejected = (stats.removed || 0) + (stats.undone || 0);
+    return rejected >= DEMOTE_THRESHOLD && rejected > (stats.accepted || 0);
+  }
+
+  // Within the non-anchor steps only: drop a step kind isNetRejected() flags,
+  // and otherwise order the rest by historical acceptance rate —
+  // most-reliably-kept first. No history for a step yet -> neutral 0.5 rate,
+  // which keeps the catalog's own default order for ties.
+  function applyMemory(stepKinds, anchor, memoryForProcess) {
+    const rest = stepKinds.filter((k) => k !== anchor);
+    const stats = (memoryForProcess && memoryForProcess.steps) || {};
+
+    const kept = rest.filter((k) => !isNetRejected(stats[k]));
+
+    const scored = kept.map((k, i) => {
+      const s = stats[k];
+      if (!s) return { k, rate: 0.5, i };
+      const total = s.accepted + s.removed + s.undone;
+      return { k, rate: total > 0 ? s.accepted / total : 0.5, i };
+    });
+    scored.sort((a, b) => b.rate - a.rate || a.i - b.i);
+
+    const ordered = scored.map((x) => x.k);
+    return stepKinds.includes(anchor) ? [anchor, ...ordered] : ordered;
+  }
+
+  // ctx.executionMemory, when present, is the FULL memory blob keyed by
+  // process id (FlowExecutionMemory.getAll()'s own shape) — fetched once by
+  // content-gmail.js per scan, not per process, since which process this
+  // message needs isn't known until after classification.
+  function withThread(step, ctx) {
+    if (step.params && ctx.threadUrl) step.params.threadUrl = ctx.threadUrl;
+    return step;
+  }
+
+  // A Drive / Doc / Sheet close planned by google-closes.js. One process,
+  // reversible writes only. The draft shares the link of the file this
+  // same click created; it does not search Drive (that search belongs to
+  // the find-and-attach path).
+  function planGoogle(intent, ctx) {
+    const g = intent.googleClose;
+    if (!g) return null;
+    const e = intent.entities || {};
+    if (g.personalClose === 'file-on-hold') {
+      return {
+        id: 'file-on-hold',
+        name: 'Hold it',
+        closingLine: g.cardLine,
+        closedLine: 'On your calendar, with the file.',
+        steps: [withThread({
+          id: 'calendar',
+          kind: 'calendar',
+          label: 'Calendar',
+          hint: 'Add to Calendar with the file',
+          dependsOn: null,
+          params: {
+            title: String(e.what || g.fileTerm || 'Hold').slice(0, 200),
+            dateIso: e.dateIso,
+            hour: e.hour,
+            minute: e.minute,
+            quote: e.what || null,
+            requireTime: true,
+            fileTerm: g.fileTerm
+          }
+        }, ctx)]
+      };
+    }
+    if (g.personalClose === 'file-on-task') {
+      return {
+        id: 'file-on-task',
+        name: 'Note it',
+        closingLine: g.cardLine,
+        closedLine: 'On the task, with the file.',
+        steps: [withThread({
+          id: 'task',
+          kind: 'googleTask',
+          label: 'Task',
+          hint: 'Task note with the file',
+          dependsOn: null,
+          params: {
+            title: e.what || g.fileTerm,
+            dateIso: e.dateIso,
+            amount: e.amount,
+            what: e.what || null,
+            fileTerm: g.fileTerm
+          }
+        }, ctx)]
+      };
+    }
+    if (g.personalClose === 'drive-file') {
+      const fileStep = {
+        id: 'file',
+        kind: 'driveFile',
+        label: 'Drive',
+        hint: 'Save the attached file',
+        dependsOn: null,
+        params: { copyAttachment: true, googleClose: g }
+      };
+      const draftStep = {
+        id: 'draft',
+        kind: 'gmailDraft',
+        label: 'Draft link',
+        hint: 'Draft a reply with the file link',
+        dependsOn: 'file',
+        params: { what: g.cardLine, shareLink: true, includeAttachment: false, requestedObjectTerm: null }
+      };
+      return {
+        id: 'file-it',
+        name: 'File it',
+        closingLine: g.cardLine,
+        closedLine: 'Saved to Drive, link drafted.',
+        steps: [fileStep, draftStep]
+      };
+    }
+    if (g.personalClose !== 'create-missing') return null;
+    const createId = g.kind === 'sheet' ? 'sheet' : 'doc';
+    const createKind = g.kind === 'sheet' ? 'driveSheet' : 'driveDoc';
+    const steps = [{
+      id: createId,
+      kind: createKind,
+      label: g.kind === 'sheet' ? 'Sheet' : 'Doc',
+      hint: g.templateName || 'Create from the template',
+      dependsOn: null,
+      params: { googleClose: g }
+    }];
+    if (g.destination === 'calendar') {
+      steps.push(withThread({
+        id: 'calendar',
+        kind: 'calendar',
+        label: 'Calendar',
+        hint: 'Add to Calendar with the new file',
+        dependsOn: createId,
+        params: {
+          title: String(e.what || g.cardLine || 'Hold').slice(0, 200),
+          dateIso: e.dateIso,
+          hour: e.hour,
+          minute: e.minute,
+          quote: e.what || null,
+          requireTime: true,
+          shareLink: true
+        }
+      }, ctx));
+    }
+    steps.push({
+      id: 'draft',
+      kind: 'gmailDraft',
+      label: 'Draft link',
+      hint: 'Draft a reply with the file link',
+      dependsOn: createId,
+      params: { what: g.cardLine, shareLink: true, includeAttachment: false, requestedObjectTerm: null }
+    });
+    return {
+      id: 'create-missing',
+      name: 'Draft it',
+      closingLine: g.cardLine,
+      closedLine: 'Drafted from the template, link ready.',
+      steps: steps
+    };
+  }
+
+  function planFor(intent, ctx) {
+    ctx = ctx || {};
+    if (!intent || !intent.type) return null;
+    if (intent.googleClose) return planGoogle(intent, ctx);
+
+    const e = intent.entities || {};
+    const hasAttachment = Boolean(ctx.hasThreadAttachment);
+    const proc = processFor(intent);
+    const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
+    const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
+
+    const steps = orderedKinds
+      .map((kind) => buildStep(kind, intent, e, ctx, hasAttachment))
+      .filter(Boolean);
+    if (!steps.length) return null; // every non-anchor step demoted AND no anchor in this catalog entry — never happens today, but never silently propose nothing described
+
+    return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };
+  }
+
+  // The receipt lines for writes that actually landed. A failed step can
+  // still carry a `written` string from a partial attempt — it must not
+  // show up, because the receipt is the claim that the thing exists.
+  function receiptWrittenLines(results) {
+    const lines = [];
+    for (const r of results || []) {
+      const response = r && r.response;
+      if (!response || !response.ok || typeof response.written !== 'string') continue;
+      const line = response.written.trim();
+      if (!line || lines.indexOf(line) !== -1) continue;
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  return { planFor, MAX_ACTIONS, PROCESS_CATALOG, isNetRejected, receiptWrittenLines };
+})();
+
+if (typeof module !== 'undefined') module.exports = { FlowActions };

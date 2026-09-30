@@ -4,7 +4,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://zjquktirlrhbqcnkfaok.supabase.co https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://zjquktirlrhbqcnkfaok.supabase.co https://www.google-analytics.com https://analytics.google.com https://region1.google-analytics.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'
 
 # Caching. Netlify's default for everything here is max-age=0, must-revalidate,
 # so every asset costs a round trip on every repeat visit.
@@ -37,6 +37,22 @@
 # a stylesheet from before the last deploy.
 /assets/*
   Cache-Control: public, max-age=86400, stale-while-revalidate=604800
+
+# fonts.css specifically: still under /assets/* above (day-cache + SWR), but
+# it earns a longer ceiling than the rest of that bucket. Unlike
+# home.css/flow-premium.css, which get edited in place across a session as
+# copy and layout change, fonts.css holds font BINARY DATA under a name that
+# has no reason to change unless a weight or family is added -- much closer
+# to how the image rules above treat logo-header.png than to how the rest of
+# /assets/* is treated. It's also the one /assets/* file every one of the
+# 47 pages requests with the identical URL, so the gap between "cached a day"
+# and "cached a month" is the gap between re-fetching 131KB on most repeat
+# visits and re-fetching it on almost none. Netlify combines matching _headers
+# blocks and the LATER block wins for a header set in both, so this rule
+# (listed after /assets/* above) overrides just its Cache-Control for this
+# one file without needing its own exemption from the block above.
+/assets/fonts.css
+  Cache-Control: public, max-age=2592000, stale-while-revalidate=31536000
 
 # HTML must revalidate: these pages carry the copy and the CTAs, and shipping a
 # fix that visitors cannot see for a day is worse than the round trip.
