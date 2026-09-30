@@ -27,13 +27,53 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Flow",
-  "url": "https://theflow-ai.com/",
-  "description": "Flow — Cognitive Workflow Engine: Flow watches your work and executes what happens next, updating your files and stack with no rules to write. Sensitive data is masked before processing, and high-risk steps wait for your approval.",
-  "applicationCategory": "BusinessApplication",
-  "operatingSystem": "Web, Windows, macOS, Linux",
-  "offers": { "@type": "Offer", "url": "https://theflow-ai.com/#waitlist" }
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://theflow-ai.com/#org",
+      "name": "Flow",
+      "alternateName": [
+        "The Flow AI",
+        "theflow-ai.com"
+      ],
+      "url": "https://theflow-ai.com/",
+      "logo": "https://theflow-ai.com/logo.png",
+      "description": "Flow is a cognitive workflow engine for teams with sensitive data. It watches for what happened, proposes the update across your files and stack, and writes it when you approve.",
+      "founder": [
+        {
+          "@type": "Person",
+          "name": "Sali Sapan",
+          "jobTitle": "CEO & Co-Founder",
+          "url": "https://theflow-ai.com/about.html"
+        },
+        {
+          "@type": "Person",
+          "name": "Tomer Steinmetz",
+          "jobTitle": "CTO & Co-Founder",
+          "url": "https://theflow-ai.com/about.html"
+        }
+      ],
+      "foundingLocation": {
+        "@type": "Place",
+        "name": "Israel"
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "Flow",
+      "url": "https://theflow-ai.com/",
+      "description": "Flow — Cognitive Workflow Engine: Flow watches your work and executes what happens next, updating your files and stack with no rules to write. Sensitive data is masked before processing, and high-risk steps wait for your approval.",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web, Windows, macOS, Linux",
+      "offers": {
+        "@type": "Offer",
+        "url": "https://theflow-ai.com/#waitlist"
+      },
+      "publisher": {
+        "@id": "https://theflow-ai.com/#org"
+      }
+    }
+  ]
 }
 </script>
 <!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
@@ -89,7 +129,7 @@
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
       </button>
-      <span class="magnetic nav-cta"><a class="doit sm" href="#waitlist" data-ga="nav_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></a></span>
+      <span class="magnetic nav-cta"><a class="doit sm" href="#waitlist" data-ga="nav_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Get started</span></a></span>
       <button class="icon-btn hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <svg viewBox="0 0 24 24"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg>
       </button>
@@ -124,7 +164,7 @@
       <h1 class="reveal in" data-d="1" data-i18n="hero.h1">Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span></h1>
       <p class="lead reveal in" data-d="2" data-i18n="hero.sub">When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve — no rules to write. Sensitive data is masked before anything is processed.</p>
       <div class="hero-cta reveal in" data-d="3">
-        <span class="magnetic"><a class="doit lg breathe" href="#waitlist" data-ga="hero_doit"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Do It</span></a></span>
+        <span class="magnetic"><a class="doit lg breathe" href="#waitlist" data-ga="hero_doit"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Get a deployment plan</span></a></span>
       </div>
       <button class="hero-scroll reveal in" data-d="3" data-scroll="#how"><span data-i18n="hero.cta3">See how it works</span></button>
       <div class="hero-foot reveal in" data-d="4"><span class="dot"></span><span data-i18n="hero.foot">Masked before processing · Approval before risky steps · Every write reversible</span></div>
@@ -296,7 +336,7 @@ Best,
             <p data-i18n="legal.end.line2">Deed updated. Ledger recalculated. Client package dispatched.</p>
             <p class="final" data-i18n="legal.end.line3">And the sensitive fields? Masked before anything was processed.</p>
           </div>
-          <span class="magnetic"><a class="doit" id="ldCta" href="#waitlist" data-ga="legal_demo_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.end.cta">Do It</span></a></span>
+          <span class="magnetic"><a class="doit" id="ldCta" href="#waitlist" data-ga="legal_demo_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.end.cta">Get a deployment plan</span></a></span>
         </div>
 
       </div>
@@ -428,6 +468,7 @@ Best,
     </div>
     <div class="foot-legal">
       <span data-i18n="foot.copy">© 2026 Flow — Cognitive Workflow Engine. All rights reserved.</span>
+      <span class="foot-founders"><a href="/about.html">Founded by Sali Sapan &amp; Tomer Steinmetz</a></span>
       <span class="en">PRIVACY BY DESIGN</span>
     </div>
   </div>
@@ -481,9 +522,9 @@ Best,
     'hero.eyebrow':{en:'FOR TEAMS WITH SENSITIVE DATA',he:'לצוותים עם מידע רגיש'},
     'hero.h1':{en:'Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span>',he:'ביצוע אוטונומי.<br><span class="chrome-text">בתנאים שלכם.</span>'},
     'hero.sub':{en:'When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve — no rules to write. Sensitive data is masked before anything is processed.',he:'כשעסקה נסגרת, חוזה נחתם או תיק מאושר, Flow מציע את העדכון לקבצים ולשאר המערכות שלכם, וכותב אותו ברגע שתאשרו — בלי חוקים לכתוב. מידע רגיש ממוסך לפני כל עיבוד.'},
-    'hero.cta1':{en:'Do It',he:'עשו את זה'},
+    'hero.cta1':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'},
     'hero.cta3':{en:'See how it works',he:'איך זה עובד'},
-    'nav.cta':{en:'Do It',he:'עשו את זה'},
+    'nav.cta':{en:'Get started',he:'מתחילים'},
     'wl.submit':{en:'Get My Deployment Plan',he:'קבלו תוכנית פריסה'},
     'hero.foot':{en:'Masked before processing · Approval before risky steps · Every write reversible',he:'ממוסך לפני עיבוד · אישור לפני פעולות מסוכנות · כל כתיבה הפיכה'},
     'trust.note':{en:'Flow is pre-certification. We will tell you in writing exactly where each framework stands, rather than have you infer it from a badge.',he:'Flow טרם עבר הסמכה. נמסור לכם בכתב היכן בדיוק עומד כל תקן, במקום שתסיקו זאת מתגית.'},
@@ -568,7 +609,7 @@ Best,
     'legal.end.line1':{en:'3 clicks. 0 manual data entry.',he:'3 קליקים. 0 הזנת נתונים ידנית.'},
     'legal.end.line2':{en:'Deed updated. Ledger recalculated. Client package dispatched.',he:'שטר ההעברה עודכן. הספר חושב מחדש. חבילת הלקוח נשלחה.'},
     'legal.end.line3':{en:'And the sensitive fields? Masked before anything was processed.',he:'והשדות הרגישים? ממוסכים לפני שמשהו עובד עליהם.'},
-    'legal.end.cta':{en:'Do It',he:'עשו את זה'}
+    'legal.end.cta':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'}
   };
   var YEAR=new Date().getFullYear();
   var curLang=root.getAttribute('lang')||'en';
@@ -819,7 +860,17 @@ Best,
       waitAuth = auth || null;
       btn.classList.remove('loading'); btn.disabled=false; btn.style.pointerEvents='';
       wrap.classList.add('step2');
-      if(orgInput) orgInput.focus();
+      // Save typing: a work address already says who they work for. Free
+      // mailboxes (gmail.com etc.) say nothing, so those stay empty.
+      (function prefillFromEmail(addr){
+        var dom=String(addr.split('@')[1]||'').toLowerCase();
+        if(!dom || /^(gmail|googlemail|yahoo|outlook|hotmail|live|icloud|me|aol|proton|protonmail|msn|mail|gmx|yandex|zoho|fastmail)\./.test(dom)) return;
+        if(websiteInput && !websiteInput.value) websiteInput.value='https://'+dom;
+        var label=dom.split('.')[0].replace(/[-_]+/g,' ');
+        if(orgInput && !orgInput.value && label) orgInput.value=label.replace(/\b\w/g,function(c){return c.toUpperCase();});
+      })(v);
+      var firstEmpty=(orgInput && orgInput.value && roleInput) ? roleInput : orgInput;
+      if(firstEmpty) firstEmpty.focus();
       if(typeof gtag==='function') gtag('event','waitlist_email_submit');
     }
     function fail(){

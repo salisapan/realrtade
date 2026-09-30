@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Why Flow exists: an AI workflow engine built for organizations that cannot send raw sensitive data to a third-party model.">
+<meta name="description" content="About Flow and its founders, Sali Sapan (CEO) and Tomer Steinmetz (CTO): why we are building an AI workflow engine for organizations that cannot send raw sensitive data to a third-party model.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/about.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -15,14 +15,14 @@
 <title>About — Flow</title>
 <meta property="og:type" content="website">
 <meta property="og:title" content="About — Flow">
-<meta property="og:description" content="Why Flow exists: an AI workflow engine built for organizations that cannot send raw sensitive data to a third-party model.">
+<meta property="og:description" content="About Flow and its founders, Sali Sapan (CEO) and Tomer Steinmetz (CTO): why we are building an AI workflow engine for organizations that cannot send raw sensitive data to a third-party model.">
 <meta property="og:url" content="https://theflow-ai.com/about.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="About — Flow">
-<meta name="twitter:description" content="Why Flow exists: an AI workflow engine built for organizations that cannot send raw sensitive data to a third-party model.">
+<meta name="twitter:description" content="About Flow and its founders, Sali Sapan (CEO) and Tomer Steinmetz (CTO): why we are building an AI workflow engine for organizations that cannot send raw sensitive data to a third-party model.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
+<script type="application/ld+json">{"@type": "Organization", "@id": "https://theflow-ai.com/#org", "name": "Flow", "alternateName": ["The Flow AI", "theflow-ai.com"], "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png", "description": "Flow is a cognitive workflow engine for teams with sensitive data. It watches for what happened, proposes the update across your files and stack, and writes it when you approve.", "founder": [{"@type": "Person", "name": "Sali Sapan", "jobTitle": "CEO & Co-Founder", "url": "https://theflow-ai.com/about.html"}, {"@type": "Person", "name": "Tomer Steinmetz", "jobTitle": "CTO & Co-Founder", "url": "https://theflow-ai.com/about.html"}], "foundingLocation": {"@type": "Place", "name": "Israel"}, "@context": "https://schema.org"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"About","item":"https://theflow-ai.com/about.html"}]}</script>
 <style>
 
@@ -224,9 +224,9 @@ footer.site a{color:var(--muted)}
 <h2>What we built instead</h2>
 <p>Flow starts from the deployment constraint rather than treating it as a later integration problem:</p>
 <ul>
-<li><b>Where processing happens is a choice, not a default.</b> Run Flow in a masked secure cloud, or entirely inside your own infrastructure with Flow-Edge. The second option exists because for some organizations it is the only option.</li>
+<li><b>Where processing happens is a choice, not a default.</b> Flow runs in a masked secure cloud today. Running entirely inside your own infrastructure with Flow-Edge is on the roadmap and scoped per engagement, because for some organizations it will be the only option.</li>
 <li><b>Sensitive fields are masked before processing</b>, not filtered out of logs afterward.</li>
-<li><b>Every action is logged</b> in an append-only record, because "we think it did the right thing" is not an answer to an auditor.</li>
+<li><b>Every write is reversible,</b> because "we think it did the right thing" is not an answer to an auditor. A full append-only audit trail is on the roadmap for regulated deployments; it is not a live feature today.</li>
 <li><b>High-risk actions wait for a human.</b> Autonomy is bounded by policy you set.</li>
 </ul>
 <p>The technical detail is on the <a href="/security.html">security page</a>.</p>

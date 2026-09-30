@@ -133,13 +133,13 @@ footer.site a{color:var(--muted)}
 <p>We do not sell your personal information, and we do not use your waitlist submission to train third-party AI models.</p>
 
 <h2>3. Email Confirmation</h2>
-<p>To keep our mailing list accurate and to prevent someone from signing up an email address that isn't theirs, we use a confirmation step: after you submit the waitlist form, we send a confirmation link to the email address provided. The Playbook and further communications are sent only after that link is clicked.</p>
+<p>To keep our mailing list accurate and to prevent someone from signing up an email address that isn't theirs, we use a confirmation step for the Flow waitlist: after you submit the form, we send a confirmation link to the email address provided, and the Playbook and further communications are sent only after that link is clicked. Glance works differently: because it is free and sends you nothing but the install file, the download starts as soon as you enter your email, and we email you the same download link once as a backup.</p>
 
 <h2>4. Who We Share Information With</h2>
 <p>We share information only with the service providers that operate the waitlist and site on our behalf, under their own data-processing terms:</p>
 <ul>
 <li><b>Supabase</b> — stores waitlist submissions (email, company, role, website) and enterprise enquiries submitted through the contact form.</li>
-<li><b>Resend</b> — delivers transactional email (confirmation link, and then the Playbook, Glance install instructions, or a Glance Pro launch notice, depending what you signed up for).</li>
+<li><b>Resend</b> — delivers transactional email (for the Flow waitlist a confirmation link and then the Playbook; for Glance the install link; for Glance Pro a launch notice).</li>
 <li><b>Netlify</b> — hosts the site and runs the serverless functions that process signups.</li>
 <li><b>Google Analytics</b> — aggregate site-traffic analytics.</li>
 <li><b>Anthropic, xAI, and Google</b> — power Glance's Draft-It reply, attachment summary, and the masked classification fallback in Section 5, when those paths run. They receive masked placeholder text only — never a real name, company, amount, date, email address, or phone number. <b>OpenAI</b> is called only to summarize an attachment when Google's Gemini is not configured or is temporarily skipped after errors. Classification is never sent to Google or OpenAI. See Section 5.</li>

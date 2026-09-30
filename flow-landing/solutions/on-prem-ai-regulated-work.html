@@ -24,7 +24,7 @@
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "Organization", "name": "Flow", "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "Home", "item": "https://theflow-ai.com/"}, {"@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://theflow-ai.com/solutions/"}, {"@type": "ListItem", "position": 3, "name": "On your own infrastructure", "item": "https://theflow-ai.com/solutions/on-prem-ai-regulated-work.html"}]}</script>
-<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is cloud AI enough for HIPAA, GDPR, or government work?", "acceptedAnswer": {"@type": "Answer", "text": "Sometimes, with controls: masking, minimization, contracts, and a human gate before a write. Often the policy requires a tighter path. Evaluate the policy. This page does not claim a blanket yes, and it is not legal advice."}}, {"@type": "Question", "name": "What is Flow-Edge status?", "acceptedAnswer": {"@type": "Answer", "text": "Flow-Edge is an offer / roadmap / in rollout (בפריסה). It is not a live shipped claim for every customer today. When policy requires processing to stay on your side, ask about that deployment option."}}, {"@type": "Question", "name": "Does Flow send all documents to a public LLM by default?", "acceptedAnswer": {"@type": "Answer", "text": "No. The design is local-first, with human-gated writes. Masked cloud is an option where the policy allows a minimized payload. This page does not mean everything goes to a public model."}}]}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is cloud AI enough for HIPAA, GDPR, or government work?", "acceptedAnswer": {"@type": "Answer", "text": "Sometimes, with controls: masking, minimization, contracts, and a human gate before a write. Often the policy requires a tighter path. Evaluate the policy. This page does not claim a blanket yes, and it is not legal advice."}}, {"@type": "Question", "name": "What is Flow-Edge status?", "acceptedAnswer": {"@type": "Answer", "text": "Flow-Edge is on the roadmap or offered per engagement. It is not a live shipped claim for every customer today. When policy requires processing to stay on your side, ask about that deployment option."}}, {"@type": "Question", "name": "Does Flow send all documents to a public LLM by default?", "acceptedAnswer": {"@type": "Answer", "text": "No. The design is local-first, with human-gated writes. Masked cloud is an option where the policy allows a minimized payload. This page does not mean everything goes to a public model."}}]}</script>
 <link rel="stylesheet" href="/assets/fonts.css">
 <style>
 
@@ -146,7 +146,7 @@ footer.site a{color:var(--muted)}
     <h1 class="title">Running AI on your own infrastructure for regulated work</h1>
     <article>
 
-      <p class="lead">Regulated teams ask two questions: where the data goes, and who can compel access to it. Careful cloud processing can be enough when payloads are masked and minimized. When policy forbids raw material from leaving your control, the work has to stay on your machine or in a tenant you control. Flow can be scoped to either path. Flow-Edge, the fully local deployment, is an offer in rollout (בפריסה), not a runtime that is live for every customer today.</p>
+      <p class="lead">Regulated teams ask two questions: where the data goes, and who can compel access to it. Careful cloud processing can be enough when payloads are masked and minimized. When policy forbids raw material from leaving your control, the work has to stay on your machine or in a tenant you control. Flow can be scoped to either path. Flow-Edge, the fully local deployment, is offered per engagement and is on the roadmap, not a runtime that is live for every customer today.</p>
 
       <h2>Residency is not sovereignty</h2>
       <p>Residency is where the bytes sit. Sovereignty is who can demand them. A region pin answers the first question. It does not, by itself, answer a compel, a subpoena, or a vendor that can read the payload. Name which question the policy is actually asking before you pick an architecture.</p>
@@ -158,12 +158,12 @@ footer.site a{color:var(--muted)}
       <p>Government, health, legal privilege, and finance policies often forbid raw egress. In those cases processing stays on the customer machine or in a controlled tenant. The policy decides. A slogan about "private AI" does not.</p>
 
       <h2>How Flow talks about this</h2>
-      <p>Flow's architecture is local-first and scoped to the engagement, so sensitive work can stay on your side when that is the requirement. Masked cloud is the option where a minimized payload in a controlled tenant fits the policy. <b>Flow-Edge is the deployment offer</b> when policy requires processing on infrastructure you control. It is in rollout (בפריסה). It is not universally shipped today. This page carries no compliance badge that stands in for counsel.</p>
-      <p>SSO and an immutable audit log sit in the same bucket: roadmap / offer / in rollout (בפריסה). Bring them up as questions for a deployment conversation. Do not tick them as live.</p>
+      <p>Flow's architecture is local-first and scoped to the engagement, so sensitive work can stay on your side when that is the requirement. Masked cloud is the option where a minimized payload in a controlled tenant fits the policy. <b>Flow-Edge is the deployment offer</b> when policy requires processing on infrastructure you control. It is on the roadmap and is not universally shipped today. This page carries no compliance badge that stands in for counsel.</p>
+      <p>SSO and an immutable audit log sit in the same bucket: on the roadmap or offered per engagement. Bring them up as questions for a deployment conversation. Do not tick them as live.</p>
 
       <h2>What a design partner should bring</h2>
       <p>The policy that forbids egress, the systems a write would touch, and who must approve it. Pair that with <a href="/solutions/human-in-the-loop-ai-agents.html">how approval works before a write</a>. <a href="/solutions/close-from-gmail-without-a-prompt.html">Glance</a> is a separate personal product and is not this deployment.</p>
-      <p class="note"><b>Roadmap, not live.</b> SSO, an immutable audit log, Action Graph, Malpractice Shield, and Flow-Edge are roadmap / offer / in rollout (בפריסה). They are not a live runtime today. This page is product framing, not legal advice.</p>
+      <p class="note"><b>Roadmap, not live.</b> SSO, an immutable audit log, Action Graph, Malpractice Shield, and Flow-Edge are on the roadmap or offered per engagement. They are not a live runtime today. This page is product framing, not legal advice.</p>
       <h2 id="faq">Common questions</h2>
       <div class="faq-list">
         <details>
@@ -172,7 +172,7 @@ footer.site a{color:var(--muted)}
         </details>
         <details>
           <summary>What is Flow-Edge status?</summary>
-          <p>Flow-Edge is an offer / roadmap / in rollout (בפריסה). It is not a live shipped claim for every customer today. When policy requires processing to stay on your side, ask about that deployment option.</p>
+          <p>Flow-Edge is on the roadmap or offered per engagement. It is not a live shipped claim for every customer today. When policy requires processing to stay on your side, ask about that deployment option.</p>
         </details>
         <details>
           <summary>Does Flow send all documents to a public LLM by default?</summary>
