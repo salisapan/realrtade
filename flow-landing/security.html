@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="How Flow handles your data: deployment models, data masking, zero-retention processing, audit logging, and human approval gates.">
+<meta name="description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap / בפריסה), not live toggles today.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/security.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -15,12 +15,12 @@
 <title>Security &amp; Architecture — Flow</title>
 <meta property="og:type" content="website">
 <meta property="og:title" content="Security &amp; Architecture — Flow">
-<meta property="og:description" content="How Flow handles your data: deployment models, data masking, zero-retention processing, audit logging, and human approval gates.">
+<meta property="og:description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap / בפריסה), not live toggles today.">
 <meta property="og:url" content="https://theflow-ai.com/security.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Security &amp; Architecture — Flow">
-<meta name="twitter:description" content="How Flow handles your data: deployment models, data masking, zero-retention processing, audit logging, and human approval gates.">
+<meta name="twitter:description" content="Intended architecture for how Flow handles data. Deployment models, Flow-Edge, and the append-only audit log are a deployment offer (roadmap / בפריסה), not live toggles today.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Security &amp; Architecture","item":"https://theflow-ai.com/security.html"}]}</script>
@@ -144,33 +144,34 @@ footer.site a{color:var(--muted)}
   <div class="wrap">
     <span class="eyebrow">Trust</span>
     <h1 class="title">Security &amp; Architecture</h1>
-    <div class="updated">Last updated: September 2, 2026</div>
+    <div class="updated">Last updated: September 30, 2026</div>
     <article>
+<p class="note">Flow is in pre-release. This page describes intended architecture. SSO, the audit log, and Flow-Edge are part of the deployment offer (roadmap / בפריסה) &mdash; not capabilities marked live in the product today. For current status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
 <p class="lead">Flow is built for organizations that cannot send raw sensitive data to a third-party model &mdash; legal, healthcare, finance, insurance, and government. This page describes how the system is designed, so your security team can evaluate it without a call.</p>
 
-<h2>1. Two Deployment Models</h2>
-<p>The most important security decision is where processing happens. Flow supports two models, and you choose per deployment:</p>
+<h2>1. Planned Deployment Models</h2>
+<p>The most important security decision is where processing happens. Flow is planned for two deployment models, per engagement &mdash; not as live product toggles today:</p>
 <div class="cards two">
   <div class="card">
     <h3>Masked Secure Cloud</h3>
-    <p>Processing runs in Flow's managed environment. Personally identifiable and confidential fields are detected and masked <b>before</b> any data leaves your environment for processing.</p>
+    <p>Processing is designed for a managed environment, with personally identifiable and confidential fields masked <b>before</b> processing. That is the architecture; deployment status is closed in the project, not a live toggle today.</p>
   </div>
   <div class="card">
-    <h3>Flow-Edge (Fully Local)</h3>
-    <p>The entire engine runs inside your own infrastructure. Data never leaves your network boundary. This is the model for environments where policy or regulation prohibits external processing outright.</p>
+    <h3>Flow-Edge (Fully Local) &mdash; roadmap / בפריסה</h3>
+    <p>When policy requires that data not leave the network, this is the deployment path designed into the engagement &mdash; not a cloud configuration with a flag, and not a live product toggle today.</p>
   </div>
 </div>
-<p>If your obligations make cloud processing untenable &mdash; export-controlled manufacturing data, NERC CIP-scoped operational systems, classified or CUI-adjacent government work &mdash; Flow-Edge is the deployment answer, not a configuration flag on a cloud product.</p>
+<p>If your obligations make cloud processing untenable &mdash; export-controlled manufacturing data, NERC CIP-scoped operational systems, classified or CUI-adjacent government work &mdash; Flow-Edge (roadmap / בפריסה) is the deployment path designed into the engagement, not a configuration flag on a cloud product.</p>
 
 <h2>2. Data Masking</h2>
-<p>In the cloud deployment model, sensitive fields are identified and replaced with structure-preserving placeholders before processing. The model operates on the masked representation; the mapping back to real values stays under your control. This means a prompt, a log, or a model provider never receives the underlying identifier.</p>
-<p>Masking is a mitigation, not a substitute for architecture. Where the requirement is "this data must not leave the building," the correct answer is Flow-Edge. We will tell you that directly rather than sell you a cloud deployment with extra controls.</p>
+<p>In the masked-cloud model, sensitive fields are designed to be identified and replaced with structure-preserving placeholders before processing. The model is designed to operate on the masked representation, with the mapping back to real values staying under your control, so a prompt, a log, or a model provider is not meant to receive the underlying identifier. Deployment status is closed in the engagement &mdash; not a live product toggle today.</p>
+<p>Masking is a mitigation, not a substitute for architecture. Where the requirement is "this data must not leave the building," the deployment path designed into the engagement is Flow-Edge (roadmap / בפריסה). We will say that directly rather than offer a cloud deployment with extra controls as if it were the same thing.</p>
 
 <h2>3. Zero-Retention Processing</h2>
 <p>Flow is designed so that content processed through the engine is not retained for model training and is not persisted beyond the life of the task that required it. "Zero-retention" is a claim worth verifying with any vendor &mdash; including us. We wrote a guide on <a href="/blog/zero-retention-ai-architecture.html">how to verify a vendor's zero-retention claim</a>, and we expect you to apply it to Flow.</p>
 
 <h2>4. Audit Logging &amp; Provenance</h2>
-<p>Every action the engine takes is recorded in an append-only log: what was observed, what was proposed, who approved it, and what was executed. The purpose is defensibility &mdash; when a regulator, auditor, or opposing counsel asks why a system did something eighteen months ago, the answer must be reconstructible from records rather than from memory.</p>
+<p><b>Immutable audit trail &mdash; roadmap / בפריסה.</b> For regulated deployments, an append-only log is planned: what was observed, what was proposed, who approved it, and what was executed. This is not a live product toggle today; it is closed in the engagement and the deployment. When it ships with a regulated rollout, the purpose is defensibility &mdash; when a regulator, auditor, or opposing counsel asks why a system did something eighteen months ago, the answer must be reconstructible from records rather than from memory.</p>
 <p>Related reading: <a href="/blog/auditability-by-design-ai-systems.html">Auditability by Design</a> and <a href="/blog/ai-observability-tracing-debugging.html">Tracing a workflow decision back to its source</a>.</p>
 
 <h2>5. Human Approval Gates</h2>
