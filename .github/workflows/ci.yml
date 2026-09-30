@@ -1,0 +1,34 @@
+# Minimal gate for the Flow Trial / Glance surface.
+#
+# flow-landing is static HTML. netlify.toml's build command is empty, and
+# netlify/functions has no npm dependencies. The Glance extension is plain
+# JavaScript with no package.json. Root `npm ci` does not run here: the
+# lockfile is out of sync with package.json, and `tsc -p tsconfig.app.json`
+# already fails in src/pages/Auth.tsx, which is outside this surface.
+# Playwright is a root dependency and is intentionally not installed.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  flow-glance:
+    name: Flow and Glance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Syntax-check landing functions and the extension
+        run: node scripts/syntax-check-flow.mjs
+
+      - name: Check .env.example covers every env name the code reads
+        run: node scripts/check-env-example.mjs
+
+      - name: Run the Glance judgment corpus
+        run: node flow-trial-extension/test/judgment-corpus.cjs
