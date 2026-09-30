@@ -38,5 +38,14 @@ export const SHADOW_XL =
   '0 8px 20px rgba(0,0,0,0.55), 0 40px 90px rgba(0,0,0,0.5), 0 90px 180px rgba(0,0,0,0.42)';
 export const GLOW_AI = `0 0 90px ${VIOLET}44, 0 0 180px ${BLUE}33`;
 
+/* The Malpractice Shield's color — deliberately distinct from both the AI
+   palette and SUCCESS, so it reads as its own signal (Hebrew cut). */
+export const WARNING = '#F5A623';
+export const WARNING_DARK = '#C97A0A';
+export const GLOW_WARNING = `0 0 60px ${WARNING}55`;
+
 export const FONT_STACK =
   '"Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif';
+
+/* Self-hosted (public/fonts/Heebo-*.woff2) — Inter has no Hebrew glyphs. */
+export const FONT_STACK_HE = '"Heebo", "Inter", sans-serif';

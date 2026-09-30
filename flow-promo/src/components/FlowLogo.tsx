@@ -1,4 +1,5 @@
 import React from 'react';
+import { interpolate, useCurrentFrame } from 'remotion';
 import { FONT_STACK } from '../theme';
 
 /**
@@ -6,11 +7,23 @@ import { FONT_STACK } from '../theme';
  * reference: a polished metal ramp with a hard horizon, a specular sweep
  * across the upper half, and a few mercury droplets shedding off the type.
  *
+ * `progress` (0..1, default 1 = the original static crisp look) drives a
+ * liquid-metal -> solid-chrome coalescing effect for the Hebrew cut's logo
+ * formation beat: at 0 the turbulence displacement is strong and boiling,
+ * settling to the resting design as progress reaches 1.
+ *
  * If the real logo file is added to public/, Outro.tsx uses that instead.
  */
-export const FlowLogo: React.FC<{ height?: number }> = ({ height = 300 }) => {
+export const FlowLogo: React.FC<{ height?: number; progress?: number }> = ({ height = 300, progress = 1 }) => {
+  const frame = useCurrentFrame();
   const w = height * 3.1;
   const uid = 'flowlogo';
+
+  const scale = interpolate(progress, [0, 1], [42, 7]);
+  const freqA = interpolate(progress, [0, 1], [0.05, 0.012]);
+  const freqB = interpolate(progress, [0, 1], [0.09, 0.03]);
+  const seed = progress < 1 ? Math.floor(frame * 0.06) : 7;
+  const dropletOpacity = interpolate(progress, [0.7, 1], [0, 1], { extrapolateLeft: 'clamp' });
 
   return (
     <svg width={w} height={height} viewBox="0 0 620 200" style={{ display: 'block', overflow: 'visible' }}>
@@ -35,8 +48,8 @@ export const FlowLogo: React.FC<{ height?: number }> = ({ height = 300 }) => {
         </linearGradient>
 
         <filter id={`${uid}-molten`} x="-15%" y="-25%" width="130%" height="150%">
-          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.03" numOctaves={3} seed={7} result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale={7} xChannelSelector="R" yChannelSelector="G" />
+          <feTurbulence type="fractalNoise" baseFrequency={`${freqA} ${freqB}`} numOctaves={3} seed={seed} result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={scale} xChannelSelector="R" yChannelSelector="G" />
         </filter>
 
         <linearGradient id={`${uid}-edge`} x1="0" y1="0" x2="0" y2="1">
@@ -96,11 +109,11 @@ export const FlowLogo: React.FC<{ height?: number }> = ({ height = 300 }) => {
         </text>
       </g>
 
-      {/* mercury droplets shedding off the wordmark */}
-      <circle cx="521" cy="44" r="13" fill={`url(#${uid}-chrome)`} />
-      <circle cx="546" cy="72" r="8" fill={`url(#${uid}-chrome)`} />
-      <circle cx="96" cy="40" r="9" fill={`url(#${uid}-chrome)`} />
-      <circle cx="72" cy="66" r="6" fill={`url(#${uid}-chrome)`} />
+      {/* mercury droplets shedding off the wordmark — appear as it settles */}
+      <circle cx="521" cy="44" r="13" fill={`url(#${uid}-chrome)`} opacity={dropletOpacity} />
+      <circle cx="546" cy="72" r="8" fill={`url(#${uid}-chrome)`} opacity={dropletOpacity} />
+      <circle cx="96" cy="40" r="9" fill={`url(#${uid}-chrome)`} opacity={dropletOpacity} />
+      <circle cx="72" cy="66" r="6" fill={`url(#${uid}-chrome)`} opacity={dropletOpacity} />
     </svg>
   );
 };

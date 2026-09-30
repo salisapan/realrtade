@@ -16,7 +16,9 @@ export type DocKind =
   | 'jira'
   | 'notion'
   | 'calendar'
-  | 'hubspot';
+  | 'hubspot'
+  | 'gov'
+  | 'insurer';
 
 const Line: React.FC<{ w: string | number; h?: number; c?: string }> = ({
   w,
@@ -307,6 +309,24 @@ export const DocumentPage: React.FC<{ kind: DocKind }> = ({ kind }) => {
             <div style={{ width: 15, height: 15, borderRadius: 4, border: '2px solid rgba(17,17,17,0.3)' }} />
             <Line w="46%" h={8} />
           </div>
+        </Shell>
+      );
+
+    case 'gov':
+      return (
+        <Shell accent="#3B4B63" title="רשות המסים" meta="דיווח עסקת מקרקעין">
+          <Line w="70%" h={14} c="rgba(17,17,17,0.32)" />
+          <Line w="100%" />
+          <Line w="88%" />
+        </Shell>
+      );
+
+    case 'insurer':
+      return (
+        <Shell accent="#B84A2E" title="מערכת מייצגים" meta="הנפקת פוליסה">
+          <Line w="64%" h={14} c="rgba(17,17,17,0.32)" />
+          <Line w="92%" />
+          <Line w="70%" />
         </Shell>
       );
 
