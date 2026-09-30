@@ -58,18 +58,16 @@ function htmlBody(lang, downloadUrl) {
     : "Thanks for requesting early access to Glance. Installing it takes under a minute — just follow the steps below.";
   var steps = isHe
     ? [
-        'הורידו את קובץ ה-ZIP וחלצו אותו לתיקייה.',
-        'ב-Chrome, פתחו chrome://extensions.',
-        'הפעילו את מצב המפתחים (Developer mode) בפינה הימנית העליונה.',
+        'הורידו את קובץ ה-ZIP וחלצו אותו לתיקייה שתשמרו. Chrome מריץ את Glance מהתיקייה הזו, אז אל תמחקו אותה.',
+        'ב-Chrome, פתחו chrome://extensions והפעילו את מצב המפתחים (Developer mode) בפינה הימנית העליונה.',
         'לחצו Load unpacked ובחרו את התיקייה שחילצתם.',
-        'פתחו את התוסף, בחרו לאן Glance רשאי לכתוב, ולחצו שמירה.',
+        'פתחו את Gmail. Glance שותק עד שמייל באמת מכריע משהו, אז אל תיבהלו אם בהתחלה לא מופיע כלום.',
       ]
     : [
-        'Download the ZIP file and unzip it to a folder.',
-        'In Chrome, open chrome://extensions.',
-        'Turn on Developer mode (top-right corner).',
-        'Click Load unpacked and select the unzipped folder.',
-        'Open the extension, choose where Glance may write, and hit Save & start.',
+        'Download the ZIP file and unzip it into a folder you will keep. Chrome runs Glance from that folder, so do not delete it.',
+        'In Chrome, open chrome://extensions and switch on Developer mode (top-right corner).',
+        'Click Load unpacked and choose that folder.',
+        'Open Gmail. Glance stays quiet until an email actually decides something, so do not worry if nothing shows up at first.',
       ];
   var stepsHtml = steps
     .map(function (s, i) {

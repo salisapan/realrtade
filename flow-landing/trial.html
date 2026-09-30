@@ -297,6 +297,10 @@ p{margin:0 0 15px}
 .note-box .ic{flex:none; width:20px; height:20px; margin-top:2px; color:var(--warn)}
 .note-box b{color:var(--ink)}
 
+.formcard .linkbtn:not(.doit){all:unset; cursor:pointer; color:var(--ink-3); font-size:.83rem; text-decoration:underline; text-underline-offset:3px}
+.formcard .linkbtn:not(.doit):hover{color:var(--accent)}
+.formcard .linkbtn:not(.doit):focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+.dl-warn{color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line); border-radius:10px; padding:10px 14px; margin:0 0 18px}
 .dlpanel{text-align:center}
 .dlpanel:focus{outline:none}
 .dl-lead{display:flex; align-items:center; justify-content:center; gap:10px; margin:0 0 20px; font-size:1.15rem; font-weight:700; color:var(--ink)}
@@ -399,6 +403,7 @@ footer.site a{color:var(--ink-3)}
   gtag('js', new Date());
   gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
 </script>
+<script src="/assets/site-config.js"></script>
 </head>
 <body>
 <canvas id="bgcanvas" aria-hidden="true"></canvas>
@@ -523,15 +528,21 @@ footer.site a{color:var(--ink-3)}
         </form>
 
         <div class="dlpanel" id="dlPanel" hidden tabindex="-1">
-          <p class="dl-lead"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span>You&rsquo;re in. Your download is starting.</span></p>
-          <span class="magnetic"><a class="doit glance" id="dlBtn" href="#" download><span class="shell"></span><span class="ring"></span><span class="shine"></span>Download Glance</a></span>
+          <p class="dl-lead"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg><span id="dlLead">You&rsquo;re in. Your download is starting.</span></p>
+          <p class="fine dl-warn" id="dlWarn" hidden></p>
+          <span class="magnetic"><a class="doit glance" id="dlBtn" href="#" download><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="dlBtnLabel">Download Glance</span></a></span>
           <p class="fine" id="dlRetry">Nothing happened? Click the button above.</p>
-          <ol class="dl-steps">
-            <li><b>Unzip</b> the file to a folder you&rsquo;ll keep.</li>
-            <li>In Chrome, open <code>chrome://extensions</code> <button type="button" class="copy-mini" id="copyExt">Copy</button> and turn on <b>Developer mode</b> (top-right).</li>
-            <li>Click <b>Load unpacked</b> and choose that folder. Then open Glance and sign in with the Google account it should write to.</li>
-          </ol>
+          <div id="dlSteps">
+            <ol class="dl-steps">
+              <li><b>Unzip</b> the file into a folder you&rsquo;ll keep. Chrome runs Glance from that folder, so don&rsquo;t delete it.</li>
+              <li>In Chrome, open <code id="extUrl">chrome://extensions</code> <button type="button" class="copy-mini" id="copyExt">Copy</button> and switch on <b>Developer mode</b> (top-right).</li>
+              <li>Click <b>Load unpacked</b> and choose that folder. Glance is now installed.</li>
+              <li>Open Gmail. Glance stays quiet until an email actually decides something, so don&rsquo;t worry if nothing appears at first.</li>
+            </ol>
+            <p class="fine">Glance isn&rsquo;t in the Chrome Web Store yet, which is why it installs this way. It only reads the Gmail message you have open.</p>
+          </div>
           <p class="fine" id="dlEmailNote"></p>
+          <p class="fine"><button type="button" class="linkbtn" id="dlOther">Use a different email</button></p>
         </div>
       </div>
     </section>
@@ -675,17 +686,46 @@ footer.site a{color:var(--ink-3)}
   if(!form) return;
   var email=document.getElementById('trialEmail'), btn=document.getElementById('trialBtn'), btnLabel=document.getElementById('trialBtnLabel'),
       status=document.getElementById('trialStatus'), honey=form.querySelector('.hp'),
-      panel=document.getElementById('dlPanel'), dlBtn=document.getElementById('dlBtn'), emailNote=document.getElementById('dlEmailNote'), copyBtn=document.getElementById('copyExt');
+      panel=document.getElementById('dlPanel'), dlBtn=document.getElementById('dlBtn'), dlBtnLabel=document.getElementById('dlBtnLabel'),
+      dlLead=document.getElementById('dlLead'), dlWarn=document.getElementById('dlWarn'), dlRetry=document.getElementById('dlRetry'),
+      dlSteps=document.getElementById('dlSteps'), emailNote=document.getElementById('dlEmailNote'),
+      copyBtn=document.getElementById('copyExt'), extUrl=document.getElementById('extUrl'), other=document.getElementById('dlOther');
+  var STORE=(window.FLOW_CONFIG&&window.FLOW_CONFIG.chromeStoreUrl)||'';
+  var KEY='glance_dl';
+  var ua=navigator.userAgent||'';
+  var isMobile=/Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  var isFirefox=/Firefox\//.test(ua);
+  var isSafari=/Safari\//.test(ua)&&!/Chrome|Chromium|CriOS|Edg|OPR|Brave/i.test(ua);
+  var isEdge=/Edg\//.test(ua);
+  if(isEdge&&extUrl) extUrl.textContent='edge://extensions';
+
+  // Published on the Web Store? Then "Add to Chrome" is the whole install and
+  // every manual step goes away. The hero button goes straight to the store too.
+  if(STORE){
+    var heroCta=document.querySelector('.hero-banner a.doit.glance[href="#signup"]');
+    if(heroCta){ heroCta.href=STORE; heroCta.target='_blank'; heroCta.rel='noopener'; heroCta.lastChild.textContent='Add to Chrome \u2014 free'; }
+    var h=document.querySelector('#signup h2'); if(h) h.textContent='Get the link by email';
+    var sp=document.querySelector('#signup .sec-head p'); if(sp) sp.textContent='Prefer it in your inbox? Enter your email and we will send the link.';
+    btnLabel.textContent='Email me the link';
+  }
+
+  function remember(v,url){
+    try{ var e=Number(new URL(url).searchParams.get('exp'))||0; localStorage.setItem(KEY,JSON.stringify({email:v,url:url,exp:e})); }catch(e){}
+  }
+  function recall(){
+    try{ var o=JSON.parse(localStorage.getItem(KEY)||'null'); if(o&&o.url&&o.exp>Date.now()+86400000) return o; }catch(e){}
+    return null;
+  }
 
   function fail(msg){
-    btn.disabled=false; btnLabel.textContent='Get Glance';
+    btn.disabled=false; btnLabel.textContent=STORE?'Email me the link':'Get Glance';
     status.className='status err'; status.textContent=msg;
   }
 
   // Starts the download without leaving the page. A hidden iframe is used on
   // purpose: if the function ever answers with an error page, it lands in an
   // invisible frame instead of replacing this one, and the visible button
-  // below stays as the fallback either way.
+  // stays as the fallback either way.
   function startDownload(url){
     try{
       var f=document.createElement('iframe');
@@ -694,13 +734,47 @@ footer.site a{color:var(--ink-3)}
     }catch(e){}
   }
 
+  // One panel, three situations: Web Store (one click), a phone (nothing to
+  // download here, so say so and lean on the email), or a desktop download.
+  function showPanel(v,url,opts){
+    opts=opts||{};
+    form.hidden=true; panel.hidden=false;
+    dlWarn.hidden=true; dlRetry.hidden=false; dlSteps.hidden=false; dlBtn.removeAttribute('download');
+    if(STORE){
+      dlLead.textContent='You\u2019re in. One click to add it.';
+      dlBtnLabel.textContent='Add to Chrome'; dlBtn.href=STORE; dlBtn.target='_blank'; dlBtn.rel='noopener';
+      dlRetry.hidden=true; dlSteps.hidden=true;
+    } else if(isMobile){
+      dlLead.textContent='Open this on your computer.';
+      dlBtnLabel.textContent='Copy the download link'; dlBtn.href=url; dlBtn.setAttribute('download','');
+      dlWarn.textContent='Glance is a Chrome extension, so it installs on a desktop or laptop, not on a phone.';
+      dlWarn.hidden=false; dlRetry.hidden=true; dlSteps.hidden=true;
+    } else {
+      dlLead.textContent=opts.back?'Welcome back. Your download is ready.':'You\u2019re in. Your download is starting.';
+      dlBtnLabel.textContent='Download Glance'; dlBtn.href=url; dlBtn.setAttribute('download','');
+      if(isFirefox||isSafari){
+        dlWarn.textContent='Glance runs in Chrome (or Edge or Brave). Download it here, then open Chrome to install.';
+        dlWarn.hidden=false;
+      }
+      if(!opts.back) startDownload(url);
+    }
+    if(opts.emailed===true) emailNote.textContent='We also sent the link to '+v+', so you can install later or on another computer.';
+    else if(opts.emailed===false) emailNote.textContent='Keep this page open until the file has finished downloading.';
+    else emailNote.textContent='';
+    if(!opts.back){ panel.focus({preventScroll:true}); panel.scrollIntoView({behavior:'smooth',block:'center'}); }
+  }
+
+  // A returning visitor already has a live link: show it instead of asking again.
+  var saved=recall();
+  if(saved) showPanel(saved.email,saved.url,{back:true});
+
   form.addEventListener('submit', function(ev){
     ev.preventDefault();
     var v=(email.value||'').trim();
     if(!EMAIL_RE.test(v)){
       status.className='status err'; status.textContent='Enter a valid email address.'; email.focus(); return;
     }
-    btn.disabled=true; btnLabel.textContent='One moment…';
+    btn.disabled=true; btnLabel.textContent='One moment\u2026';
     status.className=''; status.textContent='';
 
     // ref_code carries the referring install's id when this visit came from
@@ -719,18 +793,11 @@ footer.site a{color:var(--ink-3)}
           fail(res.j && res.j.error ? res.j.error : 'Something went wrong on our side. Please try again in a moment, or email hello@theflow-ai.com.');
           return;
         }
-        form.hidden=true;
-        panel.hidden=false;
-        dlBtn.href=res.j.downloadUrl;
-        emailNote.textContent = res.j.emailed
-          ? 'We also sent the link to '+v+', in case you want to install later.'
-          : 'Keep this page open until the file has finished downloading.';
-        startDownload(res.j.downloadUrl);
-        panel.focus({preventScroll:true});
-        panel.scrollIntoView({behavior:'smooth',block:'center'});
+        remember(v,res.j.downloadUrl);
+        showPanel(v,res.j.downloadUrl,{emailed:!!res.j.emailed});
         if(typeof gtag==='function'){
           gtag('event','trial_signup_submit',{stored:res.j.stored?1:0});
-          gtag('event','download_start',{kind:'trial'});
+          if(!isMobile) gtag('event','download_start',{kind:'trial'});
         }
       })
       .catch(function(){
@@ -739,10 +806,23 @@ footer.site a{color:var(--ink-3)}
       });
   });
 
-  dlBtn.addEventListener('click', function(){ if(typeof gtag==='function') gtag('event','download_start',{kind:'trial',via:'button'}); });
+  dlBtn.addEventListener('click', function(ev){
+    if(typeof gtag==='function') gtag('event', STORE?'store_click':'download_start',{kind:'trial',via:'button'});
+    if(isMobile && !STORE){
+      ev.preventDefault();
+      var u=dlBtn.getAttribute('href');
+      function ok(){ dlBtnLabel.textContent='Link copied'; setTimeout(function(){ dlBtnLabel.textContent='Copy the download link'; },2000); }
+      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(u).then(ok,function(){});
+    }
+  });
+
+  if(other) other.addEventListener('click', function(){
+    try{ localStorage.removeItem(KEY); }catch(e){}
+    panel.hidden=true; form.hidden=false; btn.disabled=false; btnLabel.textContent=STORE?'Email me the link':'Get Glance'; email.value=''; email.focus();
+  });
 
   if(copyBtn) copyBtn.addEventListener('click', function(){
-    var txt='chrome://extensions';
+    var txt=extUrl?extUrl.textContent:'chrome://extensions';
     function ok(){ copyBtn.textContent='Copied'; setTimeout(function(){ copyBtn.textContent='Copy'; },1800); }
     if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(ok,function(){}); }
     else { var t=document.createElement('textarea'); t.value=txt; document.body.appendChild(t); t.select(); try{ document.execCommand('copy'); ok(); }catch(e){} document.body.removeChild(t); }

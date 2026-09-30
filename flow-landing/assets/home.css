@@ -739,3 +739,17 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 }
 .skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans,sans-serif); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
+
+/* who is behind Flow */
+.team-sec{padding-block:clamp(40px,6vw,72px)}
+.team-sec .sec-head{text-align:center; margin-inline:auto}
+.team-row{display:grid; gap:16px; grid-template-columns:1fr; max-width:760px; margin:28px auto 0}
+@media (min-width:700px){ .team-row{grid-template-columns:1fr 1fr} }
+.team-card{display:flex; align-items:center; gap:16px; padding:18px 20px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); text-decoration:none; color:inherit; transition:transform .2s, border-color .2s}
+.team-card:hover{transform:translateY(-2px); border-color:var(--cat)}
+.team-card:focus-visible{outline:2px solid var(--cat); outline-offset:3px}
+.team-card img{width:64px; height:64px; border-radius:50%; object-fit:cover; flex:none}
+.team-card span{display:flex; flex-direction:column; gap:2px}
+.team-card b{color:var(--txt-hi); font-size:1.02rem}
+.team-card i{font-style:normal; color:var(--cat); font-size:.82rem; font-weight:600}
+.team-card small{color:var(--muted); font-size:.83rem; line-height:1.45}

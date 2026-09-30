@@ -69,6 +69,22 @@
     state = await FlowStorage.get();
     renderConnectors();
     renderStatusPill();
+    renderSetupDone();
+  }
+
+  // Once a system is connected there is nothing left to save, so the button
+  // gives way to a plain "you're set" line. Disconnecting brings it back.
+  function renderSetupDone() {
+    const saveBtn = document.getElementById('save');
+    const note = document.getElementById('saved-note');
+    if (!saveBtn || !note) return;
+    const connected = Object.keys(status || {}).some((k) => status[k].connected);
+    const done = connected && !!(state && state.onboarded);
+    saveBtn.style.display = done ? 'none' : '';
+    if (done) {
+      note.textContent = 'You\u2019re set. Open an email in Gmail \u2014 Glance stays quiet until one matters.';
+      note.hidden = false;
+    }
   }
 
   function renderStatusPill() {
@@ -173,7 +189,9 @@
       Object.keys(inputs).forEach((k) => { msg[k] = inputs[k].value; });
       const res = await send(msg);
       if (res && res.ok) {
-        await FlowStorage.set({ connectorId: c.id });
+        // Connecting IS the setup. Making people also press "Save & start"
+        // afterwards was a second click that did nothing the first did not.
+        await FlowStorage.set({ connectorId: c.id, onboarded: true });
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'connector_configured', params: { connector: c.id } });
         await refresh();
       } else {

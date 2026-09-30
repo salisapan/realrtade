@@ -1,0 +1,19 @@
+# Flow (theflow-ai.com)
+
+> Flow is a cognitive workflow engine for organizations with sensitive data. It watches for what happened (a deal closes, a contract is signed, a case is approved), proposes the update across your files and stack, and writes it when a person approves. Sensitive data is masked before processing and high-risk steps wait for human approval.
+
+Flow is an independent company. It is not affiliated with Google Flow, flow-ai.com (Aiven) or "The Flow" (Avi Sela).
+
+## Founders
+- Sali Sapan, CEO and Co-Founder. Attorney at Fischer Behar Chen; LL.B. and B.A. (Reichman University); M.Sc. in Data Science and Machine Learning (Bar-Ilan University).
+- Tomer Steinmetz, CTO and Co-Founder. B.Sc. in Computer Science (Reichman University); AI Engineer at Amazon; previously Team Lead at Hypernative.
+
+## Products
+- Flow: for organizations with sensitive data. Scoped per engagement. Pricing: https://theflow-ai.com/pricing.html
+- Glance: a free Chrome extension for individuals that closes one email into one real record (calendar event, task or drafted reply) in Google. A separate product from Flow. https://theflow-ai.com/trial.html
+
+## Key pages
+- About and founders: https://theflow-ai.com/about.html
+- Security: https://theflow-ai.com/security.html
+- Research library: https://theflow-ai.com/blog/
+- Contact: https://theflow-ai.com/contact.html
