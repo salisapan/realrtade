@@ -19,6 +19,14 @@
   node_bundler = "none"
   included_files = ["netlify/functions/download-trial-zip/flow-trial-extension.zip"]
 
+# send-playbook attaches the Playbook PDF by reading it from disk. The default
+# esbuild bundler ships only what the handler imports, so without this the
+# deployed function could not find the PDF and every confirmed Flow waitlist
+# signup would get "Attachment unavailable" instead of the Playbook it was promised.
+[functions."send-playbook"]
+  node_bundler = "none"
+  included_files = ["netlify/functions/send-playbook/hybrid-automation-playbook.pdf"]
+
 # Clean slug for the Glance BragJack trust page. The file stays .html,
 # matching the rest of flow-landing. This rewrite serves it at the
 # extensionless path even if Pretty URLs are off in the Netlify UI.

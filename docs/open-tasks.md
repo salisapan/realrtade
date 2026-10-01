@@ -21,6 +21,7 @@ Last updated: 2026-10-01
 | 6 | Send LinkedIn links (Sali, Tomer, company page) so `sameAs` can be added | open | owner | 2026-10-07 | ClickUp: https://app.clickup.com/t/z8vk7p8nh5. Claude then adds `sameAs` to JSON-LD on `index.html` and `about.html`. |
 | 7 | Publish Glance on the Chrome Web Store, then set `chromeStoreUrl` in `flow-landing/assets/site-config.js` | open | owner | - | Turns every "Get Glance" path into one-click "Add to Chrome". Submission drafts: `flow-trial-extension/docs/chrome-web-store-submission.md`. |
 | 8 | Re-check Google AI Mode for "theflow-ai.com founders" a few days after #1 and #5 | open | owner | ~2026-10-14 | Expect Sali Sapan and Tomer Steinmetz; if not, revisit entity signals. |
+| 9 | After deploy: confirm a Flow waitlist sign-up receives the Playbook PDF | open | Claude + owner | after #1-3 | `send-playbook` now ships its PDF via `netlify.toml` (`node_bundler = "none"` + `included_files`); verify end to end once deployed. |
 
 ## Decisions waiting for an answer
 
@@ -33,6 +34,8 @@ Last updated: 2026-10-01
 
 ## Done (recent)
 
+- 2026-10-01: Playbook promise fixed: `send-playbook` could not find its PDF on Netlify (default bundler skips it); added `included_files`. Light-theme fixes for founder cards and header wordmark. Visual check in light/dark and desktop/mobile of the new homepage sections, Pricing, About and the Glance download panel.
+- 2026-10-01: Open-tasks file plus a scheduled routine (weekdays 07:47 Israel) that checks state and syncs; ClickUp sync needs connectors the org does not allow on routines.
 - 2026-10-01: Founders section on the homepage, richer Person/Organization data, `llms.txt`, About title/lead naming the founders.
 - 2026-09-30: Glance sign-up gives an instant download (`trial-signup` function, 28 tests), device-aware install panel, returning-visitor memory, store-ready config.
 - 2026-09-30: Glance setup questions (work domain, caution, team size) removed from `trial.html`; popup "Save & start" step removed.

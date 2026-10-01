@@ -753,3 +753,6 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 .team-card b{color:var(--txt-hi); font-size:1.02rem}
 .team-card i{font-style:normal; color:var(--cat); font-size:.82rem; font-weight:600}
 .team-card small{color:var(--muted); font-size:.83rem; line-height:1.45}
+:root[data-theme="light"] .team-card{background:#fff; box-shadow:0 1px 2px rgba(20,44,100,.08), 0 14px 32px -20px rgba(20,44,100,.28)}
+:root[data-theme="light"] .team-card small{color:#566180}
+:root[data-theme="light"] .nav .brand img{filter:brightness(.42) contrast(1.25)}

@@ -212,7 +212,15 @@ exports.handler = async function (event) {
 
   var pdfBase64;
   try {
-    var pdfPath = path.join(__dirname, 'hybrid-automation-playbook.pdf');
+    // Same layout problem download-trial-zip solves: __dirname differs between
+    // `netlify dev` and the deployed function, so take the first path that exists.
+    var pdfName = 'hybrid-automation-playbook.pdf';
+    var pdfCandidates = [
+      path.join(__dirname, pdfName),
+      path.join(process.cwd(), 'netlify', 'functions', 'send-playbook', pdfName),
+      path.join(process.cwd(), pdfName)
+    ];
+    var pdfPath = pdfCandidates.filter(function (c) { try { return fs.existsSync(c); } catch (e) { return false; } })[0] || pdfCandidates[0];
     pdfBase64 = fs.readFileSync(pdfPath).toString('base64');
     log('PDF attachment loaded', { bytes: Math.round((pdfBase64.length * 3) / 4) });
   } catch (err) {
