@@ -1,3 +1,10 @@
+## Open tasks file — keep it current
+
+`docs/open-tasks.md` is the running list of open tasks, blockers, decisions and
+their status. Whenever a task, blocker, owner action or decision comes up in
+conversation, add it there; when one is finished or changes status, update it in
+the same turn, and refresh the "Last updated" date. Link the ClickUp task when one exists.
+
 ## Product architecture — read before touching pricing, positioning, or feature scope
 
 Flow Trial (Free + Pro) and Flow (the core product) are **two separate
