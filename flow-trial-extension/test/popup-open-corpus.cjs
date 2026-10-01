@@ -40,6 +40,7 @@ function makeNode(tag) {
     setAttribute(k, v) { this.attrs[k] = v; },
     getAttribute(k) { return this.attrs[k]; },
     addEventListener(k, fn) { (this.listeners[k] = this.listeners[k] || []).push(fn); },
+    classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
     querySelectorAll: () => [],
     querySelector: () => null,
     // exportRecipe() (Setup tab's own Export button, and the referral card's
@@ -137,7 +138,8 @@ function load(stored, opts) {
     [SRC, 'storage.js'],
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],
-    [SRC, 'receipt-copy.js']
+    [SRC, 'receipt-copy.js'],
+    [CORE, 'follow-up.js'], [CORE, 'entitlements.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });

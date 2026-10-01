@@ -552,77 +552,123 @@
   }
 
 
-  // ---- Waiting on -----------------------------------------------------------
-  // What the account asked others for and has not had answered. Free tracks
-  // three at a time; Pro tracks all of them and adds the money line. Nothing
-  // here reads mail: every record was made by the person clicking "Remind me".
+  // ---- Open loops: what others owe you ---------------------------------------
+  // A loop is something you asked for and have not had back. Free follows three
+  // at a time and drafts the friendly nudge; Pro follows all of them, shows the
+  // money still owed to you, and drafts the firmer second and last third nudge.
+  // Nothing here reads mail: every record was made by the person clicking
+  // "Stay on it", and every change to it came from them or from a reply they
+  // opened in Gmail.
   function dayShort(iso) {
     const d = new Date(iso + 'T00:00:00');
     return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
+  function whoLabel(w) {
+    return FlowFollowUp.firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email) || (w.subject || 'Reply');
+  }
+
+  function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
+
   async function renderWaiting() {
-    const block = document.getElementById('waitingBlock');
     const all = await FlowStorage.getWatches();
+    const now = Date.now();
     const active = all.filter(FlowFollowUp.isActive)
       .sort((a, b) => (a.chaseIso || '').localeCompare(b.chaseIso || ''));
+    const block = document.getElementById('waitingBlock');
     block.hidden = active.length === 0;
-    if (!active.length) return;
+    const recent = FlowFollowUp.recentlyClosed(all, now, 5);
+    document.getElementById('onYouLabel').hidden = active.length === 0 && recent.length === 0;
+    if (!all.length) { document.getElementById('closedBlock').hidden = true; return; }
 
     const status = await send({ type: 'flow:pro-status' });
-    const pro = FlowEntitlements.isActive(status && status.record, Date.now());
-    const now = Date.now();
-    const sum = FlowFollowUp.summarize(all, now);
+    const record = status && status.record;
+    const pro = FlowEntitlements.isActive(record, now);
+    renderClosed(recent, active.length, record, now);
+    if (!active.length) return;
 
+    const sum = FlowFollowUp.summarize(all, now);
     const line = document.getElementById('waitingSummary');
     line.replaceChildren();
-    const parts = [el('b', null, String(sum.active)), document.createTextNode(' open')];
-    if (sum.overdue) { parts.push(document.createTextNode(' · ')); parts.push(el('b', null, String(sum.overdue))); parts.push(document.createTextNode(' overdue')); }
-    parts.forEach((n) => line.appendChild(n));
+    const segs = [[String(sum.active), ' open']];
+    if (sum.overdue) segs.push([String(sum.overdue), ' overdue']);
     const payments = active.filter((w) => w.kind === 'payment' && w.amount && w.amount.value > 0);
+    if (payments.length && pro) segs.push(['owed to you ', sum.moneyOwed.map(FlowFollowUp.formatMoney).join(' + ')]);
+    if (sum.closedThisMonth) segs.push([String(sum.closedThisMonth), ' closed this month']);
+    if (pro && sum.paidThisMonth.length) segs.push(['paid ', sum.paidThisMonth.map(FlowFollowUp.formatMoney).join(' + ')]);
+    segs.forEach((seg, i) => {
+      if (i) line.appendChild(document.createTextNode(' · '));
+      // First part plain, second bold, except the leading count which is bold.
+      if (/^\d/.test(seg[0])) { line.appendChild(el('b', null, seg[0])); line.appendChild(document.createTextNode(seg[1])); }
+      else { line.appendChild(document.createTextNode(seg[0])); line.appendChild(el('b', null, seg[1])); }
+    });
+
     const upsell = document.getElementById('waitingUpsell');
     upsell.hidden = true;
-    if (payments.length && pro) {
-      line.appendChild(document.createTextNode(' · owed to you '));
-      line.appendChild(el('b', null, sum.moneyOwed.map(FlowFollowUp.formatMoney).join(' + ')));
-    } else if (payments.length) {
+    if (payments.length && !pro) {
       upsell.hidden = false;
-      upsell.textContent = payments.length + (payments.length === 1 ? ' payment is' : ' payments are') + ' being chased. Glance Pro shows the total owed to you.';
+      upsell.textContent = plural(payments.length, 'payment is', 'payments are') + ' being chased. Glance Pro shows the total owed to you.';
     } else if (!pro && active.length >= FlowEntitlements.FREE_WATCH_CAP) {
       upsell.hidden = false;
-      upsell.textContent = 'You are using all ' + FlowEntitlements.FREE_WATCH_CAP + ' free follow-ups. Glance Pro tracks as many as you have.';
+      upsell.textContent = 'You are following all ' + FlowEntitlements.FREE_WATCH_CAP + ' free open loops. Glance Pro stays on every one until it is closed.';
     }
 
     const host = document.getElementById('waiting-list');
     host.replaceChildren();
-    for (const w of active) host.appendChild(waitingItem(w, now));
+    for (const w of active) host.appendChild(waitingItem(w, now, record));
   }
 
-  function waitingItem(w, now) {
+  function stageLabel(w, now) {
+    const d = FlowFollowUp.daysOpen(w, now);
+    const age = d === 0 ? 'opened today' : 'day ' + (d + 1);
+    const stage = FlowFollowUp.stageOf(w);
+    if (stage === 'promised' && w.promisedIso) return 'Promised ' + dayShort(w.promisedIso) + ' · ' + age;
+    if (stage === 'nudged') return 'Chased ' + plural(w.nudges || 1, 'time', 'times') + ' · ' + age;
+    return 'Waiting · ' + age;
+  }
+
+  // A function, not a const: renderWaiting() runs before a const down here would
+  // be initialised (the same trap noted at the top of popupInit).
+  function nudgeLabel(level) { return level === 2 ? 'Draft a firmer nudge' : level === 3 ? 'Draft a last nudge' : null; }
+
+  function waitingItem(w, now, record) {
     const state = FlowFollowUp.watchState(w, now);
+    const isPay = w.kind === 'payment';
     const item = el('div', 'wait-item');
     const top = el('div', 'wait-top');
-    top.appendChild(el('span', 'wait-who', FlowFollowUp.firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email) || (w.subject || 'Reply')));
+    top.appendChild(el('span', 'wait-who', whoLabel(w)));
     top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : ''), state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : 'Chase ' + dayShort(w.chaseIso)));
     item.appendChild(top);
+    item.appendChild(el('div', 'wait-meta', stageLabel(w, now)));
     const what = el('div', 'wait-what');
-    if (w.kind === 'payment' && w.amount && w.amount.raw) what.appendChild(el('span', 'wait-amt', w.amount.raw + ' · '));
+    if (isPay && w.amount && w.amount.raw) what.appendChild(el('span', 'wait-amt', w.amount.raw + ' · '));
     what.appendChild(document.createTextNode(w.what));
     item.appendChild(what);
     const note = el('p', 'wait-note');
     note.hidden = true;
     const acts = el('div', 'wait-acts');
+
     if (w.counterpart && w.counterpart.email) {
-      const nudge = el('button', 'ghost sm', state === 'overdue' ? 'Draft a nudge' : 'Nudge now');
+      const level = FlowFollowUp.nextNudgeLevel(w);
+      const gate = FlowEntitlements.nudgeGate(level, record, now);
+      const base = nudgeLabel(level) || (state === 'overdue' ? 'Draft a nudge' : 'Nudge now');
+      const label = gate.allowed ? base : base + ' · Pro';
+      const nudge = el('button', 'ghost sm', label);
       nudge.type = 'button';
       nudge.addEventListener('click', async () => {
-        nudge.disabled = true; nudge.textContent = 'Drafting…';
-        const res = await send({ type: 'flow:follow-draft', payload: { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject, body: FlowFollowUp.nudgeText(w) } });
-        nudge.disabled = false; nudge.textContent = state === 'overdue' ? 'Draft a nudge' : 'Nudge now';
         note.hidden = false;
+        if (!gate.allowed) {
+          note.replaceChildren(document.createTextNode('The firmer follow-ups are part of Glance Pro. The friendly first nudge stays free. '));
+          const a = el('a', null, 'See Glance Pro');
+          a.href = FlowEntitlements.PRICING_URL; a.target = '_blank'; a.rel = 'noopener';
+          note.appendChild(a);
+          return;
+        }
+        nudge.disabled = true; nudge.textContent = 'Drafting…';
+        const res = await send({ type: 'flow:follow-draft', payload: { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject, body: FlowFollowUp.nudgeText(w, level, now) } });
+        nudge.disabled = false; nudge.textContent = label;
         if (res && res.ok) {
-          note.textContent = 'A draft is waiting in Gmail. Nothing was sent.';
-          await FlowStorage.updateWatch(w.id, { nudges: (w.nudges || 0) + 1 });
+          note.textContent = 'A draft is waiting in Gmail. Nothing was sent. Send it and I will move the next look out.';
           send({ type: 'flow:track', event: 'follow_nudge_drafted', params: {} });
         } else {
           note.textContent = (res && res.reason === 'not-connected') ? 'Connect Google first (Setup tab).' : 'Could not create the draft. Try again.';
@@ -630,6 +676,17 @@
       });
       acts.appendChild(nudge);
     }
+
+    const done = el('button', 'ghost sm', isPay ? 'Mark paid' : 'Mark done');
+    done.type = 'button';
+    done.addEventListener('click', async () => {
+      await FlowStorage.updateWatch(w.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: isPay ? 'paid' : 'manual' });
+      if (w.taskRef) send({ type: 'flow:follow-complete', ref: w.taskRef });
+      send({ type: 'flow:track', event: 'follow_resolved', params: {} });
+      await renderWaiting();
+    });
+    acts.appendChild(done);
+
     const stop = el('button', 'ghost sm', 'Stop tracking');
     stop.type = 'button';
     stop.addEventListener('click', async () => {
@@ -641,6 +698,55 @@
     item.appendChild(acts);
     item.appendChild(note);
     return item;
+  }
+
+  // Closed lately, each with a Reopen. A loop closed by mistake (or one that
+  // came back to life) goes straight back on the list.
+  function renderClosed(recent, activeCount, record, now) {
+    const block = document.getElementById('closedBlock');
+    block.hidden = recent.length === 0;
+    const host = document.getElementById('closed-list');
+    host.replaceChildren();
+    for (const w of recent) {
+      const item = el('div', 'wait-item closed-item');
+      const top = el('div', 'wait-top');
+      const amt = w.kind === 'payment' && w.amount && w.amount.raw ? w.amount.raw + ' · ' : '';
+      top.appendChild(el('span', 'wait-who', whoLabel(w)));
+      const days = FlowFollowUp.daysOpen(w, w.resolvedAt || now);
+      top.appendChild(el('span', 'wait-state ok', (w.closedAs === 'paid' ? 'Paid' : 'Closed') + (days >= 1 ? ' · ' + plural(days, 'day', 'days') : '')));
+      item.appendChild(top);
+      item.appendChild(el('div', 'wait-what', amt + w.what));
+      const note = el('p', 'wait-note');
+      note.hidden = true;
+      const acts = el('div', 'wait-acts');
+      const reopen = el('button', 'ghost sm', 'Reopen');
+      reopen.type = 'button';
+      reopen.addEventListener('click', async () => {
+        const gate = FlowEntitlements.watchGate(activeCount, record, Date.now());
+        if (!gate.allowed) {
+          note.hidden = false;
+          note.textContent = 'You are following ' + gate.used + ' of ' + gate.cap + ' open loops. Close one first, or see Glance Pro.';
+          return;
+        }
+        const patch = FlowFollowUp.reopenPatch(w, Date.now());
+        await FlowStorage.updateWatch(w.id, patch);
+        if (w.taskRef) {
+          const r = await send({ type: 'flow:follow-reopen', ref: w.taskRef, dueIso: patch.chaseIso });
+          if (r && r.reason === 'gone') {
+            const next = Object.assign({}, w, patch);
+            const cp = next.counterpart || {};
+            const made = await send({ type: 'flow:follow-task', payload: { title: FlowFollowUp.taskTitle(next), dueIso: patch.chaseIso, what: next.what, counterpart: cp.name ? cp.name + (cp.email ? ' <' + cp.email + '>' : '') : cp.email, threadUrl: next.threadUrl || null } });
+            if (made && made.ok && made.ref) await FlowStorage.updateWatch(w.id, { taskRef: made.ref });
+          }
+        }
+        send({ type: 'flow:track', event: 'follow_reopened', params: {} });
+        await renderWaiting();
+      });
+      acts.appendChild(reopen);
+      item.appendChild(acts);
+      item.appendChild(note);
+      host.appendChild(item);
+    }
   }
 
   async function renderOpen() {

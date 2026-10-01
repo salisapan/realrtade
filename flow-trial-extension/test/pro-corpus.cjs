@@ -79,6 +79,10 @@ const liveRecord = (over) => Object.assign({ key: KEY, valid: true, status: 'act
   // ------------------------------------------------------------ policy helpers
   const now = Date.now();
   check('a key with the right shape normalises', FlowEntitlements.normalizeKey(KEY.toLowerCase().replace(/-/g, ' ')) === KEY);
+  const activeRec = FlowEntitlements.recordFromVerification(KEY, { valid: true, status: 'active' }, 1000);
+  check('Free may draft only the friendly nudge', FlowEntitlements.nudgeGate(1, null, 2000).allowed && !FlowEntitlements.nudgeGate(2, null, 2000).allowed && !FlowEntitlements.nudgeGate(3, null, 2000).allowed);
+  check('Pro may draft all three nudge levels', [1, 2, 3].every((l) => FlowEntitlements.nudgeGate(l, activeRec, 2000).allowed) && FlowEntitlements.nudgeGate(1, activeRec, 2000).pro === true);
+  check('a lapsed key is Free again for nudges', !FlowEntitlements.nudgeGate(2, activeRec, 1000 + FlowEntitlements.OFFLINE_GRACE_MS + 1).allowed);
   check('garbage is not a key', FlowEntitlements.normalizeKey('hello') === null && FlowEntitlements.normalizeKey(null) === null);
   const sample = ['GLNC-5RST4-QAHHX-YNVFT-93Q2N', 'glnc5rst4qahhxynvft93q2n', 'GLNC-5RST4-QAHHX-YNVFT-93Q2', 'GLNC-5RST4-QAHHX-YNVFT-93Q2O', 'XXXX-5RST4-QAHHX-YNVFT-93Q2N', ''];
   check('the extension and the server agree on what a key is', sample.every((s) => FlowEntitlements.normalizeKey(s) === serverCore.normalizeKey(s)), sample.map((s) => [FlowEntitlements.normalizeKey(s), serverCore.normalizeKey(s)]));

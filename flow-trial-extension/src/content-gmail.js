@@ -627,9 +627,13 @@
     // so it runs before the incoming-mail logic below, which skips the
     // account's own messages entirely. It never blocks or alters that logic.
     if (typeof FlowFollow !== 'undefined') {
+      // Read the message BODY, not the whole row: the row's text carries the
+      // sender's name, "to me" and the date, which would look like content.
+      const bodyOf = (node) => (node && node.querySelector && node.querySelector('.a3s.aiL, .a3s')) || node;
       FlowFollow.consider({
-        messages, ownEmail, extractSender, ownMessageText,
-        messageText: (node) => ownMessageText(node),
+        messages, ownEmail, extractSender,
+        ownMessageText: (node) => ownMessageText(bodyOf(node)),
+        messageText: (node) => ownMessageText(bodyOf(node)),
         threadIdFrom, subject: currentSubject(), threadUrl
       }).catch((e) => console.error('[Glance] follow-up check failed', e));
     }

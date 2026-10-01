@@ -1172,6 +1172,42 @@ async function followTaskComplete(ref) {
   return { ok: res.ok || res.status === 404 };
 }
 
+// The chase day moved (they promised a date, or you chased and it slid out).
+// Same midnight-UTC convention as the create. A Task that was deleted is
+// reported as 'gone' so the caller can create a fresh one instead of silently
+// leaving the loop without a reminder.
+async function followTaskPatch(ref, fields) {
+  if (!ref || !ref.taskId) return { ok: false, reason: 'invalid' };
+  const auth = await getGoogleTasksAuth();
+  const listId = ref.taskListId || (auth && auth.taskListId);
+  if (!listId) return { ok: false, reason: 'not-connected' };
+  const res = await googleTasksAuthedFetch(
+    '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId),
+    { method: 'PATCH', body: JSON.stringify(fields) }
+  );
+  if (res.status === 404) return { ok: false, reason: 'gone' };
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  return { ok: res.ok };
+}
+
+function followDue(dueIso) {
+  return dueIso && /^\d{4}-\d{2}-\d{2}$/.test(dueIso) ? dueIso + 'T00:00:00.000Z' : null;
+}
+
+async function followTaskSchedule(ref, dueIso) {
+  const due = followDue(dueIso);
+  if (!due) return { ok: false, reason: 'invalid' };
+  return followTaskPatch(ref, { due });
+}
+
+// Back from the closed list: the Task is open again, on the new chase day.
+async function followTaskReopen(ref, dueIso) {
+  const fields = { status: 'needsAction', completed: null };
+  const due = followDue(dueIso);
+  if (due) fields.due = due;
+  return followTaskPatch(ref, fields);
+}
+
 async function findThreadIdTo(recipientEmail, subject) {
   if (!recipientEmail) return null;
   try {
@@ -2715,6 +2751,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:follow-task') return reply(sendResponse, followTaskCreate(msg.payload || {}));
   if (msg.type === 'flow:follow-complete') return reply(sendResponse, followTaskComplete(msg.ref));
+  if (msg.type === 'flow:follow-reschedule') return reply(sendResponse, followTaskSchedule(msg.ref, msg.dueIso));
+  if (msg.type === 'flow:follow-reopen') return reply(sendResponse, followTaskReopen(msg.ref, msg.dueIso));
   if (msg.type === 'flow:follow-draft') return reply(sendResponse, followDraftCreate(msg.payload || {}));
 
   if (msg.type === 'flow:pro-status') return reply(sendResponse, proStatus());

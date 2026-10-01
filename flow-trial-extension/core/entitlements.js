@@ -21,6 +21,11 @@ const FlowEntitlements = (() => {
   // which is honest for a local feature: it is a limit on a convenience, not a
   // lock on a paid model call, and the paid model calls are checked by the server.
   const FREE_WATCH_CAP = 3;
+  // The friendly first nudge is free. The firmer second and last third are the
+  // chase doing its job for you, which is what Pro is for. Enforced on this
+  // device only, like the cap above: a nudge is a draft the person edits.
+  const FREE_NUDGE_LEVEL = 1;
+  const PRO_NUDGE_LEVEL = 3;
   const NUDGE_MIN_CLOSES = 5;
   const NUDGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
   const PRICING_URL = 'https://theflow-ai.com/pricing.html#glance-pro';
@@ -105,8 +110,14 @@ const FlowEntitlements = (() => {
     return { allowed: activeCount < FREE_WATCH_CAP, pro: false, cap: FREE_WATCH_CAP, used: activeCount };
   }
 
+  // Highest nudge level this person may draft, and whether `level` is allowed.
+  function nudgeGate(level, record, now) {
+    const max = isActive(record, now) ? PRO_NUDGE_LEVEL : FREE_NUDGE_LEVEL;
+    return { allowed: level <= max, max, pro: max === PRO_NUDGE_LEVEL };
+  }
+
   return {
-    FREE_WATCH_CAP, watchGate,
+    FREE_WATCH_CAP, FREE_NUDGE_LEVEL, PRO_NUDGE_LEVEL, watchGate, nudgeGate,
     OFFLINE_GRACE_MS, RECHECK_AFTER_MS, NUDGE_MIN_CLOSES, NUDGE_COOLDOWN_MS, PRICING_URL,
     normalizeKey, isActive, needsRecheck, recordFromVerification, describe, shouldNudge
   };

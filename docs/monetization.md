@@ -44,6 +44,8 @@ that decides a booking. Gmail does nothing about that. Boomerang and Superhuman
 charge $15–30 a month for reminders of exactly this kind, which is the price
 signal for the category.
 
+The sharpest version of the offer is **protection plus pursuit**: it stops money and replies from disappearing, and it stays on the loop until it is closed. The full model (lifecycle, what does and does not close a loop, the real-Gmail test script) is in `docs/open-loops.md`.
+
 So Glance now does two jobs:
 
 1. **Catches what was decided** (Do It, unchanged and free).
@@ -57,9 +59,10 @@ So Glance now does two jobs:
 | | Free | Pro |
 |---|---|---|
 | Do It (Calendar, Tasks, drafts, Undo) | yes, no limit | same |
-| Waiting on | **3 at a time** | **as many as you have** |
-| Money owed to you (total of the payments being chased) | hidden | shown |
-| Nudge drafts for overdue items | yes (template, never sent) | yes |
+| Open loops (Waiting on) | **3 at a time** | **as many as you have** |
+| Loop closes by itself on a real reply, promise moves the chase day, Reopen | yes | yes |
+| Money owed to you, and paid this month | hidden | shown |
+| Nudge drafts | friendly first nudge only (never sent) | friendly, firmer and last (never sent) |
 | Draft-It (AI reply) and attachment summaries | no | yes (server-enforced) |
 
 **Why the limit is 3.** The limit sits on the thing that grows with the value
@@ -129,7 +132,7 @@ classification" fallback stays off for everyone (`REMOTE_CLASSIFY = false`).
 - Pages: Pricing (checkout when live, "Notify me" until then), `/pro-welcome.html`
   (shows the key right after paying), privacy and terms updated.
 - Tests: `verify-license/license.test.cjs` (57 checks), `test/pro-corpus.cjs`,
-  `test/follow-up-corpus.cjs` (what is and is not an ask, dates, money, settling),
+  `test/follow-up-corpus.cjs` (what is and is not an ask, dates, money, and what a reply does: ack, promise, paid, close),
   `test/follow-write-corpus.cjs` (storage and the three Google writes) and
   `test/follow-gmail-harness.cjs` (the real content scripts in a Gmail-shaped page).
 

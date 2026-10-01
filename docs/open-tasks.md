@@ -23,7 +23,7 @@ Last updated: 2026-10-01
 | 8 | Re-check Google AI Mode for "theflow-ai.com founders" a few days after #1 and #5 | open | owner | ~2026-10-14 | Expect Sali Sapan and Tomer Steinmetz; if not, revisit entity signals. |
 | 9 | After deploy: confirm a Flow waitlist sign-up receives the Playbook PDF | open | Claude + owner | after #1-3 | `send-playbook` now ships its PDF via `netlify.toml` (`node_bundler = "none"` + `included_files`); verify end to end once deployed. |
 | 10 | When Supabase is restored: confirm migration `20260928170000_landing_lead_schema.sql` is applied (waitlist `ref_code`, `confirmed_at`, `leads` table) | open | owner + Claude | after #2 | Code writes these columns; they could not be checked while the project is paused. |
-| 11 | Switch on Glance Pro payments: Stripe account, prices, webhook, Netlify env vars, Supabase migration, real-Gmail check of Draft-It, test-mode purchase, then `PRO_PUBLIC=1`. **Also verify Waiting on in real Gmail before merging** | open | owner | 2026-10-08 | Full order in `docs/monetization.md` §5. ClickUp: https://app.clickup.com/t/z8vk7p8q64 |
+| 11 | Switch on Glance Pro payments: Stripe account, prices, webhook, Netlify env vars, Supabase migration, real-Gmail check of Draft-It, test-mode purchase, then `PRO_PUBLIC=1`. **Also run the 12-step real-Gmail script in `docs/open-loops.md` §6 (open loops: ack/promise/chase/close/reopen/payment) before merging** | open | owner | 2026-10-08 | Full order in `docs/monetization.md` §5; loop behaviour in `docs/open-loops.md`. ClickUp: https://app.clickup.com/t/z8vk7p8q64 |
 
 ## Decisions waiting for an answer
 
@@ -40,6 +40,7 @@ Last updated: 2026-10-01
 
 ## Done (recent)
 
+- 2026-10-01: Glance reframed as an open-loop system (`docs/open-loops.md`). A loop now has stages (waiting, nudged, promised, closed); a reply is read for what it did (out-of-office and "thanks" leave it open, a dated promise moves the chase day, a real answer closes it, a payment closes only when they say it was paid, otherwise it asks once); three nudge levels (friendly free, firmer and last Pro); Reopen; "Loops" tab with days open, money owed and paid this month; site and Pro copy leads with money on the line. Also fixed: month-and-day dates in your own message threw inside the follow-up check. New checks in `follow-up-corpus` (+60), `follow-write-corpus` (+9), `follow-gmail-harness` (+14).
 - 2026-10-01: Glance's paid value rebuilt around money and deadlines. New "Waiting on": your own message asks for something (or sends an invoice) -> one card -> a Google Task on the chase day -> completed automatically when they reply; nudge drafts; the Free limit of 3; a Pro-only total owed to you. Pricing page wording fixed ("Join the Pro waitlist" replaces "Notify Me"). 66 + 27 + 18 new checks.
 
 - 2026-10-01: Glance Pro payment rails (not live until `PRO_PUBLIC=1`): Stripe Checkout, signature-verified webhook, derived licence keys (hash only in the database), key check / resend / billing portal, a server-side licence gate on `glance-assist` (it was open to anyone and calls paid models), Pro card in the extension panel, welcome page, pricing page that switches from Notify Me to checkout by itself, privacy and terms updated, 57 + 40 new checks. Founders section back on the homepage. Plan and owner steps: `docs/monetization.md`.

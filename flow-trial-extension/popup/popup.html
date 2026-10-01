@@ -15,7 +15,7 @@
 
   <nav class="tabs" role="tablist">
     <button class="tab" data-tab="setup" role="tab" aria-selected="true">Setup</button>
-    <button class="tab" data-tab="open" role="tab" aria-selected="false">Open</button>
+    <button class="tab" data-tab="open" role="tab" aria-selected="false">Loops</button>
     <button class="tab" data-tab="log" role="tab" aria-selected="false">Activity</button>
   </nav>
 
@@ -33,7 +33,7 @@
       <div class="block pro-block" id="proBlock">
         <button type="button" class="referral-x" id="proNudgeX" aria-label="Not now" hidden>&times;</button>
         <p class="label">Glance Pro <span class="pro-badge" id="proBadge" hidden></span></p>
-        <p class="hint" id="proPitch" hidden>Follow up on everything you are waiting on, with the total owed to you. Draft replies and read attachments with AI; names, amounts and dates are masked on this device first. Everything else in Glance stays free.</p>
+        <p class="hint" id="proPitch" hidden>Glance Pro stays on every reply and payment you are waiting on until it is closed: no limit on how many, the money still owed to you in one number, and firmer follow-ups when it matters. It also drafts replies and reads attachments; names, amounts and dates are masked on this device first. Everything else in Glance stays free.</p>
         <div class="recipe-row" id="proActions">
           <button type="button" class="ghost sm" id="proStart" hidden>Start free trial</button>
           <button type="button" class="ghost sm" id="proManage" hidden>Manage billing</button>
@@ -60,15 +60,21 @@
     </section>
 
     <section data-panel="open" class="panel">
+      <div class="waiting first" id="waitingBlock" hidden>
+        <p class="label">Waiting on others</p>
+        <p class="waiting-sum" id="waitingSummary"></p>
+        <div id="waiting-list" class="log-list"></div>
+        <p class="hint" id="waitingUpsell" hidden></p>
+      </div>
+
+      <p class="label on-you" id="onYouLabel" hidden>On you</p>
       <p class="hint">מה עדיין פתוח · Still open. Up to three things you can close from here — the same list as the morning brief. If nothing is clearly still open, this stays empty.</p>
       <div id="open-list" class="log-list"></div>
       <p id="open-empty" class="hint" hidden>Nothing still open.</p>
 
-      <div class="waiting" id="waitingBlock" hidden>
-        <p class="label">Waiting on</p>
-        <p class="waiting-sum" id="waitingSummary"></p>
-        <div id="waiting-list" class="log-list"></div>
-        <p class="hint" id="waitingUpsell" hidden></p>
+      <div class="waiting" id="closedBlock" hidden>
+        <p class="label">Closed lately</p>
+        <div id="closed-list" class="log-list"></div>
       </div>
     </section>
 

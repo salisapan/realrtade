@@ -130,6 +130,28 @@ async function backgroundTests() {
   r = await w.fn('followTaskComplete')(null);
   check('no reference, no request', r.ok === false && w.calls.length === 1, r);
 
+  // rescheduling (they promised a date / you chased) and reopening
+  w = load({ stored: auth, routes: [[TASKS, { method: 'PATCH', reply: ok({}) }]] });
+  r = await w.fn('followTaskSchedule')({ taskListId: 'LIST1', taskId: 'T1' }, '2026-10-16');
+  const moved = w.calls[0];
+  check('a moved chase day PATCHes only the due date', r.ok && moved.method === 'PATCH' && moved.body.due === '2026-10-16T00:00:00.000Z' && Object.keys(moved.body).join() === 'due', { r, moved });
+  r = await w.fn('followTaskSchedule')({ taskListId: 'LIST1', taskId: 'T1' }, 'next friday');
+  check('a malformed day is refused without a request', r.ok === false && r.reason === 'invalid' && w.calls.length === 1, r);
+  r = await w.fn('followTaskSchedule')(null, '2026-10-16');
+  check('no Task reference, no request', r.ok === false && r.reason === 'invalid' && w.calls.length === 1, r);
+  w = load({ stored: auth, routes: [[TASKS, { method: 'PATCH', reply: status(404) }]] });
+  r = await w.fn('followTaskSchedule')({ taskListId: 'LIST1', taskId: 'GONE' }, '2026-10-16');
+  check('a deleted Task is reported as gone, so the caller can make a new one', r.ok === false && r.reason === 'gone', r);
+  w = load({ stored: auth, routes: [[TASKS, { method: 'PATCH', reply: status(403) }]] });
+  r = await w.fn('followTaskSchedule')({ taskListId: 'LIST1', taskId: 'T1' }, '2026-10-16');
+  check('a revoked grant reads as not-connected', r.reason === 'not-connected', r);
+  w = load({ stored: auth, routes: [[TASKS, { method: 'PATCH', reply: ok({}) }]] });
+  r = await w.fn('followTaskReopen')({ taskListId: 'LIST1', taskId: 'T1' }, '2026-10-13');
+  const reopened = w.calls[0];
+  check('reopening makes the Task open again on the new day', r.ok && reopened.body.status === 'needsAction' && reopened.body.completed === null && reopened.body.due === '2026-10-13T00:00:00.000Z', { r, reopened });
+  r = await w.fn('followTaskReopen')({ taskListId: 'LIST1', taskId: 'T1' }, null);
+  check('reopening without a day still reopens', r.ok && w.calls[1].body.status === 'needsAction' && !('due' in w.calls[1].body), w.calls[1]);
+
   // nudge draft
   const watch = F.buildWatch({ threadId: 't', messageId: 'm', subject: 'Vendor booking', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, ask: F.classifyOutgoing('Please confirm the final figure by Monday so I can book the vendor.', { now: new Date(2026, 9, 1, 12).getTime(), extract: FlowExtract }), now: 1 });
   w = load({ stored: auth, routes: [

@@ -1,12 +1,17 @@
-// "Waiting on" in Gmail — the content-script half of core/follow-up.js.
+// Open loops in Gmail — the content-script half of core/follow-up.js.
 //
-// Two moments, both quiet:
+// A loop is something you are owed. Glance opens one when you ask, and stays
+// on it until reality closes it. Four quiet moments:
 //   1. You open a thread whose NEWEST message is yours and it asks someone for
 //      something (an answer, a signature, a payment). One small card offers to
-//      remind you on the day to chase, and to settle the reminder by itself if
-//      they reply.
-//   2. You open a thread you were waiting on and the newest message is now
-//      theirs. The reminder is completed, with a one-line receipt.
+//      take the loop and look again on the day to chase.
+//   2. You chase it yourself. Your message is recognised as a chase, the next
+//      look moves out, and the next nudge Glance drafts will be firmer.
+//   3. They answer. Glance reads what the answer DID: "got it, thanks" and an
+//      out-of-office leave the loop open, "I will pay Friday" moves the day to
+//      Friday, a real answer closes it, and on a payment only "it was paid"
+//      closes it — otherwise it asks, once.
+//   4. A closed loop can be reopened from its receipt.
 //
 // Everything is local except the writes the person approves (a Google Task, an
 // optional Gmail draft). The card is position:fixed, appended to <body>, like
@@ -78,25 +83,149 @@ const FlowFollow = (() => {
     return b;
   }
 
-  function receipt(text, undo) {
+  // `undo` is a function (labelled "Undo") or { label, run }.
+  function receipt(text, undo, action) {
     const h = card(false);
     h.appendChild(el('div', 'flow-fu-line', text));
-    if (undo) {
+    const act = action || (undo ? { label: 'Undo', run: undo } : null);
+    if (act) {
       const row = el('div', 'flow-fu-actions');
-      row.appendChild(button('Undo', 'ghost', undo));
+      row.appendChild(button(act.label, 'ghost', act.run));
       h.appendChild(row);
     }
     clearTimeout(hideTimer);
     hideTimer = setTimeout(dismiss, RECEIPT_MS);
   }
 
-  // ---- 2. a reply settles the reminder ---------------------------------------
-  async function settle(watch, who, lastText) {
-    await FlowStorage.updateWatch(watch.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'reply' });
+  // ---- helpers ------------------------------------------------------------------
+  function amountLabel(w) {
+    if (!w.amount) return '';
+    return w.amount.currency && w.amount.value ? FlowFollowUp.formatMoney({ currency: w.amount.currency, value: w.amount.value }) : (w.amount.raw || '');
+  }
+
+  function took(w) {
+    const d = FlowFollowUp.daysOpen(w, Date.now());
+    return d >= 1 ? ' after ' + d + (d === 1 ? ' day' : ' days') : '';
+  }
+
+  function whoOf(sender) {
+    return FlowFollowUp.firstName(sender && sender.name, sender && sender.email) || 'They';
+  }
+
+  function taskPayload(watch) {
+    const cp = watch.counterpart || {};
+    return {
+      title: FlowFollowUp.taskTitle(watch),
+      dueIso: watch.chaseIso,
+      what: watch.what,
+      counterpart: cp.name ? cp.name + (cp.email ? ' <' + cp.email + '>' : '') : cp.email,
+      threadUrl: watch.threadUrl || null
+    };
+  }
+
+  // Move the reminder to the loop's new chase day. A Task the person deleted is
+  // recreated, so a loop never silently loses its reminder.
+  async function moveTask(watch, dueIso) {
+    if (!watch.taskRef) return;
+    const r = await send({ type: 'flow:follow-reschedule', ref: watch.taskRef, dueIso });
+    if (r && r.reason === 'gone') {
+      const made = await send({ type: 'flow:follow-task', payload: Object.assign(taskPayload(watch), { dueIso }) });
+      if (made && made.ok && made.ref) await FlowStorage.updateWatch(watch.id, { taskRef: made.ref });
+    }
+  }
+
+  // ---- 4. reopen -----------------------------------------------------------------
+  async function reopen(watch) {
+    const status = await send({ type: 'flow:pro-status' });
+    const list = await FlowStorage.getWatches();
+    const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
+    if (!gate.allowed) { await capCard(gate.used, gate.cap, true); return; }
+    const patch = FlowFollowUp.reopenPatch(watch, Date.now());
+    const next = await FlowStorage.updateWatch(watch.id, patch);
+    if (watch.taskRef) {
+      const r = await send({ type: 'flow:follow-reopen', ref: watch.taskRef, dueIso: patch.chaseIso });
+      if (r && r.reason === 'gone') await moveTask(Object.assign({}, watch, patch), patch.chaseIso);
+    }
+    track('follow_reopened');
+    receipt('Reopened. I will look again on ' + dayLabel(patch.chaseIso) + '.', null);
+    return next;
+  }
+
+  // ---- 3. what the answer did ------------------------------------------------------
+  async function closed(watch, sender, how) {
     if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
     track('follow_resolved');
-    const name = FlowFollowUp.firstName(who && who.name, who && who.email) || 'They';
-    receipt(name + ' replied. Your reminder is closed.', null);
+    const name = whoOf(sender);
+    const amt = amountLabel(watch);
+    const line = how === 'paid'
+      ? name + ' says it is paid' + (amt ? ' (' + amt + ')' : '') + took(watch) + '. Loop closed.'
+      : name + ' replied' + took(watch) + '. Loop closed.';
+    receipt(line, null, { label: 'Reopen', run: () => reopen(watch) });
+  }
+
+  async function promised(watch, sender, patch) {
+    await moveTask(Object.assign({}, watch, patch), patch.chaseIso);
+    track('follow_promised');
+    const name = whoOf(sender);
+    const line = patch.promisedIso
+      ? name + ' promised it for ' + dayLabel(patch.promisedIso) + '. I moved your reminder to ' + dayLabel(patch.chaseIso) + '.'
+      : name + ' said they will get to it. I will look again on ' + dayLabel(patch.chaseIso) + '.';
+    receipt(line, null);
+  }
+
+  // A payment thread got a reply that never says it was paid. Ask once.
+  function paidCard(watch, sender) {
+    const h = card(watch.lang === 'he');
+    h.appendChild(el('div', 'flow-fu-title', whoOf(sender) + ' replied. Is it paid?'));
+    h.appendChild(el('div', 'flow-fu-line', 'Nothing in the message says the payment was sent, so I kept the loop open.'));
+    const row = el('div', 'flow-fu-actions');
+    row.appendChild(button('Mark paid', 'primary', async () => {
+      const done = Object.assign({ status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: 'paid' });
+      await FlowStorage.updateWatch(watch.id, done);
+      await closed(Object.assign({}, watch, done), sender, 'paid');
+    }));
+    row.appendChild(button('Keep chasing', 'ghost', dismiss));
+    h.appendChild(row);
+  }
+
+  // Everything they wrote after the message that opened the loop, judged as one:
+  // an answer followed by a "thanks" is still an answer.
+  const RANK = { paid: 6, closed: 5, promised: 4, answered: 3, ack: 2, auto: 1 };
+  function judge(ctx, watch) {
+    const msgs = Array.from(ctx.messages);
+    let from = msgs.length - 1;
+    if (watch.messageId) {
+      const at = msgs.findIndex((m) => m.getAttribute('data-legacy-message-id') === watch.messageId);
+      if (at >= 0) from = at + 1;
+    }
+    let best = null;
+    for (let i = from; i < msgs.length; i++) {
+      const sender = ctx.extractSender(msgs[i]);
+      if (sender.email && sender.email.toLowerCase() === String(ctx.ownEmail).toLowerCase()) continue;
+      const reply = FlowFollowUp.classifyReply(ctx.messageText(msgs[i]), watch, { now: Date.now(), email: sender.email });
+      if (!best || (RANK[reply.outcome] || 0) > (RANK[best.reply.outcome] || 0)) best = { reply, sender };
+    }
+    return best;
+  }
+
+  async function handleReply(ctx, watch, lastId) {
+    const best = judge(ctx, watch);
+    if (!best) return;
+    const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
+    if (res.none) return;
+    const patch = Object.assign({}, res.patch, { lastReplyMessageId: lastId });
+    const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+    if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : 'replied');
+    else if (res.rescheduled) await promised(watch, best.sender, patch);
+    else if (res.confirm) paidCard(next, best.sender);
+  }
+
+  // ---- 2. you chased -----------------------------------------------------------------
+  async function chased(watch, lastId) {
+    const patch = Object.assign({ messageId: lastId }, FlowFollowUp.recordNudge(watch, Date.now()));
+    const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+    await moveTask(next, patch.chaseIso);
+    receipt('Chase noted. I will look again on ' + dayLabel(patch.chaseIso) + '.', null);
   }
 
   // ---- 1. offer ---------------------------------------------------------------
@@ -113,16 +242,8 @@ const FlowFollow = (() => {
 
   async function track1(ask, base) {
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
-    const res = await send({
-      type: 'flow:follow-task',
-      payload: {
-        title: FlowFollowUp.taskTitle(watch),
-        dueIso: watch.chaseIso,
-        what: watch.what,
-        counterpart: watch.counterpart.name ? watch.counterpart.name + (watch.counterpart.email ? ' <' + watch.counterpart.email + '>' : '') : watch.counterpart.email,
-        threadUrl: base.threadUrl
-      }
-    });
+    watch.threadUrl = base.threadUrl || null;
+    const res = await send({ type: 'flow:follow-task', payload: taskPayload(watch) });
     if (!res || !res.ok) {
       const msg = res && res.reason === 'not-connected'
         ? 'Open the Glance panel and connect Google first, then try again.'
@@ -133,7 +254,12 @@ const FlowFollow = (() => {
     watch.taskRef = res.ref || null;
     await FlowStorage.upsertWatch(watch);
     track('follow_tracked');
-    receipt('Reminder set for ' + dayLabel(watch.chaseIso) + '. If they reply, I will close it.', async () => {
+    const name = FlowFollowUp.firstName(watch.counterpart.name, watch.counterpart.email);
+    const amt = amountLabel(watch);
+    const head = watch.kind === FlowFollowUp.KINDS.PAYMENT
+      ? "I'm on this one now. Watching for " + (amt ? 'the ' + amt : 'the payment') + '.'
+      : "I'm on this one now.";
+    receipt(head + ' I will look again on ' + dayLabel(watch.chaseIso) + ' and close it when ' + (name ? name + (watch.kind === FlowFollowUp.KINDS.PAYMENT ? ' pays.' : ' answers.') : 'they ' + (watch.kind === FlowFollowUp.KINDS.PAYMENT ? 'pay.' : 'answer.')), async () => {
       await send({ type: 'flow:undo-action', connectorId: 'googleTask', ref: res.ref });
       await FlowStorage.updateWatch(watch.id, { status: 'stopped', resolvedAt: Date.now(), resolvedBy: 'undo' });
       dismiss();
@@ -154,21 +280,21 @@ const FlowFollow = (() => {
     const h = card(ask.lang === 'he');
     h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : 'Waiting on a reply?'));
     h.appendChild(el('div', 'flow-fu-quote', ask.what));
-    h.appendChild(el('div', 'flow-fu-line', 'I can remind you on ' + dayLabel(ask.chaseIso) + ' and close it by myself if they reply.'));
+    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + ', and close it myself when ' + (isPay ? 'it is paid.' : 'they answer.')));
     const row = el('div', 'flow-fu-actions');
-    row.appendChild(button('Remind me', 'primary', () => { track1(ask, base); }));
+    row.appendChild(button('Stay on it', 'primary', () => { track1(ask, base); }));
     row.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
     h.appendChild(row);
   }
 
-  async function capCard(active, cap) {
+  async function capCard(active, cap, reopening) {
     const stored = await new Promise((r) => chrome.storage.local.get(UPSELL_KEY, r));
     if (stored && stored[UPSELL_KEY] && Date.now() - stored[UPSELL_KEY] < UPSELL_COOLDOWN_MS) return;
     await new Promise((r) => chrome.storage.local.set({ [UPSELL_KEY]: Date.now() }, r));
     track('follow_cap_hit');
     const h = card(false);
-    h.appendChild(el('div', 'flow-fu-title', 'You are tracking ' + active + ' of ' + cap + ' follow-ups'));
-    h.appendChild(el('div', 'flow-fu-line', 'This one looks like it needs chasing too. Glance Pro tracks as many as you have, and shows what is owed to you.'));
+    h.appendChild(el('div', 'flow-fu-title', 'You are following ' + active + ' of ' + cap + ' open loops'));
+    h.appendChild(el('div', 'flow-fu-line', (reopening ? 'To reopen this one, another has to close first. ' : 'This one looks like it needs chasing too. ') + 'Glance Pro stays on every loop until it is closed, and shows the money still owed to you.'));
     const row = el('div', 'flow-fu-actions');
     row.appendChild(button('See Glance Pro', 'primary', () => { window.open(FlowEntitlements.PRICING_URL, '_blank', 'noopener'); dismiss(); }));
     row.appendChild(button('Not now', 'ghost', dismiss));
@@ -194,14 +320,11 @@ const FlowFollow = (() => {
     if (examined.size > 400) examined.clear();
     const watch = await FlowStorage.getWatch(threadId);
 
-    // A reply settles a live watch.
+    // They wrote last. What did the answer do to the loop?
     if (!lastIsOwn) {
-      if (watch && watch.status === 'waiting') {
-        const text = ctx.messageText(last);
-        if (FlowFollowUp.repliedSince(watch, { isOwn: false, text, email: sender.email }) && !settling.has(watch.id)) {
-          settling.add(watch.id);
-          try { await settle(watch, sender, text); } finally { settling.delete(watch.id); }
-        }
+      if (watch && watch.status === 'waiting' && !(watch.lastReplyMessageId && watch.lastReplyMessageId === lastId) && !settling.has(watch.id)) {
+        settling.add(watch.id);
+        try { await handleReply(ctx, watch, lastId); } finally { settling.delete(watch.id); }
       }
       return;
     }
@@ -209,7 +332,11 @@ const FlowFollow = (() => {
     // My own message is newest.
     if (watch) {
       if (watch.status === 'waiting') {
-        if (lastId && watch.messageId !== lastId) await FlowStorage.updateWatch(threadId, { messageId: lastId });
+        if (lastId && watch.messageId !== lastId) {
+          // A new message of mine in a thread I am waiting on: a chase, or just talk.
+          if (FlowFollowUp.looksLikeChase(ctx.ownMessageText(last))) await chased(watch, lastId);
+          else await FlowStorage.updateWatch(threadId, { messageId: lastId });
+        }
         return;
       }
       // Already offered (declined / closed) for this very message.

@@ -55,7 +55,9 @@ const ALLOWED_EVENTS = new Set([
   'follow_tracked',
   'follow_resolved',
   'follow_nudge_drafted',
-  'follow_cap_hit'
+  'follow_cap_hit',
+  'follow_reopened',
+  'follow_promised'
 ]);
 
 // Each allowed param key validates its own value rather than sharing one
