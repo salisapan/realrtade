@@ -304,8 +304,6 @@ footer.site a{color:var(--muted)}
 </footer>
 <script>
 (function(){
-  var SB_URL='https://zjquktirlrhbqcnkfaok.supabase.co';
-  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqcXVrdGlybHJoYnFjbmtmYW9rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MjIzNTAsImV4cCI6MjEwNDI5ODM1MH0.JxOiqHGNsZRZM_2aON1nspKhK_xpriW_q4FY11dxLPo';
   var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var form=document.getElementById('proNotifyForm');
   if(!form) return;
@@ -321,19 +319,22 @@ footer.site a{color:var(--muted)}
     btn.disabled=true; label.textContent='Sending…';
     status.className=''; status.textContent='';
 
-    function done(ok){
+    function done(ok,emailed){
       btn.disabled=false; label.textContent='Notify Me';
       status.className='tier-notify-status ' + (ok?'ok':'err');
-      status.textContent = ok
-        ? 'Check your inbox to confirm — we’ll email you when Pro launches.'
-        : 'Something went wrong. Please try again in a moment.';
+      status.textContent = !ok
+        ? 'Something went wrong. Please try again in a moment, or email hello@theflow-ai.com.'
+        : (emailed === false
+            ? 'You are on the list. The confirmation email did not send just now, so please submit once more in a few minutes.'
+            : 'Check your inbox to confirm — we’ll email you when Pro launches.');
     }
 
-    fetch(SB_URL+'/rest/v1/waitlist',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({email:v,lang:'en',source:'pricing-pro',created_at:new Date().toISOString()})})
-      .catch(function(){}); // best-effort; never blocks the confirmation email
-
-    fetch('/.netlify/functions/send-confirmation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:v,lang:'en',kind:'pro'})})
-      .then(function(r){ done(r.ok); })
+    // Stored server-side, so a database failure is reported instead of
+    // looking like success, and the confirmation email is only promised when
+    // it was actually handed to the mail provider.
+    fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',email:v,lang:'en',source:'pricing-pro',kind:'pro',hp:honey?honey.value:''})})
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&j.ok!==false,j:j}; }); })
+      .then(function(res){ done(res.ok,res.j.emailed); })
       .catch(function(){ done(false); });
 
     if(typeof gtag==='function') gtag('event','pricing_pro_notify_submit');

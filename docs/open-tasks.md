@@ -22,6 +22,7 @@ Last updated: 2026-10-01
 | 7 | Publish Glance on the Chrome Web Store, then set `chromeStoreUrl` in `flow-landing/assets/site-config.js` | open | owner | - | Turns every "Get Glance" path into one-click "Add to Chrome". Submission drafts: `flow-trial-extension/docs/chrome-web-store-submission.md`. |
 | 8 | Re-check Google AI Mode for "theflow-ai.com founders" a few days after #1 and #5 | open | owner | ~2026-10-14 | Expect Sali Sapan and Tomer Steinmetz; if not, revisit entity signals. |
 | 9 | After deploy: confirm a Flow waitlist sign-up receives the Playbook PDF | open | Claude + owner | after #1-3 | `send-playbook` now ships its PDF via `netlify.toml` (`node_bundler = "none"` + `included_files`); verify end to end once deployed. |
+| 10 | When Supabase is restored: confirm migration `20260928170000_landing_lead_schema.sql` is applied (waitlist `ref_code`, `confirmed_at`, `leads` table) | open | owner + Claude | after #2 | Code writes these columns; they could not be checked while the project is paused. |
 
 ## Decisions waiting for an answer
 
@@ -34,6 +35,7 @@ Last updated: 2026-10-01
 
 ## Done (recent)
 
+- 2026-10-01: Action-to-outcome audit of every form: Pricing Pro "Notify Me" no longer swallows database failures (now stored server-side and the confirmation email is only promised when sent); the homepage deployment form now notifies the owner when a lead completes it; both covered by tests (`submit-waitlist.test.cjs`).
 - 2026-10-01: Playbook promise fixed: `send-playbook` could not find its PDF on Netlify (default bundler skips it); added `included_files`. Light-theme fixes for founder cards and header wordmark. Visual check in light/dark and desktop/mobile of the new homepage sections, Pricing, About and the Glance download panel.
 - 2026-10-01: Open-tasks file plus a scheduled routine (weekdays 07:47 Israel) that checks state and syncs; ClickUp sync needs connectors the org does not allow on routines.
 - 2026-10-01: Founders section on the homepage, richer Person/Organization data, `llms.txt`, About title/lead naming the founders.

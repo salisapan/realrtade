@@ -661,7 +661,16 @@ async function run() {
 
     // Build up exactly what core/pmf-metrics.js's computeWeeklyHabit needs:
     // 3 distinct active days this week, plus one real close this week.
-    const today = Date.now();
+    // The week key buckets days as floor(dayOfYear / 7), so on the first day of a
+    // bucket (every 7th day from Jan 1) "yesterday" belongs to the previous
+    // week and this fixture would honestly report only one active day. Pin the
+    // clock to a mid-bucket day so the test does not depend on the day it runs.
+    // storage.js runs in its own vm realm, so the clock to pin is that realm's Date.
+    const sandboxDate = vm.runInContext('Date', sandbox);
+    const realNow = sandboxDate.now;
+    const pinned = new Date(2026, 8, 12, 12).getTime();
+    sandboxDate.now = () => pinned;
+    const today = pinned;
     await FlowStorage.set({
       activeDays: [new Date(today).toDateString(), new Date(today - 1 * 86400000).toDateString(), new Date(today - 2 * 86400000).toDateString()],
       closeStats: { total: 1, recent: [{ id: 'm1', ts: today }] }
@@ -674,6 +683,7 @@ async function run() {
 
     const secondFire = await FlowStorage.consumeWeeklyHabitTrigger();
     check('the SAME week never fires a second time, even though the bar is still met', secondFire === false);
+    sandboxDate.now = realNow;
   }
 
   console.log('\n--- storage.js: getPmfSnapshot() assembles current state through core/pmf-metrics.js ---\n');

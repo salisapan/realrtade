@@ -20,6 +20,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SB_URL = 'https://zjquktirlrhbqcnkfaok.supabase.co';
 const SITE_URL = 'https://theflow-ai.com';
 const LOG_PREFIX = '[submit-waitlist]';
+const OWNER_EMAIL = 'ai.local.flow@gmail.com';
 
 const LIMITS = { email: 200, company: 160, role: 120, website: 200 };
 
@@ -167,17 +168,32 @@ exports.handler = async function (event) {
       return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email hello@theflow-ai.com.' }) };
     }
 
-    // Fire-and-forget: emails a confirmation link (double opt-in). Not
-    // awaiting the result here matches the rest of this flow — the signup is
-    // already durably stored above, so a slow or failed send-confirmation
-    // call should not turn a successful signup into an error for the visitor.
-    fetch(SITE_URL + '/.netlify/functions/send-confirmation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, lang }),
-    }).catch((err) => logErr('send-confirmation trigger failed (non-fatal)', String(err)));
+    // Emails the confirmation link (double opt-in). Awaited with a timeout:
+    // a serverless function can be frozen the moment it responds, so a
+    // fire-and-forget call may never leave, and the visitor would be told
+    // "check your inbox" for an email that was never sent. The signup is
+    // already stored above, so a failed send is reported (emailed:false)
+    // rather than turned into a failed signup. 'pro' routes the Glance Pro
+    // launch-notice flow through the same stored-and-confirmed path.
+    const kind = payload.kind === 'pro' ? 'pro' : undefined;
+    let emailed = false;
+    try {
+      const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+      const timer = setTimeout(() => { if (ctl) ctl.abort(); }, 6000);
+      const r = await fetch(SITE_URL + '/.netlify/functions/send-confirmation', {
+        method: 'POST',
+        signal: ctl ? ctl.signal : undefined,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, lang, kind }),
+      });
+      clearTimeout(timer);
+      emailed = r.ok;
+      if (!r.ok) logErr('send-confirmation answered ' + r.status);
+    } catch (err) {
+      logErr('send-confirmation trigger failed (non-fatal)', String(err));
+    }
 
-    return { statusCode: 200, body: JSON.stringify({ ok: true, authExp, authSig }) };
+    return { statusCode: 200, body: JSON.stringify({ ok: true, emailed, authExp, authSig }) };
   }
 
   // action === 'update': the mandatory second step. A deployment lead with no
@@ -227,6 +243,36 @@ exports.handler = async function (event) {
       return { statusCode: 404, body: JSON.stringify({ error: 'We could not find your signup. Please re-enter your email above.' }) };
     }
     log('waitlist row updated', { email: maskEmail(email), company });
+
+    // The homepage promises "we'll come back with a real deployment plan", so a
+    // person has to actually be told a qualified lead arrived. Until now the
+    // role/company/website landed in the database and nobody was notified.
+    // Best-effort and time-boxed: the lead is already stored.
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey) {
+      const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      try {
+        const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+        const timer = setTimeout(() => { if (ctl) ctl.abort(); }, 6000);
+        const r = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          signal: ctl ? ctl.signal : undefined,
+          headers: { Authorization: 'Bearer ' + resendKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from: 'Flow <hello@theflow-ai.com>',
+            to: [OWNER_EMAIL],
+            subject: 'Flow deployment lead: ' + company + ' (' + role + ')',
+            html: '<p>A visitor completed the Flow deployment form and is expecting a deployment plan.</p>' +
+              '<table cellpadding="4"><tr><td>Email</td><td><b>' + esc(email) + '</b></td></tr><tr><td>Company</td><td>' + esc(company) +
+              '</td></tr><tr><td>Role</td><td>' + esc(role) + '</td></tr><tr><td>Website</td><td>' + esc(website) + '</td></tr></table>',
+          }),
+        });
+        clearTimeout(timer);
+        if (!r.ok) logErr('lead notification rejected', r.status);
+      } catch (err) {
+        logErr('lead notification failed (non-fatal)', String(err));
+      }
+    }
   } catch (err) {
     logErr('network error updating waitlist row', String(err));
     return { statusCode: 502, body: JSON.stringify({ error: 'We could not save that. Please try again or email hello@theflow-ai.com.' }) };
