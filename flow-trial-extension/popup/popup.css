@@ -343,3 +343,18 @@ main{padding:var(--space-5)}
 .wait-acts .ghost{margin-top:0}
 .wait-note{font-size:.74rem; color:var(--ink-2); margin:0}
 #waiting-list{max-height:none; overflow:visible}
+
+/* ---- Open loops: dimensions ---- */
+.seg{display:inline-flex; border:1px solid var(--line,rgba(127,127,127,.3)); border-radius:999px; overflow:hidden; margin:0 0 var(--space-3)}
+.seg[hidden]{display:none !important}
+.seg-btn{all:unset; cursor:pointer; padding:4px 12px; font:600 .72rem/1.2 inherit; color:var(--ink-2)}
+.seg-btn[aria-pressed="true"]{background:var(--accent-wash); color:var(--accent)}
+.seg-btn:focus-visible{outline:2px solid var(--accent); outline-offset:-2px}
+.person-head{display:flex; justify-content:space-between; align-items:baseline; margin:var(--space-4) 0 var(--space-2); font-size:.8rem; font-weight:700; color:var(--ink)}
+.person-head small{font-weight:600; color:var(--ink-2); font-size:.7rem}
+.wait-state.lapsed{color:var(--ink-3); background:rgba(127,127,127,.14)}
+.log-age{display:inline-block; font-size:.7rem; font-weight:700; color:var(--ink-3); margin-right:var(--space-2)}
+.log-age.stale{color:#E0A030}
+.log-age.late{color:#E5484D}
+.debrief-text{width:100%; box-sizing:border-box; min-height:64px; resize:vertical; font:.78rem/1.4 inherit; padding:var(--space-2) var(--space-3); border:1px solid var(--line,rgba(127,127,127,.35)); border-radius:8px; background:var(--surface,transparent); color:var(--ink)}
+.debrief-text:focus{outline:2px solid var(--accent); outline-offset:1px}

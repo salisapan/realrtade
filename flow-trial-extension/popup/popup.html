@@ -60,8 +60,23 @@
     </section>
 
     <section data-panel="open" class="panel">
-      <div class="waiting first" id="waitingBlock" hidden>
+      <div class="waiting first" id="debriefBlock" hidden>
+        <p class="label">After your meetings</p>
+        <div id="debrief-list" class="log-list"></div>
+      </div>
+
+      <div class="waiting" id="recurBlock" hidden>
+        <p class="label">Coming around again</p>
+        <div id="recur-list" class="log-list"></div>
+        <p class="hint" id="recurUpsell" hidden></p>
+      </div>
+
+      <div class="waiting" id="waitingBlock" hidden>
         <p class="label">Open loops</p>
+        <div class="seg" id="loopView" hidden>
+          <button type="button" class="seg-btn" data-view="date" aria-pressed="true">By date</button>
+          <button type="button" class="seg-btn" data-view="person" aria-pressed="false">By person</button>
+        </div>
         <p class="waiting-sum" id="waitingSummary"></p>
         <div id="waiting-list" class="log-list"></div>
         <p class="hint" id="waitingUpsell" hidden></p>
@@ -149,7 +164,11 @@
        Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../src/chrome-storage-adapter.js"></script>
   <script src="../src/receipt-copy.js"></script>
+  <script src="../core/request-types.js"></script>
   <script src="../core/follow-up.js"></script>
+  <script src="../core/expiry.js"></script>
+  <script src="../core/meeting-debrief.js"></script>
+  <script src="../core/recurrence.js"></script>
   <script src="../core/entitlements.js"></script>
   <script src="popup.js"></script>
 </body>

@@ -142,14 +142,34 @@ Extra real-Gmail steps for these:
 13. **Typed ask.** From A send: *"Could you please sign the NDA by Friday?"* Expect the "Waiting on a reply?" card even though no earlier phrasing covered it.
 14. **Your promise.** From A send: *"Sure, I'll send you the revised numbers by Friday."* Expect "You promised something". Tap Remind me, then reply in the thread *"Hi, attached are the numbers."* Expect "Promise kept… Loop closed." If instead the other person replies, nothing should close.
 
-## 9. Next dimensions on the same pattern (not built)
+## 9. Five more dimensions (built 2026-10-01, third pass)
 
-Ranked by how directly they stop something from disappearing:
-1. **Meetings that ended with actions.** A Calendar event passes; Glance asks once "what came out of it?" and opens loops for each commitment.
-2. **Things that expire.** Quotes, offers, trials and deadlines that pass silently ("valid until Oct 31"): remember and warn before they lapse.
-3. **Replies you owe that are going stale.** Incoming asks already open in Still Open; add an aging line ("owed 6 days") and a firmer reminder.
-4. **Recurring obligations.** The same ask every month (report, invoice): learn it and open the loop for you.
-5. **A person view.** "Everything open with Dana", across both directions.
+All local, all deterministic (`docs/local-first-principle.md`), all silent when
+unsure. Tests: `test/loop-dimensions-corpus.cjs` plus harness and storage cases.
+
+1. **Meetings that ended with actions** (`core/meeting-debrief.js`). When Do It puts a meeting on the Calendar, Glance remembers its title and date only. From the day after, for ten days, the Loops tab asks "What came out of it?". You type one line each ("Dana to send the contract by Friday", "I will share the deck", Hebrew too); each line with a real action becomes a loop, yours or theirs, with a Task. Chatter is skipped. Nothing is read from your calendar.
+2. **Things that run out** (`core/expiry.js`). A message stating "valid until Oct 31", "your trial ends", "renews on", "תקף עד" gets one card offering to look again three days before. Only validity wording counts; "due by" asks belong to the other lists. Sales, discounts, coupons, newsletters and no-reply senders are ignored. Shown in the Loops tab with days left, then "Lapsed".
+3. **Replies you owe that go stale.** Still Open rows now say how long it has been on you ("On you 5 days"), amber from 3 days, red from 7. Display only: no new card or notification.
+4. **Things that come around again** (`core/recurrence.js`). From the days you opened loops with the same person for the same kind of thing, Glance learns a rhythm: at least three occurrences, regular gaps, between a week and about three months. When the next is due it shows "Around Oct 13 — you have asked about every month". **Pro** shows what and when and offers a Task; Free sees one line that something comes around again.
+5. **A person view.** "By person" in the Loops tab groups everything open with each person, both directions, most overdue first, with the money they owe (Pro).
+
+Counting: expiry reminders and debrief loops count toward the Free limit of 3
+open loops like any other loop. Local data added: meeting titles and dates, and
+loop-open dates per person (never message text), capped.
+
+Extra real-Gmail steps:
+
+15. **Meeting.** Do It a message that proposes a meeting on a date, then (or change the date to yesterday in a test) open the Loops tab the next day. Expect "After your meetings". Type *Dana to send the contract by Friday* and *I will share the deck*, tap Add to loops. Expect two loops.
+16. **Expiry.** Receive (or send yourself from another account) *"This quote is valid until October 31, 2026, so please let us know."* Expect "This offer ends Sat, Oct 31" and a reminder three days before. A promotional email with "40% off, offer ends…" must show nothing.
+17. **Aging.** Leave a Still Open item for 3+ days: the age turns amber.
+18. **Rhythm.** After three monthly loops with the same person, the Loops tab shows "Coming around again" near the next date (Pro).
+19. **By person.** With two or more loops open, switch to By person.
+
+## 9b. Still not built
+
+- Reading the Calendar itself to find meetings Glance did not create.
+- A morning summary line combining all of the above.
+- Per-person notes or history beyond open loops.
 
 ## 10. What was built
 

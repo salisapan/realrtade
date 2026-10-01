@@ -457,8 +457,25 @@ const FlowStillOpen = (() => {
     return 'Still open — shown ' + shown + ' · Do It ' + did + ' · undo ' + undo + ' · false-close ' + falseClose;
   }
 
+  // How long something has been waiting on YOU. Three days is where a reply
+  // starts to feel late; a week is where it starts to cost something. Display
+  // only: this never adds a card, a notification or a nudge (silence rule).
+  const STALE_DAYS = 3;
+  const OVERDUE_DAYS = 7;
+  function agingOf(entry, now) {
+    const ts = entry && entry.ts;
+    if (!ts) return { days: 0, level: 'fresh', label: '' };
+    const t = typeof now === 'number' ? now : Date.now();
+    const a = new Date(ts); const b = new Date(t);
+    const days = Math.max(0, Math.round((new Date(b.getFullYear(), b.getMonth(), b.getDate()) - new Date(a.getFullYear(), a.getMonth(), a.getDate())) / 86400000));
+    const level = days >= OVERDUE_DAYS ? 'late' : days >= STALE_DAYS ? 'stale' : 'fresh';
+    const label = days === 0 ? 'On you since today' : 'On you ' + days + (days === 1 ? ' day' : ' days');
+    return { days: days, level: level, label: label };
+  }
+
   return {
     CAP: CAP,
+    agingOf: agingOf,
     MIN_SCORE: MIN_SCORE,
     closeKind: closeKind,
     scoreOf: scoreOf,

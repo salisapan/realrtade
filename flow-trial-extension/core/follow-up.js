@@ -238,6 +238,8 @@ const FlowFollowUp = (() => {
   }
 
   function isMine(w) { return Boolean(w) && w.direction === 'mine'; }
+  // A 'clock' loop is a date that runs out (an offer, a trial), not a person to chase.
+  function isClock(w) { return Boolean(w) && w.direction === 'clock'; }
 
   // ---- watches -----------------------------------------------------------------
   function buildWatch(a) {
@@ -259,7 +261,8 @@ const FlowFollowUp = (() => {
       resolvedAt: null,
       resolvedBy: null,
       taskRef: a.taskRef || null,
-      direction: ask.direction === 'mine' ? 'mine' : 'theirs',
+      direction: ask.direction === 'mine' ? 'mine' : ask.direction === 'clock' ? 'clock' : 'theirs',
+      expiresIso: ask.expiresIso || null,
       subtype: ask.subtype || null,
       stage: 'waiting',
       nudges: 0,
@@ -274,6 +277,7 @@ const FlowFollowUp = (() => {
   function watchState(w, now) {
     if (!w) return null;
     if (w.status === 'resolved' || w.status === 'stopped') return w.status;
+    if (isClock(w) && w.expiresIso && w.expiresIso < isoDay(today(now))) return 'lapsed';
     return w.chaseIso && w.chaseIso < isoDay(today(now)) ? 'overdue' : 'waiting';
   }
 
@@ -414,7 +418,7 @@ const FlowFollowUp = (() => {
   // `rescheduled` means the chase day moved and the Task should follow.
   function applyReply(watch, reply, now) {
     const t = typeof now === 'number' ? now : Date.now();
-    if (!watch || watch.status !== 'waiting' || isMine(watch) || !reply || reply.outcome === 'auto') return { none: true };
+    if (!watch || watch.status !== 'waiting' || isMine(watch) || isClock(watch) || !reply || reply.outcome === 'auto') return { none: true };
     const seen = { lastReplyAt: t };
     switch (reply.outcome) {
       case 'closed':
@@ -473,7 +477,7 @@ const FlowFollowUp = (() => {
     const overdue = active.filter((w) => watchState(w, now) === 'overdue');
     const owed = {};
     active.forEach((w) => {
-      if (isMine(w) || w.kind !== KINDS.PAYMENT || !w.amount || !(w.amount.value > 0)) return;
+      if (isMine(w) || isClock(w) || w.kind !== KINDS.PAYMENT || !w.amount || !(w.amount.value > 0)) return;
       const cur = w.amount.currency || '?';
       owed[cur] = (owed[cur] || 0) + w.amount.value;
     });
@@ -495,6 +499,7 @@ const FlowFollowUp = (() => {
       active: active.length,
       overdue: overdue.length,
       youOwe: active.filter(isMine).length,
+      expiring: active.filter((w) => isClock(w) && watchState(w, now) !== 'lapsed').length,
       nudged: active.filter((w) => stageOf(w) === 'nudged').length,
       promised: active.filter((w) => stageOf(w) === 'promised').length,
       oldestOpenDays: active.reduce((m, w) => Math.max(m, daysOpen(w, now)), 0),
@@ -502,6 +507,32 @@ const FlowFollowUp = (() => {
       closedThisMonth: closed.length,
       paidThisMonth
     };
+  }
+
+  // Everything open with each person, both directions, most urgent first.
+  // Loops with no known person are grouped under 'Other'.
+  function groupByPerson(watches, now) {
+    const groups = {};
+    (Array.isArray(watches) ? watches : []).filter(isActive).forEach((w) => {
+      const email = (w.counterpart && w.counterpart.email) ? String(w.counterpart.email).toLowerCase() : '';
+      const key = email || (w.counterpart && w.counterpart.name) || '';
+      const g = groups[key] || (groups[key] = { key, name: firstName(w.counterpart && w.counterpart.name, email) || 'Other', email: email || null, loops: [], overdue: 0, youOwe: 0, owed: {} });
+      g.loops.push(w);
+      if (watchState(w, now) === 'overdue') g.overdue++;
+      if (isClock(w)) g.clock = (g.clock || 0) + 1;
+      else if (isMine(w)) g.youOwe++;
+      else if (!isClock(w) && w.kind === KINDS.PAYMENT && w.amount && w.amount.value > 0) {
+        const cur = w.amount.currency || '?';
+        g.owed[cur] = (g.owed[cur] || 0) + w.amount.value;
+      }
+    });
+    return Object.keys(groups).map((k) => {
+      const g = groups[k];
+      g.money = Object.keys(g.owed).sort().map((currency) => ({ currency, value: g.owed[currency] }));
+      delete g.owed;
+      g.loops.sort((a, b) => (a.chaseIso || '').localeCompare(b.chaseIso || ''));
+      return g;
+    }).sort((a, b) => b.overdue - a.overdue || b.loops.length - a.loops.length || a.name.localeCompare(b.name));
   }
 
   // Loops closed lately, newest first, for the "closed" list and its Reopen.
@@ -565,6 +596,7 @@ const FlowFollowUp = (() => {
 
   function taskTitle(w) {
     const who = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
+    if (isClock(w)) return 'Before it ends' + (w.subject ? ' — ' + clip(w.subject, 80) : '');
     if (isMine(w)) return 'Keep your promise' + (who ? ' to ' + who : '') + (w.subject ? ' — ' + clip(w.subject, 80) : '');
     const head = w.kind === KINDS.PAYMENT ? 'Chase payment' : 'Chase reply';
     const amt = w.kind === KINDS.PAYMENT && w.amount && w.amount.raw ? ' ' + w.amount.raw : '';
@@ -572,9 +604,9 @@ const FlowFollowUp = (() => {
   }
 
   return {
-    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, closeAsKept, isMine, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
+    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
-    nextNudgeLevel, summarize, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
+    nextNudgeLevel, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };
 })();
 

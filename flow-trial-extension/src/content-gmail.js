@@ -630,12 +630,15 @@
       // Read the message BODY, not the whole row: the row's text carries the
       // sender's name, "to me" and the date, which would look like content.
       const bodyOf = (node) => (node && node.querySelector && node.querySelector('.a3s.aiL, .a3s')) || node;
-      FlowFollow.consider({
+      const followCtx = {
         messages, ownEmail, extractSender,
         ownMessageText: (node) => ownMessageText(bodyOf(node)),
         messageText: (node) => ownMessageText(bodyOf(node)),
         threadIdFrom, subject: currentSubject(), threadUrl
-      }).catch((e) => console.error('[Glance] follow-up check failed', e));
+      };
+      FlowFollow.consider(followCtx).catch((e) => console.error('[Glance] follow-up check failed', e));
+      // A date that runs out ("valid until…"). Same silence rules; marketing mail is skipped.
+      FlowFollow.considerClock(followCtx).catch((e) => console.error('[Glance] expiry check failed', e));
     }
 
     let message = null;
@@ -2002,10 +2005,19 @@
     // the one unacceptable failure. Losing this specific log entry is a
     // real, narrow residual risk (hasTerminalOutcome wouldn't yet know this
     // message is resolved), logged so it's at least visible, not silent.
+    // A meeting that went on the Calendar is remembered (title and date only) so
+    // the day after, the popup can ask what came out of it.
+    const meetingIso = ctx.intent && ctx.intent.facts && ctx.intent.facts.date && ctx.intent.facts.date.iso;
+    const calendarStep = succeeded.find((r) => r.action && r.action.kind === 'calendar');
+    const meetingNote = calendarStep && meetingIso && typeof FlowStorage.recordMeeting === 'function'
+      ? FlowStorage.recordMeeting({ id: ctx.messageId, title: ctx.intent.label, dateIso: meetingIso, threadUrl: window.location.href })
+          .catch((e) => console.error('[Glance] failed to remember the meeting for its debrief', e))
+      : null;
     const bookkeeping = succeeded.map((r) =>
       FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
         .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e))
     );
+    if (meetingNote) bookkeeping.push(meetingNote);
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a

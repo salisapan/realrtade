@@ -25,7 +25,7 @@ async function storageTests() {
   } }, runtime: { sendMessage: (m, cb) => cb && cb({}) } };
   const sandbox = { console, chrome, crypto: { randomUUID: () => 'u' } };
   vm.createContext(sandbox);
-  for (const f of ['core/pmf-metrics.js', 'core/classification-metrics.js', 'core/close-quality-metrics.js', 'core/quiet-metrics.js', 'src/storage.js']) {
+  for (const f of ['core/pmf-metrics.js', 'core/classification-metrics.js', 'core/close-quality-metrics.js', 'core/quiet-metrics.js', 'core/recurrence.js', 'src/storage.js']) {
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), sandbox, { filename: f });
   }
   const S = vm.runInContext('FlowStorage', sandbox);
@@ -51,6 +51,26 @@ async function storageTests() {
   const all = await S.getWatches();
   check('the list is capped at 60', all.length === 60, all.length);
   check('the cap never drops a live watch', all.some((w) => w.id === 'live') && all.filter((w) => w.status === 'waiting').length >= 6, all.filter((w) => w.status === 'waiting').map((w) => w.id));
+  // meetings to debrief
+  check('no meetings to begin with', (await S.getMeetings()).length === 0);
+  await S.recordMeeting({ id: 'msg1', title: 'Call with Dana', dateIso: '2026-10-09', threadUrl: 'https://mail.google.com/x' });
+  await S.recordMeeting({ id: 'msg1', title: 'Call with Dana (moved)', dateIso: '2026-10-10' });
+  const ms = await S.getMeetings();
+  check('a meeting is stored once, with title and date only, and updating replaces it', ms.length === 1 && ms[0].title === 'Call with Dana (moved)' && ms[0].dateIso === '2026-10-10' && ms[0].done === false && Object.keys(ms[0]).sort().join() === 'dateIso,done,id,threadUrl,title', ms);
+  await S.updateMeeting('msg1', { done: true });
+  check('a meeting can be marked debriefed', (await S.getMeetings())[0].done === true);
+  check('a meeting with no date is refused', (await S.recordMeeting({ id: 'x', title: 't' })) === null && (await S.getMeetings()).length === 1);
+  for (let i = 0; i < 25; i++) await S.recordMeeting({ id: 'm' + i, title: 't', dateIso: '2026-10-09' });
+  check('meetings are capped at 20', (await S.getMeetings()).length === 20);
+
+  // loop rhythms
+  const open = (day) => Object.assign({}, mk('r'), { counterpart: { email: 'dana@acme.com', name: 'Dana' }, createdAt: new Date(day + 'T12:00:00').getTime() });
+  await S.recordLoopOpen(open('2026-07-12')); await S.recordLoopOpen(open('2026-08-12')); await S.recordLoopOpen(open('2026-09-12')); await S.recordLoopOpen(open('2026-09-12'));
+  const lh = await S.getLoopHistory();
+  check('opening loops records only dates, per person and kind, once per day', Object.keys(lh.history).length === 1 && Object.values(lh.history)[0].dates.length === 3 && !/Please confirm/.test(JSON.stringify(lh.history)), lh.history);
+  await S.ackRecurrence('k', '2026-10-12');
+  check('an acknowledged prediction is remembered', (await S.getLoopHistory()).acked.k === '2026-10-12');
+
   check('it drops the OLDEST settled records first', !all.some((w) => w.id === 's0') && all.some((w) => w.id === 's69'));
 }
 

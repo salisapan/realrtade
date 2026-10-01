@@ -61,7 +61,9 @@ So Glance now does two jobs:
 | Do It (Calendar, Tasks, drafts, Undo) | yes, no limit | same |
 | Open loops (Waiting on) | **3 at a time** | **as many as you have** |
 | Loop closes by itself on a real reply, promise moves the chase day, Reopen | yes | yes |
-| Money owed to you, and paid this month | hidden | shown |
+| Money owed to you, paid this month, and the money per person | hidden | shown |
+| Learns what comes around again (monthly invoice, weekly report) | one line only | shown, with a reminder |
+| Meeting debrief, expiry reminders, "By person" view, aging | yes (count toward the 3 loops) | yes |
 | Nudge drafts | friendly first nudge only (never sent) | friendly, firmer and last (never sent) |
 | Draft-It (AI reply) and attachment summaries | no | yes (server-enforced) |
 

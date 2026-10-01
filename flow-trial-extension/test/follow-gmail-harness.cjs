@@ -256,6 +256,28 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('another promise is not delivery', s.watches[0].status === 'waiting', s.watches);
   await t.ctx.close();
 
+
+  // 17. a date that runs out
+  t = await open(browser, 'clock', [msg(mine, 'Could you send me the quote for the new scope?'), msg(theirs, 'Hi, here is the quote. It is valid until October 20, 2026, so please let us know before then.')]);
+  s = await t.state();
+  check('a stated expiry is offered with the day to look again', /This offer ends Tue, Oct 20/.test(s.card || '') && /Sat, Oct 17/.test(s.card || '') && /Remind me/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(400);
+  s = await t.state();
+  check('accepting makes a clock loop with a Task', s.msgs.includes('flow:follow-task') && s.watches.some((w) => w.id === 'clock:t1' && w.status === 'waiting' && w.chase === '2026-10-17'), s);
+  await t.ctx.close();
+  t = await open(browser, 'clock-promo', [msg(mine, 'Hi there, any news?'), msg(theirs, 'Flash sale! 40% off everything. Offer ends October 20, 2026, shop now before it is gone.')]);
+  s = await t.state();
+  check('marketing mail with an end date is ignored', s.card === null && s.watches.length === 0, s);
+  await t.ctx.close();
+  t = await open(browser, 'clock-noreply', [msg(mine, 'Hi there, any news?'), msg({ from: 'noreply@acme.com', fromName: 'Acme', to: 'me@x.com', toIsMe: true }, 'Your subscription renews on November 12, 2026 at the current rate.')]);
+  s = await t.state();
+  check('a no-reply sender never gets a card', s.card === null && s.watches.length === 0, s);
+  await t.ctx.close();
+  t = await open(browser, 'clock-seen', [msg(mine, 'Could you send me the quote?'), msg(theirs, 'Here it is. It is valid until October 20, 2026, so please decide.')], { watches: [Object.assign({}, baseWatch, { id: 'clock:t1', direction: 'clock', expiresIso: '2026-10-20', status: 'waiting', chaseIso: '2026-10-17' })] });
+  s = await t.state();
+  check('an expiry already tracked for that date is not offered again', s.card === null, s.card);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);

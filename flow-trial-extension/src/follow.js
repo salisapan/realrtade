@@ -262,6 +262,7 @@ const FlowFollow = (() => {
     }
     watch.taskRef = res.ref || null;
     await FlowStorage.upsertWatch(watch);
+    FlowStorage.recordLoopOpen(watch).catch(() => {});
     track('follow_tracked');
     if (FlowFollowUp.isMine(watch)) {
       receipt('Reminder set for ' + dayLabel(watch.chaseIso) + '. I will close it when you send it.', async () => {
@@ -326,6 +327,82 @@ const FlowFollow = (() => {
     row.appendChild(button('See Glance Pro', 'primary', () => { window.open(FlowEntitlements.PRICING_URL, '_blank', 'noopener'); dismiss(); }));
     row.appendChild(button('Not now', 'ghost', dismiss));
     h.appendChild(row);
+  }
+
+
+  // ---- things that run out ---------------------------------------------------------
+  // The newest message is theirs and states a date something stops being valid
+  // ("valid until Oct 31", "your trial ends Oct 15"). One card offers to look
+  // again three days before. Marketing mail is ignored by core/expiry.js.
+  const examinedClock = new Set();
+  const offeredClock = new Set();
+
+  async function trackClock(found, base) {
+    const ask = { kind: FlowFollowUp.KINDS.REPLY, what: found.what, amount: null, deadlineIso: found.expiresIso, chaseIso: found.warnIso, lang: found.lang, subtype: 'expiry:' + found.noun, direction: 'clock', expiresIso: found.expiresIso };
+    const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
+    watch.id = 'clock:' + base.threadId;
+    watch.threadUrl = base.threadUrl || null;
+    const res = await send({ type: 'flow:follow-task', payload: taskPayload(watch) });
+    if (!res || !res.ok) {
+      receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not add the reminder. Try again in a moment.', null);
+      return;
+    }
+    watch.taskRef = res.ref || null;
+    await FlowStorage.upsertWatch(watch);
+    track('follow_tracked');
+    receipt('Reminder set for ' + dayLabel(found.warnIso) + ', before it ends on ' + dayLabel(found.expiresIso) + '.', async () => {
+      await send({ type: 'flow:undo-action', connectorId: 'googleTask', ref: res.ref });
+      await FlowStorage.updateWatch(watch.id, { status: 'stopped', resolvedAt: Date.now(), resolvedBy: 'undo' });
+      dismiss();
+    });
+  }
+
+  function clockCard(found, base) {
+    const h = card(found.lang === 'he');
+    h.appendChild(el('div', 'flow-fu-title', FlowExpiry.title(found.noun) + ' ends ' + dayLabel(found.expiresIso)));
+    h.appendChild(el('div', 'flow-fu-quote', found.what));
+    h.appendChild(el('div', 'flow-fu-line', 'I can remind you on ' + dayLabel(found.warnIso) + ' so it does not lapse.'));
+    const row = el('div', 'flow-fu-actions');
+    row.appendChild(button('Remind me', 'primary', () => { trackClock(found, base); }));
+    row.appendChild(button('Not now', 'ghost', async () => {
+      const ask = { kind: FlowFollowUp.KINDS.REPLY, what: found.what, amount: null, deadlineIso: found.expiresIso, chaseIso: found.warnIso, lang: found.lang, direction: 'clock', expiresIso: found.expiresIso };
+      const w = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
+      w.id = 'clock:' + base.threadId; w.status = 'stopped'; w.resolvedAt = Date.now(); w.resolvedBy = 'declined';
+      await FlowStorage.upsertWatch(w);
+      dismiss();
+    }));
+    h.appendChild(row);
+  }
+
+  async function considerClock(ctx) {
+    if (typeof FlowExpiry === 'undefined' || typeof FlowFollowUp === 'undefined' || typeof FlowStorage === 'undefined') return;
+    const msgs = ctx && ctx.messages;
+    if (!msgs || !msgs.length || !ctx.ownEmail) return;
+    const last = msgs[msgs.length - 1];
+    const sender = ctx.extractSender(last);
+    if (!sender.email || sender.email.toLowerCase() === String(ctx.ownEmail).toLowerCase()) return;
+    if (FlowFollowUp.isAutoReply('', sender.email)) return; // noreply senders never get a card
+    const threadId = ctx.threadIdFrom(last);
+    if (!threadId) return;
+    const lastId = last.getAttribute('data-legacy-message-id') || null;
+    const key = threadId + '|' + lastId;
+    if (examinedClock.has(key)) return;
+    examinedClock.add(key);
+    if (examinedClock.size > 400) examinedClock.clear();
+
+    const found = FlowExpiry.detect(ctx.messageText(last), { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+    if (!found) return;
+    const existing = await FlowStorage.getWatch('clock:' + threadId);
+    if (existing && existing.expiresIso === found.expiresIso) return;
+    if (offeredClock.has(key)) return;
+    offeredClock.add(key);
+
+    const base = { threadId, messageId: lastId, subject: ctx.subject, counterpart: { email: sender.email, name: sender.name || null }, threadUrl: ctx.threadUrl(lastId) };
+    const status = await send({ type: 'flow:pro-status' });
+    const list = await FlowStorage.getWatches();
+    const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
+    if (!gate.allowed) { await capCard(gate.used, gate.cap); return; }
+    clockCard(found, base);
   }
 
   // ctx: { messages, ownEmail, extractSender(node), ownMessageText(node),
@@ -402,5 +479,5 @@ const FlowFollow = (() => {
     offerCard(ask, base);
   }
 
-  return { consider, dismiss };
+  return { consider, considerClock, dismiss };
 })();

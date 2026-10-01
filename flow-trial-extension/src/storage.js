@@ -190,7 +190,16 @@ const FlowStorage = (() => {
     // had answered (core/follow-up.js owns the shape). Each is a compact
     // record — the asking sentence, who, when to chase — never the message.
     // Local to this device, capped, oldest settled records dropped first.
-    followWatches: []
+    followWatches: [],
+    // Meetings Glance put on the Calendar, kept so the day after they can be
+    // debriefed ("what came out of it?"). { id, title, dateIso, threadUrl, done }.
+    // Title and date only, never the message. Capped.
+    meetings: [],
+    // core/recurrence.js: when you opened loops with the same person for the
+    // same kind of thing, as dates only. Local, capped, never the message text.
+    loopHistory: {},
+    // Predictions already shown or accepted: { key: 'YYYY-MM-DD' }.
+    recurrenceAck: {}
   };
 
   function get() {
@@ -919,6 +928,57 @@ const FlowStorage = (() => {
     return list.find((w) => w.id === id) || null;
   }
 
+  // ---- meetings to debrief, and loop rhythms ---------------------------------------
+  const MEETING_CAP = 20;
+
+  const recordMeeting = serialize(async function recordMeeting(m) {
+    if (!m || !m.id || !m.dateIso) return null;
+    const state = await get();
+    const list = (state.meetings || []).filter((x) => x && x.id !== m.id);
+    list.unshift({ id: String(m.id), title: String(m.title || 'Meeting').slice(0, 120), dateIso: m.dateIso, threadUrl: m.threadUrl || null, done: false });
+    await set({ meetings: list.slice(0, MEETING_CAP) });
+    return list[0];
+  });
+
+  const updateMeeting = serialize(async function updateMeeting(id, patch) {
+    const state = await get();
+    let updated = null;
+    const list = (state.meetings || []).map((x) => {
+      if (!x || x.id !== id) return x;
+      updated = Object.assign({}, x, patch);
+      return updated;
+    });
+    if (updated) await set({ meetings: list });
+    return updated;
+  });
+
+  async function getMeetings() {
+    const state = await get();
+    return (state.meetings || []).filter(Boolean);
+  }
+
+  // A loop was opened: remember the day, for rhythm detection.
+  const recordLoopOpen = serialize(async function recordLoopOpen(watch) {
+    const state = await get();
+    const next = FlowRecurrence.record(state.loopHistory || {}, watch, Date.now());
+    await set({ loopHistory: next });
+    return next;
+  });
+
+  async function getLoopHistory() {
+    const state = await get();
+    return { history: state.loopHistory || {}, acked: state.recurrenceAck || {} };
+  }
+
+  const ackRecurrence = serialize(async function ackRecurrence(key, nextIso) {
+    const state = await get();
+    const acked = Object.assign({}, state.recurrenceAck || {}, { [key]: nextIso });
+    const keys = Object.keys(acked);
+    if (keys.length > 60) delete acked[keys[0]];
+    await set({ recurrenceAck: acked });
+    return acked;
+  });
+
   const consumeWeeklyHabitTrigger = serialize(async function consumeWeeklyHabitTrigger() {
     const state = await get();
     const habit = FlowPmfMetrics.computeWeeklyHabit(state.activeDays, state.closeStats, Date.now());
@@ -968,7 +1028,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

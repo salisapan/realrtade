@@ -40,11 +40,14 @@
   // reach the Glance Pro section where these are used.
   const OFFER_URL = 'https://theflow-ai.com/.netlify/functions/create-checkout';
   let proOffer = { enabled: false, trialDays: 0 };
+  // Same trap again: renderWaiting() runs before a later `let` would initialise.
+  let loopView = 'date';
 
   wireTabs();
   wireSave();
   wireRecipe();
   wirePro();
+  wireLoopView();
   renderConnectors();
   renderStatusPill();
   await renderLog();
@@ -500,6 +503,10 @@
     // list. Same when()/.when the Activity tab's own logRow() already uses,
     // reused rather than a second age-formatting rule, on entry.ts —
     // appendLog stamps every row with ts unconditionally, 'shown' included.
+    if (entry.ts && typeof FlowStillOpen !== 'undefined' && FlowStillOpen.agingOf) {
+      const ag = FlowStillOpen.agingOf(entry, Date.now());
+      if (ag.label) item.appendChild(el('span', 'log-age ' + ag.level, ag.label));
+    }
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
 
     const acts = el('div', 'log-acts');
@@ -579,12 +586,19 @@
     block.hidden = active.length === 0;
     const recent = FlowFollowUp.recentlyClosed(all, now, 5);
     document.getElementById('onYouLabel').hidden = active.length === 0 && recent.length === 0;
-    if (!all.length) { document.getElementById('closedBlock').hidden = true; return; }
+    if (!all.length) {
+      document.getElementById('closedBlock').hidden = true;
+      await renderDebrief(0, null, now);
+      await renderRecurrence(false, now);
+      return;
+    }
 
     const status = await send({ type: 'flow:pro-status' });
     const record = status && status.record;
     const pro = FlowEntitlements.isActive(record, now);
     renderClosed(recent, active.length, record, now);
+    await renderDebrief(active.length, record, now);
+    await renderRecurrence(pro, now);
     if (!active.length) return;
 
     const sum = FlowFollowUp.summarize(all, now);
@@ -616,13 +630,43 @@
 
     const host = document.getElementById('waiting-list');
     host.replaceChildren();
-    for (const w of active) host.appendChild(waitingItem(w, now, record));
+    const toggle = document.getElementById('loopView');
+    toggle.hidden = active.length < 2;
+    if (loopView === 'person' && active.length > 1) {
+      for (const g of FlowFollowUp.groupByPerson(all, now)) {
+        const head = el('div', 'person-head');
+        head.appendChild(el('span', null, g.name));
+        const bits = [plural(g.loops.length, 'open', 'open')];
+        if (g.overdue) bits.push(g.overdue + ' overdue');
+        if (g.youOwe) bits.push(g.youOwe + ' you promised');
+        if (g.money.length && pro) bits.push('owes ' + g.money.map(FlowFollowUp.formatMoney).join(' + '));
+        head.appendChild(el('small', null, bits.join(' · ')));
+        host.appendChild(head);
+        for (const w of g.loops) host.appendChild(waitingItem(w, now, record));
+      }
+    } else {
+      for (const w of active) host.appendChild(waitingItem(w, now, record));
+    }
+  }
+
+  // "By date" (default) or "By person": the same loops, two ways to look.
+  function wireLoopView() {
+    const toggle = document.getElementById('loopView');
+    toggle.querySelectorAll('.seg-btn').forEach((b) => b.addEventListener('click', async () => {
+      loopView = b.getAttribute('data-view');
+      toggle.querySelectorAll('.seg-btn').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      await renderWaiting();
+    }));
   }
 
   function stageLabel(w, now) {
     const d = FlowFollowUp.daysOpen(w, now);
     const age = d === 0 ? 'opened today' : 'day ' + (d + 1);
     const stage = FlowFollowUp.stageOf(w);
+    if (FlowFollowUp.isClock(w)) {
+      const left = FlowExpiry.daysLeft(w.expiresIso, now);
+      return left < 0 ? 'Lapsed ' + dayShort(w.expiresIso) : 'Ends ' + dayShort(w.expiresIso) + ' · ' + (left === 0 ? 'today' : left === 1 ? '1 day left' : left + ' days left');
+    }
     if (FlowFollowUp.isMine(w)) return 'You promised · ' + age;
     if (stage === 'promised' && w.promisedIso) return 'Promised ' + dayShort(w.promisedIso) + ' · ' + age;
     if (stage === 'nudged') return 'Chased ' + plural(w.nudges || 1, 'time', 'times') + ' · ' + age;
@@ -639,7 +683,7 @@
     const item = el('div', 'wait-item');
     const top = el('div', 'wait-top');
     top.appendChild(el('span', 'wait-who', whoLabel(w)));
-    top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : ''), state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : 'Chase ' + dayShort(w.chaseIso)));
+    top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : state === 'lapsed' ? ' lapsed' : ''), state === 'lapsed' ? 'Lapsed' : state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : (FlowFollowUp.isClock(w) ? 'Look ' : 'Chase ') + dayShort(w.chaseIso)));
     item.appendChild(top);
     item.appendChild(el('div', 'wait-meta', stageLabel(w, now)));
     const what = el('div', 'wait-what');
@@ -650,7 +694,7 @@
     note.hidden = true;
     const acts = el('div', 'wait-acts');
 
-    if (!FlowFollowUp.isMine(w) && w.counterpart && w.counterpart.email) {
+    if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && w.counterpart && w.counterpart.email) {
       const level = FlowFollowUp.nextNudgeLevel(w);
       const gate = FlowEntitlements.nudgeGate(level, record, now);
       const base = nudgeLabel(level) || (state === 'overdue' ? 'Draft a nudge' : 'Nudge now');
@@ -680,10 +724,11 @@
     }
 
     const mineLoop = FlowFollowUp.isMine(w);
-    const done = el('button', 'ghost sm', mineLoop ? 'Mark kept' : isPay ? 'Mark paid' : 'Mark done');
+    const clockLoop = FlowFollowUp.isClock(w);
+    const done = el('button', 'ghost sm', clockLoop ? 'Handled' : mineLoop ? 'Mark kept' : isPay ? 'Mark paid' : 'Mark done');
     done.type = 'button';
     done.addEventListener('click', async () => {
-      await FlowStorage.updateWatch(w.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: mineLoop ? 'kept' : isPay ? 'paid' : 'manual' });
+      await FlowStorage.updateWatch(w.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: clockLoop ? 'manual' : mineLoop ? 'kept' : isPay ? 'paid' : 'manual' });
       if (w.taskRef) send({ type: 'flow:follow-complete', ref: w.taskRef });
       send({ type: 'flow:track', event: 'follow_resolved', params: {} });
       await renderWaiting();
@@ -701,6 +746,114 @@
     item.appendChild(acts);
     item.appendChild(note);
     return item;
+  }
+
+  // ---- after a meeting: what came out of it -------------------------------------
+  async function renderDebrief(activeCount, record, now) {
+    const block = document.getElementById('debriefBlock');
+    const host = document.getElementById('debrief-list');
+    const due = (await FlowStorage.getMeetings()).filter((m) => FlowMeetingDebrief.isDue(m, now)).slice(0, 2);
+    block.hidden = due.length === 0;
+    host.replaceChildren();
+    for (const m of due) {
+      const item = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', m.title));
+      top.appendChild(el('span', 'wait-state', dayShort(m.dateIso)));
+      item.appendChild(top);
+      item.appendChild(el('div', 'wait-what', 'What came out of it? One line each, for example: Dana to send the contract by Friday, or I will share the deck.'));
+      const text = el('textarea', 'debrief-text');
+      text.setAttribute('aria-label', 'What came out of ' + m.title);
+      text.setAttribute('rows', '3');
+      item.appendChild(text);
+      const note = el('p', 'wait-note');
+      note.hidden = true;
+      const acts = el('div', 'wait-acts');
+      const add = el('button', 'ghost sm', 'Add to loops');
+      add.type = 'button';
+      add.addEventListener('click', async () => {
+        const items = FlowMeetingDebrief.parse(text.value, { now: Date.now() });
+        note.hidden = false;
+        if (!items.length) { note.textContent = 'I could not find an action in that. Try "Name to do something by Friday" or "I will do something".'; return; }
+        add.disabled = true;
+        const made = await createDebriefLoops(m, items, activeCount, record);
+        await FlowStorage.updateMeeting(m.id, { done: true });
+        send({ type: 'flow:track', event: 'follow_tracked', params: {} });
+        note.textContent = made.made + (made.made === 1 ? ' loop added.' : ' loops added.') + (made.capped ? ' The rest need Glance Pro (the free limit is ' + FlowEntitlements.FREE_WATCH_CAP + ' open loops).' : '');
+        setTimeout(() => { renderWaiting(); }, 1400);
+      });
+      acts.appendChild(add);
+      const none = el('button', 'ghost sm', 'Nothing came out of it');
+      none.type = 'button';
+      none.addEventListener('click', async () => { await FlowStorage.updateMeeting(m.id, { done: true }); await renderWaiting(); });
+      acts.appendChild(none);
+      item.appendChild(acts);
+      item.appendChild(note);
+      host.appendChild(item);
+    }
+  }
+
+  async function createDebriefLoops(meeting, items, activeCount, record) {
+    let made = 0, capped = false, used = activeCount;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      const gate = FlowEntitlements.watchGate(used, record, Date.now());
+      if (!gate.allowed) { capped = true; break; }
+      const ask = {
+        kind: 'reply', what: it.what, amount: null, deadlineIso: it.deadlineIso,
+        chaseIso: FlowFollowUp.chaseDate('reply', it.deadlineIso, Date.now()),
+        lang: it.lang, subtype: 'meeting', direction: it.direction
+      };
+      const watch = FlowFollowUp.buildWatch({ threadId: 'mtg:' + meeting.id + ':' + i, messageId: null, subject: meeting.title, counterpart: { email: null, name: it.owner }, ask, now: Date.now() });
+      watch.threadUrl = meeting.threadUrl || null;
+      const res = await send({ type: 'flow:follow-task', payload: { title: FlowFollowUp.taskTitle(watch), dueIso: watch.chaseIso, what: watch.what, counterpart: it.owner || null, threadUrl: watch.threadUrl } });
+      if (res && res.ok && res.ref) watch.taskRef = res.ref;
+      await FlowStorage.upsertWatch(watch);
+      FlowStorage.recordLoopOpen(watch).catch(() => {});
+      used++; made++;
+    }
+    return { made, capped };
+  }
+
+  // ---- things that come around again ----------------------------------------------
+  async function renderRecurrence(pro, now) {
+    const block = document.getElementById('recurBlock');
+    const host = document.getElementById('recur-list');
+    const upsell = document.getElementById('recurUpsell');
+    const { history, acked } = await FlowStorage.getLoopHistory();
+    const predicted = FlowRecurrence.predict(history, now, acked).slice(0, 3);
+    block.hidden = predicted.length === 0;
+    host.replaceChildren();
+    upsell.hidden = true;
+    if (!predicted.length) return;
+    if (!pro) {
+      upsell.hidden = false;
+      upsell.textContent = 'Glance noticed ' + plural(predicted.length, 'thing that comes', 'things that come') + ' around again. Glance Pro shows what and when.';
+      return;
+    }
+    for (const p of predicted) {
+      const item = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', p.label));
+      top.appendChild(el('span', 'wait-state', 'Around ' + dayShort(p.nextIso)));
+      item.appendChild(top);
+      item.appendChild(el('div', 'wait-what', 'You have asked ' + FlowRecurrence.periodWords(p.periodDays) + ' (' + p.count + ' times).'));
+      const acts = el('div', 'wait-acts');
+      const remind = el('button', 'ghost sm', 'Remind me');
+      remind.type = 'button';
+      remind.addEventListener('click', async () => {
+        await send({ type: 'flow:follow-task', payload: { title: 'Likely again: ' + p.label, dueIso: p.nextIso, what: 'You have asked ' + FlowRecurrence.periodWords(p.periodDays) + '.', counterpart: null, threadUrl: null } });
+        await FlowStorage.ackRecurrence(p.key, p.nextIso);
+        await renderWaiting();
+      });
+      acts.appendChild(remind);
+      const skip = el('button', 'ghost sm', 'Not now');
+      skip.type = 'button';
+      skip.addEventListener('click', async () => { await FlowStorage.ackRecurrence(p.key, p.nextIso); await renderWaiting(); });
+      acts.appendChild(skip);
+      item.appendChild(acts);
+      host.appendChild(item);
+    }
   }
 
   // Closed lately, each with a Reopen. A loop closed by mistake (or one that
