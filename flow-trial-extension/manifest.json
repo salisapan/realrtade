@@ -47,6 +47,7 @@
         "core/close-quality-metrics.js",
         "core/quiet-metrics.js",
         "core/still-open.js",
+        "core/request-types.js",
         "core/follow-up.js",
         "core/entitlements.js",
         "src/chrome-storage-adapter.js",

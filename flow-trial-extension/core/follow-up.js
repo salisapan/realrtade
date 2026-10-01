@@ -117,7 +117,7 @@ const FlowFollowUp = (() => {
   //   payment      : the day AFTER the due date (it is only late then), else a
   //                  week after sending.
   // A deadline already in the past is not trusted as a deadline.
-  function chaseDate(kind, deadlineIso, now) {
+  function chaseDate(kind, deadlineIso, now, days) {
     const t0 = today(now);
     const deadline = deadlineIso ? new Date(deadlineIso + 'T00:00:00') : null;
     const valid = deadline && !isNaN(deadline.getTime()) && deadline.getTime() >= t0.getTime();
@@ -129,7 +129,7 @@ const FlowFollowUp = (() => {
       const day = deadline.getTime() === t0.getTime() ? addBusinessDays(t0, 1) : deadline;
       return isoDay(day);
     }
-    return isoDay(addBusinessDays(t0, REPLY_BUSINESS_DAYS));
+    return isoDay(addBusinessDays(t0, days || REPLY_BUSINESS_DAYS));
   }
 
   // ---- classification ---------------------------------------------------------
@@ -154,12 +154,24 @@ const FlowFollowUp = (() => {
 
     const he = hasHebrew(body);
     const asks = he ? ASK_HE : ASK_EN;
-    const askLine = candidates.find((s) => asks.some((re) => re.test(s)) || (he && ASK_EN.some((re) => re.test(s))));
+    let askLine = candidates.find((s) => asks.some((re) => re.test(s)) || (he && ASK_EN.some((re) => re.test(s))));
+
+    // The lexicon (core/request-types.js) recognises asks the fixed phrasings
+    // above miss: frame + action + object, in either language. Local code, no
+    // model. Absent when that file is not loaded, so nothing depends on it.
+    const types = c.types || (typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null);
+    let typed = null;
+    if (types) {
+      for (const s of candidates) { const t = types.detectRequest(s); if (t) { typed = { line: s, req: t }; break; } }
+      if (!askLine && typed) askLine = typed.line;
+    }
 
     // Payment: a payment word AND a figure AND some instruction or due date.
     const payLine = money ? candidates.find((s) => PAY_WORD.test(s)) : null;
     const dueCue = /\b(?:due|by|before|within|no later than|please|kindly|overdue|outstanding)\b|(?:עד|לפני|בתוך|נא|בבקשה|באיחור)/i;
     const isPayment = Boolean(payLine && (dueCue.test(payLine) || deadlineIso || askLine));
+    // "Please pay the invoice" with no figure is still a payment being chased.
+    const payAsk = !isPayment && typed && typed.req.action === 'pay' ? typed : null;
 
     if (!askLine && !isPayment) return null;
 
@@ -167,16 +179,65 @@ const FlowFollowUp = (() => {
     const chosen = isPayment ? payLine : askLine;
     if (HEDGE.test(chosen) && !deadlineIso && !isPayment) return null;
 
-    const kind = isPayment ? KINDS.PAYMENT : KINDS.REPLY;
+    const kind = isPayment || payAsk ? KINDS.PAYMENT : KINDS.REPLY;
+    const req = typed && (typed.line === chosen || !isPayment) ? typed.req : null;
     return {
       kind,
       what: clip(chosen, MAX_WHAT),
       amount: money ? { value: money.value, currency: money.currency || null, raw: money.raw } : null,
       deadlineIso,
-      chaseIso: chaseDate(kind, deadlineIso, c.now),
-      lang: he ? 'he' : 'en'
+      chaseIso: chaseDate(kind, deadlineIso, c.now, req ? req.days : undefined),
+      lang: he ? 'he' : 'en',
+      subtype: req ? req.type : null,
+      subtypeLabel: req ? req.label : null,
+      direction: 'theirs'
     };
   }
+
+  // ---- the mirror: what YOU promised ---------------------------------------------
+  // Your own message says "I'll send it by Friday". That is a loop too — one you
+  // owe. Same discipline: a first-person promise with a real action, no hedge, no
+  // courtesy, and the day it is due (stated, else two business days).
+  // text: your own message, quoted history removed. Returns null or a loop-shaped
+  // ask with direction 'mine'.
+  function classifyCommitment(text, ctx) {
+    const c = ctx || {};
+    const body = String(text || '').trim();
+    if (!body || words(body) < 4) return null;
+    const types = c.types || (typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null);
+    if (!types) return null;
+    const lines = sentences(body).filter((s) => words(s) >= 4 && !COURTESY.test(s));
+    let hit = null;
+    for (const s of lines) { const t = types.detectCommitmentSentence(s); if (t) { hit = { line: s, t }; break; } }
+    if (!hit) return null;
+    const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
+    const date = ex && ex.parseDate ? ex.parseDate(hit.line, new Date(typeof c.now === 'number' ? c.now : Date.now())) : null;
+    const deadlineIso = date && date.iso ? date.iso : null;
+    return {
+      kind: KINDS.REPLY,
+      what: clip(hit.line, MAX_WHAT),
+      amount: null,
+      deadlineIso,
+      chaseIso: chaseDate(KINDS.REPLY, deadlineIso, c.now),
+      lang: hasHebrew(body) ? 'he' : 'en',
+      subtype: hit.t.type,
+      subtypeLabel: null,
+      direction: 'mine'
+    };
+  }
+
+  // Did your own newer message deliver what you promised?
+  const DELIVERS = /\b(?:attached|attaching|enclosed|here(?:'s| is| are)|please find|as promised|sent (?:it|them|over)|done|finished|completed|just sent)\b|(?:מצורף|מצורפת|שלחתי|סיימתי|הנה|כפי שהבטחתי)/i;
+  function deliversPromise(text) {
+    return DELIVERS.test(String(text || '')) && !/\b(?:will|'ll|going to)\b/i.test(String(text || '').slice(0, 200));
+  }
+
+  function closeAsKept(w, now) {
+    const t = typeof now === 'number' ? now : Date.now();
+    return { status: 'resolved', resolvedAt: t, resolvedBy: 'delivered', closedAs: 'kept' };
+  }
+
+  function isMine(w) { return Boolean(w) && w.direction === 'mine'; }
 
   // ---- watches -----------------------------------------------------------------
   function buildWatch(a) {
@@ -198,6 +259,8 @@ const FlowFollowUp = (() => {
       resolvedAt: null,
       resolvedBy: null,
       taskRef: a.taskRef || null,
+      direction: ask.direction === 'mine' ? 'mine' : 'theirs',
+      subtype: ask.subtype || null,
       stage: 'waiting',
       nudges: 0,
       nudgedAt: null,
@@ -256,12 +319,12 @@ const FlowFollowUp = (() => {
   // (a date or "I will" — the loop stays open and the chase moves), 'answered'
   // (a payment thread got a reply that never says it was paid), 'paid',
   // 'closed' (a real answer to a request for a reply).
-  const ACK_EN = /^(?:ok(?:ay)?|got it|noted|received|thanks?(?: you)?|thank you|will do|sure|sounds good|on it|looking into it|will look(?: into it)?|i'?ll look(?: into it)?|let me (?:check|look|review)|checking|acknowledged|understood)\b/i;
-  const ACK_HE = /^(?:תודה|קיבלתי|קיבלנו|רשמתי|אבדוק|בודק|בודקת|נבדוק|סבבה|אוקיי|בסדר|על זה|הבנתי)/;
+  const ACK_EN = /^(?:ok(?:ay)?|got it|noted|received|thanks?(?: you)?|thank you|will do|sure|sounds good|on it|looking into it|will look(?: into it)?|i'?ll look(?: into it)?|let me (?:check|look|review)|checking|acknowledged|understood|much appreciated|appreciate it|thanks for (?:sending|sharing|the (?:update|note|email|heads-?up)))\b/i;
+  const ACK_HE = /^(?:תודה רבה|תודה|קיבלתי|קיבלנו|רשמתי|אבדוק|בודק|בודקת|נבדוק|סבבה|אוקיי|בסדר|על זה|הבנתי)/;
   // Words that mean the reply carries the substance asked for.
   const CONFIRM = /\b(?:confirmed?|approved?|agreed?|attached|enclosed|here(?:'s| is| are)|signed|done|yes|accepted|that works|works for me)\b|(?:אושר|מאשר|מאשרת|מצורף|חתום|חתמתי|כן|מסכים|מסכימה|סגור)/i;
-  const PROMISE_EN = /\b(?:(?:i|we)(?:'ll| will| shall| am going to|'re going to| are going to) (?:\w+ ){0,2}(?:send|pay|wire|transfer|get|reply|respond|confirm|share|return|forward|sign|approve|review|look|check|have|revert|come back|process|release|make|deliver|finali[sz]e)|(?:will|should) (?:be )?(?:paid|sent|wired|transferred|processed|released|ready|done|signed|approved)|get back to you|revert (?:to you )?(?:by|on)|scheduled for|later (?:today|this week)|not yet|still (?:working|looking|reviewing|waiting)|working on (?:it|this)|in progress|(?:this|next) (?:week|month)|tomorrow|end of (?:the )?week|eow|within \d+ (?:business )?days?)\b/i;
-  const PROMISE_HE = /(?:אעביר|נעביר|אשלח|נשלח|אחזור אל|נחזור אל|אאשר|נאשר|יועבר|ישולם|יישלח|מחר|השבוע|בשבוע הבא|בחודש הבא)/;
+  const PROMISE_EN = /\b(?:(?:i|we)(?:'ll| will| shall| am going to|'re going to| are going to) (?:\w+ ){0,2}(?:send|pay|wire|transfer|get|reply|respond|confirm|share|return|forward|sign|approve|review|look|check|have|revert|come back|process|release|make|deliver|finali[sz]e)|(?:will|should) (?:be )?(?:paid|sent|wired|transferred|processed|released|ready|done|signed|approved)|get back to you|(?:forwarded|passed|passing|handing|handed) (?:it |this |that )?(?:to|over to|on to)|(?:looping|looped|cc'?ing|cc'?d) in|(?:my|our) (?:colleague|assistant|team|manager|accountant|lawyer) (?:will|is going to)|revert (?:to you )?(?:by|on)|scheduled for|later (?:today|this week)|not yet|still (?:working|looking|reviewing|waiting)|working on (?:it|this)|in progress|(?:this|next) (?:week|month)|tomorrow|end of (?:the )?week|eow|within \d+ (?:business )?days?)\b/i;
+  const PROMISE_HE = /(?:העבר(?:תי|נו) (?:את )?(?:זה |הכל )?ל(?:חשבות|הנה"ח|הנהלת|מנהל|עמית|גורם|אחראי|עורך)|אעביר|נעביר|אשלח|נשלח|אחזור אל|נחזור אל|אאשר|נאשר|יועבר|ישולם|יישלח|מחר|השבוע|בשבוע הבא|בחודש הבא)/;
   // "I paid" / "payment was sent" — and the sentence-level guards that turn it
   // into a hypothetical or a negative ("not paid", "once it is paid").
   const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been )?(?:sent|made|done|completed|processed|released|initiated)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
@@ -282,8 +345,10 @@ const FlowFollowUp = (() => {
     return ACK_EN.test(body) || ACK_HE.test(body);
   }
 
+  // "Passed it to accounting" is a hand-off, not a payment.
+  const HANDOFF_HE = /העבר(?:תי|נו)[^.]{0,20}ל(?:חשבות|הנה"ח|הנהלת|מנהל|עמית|גורם|אחראי)/;
   function paidClaimed(body) {
-    return sentences(body).some((s) => (PAID_EN.test(s) || PAID_HE.test(s)) && !GUARD_EN.test(s) && !GUARD_HE.test(s));
+    return sentences(body).filter((s) => !HANDOFF_HE.test(s)).some((s) => (PAID_EN.test(s) || PAID_HE.test(s)) && !GUARD_EN.test(s) && !GUARD_HE.test(s));
   }
 
   // The day a reply promised something, or null. Accepts only today or later.
@@ -349,7 +414,7 @@ const FlowFollowUp = (() => {
   // `rescheduled` means the chase day moved and the Task should follow.
   function applyReply(watch, reply, now) {
     const t = typeof now === 'number' ? now : Date.now();
-    if (!watch || watch.status !== 'waiting' || !reply || reply.outcome === 'auto') return { none: true };
+    if (!watch || watch.status !== 'waiting' || isMine(watch) || !reply || reply.outcome === 'auto') return { none: true };
     const seen = { lastReplyAt: t };
     switch (reply.outcome) {
       case 'closed':
@@ -408,7 +473,7 @@ const FlowFollowUp = (() => {
     const overdue = active.filter((w) => watchState(w, now) === 'overdue');
     const owed = {};
     active.forEach((w) => {
-      if (w.kind !== KINDS.PAYMENT || !w.amount || !(w.amount.value > 0)) return;
+      if (isMine(w) || w.kind !== KINDS.PAYMENT || !w.amount || !(w.amount.value > 0)) return;
       const cur = w.amount.currency || '?';
       owed[cur] = (owed[cur] || 0) + w.amount.value;
     });
@@ -429,6 +494,7 @@ const FlowFollowUp = (() => {
     return {
       active: active.length,
       overdue: overdue.length,
+      youOwe: active.filter(isMine).length,
       nudged: active.filter((w) => stageOf(w) === 'nudged').length,
       promised: active.filter((w) => stageOf(w) === 'promised').length,
       oldestOpenDays: active.reduce((m, w) => Math.max(m, daysOpen(w, now)), 0),
@@ -499,13 +565,14 @@ const FlowFollowUp = (() => {
 
   function taskTitle(w) {
     const who = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
+    if (isMine(w)) return 'Keep your promise' + (who ? ' to ' + who : '') + (w.subject ? ' — ' + clip(w.subject, 80) : '');
     const head = w.kind === KINDS.PAYMENT ? 'Chase payment' : 'Chase reply';
     const amt = w.kind === KINDS.PAYMENT && w.amount && w.amount.raw ? ' ' + w.amount.raw : '';
     return head + (who ? ' from ' + who : '') + amt + (w.subject ? ' — ' + clip(w.subject, 80) : '');
   }
 
   return {
-    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
+    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, closeAsKept, isMine, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
     nextNudgeLevel, summarize, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };

@@ -592,6 +592,7 @@
     line.replaceChildren();
     const segs = [[String(sum.active), ' open']];
     if (sum.overdue) segs.push([String(sum.overdue), ' overdue']);
+    if (sum.youOwe) segs.push([String(sum.youOwe), ' you promised']);
     const payments = active.filter((w) => w.kind === 'payment' && w.amount && w.amount.value > 0);
     if (payments.length && pro) segs.push(['owed to you ', sum.moneyOwed.map(FlowFollowUp.formatMoney).join(' + ')]);
     if (sum.closedThisMonth) segs.push([String(sum.closedThisMonth), ' closed this month']);
@@ -622,6 +623,7 @@
     const d = FlowFollowUp.daysOpen(w, now);
     const age = d === 0 ? 'opened today' : 'day ' + (d + 1);
     const stage = FlowFollowUp.stageOf(w);
+    if (FlowFollowUp.isMine(w)) return 'You promised · ' + age;
     if (stage === 'promised' && w.promisedIso) return 'Promised ' + dayShort(w.promisedIso) + ' · ' + age;
     if (stage === 'nudged') return 'Chased ' + plural(w.nudges || 1, 'time', 'times') + ' · ' + age;
     return 'Waiting · ' + age;
@@ -648,7 +650,7 @@
     note.hidden = true;
     const acts = el('div', 'wait-acts');
 
-    if (w.counterpart && w.counterpart.email) {
+    if (!FlowFollowUp.isMine(w) && w.counterpart && w.counterpart.email) {
       const level = FlowFollowUp.nextNudgeLevel(w);
       const gate = FlowEntitlements.nudgeGate(level, record, now);
       const base = nudgeLabel(level) || (state === 'overdue' ? 'Draft a nudge' : 'Nudge now');
@@ -677,10 +679,11 @@
       acts.appendChild(nudge);
     }
 
-    const done = el('button', 'ghost sm', isPay ? 'Mark paid' : 'Mark done');
+    const mineLoop = FlowFollowUp.isMine(w);
+    const done = el('button', 'ghost sm', mineLoop ? 'Mark kept' : isPay ? 'Mark paid' : 'Mark done');
     done.type = 'button';
     done.addEventListener('click', async () => {
-      await FlowStorage.updateWatch(w.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: isPay ? 'paid' : 'manual' });
+      await FlowStorage.updateWatch(w.id, { status: 'resolved', resolvedAt: Date.now(), resolvedBy: 'manual', closedAs: mineLoop ? 'kept' : isPay ? 'paid' : 'manual' });
       if (w.taskRef) send({ type: 'flow:follow-complete', ref: w.taskRef });
       send({ type: 'flow:track', event: 'follow_resolved', params: {} });
       await renderWaiting();
@@ -713,7 +716,7 @@
       const amt = w.kind === 'payment' && w.amount && w.amount.raw ? w.amount.raw + ' · ' : '';
       top.appendChild(el('span', 'wait-who', whoLabel(w)));
       const days = FlowFollowUp.daysOpen(w, w.resolvedAt || now);
-      top.appendChild(el('span', 'wait-state ok', (w.closedAs === 'paid' ? 'Paid' : 'Closed') + (days >= 1 ? ' · ' + plural(days, 'day', 'days') : '')));
+      top.appendChild(el('span', 'wait-state ok', (w.closedAs === 'paid' ? 'Paid' : w.closedAs === 'kept' ? 'Kept' : 'Closed') + (days >= 1 ? ' · ' + plural(days, 'day', 'days') : '')));
       item.appendChild(top);
       item.appendChild(el('div', 'wait-what', amt + w.what));
       const note = el('p', 'wait-note');

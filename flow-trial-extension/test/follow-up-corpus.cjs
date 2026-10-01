@@ -3,6 +3,7 @@
 // Run: node test/follow-up-corpus.cjs
 const { FlowFollowUp: F } = require('../core/follow-up.js');
 const { FlowExtract } = require('../core/extract.js');
+const { FlowRequestTypes } = require('../core/request-types.js');
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -12,7 +13,7 @@ function check(name, cond, detail) {
 
 // Thursday 1 October 2026, noon local.
 const NOW = new Date(2026, 9, 1, 12).getTime();
-const classify = (t) => F.classifyOutgoing(t, { now: NOW, extract: FlowExtract });
+const classify = (t) => F.classifyOutgoing(t, { now: NOW, extract: FlowExtract, types: FlowRequestTypes });
 
 console.log('\n--- asks that SHOULD be tracked ---\n');
 const yes = [
@@ -145,6 +146,11 @@ check('a long thoughtful reply closes it', outcome('We reviewed the numbers with
 check('Hebrew confirmation closes it', outcome('אישרתי, מצורפת החתימה', replyW) === 'closed');
 check('a short thanks that argues is not an acknowledgement', outcome('Thanks, but the figure is wrong and needs a rework.', replyW) === 'closed');
 
+check('"forwarded to my colleague" is a hand-off, the loop stays open', (() => { const r = cr('I forwarded this to my colleague Sam, he will respond today.', replyW); return r.outcome === 'promised'; })(), cr('I forwarded this to my colleague Sam, he will respond today.', replyW));
+check('"passed it to accounting" on a payment is not paid', outcome('העברתי את זה לחשבות והם יטפלו בזה', payW) !== 'paid');
+check('"much appreciated" is an acknowledgement', outcome('Much appreciated!', replyW) === 'ack');
+check('"thanks for sending" is an acknowledgement', outcome('Thanks for sending this over.', replyW) === 'ack');
+check('a refusal is still an answer (the loop closes, you know where you stand)', outcome('Unfortunately we decided not to go ahead with the vendor.', replyW) === 'closed');
 console.log('  payment:');
 check('"payment sent" closes a payment loop as paid', outcome('Payment sent today, confirmation attached.', payW) === 'paid');
 check('"I paid yesterday" is paid', outcome('I paid yesterday, should reach you shortly.', payW) === 'paid');

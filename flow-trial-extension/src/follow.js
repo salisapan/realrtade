@@ -220,6 +220,15 @@ const FlowFollow = (() => {
     else if (res.confirm) paidCard(next, best.sender);
   }
 
+  // ---- a promise of yours, kept ------------------------------------------------
+  async function kept(watch, lastId) {
+    const patch = Object.assign({ messageId: lastId }, FlowFollowUp.closeAsKept(watch, Date.now()));
+    const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+    if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
+    track('follow_resolved');
+    receipt('Promise kept' + took(watch) + '. Loop closed.', null, { label: 'Reopen', run: () => reopen(next) });
+  }
+
   // ---- 2. you chased -----------------------------------------------------------------
   async function chased(watch, lastId) {
     const patch = Object.assign({ messageId: lastId }, FlowFollowUp.recordNudge(watch, Date.now()));
@@ -254,6 +263,14 @@ const FlowFollow = (() => {
     watch.taskRef = res.ref || null;
     await FlowStorage.upsertWatch(watch);
     track('follow_tracked');
+    if (FlowFollowUp.isMine(watch)) {
+      receipt('Reminder set for ' + dayLabel(watch.chaseIso) + '. I will close it when you send it.', async () => {
+        await send({ type: 'flow:undo-action', connectorId: 'googleTask', ref: res.ref });
+        await FlowStorage.updateWatch(watch.id, { status: 'stopped', resolvedAt: Date.now(), resolvedBy: 'undo' });
+        dismiss();
+      });
+      return;
+    }
     const name = FlowFollowUp.firstName(watch.counterpart.name, watch.counterpart.email);
     const amt = amountLabel(watch);
     const head = watch.kind === FlowFollowUp.KINDS.PAYMENT
@@ -278,6 +295,16 @@ const FlowFollow = (() => {
   function offerCard(ask, base) {
     const isPay = ask.kind === FlowFollowUp.KINDS.PAYMENT;
     const h = card(ask.lang === 'he');
+    if (ask.direction === 'mine') {
+      h.appendChild(el('div', 'flow-fu-title', 'You promised something'));
+      h.appendChild(el('div', 'flow-fu-quote', ask.what));
+      h.appendChild(el('div', 'flow-fu-line', 'I can remind you on ' + dayLabel(ask.chaseIso) + ' so it does not slip, and close it when you send it.'));
+      const mrow = el('div', 'flow-fu-actions');
+      mrow.appendChild(button('Remind me', 'primary', () => { track1(ask, base); }));
+      mrow.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
+      h.appendChild(mrow);
+      return;
+    }
     h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : 'Waiting on a reply?'));
     h.appendChild(el('div', 'flow-fu-quote', ask.what));
     h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + ', and close it myself when ' + (isPay ? 'it is paid.' : 'they answer.')));
@@ -322,7 +349,7 @@ const FlowFollow = (() => {
 
     // They wrote last. What did the answer do to the loop?
     if (!lastIsOwn) {
-      if (watch && watch.status === 'waiting' && !(watch.lastReplyMessageId && watch.lastReplyMessageId === lastId) && !settling.has(watch.id)) {
+      if (watch && watch.status === 'waiting' && !FlowFollowUp.isMine(watch) && !(watch.lastReplyMessageId && watch.lastReplyMessageId === lastId) && !settling.has(watch.id)) {
         settling.add(watch.id);
         try { await handleReply(ctx, watch, lastId); } finally { settling.delete(watch.id); }
       }
@@ -333,6 +360,13 @@ const FlowFollow = (() => {
     if (watch) {
       if (watch.status === 'waiting') {
         if (lastId && watch.messageId !== lastId) {
+          const text = ctx.ownMessageText(last);
+          // A promise of mine: a newer message that delivers it keeps it.
+          if (FlowFollowUp.isMine(watch)) {
+            if (FlowFollowUp.deliversPromise(text)) await kept(watch, lastId);
+            else await FlowStorage.updateWatch(threadId, { messageId: lastId });
+            return;
+          }
           // A new message of mine in a thread I am waiting on: a chase, or just talk.
           if (FlowFollowUp.looksLikeChase(ctx.ownMessageText(last))) await chased(watch, lastId);
           else await FlowStorage.updateWatch(threadId, { messageId: lastId });
@@ -345,7 +379,10 @@ const FlowFollow = (() => {
     const key = threadId + '|' + lastId;
     if (offered.has(key)) return;
 
-    const ask = FlowFollowUp.classifyOutgoing(ctx.ownMessageText(last), { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+    const mineText = ctx.ownMessageText(last);
+    const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
+    // What I asked of them comes first; if I asked nothing, what I promised them.
+    const ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
     if (!ask) return;
     offered.add(key);
 

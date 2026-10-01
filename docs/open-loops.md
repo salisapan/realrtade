@@ -117,7 +117,41 @@ console error. Anything else is a defect to fix before launch.
   step 1–12 above are how that is caught.
 - **The Free cap is local-only.** Said plainly in `docs/monetization.md`.
 
-## 8. What was built
+## 8. Two more dimensions (added 2026-10-01, second pass)
+
+**What you promised.** The mirror of everything above. If your own message says
+"I'll send you the numbers by Friday" or "אחזור אליך מחר", Glance offers one
+card ("You promised something", **Remind me**), sets a Task on the day, and
+closes the loop as *kept* when a later message of yours delivers it ("attached",
+"here is", "מצורף"). Their reply never closes a promise of yours, and a second
+promise is not delivery. It is kept apart from money owed to you. A thread holds
+one loop: what you asked of them wins over what you promised.
+
+**Local recognition of thousands of phrasings.** `core/request-types.js` reads a
+sentence as FRAME (how it is asked) + ACTION (what is wanted) + OBJECT (of
+what), in English and Hebrew. 11 actions x 14 objects (and none), asked or
+promised, in two languages: 660 request types, each reachable through dozens
+of phrasings, all by deterministic code with no model. This is the standing
+rule in `docs/local-first-principle.md`. The type also sets the chase day
+(scheduling 1 business day, quotes and deliverables 3, payments 7).
+Honest limit: this is breadth by vocabulary, not understanding. A phrasing
+outside the lexicon is silent, never guessed. Tests: `test/request-types-corpus.cjs`.
+
+Extra real-Gmail steps for these:
+
+13. **Typed ask.** From A send: *"Could you please sign the NDA by Friday?"* Expect the "Waiting on a reply?" card even though no earlier phrasing covered it.
+14. **Your promise.** From A send: *"Sure, I'll send you the revised numbers by Friday."* Expect "You promised something". Tap Remind me, then reply in the thread *"Hi, attached are the numbers."* Expect "Promise kept… Loop closed." If instead the other person replies, nothing should close.
+
+## 9. Next dimensions on the same pattern (not built)
+
+Ranked by how directly they stop something from disappearing:
+1. **Meetings that ended with actions.** A Calendar event passes; Glance asks once "what came out of it?" and opens loops for each commitment.
+2. **Things that expire.** Quotes, offers, trials and deadlines that pass silently ("valid until Oct 31"): remember and warn before they lapse.
+3. **Replies you owe that are going stale.** Incoming asks already open in Still Open; add an aging line ("owed 6 days") and a firmer reminder.
+4. **Recurring obligations.** The same ask every month (report, invoice): learn it and open the loop for you.
+5. **A person view.** "Everything open with Dana", across both directions.
+
+## 10. What was built
 
 `core/follow-up.js` (stages, `classifyReply`, `applyReply`, re-chase dates,
 three nudge levels, `summarize`, reopen), `core/entitlements.js`

@@ -61,6 +61,15 @@ terms cover all five of §5.8's questions. Read whichever level you need
 before proposing new features, new data paths, or new UI surfaces — not
 just once.
 
+## Local-first recognition — the base rule, apply to everything
+
+Our own code recognises requests, promises, answers and tasks BEFORE any
+external model is involved, and no feature may depend on a model to work. Build
+recognition as data (lexicons, frames) in `flow-trial-extension/core/`, with
+corpus tests, and stay silent when unsure. A model is an optional, masked,
+Pro-only last resort that never closes or writes anything alone. Full rule:
+`docs/local-first-principle.md`.
+
 ## The Magic Moment — read before touching onboarding or first-use copy
 
 `docs/magic-moment.md` defines, in concrete product terms, the first

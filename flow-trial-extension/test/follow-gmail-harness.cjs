@@ -226,6 +226,36 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('and does not re-close itself on the same reply', s.watches[0].status === 'waiting', s.watches);
   await t.ctx.close();
 
+
+  // 15. a typed ask the fixed phrasings do not cover (local lexicon)
+  t = await open(browser, 'typed', [msg(theirs, 'Thanks for the call.'), msg(mine, 'Hi Dana, could you please sign the NDA by Friday? We would like to start on Monday.')]);
+  s = await t.state();
+  check('a request recognised by the local lexicon is offered', /Waiting on a reply\?/.test(s.card || '') && /Stay on it/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 16. a promise of mine is a loop too
+  t = await open(browser, 'promise-out', [msg(theirs, 'Can we talk numbers soon?'), msg(mine, "Sure. I'll send you the revised numbers by Friday.")]);
+  s = await t.state();
+  check('my own promise is offered, worded as a promise', /You promised something/.test(s.card || '') && /Remind me/.test(s.card || '') && /Fri, Oct 2/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(400);
+  s = await t.state();
+  check('accepting stores a loop that is mine, with a Task', s.msgs.includes('flow:follow-task') && s.watches[0].status === 'waiting', s);
+  check('and the receipt says it will close when I send it', /I will close it when you send it/.test(s.card || ''), s.card);
+  await t.ctx.close();
+  const MINEW = Object.assign({}, baseWatch, { direction: 'mine', messageId: 'm2', what: "I'll send you the revised numbers by Friday." });
+  t = await open(browser, 'promise-kept', [msg(theirs, 'Can we talk numbers soon?'), msg(mine, "Sure. I'll send you the revised numbers by Friday."), msg(mine, 'Hi Dana, attached are the revised numbers.')], { watches: [MINEW] });
+  s = await t.state();
+  check('sending it closes the promise as kept', s.watches[0].status === 'resolved' && s.watches[0].closedAs === 'kept' && s.msgs.includes('flow:follow-complete') && /Promise kept after 3 days\. Loop closed\./.test(s.card || ''), { w: s.watches, card: s.card });
+  await t.ctx.close();
+  t = await open(browser, 'promise-reply', [msg(theirs, 'Can we talk numbers soon?'), msg(mine, "Sure. I'll send you the revised numbers by Friday."), msg(theirs, 'Great, thanks, no rush.')], { watches: [MINEW] });
+  s = await t.state();
+  check('their reply does not close my promise', s.watches[0].status === 'waiting' && s.card === null, s);
+  await t.ctx.close();
+  t = await open(browser, 'promise-more', [msg(theirs, 'Can we talk numbers soon?'), msg(mine, "Sure. I'll send you the revised numbers by Friday."), msg(mine, 'Still working on it, will send tomorrow.')], { watches: [MINEW] });
+  s = await t.state();
+  check('another promise is not delivery', s.watches[0].status === 'waiting', s.watches);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);

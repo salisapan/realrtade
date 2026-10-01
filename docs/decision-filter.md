@@ -16,6 +16,8 @@ surface, a piece of infrastructure — ask:
 
 If the answer is not a clear yes, do not build it.
 
+> Companion rule: `docs/local-first-principle.md` (our code recognises before any model).
+
 ## Relationship to product-architecture.md §5.8
 
 `docs/product-architecture.md` §5.8 ("Decision Filter — Use on Every
