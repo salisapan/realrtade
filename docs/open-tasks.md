@@ -23,6 +23,7 @@ Last updated: 2026-10-01
 | 8 | Re-check Google AI Mode for "theflow-ai.com founders" a few days after #1 and #5 | open | owner | ~2026-10-14 | Expect Sali Sapan and Tomer Steinmetz; if not, revisit entity signals. |
 | 9 | After deploy: confirm a Flow waitlist sign-up receives the Playbook PDF | open | Claude + owner | after #1-3 | `send-playbook` now ships its PDF via `netlify.toml` (`node_bundler = "none"` + `included_files`); verify end to end once deployed. |
 | 10 | When Supabase is restored: confirm migration `20260928170000_landing_lead_schema.sql` is applied (waitlist `ref_code`, `confirmed_at`, `leads` table) | open | owner + Claude | after #2 | Code writes these columns; they could not be checked while the project is paused. |
+| 11 | Switch on Glance Pro payments: Stripe account, prices, webhook, Netlify env vars, Supabase migration, real-Gmail check of Draft-It, test-mode purchase, then `PRO_PUBLIC=1` | open | owner | 2026-10-08 | Full order in `docs/monetization.md` §5. ClickUp: https://app.clickup.com/t/z8vk7p8q64 |
 
 ## Decisions waiting for an answer
 
@@ -32,9 +33,13 @@ Last updated: 2026-10-01
 | Simplify the extension popup further (it still asks "Where should Glance write?" and offers recipe export)? | decision | Connecting Google is now the whole setup. |
 | Homepage Hebrew dictionary is dormant (no language switch) | decision | Either add a language switch or remove the Hebrew strings. |
 | The 31 long articles in `/blog` and 8 long pages in `/solutions` (about 1,600 and 700 words each) are the organic/AI-search layer, and many cover industries Flow does not target (energy, telecom, retail, customs, education). Keep as is, or consolidate/noindex the off-target ones? | decision | Nothing was deleted: removing indexed URLs loses ranking history. Recommended: wait for Search Console data after the first deploy, then merge or noindex whatever draws no impressions. The visitor path no longer depends on them: they are reachable from the footer only. |
-| Glance Pro ($14/user/mo) is listed on Pricing but not built | decision | Page says "Not available yet" and collects interest only. |
+| Glance Pro redefined as the individual AI tier (Draft-It + attachment summaries), instead of the small-team plan in `product-architecture.md` §2 | decision | Reason: it is the only boundary that can be enforced (server-side, costs us per use) and everything in it is built. Team features stay a later tier via Contact. Approve, or tell me which features Pro must carry. |
+| Pro price ($14 monthly / $132 yearly), 14-day card-required trial, founding coupon, refund within 14 days | decision | Prices live in Stripe, so changing them needs no code. The refund promise is already in `terms.html`. |
+| Automatic remote classification is now switched off for everyone (`REMOTE_CLASSIFY = false`) | decision | It sent masked email text to a model without being asked, which contradicts the page's promise. Keep it off, or build it as an opt-in Pro setting. |
 
 ## Done (recent)
+
+- 2026-10-01: Glance Pro payment rails (not live until `PRO_PUBLIC=1`): Stripe Checkout, signature-verified webhook, derived licence keys (hash only in the database), key check / resend / billing portal, a server-side licence gate on `glance-assist` (it was open to anyone and calls paid models), Pro card in the extension panel, welcome page, pricing page that switches from Notify Me to checkout by itself, privacy and terms updated, 57 + 40 new checks. Founders section back on the homepage. Plan and owner steps: `docs/monetization.md`.
 
 - 2026-10-01: Site simplification pass. Homepage 5,332 px to 3,725 px: the "Built for sensitive data" and founders sections were removed (they repeated the hero chips and the footer/About founders link; the pre-certification note now sits under "How it works"), the closing CTA is one heading and one form. Glance page 4,471 px to 2,514 px: the signup form is now in the hero, "What it is / isn't", "Data & privacy" and the closing box were merged into one short privacy card, FAQ cut from 9 to 5 (FAQ schema updated to match). Fixed a real bug where reduced-motion visitors saw the homepage cards as blank.
 

@@ -243,6 +243,14 @@ be redirected to offering #3, not sold Pro with an asterisk.
 
 ### 2.4 Status
 
+> **Update 2026-10-01 (see `docs/monetization.md`).** Pro is being built as the
+> *individual* AI tier — Draft-It and attachment summaries, licence-gated on
+> the server — not the small-team plan described above. The shared setup,
+> weekly digest and history dashboard in §2.2 do not exist and are not
+> promised anywhere on the site. Pro still carries no security or compliance
+> claim (§2.3 stands). Awaiting the owner's sign-off, which this section's
+> header requires for any change to the boundary.
+
 Not yet built. `pricing.html`'s `Notify Me` button is a real double
 opt-in waitlist form (Supabase + `send-confirmation`), not a checkout —
 there is no Stripe integration yet, and the specific

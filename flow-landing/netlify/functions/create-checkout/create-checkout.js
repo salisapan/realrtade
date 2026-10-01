@@ -9,7 +9,10 @@
 //        Creates a Stripe Checkout session and returns its hosted URL.
 //
 // Settings (Netlify environment):
-//   STRIPE_SECRET_KEY, STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_YEARLY  required
+//   STRIPE_SECRET_KEY, STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_YEARLY,
+//   STRIPE_WEBHOOK_SECRET, LICENSE_SECRET, SUPABASE_SERVICE_ROLE_KEY   required
+//   PRO_PUBLIC=1            the last switch: nothing is offered to visitors until
+//                           this is set, so keys can be installed and tested first
 //   PRO_TRIAL_DAYS          optional, default 14, 0 = no trial
 //   FOUNDING_COUPON_ID      optional Stripe coupon with max_redemptions; applied
 //                           automatically while redemptions remain
@@ -44,7 +47,7 @@ function settings(env) {
     priceYear: env.STRIPE_PRICE_PRO_YEARLY,
     trialDays,
     coupon: env.FOUNDING_COUPON_ID || '',
-    enabled: Boolean(env.STRIPE_SECRET_KEY && env.STRIPE_PRICE_PRO_MONTHLY && env.STRIPE_PRICE_PRO_YEARLY && env.LICENSE_SECRET && env.SUPABASE_SERVICE_ROLE_KEY && env.STRIPE_WEBHOOK_SECRET),
+    enabled: Boolean(env.PRO_PUBLIC === '1' && env.STRIPE_SECRET_KEY && env.STRIPE_PRICE_PRO_MONTHLY && env.STRIPE_PRICE_PRO_YEARLY && env.LICENSE_SECRET && env.SUPABASE_SERVICE_ROLE_KEY && env.STRIPE_WEBHOOK_SECRET),
   };
 }
 

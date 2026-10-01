@@ -119,6 +119,12 @@ footer.site a{color:var(--muted)}
 .tier-price .amt{font-size:1.85rem; font-weight:800; color:var(--txt-hi)}
 .tier-price .period{font-size:.82rem; color:var(--muted); padding-bottom:2px}
 .tier-note{position:relative; font-size:.76rem; color:var(--muted); margin:0 0 16px}
+.tier-notify[hidden],.pro-billing[hidden],.pro-founding[hidden],#proCheckout[hidden]{display:none}
+.pro-billing{display:inline-flex; gap:4px; padding:3px; margin:0 0 14px; border:1px solid var(--line); border-radius:999px; position:relative}
+.pro-bill{all:unset; box-sizing:border-box; cursor:pointer; padding:5px 14px; border-radius:999px; font-family:var(--sans); font-size:.76rem; font-weight:700; color:var(--muted)}
+.pro-bill[aria-pressed="true"]{background:var(--cat); color:#fff}
+.pro-bill:focus-visible{outline:2px solid var(--cat); outline-offset:2px}
+.pro-founding{position:relative; margin:0 0 14px; padding:8px 12px; border-radius:10px; background:color-mix(in srgb,var(--cat) 12%,transparent); color:var(--txt-hi); font-size:.78rem; font-weight:600}
 .tier-notify{display:flex; flex-direction:column; gap:8px; position:relative}
 .tier-notify input[type=email]{width:100%; box-sizing:border-box; padding:11px 14px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--txt-hi); font-family:var(--sans); font-size:.88rem}
 .tier-notify input[type=email]:focus{outline:none; border-color:var(--cat)}
@@ -270,11 +276,20 @@ footer.site a{color:var(--muted)}
       <p class="note">Glance does not include Flow&rsquo;s organization features.</p>
     </div>
   </div>
-  <div class="tier tier-pro">
+  <div class="tier tier-pro" id="glance-pro">
     <div class="tier-head">
-      <div class="tier-plan"><h3 class="tier-name">Pro</h3><span class="tier-badge">Small team (2&ndash;10)</span></div>
-      <p class="tier-price"><span class="amt">$14</span><span class="period">/user/mo</span></p>
-      <p class="tier-note">$11/user/mo billed annually. Not available yet: leave your email and we will tell you when it launches.</p>
+      <div class="tier-plan"><h3 class="tier-name">Pro</h3><span class="tier-badge">Individual</span></div>
+      <div class="pro-billing" id="proBilling" role="group" aria-label="Billing period" hidden>
+        <button type="button" class="pro-bill" data-interval="year" aria-pressed="true">Yearly</button>
+        <button type="button" class="pro-bill" data-interval="month" aria-pressed="false">Monthly</button>
+      </div>
+      <p class="tier-price"><span class="amt" id="proAmt">$14</span><span class="period" id="proPeriod">/mo</span></p>
+      <p class="tier-note" id="proNote">Not available yet: leave your email and we will tell you when it launches.</p>
+      <p class="pro-founding" id="proFounding" hidden></p>
+      <div id="proCheckout" hidden>
+        <span class="magnetic"><button type="button" class="doit sm" id="proCheckoutBtn" data-ga="pricing_pro_checkout"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="proCheckoutLabel">Start free trial</span></button></span>
+        <p class="tier-notify-status" id="proCheckoutStatus" role="status" aria-live="polite"></p>
+      </div>
       <form class="tier-notify" id="proNotifyForm" novalidate>
         <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
         <input type="email" id="proEmail" placeholder="you@company.com" required autocomplete="email" aria-label="Work email">
@@ -285,9 +300,11 @@ footer.site a{color:var(--muted)}
     <div class="tier-body">
       <ul class="tier-list">
         <li>Everything in Free</li>
-        <li>Connect more than one system at once</li>
-        <li>One shared invoice, a weekly digest and priority support</li>
+        <li>Draft-It: a drafted reply to the email you have open, with names, amounts and dates masked on your device before anything is sent</li>
+        <li>Attachment summaries: hover a Word attachment for a short summary</li>
+        <li>Priority email support</li>
       </ul>
+      <p class="note">Need it for a team? <a href="/contact.html">Contact us</a> for a team plan.</p>
     </div>
   </div>
 </div></div>
@@ -338,6 +355,66 @@ footer.site a{color:var(--muted)}
       .catch(function(){ done(false); });
 
     if(typeof gtag==='function') gtag('event','pricing_pro_notify_submit');
+  });
+})();
+
+(function(){
+  var box=document.getElementById('proCheckout'); if(!box) return;
+  var form=document.getElementById('proNotifyForm'), billing=document.getElementById('proBilling');
+  var amt=document.getElementById('proAmt'), period=document.getElementById('proPeriod'), note=document.getElementById('proNote');
+  var founding=document.getElementById('proFounding'), btn=document.getElementById('proCheckoutBtn'), label=document.getElementById('proCheckoutLabel'), status=document.getElementById('proCheckoutStatus');
+  var offer=null, interval='year';
+
+  function money(cents,cur){
+    var v=cents/100, whole=Math.abs(v-Math.round(v))<0.005;
+    try{ return new Intl.NumberFormat('en-US',{style:'currency',currency:(cur||'usd').toUpperCase(),minimumFractionDigits:whole?0:2,maximumFractionDigits:whole?0:2}).format(v); }catch(e){ return '$'+(whole?Math.round(v):v.toFixed(2)); }
+  }
+  function paint(){
+    var p=offer.prices[interval]; if(!p) return;
+    var trial=offer.trialDays>0;
+    if(interval==='year'){
+      amt.textContent=money(Math.round(p.amount/12),p.currency); period.textContent='/mo';
+      note.textContent='Billed yearly: '+money(p.amount,p.currency)+'. Cancel any time.'+(trial?' '+offer.trialDays+'-day free trial.':'');
+    } else {
+      amt.textContent=money(p.amount,p.currency); period.textContent='/mo';
+      note.textContent='Billed monthly. Cancel any time.'+(trial?' '+offer.trialDays+'-day free trial.':'');
+    }
+    label.textContent=trial?('Start '+offer.trialDays+'-day free trial'):'Get Glance Pro';
+    [].forEach.call(billing.querySelectorAll('.pro-bill'),function(b){ b.setAttribute('aria-pressed',String(b.getAttribute('data-interval')===interval)); });
+  }
+
+  // Only switches the card from "Notify Me" to a real checkout when the
+  // server says every payment setting is in place. Prices are read from
+  // Stripe, so the number shown is the number charged.
+  fetch('/.netlify/functions/create-checkout').then(function(r){ return r.json(); }).then(function(j){
+    if(!j || !j.enabled || !j.prices || !j.prices.month || !j.prices.year) return;
+    offer=j; form.hidden=true; box.hidden=false; billing.hidden=false;
+    if(j.founding){
+      var f=j.founding, off=f.percentOff?(f.percentOff+'% off'):(f.amountOff?(money(f.amountOff,j.prices.month.currency)+' off'):'a founding discount');
+      founding.textContent='Founding members: '+off+(f.duration==='forever'?' for as long as you stay':'')+(f.remaining!==null?'. '+f.remaining+' spots left.':'.');
+      founding.hidden=false;
+    }
+    paint();
+  }).catch(function(){});
+
+  billing.addEventListener('click',function(ev){
+    var b=ev.target.closest('.pro-bill'); if(!b||!offer) return;
+    interval=b.getAttribute('data-interval'); paint();
+  });
+  btn.addEventListener('click',function(){
+    if(!offer) return;
+    btn.disabled=true; var prev=label.textContent; label.textContent='Opening checkout…'; status.className='tier-notify-status'; status.textContent='';
+    if(typeof gtag==='function') gtag('event','pricing_pro_checkout_click',{interval:interval});
+    fetch('/.netlify/functions/create-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({interval:interval})})
+      .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        if(res.ok && res.j.url){ window.location.href=res.j.url; return; }
+        throw new Error(res.j.error||'failed');
+      })
+      .catch(function(e){
+        btn.disabled=false; label.textContent=prev; status.className='tier-notify-status err';
+        status.textContent=(e&&e.message&&e.message!=='failed')?e.message:'We could not open checkout. Please try again, or email hello@theflow-ai.com.';
+      });
   });
 })();
 

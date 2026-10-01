@@ -35,13 +35,116 @@
   // the popup.
   const STEP_NOUNS = { calendar: 'the Calendar step', draft: 'the draft reply step', task: 'the Task step' };
 
+  // Declared up here for the same temporal-dead-zone reason as the two above:
+  // wirePro() runs a few lines below, long before this function's body would
+  // reach the Glance Pro section where these are used.
+  const OFFER_URL = 'https://theflow-ai.com/.netlify/functions/create-checkout';
+  let proOffer = { enabled: false, trialDays: 0 };
+
   wireTabs();
   wireSave();
   wireRecipe();
+  wirePro();
   renderConnectors();
   renderStatusPill();
   await renderLog();
   await renderOpen();
+
+
+  // ---- Glance Pro -----------------------------------------------------------
+  // Free stays free: this card never blocks anything. It shows one of four
+  // things — nothing but a "have a key?" link while checkout is closed, the
+  // offer once it is open, the live subscription, or a lapsed key.
+  function proNote(text, isError) {
+    const n = document.getElementById('proNote');
+    n.textContent = text || '';
+    n.hidden = !text;
+    n.classList.toggle('err', Boolean(isError));
+  }
+
+  async function fetchProOffer() {
+    try {
+      const res = await fetch(OFFER_URL);
+      const data = await res.json();
+      return data && data.enabled ? { enabled: true, trialDays: data.trialDays || 0 } : { enabled: false, trialDays: 0 };
+    } catch (e) {
+      return { enabled: false, trialDays: 0 };
+    }
+  }
+
+  async function renderPro() {
+    const status = await send({ type: 'flow:pro-status' });
+    const record = status && status.record;
+    const info = FlowEntitlements.describe(record, Date.now());
+    const closes = (state.closeStats && state.closeStats.total) || 0;
+    const stored = await chrome.storage.local.get('proNudgeDismissedAt');
+    const nudge = FlowEntitlements.shouldNudge({ checkoutOpen: proOffer.enabled, pro: info.state === 'pro' || info.state === 'trial', closes, dismissedAt: stored.proNudgeDismissedAt }, Date.now());
+
+    const show = (id, on) => { document.getElementById(id).hidden = !on; };
+    const active = info.state === 'pro' || info.state === 'trial';
+    const badge = document.getElementById('proBadge');
+    badge.hidden = !active;
+    badge.textContent = active ? info.label + ' · ' + info.detail : '';
+
+    show('proPitch', !active && proOffer.enabled);
+    const start = document.getElementById('proStart');
+    start.textContent = proOffer.trialDays > 0 ? 'Start ' + proOffer.trialDays + '-day free trial' : 'Get Glance Pro';
+    show('proStart', !active && proOffer.enabled);
+    show('proManage', active && record && record.status !== 'comp');
+    show('proHaveKey', !active);
+    show('proRemove', Boolean(record && record.key));
+    if (info.state === 'lapsed') proNote('Your Pro subscription has ended. Renew it, or remove the key.', true);
+
+    const block = document.getElementById('proBlock');
+    block.classList.toggle('nudge', nudge);
+    show('proNudgeX', nudge);
+    if (nudge && block.parentNode.firstElementChild !== block) block.parentNode.insertBefore(block, block.parentNode.firstElementChild);
+  }
+
+  function wirePro() {
+    const keyRow = document.getElementById('proKeyRow');
+    const input = document.getElementById('proKeyInput');
+    document.getElementById('proHaveKey').addEventListener('click', () => {
+      keyRow.hidden = !keyRow.hidden;
+      if (!keyRow.hidden) input.focus();
+    });
+    async function activate() {
+      const btn = document.getElementById('proActivate');
+      btn.disabled = true; btn.textContent = 'Checking…';
+      const res = await send({ type: 'flow:pro-activate', key: input.value });
+      btn.disabled = false; btn.textContent = 'Activate';
+      if (res && res.ok) {
+        input.value = ''; keyRow.hidden = true;
+        proNote('Glance Pro is active on this device.', false);
+        send({ type: 'flow:track', event: 'pro_activated', params: {} });
+      } else {
+        proNote((res && res.error) || 'Could not activate that key.', true);
+      }
+      await renderPro();
+    }
+    document.getElementById('proActivate').addEventListener('click', activate);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') activate(); });
+    document.getElementById('proStart').addEventListener('click', () => {
+      send({ type: 'flow:track', event: 'pro_start_clicked', params: {} });
+      chrome.tabs.create({ url: FlowEntitlements.PRICING_URL });
+    });
+    document.getElementById('proManage').addEventListener('click', async () => {
+      const res = await send({ type: 'flow:pro-billing' });
+      if (res && res.ok && res.url) chrome.tabs.create({ url: res.url });
+      else proNote((res && res.error) || 'Could not open billing right now.', true);
+    });
+    document.getElementById('proRemove').addEventListener('click', async () => {
+      await send({ type: 'flow:pro-deactivate' });
+      proNote('Key removed from this device.', false);
+      await renderPro();
+    });
+    document.getElementById('proNudgeX').addEventListener('click', async () => {
+      await chrome.storage.local.set({ proNudgeDismissedAt: Date.now() });
+      await renderPro();
+    });
+    fetchProOffer().then((offer) => { proOffer = offer; return renderPro(); });
+    renderPro();
+  }
 
   function send(msg) {
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));

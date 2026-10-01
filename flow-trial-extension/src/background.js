@@ -2314,14 +2314,153 @@ async function notionUndo(ref) {
 // connector above, the actual fetch happens here in the service worker.
 
 const GLANCE_ASSIST_URL = 'https://theflow-ai.com/.netlify/functions/glance-assist';
+const PRO_API = 'https://theflow-ai.com/.netlify/functions';
 
-async function callGlanceAssist(body) {
-  const res = await fetch(GLANCE_ASSIST_URL, {
+/* ------------------------------------------------------------- glance pro */
+//
+// Glance Pro is the paid tier. What it unlocks is exactly what costs us money
+// per use: the masked-AI features above (Draft-It, attachment summaries). The
+// free product — judging email, the Do It chip, writing to Google, Undo — never
+// touches a licence. The policy helpers live in core/entitlements.js (used by
+// the popup and the Gmail script); this file owns the only network calls and
+// the only writes to the stored record, `proLicense`. The grace window below
+// must equal FlowEntitlements.OFFLINE_GRACE_MS — a corpus test pins that.
+//
+// The server (glance-assist) checks the licence again on every call, so this
+// local check is a courtesy that avoids a pointless request, not the gate.
+
+const PRO_STORAGE_KEY = 'proLicense';
+const PRO_OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
+const PRO_RECHECK_AFTER_MS = 12 * 60 * 60 * 1000;
+const PRO_KEY_RE = /^GLNC(-[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{5}){4}$/;
+
+function normalizeProKey(raw) {
+  const compact = String(raw == null ? '' : raw).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (compact.length !== 24 || !compact.startsWith('GLNC')) return null;
+  const body = compact.slice(4);
+  const key = 'GLNC-' + [0, 5, 10, 15].map((i) => body.slice(i, i + 5)).join('-');
+  return PRO_KEY_RE.test(key) ? key : null;
+}
+
+async function getProRecord() {
+  const stored = await chrome.storage.local.get(PRO_STORAGE_KEY);
+  return stored[PRO_STORAGE_KEY] || null;
+}
+
+function proIsActive(record, now) {
+  return Boolean(record && record.valid && record.key && typeof record.activeUntil === 'number' && now < record.activeUntil);
+}
+
+function proRecordFrom(key, answer, now) {
+  const valid = Boolean(answer && answer.valid);
+  return {
+    key,
+    valid,
+    status: (answer && answer.status) || null,
+    plan: (answer && answer.plan) || null,
+    interval: (answer && answer.interval) || null,
+    renewsAt: (answer && answer.renewsAt) || null,
+    trialEnds: (answer && answer.trialEnds) || null,
+    checkedAt: now,
+    activeUntil: valid ? now + PRO_OFFLINE_GRACE_MS : 0
+  };
+}
+
+async function proPost(endpoint, body) {
+  const res = await fetch(PRO_API + '/' + endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
   });
   const data = await res.json().catch(() => ({}));
+  return { status: res.status, ok: res.ok, data };
+}
+
+// Paste-a-key activation. Only a key the server confirms is stored.
+async function activatePro(rawKey) {
+  const key = normalizeProKey(rawKey);
+  if (!key) return { ok: false, error: 'That does not look like a Glance Pro key. It starts with GLNC- and has four groups of five characters.' };
+  let res;
+  try {
+    res = await proPost('verify-license', { key });
+  } catch (e) {
+    return { ok: false, error: 'Could not reach the licence server. Check your connection and try again.' };
+  }
+  if (res.status === 429) return { ok: false, error: 'Too many attempts. Try again in a few minutes.' };
+  if (!res.ok || !res.data || !res.data.ok) return { ok: false, error: 'Could not check that key right now. Please try again.' };
+  if (!res.data.valid) {
+    const why = res.data.reason === 'inactive' ? 'That subscription is no longer active.' : 'That key was not recognised. Check it against your email.';
+    return { ok: false, error: why };
+  }
+  const record = proRecordFrom(key, res.data, Date.now());
+  await chrome.storage.local.set({ [PRO_STORAGE_KEY]: record });
+  return { ok: true, record };
+}
+
+// Re-confirms a stored key in the background of normal use. A network failure
+// keeps the existing record (the offline grace covers it); only the server
+// saying "not valid" ends access early.
+async function refreshPro(force) {
+  const record = await getProRecord();
+  if (!record || !record.key) return record;
+  const now = Date.now();
+  if (!force && record.checkedAt && now - record.checkedAt < PRO_RECHECK_AFTER_MS) return record;
+  let res;
+  try {
+    res = await proPost('verify-license', { key: record.key });
+  } catch (e) {
+    return record;
+  }
+  if (!res.ok || !res.data || !res.data.ok) return record;
+  const next = proRecordFrom(record.key, res.data, now);
+  await chrome.storage.local.set({ [PRO_STORAGE_KEY]: next });
+  return next;
+}
+
+async function proStatus() {
+  const record = await refreshPro(false);
+  return { ok: true, active: proIsActive(record, Date.now()), record: record || null };
+}
+
+async function deactivatePro() {
+  await chrome.storage.local.remove(PRO_STORAGE_KEY);
+  return { ok: true };
+}
+
+async function openBillingPortal() {
+  const record = await getProRecord();
+  if (!record || !record.key) return { ok: false, error: 'No Pro key is activated on this device.' };
+  let res;
+  try {
+    res = await proPost('billing-portal', { key: record.key });
+  } catch (e) {
+    return { ok: false, error: 'Could not reach billing. Check your connection and try again.' };
+  }
+  if (!res.ok || !res.data || !res.data.url) return { ok: false, error: (res.data && res.data.error) || 'Could not open billing right now.' };
+  return { ok: true, url: res.data.url };
+}
+
+function proRequiredError() {
+  const err = new Error('This is part of Glance Pro.');
+  err.code = 'pro_required';
+  return err;
+}
+
+async function callGlanceAssist(body) {
+  const record = await refreshPro(false);
+  if (!proIsActive(record, Date.now())) throw proRequiredError();
+  const res = await fetch(GLANCE_ASSIST_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({}, body, { licenseKey: record.key }))
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 402) {
+    // The server says this key is not live (cancelled, refunded). Stop offering
+    // the features now rather than at the next scheduled recheck.
+    await chrome.storage.local.set({ [PRO_STORAGE_KEY]: Object.assign({}, record, { valid: false, activeUntil: 0, checkedAt: Date.now() }) });
+    throw proRequiredError();
+  }
   if (!res.ok || !data.ok) {
     const message = (data && data.error) || ('Request failed (' + res.status + ')');
     const err = new Error(message);
@@ -2421,7 +2560,7 @@ async function connectorStatus() {
 function reply(sendResponse, promise) {
   promise
     .then((r) => sendResponse(r))
-    .catch((err) => sendResponse({ ok: false, reason: 'error', error: String((err && err.message) || err) }));
+    .catch((err) => sendResponse({ ok: false, reason: 'error', code: (err && err.code) || undefined, error: String((err && err.message) || err) }));
   return true;
 }
 
@@ -2480,6 +2619,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:summarize-attachment') {
     return reply(sendResponse, summarizeAttachmentViaBackend(msg.payload || {}));
   }
+
+  if (msg.type === 'flow:pro-status') return reply(sendResponse, proStatus());
+  if (msg.type === 'flow:pro-activate') return reply(sendResponse, activatePro(msg.key));
+  if (msg.type === 'flow:pro-deactivate') return reply(sendResponse, deactivatePro());
+  if (msg.type === 'flow:pro-billing') return reply(sendResponse, openBillingPortal());
 
   if (msg.type === 'flow:classify-remote') {
     return reply(sendResponse, classifyViaBackend(msg.payload || {}));

@@ -5,7 +5,7 @@ const crypto = require('crypto');
 Object.assign(process.env, {
   SUPABASE_SERVICE_ROLE_KEY: 'svc', LICENSE_SECRET: 'lic-secret', STRIPE_SECRET_KEY: 'sk_test_x',
   STRIPE_WEBHOOK_SECRET: 'whsec_x', STRIPE_PRICE_PRO_MONTHLY: 'price_m', STRIPE_PRICE_PRO_YEARLY: 'price_y',
-  RESEND_API_KEY: 're_x',
+  RESEND_API_KEY: 're_x', PRO_PUBLIC: '1',
 });
 
 let calls = [];
@@ -178,6 +178,10 @@ const signed = (payload, secret, ts) => {
   r = await checkout(ev('GET')); j = parse(r);
   check('a used-up founding coupon disappears instead of lying', j.founding === null, j);
   delete process.env.FOUNDING_COUPON_ID;
+  process.env.PRO_PUBLIC = '0';
+  r = await checkout(ev('GET'));
+  check('everything configured but PRO_PUBLIC unset: still not offered', parse(r).enabled === false, parse(r));
+  process.env.PRO_PUBLIC = '1';
   const saved = process.env.STRIPE_PRICE_PRO_YEARLY; delete process.env.STRIPE_PRICE_PRO_YEARLY;
   r = await checkout(ev('GET'));
   check('with any Stripe setting missing, checkout reports disabled', parse(r).enabled === false, parse(r));

@@ -46,7 +46,11 @@ const ALLOWED_EVENTS = new Set([
   // rate, retention) is computed and stays entirely on-device — see
   // core/pmf-metrics.js — because it's only ever meaningful per account,
   // not as a population rollup.
-  'weekly_habit_formed'
+  'weekly_habit_formed',
+  // Glance Pro funnel: the two moments that matter for revenue, nothing about
+  // the person or the mail. Fired from the popup only.
+  'pro_start_clicked',
+  'pro_activated'
 ]);
 
 // Each allowed param key validates its own value rather than sharing one

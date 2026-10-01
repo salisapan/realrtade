@@ -48,9 +48,11 @@
     // just quiet until there's something real to connect for.
     if (!watching) { watching = true; observe(); }
     if (!state.onboarded) return;
-    // mountSidebar() is off — see the note at wireAttachmentHoverCards()'s
-    // call site in scanReadingPane() for why the whole sidebar surface
-    // (badge, Draft-It, attachment X-ray) is cut, not just styled.
+    // The sidebar surface (privacy badge, Draft-It, attachment X-ray) is the
+    // Glance Pro feature set: it calls the masked-AI backend, which costs
+    // money per use and is licence-gated on the server. Free accounts never
+    // see it. See applyProState().
+    await applyProState();
     if (typeof FlowBrief !== 'undefined') {
       await checkBrief();
       await consumeStillOpenHandoff();
@@ -208,6 +210,14 @@
   // Returns null on any failure — not configured, network error, model
   // found nothing either — and the caller treats that exactly like the
   // local classifier's own { type: null }: stay silent, no crash, no chip.
+  // Off by design. Sending even masked email text to a model on every message
+  // Glance cannot read locally would contradict the one promise this product
+  // makes on its own page: the decision happens on your device. Draft-It and
+  // attachment summaries are different — you ask for them, and you know the
+  // masked text goes out. If this ever returns it must be opt-in, in the
+  // popup, and the privacy copy must change in the same commit.
+  const REMOTE_CLASSIFY = false;
+
   async function ensureRemoteClassification(rawText) {
     if (typeof FlowPrivacyShield === 'undefined') return null;
     const lang = (typeof FlowSidebar !== 'undefined' && FlowSidebar.isRTLText(rawText)) ? 'he' : 'en';
@@ -255,6 +265,34 @@
   // mounts — it isn't gated behind the judgment engine finding anything,
   // since "the shield is active" is true for every message Glance ever
   // reads, not only the ones that clear the chip threshold.
+  // ---- Glance Pro ---------------------------------------------------------
+  // `proActive` mirrors the stored licence (written only by background.js).
+  // It decides whether the Draft-It / attachment-summary surface exists at
+  // all. The server re-checks the licence on every AI call, so a stale value
+  // here can show a button that then answers "part of Glance Pro" — it can
+  // never get anyone a free model call.
+  let proActive = false;
+
+  async function applyProState() {
+    let active = false;
+    try {
+      const res = await new Promise((resolve) => chrome.runtime.sendMessage({ type: 'flow:pro-status' }, resolve));
+      active = Boolean(res && res.ok && res.active);
+    } catch (e) { active = false; }
+    proActive = active;
+    if (active) mountSidebar();
+    else if (typeof FlowSidebar !== 'undefined') FlowSidebar.unmount();
+  }
+
+  // Shown where a Pro feature was reached without a live licence (an expired
+  // key, or a lapse mid-session). Plain words, one path forward.
+  const PRO_REQUIRED_MESSAGE = 'Draft-It and attachment summaries are part of Glance Pro. Open the Glance panel to start a free trial or enter a key.';
+
+  function aiErrorMessage(response, fallback) {
+    if (response && response.code === 'pro_required') return PRO_REQUIRED_MESSAGE;
+    return (response && response.error) || fallback;
+  }
+
   function mountSidebar() {
     if (typeof FlowSidebar === 'undefined') return; // degrade silently, same policy as the chip system below
     FlowSidebar.mount();
@@ -628,14 +666,8 @@
       }
       checkContextualResurface(messages, currentContext.messageId);
     }
-    // wireAttachmentHoverCards(message) is off — Draft-It and the attachment
-    // X-ray both depend on the same glance-assist backend call, and that call
-    // isn't reliably configured yet ("This feature is not configured yet"
-    // reaching the card in practice). Cutting the whole sidebar surface
-    // (badge, Draft-It, this hover card) rather than shipping a feature that
-    // errors on click — the chip's own write is the one path proven to work
-    // end to end. Re-enable both this call and mountSidebar() in init() once
-    // glance-assist is confirmed working.
+    // Attachment summaries are a Glance Pro feature (see applyProState()).
+    if (proActive) wireAttachmentHoverCards(message);
 
     // A live chip already sitting in this exact node means there is nothing
     // to do — this is the fast path that avoids re-running judgment on every
@@ -757,7 +789,7 @@
     // The remote router is only for when the local pass found nothing at
     // all — it must not be asked to overturn a silence. A fact ask Glance
     // already owned is not sent out to be reclassified into a generic reply.
-    if (!intent.type && !intent.quiet && !intent.googleSilence && !factOwns) intent = await ensureRemoteClassification(text) || intent;
+    if (REMOTE_CLASSIFY && !intent.type && !intent.quiet && !intent.googleSilence && !factOwns) intent = await ensureRemoteClassification(text) || intent;
     // Item 4's real-usage telemetry — the empirical answer to "how often is
     // the free local pass actually enough, how often does the one remote
     // fallback rescue what it missed, how often does nothing fire at all,"
@@ -2406,7 +2438,7 @@
 
     chrome.runtime.sendMessage({ type: 'flow:draft-reply', payload: { lang, entries } }, (response) => {
       if (!response || !response.ok) {
-        FlowSidebar.renderDraft('error', { message: (response && response.error) || 'Could not draft a reply.', onDraft: handleDraftIt });
+        FlowSidebar.renderDraft('error', { message: aiErrorMessage(response, 'Could not draft a reply.'), onDraft: handleDraftIt });
         return;
       }
       // The one place a real name/amount/date is reconstructed for this
@@ -2522,7 +2554,7 @@
       const masked = FlowPrivacyShield.mask(rawText);
       chrome.runtime.sendMessage({ type: 'flow:summarize-attachment', payload: { maskedText: masked.maskedText } }, (response) => {
         if (!response || !response.ok) {
-          FlowSidebar.showFloatingCard(rect, { state: 'error', message: (response && response.error) || 'Couldn’t read this attachment.' });
+          FlowSidebar.showFloatingCard(rect, { state: 'error', message: aiErrorMessage(response, 'Couldn’t read this attachment.') });
           return;
         }
         const summary = FlowPrivacyShield.unmask(response.summary, masked.tokenMap);
@@ -2538,6 +2570,7 @@
 
   chrome.storage.onChanged.addListener((changes) => {
     if (changes.onboarded || changes.domainId || changes.connectorId) init();
+    else if (changes.proLicense) applyProState();
   });
 
   init();

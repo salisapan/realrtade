@@ -328,14 +328,29 @@ async function run() {
 
   console.log('\n--- handler: 502 has no fake summary; classify silence is 200 ---\n');
   let ip = 0;
+  // Every glance-assist action needs a live Glance Pro licence (see the gate in
+  // glance-assist.js; the gate itself is tested in verify-license/license.test.cjs).
+  // These cases are about routing, so they call as a licensed user: licence
+  // lookups are answered here and everything else reaches the scripted fetch.
+  const licenseCore = require('../verify-license/license-core.js');
+  const TEST_KEY = licenseCore.deriveKey('test-secret', 'sub_test');
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'svc';
   async function post(body) {
     ip += 1;
-    const res = await handler({
-      httpMethod: 'POST',
-      headers: { 'x-nf-client-connection-ip': '10.0.0.' + ip },
-      body: JSON.stringify(body)
-    });
-    return { status: res.statusCode, json: JSON.parse(res.body) };
+    const scripted = global.fetch;
+    global.fetch = async (url, o) => (String(url).indexOf('supabase.co/rest/v1/licenses') !== -1
+      ? { ok: true, status: 200, json: async () => [{ status: 'active', plan: 'pro', key_hash: licenseCore.hashKey(TEST_KEY) }] }
+      : scripted(url, o));
+    try {
+      const res = await handler({
+        httpMethod: 'POST',
+        headers: { 'x-nf-client-connection-ip': '10.0.0.' + ip },
+        body: JSON.stringify(Object.assign({ licenseKey: TEST_KEY }, body))
+      });
+      return { status: res.statusCode, json: JSON.parse(res.body) };
+    } finally {
+      global.fetch = scripted;
+    }
   }
   const previousFetch = global.fetch;
   try {
