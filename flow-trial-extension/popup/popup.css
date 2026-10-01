@@ -321,3 +321,19 @@ main{padding:var(--space-5)}
 .saved-note.err{color:#E5484D}
 /* .ghost and .pro-key-row set display, which beats the hidden attribute. */
 .pro-block [hidden]{display:none !important}
+
+/* ---- Waiting on ---- */
+.waiting{margin-top:var(--space-6)}
+.waiting-sum{margin:0 0 var(--space-3); font-size:.8rem; color:var(--ink-2)}
+.waiting-sum b{color:var(--ink)}
+.wait-item{border:1px solid var(--line,rgba(127,127,127,.3)); border-radius:12px; padding:var(--space-3) var(--space-4); display:flex; flex-direction:column; gap:var(--space-2)}
+.wait-top{display:flex; justify-content:space-between; gap:var(--space-3); align-items:baseline}
+.wait-who{font-weight:700; font-size:.84rem; color:var(--ink)}
+.wait-state{font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:1px 8px; border-radius:999px; color:var(--accent); background:var(--accent-wash); white-space:nowrap}
+.wait-state.overdue{color:#E5484D; background:rgba(229,72,77,.12)}
+.wait-what{font-size:.78rem; color:var(--ink-2); line-height:1.4}
+.wait-amt{font-weight:700; color:var(--ink)}
+.wait-acts{display:flex; gap:var(--space-2); flex-wrap:wrap}
+.wait-acts .ghost{margin-top:0}
+.wait-note{font-size:.74rem; color:var(--ink-2); margin:0}
+#waiting-list{max-height:none; overflow:visible}

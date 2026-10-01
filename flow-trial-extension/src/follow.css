@@ -1,0 +1,25 @@
+/* "Waiting on" card. Fixed to the corner, independent of Gmail's own markup. */
+.flow-fu{
+  position:fixed; right:20px; bottom:20px; z-index:2147483000;
+  width:min(340px, calc(100vw - 40px)); box-sizing:border-box;
+  padding:14px 16px 12px; border-radius:14px;
+  background:#0E1322; color:#EEF2F9; border:1px solid rgba(150,166,204,.28);
+  box-shadow:0 16px 40px -12px rgba(0,0,0,.55);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  animation:flow-fu-in .22s ease-out;
+}
+@keyframes flow-fu-in{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+@media (prefers-reduced-motion:reduce){ .flow-fu{animation:none} }
+.flow-fu-title{font-weight:700; font-size:14px; margin:0 0 6px; color:#EEF2F9}
+.flow-fu-quote{margin:0 0 8px; padding:6px 10px; border-inline-start:3px solid #3B74FF; color:#C9D0DE; font-size:13px; background:rgba(59,116,255,.08); border-radius:4px}
+.flow-fu-line{margin:0 0 10px; color:#AEB9D6; font-size:13px}
+.flow-fu-actions{display:flex; gap:8px; justify-content:flex-start}
+.flow-fu-btn{
+  all:unset; box-sizing:border-box; cursor:pointer; padding:7px 14px; border-radius:999px;
+  font:600 13px/1 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+}
+.flow-fu-btn.primary{background:#3B74FF; color:#fff}
+.flow-fu-btn.primary:hover{background:#5C8CFF}
+.flow-fu-btn.ghost{color:#AEB9D6; border:1px solid rgba(150,166,204,.32)}
+.flow-fu-btn.ghost:hover{color:#fff; border-color:rgba(150,166,204,.6)}
+.flow-fu-btn:focus-visible{outline:2px solid #8FB0FF; outline-offset:2px}

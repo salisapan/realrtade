@@ -271,6 +271,7 @@ footer.site a{color:var(--muted)}
       <ul class="tier-list">
         <li>One click on Do It closes a real outcome from the email you have open, and Glance stays quiet when it is unsure</li>
         <li>Writes to Google Calendar, Google Tasks and Gmail drafts, with an Undo for every write</li>
+        <li>Follows up for you on up to 3 things you are waiting on</li>
         <li>Email support</li>
       </ul>
       <p class="note">Glance does not include Flow&rsquo;s organization features.</p>
@@ -284,7 +285,7 @@ footer.site a{color:var(--muted)}
         <button type="button" class="pro-bill" data-interval="month" aria-pressed="false">Monthly</button>
       </div>
       <p class="tier-price"><span class="amt" id="proAmt">$14</span><span class="period" id="proPeriod">/mo</span></p>
-      <p class="tier-note" id="proNote">Not available yet: leave your email and we will tell you when it launches.</p>
+      <p class="tier-note" id="proNote">Pro is not open yet. Join the waitlist and we will email you the day it opens, before anyone else.</p>
       <p class="pro-founding" id="proFounding" hidden></p>
       <div id="proCheckout" hidden>
         <span class="magnetic"><button type="button" class="doit sm" id="proCheckoutBtn" data-ga="pricing_pro_checkout"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="proCheckoutLabel">Start free trial</span></button></span>
@@ -293,13 +294,15 @@ footer.site a{color:var(--muted)}
       <form class="tier-notify" id="proNotifyForm" novalidate>
         <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
         <input type="email" id="proEmail" placeholder="you@company.com" required autocomplete="email" aria-label="Work email">
-        <span class="magnetic"><button type="submit" class="doit sm" id="proNotifyBtn" data-ga="pricing_pro"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="proNotifyLabel">Notify Me</span></button></span>
+        <span class="magnetic"><button type="submit" class="doit sm" id="proNotifyBtn" data-ga="pricing_pro"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="proNotifyLabel">Join the Pro waitlist</span></button></span>
         <p class="tier-notify-status" id="proNotifyStatus" role="status" aria-live="polite"></p>
       </form>
     </div>
     <div class="tier-body">
       <ul class="tier-list">
         <li>Everything in Free</li>
+        <li><b>Follow-ups without a limit.</b> Ask someone for an answer, a signature or a payment and Glance remembers, reminds you on the day, and closes it itself when they reply. Free tracks 3 at a time.</li>
+        <li><b>Money owed to you.</b> The total of the payments you are chasing, in one line.</li>
         <li>Draft-It: a drafted reply to the email you have open, with names, amounts and dates masked on your device before anything is sent</li>
         <li>Attachment summaries: hover a Word attachment for a short summary</li>
         <li>Priority email support</li>
@@ -337,13 +340,13 @@ footer.site a{color:var(--muted)}
     status.className=''; status.textContent='';
 
     function done(ok,emailed){
-      btn.disabled=false; label.textContent='Notify Me';
+      btn.disabled=false; label.textContent='Join the Pro waitlist';
       status.className='tier-notify-status ' + (ok?'ok':'err');
       status.textContent = !ok
         ? 'Something went wrong. Please try again in a moment, or email hello@theflow-ai.com.'
         : (emailed === false
-            ? 'You are on the list. The confirmation email did not send just now, so please submit once more in a few minutes.'
-            : 'Check your inbox to confirm — we’ll email you when Pro launches.');
+            ? 'You are on the waitlist, but the confirmation email did not send just now. Please submit once more in a few minutes.'
+            : 'Check your inbox and confirm your email. We will write to you the day Pro opens.');
     }
 
     // Stored server-side, so a database failure is reported instead of
@@ -383,7 +386,7 @@ footer.site a{color:var(--muted)}
     [].forEach.call(billing.querySelectorAll('.pro-bill'),function(b){ b.setAttribute('aria-pressed',String(b.getAttribute('data-interval')===interval)); });
   }
 
-  // Only switches the card from "Notify Me" to a real checkout when the
+  // Only switches the card from "Join the Pro waitlist" to a real checkout when the
   // server says every payment setting is in place. Prices are read from
   // Stripe, so the number shown is the number charged.
   fetch('/.netlify/functions/create-checkout').then(function(r){ return r.json(); }).then(function(j){

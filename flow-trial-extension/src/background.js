@@ -1110,6 +1110,99 @@ async function googleTasksUndo(ref) {
   return { ok: res.ok || res.status === 404 };
 }
 
+
+/* ------------------------------------------------------------- waiting on */
+//
+// "Waiting on" — things the account asked someone else for. core/follow-up.js
+// decides what is worth tracking and when to chase; these are the three
+// writes it needs, all to the user's own Google account through the grant
+// they already gave: a Task due on the chase day, completing that Task when a
+// reply settles it, and an editable Gmail draft nudge (never sent).
+
+async function followTaskCreate(p) {
+  const auth = await getGoogleTasksAuth();
+  if (!auth) return { ok: false, reason: 'not-connected' };
+  const title = String((p && p.title) || '').trim();
+  if (!title) return { ok: false, reason: 'invalid', error: 'Nothing to track.' };
+  const lines = [];
+  if (p.what) lines.push('Asked: ' + String(p.what).slice(0, 300));
+  if (p.counterpart) lines.push('Waiting on: ' + String(p.counterpart).slice(0, 200));
+  if (p.threadUrl) lines.push('Open in Gmail: ' + p.threadUrl);
+  const body = { title: title.slice(0, 1024), notes: lines.join('\n').slice(0, 8192) };
+  // Same midnight-UTC convention as googleTasksWrite: the date shown must not
+  // shift a day in either direction.
+  if (p.dueIso && /^\d{4}-\d{2}-\d{2}$/.test(p.dueIso)) body.due = p.dueIso + 'T00:00:00.000Z';
+
+  const post = (listId) => googleTasksAuthedFetch('/lists/' + encodeURIComponent(listId) + '/tasks', { method: 'POST', body: JSON.stringify(body) });
+  let taskListId = auth.taskListId;
+  let res = await post(taskListId);
+  if (res.status === 404) {
+    try {
+      const fresh = await findOrCreateGlanceTaskList();
+      if (fresh && fresh !== taskListId) {
+        taskListId = fresh;
+        await chrome.storage.local.set({ googleTasksAuth: Object.assign({}, auth, { taskListId }) });
+        res = await post(taskListId);
+      }
+    } catch (e) { /* report the original failure below */ }
+  }
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  if (!res.ok) throw new Error('Google Tasks write failed (' + res.status + ')');
+  const task = await res.json();
+  return {
+    ok: true,
+    where: 'Google Tasks',
+    ref: { taskListId, taskId: task.id },
+    url: 'https://tasks.google.com/embed/list/' + encodeURIComponent(taskListId) + '?pli=1'
+  };
+}
+
+// A reply arrived, so the reminder is no longer needed. Completing (not
+// deleting) keeps the record in Tasks. A task the person already deleted or
+// completed is fine: nothing left to do is success.
+async function followTaskComplete(ref) {
+  if (!ref || !ref.taskId) return { ok: false, reason: 'invalid' };
+  const auth = await getGoogleTasksAuth();
+  const listId = ref.taskListId || (auth && auth.taskListId);
+  if (!listId) return { ok: false, reason: 'not-connected' };
+  const res = await googleTasksAuthedFetch(
+    '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId),
+    { method: 'PATCH', body: JSON.stringify({ status: 'completed' }) }
+  );
+  return { ok: res.ok || res.status === 404 };
+}
+
+async function findThreadIdTo(recipientEmail, subject) {
+  if (!recipientEmail) return null;
+  try {
+    const q = 'to:' + recipientEmail + (subject ? ' subject:"' + String(subject).replace(/^re:\s*/i, '').replace(/"/g, '') + '"' : '');
+    const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/threads?maxResults=1&q=' + encodeURIComponent(q));
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.threads && data.threads[0] && data.threads[0].id) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function followDraftCreate(p) {
+  if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+  const to = String((p && p.to) || '').trim();
+  const text = String((p && p.body) || '').trim();
+  if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
+  const base = String(p.subject || '').trim();
+  const subject = base ? (/^re:/i.test(base) ? base : 'Re: ' + base) : 'Following up';
+  const threadId = await findThreadIdTo(to, base);
+  const raw = base64UrlEncode(buildMimeMessage({ to: toHeaderValue(to, p.toName), subject, body: text, attachment: null }));
+  const message = { raw };
+  if (threadId) message.threadId = threadId;
+  const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts', { method: 'POST', body: JSON.stringify({ message }) });
+  if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
+  if (!res.ok) throw new Error('Gmail draft creation failed (' + res.status + ')');
+  const draft = await res.json();
+  return { ok: true, where: 'Gmail', target: 'a draft follow-up', ref: { draftId: draft.id }, url: 'https://mail.google.com/mail/u/0/#drafts' };
+}
+
 /* --------------------------------------------------------------- Calendar */
 //
 // The top of the execution priority the spec calls for: a SCHEDULED_EVENT
@@ -2619,6 +2712,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:summarize-attachment') {
     return reply(sendResponse, summarizeAttachmentViaBackend(msg.payload || {}));
   }
+
+  if (msg.type === 'flow:follow-task') return reply(sendResponse, followTaskCreate(msg.payload || {}));
+  if (msg.type === 'flow:follow-complete') return reply(sendResponse, followTaskComplete(msg.ref));
+  if (msg.type === 'flow:follow-draft') return reply(sendResponse, followDraftCreate(msg.payload || {}));
 
   if (msg.type === 'flow:pro-status') return reply(sendResponse, proStatus());
   if (msg.type === 'flow:pro-activate') return reply(sendResponse, activatePro(msg.key));

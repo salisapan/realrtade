@@ -33,7 +33,7 @@
       <div class="block pro-block" id="proBlock">
         <button type="button" class="referral-x" id="proNudgeX" aria-label="Not now" hidden>&times;</button>
         <p class="label">Glance Pro <span class="pro-badge" id="proBadge" hidden></span></p>
-        <p class="hint" id="proPitch" hidden>Draft replies and read attachments with AI. Names, amounts and dates are masked on this device before anything is sent. Everything else in Glance stays free.</p>
+        <p class="hint" id="proPitch" hidden>Follow up on everything you are waiting on, with the total owed to you. Draft replies and read attachments with AI; names, amounts and dates are masked on this device first. Everything else in Glance stays free.</p>
         <div class="recipe-row" id="proActions">
           <button type="button" class="ghost sm" id="proStart" hidden>Start free trial</button>
           <button type="button" class="ghost sm" id="proManage" hidden>Manage billing</button>
@@ -63,6 +63,13 @@
       <p class="hint">מה עדיין פתוח · Still open. Up to three things you can close from here — the same list as the morning brief. If nothing is clearly still open, this stays empty.</p>
       <div id="open-list" class="log-list"></div>
       <p id="open-empty" class="hint" hidden>Nothing still open.</p>
+
+      <div class="waiting" id="waitingBlock" hidden>
+        <p class="label">Waiting on</p>
+        <p class="waiting-sum" id="waitingSummary"></p>
+        <div id="waiting-list" class="log-list"></div>
+        <p class="hint" id="waitingUpsell" hidden></p>
+      </div>
     </section>
 
     <section data-panel="log" class="panel">
@@ -136,6 +143,7 @@
        Must load after both, and after close-quality-metrics.js, before popup.js. -->
   <script src="../src/chrome-storage-adapter.js"></script>
   <script src="../src/receipt-copy.js"></script>
+  <script src="../core/follow-up.js"></script>
   <script src="../core/entitlements.js"></script>
   <script src="popup.js"></script>
 </body>

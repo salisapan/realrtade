@@ -50,7 +50,12 @@ const ALLOWED_EVENTS = new Set([
   // Glance Pro funnel: the two moments that matter for revenue, nothing about
   // the person or the mail. Fired from the popup only.
   'pro_start_clicked',
-  'pro_activated'
+  'pro_activated',
+  // "Waiting on": counts only. Never who, what, or how much.
+  'follow_tracked',
+  'follow_resolved',
+  'follow_nudge_drafted',
+  'follow_cap_hit'
 ]);
 
 // Each allowed param key validates its own value rather than sharing one

@@ -32,43 +32,69 @@ month plus a setup fee) for 20 people is $1,600 a month, the same as roughly
 sign-ups share a company domain. Those emails are warm Flow leads. Answer them
 the same day.
 
-## 2. What is sold, and why this boundary
+## 2. What is sold, and why
 
-**Free (unchanged):** judging email on the device, the Do It chip, writing to
-Google Calendar, Tasks and Gmail drafts, Undo. Nothing is capped.
+**The test for any paid feature: does it save the person from a specific cost?**
+Writing a calendar event from an email is a convenience, and Gmail's own AI
+does it for free. People do not pay $14 a month for a convenience. They pay to
+stop losing money and deadlines. The expensive failure in email is not the
+incoming message you forgot to log. It is the thing **you asked for that never
+came back**: the invoice nobody paid, the contract nobody signed, the answer
+that decides a booking. Gmail does nothing about that. Boomerang and Superhuman
+charge $15–30 a month for reminders of exactly this kind, which is the price
+signal for the category.
 
-**Pro:** Draft-It (an AI-drafted reply to the open email) and attachment
-summaries.
+So Glance now does two jobs:
 
-Why that line:
+1. **Catches what was decided** (Do It, unchanged and free).
+2. **Chases what you are owed** ("Waiting on"). When your own newest message in a
+   thread asks for something, one small card offers a reminder on the day to
+   chase. If you accept, Glance adds a Google Task due that day. When the person
+   replies, Glance completes the Task by itself, so the loop is closed by the
+   outcome and not by the click. An invoice you sent is recognised as a payment
+   and its amount is kept.
 
-- **It is the only line that can be enforced.** A limit on a local feature can
-  be removed by editing the extension. A feature that calls a paid model
-  through our server cannot be unlocked from the client. `glance-assist`
-  checks the licence on every call and fails closed.
-- **It follows our cost.** Free costs us almost nothing to run. Pro is what
-  costs money per use, so it is what the subscription pays for. Before this
-  change `glance-assist` was open to anyone who found the URL.
-- **It keeps the free promise true.** The free product never sends email text
-  anywhere. The automatic "remote classification" fallback that did send masked
-  text is now switched off for everyone (`REMOTE_CLASSIFY = false`). Pro's AI
-  runs only when the person asks for a draft or a summary, and the policy says
-  so.
-- **It does not gate the thing that earns trust.** The first closed item is
-  free, always.
+| | Free | Pro |
+|---|---|---|
+| Do It (Calendar, Tasks, drafts, Undo) | yes, no limit | same |
+| Waiting on | **3 at a time** | **as many as you have** |
+| Money owed to you (total of the payments being chased) | hidden | shown |
+| Nudge drafts for overdue items | yes (template, never sent) | yes |
+| Draft-It (AI reply) and attachment summaries | no | yes (server-enforced) |
 
-The risk to say out loud: Gmail's own AI drafts replies for free. Pro's case
-is masked-before-sending (names, amounts, dates, emails and phone numbers are
-replaced on the device), plus Draft-It living next to the close that was just
-made. If Pro does not convert, test $9 before changing the boundary. The
-price is read from Stripe, so changing it needs no code change.
+**Why the limit is 3.** The limit sits on the thing that grows with the value
+Glance delivers. Anyone using Waiting on for a week has more than three open
+asks, so the limit is met in a real situation: the card says "You are tracking 3
+of 3" at the moment a fourth ask needs chasing, which is the strongest reason to
+upgrade this product can ever give. The panel also tells a Free user, once a
+payment is being chased, that Pro shows the total owed to them.
+
+**The honest enforcement note.** The cap is a local rule. Someone who edits their
+own copy of the extension can remove it. That is acceptable for a limit on a
+convenience at this stage. What cannot be bypassed is everything that calls a
+paid model: Draft-It and attachment summaries are checked by the server on every
+call, and the server fails closed.
+
+**What the money argument is, and what it is not.** One $1,000 invoice paid a
+week earlier, or one signature that does not slip a deadline, is worth many
+months of $14. That is the claim to test with users, not a measured result.
+Do not put it on the site as a number.
+
+**Free stays private.** Waiting on reads only your own newest message in the
+thread, on the device. Nothing is sent to us. The automatic "remote
+classification" fallback stays off for everyone (`REMOTE_CLASSIFY = false`).
 
 > Product-architecture note: `docs/product-architecture.md` §2 describes Pro as
-> a small-team plan (shared setup, digest, dashboard). None of that exists. This
-> document redefines Pro as the individual AI tier, which is what can be built
-> and verified now. Team features remain a later tier (sold through Contact).
-> This is a boundary change in that document's sense, so it is recorded in
+> a small-team plan. This document redefines Pro as the individual
+> follow-through tier, which is what can be built and verified now. Team
+> features remain a later tier (sold through Contact). Recorded in
 > `docs/open-tasks.md` as a decision waiting for the owner.
+
+> **Verification gap, stated plainly.** Waiting on is tested against a page that
+> reproduces Gmail's structural anchors (`test/follow-gmail-harness.cjs`), not
+> against live Gmail. Before this is deployed, send yourself a thread with an
+> ask, a payment request and a courtesy line, and confirm the card appears only
+> for the first two, that Remind me creates the Task, and that a reply closes it.
 
 ## 3. The offer
 
@@ -96,11 +122,16 @@ price is read from Stripe, so changing it needs no code change.
 - Extension: the Glance Pro card in the panel (activate key, manage billing,
   one quiet nudge after 5 closes), Draft-It and attachment summaries only for
   licensed accounts, 7-day offline grace, immediate stop when the server says
-  the key is no longer valid.
+  the key is no longer valid. **Waiting on**: `core/follow-up.js` (what to track,
+  when to chase, when a reply settles it, the money view), `src/follow.js` (the
+  card), the Open tab list with nudge drafts and the Pro-only total, and the
+  3-follow-up Free limit.
 - Pages: Pricing (checkout when live, "Notify me" until then), `/pro-welcome.html`
   (shows the key right after paying), privacy and terms updated.
-- Tests: `verify-license/license.test.cjs` (57 checks) and
-  `flow-trial-extension/test/pro-corpus.cjs`.
+- Tests: `verify-license/license.test.cjs` (57 checks), `test/pro-corpus.cjs`,
+  `test/follow-up-corpus.cjs` (what is and is not an ask, dates, money, settling),
+  `test/follow-write-corpus.cjs` (storage and the three Google writes) and
+  `test/follow-gmail-harness.cjs` (the real content scripts in a Gmail-shaped page).
 
 ## 5. Owner: the order that gets the first dollar (about an hour)
 
@@ -127,7 +158,7 @@ price is read from Stripe, so changing it needs no code change.
    prints a key and one SQL line to run. Paste the key in the Glance panel.
    Open a real Gmail thread: confirm Draft-It and an attachment summary work.
    These two were switched off earlier because the backend was "not reliably
-   configured"; this is the check that matters most.
+   configured". Then run the Waiting on check from §2. This step matters most.
 7. **Test the money path in Stripe test mode** on a Netlify deploy preview with
    `PRO_PUBLIC=1` set only there: card 4242 4242 4242 4242, see the welcome page,
    receive the key email, activate, then cancel in the portal and confirm
@@ -148,6 +179,7 @@ price is read from Stripe, so changing it needs no code change.
 | Answer every company-domain cluster email the same day (Flow leads) | running; owner action |
 | Chrome Web Store listing (removes Developer-mode install) | owner |
 | In-product nudge after 5 closes (panel only, once a month, dismissible) | built |
+| The 4th follow-up as the upgrade moment, and the locked money total | built |
 | Founding-member offer for the first N | built, optional |
 | Annual pre-selected | built |
 | Inbox Scan page (`missed-deadline.html`) and the referral link as free acquisition | built; needs traffic |

@@ -16,6 +16,11 @@
 const FlowEntitlements = (() => {
   const OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
   const RECHECK_AFTER_MS = 12 * 60 * 60 * 1000;
+  // Free tracks three things you are waiting on at once. Pro tracks as many as
+  // you have. Enforced on this device only (nothing server-side to enforce),
+  // which is honest for a local feature: it is a limit on a convenience, not a
+  // lock on a paid model call, and the paid model calls are checked by the server.
+  const FREE_WATCH_CAP = 3;
   const NUDGE_MIN_CLOSES = 5;
   const NUDGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
   const PRICING_URL = 'https://theflow-ai.com/pricing.html#glance-pro';
@@ -94,7 +99,14 @@ const FlowEntitlements = (() => {
     return true;
   }
 
+  // May another follow-up be tracked? `activeCount` is how many are waiting now.
+  function watchGate(activeCount, record, now) {
+    if (isActive(record, now)) return { allowed: true, pro: true, cap: null, used: activeCount };
+    return { allowed: activeCount < FREE_WATCH_CAP, pro: false, cap: FREE_WATCH_CAP, used: activeCount };
+  }
+
   return {
+    FREE_WATCH_CAP, watchGate,
     OFFLINE_GRACE_MS, RECHECK_AFTER_MS, NUDGE_MIN_CLOSES, NUDGE_COOLDOWN_MS, PRICING_URL,
     normalizeKey, isActive, needsRecheck, recordFromVerification, describe, shouldNudge
   };

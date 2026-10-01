@@ -49,6 +49,7 @@
   renderStatusPill();
   await renderLog();
   await renderOpen();
+  await renderWaiting();
 
 
   // ---- Glance Pro -----------------------------------------------------------
@@ -547,6 +548,98 @@
     });
     acts.appendChild(dismiss);
     item.appendChild(acts);
+    return item;
+  }
+
+
+  // ---- Waiting on -----------------------------------------------------------
+  // What the account asked others for and has not had answered. Free tracks
+  // three at a time; Pro tracks all of them and adds the money line. Nothing
+  // here reads mail: every record was made by the person clicking "Remind me".
+  function dayShort(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  async function renderWaiting() {
+    const block = document.getElementById('waitingBlock');
+    const all = await FlowStorage.getWatches();
+    const active = all.filter(FlowFollowUp.isActive)
+      .sort((a, b) => (a.chaseIso || '').localeCompare(b.chaseIso || ''));
+    block.hidden = active.length === 0;
+    if (!active.length) return;
+
+    const status = await send({ type: 'flow:pro-status' });
+    const pro = FlowEntitlements.isActive(status && status.record, Date.now());
+    const now = Date.now();
+    const sum = FlowFollowUp.summarize(all, now);
+
+    const line = document.getElementById('waitingSummary');
+    line.replaceChildren();
+    const parts = [el('b', null, String(sum.active)), document.createTextNode(' open')];
+    if (sum.overdue) { parts.push(document.createTextNode(' · ')); parts.push(el('b', null, String(sum.overdue))); parts.push(document.createTextNode(' overdue')); }
+    parts.forEach((n) => line.appendChild(n));
+    const payments = active.filter((w) => w.kind === 'payment' && w.amount && w.amount.value > 0);
+    const upsell = document.getElementById('waitingUpsell');
+    upsell.hidden = true;
+    if (payments.length && pro) {
+      line.appendChild(document.createTextNode(' · owed to you '));
+      line.appendChild(el('b', null, sum.moneyOwed.map(FlowFollowUp.formatMoney).join(' + ')));
+    } else if (payments.length) {
+      upsell.hidden = false;
+      upsell.textContent = payments.length + (payments.length === 1 ? ' payment is' : ' payments are') + ' being chased. Glance Pro shows the total owed to you.';
+    } else if (!pro && active.length >= FlowEntitlements.FREE_WATCH_CAP) {
+      upsell.hidden = false;
+      upsell.textContent = 'You are using all ' + FlowEntitlements.FREE_WATCH_CAP + ' free follow-ups. Glance Pro tracks as many as you have.';
+    }
+
+    const host = document.getElementById('waiting-list');
+    host.replaceChildren();
+    for (const w of active) host.appendChild(waitingItem(w, now));
+  }
+
+  function waitingItem(w, now) {
+    const state = FlowFollowUp.watchState(w, now);
+    const item = el('div', 'wait-item');
+    const top = el('div', 'wait-top');
+    top.appendChild(el('span', 'wait-who', FlowFollowUp.firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email) || (w.subject || 'Reply')));
+    top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : ''), state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : 'Chase ' + dayShort(w.chaseIso)));
+    item.appendChild(top);
+    const what = el('div', 'wait-what');
+    if (w.kind === 'payment' && w.amount && w.amount.raw) what.appendChild(el('span', 'wait-amt', w.amount.raw + ' · '));
+    what.appendChild(document.createTextNode(w.what));
+    item.appendChild(what);
+    const note = el('p', 'wait-note');
+    note.hidden = true;
+    const acts = el('div', 'wait-acts');
+    if (w.counterpart && w.counterpart.email) {
+      const nudge = el('button', 'ghost sm', state === 'overdue' ? 'Draft a nudge' : 'Nudge now');
+      nudge.type = 'button';
+      nudge.addEventListener('click', async () => {
+        nudge.disabled = true; nudge.textContent = 'Drafting…';
+        const res = await send({ type: 'flow:follow-draft', payload: { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject, body: FlowFollowUp.nudgeText(w) } });
+        nudge.disabled = false; nudge.textContent = state === 'overdue' ? 'Draft a nudge' : 'Nudge now';
+        note.hidden = false;
+        if (res && res.ok) {
+          note.textContent = 'A draft is waiting in Gmail. Nothing was sent.';
+          await FlowStorage.updateWatch(w.id, { nudges: (w.nudges || 0) + 1 });
+          send({ type: 'flow:track', event: 'follow_nudge_drafted', params: {} });
+        } else {
+          note.textContent = (res && res.reason === 'not-connected') ? 'Connect Google first (Setup tab).' : 'Could not create the draft. Try again.';
+        }
+      });
+      acts.appendChild(nudge);
+    }
+    const stop = el('button', 'ghost sm', 'Stop tracking');
+    stop.type = 'button';
+    stop.addEventListener('click', async () => {
+      await FlowStorage.updateWatch(w.id, { status: 'stopped', resolvedAt: Date.now(), resolvedBy: 'manual' });
+      if (w.taskRef) send({ type: 'flow:follow-complete', ref: w.taskRef });
+      await renderWaiting();
+    });
+    acts.appendChild(stop);
+    item.appendChild(acts);
+    item.appendChild(note);
     return item;
   }
 

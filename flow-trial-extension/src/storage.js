@@ -185,7 +185,12 @@ const FlowStorage = (() => {
     stillOpenScan: [],
     // shown / Do It / undo / false-close for the morning list. Same local
     // posture as closeQuality. Null until the first event.
-    stillOpenMetrics: null
+    stillOpenMetrics: null,
+    // "Waiting on": things the account asked someone else for and has not
+    // had answered (core/follow-up.js owns the shape). Each is a compact
+    // record — the asking sentence, who, when to chase — never the message.
+    // Local to this device, capped, oldest settled records dropped first.
+    followWatches: []
   };
 
   function get() {
@@ -869,6 +874,51 @@ const FlowStorage = (() => {
   // Mirrors consumeDailyActiveTrigger's own shape one level up: a local,
   // on-device computation (FlowPmfMetrics.computeWeeklyHabit) decides
   // whether it's true; this function only decides whether it's NEW.
+
+  // ---- Waiting on (core/follow-up.js) -----------------------------------------
+  const FOLLOW_CAP = 60;
+
+  function trimWatches(list) {
+    if (list.length <= FOLLOW_CAP) return list;
+    // Keep every active watch; drop the oldest settled ones first.
+    const active = list.filter((w) => w && w.status === 'waiting');
+    const settled = list.filter((w) => w && w.status !== 'waiting')
+      .sort((a, b) => (b.resolvedAt || b.createdAt || 0) - (a.resolvedAt || a.createdAt || 0));
+    return active.concat(settled).slice(0, FOLLOW_CAP);
+  }
+
+  const upsertWatch = serialize(async function upsertWatch(watch) {
+    if (!watch || !watch.id) return null;
+    const state = await get();
+    const list = (state.followWatches || []).filter((w) => w && w.id !== watch.id);
+    list.unshift(watch);
+    await set({ followWatches: trimWatches(list) });
+    return watch;
+  });
+
+  const updateWatch = serialize(async function updateWatch(id, patch) {
+    if (!id) return null;
+    const state = await get();
+    let updated = null;
+    const list = (state.followWatches || []).map((w) => {
+      if (!w || w.id !== id) return w;
+      updated = Object.assign({}, w, patch);
+      return updated;
+    });
+    if (updated) await set({ followWatches: list });
+    return updated;
+  });
+
+  async function getWatches() {
+    const state = await get();
+    return (state.followWatches || []).filter(Boolean);
+  }
+
+  async function getWatch(id) {
+    const list = await getWatches();
+    return list.find((w) => w.id === id) || null;
+  }
+
   const consumeWeeklyHabitTrigger = serialize(async function consumeWeeklyHabitTrigger() {
     const state = await get();
     const habit = FlowPmfMetrics.computeWeeklyHabit(state.activeDays, state.closeStats, Date.now());
@@ -918,7 +968,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

@@ -623,6 +623,17 @@
     // a missed chip once per account, never a wrong one.
     if (!ownEmail) return;
 
+    // "Waiting on" looks at the thread as a whole — whose message is newest —
+    // so it runs before the incoming-mail logic below, which skips the
+    // account's own messages entirely. It never blocks or alters that logic.
+    if (typeof FlowFollow !== 'undefined') {
+      FlowFollow.consider({
+        messages, ownEmail, extractSender, ownMessageText,
+        messageText: (node) => ownMessageText(node),
+        threadIdFrom, subject: currentSubject(), threadUrl
+      }).catch((e) => console.error('[Glance] follow-up check failed', e));
+    }
+
     let message = null;
     for (let i = messages.length - 1; i >= 0; i--) {
       const candidate = messages[i];
