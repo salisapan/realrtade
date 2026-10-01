@@ -39,6 +39,7 @@
 
 const crypto = require('crypto');
 const { callRoutedLlm, silenceResult } = require('./model-router.js');
+const license = require('../verify-license/license-core.js');
 
 const LOG_PREFIX = '[glance-assist]';
 
@@ -270,6 +271,24 @@ exports.handler = async function (event) {
   if (rateLimited(ip, Date.now())) {
     logErr('rate limited');
     return { statusCode: 429, body: JSON.stringify({ error: 'Too many requests. Please try again shortly.' }) };
+  }
+
+  // Every action here calls a paid model, so every action needs a live Glance
+  // Pro licence, checked on the server. The extension also checks locally to
+  // avoid a pointless round trip, but this is the check that counts. It fails
+  // closed: with licensing unavailable, nothing reaches the model.
+  let entitlement;
+  try {
+    entitlement = await license.checkLicense(payload.licenseKey, process.env, Date.now());
+  } catch (err) {
+    logErr('licence check failed', String(err && err.message || err));
+    return { statusCode: 503, body: JSON.stringify({ ok: false, code: 'license_unavailable', error: 'We could not check your Glance Pro licence just now. Please try again.' }) };
+  }
+  if (!entitlement.configured) {
+    return { statusCode: 503, body: JSON.stringify({ ok: false, code: 'license_unavailable', error: 'Glance Pro is not available right now.' }) };
+  }
+  if (!entitlement.valid) {
+    return { statusCode: 402, body: JSON.stringify({ ok: false, code: 'pro_required', error: 'This feature is part of Glance Pro.' }) };
   }
 
   const action = payload.action;
