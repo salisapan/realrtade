@@ -31,9 +31,12 @@ Last updated: 2026-10-01
 | Keep the "independent, not affiliated with other Flow products" line in `llms.txt` and JSON-LD, or drop it? | decision | It was removed from visible text on request; it remains only in machine-readable data. |
 | Simplify the extension popup further (it still asks "Where should Glance write?" and offers recipe export)? | decision | Connecting Google is now the whole setup. |
 | Homepage Hebrew dictionary is dormant (no language switch) | decision | Either add a language switch or remove the Hebrew strings. |
+| The 31 long articles in `/blog` and 8 long pages in `/solutions` (about 1,600 and 700 words each) are the organic/AI-search layer, and many cover industries Flow does not target (energy, telecom, retail, customs, education). Keep as is, or consolidate/noindex the off-target ones? | decision | Nothing was deleted: removing indexed URLs loses ranking history. Recommended: wait for Search Console data after the first deploy, then merge or noindex whatever draws no impressions. The visitor path no longer depends on them: they are reachable from the footer only. |
 | Glance Pro ($14/user/mo) is listed on Pricing but not built | decision | Page says "Not available yet" and collects interest only. |
 
 ## Done (recent)
+
+- 2026-10-01: Site simplification pass. Homepage 5,332 px to 3,725 px: the "Built for sensitive data" and founders sections were removed (they repeated the hero chips and the footer/About founders link; the pre-certification note now sits under "How it works"), the closing CTA is one heading and one form. Glance page 4,471 px to 2,514 px: the signup form is now in the hero, "What it is / isn't", "Data & privacy" and the closing box were merged into one short privacy card, FAQ cut from 9 to 5 (FAQ schema updated to match). Fixed a real bug where reduced-motion visitors saw the homepage cards as blank.
 
 - 2026-10-01: Action-to-outcome audit of every form: Pricing Pro "Notify Me" no longer swallows database failures (now stored server-side and the confirmation email is only promised when sent); the homepage deployment form now notifies the owner when a lead completes it; both covered by tests (`submit-waitlist.test.cjs`).
 - 2026-10-01: Playbook promise fixed: `send-playbook` could not find its PDF on Netlify (default bundler skips it); added `included_files`. Light-theme fixes for founder cards and header wordmark. Visual check in light/dark and desktop/mobile of the new homepage sections, Pricing, About and the Glance download panel.

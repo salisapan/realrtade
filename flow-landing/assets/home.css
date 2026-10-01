@@ -438,16 +438,12 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 @media (prefers-reduced-motion:reduce){.integ-track{animation:none; flex-wrap:wrap; justify-content:center; width:auto; gap:18px 34px}}
 
 /* scroll reveal animations */
-.reveal{opacity:0; animation:fadeInUp 0.7s ease-out forwards}
-.reveal.in{animation-play-state:running}
 .card{transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.35s ease, border-color .35s}
 .card:hover{transform:translateY(-6px); border-color:color-mix(in srgb,var(--accent) 40%,transparent); box-shadow:var(--card-shadow), 0 16px 44px -14px var(--glow), inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent); animation:shimmerCard 2s ease-in-out infinite}
-.card.reveal{animation:slideInLeft 0.6s cubic-bezier(0.2,0.7,0.2,1) forwards; opacity:0}
-.card[data-d="2"].reveal{animation-delay:0.1s}
-.card[data-d="3"].reveal{animation-delay:0.2s}
-.card[data-d="4"].reveal{animation-delay:0.3s}
-.card[data-d="5"].reveal{animation-delay:0.4s}
-.card[data-d="6"].reveal{animation-delay:0.5s}
+.card.reveal{transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1), box-shadow .35s ease, border-color .35s}
+.card.reveal.in:hover{transition:transform .35s cubic-bezier(0.34,1.56,0.64,1), box-shadow .35s ease, border-color .35s}
+.card[data-d="2"].reveal{transition-delay:.08s,.08s,0s,0s}
+.card[data-d="3"].reveal{transition-delay:.16s,.16s,0s,0s}
 
 /* ---------- border beam: a light that travels the card's own border on a conic gradient ----------
    The gradient's *angle* is animated via the --beam-a custom property (driven by rAF in JS below) —
@@ -515,16 +511,7 @@ canvas.terrain-canvas.show{opacity:1}
 #usecases .sixgrid{grid-template-columns:1fr}
 @media(min-width:760px){#usecases .sixgrid{grid-template-columns:1fr 1fr}}
 /* Trust band */
-.trust-sec{position:relative; overflow:hidden; border-block:1px solid var(--line); padding-block:clamp(40px,6vw,64px); background:color-mix(in srgb,var(--panel) 22%, transparent); text-align:center}
-.trust-sec::before{content:""; position:absolute; z-index:0; inset:auto; width:60vw; height:60vw; left:20%; top:-30%; border-radius:50%; background:radial-gradient(circle, var(--blob) 0%, color-mix(in srgb,var(--blob) 78%,transparent) 17%, color-mix(in srgb,var(--blob) 46%,transparent) 34%, color-mix(in srgb,var(--blob) 20%,transparent) 53%, color-mix(in srgb,var(--blob) 6%,transparent) 74%, transparent 100%); opacity:.5; pointer-events:none; animation:orbDrift 30s ease-in-out infinite}
-.trust-sec .wrap{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:22px}
-.trust-sec .eyebrow{justify-content:center}
-.trust-row{display:flex; flex-wrap:wrap; justify-content:center; gap:14px}
-.trust-badge{display:inline-flex; align-items:center; gap:9px; font-family:var(--mono); font-size:.82rem; letter-spacing:.06em; color:var(--txt-hi); padding:11px 18px; border-radius:999px; border:1px solid var(--line-hi); background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 60%,transparent)); box-shadow:var(--card-shadow); transition:transform .3s cubic-bezier(.34,1.56,.64,1), border-color .3s}
-.trust-badge:hover{transform:translateY(-4px); border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
-.trust-badge svg{width:19px; height:19px; fill:none; stroke:var(--accent-2); stroke-width:1.6; flex:0 0 auto}
-.trust-note{max-width:60ch; color:var(--muted); font-size:1rem}
-@media (prefers-reduced-motion:reduce){.trust-sec::before{animation:none}}
+.trust-note{max-width:60ch; margin:28px auto 0; text-align:center; color:var(--muted); font-size:.95rem}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 /* Phones: shed the remaining per-element blur surfaces. Each filter:blur() box
@@ -672,7 +659,6 @@ canvas.terrain-canvas.show{opacity:1}
 .cta-solo a{color:var(--txt-hi); font-weight:600; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line)}
 .cta-solo a:hover{text-decoration-color:var(--cat); color:var(--cat)}
 #how .grid-3, #trust .grid-3{margin-top:8px}
-#trust .trust-note{margin-top:34px; text-align:center}
 #trust .card{text-align:start}
 .cta-path{
   display:flex; flex-direction:column; gap:8px; padding:24px 26px; border-radius:20px;
@@ -740,19 +726,4 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 .skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans,sans-serif); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 
-/* who is behind Flow */
-.team-sec{padding-block:clamp(40px,6vw,72px)}
-.team-sec .sec-head{text-align:center; margin-inline:auto}
-.team-row{display:grid; gap:16px; grid-template-columns:1fr; max-width:760px; margin:28px auto 0}
-@media (min-width:700px){ .team-row{grid-template-columns:1fr 1fr} }
-.team-card{display:flex; align-items:center; gap:16px; padding:18px 20px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); text-decoration:none; color:inherit; transition:transform .2s, border-color .2s}
-.team-card:hover{transform:translateY(-2px); border-color:var(--cat)}
-.team-card:focus-visible{outline:2px solid var(--cat); outline-offset:3px}
-.team-card img{width:64px; height:64px; border-radius:50%; object-fit:cover; flex:none}
-.team-card span{display:flex; flex-direction:column; gap:2px}
-.team-card b{color:var(--txt-hi); font-size:1.02rem}
-.team-card i{font-style:normal; color:var(--cat); font-size:.82rem; font-weight:600}
-.team-card small{color:var(--muted); font-size:.83rem; line-height:1.45}
-:root[data-theme="light"] .team-card{background:#fff; box-shadow:0 1px 2px rgba(20,44,100,.08), 0 14px 32px -20px rgba(20,44,100,.28)}
-:root[data-theme="light"] .team-card small{color:#566180}
 :root[data-theme="light"] .nav .brand img{filter:brightness(.42) contrast(1.25)}
