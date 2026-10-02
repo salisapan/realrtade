@@ -54,7 +54,9 @@ const FlowMeetingDebrief = (() => {
           if (!types.findAction(m[3])) continue;
           what = line;
         } else {
-          const t = types.detectCommitmentSentence(line);
+          const pipe = c.pipeline === undefined ? (typeof FlowIntentPipeline !== 'undefined' ? FlowIntentPipeline : null) : c.pipeline;
+          const r = pipe ? pipe.recognize(line) : null;
+          const t = r ? (r.act === 'PROMISE' ? r.commitment : null) : types.detectCommitmentSentence(line);
           if (!t) continue;
           direction = 'mine'; what = line;
         }

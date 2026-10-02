@@ -278,6 +278,20 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('an expiry already tracked for that date is not offered again', s.card === null, s.card);
   await t.ctx.close();
 
+
+  // 18. the on-device model finds an ask no word list has a frame for, and learns from a refusal
+  t = await open(browser, 'model-ask', [msg(theirs, 'Thanks for the draft.'), msg(mine, 'Hi Dana, do you mind taking another pass at the clause on indemnity before Friday? Legal wants it tight.')]);
+  s = await t.state();
+  check('a polite ask outside every listed frame is still offered (local model)', /Waiting on a reply\?/.test(s.card || '') && /Stay on it/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.ghost'); await t.p.waitForTimeout(600);
+  const adapt = await t.p.evaluate(() => window.__store.intentAdapt);
+  check('turning a card down teaches the model a little: only feature numbers are stored, never the sentence', adapt && Object.keys(adapt.act || {}).length > 0 && !/indemnity|clause/i.test(JSON.stringify(adapt)), adapt && Object.keys(adapt.act || {}).length);
+  await t.ctx.close();
+  t = await open(browser, 'model-quiet', [msg(theirs, 'Great call today.'), msg(mine, 'Please find attached the signed agreement for your records. Have a great weekend and talk soon.')]);
+  s = await t.state();
+  check('boilerplate that borrows a request\'s words stays silent', s.card === null && s.watches.length === 0, s);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);

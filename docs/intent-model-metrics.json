@@ -1,0 +1,347 @@
+{
+ "comparison": {
+  "devSet": {
+   "n": 193,
+   "lexicon": {
+    "ASK": {
+     "precision": 1,
+     "recall": 0.391,
+     "tp": 25,
+     "fp": 0,
+     "fn": 39
+    },
+    "PROMISE": {
+     "precision": 1,
+     "recall": 0.548,
+     "tp": 23,
+     "fp": 0,
+     "fn": 19
+    }
+   },
+   "pipeline": {
+    "ASK": {
+     "precision": 1,
+     "recall": 0.891,
+     "tp": 57,
+     "fp": 0,
+     "fn": 7
+    },
+    "PROMISE": {
+     "precision": 1,
+     "recall": 0.881,
+     "tp": 37,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  "blindSet": {
+   "n": 108,
+   "lexicon": {
+    "ASK": {
+     "precision": 1,
+     "recall": 0.265,
+     "tp": 9,
+     "fp": 0,
+     "fn": 25
+    },
+    "PROMISE": {
+     "precision": 1,
+     "recall": 0.333,
+     "tp": 8,
+     "fp": 0,
+     "fn": 16
+    }
+   },
+   "pipeline": {
+    "ASK": {
+     "precision": 1,
+     "recall": 0.706,
+     "tp": 24,
+     "fp": 0,
+     "fn": 10
+    },
+    "PROMISE": {
+     "precision": 1,
+     "recall": 0.75,
+     "tp": 18,
+     "fp": 0,
+     "fn": 6
+    }
+   }
+  }
+ },
+ "generatedAt": "2026-10-02",
+ "config": {
+  "seed": 11,
+  "models": 4,
+  "en": 16000,
+  "he": 12000,
+  "epochs": 10
+ },
+ "temperature": 2.5,
+ "devHeldOut": {
+  "n": 96,
+  "accuracy": 0.969,
+  "per": {
+   "ASK": {
+    "precision": 0.941,
+    "recall": 1,
+    "n": 32
+   },
+   "PROMISE": {
+    "precision": 1,
+    "recall": 0.857,
+    "n": 21
+   },
+   "INFORM": {
+    "precision": 1,
+    "recall": 1,
+    "n": 26
+   },
+   "ACK": {
+    "precision": 0.944,
+    "recall": 1,
+    "n": 17
+   }
+  },
+  "confusion": {
+   "ASK": {
+    "ASK": 32,
+    "PROMISE": 0,
+    "INFORM": 0,
+    "ACK": 0
+   },
+   "PROMISE": {
+    "ASK": 2,
+    "PROMISE": 18,
+    "INFORM": 0,
+    "ACK": 1
+   },
+   "INFORM": {
+    "ASK": 0,
+    "PROMISE": 0,
+    "INFORM": 26,
+    "ACK": 0
+   },
+   "ACK": {
+    "ASK": 0,
+    "PROMISE": 0,
+    "INFORM": 0,
+    "ACK": 17
+   }
+  },
+  "wrong": [
+   {
+    "t": "תקבל את הקבצים לתיבה לפני הצהריים.",
+    "want": "PROMISE",
+    "got": "ASK",
+    "p": 0.74
+   },
+   {
+    "t": "אשלח הזמנה ליומן ליום שלישי בקרוב.",
+    "want": "PROMISE",
+    "got": "ACK",
+    "p": 0.73
+   },
+   {
+    "t": "אכין את הטיוטה הראשונה עד סוף השבוע.",
+    "want": "PROMISE",
+    "got": "ASK",
+    "p": 0.6
+   }
+  ]
+ },
+ "dev": {
+  "n": 193,
+  "accuracy": 0.979,
+  "per": {
+   "ASK": {
+    "precision": 0.969,
+    "recall": 0.984,
+    "n": 64
+   },
+   "PROMISE": {
+    "precision": 1,
+    "recall": 0.929,
+    "n": 42
+   },
+   "INFORM": {
+    "precision": 0.981,
+    "recall": 1,
+    "n": 53
+   },
+   "ACK": {
+    "precision": 0.971,
+    "recall": 1,
+    "n": 34
+   }
+  },
+  "confusion": {
+   "ASK": {
+    "ASK": 63,
+    "PROMISE": 0,
+    "INFORM": 1,
+    "ACK": 0
+   },
+   "PROMISE": {
+    "ASK": 2,
+    "PROMISE": 39,
+    "INFORM": 0,
+    "ACK": 1
+   },
+   "INFORM": {
+    "ASK": 0,
+    "PROMISE": 0,
+    "INFORM": 53,
+    "ACK": 0
+   },
+   "ACK": {
+    "ASK": 0,
+    "PROMISE": 0,
+    "INFORM": 0,
+    "ACK": 34
+   }
+  },
+  "wrong": [
+   {
+    "t": "תעדכן אותי איפה זה עומד מול הלקוח.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 0.79
+   },
+   {
+    "t": "תקבל את הקבצים לתיבה לפני הצהריים.",
+    "want": "PROMISE",
+    "got": "ASK",
+    "p": 0.74
+   },
+   {
+    "t": "אשלח הזמנה ליומן ליום שלישי בקרוב.",
+    "want": "PROMISE",
+    "got": "ACK",
+    "p": 0.73
+   },
+   {
+    "t": "אכין את הטיוטה הראשונה עד סוף השבוע.",
+    "want": "PROMISE",
+    "got": "ASK",
+    "p": 0.6
+   }
+  ]
+ },
+ "blind": {
+  "n": 108,
+  "accuracy": 0.907,
+  "per": {
+   "ASK": {
+    "precision": 0.941,
+    "recall": 0.941,
+    "n": 34
+   },
+   "PROMISE": {
+    "precision": 0.852,
+    "recall": 0.958,
+    "n": 24
+   },
+   "INFORM": {
+    "precision": 0.929,
+    "recall": 0.813,
+    "n": 32
+   },
+   "ACK": {
+    "precision": 0.895,
+    "recall": 0.944,
+    "n": 18
+   }
+  },
+  "confusion": {
+   "ASK": {
+    "ASK": 32,
+    "PROMISE": 0,
+    "INFORM": 1,
+    "ACK": 1
+   },
+   "PROMISE": {
+    "ASK": 0,
+    "PROMISE": 23,
+    "INFORM": 1,
+    "ACK": 0
+   },
+   "INFORM": {
+    "ASK": 1,
+    "PROMISE": 4,
+    "INFORM": 26,
+    "ACK": 1
+   },
+   "ACK": {
+    "ASK": 1,
+    "PROMISE": 0,
+    "INFORM": 0,
+    "ACK": 17
+   }
+  },
+  "wrong": [
+   {
+    "t": "Why hasn't the refund hit my account yet?",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 0.96
+   },
+   {
+    "t": "I have been working with the contractor on the plan since January.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.64
+   },
+   {
+    "t": "I read through the term sheet and it looks reasonable overall.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.48
+   },
+   {
+    "t": "All the best with the move!",
+    "want": "ACK",
+    "got": "ASK",
+    "p": 0.64
+   },
+   {
+    "t": "תגיד לי איזה מועמד אתה רוצה להתקדם איתו.",
+    "want": "ASK",
+    "got": "ACK",
+    "p": 0.94
+   },
+   {
+    "t": "תשמע מהמגייס שלנו תוך יומיים.",
+    "want": "PROMISE",
+    "got": "INFORM",
+    "p": 1
+   },
+   {
+    "t": "בעל הבית אמר שהמקדמה תוחזר תוך שלושים יום מהפינוי.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.57
+   },
+   {
+    "t": "מכתב ההצעה מתאריך 3 במרץ ותקף לשבוע.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.81
+   },
+   {
+    "t": "רואי החשבון סיימו את העבודה בשטח וכותבים את הדוח.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.48
+   },
+   {
+    "t": "הבניין סגור בסופי שבוע.",
+    "want": "INFORM",
+    "got": "ACK",
+    "p": 0.95
+   }
+  ]
+ }
+}

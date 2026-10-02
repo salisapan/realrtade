@@ -5,6 +5,7 @@
 const T = require('../core/request-types.js').FlowRequestTypes;
 const F = require('../core/follow-up.js').FlowFollowUp;
 const { FlowExtract } = require('../core/extract.js');
+const P = require('../core/intent-pipeline.js').FlowIntentPipeline;
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -91,18 +92,18 @@ for (const text of no) check('silent: ' + text.slice(0, 56), T.detectRequest(tex
 console.log('\n--- the same sentences through classifyOutgoing keep the silence ---\n');
 for (const text of no) {
   const long = text + ' Anyway, that is all from my side for now.';
-  const r = F.classifyOutgoing(long, { now: NOW, extract: FlowExtract, types: T });
+  const r = F.classifyOutgoing(long, { now: NOW, extract: FlowExtract, types: T, pipeline: P });
   check('no card: ' + text.slice(0, 50), r === null, r);
 }
 
 console.log('\n--- classifyOutgoing uses the lexicon ---\n');
-let r = F.classifyOutgoing('Hi Dana, could you please sign the NDA by Friday? We would like to start Monday.', { now: NOW, extract: FlowExtract, types: T });
+let r = F.classifyOutgoing('Hi Dana, could you please sign the NDA by Friday? We would like to start Monday.', { now: NOW, extract: FlowExtract, types: T, pipeline: P });
 check('a typed ask the fixed phrasings missed is tracked, with its type', r && r.kind === 'reply' && r.subtype === 'sign:contract', r);
-r = F.classifyOutgoing('Please schedule a call with the team for early next week to go over the plan.', { now: NOW, extract: FlowExtract, types: T });
+r = F.classifyOutgoing('Please schedule a call with the team for early next week to go over the plan.', { now: NOW, extract: FlowExtract, types: T, pipeline: P });
 check('scheduling chases in one business day', r && r.subtype && r.subtype.startsWith('schedule') && r.chaseIso === '2026-10-02', r);
-r = F.classifyOutgoing('Could you send the updated quote for the new scope as soon as possible?', { now: NOW, extract: FlowExtract, types: T });
+r = F.classifyOutgoing('Could you send the updated quote for the new scope as soon as possible?', { now: NOW, extract: FlowExtract, types: T, pipeline: P });
 check('a quote takes a day longer to produce (3 business days)', r && r.subtype === 'send:quote' && r.chaseIso === '2026-10-06', r);
-r = F.classifyOutgoing('Hi, please pay the outstanding invoice when you have the chance this week.', { now: NOW, extract: FlowExtract, types: T });
+r = F.classifyOutgoing('Hi, please pay the outstanding invoice when you have the chance this week.', { now: NOW, extract: FlowExtract, types: T, pipeline: P });
 check('"please pay the invoice" with no figure is a payment loop with no amount', r && r.kind === 'payment' && r.amount === null && r.subtype && r.subtype.startsWith('pay'), r);
 r = F.classifyOutgoing('Could you send the signed contract by Monday so we can start?', { now: NOW, extract: FlowExtract });
 check('with no lexicon loaded it still works exactly as before', r && r.kind === 'reply' && r.subtype === null, r);
@@ -135,12 +136,12 @@ const notMine = [
 ];
 for (const text of notMine) check('not a promise: ' + text.slice(0, 54), T.detectCommitmentSentence(text) === null, T.detectCommitmentSentence(text));
 
-let m = F.classifyCommitment("Thanks for today. I'll send you the revised numbers by Monday, promise.", { now: NOW, extract: FlowExtract, types: T });
+let m = F.classifyCommitment("Thanks for today. I'll send you the revised numbers by Monday, promise.", { now: NOW, extract: FlowExtract, types: T, pipeline: P });
 check('a dated promise is a loop you owe, due that day', m && m.direction === 'mine' && m.deadlineIso === '2026-10-05' && m.chaseIso === '2026-10-05', m);
-m = F.classifyCommitment('Let me check with the team and get back to you on the rollout plan.', { now: NOW, extract: FlowExtract, types: T });
+m = F.classifyCommitment('Let me check with the team and get back to you on the rollout plan.', { now: NOW, extract: FlowExtract, types: T, pipeline: P });
 check('an undated promise is due in two business days', m && m.direction === 'mine' && m.deadlineIso === null && m.chaseIso === '2026-10-05', m);
-check('an ask of THEM is not your promise', F.classifyCommitment('Could you please send the signed contract by Monday so we can start?', { now: NOW, extract: FlowExtract, types: T }) === null);
-check('a courtesy line is not a promise', F.classifyCommitment('Thanks so much, let me know if you have any other questions and I will be happy to help.', { now: NOW, extract: FlowExtract, types: T }) === null);
+check('an ask of THEM is not your promise', F.classifyCommitment('Could you please send the signed contract by Monday so we can start?', { now: NOW, extract: FlowExtract, types: T, pipeline: P }) === null);
+check('a courtesy line is not a promise', F.classifyCommitment('Thanks so much, let me know if you have any other questions and I will be happy to help.', { now: NOW, extract: FlowExtract, types: T, pipeline: P }) === null);
 check('no lexicon, no promise (silent)', F.classifyCommitment("I'll send you the numbers by Friday.", { now: NOW, extract: FlowExtract }) === null);
 
 const pw = F.buildWatch({ threadId: 'm1', messageId: 'x', subject: 'Numbers', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, ask: m, now: NOW });
@@ -150,7 +151,7 @@ check('their reply never closes a promise of yours', F.applyReply(pw, { outcome:
 check('delivering it is recognised', F.deliversPromise('Hi Dana, attached are the revised numbers.') && F.deliversPromise('הנה הדוח שהבטחתי'));
 check('another promise is not delivery', !F.deliversPromise("I'll send the attached numbers tomorrow, will do."));
 check('closing it is its own outcome', (() => { const k = F.closeAsKept(pw, NOW); return k.status === 'resolved' && k.closedAs === 'kept' && k.resolvedAt === NOW; })());
-const owedSum = F.summarize([pw, F.buildWatch({ threadId: 'p', messageId: 'y', subject: 's', counterpart: {}, ask: F.classifyOutgoing('Hi, attached is invoice #3049 for $4,200, due Oct 15. Please pay by then.', { now: NOW, extract: FlowExtract, types: T }), now: NOW })], NOW);
+const owedSum = F.summarize([pw, F.buildWatch({ threadId: 'p', messageId: 'y', subject: 's', counterpart: {}, ask: F.classifyOutgoing('Hi, attached is invoice #3049 for $4,200, due Oct 15. Please pay by then.', { now: NOW, extract: FlowExtract, types: T, pipeline: P }), now: NOW })], NOW);
 check('your promises are counted apart and never added to what is owed to you', owedSum.youOwe === 1 && owedSum.moneyOwed.length === 1 && owedSum.moneyOwed[0].value === 4200, owedSum);
 
 console.log('\n--- the lexicon combines: a generated sweep ---\n');

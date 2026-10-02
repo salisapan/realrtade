@@ -199,7 +199,11 @@ const FlowStorage = (() => {
     // same kind of thing, as dates only. Local, capped, never the message text.
     loopHistory: {},
     // Predictions already shown or accepted: { key: 'YYYY-MM-DD' }.
-    recurrenceAck: {}
+    recurrenceAck: {},
+    // core/intent-model.js on-device adaptation: small sparse nudges to what the
+    // model believes, learned from what this person confirms or turns down.
+    // Feature indexes and numbers only, never any text. Capped.
+    intentAdapt: { act: {}, topic: {}, action: {} }
   };
 
   function get() {
@@ -970,6 +974,15 @@ const FlowStorage = (() => {
     return { history: state.loopHistory || {}, acked: state.recurrenceAck || {} };
   }
 
+  async function getIntentAdapt() {
+    const state = await get();
+    return state.intentAdapt || { act: {}, topic: {}, action: {} };
+  }
+  const setIntentAdapt = serialize(async function setIntentAdapt(a) {
+    await set({ intentAdapt: { act: (a && a.act) || {}, topic: (a && a.topic) || {}, action: (a && a.action) || {} } });
+    return true;
+  });
+
   const ackRecurrence = serialize(async function ackRecurrence(key, nextIso) {
     const state = await get();
     const acked = Object.assign({}, state.recurrenceAck || {}, { [key]: nextIso });
@@ -1028,7 +1041,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

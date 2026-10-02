@@ -1,0 +1,1160 @@
+[
+{
+"t": "Could you drop the signed lease in my inbox by Friday?",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Send me the countersigned NDA when you can, we are blocked on it.",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Do you still have the Q3 deck? I need to reuse a couple of slides.",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Mind sharing the passport scan so I can finish the booking?",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "We are still missing the W-9 from your side.",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Any chance you can forward me last year's tax return?",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Would be great to have the final logo files before Monday.",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "I'd appreciate it if you could upload the receipts to the shared folder.",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Please attach the updated spreadsheet to your next reply.",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Waiting on your signature on page three.",
+"act": "ASK",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Can you settle the March invoice this week? It is now 30 days overdue.",
+"act": "ASK",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "Please transfer the deposit so we can lock in the date.",
+"act": "ASK",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "Just a reminder that the balance of $2,400 is still outstanding.",
+"act": "ASK",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "When can we expect the payment for order 5521?",
+"act": "ASK",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "Could accounting release the wire today?",
+"act": "ASK",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "Are you free Thursday afternoon for a quick call?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Let's find a time next week to go through the roadmap, what works for you?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Can we move our sync to 4pm tomorrow?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Could you pick a slot from the calendar link I sent?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Which day suits you best for the site visit?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Do you approve the revised scope or should we keep the original?",
+"act": "ASK",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "We need a yes or no on the vendor by end of day.",
+"act": "ASK",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "Which option do you want to go with, A or B?",
+"act": "ASK",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "Can you confirm that the 15th still works for the launch?",
+"act": "ASK",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "Please sign off on the budget so procurement can proceed.",
+"act": "ASK",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "Could you take a look at the draft and tell me what feels off?",
+"act": "ASK",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "Please review the contract redlines and add your comments in the doc.",
+"act": "ASK",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "Can you fix the broken link on the pricing page today?",
+"act": "ASK",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "Would you mind proofreading the announcement before it goes out?",
+"act": "ASK",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "I need you to finish the onboarding checklist by Wednesday.",
+"act": "ASK",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "What's the status on the migration, did it finish overnight?",
+"act": "ASK",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Let me know where things stand with the customer.",
+"act": "ASK",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Did you get a chance to look at my last email?",
+"act": "ASK",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Any update on the shipment?",
+"act": "ASK",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Could you tell me which address the invoice should go to?",
+"act": "ASK",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Circling back on this, have you had a chance to think about it?",
+"act": "ASK",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Do you know who owns the renewal on your side?",
+"act": "ASK",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "I'll get the signed copy back to you by Monday morning.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "You'll have the files in your inbox before lunch.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "I can send over the slides tonight.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Expect the revised contract from me early next week.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "We will forward the certificate as soon as legal releases it.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "I'll make sure the payment goes out on Thursday.",
+"act": "PROMISE",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "Our finance team will wire the money by the 10th.",
+"act": "PROMISE",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "I am going to settle the invoice this afternoon.",
+"act": "PROMISE",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "The refund will be on its way tomorrow, I promise.",
+"act": "PROMISE",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "I'll send a calendar invite for Tuesday shortly.",
+"act": "PROMISE",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Let me check my schedule and propose a couple of times.",
+"act": "PROMISE",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "We will set up the kickoff call once the contract is signed.",
+"act": "PROMISE",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "I'll come back to you with a decision after the board meets.",
+"act": "PROMISE",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "We should be able to confirm the numbers by Friday.",
+"act": "PROMISE",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "I'll let you know by Wednesday whether we are in.",
+"act": "PROMISE",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "I'll have the first draft ready for you by the end of the week.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "On it, I'll fix that bug today.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "We are going to review the proposal and respond tomorrow.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "I will get this done before the holiday.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "Leave it with me, I'll sort it out.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "Let me dig into it and report back this afternoon.",
+"act": "PROMISE",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "I'll check with the team and get back to you.",
+"act": "PROMISE",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "I will keep you posted as soon as I hear anything.",
+"act": "PROMISE",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "I'll find out who handles that and let you know.",
+"act": "PROMISE",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "I sent the signed lease to your assistant yesterday.",
+"act": "INFORM",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "The contract was countersigned on the 3rd and filed.",
+"act": "INFORM",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Attached is the deck we presented this morning.",
+"act": "INFORM",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "The passport scan has already been uploaded to the portal.",
+"act": "INFORM",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "Our NDA template is a standard mutual one, nothing unusual.",
+"act": "INFORM",
+"topic": "document",
+"lang": "en"
+},
+{
+"t": "The invoice for March was paid in full last week.",
+"act": "INFORM",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "Payment of $4,200 landed in our account this morning.",
+"act": "INFORM",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "The deposit is non-refundable after 14 days.",
+"act": "INFORM",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "Our rates went up by five percent in January.",
+"act": "INFORM",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "We charge a flat fee for the first consultation.",
+"act": "INFORM",
+"topic": "money",
+"lang": "en"
+},
+{
+"t": "The meeting is on Tuesday at 3pm in the large conference room.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Our offsite is in Lisbon this year.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "The call yesterday ran long but we covered everything.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "Dana is out of office until the 12th.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "The webinar starts at noon Eastern.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "en"
+},
+{
+"t": "The board approved the budget on Monday.",
+"act": "INFORM",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "We decided to go with option B after the review.",
+"act": "INFORM",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "Legal confirmed that the clause is enforceable.",
+"act": "INFORM",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "Management has not made a decision on hiring yet.",
+"act": "INFORM",
+"topic": "decision",
+"lang": "en"
+},
+{
+"t": "The migration finished overnight without errors.",
+"act": "INFORM",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "I looked at your draft and the structure is solid.",
+"act": "INFORM",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "The bug was caused by a stale cache and is already fixed.",
+"act": "INFORM",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "We shipped the release on Friday afternoon.",
+"act": "INFORM",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "The proofreading took longer than expected because of the tables.",
+"act": "INFORM",
+"topic": "work",
+"lang": "en"
+},
+{
+"t": "Our office is on the fourth floor, next to the elevators.",
+"act": "INFORM",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "The shipment left the warehouse on Tuesday and should arrive soon.",
+"act": "INFORM",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "I think the customer is mostly happy with the outcome.",
+"act": "INFORM",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "It looks like the renewal is handled by procurement.",
+"act": "INFORM",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Revenue was up eight percent compared with last quarter.",
+"act": "INFORM",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Here are the three things we learned from the pilot.",
+"act": "INFORM",
+"topic": "info",
+"lang": "en"
+},
+{
+"t": "Thanks so much, that was really helpful.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Got it, thank you!",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Sounds good to me.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Great, talk soon.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Appreciate the quick turnaround.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Perfect, see you then.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Noted, thanks for letting me know.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Have a wonderful weekend!",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Thank you for sending this over.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Best regards, Dana",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Looking forward to it.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "No worries at all, take your time.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Congrats on the launch, well deserved!",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Cheers.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Hope you are doing well.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "That works, thank you both.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Awesome, much appreciated.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Understood.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Happy to help anytime.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "Thanks again for your time today.",
+"act": "ACK",
+"topic": "other",
+"lang": "en"
+},
+{
+"t": "תוכל לשלוח לי את החוזה החתום עד יום חמישי?",
+"act": "ASK",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "נא להעביר אליי את הסריקה של הדרכון.",
+"act": "ASK",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "אשמח לקבל את המצגת העדכנית לפני הפגישה.",
+"act": "ASK",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "עדיין חסר לנו הטופס החתום מהצד שלכם.",
+"act": "ASK",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "אפשר לקבל את קבצי הלוגו הסופיים?",
+"act": "ASK",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "ממתין לחתימה שלך על העמוד האחרון.",
+"act": "ASK",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "תוכלו להעביר את התשלום על החשבונית מחודש מרץ?",
+"act": "ASK",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "תזכורת: היתרה בסך 2,400 ש\"ח עדיין פתוחה.",
+"act": "ASK",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "מתי נקבל את התשלום עבור ההזמנה?",
+"act": "ASK",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "נא לשלם את המקדמה כדי שנסגור את התאריך.",
+"act": "ASK",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "אתה פנוי ביום חמישי אחר הצהריים לשיחה קצרה?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "בוא נקבע זמן בשבוע הבא, מה מתאים לך?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "אפשר להזיז את הפגישה מחר לארבע?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "איזה יום נוח לך לביקור באתר?",
+"act": "ASK",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "אתם מאשרים את ההיקף המעודכן או שנשאר עם המקורי?",
+"act": "ASK",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "צריך תשובה כן או לא לגבי הספק עד סוף היום.",
+"act": "ASK",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "אפשר לאשר שהתאריך ה-15 עדיין מתאים להשקה?",
+"act": "ASK",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "נא לאשר את התקציב כדי שהרכש יתקדם.",
+"act": "ASK",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "תוכל להסתכל על הטיוטה ולומר לי מה לא נראה לך?",
+"act": "ASK",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "בבקשה לעבור על התיקונים בחוזה ולהוסיף הערות.",
+"act": "ASK",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "אפשר לתקן את הקישור השבור בעמוד המחירים היום?",
+"act": "ASK",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "צריך שתסיים את רשימת ההטמעה עד רביעי.",
+"act": "ASK",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "מה המצב עם ההעברה, היא הסתיימה בלילה?",
+"act": "ASK",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "תעדכן אותי איפה זה עומד מול הלקוח.",
+"act": "ASK",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "הספקת להסתכל על המייל האחרון שלי?",
+"act": "ASK",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "יש עדכון לגבי המשלוח?",
+"act": "ASK",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "אפשר לדעת לאיזו כתובת לשלוח את החשבונית?",
+"act": "ASK",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "אשלח לך את העותק החתום עד יום שני בבוקר.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "תקבל את הקבצים לתיבה לפני הצהריים.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "אעביר את המצגת הערב.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "נשלח את התעודה ברגע שהמשפטי ישחרר אותה.",
+"act": "PROMISE",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "אדאג שהתשלום יעבור ביום חמישי.",
+"act": "PROMISE",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "הנה\"ח יעבירו את הכסף עד העשירי.",
+"act": "PROMISE",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "אסגור את החשבונית היום אחר הצהריים.",
+"act": "PROMISE",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "אשלח הזמנה ליומן ליום שלישי בקרוב.",
+"act": "PROMISE",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "אבדוק ביומן ואציע כמה מועדים.",
+"act": "PROMISE",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "אחזור אליך עם החלטה אחרי ישיבת הדירקטוריון.",
+"act": "PROMISE",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "נוכל לאשר את המספרים עד יום שישי.",
+"act": "PROMISE",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "אכין את הטיוטה הראשונה עד סוף השבוע.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "אני על זה, אתקן את הבאג היום.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "נבדוק את ההצעה ונגיב מחר.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "אטפל בזה לפני החג.",
+"act": "PROMISE",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "אבדוק עם הצוות ואחזור אליך.",
+"act": "PROMISE",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "אעדכן אותך ברגע שאשמע משהו.",
+"act": "PROMISE",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "אברר מי אחראי על זה ואודיע לך.",
+"act": "PROMISE",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "שלחתי את החוזה החתום לעוזרת שלך אתמול.",
+"act": "INFORM",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "החוזה נחתם ב-3 בחודש והוגש.",
+"act": "INFORM",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "מצורפת המצגת שהצגנו הבוקר.",
+"act": "INFORM",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "הסריקה של הדרכון כבר הועלתה לפורטל.",
+"act": "INFORM",
+"topic": "document",
+"lang": "he"
+},
+{
+"t": "החשבונית של מרץ שולמה במלואה בשבוע שעבר.",
+"act": "INFORM",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "התשלום של 4,200 ש\"ח נכנס לחשבון הבוקר.",
+"act": "INFORM",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "המקדמה אינה ניתנת להחזר אחרי 14 יום.",
+"act": "INFORM",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "המחירים שלנו עלו בחמישה אחוזים בינואר.",
+"act": "INFORM",
+"topic": "money",
+"lang": "he"
+},
+{
+"t": "הפגישה ביום שלישי בשלוש בחדר הישיבות הגדול.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "הכנס השנתי שלנו יתקיים בליסבון.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "השיחה אתמול התארכה אבל כיסינו הכול.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "דנה לא במשרד עד ה-12.",
+"act": "INFORM",
+"topic": "meeting",
+"lang": "he"
+},
+{
+"t": "הדירקטוריון אישר את התקציב ביום שני.",
+"act": "INFORM",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "החלטנו ללכת על אפשרות ב' אחרי הבדיקה.",
+"act": "INFORM",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "המשפטי אישר שהסעיף אכיף.",
+"act": "INFORM",
+"topic": "decision",
+"lang": "he"
+},
+{
+"t": "ההעברה הסתיימה בלילה בלי שגיאות.",
+"act": "INFORM",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "הסתכלתי על הטיוטה והמבנה מוצק.",
+"act": "INFORM",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "הבאג נבע ממטמון ישן וכבר תוקן.",
+"act": "INFORM",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "העלינו את הגרסה ביום שישי אחר הצהריים.",
+"act": "INFORM",
+"topic": "work",
+"lang": "he"
+},
+{
+"t": "המשרד שלנו בקומה הרביעית ליד המעליות.",
+"act": "INFORM",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "המשלוח יצא מהמחסן ביום שלישי ואמור להגיע בקרוב.",
+"act": "INFORM",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "נראה לי שהלקוח די מרוצה מהתוצאה.",
+"act": "INFORM",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "ההכנסות עלו בשמונה אחוזים לעומת הרבעון הקודם.",
+"act": "INFORM",
+"topic": "info",
+"lang": "he"
+},
+{
+"t": "תודה רבה, זה עזר מאוד.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "קיבלתי, תודה!",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "נשמע טוב.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "מעולה, נדבר בקרוב.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "מעריך את המענה המהיר.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "מושלם, נתראה אז.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "שבוע טוב וסופ\"ש נעים!",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "תודה ששלחת.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "בברכה, דנה",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "מצפה לזה.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "אין בעיה, קח את הזמן.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "הבנתי.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "בשמחה, תמיד.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+},
+{
+"t": "תודה על הזמן היום.",
+"act": "ACK",
+"topic": "other",
+"lang": "he"
+}
+]

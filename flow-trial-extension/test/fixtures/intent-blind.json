@@ -1,0 +1,542 @@
+[
+{
+"t": "Our compliance team still needs the beneficial ownership form from you before we can onboard.",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Would it be too much to ask for a revised timeline by Thursday?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Hey, any word from the landlord on the deposit?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "I'm following up on the offer letter, have you signed it yet?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Can someone on your side confirm the delivery address for the pallet?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Kindly provide the three most recent bank statements.",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Could we get on a call Wednesday to walk through the term sheet?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Please let me know which candidate you would like to move forward with.",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "The auditors are asking for the fixed asset register, can you pull that together?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "It would really help if you could re-send the floor plans in PDF.",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Do you mind taking another pass at the clause on indemnity?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Need your go-ahead on the ad spend before noon.",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Remind me what the deadline is for submitting the grant application?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Who should I loop in from legal on this?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Is there any chance the shipment could go out a day earlier?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Could you give me a rough estimate on the renovation?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Just circling back, are we still on for the demo this Friday?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Please advise on next steps regarding the claim.",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Hoping you can send over the revised SOW this week.",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "Why hasn't the refund hit my account yet?",
+"act": "ASK",
+"lang": "en"
+},
+{
+"t": "I'll ask accounting to cut the check today and let you know the number.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "We'll get the amended filing over to you before the deadline.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "Give me until Thursday and I'll have the full analysis.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "I'll walk the contractor through the plan tomorrow morning.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "Our team is going to pull the numbers together for you.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "Count on me for the translation, it will be done by Monday.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "I'll loop in legal and come back with their view.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "I'm going to book the venue as soon as the budget is signed off.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "We will refund the difference in the next billing cycle.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "I'll pop the keys in the mail tonight.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "Will send you the updated quote shortly.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "I can have the build deployed by lunchtime.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "Let me talk to the landlord and report back.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "You'll hear from our recruiter within two days.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "I intend to finalize the hiring plan before the holiday.",
+"act": "PROMISE",
+"lang": "en"
+},
+{
+"t": "The landlord said the deposit would be returned within thirty days of move-out.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "Our compliance team completed the onboarding review last Friday.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "The offer letter is dated March 3 and expires after a week.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "I have been working with the contractor on the plan since January.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "Bank statements for the last quarter are stored in the finance drive.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "The delivery arrived damaged, so we filed a claim with the courier.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "Candidate two has a stronger background in logistics.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "The new floor plans show an extra meeting room on the second level.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "Ad spend is up about twelve percent compared with the same month last year.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "The grant application closes at five pm on the last day of the month.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "She mentioned that the shipment might be delayed by a day.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "My flight got rescheduled so I am arriving a bit late.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "Indemnity clauses are usually capped at the value of the contract.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "The refund was issued on Tuesday and should show up within a week.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "Our recruiter has interviewed fourteen people so far.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "I read through the term sheet and it looks reasonable overall.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "The auditors finished their fieldwork and are drafting the report.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "We moved the demo to next week because of the holiday.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "The building is closed on weekends.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "I think the estimate is a little optimistic.",
+"act": "INFORM",
+"lang": "en"
+},
+{
+"t": "Wonderful, thank you for the swift reply!",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "Fantastic, that makes my day.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "Thanks a bunch, speak next week.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "All the best with the move!",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "Right, got it. Thanks for clarifying.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "Much obliged.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "Safe travels and see you soon.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "That is good to hear, thank you.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "Sorry about the mix-up, and thanks for your patience.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "Cool, appreciate you.",
+"act": "ACK",
+"lang": "en"
+},
+{
+"t": "הצוות שלנו עדיין צריך ממך את טופס הבעלות לפני שנוכל להתחיל.",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "אפשר לקבל ממך לוח זמנים מעודכן עד יום חמישי?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "מה קורה עם המקדמה מבעל הבית?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "חתמת כבר על מכתב ההצעה?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "מישהו מהצד שלכם יכול לאשר את כתובת המשלוח?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "אשמח שתעביר לי את שלושת הדפים האחרונים של הבנק.",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "אפשר לתאם שיחה ביום רביעי לעבור על התנאים?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "תגיד לי איזה מועמד אתה רוצה להתקדם איתו.",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "רואי החשבון מבקשים את רשימת הנכסים, תוכל להכין אותה?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "תוכל לשלוח שוב את התוכניות ב-PDF?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "צריך את האישור שלך על תקציב הפרסום עד הצהריים.",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "למה ההחזר עוד לא נכנס לחשבון?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "אפשר הערכת מחיר גסה לשיפוץ?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "תוכל בבקשה להתייחס לסעיף על שיפוי?",
+"act": "ASK",
+"lang": "he"
+},
+{
+"t": "אבקש מהנהלת החשבונות להוציא את הצ'ק היום ואעדכן אותך.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "נעביר לך את הדיווח המתוקן לפני המועד.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "תן לי עד חמישי ויהיה לך הניתוח המלא.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "אעבור עם הקבלן על התוכנית מחר בבוקר.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "אני מתכנן לסגור את הנושא עם המשפטי השבוע.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "נחזיר את ההפרש במחזור החיוב הבא.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "אדבר עם בעל הבית ואחזור אליך.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "תשמע מהמגייס שלנו תוך יומיים.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "אשלח לך את ההצעה המעודכנת בקרוב.",
+"act": "PROMISE",
+"lang": "he"
+},
+{
+"t": "בעל הבית אמר שהמקדמה תוחזר תוך שלושים יום מהפינוי.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "הצוות שלנו סיים את בדיקת הקליטה ביום שישי.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "מכתב ההצעה מתאריך 3 במרץ ותקף לשבוע.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "דפי הבנק של הרבעון האחרון שמורים בכונן הכספים.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "המשלוח הגיע פגום אז הגשנו תביעה לחברת השילוח.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "למועמד השני יש רקע חזק יותר בלוגיסטיקה.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "הוצאות הפרסום עלו בכשנים עשר אחוזים לעומת אשתקד.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "הטיסה שלי נדחתה אז אני מגיע קצת מאוחר.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "ההחזר הונפק ביום שלישי ואמור להופיע תוך שבוע.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "רואי החשבון סיימו את העבודה בשטח וכותבים את הדוח.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "הבניין סגור בסופי שבוע.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "נראה לי שההערכה קצת אופטימית.",
+"act": "INFORM",
+"lang": "he"
+},
+{
+"t": "נהדר, תודה על המענה המהיר!",
+"act": "ACK",
+"lang": "he"
+},
+{
+"t": "מעולה, זה משמח.",
+"act": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה רבה, נדבר בשבוע הבא.",
+"act": "ACK",
+"lang": "he"
+},
+{
+"t": "בהצלחה עם המעבר!",
+"act": "ACK",
+"lang": "he"
+},
+{
+"t": "טוב, הבנתי, תודה על ההסבר.",
+"act": "ACK",
+"lang": "he"
+},
+{
+"t": "נסיעה טובה ונתראה בקרוב.",
+"act": "ACK",
+"lang": "he"
+},
+{
+"t": "שמח לשמוע, תודה.",
+"act": "ACK",
+"lang": "he"
+},
+{
+"t": "מצטער על הבלבול, ותודה על הסבלנות.",
+"act": "ACK",
+"lang": "he"
+}
+]

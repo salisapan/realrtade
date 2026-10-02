@@ -4,6 +4,7 @@
 const { FlowFollowUp: F } = require('../core/follow-up.js');
 const { FlowExtract } = require('../core/extract.js');
 const { FlowRequestTypes } = require('../core/request-types.js');
+const { FlowIntentPipeline } = require('../core/intent-pipeline.js');
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -13,7 +14,7 @@ function check(name, cond, detail) {
 
 // Thursday 1 October 2026, noon local.
 const NOW = new Date(2026, 9, 1, 12).getTime();
-const classify = (t) => F.classifyOutgoing(t, { now: NOW, extract: FlowExtract, types: FlowRequestTypes });
+const classify = (t) => F.classifyOutgoing(t, { now: NOW, extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline });
 
 console.log('\n--- asks that SHOULD be tracked ---\n');
 const yes = [

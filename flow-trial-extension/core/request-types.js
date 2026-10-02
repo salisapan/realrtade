@@ -149,13 +149,29 @@ const FlowRequestTypes = (() => {
     return { type: 'owe:' + action.id + (object ? ':' + object.id : ''), action: action.id, object: object ? object.id : null };
   }
 
+  // Everything the lexicons see in a sentence, not just the first match. The
+  // statistical model (core/intent-model.js) takes these as features, so the
+  // hand-written vocabulary becomes evidence the model weighs rather than a gate.
+  function lexHits(sentence) {
+    const s = String(sentence || '');
+    const he = hasHebrew(s);
+    const hit = (list) => list.filter((e) => e.enRe.test(s) || (he && e.heRe.some((r) => r.test(s)))).map((e) => e.id);
+    return {
+      actions: hit(ACTIONS),
+      objects: hit(OBJECTS),
+      framed: framed(s),
+      committed: hasHebrew(s) ? COMMIT_HE.test(s) : COMMIT_EN.test(s),
+      hedged: COMMIT_NOT.test(s)
+    };
+  }
+
   // How many distinct request types the lexicon can express: every action,
   // alone or with every object, in two languages, asked or promised.
   function lexiconSize() {
     return ACTIONS.length * (OBJECTS.length + 1) * 2 * 2;
   }
 
-  return { detectRequest, detectCommitmentSentence, findAction, findObject, framed, lexiconSize, ACTIONS, OBJECTS };
+  return { detectRequest, detectCommitmentSentence, findAction, findObject, framed, lexHits, lexiconSize, ACTIONS, OBJECTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowRequestTypes };

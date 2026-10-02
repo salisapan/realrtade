@@ -53,6 +53,24 @@ const FlowFollow = (() => {
     send({ type: 'flow:track', event, params: {} });
   }
 
+  // On-device learning: what this person accepts or turns down nudges the local
+  // intent model (core/intent-model.js). Only feature indexes are stored, never
+  // text. Loaded once per page; written after each decision.
+  let adaptLoaded = false;
+  async function loadAdapt() {
+    if (adaptLoaded || typeof FlowIntentModel === 'undefined' || !FlowIntentModel.ready()) return;
+    adaptLoaded = true;
+    try { FlowIntentModel.setAdaptation(await FlowStorage.getIntentAdapt()); } catch (e) { /* learning is optional */ }
+  }
+  async function teach(text, label, rate) {
+    if (typeof FlowIntentModel === 'undefined' || !FlowIntentModel.ready()) return;
+    try {
+      await loadAdapt();
+      FlowIntentModel.learn(text, 'act', label, rate);
+      await FlowStorage.setIntentAdapt(FlowIntentModel.getAdaptation());
+    } catch (e) { /* learning is optional */ }
+  }
+
   function dismiss() {
     clearTimeout(hideTimer);
     if (host && host.parentNode) host.parentNode.removeChild(host);
@@ -263,6 +281,7 @@ const FlowFollow = (() => {
     watch.taskRef = res.ref || null;
     await FlowStorage.upsertWatch(watch);
     FlowStorage.recordLoopOpen(watch).catch(() => {});
+    teach(watch.what, FlowFollowUp.isMine(watch) ? 'PROMISE' : 'ASK', 1.5);
     track('follow_tracked');
     if (FlowFollowUp.isMine(watch)) {
       receipt('Reminder set for ' + dayLabel(watch.chaseIso) + '. I will close it when you send it.', async () => {
@@ -285,6 +304,7 @@ const FlowFollow = (() => {
   }
 
   async function declined(ask, base) {
+    teach(ask.what, 'INFORM', 0.4); // a weak signal: "not now" is not always "not a request"
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
     watch.status = 'stopped';
     watch.resolvedAt = Date.now();
@@ -409,6 +429,7 @@ const FlowFollow = (() => {
   //        messageText(node), threadIdFrom(node), subject, threadUrl(id) }
   async function consider(ctx) {
     if (typeof FlowFollowUp === 'undefined' || typeof FlowStorage === 'undefined') return;
+    await loadAdapt();
     const msgs = ctx && ctx.messages;
     if (!msgs || !msgs.length || !ctx.ownEmail) return;
 

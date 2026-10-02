@@ -160,11 +160,24 @@ const FlowFollowUp = (() => {
     // above miss: frame + action + object, in either language. Local code, no
     // model. Absent when that file is not loaded, so nothing depends on it.
     const types = c.types || (typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null);
-    let typed = null;
-    if (types) {
+    // The tiered local pipeline (core/intent-pipeline.js): lexicon first, then the
+    // on-device model, each able to overrule the other. Both are local; no model
+    // outside the device is ever consulted here (docs/local-first-principle.md).
+    const pipe = c.pipeline === undefined ? (typeof FlowIntentPipeline !== 'undefined' ? FlowIntentPipeline : null) : c.pipeline;
+    let typed = null, vetoed = null;
+    if (pipe) {
+      for (const s of candidates) {
+        const r = pipe.recognize(s);
+        if (r.act === 'ASK' && r.request && !typed) typed = { line: s, req: r.request, tier: r.tier };
+        if (r.tier === 'model-veto' && !vetoed) vetoed = s;
+      }
+      if (typed && !askLine) askLine = typed.line;
+    } else if (types) {
       for (const s of candidates) { const t = types.detectRequest(s); if (t) { typed = { line: s, req: t }; break; } }
       if (!askLine && typed) askLine = typed.line;
     }
+    // The model is near-certain the only "ask" is a statement or a courtesy: no card.
+    if (askLine && vetoed === askLine && !(typed && typed.line === askLine)) askLine = null;
 
     // Payment: a payment word AND a figure AND some instruction or due date.
     const payLine = money ? candidates.find((s) => PAY_WORD.test(s)) : null;
@@ -205,10 +218,14 @@ const FlowFollowUp = (() => {
     const body = String(text || '').trim();
     if (!body || words(body) < 4) return null;
     const types = c.types || (typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null);
-    if (!types) return null;
+    const pipe = c.pipeline === undefined ? (typeof FlowIntentPipeline !== 'undefined' ? FlowIntentPipeline : null) : c.pipeline;
+    if (!types && !pipe) return null;
     const lines = sentences(body).filter((s) => words(s) >= 4 && !COURTESY.test(s));
     let hit = null;
-    for (const s of lines) { const t = types.detectCommitmentSentence(s); if (t) { hit = { line: s, t }; break; } }
+    for (const s of lines) {
+      if (pipe) { const r = pipe.recognize(s); if (r.act === 'PROMISE' && r.commitment) { hit = { line: s, t: r.commitment }; break; } }
+      else { const t = types.detectCommitmentSentence(s); if (t) { hit = { line: s, t }; break; } }
+    }
     if (!hit) return null;
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
     const date = ex && ex.parseDate ? ex.parseDate(hit.line, new Date(typeof c.now === 'number' ? c.now : Date.now())) : null;
