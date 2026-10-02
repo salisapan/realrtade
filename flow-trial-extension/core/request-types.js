@@ -165,13 +165,56 @@ const FlowRequestTypes = (() => {
     };
   }
 
+  // ---- short, unambiguous asks --------------------------------------------------
+  // Real chasers are often two or three words: "Invoice?", "Signed yet?",
+  // "Any update?", "?מה הסטטוס". They have no frame to find, and that is exactly
+  // why the frame+action rule misses them. They are recognised on their own
+  // shape instead: a very short question made of a status word or a known
+  // object, nothing else. Only ever read on a person's OWN message.
+  const SHORT_STATUS_EN = /^(?:(?:any|got any|is there any) (?:update|updates|news|progress|word)(?: on (?:this|that|it|the \w+))?|(?:what(?:'s| is) )?(?:the )?(?:status|eta)(?: on (?:this|that|it|the \w+))?|update|status|eta|news|(?:have you )?(?:seen|had a look at|checked) (?:this|it|my (?:email|message|note))|(?:did you|have you) (?:get|got|see|receive) (?:my|the|our) (?:email|message|note|invoice|contract|file|attachment|request)|(?:any )?(?:thoughts|luck|movement)(?: on (?:this|that|it))?)$/i;
+  const SHORT_DONE_EN = /^(?:(paid|signed|approved|confirmed|sent|done|ready|finished|reviewed|booked|scheduled|received)(?: yet| already)?|(?:is it|was it|has it been|have you) (paid|signed|approved|sent|done|ready|reviewed)(?: yet| already)?)$/i;
+  const SHORT_OBJECT_EN = /^(?:the |my |your |our |a )?(?:signed |updated |latest |final |revised )?(?:(?:signed )?copy|invoice|contract|agreement|quote|proposal|report|numbers|deck|draft|receipt|payment|file|files|document|form|forms|nda|po|link|address|details|slot|time|date)(?: (?:please|today|asap))?$/i;
+  const SHORT_STATUS_HE = /^(?:מה (?:הסטטוס|המצב)(?: עם (?:זה|החשבונית|החוזה|ההצעה|התשלום))?|יש (?:עדכון|חדש|התקדמות)(?: (?:לגבי|בנוגע ל|עם) [^?]{1,20})?|עדכון|סטטוס|ראית(?:ם)? (?:את )?(?:המייל|ההודעה|זה)|קיבלת(?:ם)? (?:את )?(?:המייל|ההודעה|החשבונית|החוזה|הקובץ|זה)|מתי (?:תשלח(?:ו)?|תחזור|תחזרו|תעדכן|תעדכנו|יהיה)(?: [^?]{1,20})?)$/;
+  const SHORT_DONE_HE = /^(?:(?:כבר )?(שולם|נחתם|אושר|נשלח|הוכן|סודר|נבדק)(?: כבר| עדיין)?|(?:כבר )?(שילמת(?:ם)?|חתמת(?:ם)?|אישרת(?:ם)?|שלחת(?:ם)?|בדקת(?:ם)?)(?: כבר)?)$/;
+  const SHORT_OBJECT_HE = /^(?:את |ה)?(?:חשבונית|החשבונית|חוזה|החוזה|הסכם|ההסכם|הצעה|ההצעה|הצעת מחיר|דוח|הדוח|מצגת|המצגת|קבלה|הקבלה|קובץ|הקובץ|מסמך|המסמך|טופס|הטופס|תשלום|התשלום|כתובת|פרטים|הפרטים|מועד|הקישור|קישור)(?: בבקשה| היום)?$/;
+  const DONE_ACTION = { paid: 'pay', signed: 'sign', approved: 'approve', confirmed: 'confirm', sent: 'send', done: 'complete', ready: 'complete', finished: 'complete', reviewed: 'review', booked: 'schedule', scheduled: 'schedule', received: 'send',
+    'שולם': 'pay', 'שילמת': 'pay', 'שילמתם': 'pay', 'נחתם': 'sign', 'חתמת': 'sign', 'חתמתם': 'sign', 'אושר': 'approve', 'אישרת': 'approve', 'אישרתם': 'approve', 'נשלח': 'send', 'שלחת': 'send', 'שלחתם': 'send', 'הוכן': 'complete', 'סודר': 'complete', 'נבדק': 'review', 'בדקת': 'review', 'בדקתם': 'review' };
+
+  // One whole short message -> a request or null. Needs a question mark (or, for the
+  // bare noun/status forms, nothing else in the message): "Invoice." is not a chase.
+  function detectShortAsk(text) {
+    const raw = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!raw || raw.length > 60) return null;
+    const q = /[?؟]\s*$/.test(raw) || /^\?/.test(raw);
+    const body = raw.replace(/^[?\s]+|[?!.\s]+$/g, '').trim();
+    if (!body || body.split(' ').length > 6) return null;
+    if (!q) return null;
+    const he = hasHebrew(body);
+    const mk = (actionId, objectId, label) => {
+      const act = ACTIONS.find((x) => x.id === actionId);
+      return { type: actionId + (objectId ? ':' + objectId : '') + ':short', action: actionId, object: objectId || null, label: label || (act ? act.noun : 'a reply'), days: act ? act.days : 2, short: true };
+    };
+    if (he) {
+      let m = body.match(SHORT_DONE_HE);
+      if (m) return mk(DONE_ACTION[m[1] || m[2]] || 'reply');
+      if (SHORT_STATUS_HE.test(body)) return mk('reply', null, 'a status');
+      if (SHORT_OBJECT_HE.test(body)) { const o = findObject(body); return mk('send', o ? o.id : null); }
+      return null;
+    }
+    const m = body.match(SHORT_DONE_EN);
+    if (m) return mk(DONE_ACTION[(m[1] || m[2]).toLowerCase()] || 'reply');
+    if (SHORT_STATUS_EN.test(body)) return mk('reply', null, 'a status');
+    if (SHORT_OBJECT_EN.test(body)) { const o = findObject(body); return mk('send', o ? o.id : null); }
+    return null;
+  }
+
   // How many distinct request types the lexicon can express: every action,
   // alone or with every object, in two languages, asked or promised.
   function lexiconSize() {
     return ACTIONS.length * (OBJECTS.length + 1) * 2 * 2;
   }
 
-  return { detectRequest, detectCommitmentSentence, findAction, findObject, framed, lexHits, lexiconSize, ACTIONS, OBJECTS };
+  return { detectRequest, detectShortAsk, detectCommitmentSentence, findAction, findObject, framed, lexHits, lexiconSize, ACTIONS, OBJECTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowRequestTypes };

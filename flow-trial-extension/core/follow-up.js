@@ -22,8 +22,8 @@
 //   { id, threadId, messageId, subject, counterpart:{email,name}, kind,
 //     what, amount:{value,currency,raw}|null, deadlineIso, chaseIso,
 //     createdAt, status:'waiting'|'resolved'|'stopped', resolvedAt, taskRef,
-//     stage:'waiting'|'nudged'|'promised', nudges, nudgedAt, promisedIso,
-//     lastReplyAt, closedAs:'replied'|'paid'|'manual'|null }
+//     stage:'waiting'|'nudged'|'promised'|'yours', nudges, nudgedAt, promisedIso,
+//     lastReplyAt, closedAs:'replied'|'paid'|'declined'|'manual'|null }
 //
 // A watch is an OPEN LOOP: something you are owed, kept open until reality
 // closes it. The life of one loop:
@@ -31,12 +31,26 @@
 //           -> nudged   (you chased; the chase day moves out and the next nudge
 //                        is firmer)
 //           -> promised (they said "by Friday"; the chase day becomes Friday)
-//           -> closed   (a real reply, or — for money — confirmation it was paid)
+//           -> yours    (they wrote back but need something from you: a question,
+//                        "I never got the attachment". The chase to them stops, the
+//                        reminder is for you, and it flips back when you answer)
+//           -> closed   (a real reply, or — for money — confirmation it was paid;
+//                        a plain "no" closes it too, recorded as 'declined')
 // What does NOT close a loop: an out-of-office, a bare "got it, thanks", a
-// promise, or (for a payment) a reply that never says it was paid. Closing a
+// promise, a question back, "I could not open it", or (for a payment) a reply
+// that never says it was paid. Closing a
 // loop that is still open is the one mistake this file must never make, so every
 // doubtful case keeps the loop open.
 const FlowFollowUp = (() => {
+  // Sibling modules: globals in the browser (content scripts share one scope,
+  // loaded in manifest order), require() under node. Absent is fine: every use
+  // falls back to the older behaviour.
+  function sibling(globalValue, file, name) {
+    if (globalValue) return globalValue;
+    try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
+  }
+  const replyMeaning = sibling(typeof FlowReplyMeaning !== 'undefined' ? FlowReplyMeaning : null, './reply-meaning.js', 'FlowReplyMeaning');
+  const requestTypes = sibling(typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null, './request-types.js', 'FlowRequestTypes');
   const KINDS = { REPLY: 'reply', PAYMENT: 'payment' };
   const MIN_WORDS = 6;
   const MAX_WHAT = 140;
@@ -133,6 +147,23 @@ const FlowFollowUp = (() => {
   }
 
   // ---- classification ---------------------------------------------------------
+  // A whole message of two to five words that is itself a chase: "Any update?",
+  // "Signed yet?", "?מה הסטטוס". Recognised on shape alone (core/request-types.js),
+  // and only when nothing else is in the message.
+  function shortChase(body, c) {
+    const types = c.types || requestTypes;
+    if (!types || !types.detectShortAsk) return null;
+    const bare = body.replace(/^\s*(?:hi|hello|hey|היי|שלום)[^\n,!?]{0,20}[,!:]\s*/i, '').trim();
+    const req = types.detectShortAsk(bare);
+    if (!req) return null;
+    const kind = req.action === 'pay' ? KINDS.PAYMENT : KINDS.REPLY;
+    return {
+      kind, what: clip(bare, MAX_WHAT), amount: null, deadlineIso: null,
+      chaseIso: chaseDate(kind, null, c.now, req.days),
+      lang: hasHebrew(body) ? 'he' : 'en', subtype: req.type, subtypeLabel: req.label, direction: 'theirs', short: true
+    };
+  }
+
   // text: YOUR OWN message, quoted history already removed.
   // ctx:  { now?, extract? } — `extract` is core/extract.js's FlowExtract; passed in
   //       so this file stays free of load-order assumptions.
@@ -140,7 +171,8 @@ const FlowFollowUp = (() => {
   function classifyOutgoing(text, ctx) {
     const c = ctx || {};
     const body = String(text || '').trim();
-    if (!body || words(body) < MIN_WORDS) return null;
+    if (!body) return null;
+    if (words(body) < MIN_WORDS) return shortChase(body, c);
     if (RECEIPT.test(body)) return null;
 
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
@@ -348,14 +380,18 @@ const FlowFollowUp = (() => {
   const PROMISE_HE = /(?:העבר(?:תי|נו) (?:את )?(?:זה |הכל )?ל(?:חשבות|הנה"ח|הנהלת|מנהל|עמית|גורם|אחראי|עורך)|אעביר|נעביר|אשלח|נשלח|אחזור אל|נחזור אל|אאשר|נאשר|יועבר|ישולם|יישלח|מחר|השבוע|בשבוע הבא|בחודש הבא)/;
   // "I paid" / "payment was sent" — and the sentence-level guards that turn it
   // into a hypothetical or a negative ("not paid", "once it is paid").
-  const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been )?(?:sent|made|done|completed|processed|released|initiated)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
-  const PAID_HE = /(?:שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
+  const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^paid\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
+  const PAID_HE = /(?:העברה בוצעה|שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
   const GUARD_EN = /\b(?:not|never|once|if|when|unless|until)\b|n't\b/i;
   const GUARD_HE = /(?:^|\s)(?:לא|טרם|אם|כש\S*|ברגע)(?=\s|$)/;
   // Greetings are not content: "Hi Dana, got it" is an acknowledgement.
   const GREET_EN = /^\s*(?:hi|hello|hey|dear)(?:\s+[\w'.-]+)?\s*[,!:]\s*/i;
   const GREET_HE = /^\s*(?:היי|הי|שלום)(?:\s+[^\s,!:]+)?\s*[,!:]\s*/;
   const ACK_MAX_WORDS = 7;
+  // Warm, but not an answer: "no worries, take your time" leaves the loop open.
+  const SOFT_ACK_EN = /^(?:no worries|no problem|not a problem|no rush|no hurry|take your time|happy to wait|i can['’]?t wait|can['’]?t wait|looking forward|whenever you(?:['’]re| are) ready|all good|that(?:['’]s| is) fine)\b/i;
+  const SOFT_ACK_HE = /^(?:אין בעיה|אין לחץ|אין מה למהר|קח את הזמן|קחו את הזמן|מחכה בסבלנות|מצפה)/;
+  const SOFT_ACK_MAX_WORDS = 12;
 
   function stripGreeting(text) {
     return String(text || '').replace(GREET_EN, '').replace(GREET_HE, '').trim();
@@ -394,15 +430,24 @@ const FlowFollowUp = (() => {
     const c = ctx || {};
     const kind = watch && watch.kind === KINDS.PAYMENT ? KINDS.PAYMENT : KINDS.REPLY;
     const raw = String(text || '').trim();
-    if (isAutoReply(raw, c.email)) return { outcome: 'auto', promisedIso: null };
+    if (isAutoReply(raw, c.email)) return { outcome: 'auto', promisedIso: null, basis: 'rule' };
 
     const body = stripGreeting(raw);
     const n = words(body);
     // No text at all (a bare attachment, say). For a request for a reply that
     // is the reply; for a payment it proves nothing.
-    if (!n) return { outcome: kind === KINDS.PAYMENT ? 'answered' : 'closed', promisedIso: null };
+    if (!n) return { outcome: kind === KINDS.PAYMENT ? 'answered' : 'closed', promisedIso: null, basis: 'rule' };
 
-    if (kind === KINDS.PAYMENT && paidClaimed(body)) return { outcome: 'paid', promisedIso: null };
+    if (kind === KINDS.PAYMENT && paidClaimed(body)) return { outcome: 'paid', promisedIso: null, basis: 'rule' };
+
+    // What they wrote may not be completion even though they wrote back: they
+    // could not open it, they asked something, or they said no (core/reply-meaning.js).
+    const rm = replyMeaning;
+    const meant = rm ? rm.read(body, { kind }) : null;
+    if (meant) {
+      if (meant.meaning === 'declined') return { outcome: 'declined', promisedIso: null, basis: 'rule', why: meant.why };
+      return { outcome: 'yours', reason: meant.meaning, promisedIso: null, basis: 'rule', why: meant.why };
+    }
 
     // For a request for a reply, "confirmed / attached / signed" means the thing
     // was delivered even if a promise about something else is in the message.
@@ -411,11 +456,25 @@ const FlowFollowUp = (() => {
     const ex = c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null);
     const promisedIso = promise ? promisedDay(body, c.now, ex) : null;
 
-    if (promise && promisedIso) return { outcome: 'promised', promisedIso };
-    if (isAck(body)) return { outcome: 'ack', promisedIso: null };
-    if (promise && n <= 30) return { outcome: 'promised', promisedIso: null };
-    if (kind === KINDS.PAYMENT) return { outcome: n >= 4 ? 'answered' : 'ack', promisedIso: null };
-    return { outcome: 'closed', promisedIso: null };
+    if (promise && promisedIso) return { outcome: 'promised', promisedIso, basis: 'rule' };
+    if (isAck(body) || (n <= SOFT_ACK_MAX_WORDS && !/\d/.test(body) && !CONFIRM.test(body) && (SOFT_ACK_EN.test(body) || SOFT_ACK_HE.test(body)))) return { outcome: 'ack', promisedIso: null, basis: 'rule' };
+    if (promise && n <= 30) return { outcome: 'promised', promisedIso: null, basis: 'rule' };
+    if (kind === KINDS.PAYMENT) return { outcome: n >= 4 ? 'answered' : 'ack', promisedIso: null, basis: 'default' };
+    // No cue fired. A delivered-looking message is a rule; anything else is the
+    // old assumption ("they wrote back, so it is answered") and is counted as such.
+    return { outcome: 'closed', promisedIso: null, basis: delivered ? 'rule' : 'default' };
+  }
+
+  // When the ball is in your court the reminder is for YOU: the next business day.
+  function yoursDate(now) {
+    return isoDay(addBusinessDays(today(now), 1));
+  }
+  function isYours(w) { return Boolean(w) && w.status === 'waiting' && w.stage === 'yours'; }
+
+  // You answered: the ball goes back to them, and the chase restarts from today.
+  function handBackPatch(w, now) {
+    const t = typeof now === 'number' ? now : Date.now();
+    return { stage: (w.nudges || 0) > 0 ? 'nudged' : 'waiting', yoursReason: null, yoursSince: null, handedBackAt: t, chaseIso: rechaseDate(w.kind, t, null) };
   }
 
   // The day to look again, after a nudge, a promise or a reopen.
@@ -446,6 +505,11 @@ const FlowFollowUp = (() => {
         const chaseIso = rechaseDate(watch.kind, t, reply.promisedIso);
         return { patch: Object.assign({}, seen, { stage: 'promised', promisedIso: reply.promisedIso || null, chaseIso }), rescheduled: true };
       }
+      case 'declined':
+        return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'declined' }), close: true };
+      case 'yours':
+        // The ball is back with you. Nothing to chase; the next move is yours.
+        return { patch: Object.assign({}, seen, { stage: 'yours', yoursReason: reply.reason || 'question', yoursSince: t, chaseIso: yoursDate(t) }), yours: true, rescheduled: true };
       case 'answered':
         return { patch: seen, confirm: true };
       default: // ack
@@ -460,8 +524,10 @@ const FlowFollowUp = (() => {
   const CHASE_HE = /(?:חוזר|חוזרת|תזכורת|בהמשך לפני|עדיין ממתין|עדיין מחכה|מעקב)/;
   function looksLikeChase(text) {
     const t = String(text || '');
-    if (words(t) < 4) return false;
-    return CHASE_EN.test(t) || CHASE_HE.test(t);
+    if (words(t) < 2) return false;
+    if (words(t) >= 4 && (CHASE_EN.test(t) || CHASE_HE.test(t))) return true;
+    // "Any update?", "Signed yet?", "?מה הסטטוס": a chase in two words.
+    return Boolean(requestTypes && requestTypes.detectShortAsk(stripGreeting(t)));
   }
 
   // Patch for "I chased". The chase day moves out and the next nudge is firmer.
@@ -519,6 +585,7 @@ const FlowFollowUp = (() => {
       expiring: active.filter((w) => isClock(w) && watchState(w, now) !== 'lapsed').length,
       nudged: active.filter((w) => stageOf(w) === 'nudged').length,
       promised: active.filter((w) => stageOf(w) === 'promised').length,
+      yours: active.filter(isYours).length,
       oldestOpenDays: active.reduce((m, w) => Math.max(m, daysOpen(w, now)), 0),
       moneyOwed,
       closedThisMonth: closed.length,
@@ -615,6 +682,7 @@ const FlowFollowUp = (() => {
     const who = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
     if (isClock(w)) return 'Before it ends' + (w.subject ? ' — ' + clip(w.subject, 80) : '');
     if (isMine(w)) return 'Keep your promise' + (who ? ' to ' + who : '') + (w.subject ? ' — ' + clip(w.subject, 80) : '');
+    if (isYours(w)) return (w.yoursReason === 'blocked' ? 'Resend to ' : 'Answer ') + (who || 'them') + (w.subject ? ' — ' + clip(w.subject, 80) : '');
     const head = w.kind === KINDS.PAYMENT ? 'Chase payment' : 'Chase reply';
     const amt = w.kind === KINDS.PAYMENT && w.amount && w.amount.raw ? ' ' + w.amount.raw : '';
     return head + (who ? ' from ' + who : '') + amt + (w.subject ? ' — ' + clip(w.subject, 80) : '');
@@ -622,7 +690,7 @@ const FlowFollowUp = (() => {
 
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
-    repliedSince, isAutoReply, isActive, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
+    repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
     nextNudgeLevel, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };
 })();

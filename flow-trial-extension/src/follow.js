@@ -145,7 +145,7 @@ const FlowFollow = (() => {
   // recreated, so a loop never silently loses its reminder.
   async function moveTask(watch, dueIso) {
     if (!watch.taskRef) return;
-    const r = await send({ type: 'flow:follow-reschedule', ref: watch.taskRef, dueIso });
+    const r = await send({ type: 'flow:follow-reschedule', ref: watch.taskRef, dueIso, title: FlowFollowUp.taskTitle(watch) });
     if (r && r.reason === 'gone') {
       const made = await send({ type: 'flow:follow-task', payload: Object.assign(taskPayload(watch), { dueIso }) });
       if (made && made.ok && made.ref) await FlowStorage.updateWatch(watch.id, { taskRef: made.ref });
@@ -169,6 +169,32 @@ const FlowFollow = (() => {
     return next;
   }
 
+  // ---- how much of this was understood by our own code (counts only) -----------
+  function recordDecision(text, opened, key) {
+    try {
+      if (typeof FlowStorage.recordRecognition !== 'function' || typeof FlowRecognitionStats === 'undefined' || typeof FlowIntentPipeline === 'undefined') return;
+      const d = FlowRecognitionStats.decide(FlowIntentPipeline.analyze(text), opened);
+      FlowStorage.recordRecognition({ kind: d.kind, tier: d.tier, key: 'o|' + key }).catch(() => {});
+    } catch (e) { /* measurement never blocks the product */ }
+  }
+  function recordReply(watch, reply, lastId) {
+    try {
+      if (typeof FlowStorage.recordRecognition !== 'function' || typeof FlowRecognitionStats === 'undefined') return;
+      const d = FlowRecognitionStats.decideReply(reply);
+      if (d) FlowStorage.recordRecognition({ kind: d.kind, tier: d.tier, key: 'r|' + watch.id + '|' + (lastId || '') }).catch(() => {});
+    } catch (e) { /* measurement never blocks the product */ }
+  }
+
+  // ---- one story, many threads ---------------------------------------------------
+  // The loop this message belongs to when it arrived in a thread of its own.
+  async function storyFor(ctx, last, sender) {
+    if (typeof FlowStory === 'undefined' || !sender || !sender.email) return null;
+    const list = await FlowStorage.getWatches();
+    if (!list.some((w) => FlowFollowUp.isActive(w) && !FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w))) return null;
+    const hit = FlowStory.match(list, { email: sender.email, subject: ctx.subject, text: ctx.messageText(last) }, { extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+    return hit ? hit.watch : null;
+  }
+
   // ---- 3. what the answer did ------------------------------------------------------
   async function closed(watch, sender, how) {
     if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
@@ -177,7 +203,9 @@ const FlowFollow = (() => {
     const amt = amountLabel(watch);
     const line = how === 'paid'
       ? name + ' says it is paid' + (amt ? ' (' + amt + ')' : '') + took(watch) + '. Loop closed.'
-      : name + ' replied' + took(watch) + '. Loop closed.';
+      : how === 'declined'
+        ? name + ' said no' + took(watch) + '. Nothing left to chase, so I closed it.'
+        : name + ' replied' + took(watch) + '. Loop closed.';
     receipt(line, null, { label: 'Reopen', run: () => reopen(watch) });
   }
 
@@ -189,6 +217,24 @@ const FlowFollow = (() => {
       ? name + ' promised it for ' + dayLabel(patch.promisedIso) + '. I moved your reminder to ' + dayLabel(patch.chaseIso) + '.'
       : name + ' said they will get to it. I will look again on ' + dayLabel(patch.chaseIso) + '.';
     receipt(line, null);
+  }
+
+  // They wrote back, but they need something from you. The ball is yours: the
+  // chase stops and the reminder is now for you.
+  async function yours(watch, sender, patch) {
+    await moveTask(Object.assign({}, watch, patch), patch.chaseIso);
+    track('follow_yours');
+    const name = whoOf(sender);
+    const what = patch.yoursReason === 'blocked' ? 'could not open or find what you sent' : 'asked you something';
+    receipt(name + ' ' + what + '. This one is yours now. I stopped chasing and moved your reminder to ' + dayLabel(patch.chaseIso) + '.', null);
+  }
+
+  // You answered: the ball goes back to them, and the chase starts again.
+  async function handedBack(watch, lastId) {
+    const patch = Object.assign({ messageId: lastId }, FlowFollowUp.handBackPatch(watch, Date.now()));
+    const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+    await moveTask(next, patch.chaseIso);
+    receipt('Sent. I am back on it. I will look again on ' + dayLabel(patch.chaseIso) + '.', null);
   }
 
   // A payment thread got a reply that never says it was paid. Ask once.
@@ -208,7 +254,7 @@ const FlowFollow = (() => {
 
   // Everything they wrote after the message that opened the loop, judged as one:
   // an answer followed by a "thanks" is still an answer.
-  const RANK = { paid: 6, closed: 5, promised: 4, answered: 3, ack: 2, auto: 1 };
+  const RANK = { paid: 7, closed: 6, declined: 6, yours: 5, promised: 4, answered: 3, ack: 2, auto: 1 };
   function judge(ctx, watch) {
     const msgs = Array.from(ctx.messages);
     let from = msgs.length - 1;
@@ -231,9 +277,11 @@ const FlowFollow = (() => {
     if (!best) return;
     const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
     if (res.none) return;
+    recordReply(watch, best.reply, lastId);
     const patch = Object.assign({}, res.patch, { lastReplyMessageId: lastId });
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
-    if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : 'replied');
+    if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : 'replied');
+    else if (res.yours) await yours(watch, best.sender, patch);
     else if (res.rescheduled) await promised(watch, best.sender, patch);
     else if (res.confirm) paidCard(next, best.sender);
   }
@@ -447,9 +495,13 @@ const FlowFollow = (() => {
 
     // They wrote last. What did the answer do to the loop?
     if (!lastIsOwn) {
-      if (watch && watch.status === 'waiting' && !FlowFollowUp.isMine(watch) && !(watch.lastReplyMessageId && watch.lastReplyMessageId === lastId) && !settling.has(watch.id)) {
-        settling.add(watch.id);
-        try { await handleReply(ctx, watch, lastId); } finally { settling.delete(watch.id); }
+      let target = watch;
+      // Their answer came in a thread of its own ("Re:" dropped, a fresh message):
+      // follow the story, not the thread.
+      if (!target) target = await storyFor(ctx, last, sender);
+      if (target && target.status === 'waiting' && !FlowFollowUp.isMine(target) && !FlowFollowUp.isClock(target) && !(target.lastReplyMessageId && target.lastReplyMessageId === lastId) && !settling.has(target.id)) {
+        settling.add(target.id);
+        try { await handleReply(ctx, target, lastId); } finally { settling.delete(target.id); }
       }
       return;
     }
@@ -459,6 +511,8 @@ const FlowFollow = (() => {
       if (watch.status === 'waiting') {
         if (lastId && watch.messageId !== lastId) {
           const text = ctx.ownMessageText(last);
+          // They had asked me something; this message is my answer. The ball goes back.
+          if (FlowFollowUp.isYours(watch)) { await handedBack(watch, lastId); return; }
           // A promise of mine: a newer message that delivers it keeps it.
           if (FlowFollowUp.isMine(watch)) {
             if (FlowFollowUp.deliversPromise(text)) await kept(watch, lastId);
@@ -481,8 +535,21 @@ const FlowFollow = (() => {
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
     const ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
+    recordDecision(mineText, Boolean(ask), key);
     if (!ask) return;
     offered.add(key);
+
+    // The same story already has a loop in another thread: never a second one.
+    const kin = ask.direction === 'theirs' ? await storyFor(ctx, last, counterpartOf(last, ctx.ownEmail)) : null;
+    if (kin) {
+      if (FlowFollowUp.looksLikeChase(mineText)) {
+        const patch = FlowFollowUp.recordNudge(kin, Date.now());
+        const next = (await FlowStorage.updateWatch(kin.id, patch)) || Object.assign({}, kin, patch);
+        await moveTask(next, patch.chaseIso);
+        receipt('Chase noted on the same story. I will look again on ' + dayLabel(patch.chaseIso) + '.', null);
+      }
+      return;
+    }
 
     const base = {
       threadId,

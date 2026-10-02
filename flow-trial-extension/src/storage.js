@@ -203,7 +203,13 @@ const FlowStorage = (() => {
     // core/intent-model.js on-device adaptation: small sparse nudges to what the
     // model believes, learned from what this person confirms or turns down.
     // Feature indexes and numbers only, never any text. Capped.
-    intentAdapt: { act: {}, topic: {}, action: {} }
+    intentAdapt: { act: {}, topic: {}, action: {} },
+    // core/recognition-stats.js: how many decisions our own code made versus left
+    // unresolved. Counts only, never any text.
+    recognitionStats: { localHit: 0, localSilence: 0, residual: 0, remote: 0, byTier: {}, since: null },
+    // Keys of messages already counted, so a re-render or a page reload does not
+    // count one message twice. Opaque ids only, capped.
+    recognitionSeen: []
   };
 
   function get() {
@@ -983,6 +989,33 @@ const FlowStorage = (() => {
     return true;
   });
 
+  async function getRecognitionStats() {
+    const state = await get();
+    return state.recognitionStats || { localHit: 0, localSilence: 0, residual: 0, remote: 0, byTier: {}, since: null };
+  }
+  // d: { kind: 'localHit'|'localSilence'|'residual'|'remote', tier? }
+  const recordRecognition = serialize(async function recordRecognition(d) {
+    const state = await get();
+    const cur = Object.assign({ localHit: 0, localSilence: 0, residual: 0, remote: 0, byTier: {}, since: null }, state.recognitionStats || {});
+    cur.byTier = Object.assign({}, cur.byTier || {});
+    if (!d || ['localHit', 'localSilence', 'residual', 'remote'].indexOf(d.kind) < 0) return cur;
+    let seen = Array.isArray(state.recognitionSeen) ? state.recognitionSeen.slice() : [];
+    if (d.key) {
+      if (seen.indexOf(d.key) >= 0) return cur;
+      seen.push(d.key);
+      if (seen.length > 300) seen = seen.slice(-300);
+    }
+    cur[d.kind] = (cur[d.kind] || 0) + 1;
+    if (d.tier) {
+      cur.byTier[d.tier] = (cur.byTier[d.tier] || 0) + 1;
+      const keys = Object.keys(cur.byTier);
+      if (keys.length > 24) delete cur.byTier[keys[0]];
+    }
+    if (!cur.since) cur.since = Date.now();
+    await set({ recognitionStats: cur, recognitionSeen: seen });
+    return cur;
+  });
+
   const ackRecurrence = serialize(async function ackRecurrence(key, nextIso) {
     const state = await get();
     const acked = Object.assign({}, state.recurrenceAck || {}, { [key]: nextIso });
@@ -1041,7 +1074,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getRecognitionStats, recordRecognition, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

@@ -35,8 +35,14 @@ const FlowIntentPipeline = (() => {
     return { type: a + (obj ? ':' + obj : ''), action: a, object: obj, label: act.noun + (obj ? ' · ' + obj : ''), days: act.days, viaModel: true };
   }
 
-  // One sentence -> { act, confidence, tier, topic, unsure, request, commitment, why }
+  // One sentence -> { act, confidence, tier, topic, unsure, request, commitment, why, evidence }
   function recognize(sentence, ctx) {
+    const out = recognizeCore(sentence, ctx);
+    out.evidence = evidenceOf(sentence, out);
+    return out;
+  }
+
+  function recognizeCore(sentence, ctx) {
     const s = String(sentence == null ? '' : sentence).trim();
     const out = { act: 'INFORM', confidence: 0, tier: 'none', topic: 'other', unsure: true, request: null, commitment: null, why: '' };
     if (!s || !types) return out;
@@ -53,6 +59,13 @@ const FlowIntentPipeline = (() => {
       }
       out.act = 'ASK'; out.request = lexReq; out.unsure = false; out.tier = m && m.act === 'ASK' ? 'lexicon+model' : 'lexicon';
       out.confidence = m && m.act === 'ASK' ? Math.max(0.85, m.actProb) : 0.8; out.why = 'frame + action';
+      return out;
+    }
+    // A whole short chaser ("Any update?", "Signed yet?", "?מה הסטטוס"): its shape is
+    // the evidence. A greeting in front of it does not change what it is.
+    const short = types.detectShortAsk ? types.detectShortAsk(s.replace(/^\s*(?:hi|hello|hey|היי|שלום)[^\n,!?]{0,20}[,!:]\s*/i, '')) : null;
+    if (short && !lexCom && !(m && (m.act === 'INFORM' || m.act === 'ACK') && m.actProb >= VETO_MIN)) {
+      out.act = 'ASK'; out.request = short; out.unsure = false; out.tier = 'lexicon-short'; out.confidence = 0.8; out.why = 'short chaser';
       return out;
     }
     if (lexCom && !(m && (m.act === 'INFORM' || m.act === 'ACK') && m.actProb >= VETO_MIN)) {
@@ -86,6 +99,45 @@ const FlowIntentPipeline = (() => {
     return out;
   }
 
+  // What the verdict rests on, as plain data. STRONG signals are things a person
+  // would point to ("it names a payment, an amount and a date"); WEAK ones are
+  // statistical or hedged. This is for explaining a decision and for measuring it;
+  // it never overrules the verdict above.
+  const MONEY = /(?:[$€£₪]\s?\d|\d[\d,.]*\s?(?:usd|eur|gbp|ils|nis|dollars?|euros?|₪|ש"ח|שקל(?:ים)?)\b)/i;
+  const DATE = /\b(?:today|tonight|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|eod|eow|end of (?:the )?(?:day|week|month)|by \d{1,2}[/.]\d{1,2}|\d{1,2}(?:st|nd|rd|th)? (?:of )?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec))|(?:היום|מחר|מחרתיים|עד (?:יום|סוף|ה)|ביום (?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|\d{1,2}[/.]\d{1,2})/i;
+  function evidenceOf(sentence, out) {
+    const s = String(sentence == null ? '' : sentence);
+    const strong = [], weak = [];
+    if (!s.trim()) return { strong, weak, strength: 'none' };
+    const hits = types ? types.lexHits(s) : { actions: [], objects: [], framed: false, committed: false, hedged: false };
+    if (hits.framed) strong.push('frame');
+    if (hits.committed && out.act === 'PROMISE') strong.push('first-person');
+    if (hits.actions[0]) strong.push('action:' + hits.actions[0]);
+    if (hits.objects[0]) strong.push('object:' + hits.objects[0]);
+    if (MONEY.test(s)) strong.push('amount');
+    if (DATE.test(s)) strong.push('date');
+    if (/\b(?:you|your|yours)\b|(?:אתה|את|אתם|שלך|שלכם|תוכל|תוכלו)/i.test(s)) strong.push('addressed-to-them');
+    if (out.tier === 'lexicon-short') strong.push('short-form');
+    if (/[?؟]\s*$/.test(s)) weak.push('question-mark');
+    if (hits.hedged) weak.push('hedged');
+    if (out.tier === 'model' || out.tier === 'lexicon+model') weak.push('model:' + Math.round((out.confidence || 0) * 100) / 100);
+    if (out.tier === 'model-veto') weak.push('model-veto');
+    // Politeness is not actionability: a courtesy or a statement carries no strong signal of its own.
+    const act = out.act === 'ASK' || out.act === 'PROMISE';
+    const strength = !act ? 'none' : strong.length >= 4 ? 'strong' : strong.length >= 2 ? 'medium' : 'weak';
+    return { strong, weak, strength };
+  }
+
+  // One message -> the verdict the statistics use. Counts only.
+  function verdictOf(text) {
+    const an = analyze(text);
+    const hit = an.find((a) => (a.act === 'ASK' || a.act === 'PROMISE') && !a.unsure);
+    if (hit) return { kind: 'localHit', tier: hit.tier, strength: hit.evidence.strength };
+    const maybe = an.find((a) => a.unsure && (a.act === 'ASK' || a.act === 'PROMISE'));
+    if (maybe) return { kind: 'residual', tier: maybe.tier || 'model', strength: 'weak' };
+    return { kind: 'localSilence', tier: 'none', strength: 'none' };
+  }
+
   // A whole message: the sentences that ask or promise, in order.
   function sentences(text) {
     return String(text || '').replace(/\r/g, '').split(/(?<=[.!?])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
@@ -94,7 +146,7 @@ const FlowIntentPipeline = (() => {
     return sentences(text).map((s) => Object.assign({ sentence: s }, recognize(s, ctx)));
   }
 
-  return { recognize, analyze, sentences, VETO_MIN, MODEL_MIN };
+  return { recognize, analyze, sentences, verdictOf, evidenceOf, VETO_MIN, MODEL_MIN };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntentPipeline };

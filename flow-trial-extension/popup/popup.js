@@ -668,6 +668,7 @@
       return left < 0 ? 'Lapsed ' + dayShort(w.expiresIso) : 'Ends ' + dayShort(w.expiresIso) + ' · ' + (left === 0 ? 'today' : left === 1 ? '1 day left' : left + ' days left');
     }
     if (FlowFollowUp.isMine(w)) return 'You promised · ' + age;
+    if (stage === 'yours') return 'Your turn · ' + (w.yoursReason === 'blocked' ? 'they could not open it' : 'they asked you something') + ' · ' + age;
     if (stage === 'promised' && w.promisedIso) return 'Promised ' + dayShort(w.promisedIso) + ' · ' + age;
     if (stage === 'nudged') return 'Chased ' + plural(w.nudges || 1, 'time', 'times') + ' · ' + age;
     return 'Waiting · ' + age;
@@ -683,7 +684,7 @@
     const item = el('div', 'wait-item');
     const top = el('div', 'wait-top');
     top.appendChild(el('span', 'wait-who', whoLabel(w)));
-    top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : state === 'lapsed' ? ' lapsed' : ''), state === 'lapsed' ? 'Lapsed' : state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : (FlowFollowUp.isClock(w) ? 'Look ' : 'Chase ') + dayShort(w.chaseIso)));
+    top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : state === 'lapsed' ? ' lapsed' : ''), state === 'lapsed' ? 'Lapsed' : state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : (FlowFollowUp.isClock(w) ? 'Look ' : FlowFollowUp.isYours(w) ? 'Answer ' : 'Chase ') + dayShort(w.chaseIso)));
     item.appendChild(top);
     item.appendChild(el('div', 'wait-meta', stageLabel(w, now)));
     const what = el('div', 'wait-what');
@@ -694,7 +695,7 @@
     note.hidden = true;
     const acts = el('div', 'wait-acts');
 
-    if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && w.counterpart && w.counterpart.email) {
+    if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && !FlowFollowUp.isYours(w) && w.counterpart && w.counterpart.email) {
       const level = FlowFollowUp.nextNudgeLevel(w);
       const gate = FlowEntitlements.nudgeGate(level, record, now);
       const base = nudgeLabel(level) || (state === 'overdue' ? 'Draft a nudge' : 'Nudge now');

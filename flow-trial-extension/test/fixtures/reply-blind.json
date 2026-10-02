@@ -1,0 +1,322 @@
+[
+ {
+  "text": "Hey, the PDF came through blank on my side",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Can't see any attachment in this email",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Hmm which quarter are we talking about?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Is this the same contract as the one from March?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Need the VAT number before I can approve this",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "The link you sent has expired",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "What budget are we working with?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Could you clarify what you need from me exactly",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "מצטער אבל לא רואה שום קובץ מצורף",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "על איזה פרויקט מדובר?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "אפשר שוב את הקישור? הוא לא נפתח",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "אני צריך את מספר העוסק לפני שאני מאשר",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "מה הסכום המדויק?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Did you mean the Berlin office or the London one?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "The invoice total doesn't match the PO, can you check?",
+  "label": "yours",
+  "kind": "payment"
+ },
+ {
+  "text": "Which bank account should we use?",
+  "label": "yours",
+  "kind": "payment"
+ },
+ {
+  "text": "הסכום בחשבונית שגוי, תוכל לתקן?",
+  "label": "yours",
+  "kind": "payment"
+ },
+ {
+  "text": "After some thought we're going to go with another vendor.",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "I appreciate the offer but it's not for us.",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "Unfortunately I won't be able to take this on.",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "We've decided to cancel the project.",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "תודה אבל זה לא מתאים לנו כרגע",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "החלטנו שלא להתקדם עם זה",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "מצטער, אני לא אוכל לחתום על זה",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "Yes, Thursday at 3 works for me.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Approved, go ahead.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Final figure is 12,400. Booked the vendor.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Signed copy attached.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Looks good to me, ship it",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Done, sent you the report an hour ago",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "The deposit is 2,000, details below: account 112233",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "כן, מאשר את התוכנית",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "סגור, נתראה ביום חמישי",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "הנה המסמך החתום",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "אושר, אפשר להתקדם",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Sure, 11am it is.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Got it, thanks!",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Noted.",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Thanks, will take a look",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Received, thank you",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "קיבלתי, תודה",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "אבדוק ואחזור אליך",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "On it",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "I'll send it over by Friday",
+  "label": "promised",
+  "kind": "reply"
+ },
+ {
+  "text": "Will get back to you tomorrow with numbers",
+  "label": "promised",
+  "kind": "reply"
+ },
+ {
+  "text": "Still working on it, should be ready next week",
+  "label": "promised",
+  "kind": "reply"
+ },
+ {
+  "text": "My assistant will process this on Monday",
+  "label": "promised",
+  "kind": "reply"
+ },
+ {
+  "text": "אחזור אליך עד יום חמישי",
+  "label": "promised",
+  "kind": "reply"
+ },
+ {
+  "text": "נעביר את זה השבוע",
+  "label": "promised",
+  "kind": "reply"
+ },
+ {
+  "text": "Payment will be released on the 20th",
+  "label": "promised",
+  "kind": "payment"
+ },
+ {
+  "text": "The transfer is scheduled for next Tuesday",
+  "label": "promised",
+  "kind": "payment"
+ },
+ {
+  "text": "יועבר בתחילת השבוע הבא",
+  "label": "promised",
+  "kind": "payment"
+ },
+ {
+  "text": "Automatic reply: I am out of the office until the 14th with limited access to email.",
+  "label": "auto",
+  "kind": "reply"
+ },
+ {
+  "text": "Thank you for your message. I am on vacation and will return Monday.",
+  "label": "auto",
+  "kind": "reply"
+ },
+ {
+  "text": "תשובה אוטומטית: אני מחוץ למשרד עד יום ראשון",
+  "label": "auto",
+  "kind": "reply"
+ },
+ {
+  "text": "We paid this yesterday, reference 8841",
+  "label": "paid",
+  "kind": "payment"
+ },
+ {
+  "text": "Transfer sent this morning",
+  "label": "paid",
+  "kind": "payment"
+ },
+ {
+  "text": "שילמנו אתמול, אסמכתא 5521",
+  "label": "paid",
+  "kind": "payment"
+ },
+ {
+  "text": "Payment was made on the 3rd",
+  "label": "paid",
+  "kind": "payment"
+ },
+ {
+  "text": "No worries, take your time on the draft",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Not a problem at all, happy to wait",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "I can't wait to see the final version!",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Thanks! Anything else you need from me?",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Great, see you there. Is 10 still good?",
+  "label": "closed",
+  "kind": "reply"
+ }
+]

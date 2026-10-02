@@ -1194,10 +1194,13 @@ function followDue(dueIso) {
   return dueIso && /^\d{4}-\d{2}-\d{2}$/.test(dueIso) ? dueIso + 'T00:00:00.000Z' : null;
 }
 
-async function followTaskSchedule(ref, dueIso) {
+async function followTaskSchedule(ref, dueIso, title) {
   const due = followDue(dueIso);
   if (!due) return { ok: false, reason: 'invalid' };
-  return followTaskPatch(ref, { due });
+  const fields = { due };
+  // The title follows the state of the loop ("Chase reply" -> "Answer Dana").
+  if (typeof title === 'string' && title.trim()) fields.title = title.trim().slice(0, 200);
+  return followTaskPatch(ref, fields);
 }
 
 // Back from the closed list: the Task is open again, on the new chase day.
@@ -2751,7 +2754,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:follow-task') return reply(sendResponse, followTaskCreate(msg.payload || {}));
   if (msg.type === 'flow:follow-complete') return reply(sendResponse, followTaskComplete(msg.ref));
-  if (msg.type === 'flow:follow-reschedule') return reply(sendResponse, followTaskSchedule(msg.ref, msg.dueIso));
+  if (msg.type === 'flow:follow-reschedule') return reply(sendResponse, followTaskSchedule(msg.ref, msg.dueIso, msg.title));
   if (msg.type === 'flow:follow-reopen') return reply(sendResponse, followTaskReopen(msg.ref, msg.dueIso));
   if (msg.type === 'flow:follow-draft') return reply(sendResponse, followDraftCreate(msg.payload || {}));
 

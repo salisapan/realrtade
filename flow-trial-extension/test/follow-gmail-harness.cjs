@@ -292,6 +292,62 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('boilerplate that borrows a request\'s words stays silent', s.card === null && s.watches.length === 0, s);
   await t.ctx.close();
 
+  // 19. they wrote back, but the ball is mine: the chase stops, the reminder is for me
+  const ASKTHREAD = [msg(theirs, 'Can you send the numbers for the vendor?'), msg(mine, ASK)];
+  t = await open(browser, 'yours-q', ASKTHREAD.concat([msg(theirs, 'Which vendor do you mean? We have two.')]), { watches: [W2] });
+  s = await t.state();
+  check('a question back does not close the loop: it becomes mine', s.watches[0].status === 'waiting' && s.watches[0].stage === 'yours' && s.watches[0].closedAs == null, s.watches);
+  check('the reminder moves to the next business day, for me', s.watches[0].chase === '2026-10-02', s.watches[0]);
+  check('the Task is retitled so it says what to do', await t.p.evaluate(() => window.__msgs.some((m) => m.type === 'flow:follow-reschedule' && /^Answer Dana/.test(m.title || ''))), await t.p.evaluate(() => window.__msgs.filter((m) => m.type === 'flow:follow-reschedule')));
+  check('the receipt says it is mine now', /asked you something/.test(s.card || '') && /yours now/.test(s.card || ''), s.card);
+  check('no script errors', s.errs.length === 0, s.errs);
+  await t.ctx.close();
+
+  t = await open(browser, 'yours-blocked', ASKTHREAD.concat([msg(theirs, 'I never got the attachment, can you resend?')]), { watches: [W2] });
+  s = await t.state();
+  check('"I never got the attachment" keeps the loop open as mine', s.watches[0].status === 'waiting' && s.watches[0].stage === 'yours', s.watches);
+  check('and says they could not open it', /could not open or find what you sent/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 20. I answer: the ball goes back and the chase restarts
+  t = await open(browser, 'handback', ASKTHREAD.concat([msg(theirs, 'Which vendor do you mean? We have two.'), msg(mine, 'Acme Catering, the quote is in the thread above.')]), { watches: [Object.assign({}, W2, { messageId: 'm3', stage: 'yours', yoursReason: 'question', chaseIso: '2026-10-02' })] });
+  s = await t.state();
+  check('answering hands the ball back to waiting', s.watches[0].status === 'waiting' && s.watches[0].stage === 'waiting' && s.watches[0].chase > '2026-10-02', s.watches);
+  check('and says I am back on it', /back on it/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 21. a plain no is an answer: closed, recorded as declined
+  t = await open(browser, 'declined-reply', ASKTHREAD.concat([msg(theirs, 'Unfortunately we decided not to go ahead with the vendor.')]), { watches: [W2] });
+  s = await t.state();
+  check('a "no" closes the loop as declined', s.watches[0].status === 'resolved' && s.watches[0].closedAs === 'declined', s.watches);
+  check('and the receipt says so plainly', /said no/.test(s.card || '') && /Reopen/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 22. one story, many threads
+  const KIN = Object.assign({}, baseWatch, { id: 'tX', threadId: 'tX', messageId: 'mX' });
+  t = await open(browser, 'story-reply', [msg(theirs, 'Confirmed, the final figure is 4,200 and the vendor is booked.')], { watches: [KIN] });
+  s = await t.state();
+  check('an answer in a new thread settles the loop opened in another', s.watches.find((w) => w.id === 'tX').status === 'resolved', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'story-dup', [msg(mine, ASK)], { watches: [KIN] });
+  s = await t.state();
+  check('asking again about the same story never opens a second loop', s.card === null && s.watches.length === 1, s);
+  await t.ctx.close();
+
+  // 23. a two-word chase is a real ask
+  t = await open(browser, 'short', [msg(theirs, 'Sent the draft on Monday.'), msg(mine, 'Any update?')]);
+  s = await t.state();
+  check('"Any update?" opens the same one-card offer', /Waiting on a reply\?/.test(s.card || '') && /Stay on it/.test(s.card || ''), s.card);
+  const rs = await t.p.evaluate(() => window.__store.recognitionStats);
+  check('and the decision is counted as a local hit, with no text stored', rs && rs.localHit >= 1 && !/update|Monday|draft/i.test(JSON.stringify(rs)), rs);
+  await t.ctx.close();
+  t = await open(browser, 'short-quiet', [msg(theirs, 'See you soon.'), msg(mine, 'Thanks!')]);
+  s = await t.state();
+  check('a one-word thanks stays silent', s.card === null && s.watches.length === 0, s);
+  const rs2 = await t.p.evaluate(() => window.__store.recognitionStats);
+  check('and is counted as local silence, not remote', rs2 && rs2.localSilence >= 1 && rs2.remote === 0, rs2);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);

@@ -21,10 +21,10 @@
    "pipeline": {
     "ASK": {
      "precision": 0.983,
-     "recall": 0.891,
-     "tp": 57,
+     "recall": 0.906,
+     "tp": 58,
      "fp": 1,
-     "fn": 7
+     "fn": 6
     },
     "PROMISE": {
      "precision": 1,
@@ -32,6 +32,26 @@
      "tp": 37,
      "fp": 0,
      "fn": 5
+    }
+   },
+   "localShare": {
+    "ASK": {
+     "real": 64,
+     "solvedLocally": 58,
+     "solvedShare": 0.906,
+     "residual": 6,
+     "residualShare": 0.094,
+     "wrongCards": 1,
+     "remoteShare": 0
+    },
+    "PROMISE": {
+     "real": 42,
+     "solvedLocally": 37,
+     "solvedShare": 0.881,
+     "residual": 5,
+     "residualShare": 0.119,
+     "wrongCards": 0,
+     "remoteShare": 0
     }
    }
   },
@@ -67,6 +87,26 @@
      "tp": 18,
      "fp": 0,
      "fn": 6
+    }
+   },
+   "localShare": {
+    "ASK": {
+     "real": 34,
+     "solvedLocally": 23,
+     "solvedShare": 0.676,
+     "residual": 11,
+     "residualShare": 0.324,
+     "wrongCards": 0,
+     "remoteShare": 0
+    },
+    "PROMISE": {
+     "real": 24,
+     "solvedLocally": 18,
+     "solvedShare": 0.75,
+     "residual": 6,
+     "residualShare": 0.25,
+     "wrongCards": 0,
+     "remoteShare": 0
     }
    }
   }

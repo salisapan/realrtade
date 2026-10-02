@@ -1,0 +1,157 @@
+[
+ {
+  "text": "Sorry, nothing seems to be attached to your last email",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "When exactly do you need this by?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Do you have the older version too? This one is different",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "The spreadsheet won't load for me",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Who else is on the approval list?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "I'm missing the signature page",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "הקובץ ריק, אפשר לשלוח מחדש?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "באיזה תאריך אתה צריך את זה?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "לא הצלחתי לפתוח את הקישור",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "Which of the two quotes did you want me to sign off on?",
+  "label": "yours",
+  "kind": "reply"
+ },
+ {
+  "text": "We won't be proceeding, thanks for your time.",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "I've decided to pass on this opportunity.",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "This isn't something we can commit to right now.",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "אנחנו לא נמשיך עם זה, תודה על ההצעה",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "לא נוכל להשתתף הפעם",
+  "label": "declined",
+  "kind": "reply"
+ },
+ {
+  "text": "Yes please go ahead and book it.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "The answer is 14, I double-checked the numbers.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "Reviewed and signed, back to you now",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "I'm fine with option B.",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "כן, תתקדם עם האפשרות השנייה",
+  "label": "closed",
+  "kind": "reply"
+ },
+ {
+  "text": "הבנתי, אשלח לך את זה עד סוף היום",
+  "label": "promised",
+  "kind": "reply"
+ },
+ {
+  "text": "I'll loop in finance and they'll pay it on the 18th",
+  "label": "promised",
+  "kind": "payment"
+ },
+ {
+  "text": "Thanks for the reminder, will do",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "מעולה, תודה על העדכון",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Ok great",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "Thanks, no rush from my side",
+  "label": "ack",
+  "kind": "reply"
+ },
+ {
+  "text": "I'm away until the 9th, back to you after",
+  "label": "auto",
+  "kind": "reply"
+ },
+ {
+  "text": "Paid, you should see it by Thursday",
+  "label": "paid",
+  "kind": "payment"
+ },
+ {
+  "text": "The payment went out this morning",
+  "label": "paid",
+  "kind": "payment"
+ },
+ {
+  "text": "העברה בוצעה הבוקר",
+  "label": "paid",
+  "kind": "payment"
+ },
+ {
+  "text": "It's still pending approval on our end",
+  "label": "promised",
+  "kind": "payment"
+ }
+]

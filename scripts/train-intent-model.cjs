@@ -144,6 +144,20 @@ function prf(set, pred) {
 const lexPred = (t) => (RT.detectRequest(t) ? 'ASK' : RT.detectCommitmentSentence(t) ? 'PROMISE' : 'X');
 const pipePred = (t) => { const r = P.recognize(t); return r.unsure ? 'X' : r.act; };
 const comparison = { devSet: { n: gold.length, lexicon: prf(gold, lexPred), pipeline: prf(gold, pipePred) }, blindSet: { n: blind.length, lexicon: prf(blind, lexPred), pipeline: prf(blind, pipePred) } };
+// The number the local-first rule needs: of the real asks and promises, how many our own
+// code solved, how many it left to the long tail (the only class an external model could
+// ever see; today they stay silent), and how many wrong cards it raised. Remote share is 0:
+// no external model is consulted.
+function localShare(c) {
+  const out = {};
+  ['ASK', 'PROMISE'].forEach((k) => {
+    const x = c.pipeline[k]; const real = x.tp + x.fn;
+    out[k] = { real, solvedLocally: x.tp, solvedShare: real ? Math.round((x.tp / real) * 1000) / 1000 : 0, residual: x.fn, residualShare: real ? Math.round((x.fn / real) * 1000) / 1000 : 0, wrongCards: x.fp, remoteShare: 0 };
+  });
+  return out;
+}
+comparison.devSet.localShare = localShare(comparison.devSet);
+comparison.blindSet.localShare = localShare(comparison.blindSet);
 console.log('blind set  lexicon', JSON.stringify(comparison.blindSet.lexicon), '\n           pipeline', JSON.stringify(comparison.blindSet.pipeline));
 const report = { comparison, generatedAt: new Date().toISOString().slice(0, 10), config: weights.trainedOn, temperature: weights.temp, devHeldOut: evaluate(evalSet), dev: evaluate(gold), blind: evaluate(blind) };
 fs.writeFileSync(path.join(__dirname, '..', 'docs', 'intent-model-metrics.json'), JSON.stringify(report, null, 1));

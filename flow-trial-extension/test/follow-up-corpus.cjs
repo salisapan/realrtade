@@ -151,7 +151,7 @@ check('"forwarded to my colleague" is a hand-off, the loop stays open', (() => {
 check('"passed it to accounting" on a payment is not paid', outcome('העברתי את זה לחשבות והם יטפלו בזה', payW) !== 'paid');
 check('"much appreciated" is an acknowledgement', outcome('Much appreciated!', replyW) === 'ack');
 check('"thanks for sending" is an acknowledgement', outcome('Thanks for sending this over.', replyW) === 'ack');
-check('a refusal is still an answer (the loop closes, you know where you stand)', outcome('Unfortunately we decided not to go ahead with the vendor.', replyW) === 'closed');
+check('a refusal is still an answer (it closes the loop as declined, you know where you stand)', outcome('Unfortunately we decided not to go ahead with the vendor.', replyW) === 'declined');
 console.log('  payment:');
 check('"payment sent" closes a payment loop as paid', outcome('Payment sent today, confirmation attached.', payW) === 'paid');
 check('"I paid yesterday" is paid', outcome('I paid yesterday, should reach you shortly.', payW) === 'paid');
