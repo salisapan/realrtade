@@ -207,6 +207,33 @@ Real-Gmail steps (open → carry → advance → close), two accounts or one plu
 27. **Hebrew.** Repeat 20, 23 and 25 in Hebrew (*"איזו חשבונית?"*, *"החלטנו לוותר"*, *"מה הסטטוס?"*).
 28. **Counts.** In the extension's storage (chrome://extensions → service worker → Application) `recognitionStats` should show counts only. No text.
 
+### 9a-ii. Completion you can feel (built 2026-10-02, plan: `docs/closure-plan.md`)
+
+- **Prepare my reply.** When the ball comes back, the receipt carries one button
+  (and the "Your turn" row has the same one). It writes a Gmail draft in that
+  thread: a resend note with a place to attach for "could not open it"; their
+  question quoted with a place for your answer otherwise; Hebrew and English.
+  Nothing is sent. Local data added: the one sentence that put the ball in your
+  court (`yoursLine`, at most 140 characters, on the device only; cleared when you
+  answer).
+- **Weight of intention.** A soft ask ("let me know what you think", "any
+  thoughts?") with no money, no deadline, no concrete action opens no loop and
+  uses no Free slot. Money, a stated deadline (even unparsed, "by 10/09"), a
+  concrete verb or an explicit chase always open one. The reason is on the loop
+  (`weight.signals`).
+- **Time.** A passed deadline is its own label ("Deadline passed Mon") and the
+  second and third nudge drafts say "The deadline was Monday."
+
+Real-Gmail steps:
+
+29. **Prepare my reply.** Repeat step 20, then tap *Prepare my reply* on the receipt. Expect a draft in the same thread with Dana's question quoted and `[Your answer here]`; the receipt says "Draft ready in Gmail. Nothing was sent." Check nothing was sent. Finish and send it; expect step 21 (back on it).
+30. **Same from the panel.** Open the Loops tab on a "Your turn" loop: the same button, and no nudge button on that row.
+31. **Resend note.** Repeat 22; the draft should be a resend note with `[Attach the file here, then send]`.
+32. **Deadline.** Send *"Please confirm the final figure by Monday."* and let Monday pass with no reply. Expect "Deadline passed …" on the loop. Open the second nudge draft: it should say "The deadline was …".
+33. **Soft ask.** Send *"Thanks for the chat. Let me know what you think when you get a moment."* Expect NO card. Send *"Could you let me know by Friday what you think?"*: expect the card.
+34. **Hebrew.** Repeat 29 with *"איזו חשבונית?"*: the draft opens *היי …* and quotes the question.
+35. **Google disconnected.** Disconnect Google and tap *Prepare my reply*: expect "connect Google first", nothing written.
+
 ## 9b. Still not built
 
 - Reading the Calendar itself to find meetings Glance did not create.

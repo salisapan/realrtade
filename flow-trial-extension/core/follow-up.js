@@ -147,6 +147,37 @@ const FlowFollowUp = (() => {
   }
 
   // ---- classification ---------------------------------------------------------
+  // ---- the weight of an intention -------------------------------------------------
+  // "Genius is knowing when not to start": a loop costs a Free slot and the
+  // person's attention. Money, a stated deadline, a concrete action, or an
+  // explicit need give an ask weight. A soft closer with none of those does not.
+  const SOFT_ASK = /\b(?:let me know(?: what you think| your thoughts| how you feel| if you (?:have|need|want|like|can|would))?|what do you think|any thoughts|your thoughts|thoughts\?|keep me posted|keep me in the loop|feel free|whenever|just checking|just wanted|for your information|fyi)\b|(?:מה דעתך|מה דעתכם|תעדכן אותי|תעדכנו אותי|תודיע לי מה|מה אתה חושב|מה את חושבת)/i;
+  const CONCRETE_VERB = /\b(?:confirm|send|share|review|sign|approve|forward|provide|return|schedule|book|pay|transfer|wire|settle|attach|upload|submit|complete|fill|decide|choose|verify|resend|deliver|finali[sz]e)\b|(?:לשלוח|לאשר|לחתום|להעביר|לשלם|לבדוק|לקבוע|לסיים|לבחור|לוודא|תשלח|תאשר|תחתום|תעביר|תשלם|תבדוק|תקבע|תסיים|תבחר|תוודא)/i;
+  const NEED_FRAME = /\b(?:i need|we need|need you to|waiting (?:for|on)|awaiting|required|must|have to|by (?:eod|end of)|asap|urgent(?:ly)?)\b|(?:אני צריך|אנחנו צריכים|צריך ש|ממתין|ממתינה|מחכה ל|דחוף|חייב)/i;
+  // A date was named even when it could not be resolved ("by 10/09", "by Friday EOD").
+  const DEADLINE_CUE = /\b(?:by|before|until|no later than)\s+(?:the\s+)?(?:\d|mon|tue|wed|thu|fri|sat|sun|tomorrow|today|tonight|eod|eow|end of|next|this)|(?:עד|לפני)\s+(?:יום|ה|סוף|מחר|היום|\d)/i;
+  function intentionWeight(a) {
+    const signals = [];
+    let score = 0;
+    if (a.money) { score += 3; signals.push('amount'); }
+    if (a.payment) { score += 2; signals.push('payment'); }
+    if (a.deadline) { score += 3; signals.push('deadline'); }
+    else if (DEADLINE_CUE.test(a.line)) { score += 3; signals.push('deadline-cue'); }
+    if (CONCRETE_VERB.test(a.line)) { score += 2; signals.push('concrete-action'); }
+    else if (a.req && a.req.action && a.req.action !== 'reply' && !(SOFT_ASK.test(a.line) && /^(?:review|decide)$/.test(a.req.action))) {
+      // "Any thoughts?" reads as a review or a decision to the lexicon; with a softener it is only an opinion.
+      score += 2; signals.push('action:' + a.req.action);
+    }
+    if (a.req && a.req.object) { score += 1; signals.push('object:' + a.req.object); }
+    if (NEED_FRAME.test(a.line)) { score += 1; signals.push('explicit-need'); }
+    const soft = SOFT_ASK.test(a.line);
+    if (soft) { score -= 3; signals.push('soft'); }
+    // Only a soft ask with nothing behind it is light; everything else opens.
+    const hard = signals.some((x) => x === 'amount' || x === 'payment' || x === 'deadline' || x === 'deadline-cue' || x === 'concrete-action' || x.indexOf('action:') === 0);
+    const level = soft && !hard ? 'light' : 'real';
+    return { score, level, signals };
+  }
+
   // A whole message of two to five words that is itself a chase: "Any update?",
   // "Signed yet?", "?מה הסטטוס". Recognised on shape alone (core/request-types.js),
   // and only when nothing else is in the message.
@@ -226,7 +257,12 @@ const FlowFollowUp = (() => {
 
     const kind = isPayment || payAsk ? KINDS.PAYMENT : KINDS.REPLY;
     const req = typed && (typed.line === chosen || !isPayment) ? typed.req : null;
+    // Does this intention carry enough weight to deserve a loop? (A soft "let me
+    // know what you think" with no money, date or concrete action does not.)
+    const weight = intentionWeight({ line: chosen, money: Boolean(money), deadline: Boolean(deadlineIso), payment: kind === KINDS.PAYMENT, req });
+    if (weight.level === 'light') return null;
     return {
+      weight,
       kind,
       what: clip(chosen, MAX_WHAT),
       amount: money ? { value: money.value, currency: money.currency || null, raw: money.raw } : null,
@@ -446,7 +482,7 @@ const FlowFollowUp = (() => {
     const meant = rm ? rm.read(body, { kind }) : null;
     if (meant) {
       if (meant.meaning === 'declined') return { outcome: 'declined', promisedIso: null, basis: 'rule', why: meant.why };
-      return { outcome: 'yours', reason: meant.meaning, promisedIso: null, basis: 'rule', why: meant.why };
+      return { outcome: 'yours', reason: meant.meaning, line: meant.line || null, promisedIso: null, basis: 'rule', why: meant.why };
     }
 
     // For a request for a reply, "confirmed / attached / signed" means the thing
@@ -474,7 +510,7 @@ const FlowFollowUp = (() => {
   // You answered: the ball goes back to them, and the chase restarts from today.
   function handBackPatch(w, now) {
     const t = typeof now === 'number' ? now : Date.now();
-    return { stage: (w.nudges || 0) > 0 ? 'nudged' : 'waiting', yoursReason: null, yoursSince: null, handedBackAt: t, chaseIso: rechaseDate(w.kind, t, null) };
+    return { stage: (w.nudges || 0) > 0 ? 'nudged' : 'waiting', yoursReason: null, yoursLine: null, yoursSince: null, handedBackAt: t, chaseIso: rechaseDate(w.kind, t, null) };
   }
 
   // The day to look again, after a nudge, a promise or a reopen.
@@ -509,7 +545,7 @@ const FlowFollowUp = (() => {
         return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'declined' }), close: true };
       case 'yours':
         // The ball is back with you. Nothing to chase; the next move is yours.
-        return { patch: Object.assign({}, seen, { stage: 'yours', yoursReason: reply.reason || 'question', yoursSince: t, chaseIso: yoursDate(t) }), yours: true, rescheduled: true };
+        return { patch: Object.assign({}, seen, { stage: 'yours', yoursReason: reply.reason || 'question', yoursLine: reply.line ? clip(reply.line, MAX_WHAT) : null, yoursSince: t, chaseIso: yoursDate(t) }), yours: true, rescheduled: true };
       case 'answered':
         return { patch: seen, confirm: true };
       default: // ack
@@ -649,7 +685,45 @@ const FlowFollowUp = (() => {
   // little firmer, and never rude:
   //   1  a friendly reminder        2  a clear second ask        3  a last, direct one
   // `level` defaults to the next one for this loop.
+  // ---- time is part of the intention ---------------------------------------------
+  // A stated deadline that has passed is its own state, not just a quiet loop.
+  function deadlinePassed(w, now) {
+    return Boolean(w && w.status === 'waiting' && w.direction !== 'mine' && w.direction !== 'clock' && w.deadlineIso && w.deadlineIso < isoDay(today(now)));
+  }
+  function dayWord(iso, he) {
+    try { return new Date(iso + 'T00:00:00').toLocaleDateString(he ? 'he-IL' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' }); } catch (e) { return iso; }
+  }
+
+  // The firmer nudges name the deadline the person actually set.
   function nudgeText(w, level, now) {
+    const base = nudgeBase(w, level, now);
+    const lvl = Math.min(MAX_NUDGE_LEVEL, Math.max(1, level || nextNudgeLevel(w)));
+    if (lvl < 2 || !deadlinePassed(w, now)) return base;
+    const he = w.lang === 'he';
+    const line = he ? 'המועד שנקבע היה ' + dayWord(w.deadlineIso, true) + '.' : 'The deadline was ' + dayWord(w.deadlineIso, false) + '.';
+    const parts = base.split('\n\n');
+    parts.splice(2, 0, line);
+    return parts.join('\n\n');
+  }
+
+  // The first draft of YOUR answer when the ball is back with you. A starting
+  // point in Gmail's Drafts, never sent: the person finishes and sends it.
+  function replyDraft(w) {
+    const name = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
+    const he = w.lang === 'he' || (w.yoursLine && hasHebrew(w.yoursLine));
+    const blocked = w.yoursReason === 'blocked';
+    const q = w.yoursLine ? '"' + clip(w.yoursLine, 160) + '"' : '';
+    if (he) {
+      const hi = name ? 'היי ' + name + ',' : 'שלום,';
+      if (blocked) return hi + '\n\nסליחה על זה. אני שולח/ת שוב עכשיו. [צרפו את הקובץ כאן ושלחו]\n\nאשמח לדעת אם הפעם זה מגיע.\n\nתודה,';
+      return hi + '\n\nתודה ששאלת.' + (q ? ' שאלת: ' + q : '') + '\n\n[התשובה שלכם כאן]\n\nתודה,';
+    }
+    const hi = name ? 'Hi ' + name + ',' : 'Hi,';
+    if (blocked) return hi + '\n\nSorry about that. I am resending it now. [Attach the file here, then send]\n\nPlease let me know if it comes through this time.\n\nThanks,';
+    return hi + '\n\nThanks for checking.' + (q ? ' You asked: ' + q : '') + '\n\n[Your answer here]\n\nThanks,';
+  }
+
+  function nudgeBase(w, level, now) {
     const lvl = Math.min(MAX_NUDGE_LEVEL, Math.max(1, level || nextNudgeLevel(w)));
     const name = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
     const he = w.lang === 'he';
@@ -691,7 +765,7 @@ const FlowFollowUp = (() => {
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
-    nextNudgeLevel, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
+    nextNudgeLevel, deadlinePassed, replyDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };
 })();
 

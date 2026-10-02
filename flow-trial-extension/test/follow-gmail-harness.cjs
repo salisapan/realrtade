@@ -348,6 +348,24 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('and is counted as local silence, not remote', rs2 && rs2.localSilence >= 1 && rs2.remote === 0, rs2);
   await t.ctx.close();
 
+  // 24. completion you can feel: the ball comes back and the first draft is already waiting
+  t = await open(browser, 'prepare-reply', ASKTHREAD.concat([msg(theirs, 'Which vendor do you mean? We have two.')]), { watches: [W2] });
+  s = await t.state();
+  check('when the ball comes back, the receipt offers to prepare my reply', /Prepare my reply/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.ghost'); await t.p.waitForTimeout(400);
+  s = await t.state();
+  const draftMsg = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  check('it writes a Gmail draft to the right person with their question quoted', draftMsg && draftMsg.payload.to === 'dana@acme.com' && /Which vendor do you mean\?/.test(draftMsg.payload.body) && /\[Your answer here\]/.test(draftMsg.payload.body), draftMsg);
+  check('and says plainly that nothing was sent', /Draft ready in Gmail\. Nothing was sent\./.test(s.card || ''), s.card);
+  check('no send message was ever issued', !s.msgs.some((m) => /send(?!.*draft)/i.test(m) && m !== 'flow:follow-draft'), s.msgs);
+  await t.ctx.close();
+
+  // 25. knowing when not to start
+  t = await open(browser, 'soft-ask', [msg(theirs, 'Thanks for the call.'), msg(mine, 'Thanks for the chat earlier. Let me know what you think when you get a moment.')]);
+  s = await t.state();
+  check('a soft "let me know what you think" opens nothing and costs no Free slot', s.card === null && s.watches.length === 0, s);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);

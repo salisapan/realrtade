@@ -63,7 +63,8 @@ function load(stored, opts) {
       return byId.get(id);
     },
     querySelectorAll: () => [],
-    createElement: (t) => makeNode(t)
+    createElement: (t) => makeNode(t),
+    createTextNode: (t) => { const n = makeNode('#text'); n.textContent = String(t); return n; }
   };
 
   let store = JSON.parse(JSON.stringify(stored || {}));
@@ -546,6 +547,27 @@ async function run() {
     check('a failed reverse leaves the button labeled Undo', undo.textContent === 'Undo', undo.textContent);
     const note = find(host, 'log-undo-note').map((n) => n.textContent);
     check('the note says the Google Task is still there', note.indexOf('Still there — the Google Task was not removed.') !== -1, note);
+  }
+
+  console.log('\n--- popup.js: a loop that is yours says so, offers the prepared reply, and a passed deadline is its own label ---\n');
+  {
+    const base = { kind: 'reply', status: 'waiting', direction: 'theirs', createdAt: Date.now() - 4 * 86400000, nudges: 0, lang: 'en', counterpart: { name: 'Dana Cole', email: 'dana@acme.com' }, taskRef: null };
+    const stored = {
+      followWatches: [
+        Object.assign({}, base, { id: 'y1', threadId: 'y1', subject: 'Vendor booking', what: 'Please confirm the final figure by Monday', stage: 'yours', yoursReason: 'question', yoursLine: 'Which vendor do you mean?', chaseIso: isoDaysFromNow(1) }),
+        Object.assign({}, base, { id: 'd1', threadId: 'd1', subject: 'Lease', what: 'Please sign the lease by Thursday', stage: 'waiting', deadlineIso: isoDaysFromNow(-2), chaseIso: isoDaysFromNow(-2) })
+      ]
+    };
+    const { sandbox, document } = load(stored);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('waiting-list');
+    const metas = find(host, 'wait-meta').map((n) => n.textContent);
+    check('the yours loop says "Your turn" and why', metas.some((m) => /^Your turn · they asked you something/.test(m)), metas);
+    check('the late loop says the deadline passed, not just "Waiting"', metas.some((m) => /^Deadline passed /.test(m)), metas);
+    const buttons = find(host, 'sm').map((n) => n.textContent);
+    check('the yours loop offers Prepare my reply', buttons.includes('Prepare my reply'), buttons);
+    check('and no nudge for it (the chase is not theirs to answer)', buttons.filter((b) => /nudge/i.test(b)).length === 1, buttons);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

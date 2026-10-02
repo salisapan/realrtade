@@ -668,6 +668,7 @@
       return left < 0 ? 'Lapsed ' + dayShort(w.expiresIso) : 'Ends ' + dayShort(w.expiresIso) + ' · ' + (left === 0 ? 'today' : left === 1 ? '1 day left' : left + ' days left');
     }
     if (FlowFollowUp.isMine(w)) return 'You promised · ' + age;
+    if (FlowFollowUp.deadlinePassed(w, now) && stage !== 'yours') return 'Deadline passed ' + dayShort(w.deadlineIso) + ' · ' + age;
     if (stage === 'yours') return 'Your turn · ' + (w.yoursReason === 'blocked' ? 'they could not open it' : 'they asked you something') + ' · ' + age;
     if (stage === 'promised' && w.promisedIso) return 'Promised ' + dayShort(w.promisedIso) + ' · ' + age;
     if (stage === 'nudged') return 'Chased ' + plural(w.nudges || 1, 'time', 'times') + ' · ' + age;
@@ -722,6 +723,24 @@
         }
       });
       acts.appendChild(nudge);
+    }
+
+    if (FlowFollowUp.isYours(w) && w.counterpart && w.counterpart.email) {
+      const prep = el('button', 'ghost sm', 'Prepare my reply');
+      prep.type = 'button';
+      prep.addEventListener('click', async () => {
+        note.hidden = false;
+        prep.disabled = true; prep.textContent = 'Preparing…';
+        const res = await send({ type: 'flow:follow-draft', payload: { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject, body: FlowFollowUp.replyDraft(w) } });
+        prep.disabled = false; prep.textContent = 'Prepare my reply';
+        if (res && res.ok) {
+          note.textContent = 'A draft is waiting in Gmail. Nothing was sent. Send it and I will go back to waiting for them.';
+          send({ type: 'flow:track', event: 'follow_reply_prepared', params: {} });
+        } else {
+          note.textContent = (res && res.reason === 'not-connected') ? 'Connect Google first (Setup tab).' : 'Could not create the draft. Try again.';
+        }
+      });
+      acts.appendChild(prep);
     }
 
     const mineLoop = FlowFollowUp.isMine(w);

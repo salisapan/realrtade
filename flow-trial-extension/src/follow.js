@@ -226,7 +226,19 @@ const FlowFollow = (() => {
     track('follow_yours');
     const name = whoOf(sender);
     const what = patch.yoursReason === 'blocked' ? 'could not open or find what you sent' : 'asked you something';
-    receipt(name + ' ' + what + '. This one is yours now. I stopped chasing and moved your reminder to ' + dayLabel(patch.chaseIso) + '.', null);
+    const next = Object.assign({}, watch, patch);
+    const canDraft = Boolean(next.counterpart && next.counterpart.email);
+    receipt(name + ' ' + what + '. This one is yours now. I stopped chasing and moved your reminder to ' + dayLabel(patch.chaseIso) + '.', null,
+      canDraft ? { label: 'Prepare my reply', run: () => prepareReply(next) } : null);
+  }
+
+  // The first draft of your answer, written into Gmail's Drafts in that thread.
+  // Nothing is sent: you finish it and send it.
+  async function prepareReply(watch) {
+    const res = await send({ type: 'flow:follow-draft', payload: { to: watch.counterpart.email, toName: watch.counterpart.name, subject: watch.subject, body: FlowFollowUp.replyDraft(watch) } });
+    track('follow_reply_prepared');
+    if (res && res.ok) receipt('Draft ready in Gmail. Nothing was sent.', null);
+    else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null);
   }
 
   // You answered: the ball goes back to them, and the chase starts again.
