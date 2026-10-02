@@ -20,10 +20,10 @@
    },
    "pipeline": {
     "ASK": {
-     "precision": 1,
+     "precision": 0.983,
      "recall": 0.891,
      "tp": 57,
-     "fp": 0,
+     "fp": 1,
      "fn": 7
     },
     "PROMISE": {
@@ -56,10 +56,10 @@
    "pipeline": {
     "ASK": {
      "precision": 1,
-     "recall": 0.706,
-     "tp": 24,
+     "recall": 0.676,
+     "tp": 23,
      "fp": 0,
-     "fn": 10
+     "fn": 11
     },
     "PROMISE": {
      "precision": 1,
@@ -82,16 +82,16 @@
  "temperature": 2.5,
  "devHeldOut": {
   "n": 96,
-  "accuracy": 0.969,
+  "accuracy": 0.979,
   "per": {
    "ASK": {
-    "precision": 0.941,
+    "precision": 0.97,
     "recall": 1,
     "n": 32
    },
    "PROMISE": {
     "precision": 1,
-    "recall": 0.857,
+    "recall": 0.905,
     "n": 21
    },
    "INFORM": {
@@ -113,8 +113,8 @@
     "ACK": 0
    },
    "PROMISE": {
-    "ASK": 2,
-    "PROMISE": 18,
+    "ASK": 1,
+    "PROMISE": 19,
     "INFORM": 0,
     "ACK": 1
    },
@@ -136,34 +136,28 @@
     "t": "תקבל את הקבצים לתיבה לפני הצהריים.",
     "want": "PROMISE",
     "got": "ASK",
-    "p": 0.74
+    "p": 0.82
    },
    {
     "t": "אשלח הזמנה ליומן ליום שלישי בקרוב.",
     "want": "PROMISE",
     "got": "ACK",
-    "p": 0.73
-   },
-   {
-    "t": "אכין את הטיוטה הראשונה עד סוף השבוע.",
-    "want": "PROMISE",
-    "got": "ASK",
-    "p": 0.6
+    "p": 0.56
    }
   ]
  },
  "dev": {
   "n": 193,
-  "accuracy": 0.979,
+  "accuracy": 0.984,
   "per": {
    "ASK": {
-    "precision": 0.969,
+    "precision": 0.984,
     "recall": 0.984,
     "n": 64
    },
    "PROMISE": {
     "precision": 1,
-    "recall": 0.929,
+    "recall": 0.952,
     "n": 42
    },
    "INFORM": {
@@ -185,8 +179,8 @@
     "ACK": 0
    },
    "PROMISE": {
-    "ASK": 2,
-    "PROMISE": 39,
+    "ASK": 1,
+    "PROMISE": 40,
     "INFORM": 0,
     "ACK": 1
    },
@@ -208,58 +202,52 @@
     "t": "תעדכן אותי איפה זה עומד מול הלקוח.",
     "want": "ASK",
     "got": "INFORM",
-    "p": 0.79
+    "p": 0.63
    },
    {
     "t": "תקבל את הקבצים לתיבה לפני הצהריים.",
     "want": "PROMISE",
     "got": "ASK",
-    "p": 0.74
+    "p": 0.82
    },
    {
     "t": "אשלח הזמנה ליומן ליום שלישי בקרוב.",
     "want": "PROMISE",
     "got": "ACK",
-    "p": 0.73
-   },
-   {
-    "t": "אכין את הטיוטה הראשונה עד סוף השבוע.",
-    "want": "PROMISE",
-    "got": "ASK",
-    "p": 0.6
+    "p": 0.56
    }
   ]
  },
  "blind": {
   "n": 108,
-  "accuracy": 0.907,
+  "accuracy": 0.898,
   "per": {
    "ASK": {
-    "precision": 0.941,
-    "recall": 0.941,
+    "precision": 0.939,
+    "recall": 0.912,
     "n": 34
    },
    "PROMISE": {
-    "precision": 0.852,
+    "precision": 0.885,
     "recall": 0.958,
     "n": 24
    },
    "INFORM": {
-    "precision": 0.929,
+    "precision": 0.897,
     "recall": 0.813,
     "n": 32
    },
    "ACK": {
-    "precision": 0.895,
+    "precision": 0.85,
     "recall": 0.944,
     "n": 18
    }
   },
   "confusion": {
    "ASK": {
-    "ASK": 32,
+    "ASK": 31,
     "PROMISE": 0,
-    "INFORM": 1,
+    "INFORM": 2,
     "ACK": 1
    },
    "PROMISE": {
@@ -270,9 +258,9 @@
    },
    "INFORM": {
     "ASK": 1,
-    "PROMISE": 4,
+    "PROMISE": 3,
     "INFORM": 26,
-    "ACK": 1
+    "ACK": 2
    },
    "ACK": {
     "ASK": 1,
@@ -286,31 +274,37 @@
     "t": "Why hasn't the refund hit my account yet?",
     "want": "ASK",
     "got": "INFORM",
-    "p": 0.96
+    "p": 0.95
    },
    {
     "t": "I have been working with the contractor on the plan since January.",
     "want": "INFORM",
     "got": "PROMISE",
-    "p": 0.64
+    "p": 0.99
    },
    {
-    "t": "I read through the term sheet and it looks reasonable overall.",
+    "t": "The refund was issued on Tuesday and should show up within a week.",
     "want": "INFORM",
     "got": "PROMISE",
-    "p": 0.48
+    "p": 0.87
    },
    {
     "t": "All the best with the move!",
     "want": "ACK",
     "got": "ASK",
-    "p": 0.64
+    "p": 0.76
+   },
+   {
+    "t": "חתמת כבר על מכתב ההצעה?",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 0.6
    },
    {
     "t": "תגיד לי איזה מועמד אתה רוצה להתקדם איתו.",
     "want": "ASK",
     "got": "ACK",
-    "p": 0.94
+    "p": 0.8
    },
    {
     "t": "תשמע מהמגייס שלנו תוך יומיים.",
@@ -322,25 +316,25 @@
     "t": "בעל הבית אמר שהמקדמה תוחזר תוך שלושים יום מהפינוי.",
     "want": "INFORM",
     "got": "PROMISE",
-    "p": 0.57
+    "p": 0.65
    },
    {
     "t": "מכתב ההצעה מתאריך 3 במרץ ותקף לשבוע.",
     "want": "INFORM",
     "got": "ASK",
-    "p": 0.81
-   },
-   {
-    "t": "רואי החשבון סיימו את העבודה בשטח וכותבים את הדוח.",
-    "want": "INFORM",
-    "got": "PROMISE",
-    "p": 0.48
+    "p": 0.45
    },
    {
     "t": "הבניין סגור בסופי שבוע.",
     "want": "INFORM",
     "got": "ACK",
-    "p": 0.95
+    "p": 0.92
+   },
+   {
+    "t": "נראה לי שההערכה קצת אופטימית.",
+    "want": "INFORM",
+    "got": "ACK",
+    "p": 0.45
    }
   ]
  }

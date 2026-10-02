@@ -110,7 +110,9 @@ function makeGenerator(seed) {
   const HE_DECOYS_INFORM = ['נא לשים לב ש{np} השתנה.', 'ראה מצורף את {np}.', 'לידיעתך, {np} עודכן הבוקר.', 'שים לב, המשרד סגור ביום שני.', 'נא לשים לב: הפורטל לא יהיה זמין הלילה.', 'מצורפות הערות מהשיחה.'];
   const HE_DECOYS_ACK = ['בבקשה תיהנו משארית היום.', 'תמסור דרישת שלום לצוות.', 'אתה מאמין כמה מהר זה עבר?', 'אפשר להאמין, כבר אוקטובר.', 'איזה יופי, זה עבד!', 'בבקשה סלח על הטעויות.', 'שמור על עצמך בבקשה.'];
   // Questions that are conversation, not a task: nobody needs to be chased for them.
-  const EN_SOCIAL_Q = ['Are you coming to the party on Friday?', 'Will you be at the conference this year?', 'Will you be in town next month?', 'Did you have a good trip?', 'Have you tried the new cafe downstairs?', 'Are you going to the game tonight?', 'Will you be joining us for lunch?', 'Did you enjoy the show?', 'How was your weekend?', 'Are you around next week?', 'Will you be at the offsite in {city}?', 'Do you like the new layout?', 'Have you been to {city} before?'];
+  const EN_SOCIAL_Q = ['Are you coming to the party on Friday?', 'Will you be at the conference this year?', 'Will you be in town next month?', 'Did you have a good trip?', 'Have you tried the new cafe downstairs?', 'Are you going to the game tonight?', 'Will you be joining us for lunch?', 'Did you enjoy the show?', 'How was your weekend?', 'Are you around next week?', 'Will you be at the offsite in {city}?', 'Do you like the new layout?', 'Have you been to {city} before?'].concat(['Will you be at the {ev} {when}?', 'Will you be attending the {ev} {when}?', 'Are you going to the {ev} {when}?', 'Are you joining the {ev} {when}?', 'Will you make it to the {ev} {when}?', 'Are you coming to the {ev} {when}?', 'Will you be at the {ev} meeting {when}?'].map(function (t) { return t; }));
+  const SOCIAL_EV = ['offsite', 'conference', 'party', 'dinner', 'team lunch', 'workshop', 'summit', 'happy hour', 'wedding', 'barbecue', 'retreat', 'meetup'];
+  const SOCIAL_WHEN = ['next Tuesday afternoon', 'on Friday', 'this year', 'tomorrow evening', 'next week', 'on Thursday', 'this weekend', 'next month'];
   const HE_SOCIAL_Q = ['אתה בא למסיבה ביום שישי?', 'תהיה בכנס השנה?', 'תהיה בעיר בחודש הבא?', 'היה לך טיול טוב?', 'ניסית את בית הקפה החדש?', 'אתה הולך למשחק הערב?', 'תצטרף אלינו לארוחת צהריים?', 'נהנית מההופעה?', 'איך היה סוף השבוע?', 'אתה בסביבה בשבוע הבא?', 'תהיה בנופש בעיר {city}?', 'אהבת את העיצוב החדש?'];
   const CITIES = ['Lisbon', 'Berlin', 'Boston', 'Tel Aviv', 'Austin', 'Paris'];
   const THANKS_FOR = ['Thanks for the {x}.', 'Thank you for the {x}.', 'Thanks for your {x}.', 'Great {x} today.', 'Appreciate the {x}.', 'Thanks again for the {x}.', 'Loved the {x}.', 'Enjoyed the {x} today.'];
@@ -254,7 +256,7 @@ function makeGenerator(seed) {
       else if (chance(0.6)) { core = pick(INFORM_FRAMES)(pick(PAST[topic]), np, pick(TAIL_PAST)); t = topic; }
       else { core = pick(INFORM_STATE)(np); t = topic; }
     } else {
-      core = chance(0.18) ? pick(THANKS_FOR).replace('{x}', pick(THANKS_X)) : chance(0.15) ? pick(EN_DECOYS_ACK) : chance(0.12) ? pick(EN_SOCIAL_Q).replace('{city}', pick(CITIES)) : pick(ACK_PARTS);
+      core = chance(0.18) ? pick(THANKS_FOR).replace('{x}', pick(THANKS_X)) : chance(0.15) ? pick(EN_DECOYS_ACK) : chance(0.12) ? pick(EN_SOCIAL_Q).replace('{city}', pick(CITIES)).replace('{ev}', pick(SOCIAL_EV)).replace('{when}', pick(SOCIAL_WHEN)) : pick(ACK_PARTS);
       if (chance(0.2)) core += ' ' + pick(ACK_PARTS);
     }
     return { t: act === 'ACK' ? wrapAck(core, false) : wrap(core, false), act, topic: t, action, lang: 'en' };

@@ -102,3 +102,7 @@ its own fresh context window. For a task where fresh-eyes review is the point
 implementer was blind to), prefer explicitly spawning a `general-purpose`
 Agent primed with that agent file's full contents instead of self-adopting
 the persona inline.
+
+## The local intent engine — read before touching recognition
+
+`docs/intent-model.md` describes the on-device recognition stack (lexicon tier, learned model, pipeline), how it is measured and what the numbers do not prove. Retrain with `node scripts/train-intent-model.cjs` after changing `scripts/intent/generate.cjs` or the features; `flow-trial-extension/test/intent-model-corpus.cjs` enforces the precision and recall gates. Never lower a precision gate to raise recall, and never add an external model call to this path.

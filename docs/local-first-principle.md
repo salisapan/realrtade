@@ -30,3 +30,5 @@ the decision filter (`decision-filter.md`): reliability beats cleverness.
 Where it lives today (tests: `test/request-types-corpus.cjs`, `test/follow-up-corpus.cjs`): `core/request-types.js` (what is being asked or
 promised), `core/follow-up.js` (what a reply did), `core/intent.js` and
 `core/judgment.js` (what an incoming message asks of you).
+
+**Tiers, measured results and honest caveats:** `docs/intent-model.md`. Checks: `flow-trial-extension/test/intent-model-corpus.cjs` (precision >= 0.97, recall at least double the word lists).
