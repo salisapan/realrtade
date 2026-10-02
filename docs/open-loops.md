@@ -165,6 +165,48 @@ Extra real-Gmail steps:
 18. **Rhythm.** After three monthly loops with the same person, the Loops tab shows "Coming around again" near the next date (Pro).
 19. **By person.** With two or more loops open, switch to By person.
 
+## 9a. Closure intelligence, second pass (built 2026-10-02)
+
+The loop gained one more state and three more ways to read a reply. Detail and
+measurements: `docs/local-detection-plan.md`.
+
+- **`yours` (the ball is back with you).** They wrote, but they need something:
+  a question ("which invoice?"), a counter-offer ("how about Wednesday?"), a flat
+  need ("I need the VAT number before I can approve"), or they could not use what
+  you sent ("I never got the attachment", "the link is broken", `לא קיבלתי`). The
+  loop stays open, the chase to them stops, the Google Task is retitled
+  ("Answer Dana") and moved to the next business day, and the Loops tab says
+  "Your turn · they asked you something". When you answer, the ball goes back and
+  the chase restarts. Nothing to manage.
+- **`declined`.** A plain no ("we decided not to proceed", `לא מעוניינים`) is a
+  real answer: the loop closes, recorded as declined, with Reopen. On a payment a
+  no is a pushback, so it becomes `yours` instead of closing.
+- **One story, many threads (`core/story.js`).** An answer in a new thread settles
+  the loop it belongs to when it is the same person and the same normalised
+  subject, a shared reference number (INV-204, PO 7731, `חשבונית 2041`), or the
+  same amount on a payment loop. Two plausible loops means no match. The same
+  rule stops a second loop being opened for a story already followed.
+- **Short chasers.** "Any update?", "Signed yet?", "Paid?", `מה הסטטוס?`: two-word
+  chases open a loop (or count as a chase of one already open). Only on your own
+  message, only the whole message, only with a question mark.
+- **Soft acknowledgements.** "No worries, take your time" and "can't wait to see
+  it" no longer close a loop; before, anything not recognised was assumed to be an
+  answer.
+- **Measured.** Every message decision is counted as local hit, local silence or
+  residual, and every reply as rule or default (counts only, in `recognitionStats`).
+
+Real-Gmail steps (open → carry → advance → close), two accounts or one plus a friend:
+
+20. **Question back.** Send *"Please confirm the final figure by Monday so I can book the vendor."* and tap Stay on it. From the other account reply *"Which vendor do you mean?"* Expect the loop NOT to close; the receipt says it is yours now; the Google Task is called "Answer …" and due next business day; the Loops tab shows "Your turn".
+21. **Hand back.** Reply with the answer. Expect "Sent. I am back on it", the Task title back to "Chase reply …" with a new chase day.
+22. **Could not open it.** Repeat 20 with the reply *"I never got the attachment"*. Expect the same, labelled "could not open or find what you sent".
+23. **No.** Repeat with *"Unfortunately we decided not to go ahead."* Expect the loop closed with "said no", and Reopen on the receipt.
+24. **New thread.** Send an invoice ask with "INV-204" in the subject, tap Stay on it. From the other account start a NEW email titled *"paid"* saying *"Paid INV-204 today"*. Open it. Expect the first loop closed as paid. Then send a second ask about INV-204 in a new thread: expect no second card.
+25. **Two-word chase.** In a thread with no loop send just *"Any update?"* Expect the Waiting on a reply card. Send *"Thanks!"* in another: expect nothing.
+26. **Soft ack.** Reply from the other account *"No worries, take your time."* Expect the loop to stay open.
+27. **Hebrew.** Repeat 20, 23 and 25 in Hebrew (*"איזו חשבונית?"*, *"החלטנו לוותר"*, *"מה הסטטוס?"*).
+28. **Counts.** In the extension's storage (chrome://extensions → service worker → Application) `recognitionStats` should show counts only. No text.
+
 ## 9b. Still not built
 
 - Reading the Calendar itself to find meetings Glance did not create.

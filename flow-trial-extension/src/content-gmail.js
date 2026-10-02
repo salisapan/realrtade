@@ -969,7 +969,7 @@
   // language and the "Closed —" receipt in another.
   //
   // Returns the sentence WITHOUT the "Glance" prefix — injectChip() renders
-  // that separately as a styled brand mark (sparkle + gradient wordmark),
+  // that separately as a styled brand mark (loop mark + gradient wordmark),
   // so this function only ever has to answer "what is about to happen,"
   // not "how should the brand name look."
   function closingSentence(process, intent) {
@@ -1011,13 +1011,15 @@
     }
   }
 
-  // The one AI-forward visual signature on the card: a small sparkle mark
-  // ahead of a gradient-text "Flow" — the same blue family the Do It
-  // button's own ring/shell already use (see chip.css), not a new palette,
-  // and confined to a single word rather than a page-level gradient wash.
-  function sparkleIcon() {
-    const svg = svgEl('svg', { viewBox: '0 0 16 16', class: 'flow-chip-sparkle', 'aria-hidden': 'true' });
-    svg.appendChild(svgEl('path', { d: 'M8 1 L9.4 6.6 L15 8 L9.4 9.4 L8 15 L6.6 9.4 L1 8 L6.6 6.6 Z' }));
+  // The card's one brand signature: a small closed-loop mark (a ring with the
+  // tick that shuts it) ahead of the gradient-text "Glance" — the same blue
+  // family the Do It button's own ring/shell already use, not a new palette, and
+  // confined to a single word rather than a page-level gradient wash. It says
+  // "closed", not "intelligent": docs/product-identity.md.
+  function loopMark() {
+    const svg = svgEl('svg', { viewBox: '0 0 16 16', class: 'flow-chip-mark', 'aria-hidden': 'true' });
+    svg.appendChild(svgEl('circle', { cx: '8', cy: '8', r: '5.6' }));
+    svg.appendChild(svgEl('path', { d: 'M5.3 8.2 L7.2 10.1 L10.8 6.2' }));
     return svg;
   }
 
@@ -1194,7 +1196,7 @@
     const host = el('div', 'flow-chip-host');
     host.setAttribute('dir', 'ltr');
     const textEl = el('p', 'flow-chip-text');
-    textEl.appendChild(sparkleIcon());
+    textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
     textEl.appendChild(document.createTextNode(' ' + (decision.line || ask.line)));
     host.appendChild(textEl);
@@ -1391,13 +1393,13 @@
     // that means, not left for the user to infer from a pile of pills.
     host.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
 
-    // sparkle + gradient "Glance" + the rest of the sentence as its own
-    // text node — three children in that DOM order, sparkle first, right
+    // loop mark + gradient "Glance" + the rest of the sentence as its own
+    // text node — three children in that DOM order, mark first, right
     // before the brand name, same as before this was translated to
     // English (see closingSentence's own header comment for why it no
     // longer needs a dir="rtl" host).
     const textEl = el('p', 'flow-chip-text');
-    textEl.appendChild(sparkleIcon());
+    textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
     textEl.appendChild(document.createTextNode(' ' + closingSentence(ctx.process, ctx.intent)));
     if (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang === 'he') textEl.setAttribute('dir', 'auto');

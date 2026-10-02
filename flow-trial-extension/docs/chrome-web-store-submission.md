@@ -32,10 +32,10 @@ this listing. Client secrets stay in Netlify. Do not invent IDs.
 ### Short description (max 132 characters)
 
 ```
-When an email actually decides something, Glance closes it for you — one click, straight into Google, judgment on your device.
+Glance stays on what you are waiting on until it is closed, and closes what is asked of you in one click. Judgment on your device.
 ```
 
-126 characters.
+130 characters.
 
 ### Detailed description
 
@@ -54,6 +54,18 @@ Most emails produce nothing. That's the product working, not a bug —
 Glance is built to stay quiet on price lists, newsletters, and automated
 mail, and to speak up only when something real happened.
 
+STAYS ON WHAT YOU ARE WAITING ON
+When you send a message that asks someone for a reply, a signature or a
+payment, Glance offers one small card: stay on it. If you say yes it adds a
+Google Task for the day to chase, and when the person answers it reads what
+the answer actually did. "Got it, thanks" and out-of-office replies leave the
+loop open; a promise moves the day; a question back ("which invoice?") or "I
+never got the attachment" keeps it open and hands the next move to you; a
+plain "no" closes it as a no; a real answer, or for money a confirmation it
+was paid, closes it. An answer that arrives in a new thread about the same
+invoice settles the same loop. Nothing is ever sent for you. Free follows
+three loops at a time; Pro follows every loop and shows the money still owed.
+
 HOW JUDGMENT WORKS
 The scoring that decides whether to show the Do It button runs entirely on
 your device. It's a transparent, weighted scorer — not a black box, not a
@@ -63,6 +75,12 @@ automated-sender and mailing-list signals. No email text leaves your
 machine to reach that decision. The threshold that decides "is this
 confident enough to speak up" adjusts automatically as you click or
 dismiss suggestions — no configuration screen, no rules to write.
+
+Reading what you ask others for, and what their replies mean, follows the
+same rule: Glance's own word-and-structure rules plus a small classifier that
+runs entirely on your device (a few hundred kilobytes, no download, no
+network). When it cannot tell, Glance stays silent. Learning from what you
+accept or turn down is stored on your device as numbers only, never as text.
 
 CLOSES A NAMED PROCESS, NOT A PILE OF BUTTONS
 Glance doesn't propose loose, independent actions — it recognizes one of a

@@ -70,6 +70,14 @@ corpus tests, and stay silent when unsure. A model is an optional, masked,
 Pro-only last resort that never closes or writes anything alone. Full rule:
 `docs/local-first-principle.md`.
 
+## Product identity — AI is the engine, closure is the product
+
+Glance is not sold or worded as "an AI email product". Copy on any Glance
+surface talks about loops that are open, chased, yours or closed, and money at
+risk, never about cleverness. `docs/product-identity.md` has the rule and the
+list of phrases a Glance surface may not use (enforced by
+`flow-trial-extension/test/identity-copy-corpus.cjs`).
+
 ## The Magic Moment — read before touching onboarding or first-use copy
 
 `docs/magic-moment.md` defines, in concrete product terms, the first

@@ -102,6 +102,33 @@ Added to `docs/open-loops.md` (steps 20+): open -> carry -> advance -> close,
 with the reply variants above (question back, "did not receive", a "no", a
 answer in a new thread, a bare "Paid?" chaser, a reopen, a manual let-go).
 
-## Results
+## Results (measured 2026-10-02)
 
-(filled in below after measurement)
+**Reply meaning** (what a reply does to a loop; hand-written Hebrew+English
+replies, `test/fixtures/`):
+
+| Set | Before (old `classifyReply`) | After | Note |
+|---|---|---|---|
+| `reply-blind.json` (64) | 37/64 (58%) | 50/64 (78%) first run, 64/64 after fixing what the misses showed | **Contaminated**: tuned on after its first run. A regression guard, not an estimate. |
+| `reply-fresh.json` (31) | 10/31 (32%) | 21/31 (68%) first run; 27/31 (87%) after fixing the clear bugs it showed | Written after tuning, run once before any fix. The 87% is also partly tuned: treat 68% as the honest first-contact number. |
+
+The dangerous error is closing a loop that should stay open. On the fresh set the
+old classifier closed 12 loops that should have stayed open or been handed back;
+the new one wrongly closes 1 (a Hebrew thank-you: `מעולה, תודה על העדכון`).
+Known remaining gaps: "This isn't something we can commit to right now" (a soft
+no), "I'll loop in finance and they'll pay it on the 18th", "It's still pending
+approval on our end" (promises on a payment), and Hebrew soft thanks.
+
+**Local share, asks and promises in your own messages** (blind set, 108
+sentences; `docs/intent-model-metrics.json` `localShare`): 68% of real asks and
+75% of real promises solved locally, 32% / 25% left to the long tail (and today
+stay silent), 0 wrong cards, **0% remote** (no external model is consulted).
+Dev set: 91% / 88%, 1 wrong card. Same caveats as `docs/intent-model.md`.
+
+**On device**: `recognitionStats` counts local hit, local silence, residual and
+remote per message, and replies as rule or default. Counts only; read it before
+deciding whether a fallback is ever worth building.
+
+**Not done, deliberately**: connecting this to `core/intent.js` (incoming mail
+judge, owner decision pending); any external fallback (still off, and `unsure`
+stays the only hook).

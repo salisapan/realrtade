@@ -32,3 +32,5 @@ promised), `core/follow-up.js` (what a reply did), `core/intent.js` and
 `core/judgment.js` (what an incoming message asks of you).
 
 **Tiers, measured results and honest caveats:** `docs/intent-model.md`. Checks: `flow-trial-extension/test/intent-model-corpus.cjs` (precision >= 0.97, recall at least double the word lists).
+
+**Local share is measured, not claimed:** `FlowRecognitionStats` (counts only, on device) and `localShare` in `docs/intent-model-metrics.json`. Reply understanding and one-story matching are local too (`docs/open-loops.md` §9a). Identity rule that goes with this one: `docs/product-identity.md`.

@@ -21,8 +21,8 @@
    stylesheet has no access to the site's CSS custom properties. The
    sentence is generated from the same facts (amount, date) the record
    itself will carry — see content-gmail.js's closingSentence(). The
-   sparkle mark + gradient "Glance" wordmark ahead of that sentence is the
-   card's one AI-forward signal — the same blue family the ring/shell
+   loop mark + gradient "Glance" wordmark ahead of that sentence is the
+   card's one brand signal (closed, not clever) — the same blue family the ring/shell
    already use, not a new palette, and confined to a single word rather than
    a page-level gradient wash.
 
@@ -103,12 +103,16 @@
   border-color: rgba(15,102,64,.28);
 }
 
-.flow-chip-sparkle {
+.flow-chip-mark {
   display: inline-block;
-  width: 11px;
-  height: 11px;
-  vertical-align: -1px;
-  fill: #2f5bd8;
+  width: 12px;
+  height: 12px;
+  vertical-align: -2px;
+  fill: none;
+  stroke: #2f5bd8;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   margin-inline-end: 3px;
 }
 .flow-chip-brand {

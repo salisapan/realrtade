@@ -105,3 +105,16 @@ Hebrew morphology (colloquial and slang), long multi-clause sentences (the
 pipeline reads sentence by sentence), sarcasm, requests hidden in quoted text,
 and any language other than English and Hebrew. Topic-style questions
 ("Will you be at the offsite?") are deliberately not treated as tasks.
+
+## 8. Added 2026-10-02: short chasers, evidence, local-hit accounting
+
+- `FlowRequestTypes.detectShortAsk`: whole-message short asks ("Any update?",
+  "Signed yet?", `מה הסטטוס?`) recognised on shape, pipeline tier `lexicon-short`.
+- Every `recognize()` result carries `evidence` (`strong`, `weak`, `strength`): frame,
+  action, object, amount, date, addressed-to-them, short-form versus question mark,
+  hedge, model confidence. It explains and measures a verdict; it never overrules one.
+- `FlowRecognitionStats` counts decisions as local hit, local silence, residual or
+  remote; `docs/intent-model-metrics.json` carries `localShare` per set. Reply
+  understanding (`core/reply-meaning.js`, `core/story.js`) is described in
+  `docs/open-loops.md` §9a and measured in `docs/local-detection-plan.md`.
+
