@@ -50,6 +50,7 @@ const FlowFollowUp = (() => {
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
   const replyMeaning = sibling(typeof FlowReplyMeaning !== 'undefined' ? FlowReplyMeaning : null, './reply-meaning.js', 'FlowReplyMeaning');
+  const filePath = sibling(typeof FlowFilePath !== 'undefined' ? FlowFilePath : null, './file-path.js', 'FlowFilePath');
   const requestTypes = sibling(typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null, './request-types.js', 'FlowRequestTypes');
   const KINDS = { REPLY: 'reply', PAYMENT: 'payment' };
   const MIN_WORDS = 6;
@@ -263,6 +264,7 @@ const FlowFollowUp = (() => {
     if (weight.level === 'light') return null;
     return {
       weight,
+      file: filePath ? filePath.askNeed(chosen) : null,
       kind,
       what: clip(chosen, MAX_WHAT),
       amount: money ? { value: money.value, currency: money.currency || null, raw: money.raw } : null,
@@ -307,6 +309,7 @@ const FlowFollowUp = (() => {
       lang: hasHebrew(body) ? 'he' : 'en',
       subtype: hit.t.type,
       subtypeLabel: null,
+      file: filePath ? filePath.promiseNeed(hit.line, hit.t.action) : null,
       direction: 'mine'
     };
   }
@@ -315,6 +318,12 @@ const FlowFollowUp = (() => {
   const DELIVERS = /\b(?:attached|attaching|enclosed|here(?:'s| is| are)|please find|as promised|sent (?:it|them|over)|done|finished|completed|just sent)\b|(?:מצורף|מצורפת|שלחתי|סיימתי|הנה|כפי שהבטחתי)/i;
   function deliversPromise(text) {
     return DELIVERS.test(String(text || '')) && !/\b(?:will|'ll|going to)\b/i.test(String(text || '').slice(0, 200));
+  }
+
+  // Did my newer message deliver what I promised? For a file-backed promise that takes
+  // a real attachment; "attached" with nothing attached never closes it.
+  function deliversFor(watch, text, evidence) {
+    return filePath ? filePath.promiseDelivered(watch, text, evidence, deliversPromise) : deliversPromise(text);
   }
 
   function closeAsKept(w, now) {
@@ -349,6 +358,8 @@ const FlowFollowUp = (() => {
       direction: ask.direction === 'mine' ? 'mine' : ask.direction === 'clock' ? 'clock' : 'theirs',
       expiresIso: ask.expiresIso || null,
       subtype: ask.subtype || null,
+      // The one file object that finishes this intention, or null (core/file-path.js).
+      file: ask.file || null,
       stage: 'waiting',
       nudges: 0,
       nudgedAt: null,
@@ -463,6 +474,13 @@ const FlowFollowUp = (() => {
   // watch: the loop it landed on. ctx: { now?, email?, extract? }.
   // Returns { outcome, promisedIso }.
   function classifyReply(text, watch, ctx) {
+    const base = classifyReplyText(text, watch, ctx);
+    // A real attachment (or the lack of one) matters only on a file-backed loop, and
+    // only when the page could report attachments (ctx.evidence).
+    return filePath && ctx && ctx.evidence ? filePath.judgeReply(watch, base, ctx.evidence) : base;
+  }
+
+  function classifyReplyText(text, watch, ctx) {
     const c = ctx || {};
     const kind = watch && watch.kind === KINDS.PAYMENT ? KINDS.PAYMENT : KINDS.REPLY;
     const raw = String(text || '').trim();
@@ -510,7 +528,7 @@ const FlowFollowUp = (() => {
   // You answered: the ball goes back to them, and the chase restarts from today.
   function handBackPatch(w, now) {
     const t = typeof now === 'number' ? now : Date.now();
-    return { stage: (w.nudges || 0) > 0 ? 'nudged' : 'waiting', yoursReason: null, yoursLine: null, yoursSince: null, handedBackAt: t, chaseIso: rechaseDate(w.kind, t, null) };
+    return { stage: (w.nudges || 0) > 0 ? 'nudged' : 'waiting', yoursReason: null, yoursLine: null, yoursSince: null, preparedAt: null, preparedFile: null, handedBackAt: t, chaseIso: rechaseDate(w.kind, t, null) };
   }
 
   // The day to look again, after a nudge, a promise or a reopen.
@@ -534,7 +552,7 @@ const FlowFollowUp = (() => {
     const seen = { lastReplyAt: t };
     switch (reply.outcome) {
       case 'closed':
-        return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'replied' }), close: true };
+        return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: reply.delivered === 'file' ? 'delivered' : 'replied', deliveredFiles: reply.fileNames ? reply.fileNames.slice(0, 5) : null }), close: true };
       case 'paid':
         return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'paid' }), close: true };
       case 'promised': {
@@ -549,7 +567,7 @@ const FlowFollowUp = (() => {
       case 'answered':
         return { patch: seen, confirm: true };
       default: // ack
-        return { patch: seen };
+        return { patch: reply.claimedOnly ? Object.assign({}, seen, { claimedFileAt: t }) : seen, claimedOnly: Boolean(reply.claimedOnly) };
     }
   }
 
@@ -706,21 +724,32 @@ const FlowFollowUp = (() => {
     return parts.join('\n\n');
   }
 
+  // Keeping a file promise: "as promised, attached". Written only with the one file that
+  // is really being attached; without a file there is no such draft.
+  function promiseDraft(w, opts) {
+    const fileName = opts && opts.fileName ? String(opts.fileName).replace(/[\r\n"]+/g, ' ').slice(0, 100) : null;
+    if (!fileName) return null;
+    const name = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
+    if (w.lang === 'he') return (name ? 'היי ' + name + ',' : 'שלום,') + '\n\nכפי שהבטחתי, מצורף: ' + fileName + '\n\nתודה,';
+    return (name ? 'Hi ' + name + ',' : 'Hi,') + '\n\nAs promised, attached: ' + fileName + '\n\nThanks,';
+  }
+
   // The first draft of YOUR answer when the ball is back with you. A starting
   // point in Gmail's Drafts, never sent: the person finishes and sends it.
-  function replyDraft(w) {
+  function replyDraft(w, opts) {
+    const fileName = opts && opts.fileName ? String(opts.fileName).replace(/[\r\n"]+/g, ' ').slice(0, 100) : null;
     const name = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
     const he = w.lang === 'he' || (w.yoursLine && hasHebrew(w.yoursLine));
     const blocked = w.yoursReason === 'blocked';
     const q = w.yoursLine ? '"' + clip(w.yoursLine, 160) + '"' : '';
     if (he) {
       const hi = name ? 'היי ' + name + ',' : 'שלום,';
-      if (blocked) return hi + '\n\nסליחה על זה. אני שולח/ת שוב עכשיו. [צרפו את הקובץ כאן ושלחו]\n\nאשמח לדעת אם הפעם זה מגיע.\n\nתודה,';
-      return hi + '\n\nתודה ששאלת.' + (q ? ' שאלת: ' + q : '') + '\n\n[התשובה שלכם כאן]\n\nתודה,';
+      if (blocked) return hi + '\n\nסליחה על זה. אני שולח/ת שוב עכשיו. ' + (fileName ? 'מצורף: ' + fileName : '[צרפו את הקובץ כאן ושלחו]') + '\n\nאשמח לדעת אם הפעם זה מגיע.\n\nתודה,';
+      return hi + '\n\nתודה ששאלת.' + (q ? ' שאלת: ' + q : '') + '\n\n' + (fileName ? 'מצורף: ' + fileName + '\n\n[הוסיפו מילה אם צריך]' : '[התשובה שלכם כאן]') + '\n\nתודה,';
     }
     const hi = name ? 'Hi ' + name + ',' : 'Hi,';
-    if (blocked) return hi + '\n\nSorry about that. I am resending it now. [Attach the file here, then send]\n\nPlease let me know if it comes through this time.\n\nThanks,';
-    return hi + '\n\nThanks for checking.' + (q ? ' You asked: ' + q : '') + '\n\n[Your answer here]\n\nThanks,';
+    if (blocked) return hi + '\n\nSorry about that. I am resending it now. ' + (fileName ? 'Attached: ' + fileName : '[Attach the file here, then send]') + '\n\nPlease let me know if it comes through this time.\n\nThanks,';
+    return hi + '\n\nThanks for checking.' + (q ? ' You asked: ' + q : '') + '\n\n' + (fileName ? 'Attached: ' + fileName + '\n\n[Add a line if needed]' : '[Your answer here]') + '\n\nThanks,';
   }
 
   function nudgeBase(w, level, now) {
@@ -763,9 +792,9 @@ const FlowFollowUp = (() => {
   }
 
   return {
-    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
+    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, deliversFor, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
-    nextNudgeLevel, deadlinePassed, replyDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
+    nextNudgeLevel, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };
 })();
 

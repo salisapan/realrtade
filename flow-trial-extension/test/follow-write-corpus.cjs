@@ -194,6 +194,35 @@ async function backgroundTests() {
   r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: '', body: 'Hi' });
   const d2 = w.calls.find((c) => /\/drafts$/.test(c.url));
   check('with no thread found, a standalone draft is still made', r.ok && !('threadId' in d2.body.message), d2.body);
+
+  // a draft with a file: the one in the thread, or the one Drive file. Never a claim without a file.
+  const bytes = (str) => ({ ok: true, status: 200, arrayBuffer: async () => Buffer.from(str).buffer.slice(0, Buffer.from(str).length) });
+  const gmailRoutes = [[/gmail\.googleapis\.com.*\/threads\?/, { reply: ok({ threads: [{ id: 'THREAD9' }] }) }], [/gmail\.googleapis\.com.*\/drafts$/, { method: 'POST', reply: ok({ id: 'D3' }) }]];
+  w = load({ stored: auth, routes: gmailRoutes });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', toName: 'Dana Cole', subject: 'Contract', body: 'Hi Dana,\n\nAttached: contract.pdf', attachment: { filename: 'contract.pdf', mimeType: 'application/pdf', base64: Buffer.from('PDFBYTES').toString('base64') } });
+  let d3 = w.calls.find((c) => /\/drafts$/.test(c.url));
+  let m3 = decodeRaw(d3.body.message.raw);
+  check('a thread attachment becomes a multipart draft with that file name', r.ok && r.attached === 'contract.pdf' && /multipart\/mixed/.test(m3) && /filename="contract\.pdf"/.test(m3), { r, m3: m3.slice(0, 300) });
+  check('it is still only a draft', w.calls.every((c) => !/messages\/send|drafts\/send/.test(c.url)));
+  w = load({ stored: auth, routes: gmailRoutes.concat([
+    [/drive\/v3\/files\/F1\?fields=/, { reply: ok({ name: 'Receipt - Oct.pdf', mimeType: 'application/pdf', size: '8' }) }],
+    [/drive\/v3\/files\/F1\?alt=media/, { reply: bytes('RECEIPT!') }]
+  ]) });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Receipt', body: 'Hi', driveFileId: 'F1' });
+  d3 = w.calls.find((c) => /\/drafts$/.test(c.url));
+  m3 = d3 ? decodeRaw(d3.body.message.raw) : '';
+  check('a Drive file is read by the worker and attached', r.ok && r.attached === 'Receipt - Oct.pdf' && /filename="Receipt - Oct\.pdf"/.test(m3), { r, m3: m3.slice(0, 300) });
+  w = load({ stored: auth, routes: gmailRoutes.concat([
+    [/drive\/v3\/files\/F2\?fields=/, { reply: ok({ name: 'Big.pdf', mimeType: 'application/pdf', size: String(50 * 1024 * 1024) }) }]
+  ]) });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Receipt', body: 'Hi, attached', driveFileId: 'F2' });
+  check('a file that cannot be read writes NO draft (the body claims one is attached)', r.ok === false && r.reason === 'attach' && !w.calls.some((c) => /\/drafts$/.test(c.url)), { r, calls: w.calls.map((c) => c.url) });
+  w = load({ stored: auth, routes: gmailRoutes });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Contract', body: 'Hi', attachment: { filename: 'big.bin', mimeType: 'application/octet-stream', base64: 'A'.repeat(12 * 1024 * 1024) } });
+  check('an oversized thread attachment also writes no draft', r.ok === false && r.reason === 'attach' && !w.calls.some((c) => /\/drafts$/.test(c.url)), r);
+  w = load({ stored: auth, routes: gmailRoutes });
+  r = await w.fn('followDraftCreate')({ to: 'dana@acme.com', subject: 'Contract', body: 'Hi' });
+  check('no file requested: the plain draft is unchanged', r.ok && r.attached === null && !/multipart/.test(decodeRaw(w.calls.find((c) => /\/drafts$/.test(c.url)).body.message.raw)), r);
 }
 
 (async () => {

@@ -30,13 +30,14 @@ function check(name, cond, detail) {
 
 const mine = { from: 'me@x.com', fromName: 'Me', to: 'dana@acme.com', toIsMe: false };
 const theirs = { from: 'dana@acme.com', fromName: 'Dana Cole', to: 'me@x.com', toIsMe: true };
-const msg = (who, text) => Object.assign({ text }, who);
+const msg = (who, text, att) => Object.assign({ text, att: att || [] }, who);
 
 function html(thread) {
   const items = thread.map((m, i) => `
   <div role="listitem" data-legacy-thread-id="t1" data-legacy-message-id="m${i + 1}">
     <span email="${m.from}" name="${m.fromName}">${m.fromName}</span> <span email="${m.to}">${m.toIsMe ? 'me' : 'Dana Cole'}</span>
     <div class="a3s">${m.text}</div>
+    ${(m.att || []).map((a) => `<span download_url="application/pdf:${a}:https://mail.google.com/mail/u/0?ui=2&attid=${a}">${a}</span>`).join('')}
   </div>`).join('');
   return `<!doctype html><html><head><meta charset="utf-8"><title>Inbox - me@x.com - Gmail</title>
 ${cs.css.map((c) => `<link rel="stylesheet" href="file://${ROOT}/${c}">`).join('\n')}
@@ -59,6 +60,7 @@ function stub() {
     if (m.type === 'flow:pro-status') return { ok: true, active: !!window.__pro, record: window.__pro ? { key: 'k', valid: true, activeUntil: Date.now() + 1e9 } : null };
     if (m.type === 'flow:follow-task') return { ok: true, ref: { taskListId: 'L', taskId: 'T1' } };
     if (m.type === 'flow:connector-status') return { googleTasks: { connected: true, configured: true } };
+    if (m.type === 'flow:search-drive') return { ok: true, files: window.__driveFiles || [] };
     return { ok: true };
   };
   window.chrome = {
@@ -71,6 +73,8 @@ function stub() {
     identity: {}, alarms: {}, tabs: {}
   };
   window.__store = store;
+  // A Gmail attachment's bytes (the content script fetches them with the page's cookies).
+  window.fetch = async () => ({ ok: true, headers: { get: () => '4' }, arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer });
 }
 
 async function open(browser, name, thread, opts) {
@@ -82,6 +86,7 @@ async function open(browser, name, thread, opts) {
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 200)); });
   await p.addInitScript(stub);
   if (opts.pro) await p.addInitScript(() => { window.__pro = true; });
+  if (opts.drive) await p.addInitScript((files) => { window.__driveFiles = files; }, opts.drive);
   const file = path.join(TMP, name + '.html');
   fs.writeFileSync(file, html(thread));
   await p.goto('file://' + file);
@@ -92,7 +97,7 @@ async function open(browser, name, thread, opts) {
     errs,
     card: await p.evaluate(() => { const h = document.getElementById('flow-follow-host'); return h ? h.innerText.replace(/\n+/g, ' | ') : null; }),
     msgs: await p.evaluate(() => window.__msgs.map((m) => m.type)),
-    watches: await p.evaluate(() => (window.__store.followWatches || []).map((w) => ({ id: w.id, status: w.status, chase: w.chaseIso, task: w.taskRef && w.taskRef.taskId, stage: w.stage, nudges: w.nudges, closedAs: w.closedAs, promised: w.promisedIso })))
+    watches: await p.evaluate(() => (window.__store.followWatches || []).map((w) => ({ id: w.id, status: w.status, chase: w.chaseIso, task: w.taskRef && w.taskRef.taskId, stage: w.stage, nudges: w.nudges, closedAs: w.closedAs, promised: w.promisedIso, file: w.file && w.file.object, preparedAt: w.preparedAt, preparedFile: w.preparedFile, fileChoice: w.fileChoice })))
   });
   return { p, ctx, state };
 }
@@ -364,6 +369,88 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   t = await open(browser, 'soft-ask', [msg(theirs, 'Thanks for the call.'), msg(mine, 'Thanks for the chat earlier. Let me know what you think when you get a moment.')]);
   s = await t.state();
   check('a soft "let me know what you think" opens nothing and costs no Free slot', s.card === null && s.watches.length === 0, s);
+  await t.ctx.close();
+
+  // 26. files: only when a file is part of finishing the intention
+  const CFILE = { object: 'contract', label: 'contract', lang: 'en', synonym: ['contract', 'agreement', 'nda', 'חוזה', 'הסכם'] };
+  const ASKC = 'Please send me the signed contract by Friday.';
+  t = await open(browser, 'file-offer', [msg(theirs, 'Happy to proceed.'), msg(mine, ASKC)]);
+  s = await t.state();
+  check('an ask that a file finishes says so on the card', /Waiting on the contract\?/.test(s.card || '') && /the contract arrives/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(400);
+  s = await t.state();
+  check('the loop remembers it is file-backed and says what closes it', s.watches[0].file === 'contract', s.watches);
+  check('the receipt says it closes when the contract arrives', /close it when the contract arrives\./.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  const WC = Object.assign({}, W2, { what: ASKC, file: CFILE });
+  const CT = [msg(theirs, 'Happy to proceed.'), msg(mine, ASKC)];
+  t = await open(browser, 'file-close', CT.concat([msg(theirs, 'Here you go', ['IMG_2231.pdf'])]), { watches: [WC] });
+  s = await t.state();
+  check('a real attachment from them closes a file-backed loop', s.watches[0].status === 'resolved' && s.watches[0].closedAs === 'delivered', s.watches);
+  check('and the receipt names what arrived', /sent the contract \(IMG_2231\.pdf\)/.test(s.card || '') && /Reopen/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  t = await open(browser, 'file-claim', CT.concat([msg(theirs, 'Signed copy attached.')]), { watches: [WC] });
+  s = await t.state();
+  check('"attached" with no file does NOT close it', s.watches[0].status === 'waiting', s.watches);
+  check('and it says no file came through', /no file came through/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  t = await open(browser, 'file-none-needed', ASKTHREAD.concat([msg(theirs, 'Confirmed, the final figure is 4,200.', ['IMG_9.pdf'])]), { watches: [W2] });
+  s = await t.state();
+  check('a loop that is not file-backed ignores attachments and closes on the answer as before', s.watches[0].status === 'resolved' && s.watches[0].closedAs === 'replied', s.watches);
+  await t.ctx.close();
+
+  // 27. could not open it: resend the file I actually sent, only if it is one file
+  const SENT = [msg(theirs, 'Please send the draft contract.'), msg(mine, 'Here is the contract. Please confirm the final figure by Monday.', ['contract.pdf'])];
+  t = await open(browser, 'resend-file', SENT.concat([msg(theirs, 'I never got the attachment')]), { watches: [W2] });
+  s = await t.state();
+  check('the receipt offers the reply WITH the file I sent', /Prepare reply with file/.test(s.card || '') && /File ready: contract\.pdf/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.ghost'); await t.p.waitForTimeout(500);
+  s = await t.state();
+  const dm = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  check('the draft carries that file and says so', dm && dm.payload.attachment && dm.payload.attachment.filename === 'contract.pdf' && dm.payload.attachment.base64 && /Attached: contract\.pdf/.test(dm.payload.body), dm && { att: !!dm.payload.attachment, body: dm.payload.body });
+  check('nothing is sent and the receipt says so', /Draft ready in Gmail with contract\.pdf\. Nothing was sent\./.test(s.card || ''), s.card);
+  check('preparing is NOT closing: the loop is still yours, now with a draft ready', s.watches[0].status === 'waiting' && s.watches[0].stage === 'yours' && s.watches[0].preparedFile === 'contract.pdf' && s.watches[0].preparedAt, s.watches);
+  await t.ctx.close();
+
+  t = await open(browser, 'resend-two', [msg(theirs, 'Send the drafts'), msg(mine, 'Here are both. Please confirm the final figure by Monday.', ['a.pdf', 'b.pdf']), msg(theirs, 'I never got the attachment')], { watches: [Object.assign({}, W2, { messageId: 'm2' })] });
+  s = await t.state();
+  check('two attachments is ambiguous: no file, the plain draft button', /Prepare my reply/.test(s.card || '') && !/File ready/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 28. they ask me for a file: the one right Drive file, or none
+  const RQ = [msg(mine, ASK), msg(theirs, 'Can you send me the receipt for the hotel?')];
+  const W1 = Object.assign({}, W2, { messageId: 'm1' });
+  t = await open(browser, 'ask-drive-one', RQ, { watches: [W1], drive: [{ id: 'F1', name: 'Receipt - Oct.pdf', mimeType: 'application/pdf' }, { id: 'F9', name: 'Budget.xlsx', mimeType: 'application/vnd.ms-excel' }] });
+  s = await t.state();
+  check('one confident Drive file: the receipt names it', /Prepare reply with file/.test(s.card || '') && /File ready: Receipt - Oct\.pdf/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.ghost'); await t.p.waitForTimeout(500);
+  const dd = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  s = await t.state();
+  check('the draft is told to attach exactly that Drive file', dd && dd.payload.driveFileId === 'F1' && /Attached: Receipt - Oct\.pdf/.test(dd.payload.body), dd && dd.payload);
+  check('the loop stays yours (preparing is intermediate)', s.watches[0].status === 'waiting' && s.watches[0].stage === 'yours' && s.watches[0].preparedFile === 'Receipt - Oct.pdf', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'ask-drive-two', RQ, { watches: [W1], drive: [{ id: 'F1', name: 'Receipt - Oct.pdf', mimeType: 'application/pdf' }, { id: 'F2', name: 'Receipt - Sep.pdf', mimeType: 'application/pdf' }] });
+  s = await t.state();
+  check('two receipts in Drive: no guess, the plain draft button', /Prepare my reply/.test(s.card || '') && !/File ready/.test(s.card || ''), s.card);
+  await t.ctx.close();
+  t = await open(browser, 'ask-drive-none', RQ, { watches: [W1], drive: [] });
+  s = await t.state();
+  check('nothing in Drive: silence about files, the plain draft button', /Prepare my reply/.test(s.card || '') && !/File ready/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 29. a promised file: "attached" with nothing attached never closes it
+  const WM = Object.assign({}, baseWatch, { messageId: 'm2', direction: 'mine', what: 'I will send you the signed contract by Friday.', file: CFILE });
+  const PT = [msg(theirs, 'Please send the contract.'), msg(mine, 'I will send you the signed contract by Friday.')];
+  t = await open(browser, 'promise-claim', PT.concat([msg(mine, 'Hi Dana, the contract is attached.')]), { watches: [WM] });
+  s = await t.state();
+  check('"attached" without an attachment does not keep a file promise', s.watches[0].status === 'waiting', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'promise-kept', PT.concat([msg(mine, 'Hi Dana, the contract is attached.', ['contract-signed.pdf'])]), { watches: [WM] });
+  s = await t.state();
+  check('a real attachment that says so keeps it, and the loop closes', s.watches[0].status === 'resolved' && s.watches[0].closedAs === 'kept', s.watches);
   await t.ctx.close();
 
   await browser.close();

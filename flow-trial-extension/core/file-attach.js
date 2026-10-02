@@ -432,8 +432,30 @@ const FlowFileAttach = (() => {
     };
   }
 
+  // The one file object a sentence names, or null. Used by the loops
+  // (core/file-path.js) to tell whether finishing an intention takes a file. Several
+  // objects, a plural ("the invoices"), a hedge or a negation all mean null:
+  // a loop is only file-backed when it is clear which file.
+  function mention(text) {
+    const body = fresh(text);
+    if (!body.trim()) return null;
+    if (NEG_EN.test(body) || NEG_HE.test(body) || HEDGE.test(body) || FYI.test(body)) return null;
+    const hits = narrowHits(body, collectHits(body));
+    if (hits.length !== 1 || askedPlural(hits[0], body)) return null;
+    const hit = hits[0];
+    const lang = hit.he ? 'he' : 'en';
+    return {
+      id: hit.obj.id,
+      creatable: hit.obj.creatable,
+      lang,
+      label: lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel,
+      query: lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel,
+      synonym: hit.obj.synonym.slice()
+    };
+  }
+
   return {
-    gate, decide, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
+    gate, decide, mention, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
     MAX_CARD_FIELDS, ATTACH_SCORE, MAX_BYTES
   };
 })();

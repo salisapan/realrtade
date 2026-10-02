@@ -1231,15 +1231,28 @@ async function followDraftCreate(p) {
   if (!to || !text) return { ok: false, reason: 'invalid', error: 'No one to write to.' };
   const base = String(p.subject || '').trim();
   const subject = base ? (/^re:/i.test(base) ? base : 'Re: ' + base) : 'Following up';
+  // A file prepared for this draft (docs/file-backed-closure-plan.md): either the one
+  // file already in the thread (bytes read by the content script) or the one Drive file
+  // core/file-path.js picked. If it cannot be read nothing is written: the body says
+  // a file is attached, so there is never a substitute file and never a draft that
+  // claims one it does not have. The caller then offers the plain draft instead.
+  let attachment = null;
+  if (p.attachment && p.attachment.base64) {
+    const approxBytes = Math.floor((p.attachment.base64.length * 3) / 4);
+    if (approxBytes <= GMAIL_ATTACHMENT_MAX_BYTES) attachment = { filename: p.attachment.filename, mimeType: p.attachment.mimeType, base64: p.attachment.base64 };
+  } else if (p.driveFileId) {
+    attachment = await fetchDriveFileAsAttachment(p.driveFileId);
+  }
+  if ((p.attachment || p.driveFileId) && !attachment) return { ok: false, reason: 'attach', error: 'Could not attach that file.' };
   const threadId = await findThreadIdTo(to, base);
-  const raw = base64UrlEncode(buildMimeMessage({ to: toHeaderValue(to, p.toName), subject, body: text, attachment: null }));
+  const raw = base64UrlEncode(buildMimeMessage({ to: toHeaderValue(to, p.toName), subject, body: text, attachment }));
   const message = { raw };
   if (threadId) message.threadId = threadId;
   const res = await googleAuthedFetch(GOOGLE_GMAIL_API, '/users/me/drafts', { method: 'POST', body: JSON.stringify({ message }) });
   if (res.status === 401 || res.status === 403) return { ok: false, reason: 'not-connected' };
   if (!res.ok) throw new Error('Gmail draft creation failed (' + res.status + ')');
   const draft = await res.json();
-  return { ok: true, where: 'Gmail', target: 'a draft follow-up', ref: { draftId: draft.id }, url: 'https://mail.google.com/mail/u/0/#drafts' };
+  return { ok: true, where: 'Gmail', target: 'a draft follow-up', ref: { draftId: draft.id }, url: 'https://mail.google.com/mail/u/0/#drafts', attached: attachment ? attachment.filename : null };
 }
 
 /* --------------------------------------------------------------- Calendar */

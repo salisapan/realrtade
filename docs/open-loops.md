@@ -234,6 +234,45 @@ Real-Gmail steps:
 34. **Hebrew.** Repeat 29 with *"איזו חשבונית?"*: the draft opens *היי …* and quotes the question.
 35. **Google disconnected.** Disconnect Google and tap *Prepare my reply*: expect "connect Google first", nothing written.
 
+### 9a-iii. File-backed completion (built 2026-10-02, plan: `docs/file-backed-closure-plan.md`)
+
+Cross-platform only where a file finishes the intention. No new screen: the same
+receipts and rows, one more label.
+
+- **A loop knows when a file finishes it.** An ask with exactly one clear file object
+  ("please send me the signed contract", `תשלח לי את החוזה`) or a send-promise naming one
+  ("I'll send you the contract Friday") is file-backed. The card says *Waiting on the
+  contract?* and the receipt says it closes when the contract arrives.
+- **True close needs a real file.** For a file-backed ask, a real attachment in their reply closes the
+  loop (as `delivered`, the receipt names the file). A reply that only writes "attached"
+  closes nothing and says so once. A promise, a no, a question or an out-of-office is read first, as
+  before. For a file-backed promise of yours, your newer message must carry the real
+  attachment (and say so, or be named for the thing): "attached" with nothing attached never closes it.
+  When the page cannot report attachments, the old text rules apply.
+- **Prepare reply with file.** When the ball comes back, the button becomes *Prepare reply
+  with file* only if there is exactly one right file: for "I never got the attachment" the single attachment
+  of YOUR earlier message in the thread (the file you actually sent); for "can you send the
+  receipt?" the one Drive file `core/file-attach.js` is confident about (a conflict, a
+  template, a folder or nothing means no file). On a "You promised" row the same button appears
+  after a quiet Drive lookup, only on one confident match. The draft is written into Gmail in
+  that thread, unsent. If the file cannot be read, no draft claiming a file is written; the plain
+  draft is offered instead.
+- **Preparing is intermediate.** The loop stays yours / promised, now labelled "draft ready". It
+  closes only when you send (your message hands the ball back, or delivers the promise) or the
+  other side's file arrives. Mark done / Stop tracking stay for closing outside email.
+
+Real-Gmail steps:
+
+36. **File ask.** Send *"Please send me the signed contract by Friday."* Expect *Waiting on the contract?*; tap Stay on it; the receipt says it closes when the contract arrives.
+37. **Real file closes.** From the other account reply with a PDF attached and almost no text. Expect the loop closed: *Dana sent the contract (name.pdf)*, with Reopen.
+38. **"Attached" but no file.** Repeat 36, reply *"Signed copy attached."* with NO attachment. Expect the loop still open and the one-time note "no file came through".
+39. **Resend.** Send a message with ONE attachment asking for a confirmation; reply *"I never got the attachment"*. Expect *Prepare reply with file*, "File ready: <that file>". Tap it: a draft in the thread with that same file attached and "Attached: <name>". Nothing sent; the loop is still "Your turn · draft ready".
+40. **Two attachments.** Same with two attachments in your message: expect the plain *Prepare my reply* (no file).
+41. **Receipt in Drive.** Put exactly one file called "Receipt - ...pdf" in Drive and reply *"Can you send me the receipt?"*: expect *Prepare reply with file* naming it. With two receipts in Drive, or none: the plain button.
+42. **Promise.** Send *"I will send you the signed contract by Friday."*, tap Remind me. Open the Loops tab: after a moment *Prepare reply with file* appears only if exactly one contract file is in Drive. Send a message with "the contract is attached" but no file: the loop stays open. Send it with the file: it closes.
+43. **Hebrew.** Repeat 36, 37 and 39 in Hebrew (`תשלח לי את החוזה החתום`, `לא קיבלתי את הקובץ`).
+44. **Google disconnected.** The file buttons never appear without Google; the plain button says to connect Google.
+
 ## 9b. Still not built
 
 - Reading the Calendar itself to find meetings Glance did not create.

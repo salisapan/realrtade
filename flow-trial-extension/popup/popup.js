@@ -667,9 +667,9 @@
       const left = FlowExpiry.daysLeft(w.expiresIso, now);
       return left < 0 ? 'Lapsed ' + dayShort(w.expiresIso) : 'Ends ' + dayShort(w.expiresIso) + ' · ' + (left === 0 ? 'today' : left === 1 ? '1 day left' : left + ' days left');
     }
-    if (FlowFollowUp.isMine(w)) return 'You promised · ' + age;
+    if (FlowFollowUp.isMine(w)) return 'You promised' + (w.preparedAt ? ' · draft ready' : '') + ' · ' + age;
     if (FlowFollowUp.deadlinePassed(w, now) && stage !== 'yours') return 'Deadline passed ' + dayShort(w.deadlineIso) + ' · ' + age;
-    if (stage === 'yours') return 'Your turn · ' + (w.yoursReason === 'blocked' ? 'they could not open it' : 'they asked you something') + ' · ' + age;
+    if (stage === 'yours') return 'Your turn · ' + (w.yoursReason === 'blocked' ? 'they could not open it' : 'they asked you something') + (w.preparedAt ? ' · draft ready' : '') + ' · ' + age;
     if (stage === 'promised' && w.promisedIso) return 'Promised ' + dayShort(w.promisedIso) + ' · ' + age;
     if (stage === 'nudged') return 'Chased ' + plural(w.nudges || 1, 'time', 'times') + ' · ' + age;
     return 'Waiting · ' + age;
@@ -678,6 +678,21 @@
   // A function, not a const: renderWaiting() runs before a const down here would
   // be initialised (the same trap noted at the top of popupInit).
   function nudgeLabel(level) { return level === 2 ? 'Draft a firmer nudge' : level === 3 ? 'Draft a last nudge' : null; }
+
+  // One quiet Drive lookup per promised file per popup session.
+  // (A property on the function, not a const: renderWaiting() runs before a const down here
+  // would be initialised, the same trap noted at the top of popupInit.)
+  async function findPromiseFile(w) {
+    const cache = findPromiseFile.cache || (findPromiseFile.cache = new Map());
+    if (cache.has(w.id)) return cache.get(w.id);
+    let pick = null;
+    try {
+      const found = await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery(w.file) });
+      pick = FlowFilePath.pickDrive(w.file, found && found.ok ? found.files : null, {}, w.what);
+    } catch (e) { pick = null; }
+    cache.set(w.id, pick);
+    return pick;
+  }
 
   function waitingItem(w, now, record) {
     const state = FlowFollowUp.watchState(w, now);
@@ -725,22 +740,49 @@
       acts.appendChild(nudge);
     }
 
+    // One draft action, and a file only when there is exactly one right file. Preparing never
+    // closes the loop: it stays yours (or still promised) until you actually send.
+    async function writeDraft(btn, label, body, fileName, driveFileId) {
+      note.hidden = false;
+      btn.disabled = true; btn.textContent = 'Preparing…';
+      const base = { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject };
+      let res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, base, { body }, driveFileId ? { driveFileId } : {}) });
+      let used = driveFileId ? fileName : null;
+      if (driveFileId && res && res.reason === 'attach') {
+        used = null;
+        res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, base, { body: FlowFollowUp.isMine(w) ? null : FlowFollowUp.replyDraft(w, {}) }) });
+        if (res && res.ok) note.textContent = 'A draft is waiting in Gmail, but I could not attach the file, so add it yourself. Nothing was sent.';
+      }
+      btn.disabled = false; btn.textContent = label;
+      if (res && res.ok) {
+        if (!(driveFileId && !used)) note.textContent = 'A draft is waiting in Gmail' + (used ? ' with ' + used : '') + '. Nothing was sent. ' + (FlowFollowUp.isMine(w) ? 'Send it and I will close this.' : 'Send it and I will go back to waiting for them.');
+        FlowStorage.updateWatch(w.id, FlowFilePath.preparedPatch(Date.now(), used)).catch(() => {});
+        send({ type: 'flow:track', event: used ? 'follow_file_prepared' : 'follow_reply_prepared', params: {} });
+      } else {
+        note.textContent = (res && res.reason === 'not-connected') ? 'Connect Google first (Setup tab).' : 'Could not create the draft. Try again.';
+      }
+    }
+
     if (FlowFollowUp.isYours(w) && w.counterpart && w.counterpart.email) {
-      const prep = el('button', 'ghost sm', 'Prepare my reply');
+      const fc = w.fileChoice && w.fileChoice.driveFileId ? w.fileChoice : null;
+      const label = fc ? 'Prepare reply with file' : 'Prepare my reply';
+      const prep = el('button', 'ghost sm', label);
       prep.type = 'button';
-      prep.addEventListener('click', async () => {
-        note.hidden = false;
-        prep.disabled = true; prep.textContent = 'Preparing…';
-        const res = await send({ type: 'flow:follow-draft', payload: { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject, body: FlowFollowUp.replyDraft(w) } });
-        prep.disabled = false; prep.textContent = 'Prepare my reply';
-        if (res && res.ok) {
-          note.textContent = 'A draft is waiting in Gmail. Nothing was sent. Send it and I will go back to waiting for them.';
-          send({ type: 'flow:track', event: 'follow_reply_prepared', params: {} });
-        } else {
-          note.textContent = (res && res.reason === 'not-connected') ? 'Connect Google first (Setup tab).' : 'Could not create the draft. Try again.';
-        }
-      });
+      if (fc) prep.title = fc.name;
+      prep.addEventListener('click', () => writeDraft(prep, label, FlowFollowUp.replyDraft(w, { fileName: fc && fc.name }), fc && fc.name, fc && fc.driveFileId));
       acts.appendChild(prep);
+    } else if (FlowFollowUp.isMine(w) && FlowFilePath.isFileBacked(w) && w.counterpart && w.counterpart.email) {
+      // A promised file: look up the one Drive file, quietly. No confident match, no button.
+      const fileBtn = el('button', 'ghost sm', 'Prepare reply with file');
+      fileBtn.type = 'button';
+      fileBtn.hidden = true;
+      acts.appendChild(fileBtn);
+      findPromiseFile(w).then((pick) => {
+        if (!pick) return;
+        fileBtn.hidden = false;
+        fileBtn.title = pick.name;
+        fileBtn.addEventListener('click', () => writeDraft(fileBtn, 'Prepare reply with file', FlowFollowUp.promiseDraft(w, { fileName: pick.name }), pick.name, pick.id));
+      });
     }
 
     const mineLoop = FlowFollowUp.isMine(w);

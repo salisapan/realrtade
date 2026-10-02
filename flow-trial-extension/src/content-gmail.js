@@ -634,7 +634,11 @@
         messages, ownEmail, extractSender,
         ownMessageText: (node) => ownMessageText(bodyOf(node)),
         messageText: (node) => ownMessageText(bodyOf(node)),
-        threadIdFrom, subject: currentSubject(), threadUrl
+        threadIdFrom, subject: currentSubject(), threadUrl,
+        // Real attachments of a message (not the word "attached"), and the bytes of one
+        // of them, for file-backed loops (core/file-path.js).
+        attachmentsOf: (node) => allRealAttachments(node),
+        fetchAttachment: (meta) => fetchAttachmentBase64(meta)
       };
       FlowFollow.consider(followCtx).catch((e) => console.error('[Glance] follow-up check failed', e));
       // A date that runs out ("valid until…"). Same silence rules; marketing mail is skipped.

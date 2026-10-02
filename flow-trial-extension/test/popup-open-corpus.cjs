@@ -105,6 +105,8 @@ function load(stored, opts) {
           if (cb) cb({ ok: opts.undoOk !== false });
           return;
         }
+        if (msg && msg.type === 'flow:search-drive') { if (cb) cb({ ok: true, files: opts.driveFiles || [] }); return; }
+        if (msg && msg.type === 'flow:follow-draft') { (opts.drafts = opts.drafts || []).push(msg.payload); if (cb) cb({ ok: true }); return; }
         if (cb) cb(msg && msg.type === 'flow:connector-status' ? {} : { ok: true });
       }
     }
@@ -140,7 +142,7 @@ function load(stored, opts) {
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
-    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js']
+    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -568,6 +570,51 @@ async function run() {
     const buttons = find(host, 'sm').map((n) => n.textContent);
     check('the yours loop offers Prepare my reply', buttons.includes('Prepare my reply'), buttons);
     check('and no nudge for it (the chase is not theirs to answer)', buttons.filter((b) => /nudge/i.test(b)).length === 1, buttons);
+  }
+
+  console.log('\n--- popup.js: file-backed rows prepare the one right file, quietly, and preparing does not close ---\n');
+  {
+    const base = { kind: 'reply', status: 'waiting', direction: 'theirs', createdAt: Date.now() - 2 * 86400000, nudges: 0, lang: 'en', counterpart: { name: 'Dana Cole', email: 'dana@acme.com' }, taskRef: null, chaseIso: isoDaysFromNow(1) };
+    const CF = { object: 'contract', label: 'contract', lang: 'en', synonym: ['contract', 'agreement', 'nda', 'חוזה', 'הסכם'] };
+    const stored = {
+      followWatches: [
+        Object.assign({}, base, { id: 'y1', threadId: 'y1', subject: 'Receipt', what: 'Please confirm by Monday', stage: 'yours', yoursReason: 'question', yoursLine: 'Can you send me the receipt?', fileChoice: { name: 'Receipt - Oct.pdf', driveFileId: 'F1' }, preparedAt: Date.now() }),
+        Object.assign({}, base, { id: 'y2', threadId: 'y2', subject: 'Plain', what: 'Please confirm by Monday', stage: 'yours', yoursReason: 'question', yoursLine: 'Which vendor?' }),
+        Object.assign({}, base, { id: 'm1', threadId: 'm1', subject: 'Contract', direction: 'mine', what: 'I will send you the signed contract by Friday.', file: CF })
+      ]
+    };
+    const opts = { driveFiles: [{ id: 'C1', name: 'Contract - signed.pdf', mimeType: 'application/pdf' }, { id: 'X', name: 'Budget.xlsx', mimeType: 'application/vnd.ms-excel' }] };
+    const { sandbox, document, store } = load(stored, opts);
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('waiting-list');
+    const items = find(host, 'wait-item');
+    const btns = (it) => find(it, 'sm').filter((n) => !n.hidden).map((n) => n.textContent);
+    const y1 = items.find((it) => find(it, 'wait-meta').some((n) => /draft ready/.test(n.textContent)));
+    check('a prepared loop is labelled "draft ready", still Your turn', Boolean(y1) && /Your turn/.test(find(y1, 'wait-meta')[0].textContent), y1 && find(y1, 'wait-meta').map((n) => n.textContent));
+    check('a yours loop with a chosen Drive file says Prepare reply with file', y1 && btns(y1).includes('Prepare reply with file'), y1 && btns(y1));
+    const y2 = items.find((it) => find(it, 'wait-meta').some((n) => /Your turn/.test(n.textContent) && !/draft ready/.test(n.textContent)));
+    check('a yours loop without a file keeps the plain button', Boolean(y2) && !btns(y2).includes('Prepare reply with file'), y2 && btns(y2));
+    const m1 = items.find((it) => find(it, 'wait-meta').some((n) => /You promised/.test(n.textContent)));
+    check('a file promise gets Prepare reply with file after one confident Drive match', m1 && btns(m1).includes('Prepare reply with file'), m1 && btns(m1));
+    const click = find(m1, 'sm').find((n) => n.textContent === 'Prepare reply with file');
+    click.listeners.click[0]();
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const draft = (opts.drafts || [])[0];
+    check('it writes the promise draft with exactly that Drive file', draft && draft.driveFileId === 'C1' && /As promised, attached: Contract - signed\.pdf/.test(draft.body), draft);
+    check('and says nothing was sent, not that the loop is closed', /Nothing was sent/.test(find(m1, 'wait-note')[0].textContent) && /Send it and I will close this/.test(find(m1, 'wait-note')[0].textContent), find(m1, 'wait-note').map((n) => n.textContent));
+    const saved = store().followWatches.find((w) => w.id === 'm1');
+    check('preparing only records the draft: the loop is still waiting, with the file named', saved.status === 'waiting' && saved.preparedFile === 'Contract - signed.pdf' && Boolean(saved.preparedAt), saved);
+  }
+  {
+    const base = { kind: 'reply', status: 'waiting', direction: 'mine', createdAt: Date.now(), nudges: 0, lang: 'en', counterpart: { name: 'Dana Cole', email: 'dana@acme.com' }, taskRef: null, chaseIso: isoDaysFromNow(1), file: { object: 'contract', label: 'contract', lang: 'en', synonym: ['contract', 'agreement'] }, what: 'I will send you the signed contract by Friday.', subject: 'Contract' };
+    for (const [label, files] of [['two contract files in Drive', [{ id: '1', name: 'Contract A.pdf', mimeType: 'application/pdf' }, { id: '2', name: 'Contract B.pdf', mimeType: 'application/pdf' }]], ['no file in Drive', []]]) {
+      const { sandbox, document } = load({ followWatches: [Object.assign({ id: 'm9', threadId: 'm9' }, base)] }, { driveFiles: files });
+      vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+      for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+      const shown = find(document.getElementById('waiting-list'), 'sm').filter((n) => !n.hidden).map((n) => n.textContent);
+      check('promise row, ' + label + ': no file button (never a guess)', !shown.includes('Prepare reply with file'), shown);
+    }
   }
 
   console.log('\nTOTAL FAILURES:', failures);

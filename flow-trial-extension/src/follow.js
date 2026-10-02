@@ -203,6 +203,8 @@ const FlowFollow = (() => {
     const amt = amountLabel(watch);
     const line = how === 'paid'
       ? name + ' says it is paid' + (amt ? ' (' + amt + ')' : '') + took(watch) + '. Loop closed.'
+      : how === 'file'
+        ? name + ' sent the ' + ((watch.file && watch.file.label) || 'file') + (watch.deliveredFiles && watch.deliveredFiles[0] ? ' (' + watch.deliveredFiles[0] + ')' : '') + took(watch) + '. Loop closed.'
       : how === 'declined'
         ? name + ' said no' + took(watch) + '. Nothing left to chase, so I closed it.'
         : name + ' replied' + took(watch) + '. Loop closed.';
@@ -221,24 +223,76 @@ const FlowFollow = (() => {
 
   // They wrote back, but they need something from you. The ball is yours: the
   // chase stops and the reminder is now for you.
-  async function yours(watch, sender, patch) {
+  async function yours(watch, sender, patch, ctx) {
     await moveTask(Object.assign({}, watch, patch), patch.chaseIso);
     track('follow_yours');
     const name = whoOf(sender);
     const what = patch.yoursReason === 'blocked' ? 'could not open or find what you sent' : 'asked you something';
-    const next = Object.assign({}, watch, patch);
+    let next = Object.assign({}, watch, patch);
     const canDraft = Boolean(next.counterpart && next.counterpart.email);
-    receipt(name + ' ' + what + '. This one is yours now. I stopped chasing and moved your reminder to ' + dayLabel(patch.chaseIso) + '.', null,
-      canDraft ? { label: 'Prepare my reply', run: () => prepareReply(next) } : null);
+    // Is a file part of the way out, and is there exactly one right file? Otherwise: none.
+    const choice = canDraft ? await resolveFile(ctx, next) : null;
+    if (choice && choice.source === 'drive') {
+      next = (await FlowStorage.updateWatch(watch.id, { fileChoice: { name: choice.name, driveFileId: choice.id } })) || Object.assign({}, next, { fileChoice: { name: choice.name, driveFileId: choice.id } });
+    }
+    receipt(name + ' ' + what + '. This one is yours now. I stopped chasing and moved your reminder to ' + dayLabel(patch.chaseIso) + '.' + (choice ? ' File ready: ' + choice.name + '.' : ''), null,
+      canDraft ? { label: choice ? 'Prepare reply with file' : 'Prepare my reply', run: () => prepareReply(next, choice, ctx) } : null);
   }
 
-  // The first draft of your answer, written into Gmail's Drafts in that thread.
-  // Nothing is sent: you finish it and send it.
-  async function prepareReply(watch) {
-    const res = await send({ type: 'flow:follow-draft', payload: { to: watch.counterpart.email, toName: watch.counterpart.name, subject: watch.subject, body: FlowFollowUp.replyDraft(watch) } });
-    track('follow_reply_prepared');
-    if (res && res.ok) receipt('Draft ready in Gmail. Nothing was sent.', null);
-    else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null);
+  // The one right file for this reply, or null. Never a guess:
+  //   could not open it  -> the single attachment of MY earlier message in this thread
+  //                         (the file I actually sent);
+  //   they ask for a file -> the one Drive file core/file-path.js is confident about.
+  async function resolveFile(ctx, w) {
+    try {
+      if (typeof FlowFilePath === 'undefined') return null;
+      if (w.yoursReason === 'blocked') {
+        if (!ctx || !ctx.attachmentsOf) return null;
+        const own = Array.from(ctx.messages).filter((m) => {
+          const e = (ctx.extractSender(m).email || '').toLowerCase();
+          return e && e === String(ctx.ownEmail).toLowerCase();
+        });
+        for (let i = own.length - 1; i >= 0; i--) {
+          const atts = ctx.attachmentsOf(own[i]);
+          if (atts && atts.length) {
+            const one = FlowFilePath.resendCandidate(atts);
+            return one ? { source: 'thread', name: one.filename, meta: one } : null;
+          }
+        }
+        return null;
+      }
+      const need = FlowFilePath.askNeed(w.yoursLine);
+      if (!need) return null;
+      const found = await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery(need) });
+      const pick = FlowFilePath.pickDrive(need, found && found.ok ? found.files : null, {}, w.yoursLine);
+      return pick ? { source: 'drive', id: pick.id, name: pick.name, mimeType: pick.mimeType } : null;
+    } catch (e) { return null; }
+  }
+
+  // The first draft of your answer, written into Gmail's Drafts in that thread, with the
+  // one file when there is one. Nothing is sent. Preparing is not closing: the loop
+  // stays yours until you actually send.
+  async function prepareReply(watch, choice, ctx) {
+    const payload = { to: watch.counterpart.email, toName: watch.counterpart.name, subject: watch.subject };
+    let used = null;
+    if (choice && choice.source === 'thread' && ctx && ctx.fetchAttachment) {
+      const fetched = await ctx.fetchAttachment(choice.meta);
+      if (fetched) { payload.attachment = fetched; used = choice.name; }
+    } else if (choice && choice.source === 'drive') {
+      payload.driveFileId = choice.id; used = choice.name;
+    }
+    let res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, payload, { body: FlowFollowUp.replyDraft(watch, { fileName: used }) }) });
+    let withoutFile = false;
+    if (used && res && res.reason === 'attach') {
+      // The file could not be read: the plain draft, never a body that claims a file.
+      used = null; withoutFile = true;
+      res = await send({ type: 'flow:follow-draft', payload: { to: payload.to, toName: payload.toName, subject: payload.subject, body: FlowFollowUp.replyDraft(watch, {}) } });
+    }
+    track(used ? 'follow_file_prepared' : 'follow_reply_prepared');
+    if (res && res.ok) {
+      await FlowStorage.updateWatch(watch.id, FlowFilePath.preparedPatch(Date.now(), used));
+      receipt('Draft ready in Gmail' + (used ? ' with ' + used : '') + '. Nothing was sent.' + (withoutFile ? ' I could not attach the file, so add it yourself.' : ''), null);
+    } else receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null);
   }
 
   // You answered: the ball goes back to them, and the chase starts again.
@@ -278,7 +332,11 @@ const FlowFollow = (() => {
     for (let i = from; i < msgs.length; i++) {
       const sender = ctx.extractSender(msgs[i]);
       if (sender.email && sender.email.toLowerCase() === String(ctx.ownEmail).toLowerCase()) continue;
-      const reply = FlowFollowUp.classifyReply(ctx.messageText(msgs[i]), watch, { now: Date.now(), email: sender.email });
+      const text = ctx.messageText(msgs[i]);
+      // Did a real file come with it? Only asked of a file-backed loop, and only when the page can tell.
+      const evidence = typeof FlowFilePath !== 'undefined' && ctx.attachmentsOf && FlowFilePath.isFileBacked(watch)
+        ? FlowFilePath.evidence({ text, attachments: ctx.attachmentsOf(msgs[i]) }) : null;
+      const reply = FlowFollowUp.classifyReply(text, watch, { now: Date.now(), email: sender.email, evidence });
       if (!best || (RANK[reply.outcome] || 0) > (RANK[best.reply.outcome] || 0)) best = { reply, sender };
     }
     return best;
@@ -292,8 +350,12 @@ const FlowFollow = (() => {
     recordReply(watch, best.reply, lastId);
     const patch = Object.assign({}, res.patch, { lastReplyMessageId: lastId });
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
-    if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : 'replied');
-    else if (res.yours) await yours(watch, best.sender, patch);
+    if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : best.reply.delivered === 'file' ? 'file' : 'replied');
+    else if (res.yours) await yours(watch, best.sender, patch, ctx);
+    else if (res.claimedOnly) {
+      // They wrote "attached" and nothing came through. Say so once; the loop stays open.
+      if (!watch.claimedFileAt) receipt(whoOf(best.sender) + ' said the file is attached, but no file came through. I kept the loop open.', null);
+    }
     else if (res.rescheduled) await promised(watch, best.sender, patch);
     else if (res.confirm) paidCard(next, best.sender);
   }
@@ -356,7 +418,8 @@ const FlowFollow = (() => {
     const head = watch.kind === FlowFollowUp.KINDS.PAYMENT
       ? "I'm on this one now. Watching for " + (amt ? 'the ' + amt : 'the payment') + '.'
       : "I'm on this one now.";
-    receipt(head + ' I will look again on ' + dayLabel(watch.chaseIso) + ' and close it when ' + (name ? name + (watch.kind === FlowFollowUp.KINDS.PAYMENT ? ' pays.' : ' answers.') : 'they ' + (watch.kind === FlowFollowUp.KINDS.PAYMENT ? 'pay.' : 'answer.')), async () => {
+    const fileWord = watch.file && watch.kind !== FlowFollowUp.KINDS.PAYMENT ? 'the ' + watch.file.label + ' arrives.' : null;
+    receipt(head + ' I will look again on ' + dayLabel(watch.chaseIso) + ' and close it when ' + (fileWord || (name ? name + (watch.kind === FlowFollowUp.KINDS.PAYMENT ? ' pays.' : ' answers.') : 'they ' + (watch.kind === FlowFollowUp.KINDS.PAYMENT ? 'pay.' : 'answer.'))), async () => {
       await send({ type: 'flow:undo-action', connectorId: 'googleTask', ref: res.ref });
       await FlowStorage.updateWatch(watch.id, { status: 'stopped', resolvedAt: Date.now(), resolvedBy: 'undo' });
       dismiss();
@@ -386,9 +449,9 @@ const FlowFollow = (() => {
       h.appendChild(mrow);
       return;
     }
-    h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : 'Waiting on a reply?'));
+    h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : ask.file ? 'Waiting on the ' + ask.file.label + '?' : 'Waiting on a reply?'));
     h.appendChild(el('div', 'flow-fu-quote', ask.what));
-    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + ', and close it myself when ' + (isPay ? 'it is paid.' : 'they answer.')));
+    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
     const row = el('div', 'flow-fu-actions');
     row.appendChild(button('Stay on it', 'primary', () => { track1(ask, base); }));
     row.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
@@ -527,7 +590,8 @@ const FlowFollow = (() => {
           if (FlowFollowUp.isYours(watch)) { await handedBack(watch, lastId); return; }
           // A promise of mine: a newer message that delivers it keeps it.
           if (FlowFollowUp.isMine(watch)) {
-            if (FlowFollowUp.deliversPromise(text)) await kept(watch, lastId);
+            const ev = typeof FlowFilePath !== 'undefined' && ctx.attachmentsOf ? FlowFilePath.evidence({ text, attachments: ctx.attachmentsOf(last) }) : null;
+            if (FlowFollowUp.deliversFor(watch, text, ev)) await kept(watch, lastId);
             else await FlowStorage.updateWatch(threadId, { messageId: lastId });
             return;
           }

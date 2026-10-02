@@ -55,6 +55,7 @@
         "core/reply-meaning.js",
         "core/story.js",
         "core/recognition-stats.js",
+        "core/file-path.js",
         "core/follow-up.js",
         "core/expiry.js",
         "core/meeting-debrief.js",
