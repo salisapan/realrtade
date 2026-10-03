@@ -52,6 +52,8 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'pmf-metrics.
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'classification-metrics.js'), 'utf8'), sandbox, { filename: 'classification-metrics.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'close-quality-metrics.js'), 'utf8'), sandbox, { filename: 'close-quality-metrics.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'quiet-metrics.js'), 'utf8'), sandbox, { filename: 'quiet-metrics.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'privacyShield.js'), 'utf8'), sandbox, { filename: 'privacyShield.js' });
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', 'learning-ledger.js'), 'utf8'), sandbox, { filename: 'learning-ledger.js' });
 vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8'), sandbox, { filename: 'storage.js' });
 const FlowStorage = vm.runInContext('FlowStorage', sandbox);
 
@@ -835,6 +837,21 @@ async function run() {
     const empty = await FlowStorage.getCloseQualitySnapshot();
     check('an untouched profile has three zero counts and no events',
       empty.success === 0 && empty.return === 0 && empty.falseDoIt === 0 && empty.recent.length === 0, empty);
+  }
+
+  console.log('\n--- the learning ledger ---\n');
+  store = {};
+  {
+    const L = vm.runInContext('FlowLedger', sandbox);
+    check('a fresh profile has an empty ledger', (await FlowStorage.getLedger()).length === 0);
+    await FlowStorage.appendLedger(L.make('accepted', { text: 'Can you confirm the venue booking this week please' }, 1790000000000));
+    await FlowStorage.appendLedger(L.make('accepted', { text: 'Can you confirm the venue booking this week please' }, 1790000000500));
+    const list = await FlowStorage.getLedger();
+    check('an entry is stored once, with only time, kind and line', list.length === 1 && Object.keys(list[0]).sort().join() === 'kind,line,t', list);
+    await FlowStorage.setIntentAdapt({ act: { 5: 0.3 }, topic: {}, action: {} });
+    await FlowStorage.resetLearning();
+    const after = await FlowStorage.getIntentAdapt();
+    check('reset empties the ledger and every stored adjustment', (await FlowStorage.getLedger()).length === 0 && Object.keys(after.act).length === 0, after);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

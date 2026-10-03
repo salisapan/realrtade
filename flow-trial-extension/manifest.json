@@ -67,6 +67,7 @@
         "src/chrome-storage-adapter.js",
         "src/storage.js",
         "core/privacyShield.js",
+        "core/learning-ledger.js",
         "core/docwriter.js",
         "core/docreader.js",
         "src/sidebar.js",

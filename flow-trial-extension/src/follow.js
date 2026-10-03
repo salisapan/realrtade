@@ -62,6 +62,15 @@ const FlowFollow = (() => {
     adaptLoaded = true;
     try { FlowIntentModel.setAdaptation(await FlowStorage.getIntentAdapt()); } catch (e) { /* learning is optional */ }
   }
+  // "Reset what Glance learned" (popup) clears the stored adjustments; this page must drop its in-memory copy too,
+  // or the next lesson would write the old numbers back.
+  try {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === 'local' && changes.intentAdapt && typeof FlowIntentModel !== 'undefined' && FlowIntentModel.ready()) FlowIntentModel.setAdaptation(changes.intentAdapt.newValue || {});
+      });
+    }
+  } catch (e) { /* optional */ }
   async function teach(text, label, rate) {
     if (typeof FlowIntentModel === 'undefined' || !FlowIntentModel.ready()) return;
     try {
@@ -69,6 +78,15 @@ const FlowFollow = (() => {
       FlowIntentModel.learn(text, 'act', label, rate);
       await FlowStorage.setIntentAdapt(FlowIntentModel.getAdaptation());
     } catch (e) { /* learning is optional */ }
+  }
+
+  // One line in the learning ledger (core/learning-ledger.js): what moved, and why. Optional, never blocks.
+  function note(kind, info) {
+    try {
+      if (typeof FlowLedger === 'undefined' || typeof FlowStorage.appendLedger !== 'function') return;
+      const e = FlowLedger.make(kind, info, Date.now());
+      if (e) FlowStorage.appendLedger(e).catch(() => {});
+    } catch (e) { /* the ledger is optional */ }
   }
 
   function dismiss() {
@@ -159,6 +177,7 @@ const FlowFollow = (() => {
     const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
     if (!gate.allowed) { await capCard(gate.used, gate.cap, true); return; }
     if ((watch.resolvedBy === 'reply' || watch.resolvedBy === 'delivered' || watch.resolvedBy === 'signal') && typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('reopened', watch.id + '|' + (watch.resolvedAt || '')).catch(() => {});
+    if (watch.resolvedBy === 'reply' || watch.resolvedBy === 'delivered' || watch.resolvedBy === 'signal') note('reopened', { who: whoOf({ name: watch.counterpart && watch.counterpart.name, email: watch.counterpart && watch.counterpart.email }) });
     const patch = FlowFollowUp.reopenPatch(watch, Date.now());
     const next = await FlowStorage.updateWatch(watch.id, patch);
     if (watch.taskRef) {
@@ -211,6 +230,20 @@ const FlowFollow = (() => {
         ? name + ' said no' + took(watch) + '. Nothing left to chase, so I closed it.'
         : name + ' replied' + took(watch) + '. Loop closed.';
     receipt(line, null, { label: 'Reopen', run: () => reopen(watch) });
+    timingNote(watch, sender);
+  }
+
+  // After a reply closes a loop: how long this person took, and what Glance now expects from them.
+  async function timingNote(watch, sender) {
+    try {
+      if (watch.resolvedBy !== 'reply' || FlowFollowUp.isMine(watch)) return;
+      const days = FlowFollowUp.daysOpen(watch, Date.now());
+      if (!(days >= 1)) return;
+      const list = await FlowStorage.getWatches();
+      const expect = FlowFollowUp.typicalDays(list, Object.assign({}, watch, { status: 'waiting' }), Date.now());
+      if (!(expect >= 1)) return;
+      note('timing', { who: whoOf(sender), days, expectDays: Math.round(expect) });
+    } catch (e) { /* optional */ }
   }
 
   async function promised(watch, sender, patch) {
@@ -412,7 +445,10 @@ const FlowFollow = (() => {
   async function confirmAsk(watch, kind, label) {
     try {
       if (typeof FlowStorage.recordOutcomeLabel !== 'function' || typeof FlowOutcomeLabels === 'undefined') return;
-      if (await FlowStorage.recordOutcomeLabel(kind, watch.id)) await teach(watch.what, label, FlowOutcomeLabels.RATE_CONFIRMED);
+      if (await FlowStorage.recordOutcomeLabel(kind, watch.id)) {
+        await teach(watch.what, label, FlowOutcomeLabels.RATE_CONFIRMED);
+        note(label === 'PROMISE' ? 'promiseConfirmed' : 'askConfirmed', { text: watch.what, counterpart: watch.counterpart, about: watch.subtypeLabel || null });
+      }
     } catch (e) { /* learning is optional */ }
   }
 
@@ -435,6 +471,7 @@ const FlowFollow = (() => {
       if (!found) return;
       if (await FlowStorage.recordOutcomeLabel(kind, threadId + '|' + found.key)) {
         await teach(found.sentence, kind === 'missedPromise' ? 'PROMISE' : 'ASK', FlowOutcomeLabels.RATE_MISSED);
+        note(kind === 'missedPromise' ? 'promiseMissed' : 'askMissed', { text: found.sentence });
         track(kind === 'missedPromise' ? 'follow_learned_missed_promise' : 'follow_learned_missed_ask');
       }
     } catch (e) { /* learning is optional */ }
@@ -487,6 +524,7 @@ const FlowFollow = (() => {
     await FlowStorage.upsertWatch(watch);
     FlowStorage.recordLoopOpen(watch).catch(() => {});
     teach(watch.what, FlowFollowUp.isMine(watch) ? 'PROMISE' : 'ASK', 1.5);
+    note('accepted', { text: watch.what, counterpart: watch.counterpart });
     track('follow_tracked');
     if (FlowFollowUp.isMine(watch)) {
       receipt('Reminder set for ' + dayLabel(watch.chaseIso) + '. I will close it when you send it.', async () => {
@@ -511,6 +549,7 @@ const FlowFollow = (() => {
 
   async function declined(ask, base) {
     teach(ask.what, 'INFORM', 0.4); // a weak signal: "not now" is not always "not a request"
+    note('turnedDown', { text: ask.what, counterpart: base && base.counterpart });
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
     watch.status = 'stopped';
     watch.resolvedAt = Date.now();

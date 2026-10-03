@@ -107,6 +107,12 @@
       <p class="learned-stat" id="quietMetrics" hidden title="On this device only. Trusted closes this week = Do It, every step wrote, the receipt said Handled, and that write was not Undone. Silence is a reason code (noise, hedge, family, low, google, calibrated, memory, file, fact), not the mail."></p>
       <p class="learned-stat" id="stillOpenQuality" hidden title="On this device only. Still Open cards shown, Do It clicks, undos, and false-closes."></p>
       <p class="learned-stat" id="learnedStat" hidden></p>
+      <div class="waiting" id="ledgerBlock" hidden>
+        <p class="label">What Glance learned from you</p>
+        <div id="ledger-list" class="log-list"></div>
+        <p class="hint">On this device only. Reset forgets every adjustment and this list.</p>
+        <button type="button" class="ghost sm" id="ledgerReset">Reset what Glance learned</button>
+      </div>
       <div class="sense" id="sense" hidden>
         <span class="sense-label">Sensitivity</span>
         <span class="sense-bar"><i id="senseFill"></i></span>
@@ -183,6 +189,8 @@
   <script src="../core/outcome-labels.js"></script>
   <script src="../core/follow-up.js"></script>
   <script src="../core/outside-signals.js"></script>
+  <script src="../core/privacyShield.js"></script>
+  <script src="../core/learning-ledger.js"></script>
   <script src="../core/expiry.js"></script>
   <script src="../core/meeting-debrief.js"></script>
   <script src="../core/recurrence.js"></script>

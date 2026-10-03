@@ -204,6 +204,8 @@ const FlowStorage = (() => {
     // model believes, learned from what this person confirms or turns down.
     // Feature indexes and numbers only, never any text. Capped.
     intentAdapt: { act: {}, topic: {}, action: {} },
+    // core/learning-ledger.js: one plain sentence per time the engine moved because of this person. Capped; local.
+    learningLedger: [],
     // core/recognition-stats.js: how many decisions our own code made versus left
     // unresolved. Counts only, never any text.
     recognitionStats: { localHit: 0, localSilence: 0, residual: 0, remote: 0, byTier: {}, since: null },
@@ -987,6 +989,21 @@ const FlowStorage = (() => {
     const state = await get();
     return state.intentAdapt || { act: {}, topic: {}, action: {} };
   }
+  async function getLedger() {
+    const state = await get();
+    return Array.isArray(state.learningLedger) ? state.learningLedger : [];
+  }
+  const appendLedger = serialize(async function appendLedger(entry) {
+    if (typeof FlowLedger === 'undefined' || !entry) return false;
+    const state = await get();
+    await set({ learningLedger: FlowLedger.append(state.learningLedger, entry) });
+    return true;
+  });
+  // "Reset": forget every adjustment and the list that explains them. Counts of outcomes stay (they are metrics).
+  const resetLearning = serialize(async function resetLearning() {
+    await set({ intentAdapt: { act: {}, topic: {}, action: {} }, learningLedger: [] });
+    return true;
+  });
   const setIntentAdapt = serialize(async function setIntentAdapt(a) {
     await set({ intentAdapt: { act: (a && a.act) || {}, topic: (a && a.topic) || {}, action: (a && a.action) || {} } });
     return true;
@@ -1096,7 +1113,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

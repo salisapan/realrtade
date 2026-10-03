@@ -1125,6 +1125,33 @@
   // hidden rather than announcing "0 things learned," which would read as
   // the product failing at the one thing this line exists to reassure
   // about — see the Magic Moment's own "nothing to prove yet" precedent.
+  // "What Glance learned from you" (core/learning-ledger.js): the last few adjustments, in plain words, and a reset.
+  // A function with a property, not a let: it runs during init, before a later `let` would initialise.
+  async function renderLedger() {
+    const block = document.getElementById('ledgerBlock');
+    if (!block || typeof FlowLedger === 'undefined' || !FlowStorage.getLedger) return;
+    const list = await FlowStorage.getLedger();
+    block.hidden = list.length === 0;
+    const host = document.getElementById('ledger-list');
+    host.replaceChildren();
+    for (const e of FlowLedger.recent(list, 8)) {
+      const row = el('div', 'wait-item');
+      row.appendChild(el('div', 'wait-what', e.line));
+      row.appendChild(el('div', 'wait-note', new Date(e.t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })));
+      host.appendChild(row);
+    }
+    const btn = document.getElementById('ledgerReset');
+    if (!renderLedger.wired) {
+      renderLedger.wired = true;
+      btn.addEventListener('click', async () => {
+        await FlowStorage.resetLearning();
+        await renderLedger();
+        const stat = document.getElementById('learnedStat');
+        if (stat) stat.hidden = true;
+      });
+    }
+  }
+
   async function renderLearned() {
     const wrap = document.getElementById('learnedStat');
     if (typeof FlowExecutionMemory === 'undefined' || typeof FlowActions === 'undefined') { wrap.hidden = true; return; }
@@ -1310,6 +1337,7 @@
     renderQuiet(s);
     renderStillOpenQuality(s);
     await renderLearned();
+    await renderLedger();
     renderSensitivity(s);
     await renderMemoryInsight(s);
     renderReferral(s);
