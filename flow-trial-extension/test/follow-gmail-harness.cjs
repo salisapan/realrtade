@@ -524,10 +524,10 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   const sp = await t.p.evaluate(() => window.__store.styleProfile);
   check('an own message teaches the style profile (counts only, no text)', sp && sp.n.en === 1 && !/Dana|vendor|figure|Alex/.test(JSON.stringify(sp)), sp);
   await t.ctx.close();
-  t = await open(browser, 'question', [msg(theirs, 'Hi, ok.'), msg(mine, 'can u approve my leave request? its been pending 4 days')]);
+  t = await open(browser, 'question', [msg(theirs, 'Hi, ok.'), msg(mine, 'I was thinking we could maybe try a different approach.')]);
   s = await t.state();
   const aq = await t.p.evaluate(() => window.__store.activeQuestion);
-  check('a sentence of mine the engine is torn about is kept as the one pending question, and Gmail stays quiet', aq && aq.pending && /approve my leave request/.test(aq.pending.sentence) && s.card === null, { aq, card: s.card });
+  check('a sentence of mine the engine is torn about is kept as the one pending question, and Gmail stays quiet', aq && aq.pending && /different approach/.test(aq.pending.sentence) && s.card === null, { aq, card: s.card });
   check('and the question knows its thread, not just the words', aq && aq.pending && aq.pending.threadId === 't1' && aq.pending.counterpart && aq.pending.counterpart.email === 'dana@acme.com', aq && aq.pending);
   check('no script errors', s.errs.length === 0, s.errs);
   await t.ctx.close();
