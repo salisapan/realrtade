@@ -210,6 +210,8 @@ const FlowStorage = (() => {
     styleProfile: null,
     // core/local-lm.js: the result of the on-device language model's self-test on THIS device (counts and flags only).
     localLm: null,
+    // core/identity-graph.js: which names, addresses and numbers are the same person across apps. No message text. Local, capped.
+    identityGraph: null,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.
     activeQuestion: { pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 },
     // core/recognition-stats.js: how many decisions our own code made versus left
@@ -1020,6 +1022,24 @@ const FlowStorage = (() => {
     await set({ localLm: r });
     return true;
   });
+  async function getIdentityGraph() {
+    const state = await get();
+    return state.identityGraph || (typeof FlowIdentity !== 'undefined' ? FlowIdentity.empty() : null);
+  }
+  // One sighting of a person -> { pid, suggested }. The graph itself is stored; callers only need the key and any new question.
+  const observeIdentity = serialize(async function observeIdentity(party) {
+    if (typeof FlowIdentity === 'undefined') return null;
+    const state = await get();
+    const r = FlowIdentity.observe(state.identityGraph, party, Date.now());
+    await set({ identityGraph: r.graph });
+    return { pid: r.pid, suggested: r.suggested };
+  });
+  const answerIdentity = serialize(async function answerIdentity(a, b, same) {
+    if (typeof FlowIdentity === 'undefined') return false;
+    const state = await get();
+    await set({ identityGraph: FlowIdentity.answer(state.identityGraph, a, b, Boolean(same)) });
+    return true;
+  });
   async function getActiveQuestion() {
     const state = await get();
     return Object.assign({ pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 }, state.activeQuestion || {});
@@ -1036,7 +1056,7 @@ const FlowStorage = (() => {
   });
   // "Reset": forget every adjustment and the list that explains them. Counts of outcomes stay (they are metrics).
   const resetLearning = serialize(async function resetLearning() {
-    await set({ intentAdapt: { act: {}, topic: {}, action: {} }, learningLedger: [], styleProfile: null });
+    await set({ intentAdapt: { act: {}, topic: {}, action: {} }, learningLedger: [], styleProfile: null, identityGraph: null });
     return true;
   });
   const setIntentAdapt = serialize(async function setIntentAdapt(a) {
@@ -1148,7 +1168,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getIdentityGraph, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

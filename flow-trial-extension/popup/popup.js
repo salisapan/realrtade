@@ -43,6 +43,7 @@
   // Same trap again: renderWaiting() runs before a later `let` would initialise.
   let loopView = 'date';
 
+  try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   wireTabs();
   wireSave();
   wireRecipe();
@@ -55,6 +56,9 @@
   await renderWaiting();
   checkOutsideSignals().catch(() => {});
   renderQuestion().catch(() => {});
+  renderIdentityLinks().catch(() => {});
+  renderCapture().catch(() => {});
+  renderSurfaces().catch(() => {});
 
 
   // ---- Glance Pro -----------------------------------------------------------
@@ -664,6 +668,144 @@
     } catch (e) { return text; }
   }
 
+  // ---- Stay on this (a selection from any page, core/capture.js) -----------------------------------------------
+  // The right-click handler stored the sentence and the page; here the person says who it is with and whose move it is.
+  async function renderCapture() {
+    const block = document.getElementById('captureBlock');
+    if (!block || typeof FlowCapture === 'undefined') return;
+    const st = await chrome.storage.local.get({ captureNow: null });
+    const p = st.captureNow ? FlowCapture.pending({ text: st.captureNow.text, pageUrl: st.captureNow.pageUrl }, st.captureNow.at) : null;
+    const host = document.getElementById('capture-card');
+    host.replaceChildren();
+    if (!p || !FlowCapture.fresh(p, Date.now())) { block.hidden = true; if (st.captureNow) await chrome.storage.local.remove('captureNow'); return; }
+    block.hidden = false;
+    const item = el('div', 'wait-item');
+    const top = el('div', 'wait-top');
+    top.appendChild(el('span', 'wait-who', p.host || 'A page'));
+    top.appendChild(el('span', 'wait-state', 'Stay on this?'));
+    item.appendChild(top);
+    item.appendChild(el('div', 'wait-what', '\u201c' + p.text + '\u201d'));
+    const who = el('input', null);
+    who.type = 'text'; who.placeholder = 'Who is it with? (optional)'; who.maxLength = 60; who.setAttribute('aria-label', 'Who is it with');
+    item.appendChild(who);
+    const mine = { v: false };
+    const pick = el('div', 'wait-acts');
+    const bWait = el('button', 'ghost sm', 'They owe me');
+    const bOwe = el('button', 'ghost sm', 'I owe it');
+    bWait.type = 'button'; bOwe.type = 'button';
+    const mark = () => { bWait.setAttribute('aria-pressed', String(!mine.v)); bOwe.setAttribute('aria-pressed', String(mine.v)); };
+    bWait.addEventListener('click', () => { mine.v = false; mark(); });
+    bOwe.addEventListener('click', () => { mine.v = true; mark(); });
+    mark();
+    pick.appendChild(bWait); pick.appendChild(bOwe);
+    item.appendChild(pick);
+    const note = el('p', 'wait-note');
+    note.hidden = true;
+    const acts = el('div', 'wait-acts');
+    const go = el('button', 'ghost sm', 'Stay on it');
+    go.type = 'button';
+    go.addEventListener('click', async () => {
+      go.disabled = true;
+      const loop = FlowCapture.toLoop(p, { who: who.value, mine: mine.v }, Date.now());
+      const list = await FlowStorage.getWatches();
+      const status = await send({ type: 'flow:pro-status' });
+      const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
+      if (!loop) { go.disabled = false; return; }
+      if (!gate.allowed) { go.disabled = false; note.hidden = false; note.textContent = 'You are following ' + gate.used + ' of ' + gate.cap + ' open loops. Close one first, or see Glance Pro.'; return; }
+      const watch = FlowFollowUp.buildWatch(Object.assign({ ask: loop.ask, now: loop.now }, loop.base));
+      watch.threadUrl = loop.base.threadUrl;
+      if (!list.some((w) => w.id === watch.id && FlowFollowUp.isActive(w))) {
+        const made = await send({ type: 'flow:follow-task', payload: { title: FlowFollowUp.taskTitle(watch), dueIso: watch.chaseIso, what: watch.what, counterpart: watch.counterpart.name || null, threadUrl: watch.threadUrl } });
+        if (made && made.ok && made.ref) watch.taskRef = made.ref;
+        await FlowStorage.upsertWatch(watch);
+      }
+      await chrome.storage.local.remove('captureNow');
+      send({ type: 'flow:track', event: 'follow_captured', params: {} });
+      await renderCapture();
+      await renderWaiting();
+    });
+    const cancel = el('button', 'ghost sm', 'Not now');
+    cancel.type = 'button';
+    cancel.addEventListener('click', async () => { await chrome.storage.local.remove('captureNow'); await renderCapture(); });
+    acts.appendChild(go); acts.appendChild(cancel);
+    item.appendChild(acts);
+    item.appendChild(note);
+    host.appendChild(item);
+  }
+
+  // ---- Where Glance watches (other apps, opt-in) -------------------------------------------------
+  // Gmail is always on. Another app is off until you turn it on here: the browser asks for that one site (an optional permission,
+  // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
+  // with a property for its wiring, not a let: it runs during init.
+  const SURFACE_COPY = {
+    whatsapp: 'Reads your one-to-one chats, only to see whether something you asked was answered. Never sends, types or opens anything; groups, lists and channels are ignored. Experimental: WhatsApp can change its page without notice, and Glance goes quiet if it cannot read it.'
+  };
+  async function renderSurfaces() {
+    const host = document.getElementById('surface-list');
+    if (!host) return;
+    const st = await send({ type: 'flow:surface-status' });
+    host.replaceChildren();
+    if (!st || !st.ok) return;
+    for (const id of Object.keys(st.surfaces)) {
+      const s = st.surfaces[id];
+      const row = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', s.label));
+      const bad = s.enabled && s.health && s.health.ok === false;
+      top.appendChild(el('span', 'wait-state' + (bad ? '' : s.enabled ? ' ok' : ''), s.enabled ? (bad ? 'On, but its page is not recognised' : 'On') : 'Off'));
+      row.appendChild(top);
+      row.appendChild(el('div', 'wait-note', SURFACE_COPY[id] || ''));
+      if (s.revoked) row.appendChild(el('div', 'wait-note', 'The browser permission was removed, so this is off.'));
+      const note = el('p', 'wait-note');
+      note.hidden = true;
+      const acts = el('div', 'wait-acts');
+      const btn = el('button', 'ghost sm', s.enabled ? 'Turn off' : 'Turn on');
+      btn.type = 'button';
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        if (s.enabled) { await send({ type: 'flow:surface-disable', id }); await renderSurfaces(); return; }
+        let granted = false;
+        try { granted = await chrome.permissions.request({ origins: s.origins }); } catch (e) { granted = false; }
+        if (!granted) { btn.disabled = false; note.hidden = false; note.textContent = 'The browser did not grant access, so it stays off.'; return; }
+        const r = await send({ type: 'flow:surface-enable', id });
+        if (!r || !r.ok) { btn.disabled = false; note.hidden = false; note.textContent = 'Could not turn it on. Try again.'; return; }
+        await renderSurfaces();
+      });
+      acts.appendChild(btn);
+      row.appendChild(acts);
+      row.appendChild(note);
+      host.appendChild(row);
+    }
+  }
+
+  // Two entries that might be one person (the same full name in two apps): asked once, never merged on a guess.
+  async function renderIdentityLinks() {
+    const block = document.getElementById('identityBlock');
+    if (!block || typeof FlowIdentity === 'undefined' || !FlowStorage.getIdentityGraph) return;
+    const graph = await FlowStorage.getIdentityGraph();
+    const links = FlowIdentity.pendingLinks(graph).slice(0, 1);
+    const host = document.getElementById('identity-card');
+    host.replaceChildren();
+    block.hidden = links.length === 0;
+    for (const l of links) {
+      const a = FlowIdentity.personOf(graph, l.a), b = FlowIdentity.personOf(graph, l.b);
+      if (!a || !b) continue;
+      const lab = (p, ch) => (FlowChannel.label(ch) + ': ' + ((p.emails && p.emails[0]) || (p.phones && p.phones[0] ? '+' + p.phones[0] : p.names[0] || '')));
+      const item = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', l.name || 'Same person?'));
+      top.appendChild(el('span', 'wait-state', 'Same person?'));
+      item.appendChild(top);
+      item.appendChild(el('div', 'wait-what', lab(a, l.channels[0]) + '  =  ' + lab(b, l.channels[1])));
+      const acts = el('div', 'wait-acts');
+      const mk = (label, same) => { const x = el('button', 'ghost sm', label); x.type = 'button'; x.addEventListener('click', async () => { await FlowStorage.answerIdentity(l.a, l.b, same); await renderIdentityLinks(); }); return x; };
+      acts.appendChild(mk('Yes, the same', true));
+      acts.appendChild(mk('No, different people', false));
+      item.appendChild(acts);
+      host.appendChild(item);
+    }
+  }
+
   // ---- One question (core/active-question.js) ------------------------------------------------
   // At most one, rationed by the core. A yes opens the loop (the free limit applies) and is a label for the
   // on-device model; a no is a gentler label; the x skips. Functions with properties, not lets (init order).
@@ -895,6 +1037,35 @@
         }
       });
       acts.appendChild(nudge);
+    } else if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && !FlowFollowUp.isYours(w) && w.counterpart && !w.counterpart.email && (w.counterpart.phone || w.channel === 'whatsapp')) {
+      // A chat has no draft folder: the nudge is copied, and you paste it yourself. Glance never types or sends in another app.
+      const level = FlowFollowUp.nextNudgeLevel(w);
+      const gate = FlowEntitlements.nudgeGate(level, record, now);
+      const base = nudgeLabel(level) || 'Nudge now';
+      const copy = el('button', 'ghost sm', (gate.allowed ? 'Copy a ' : 'Copy a firmer ') + 'nudge' + (gate.allowed ? '' : ' · Pro'));
+      copy.type = 'button';
+      copy.addEventListener('click', async () => {
+        note.hidden = false;
+        if (!gate.allowed) {
+          note.replaceChildren(document.createTextNode('The firmer follow-ups are part of Glance Pro. The friendly first nudge stays free. '));
+          const a = el('a', null, 'See Glance Pro');
+          a.href = FlowEntitlements.PRICING_URL; a.target = '_blank'; a.rel = 'noopener';
+          note.appendChild(a);
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(await voiced(FlowFollowUp.nudgeText(w, level, now), w));
+          note.textContent = 'Copied. Paste it into the chat yourself. Nothing was sent.';
+          send({ type: 'flow:track', event: 'follow_nudge_copied', params: {} });
+        } catch (e) { note.textContent = 'Could not copy. Try again.'; }
+      });
+      acts.appendChild(copy);
+      if (w.counterpart.phone) {
+        const open = el('a', 'ghost sm', 'Open the chat');
+        open.href = 'https://wa.me/' + String(w.counterpart.phone).replace(/\D/g, '');
+        open.target = '_blank'; open.rel = 'noopener';
+        acts.appendChild(open);
+      }
     }
 
     // One draft action, and a file only when there is exactly one right file. Preparing never

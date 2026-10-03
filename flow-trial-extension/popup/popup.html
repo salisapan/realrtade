@@ -47,6 +47,12 @@
         <p id="proNote" class="saved-note" hidden></p>
       </div>
 
+      <div class="block" id="surfacesBlock">
+        <p class="label">Where Glance watches</p>
+        <p class="hint">Gmail is always on. Another app stays off until you turn it on here. Each one asks the browser for that one site, nothing else, and you can turn it off again at any time.</p>
+        <div id="surface-list" class="conn-list"></div>
+      </div>
+
       <div class="block recipe-block">
         <p class="label">Share this setup</p>
         <p class="hint">A .glance file carries only the domain and connector you picked — never a token, never anything Glance has written.</p>
@@ -69,6 +75,16 @@
         <p class="label">Coming around again</p>
         <div id="recur-list" class="log-list"></div>
         <p class="hint" id="recurUpsell" hidden></p>
+      </div>
+
+      <div class="waiting" id="captureBlock" hidden>
+        <p class="label">From a page</p>
+        <div id="capture-card" class="log-list"></div>
+      </div>
+
+      <div class="waiting" id="identityBlock" hidden>
+        <p class="label">Same person?</p>
+        <div id="identity-card" class="log-list"></div>
       </div>
 
       <div class="waiting" id="questionBlock" hidden>
@@ -195,6 +211,10 @@
   <script src="../core/outcome-labels.js"></script>
   <script src="../core/follow-up.js"></script>
   <script src="../core/outside-signals.js"></script>
+  <script src="../core/channel.js"></script>
+  <script src="../core/capture.js"></script>
+  <script src="../core/identity-graph.js"></script>
+  <script src="../core/cross-channel.js"></script>
   <script src="../core/privacyShield.js"></script>
   <script src="../core/learning-ledger.js"></script>
   <script src="../core/active-question.js"></script>

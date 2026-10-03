@@ -562,8 +562,13 @@ foundation, not the feature.
 
 ## What is still deliberately narrow
 
-- **Gmail only.** The judgment engine takes plain text and knows nothing about
-  Gmail; adding a second source surface is a content script, not a rewrite.
+- **Gmail first, other apps opt-in and experimental.** The judgment engine takes
+  plain text and knows nothing about Gmail. Other apps speak the same small
+  contract (`core/channel.js`), are off until the person turns them on, and are
+  stricter than Gmail until measured: WhatsApp Web (read-only, one-to-one chats,
+  `src/content-whatsapp.js`), a right-click "stay on this" on any page
+  (`core/capture.js`), and Outlook through Microsoft's mail API (normalisation
+  only, not wired: `core/graph-mail.js`). See `docs/multi-platform.md`.
 - **The passive judgment engine is not a language model, and sends nothing
   anywhere.** `core/judgment.js`'s scorer is a transparent, explainable
   weighting, which is why the popup can show why Glance spoke — this has not

@@ -60,6 +60,9 @@
         "core/outcome-labels.js",
         "core/follow-up.js",
         "core/outside-signals.js",
+        "core/channel.js",
+        "core/identity-graph.js",
+        "core/cross-channel.js",
         "core/expiry.js",
         "core/meeting-debrief.js",
         "core/recurrence.js",
@@ -97,7 +100,9 @@
     "identity",
     "sidePanel",
     "alarms",
-    "notifications"
+    "notifications",
+    "scripting",
+    "contextMenus"
   ],
   "host_permissions": [
     "https://mail.google.com/*",
@@ -120,5 +125,8 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
-  }
+  },
+  "optional_host_permissions": [
+    "https://web.whatsapp.com/*"
+  ]
 }

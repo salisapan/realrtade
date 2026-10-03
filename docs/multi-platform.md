@@ -1,0 +1,115 @@
+# Multi-platform: loops beyond email
+
+> Written 2026-10-03, at the owner's request ("develop the multi-platform point"). Companion to `docs/product-architecture.md`
+> (§5.7 expansion rules, §5.8 decision filter), `docs/open-loops.md`, `docs/local-first-principle.md`.
+
+## 1. The idea
+
+The unit of Glance is the **loop**, not the email: something someone owes you, or you owe them, that stays open until reality
+closes it. Email is where Glance first saw loops open and close. Reality also closes them in other places: an answer on WhatsApp,
+a payment, a calendar entry, a shared file. So "multi-platform" is not "more inboxes". It is three things:
+
+1. **One vocabulary every app speaks** (`core/channel.js`): a *party* (name, email, phone) and an *utterance* (one message). The
+   engine (`core/follow-up.js`, `core/story.js`, `core/person-model.js`) never has to know which app a message came from.
+2. **One person across apps** (`core/identity-graph.js`): the Dana who emails and the Dana on WhatsApp are one person to the
+   engine, so one waiting-time model covers both and an answer in either settles a loop opened in the other.
+3. **Surfaces** that feed that vocabulary, each opt-in, each at least as careful as Gmail.
+
+## 2. The decision filter (docs/product-architecture.md §5.8)
+
+| Question | Answer |
+|---|---|
+| Closer to "you intend, we execute"? | Yes: a loop is chased and closed wherever the other person answers. |
+| Raises the feeling that things get closed? | Yes: today a reply on WhatsApp leaves the email loop open and Glance keeps chasing. |
+| Protects precision and silence? | Only with hard rules (section 4). New surfaces are stricter than Gmail until measured. |
+| Zero-Prompt? | One opt-in per app, once. The only recurring prompt is the rare, rationed "same person?" question. |
+| Compounding value? | Yes: the identity graph and the per-person timing model get better with every app. |
+
+§5.7 says not to expand horizontally before precision and stickiness clearly win. The owner decided to proceed on 2026-10-03. The
+risk that rule guards against is handled by design: every new surface is **off by default, opt-in per app, labelled experimental,
+stricter than Gmail, and silent when it cannot read its page**. The first measured gate to relax any of that is in section 6.
+
+## 3. What exists, and how far it is verified
+
+| Piece | Where | State |
+|---|---|---|
+| Party / utterance vocabulary, phone and name normalisation | `core/channel.js` | Built; corpus-tested. |
+| Identity graph: merge on hard keys only, a shared full name is a suggestion, "same person?" asked once, a "no" remembered | `core/identity-graph.js` | Built; corpus-tested. Stores names, addresses, numbers and which apps; no message text. |
+| Cross-app closing: same person AND a topical link (same reference, or same amount on a payment loop) closes; otherwise at most one question | `core/cross-channel.js`, `src/follow.js` | Built; corpus-tested; exercised in a real browser against a mock page. |
+| Channel hooks in the follow-up engine (message id, "is this mine", counterpart, party) with Gmail as the unchanged default | `src/follow.js` | Built; the 112-case Gmail harness still passes. |
+| WhatsApp Web, read-only, 1:1 only | `src/content-whatsapp.js`, `src/whatsapp-parse.js` | Built; parsing corpus + a browser harness on a page that **imitates** WhatsApp's structure. **Not verified on the real WhatsApp Web.** |
+| Opt-in plumbing: optional host permission, scripts registered on request, re-registered after an update, removed on "off" | `src/background.js`, popup "Where Glance watches" | Built; the popup call to the browser's permission prompt is not exercised in an automated test (it needs a real browser profile). |
+| "Stay on this" on any page (right-click menu, popup question, loop opens) | `core/capture.js`, `src/background.js`, popup | Built; core and popup logic tested. The right-click item and side-panel opening are not exercised in an automated test. |
+| Outlook through Microsoft Graph: message to utterance, HTML to text, quoted history cut | `core/graph-mail.js` | Library + tests only. **Not wired to anything**: it needs a Microsoft app registration and the person's consent (section 5). |
+
+## 4. The hard rules
+
+- **People are merged on hard evidence only** (same address, same number, or one sighting carrying both). A name alone is never
+  enough: it becomes a pending question, asked once, and a "no" is remembered. Two people with the same full name are never merged by guesswork.
+- **Cross-app closing**: the sender must be the same person; only loops waiting on *them* are considered (never your own promises or
+  clocks); a message that names the same reference, or the same amount on a payment loop, belongs to that loop; a topical
+  answer closes it with a receipt and Reopen; anything without that link only asks, and only when the person has exactly one open
+  loop and the message is a real sentence; two loops that fit equally mean silence; a loop asked about in the last three days is not asked again.
+- **Chats are stricter than email**: `ctx.strict` means only word-list asks create an offer. The learned model, the language-model
+  tier and the single question do not act in a chat until there is a labelled set of real chats to measure them on.
+- **Read-only**: Glance never types, sends, reacts to, marks or opens anything in another app. A chat has no draft folder, so a nudge is copied to the clipboard for the person to paste.
+- **WhatsApp scope**: one-to-one chats only. A group, a broadcast list, a channel or a status is left alone, on purpose, and is not reported as a broken layout.
+- **Honest failure**: each pass checks it can still make sense of the page; if not, it reports once (shown in the popup) and stays silent.
+- **No new permission at install**: another app is an *optional* host permission, requested from a click in the popup and removable.
+- **Copy and permissions move together** (`docs/design-principles.md`): the privacy page (section 5, four new bullets), the store
+  permission justifications and the README changed in the same commit as the code.
+
+## 5. Per app
+
+### WhatsApp Web (experimental)
+
+- Reads: the open 1:1 chat's header title, message ids (`data-id`: `true_`/`false_` = sent by you / them, and the chat's
+  number for a normal contact) and the text spans. Quoted messages inside a reply are dropped.
+- Risks the owner should weigh before shipping it:
+  - **Page changes**: WhatsApp Web's markup is not a public interface. It can break without notice (Glance then goes quiet).
+  - **Platform policy**: WhatsApp's terms restrict *automated* use of the service. This reads a page the person has open and
+    never sends or interacts, which is the lowest-risk form of reading, but I have not obtained a legal opinion and the Chrome Web
+    Store review may ask about it.
+  - **Sensitivity**: chats are more intimate than business email. The opt-in text says exactly what is read; nothing leaves the device.
+- To measure it properly: a labelled set of real chat sentences (like `docs/human-eval.md`) from consenting people, and only then relax `strict`.
+
+### Outlook (through Microsoft Graph; not wired)
+
+Reading Outlook's page would repeat WhatsApp's fragility, so the path is Microsoft's own API. What the owner has to do:
+1. Register an application in Microsoft Entra ID (single-page / public client), redirect URI `https://<extension-id>.chromiumapp.org/`.
+2. Delegated scope `Mail.Read` (and `offline_access`); no write scopes.
+3. Decide the consent copy: this reads the mailbox on the person's behalf, which is a bigger change to "we only read what you open"
+   than anything above (a poll, not an opened message). The privacy page and the store listing change first.
+4. Then wire: `chrome.identity.launchWebAuthFlow`, an alarm-driven poll of recent sent and received messages, `FlowGraphMail.toUtterance`,
+   and feed `FlowFollow.consider` through a context that implements the same hooks as `src/content-whatsapp.js`.
+Until then `core/graph-mail.js` is a tested library and nothing more.
+
+### Slack, Teams and others
+
+Not built. Slack and Teams are team surfaces (`docs/product-architecture.md`: Glance has none), and their pages are as unstable as
+WhatsApp's. "Stay on this" covers them in the meantime without reading anything.
+
+### Stay on this (any page)
+
+Right-click a selection, choose "Glance: stay on this", say who it is with and whose move it is. A loop opens exactly like any
+other. It has no address or number, so it is closed by hand (or the person's own later answer once they are known by an address or number).
+
+## 6. The gate for relaxing "experimental"
+
+Not before: (a) a human-labelled set of real WhatsApp sentences measured at ask precision at least 0.97 with a stated recall,
+(b) a week of real use with no wrong close reported (closes made across apps can be told apart afterwards: the loop keeps `viaChannel`),
+(c) the owner's decision on the platform-policy question above.
+
+## 7. Adding another app: the checklist
+
+1. Write the pure parsing in a `*-parse.js` with a corpus (ids, who the chat is with, what to leave alone).
+2. Write the adapter that builds the same `ctx` as `src/content-whatsapp.js` (`channel`, `messages`, `isOwn`, `messageId`, `counterpart`, `partyOf`, `extractSender`, `ownMessageText`, `messageText`, `threadIdFrom`, `subject`, `threadUrl`, `attachmentsOf`) with `strict: true`.
+3. Add it to `SURFACES` in `src/background.js` and an optional host permission in `manifest.json`.
+4. Add a copy line in the popup (`SURFACE_COPY`), a privacy-page bullet and a store-permission row, in the same commit.
+5. Add a browser harness page that imitates its structure, and a health check that reports when the page is not understood.
+
+## 8. Decisions for the owner
+
+- Ship WhatsApp Web as an experimental opt-in, or hold it until the platform-policy question and a chat test set exist?
+- Outlook through Graph: register the Microsoft app and approve the consent copy, or leave it?
+- Whether "same person?" questions are acceptable in the popup (rationed to one at a time).

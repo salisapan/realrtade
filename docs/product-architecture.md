@@ -70,7 +70,7 @@ person, they're the audience for offering #3, not this one.
 
 1. **Install.** A Chrome extension (`flow-trial-extension/`), loaded
    unpacked today (not yet on the Chrome Web Store). A content script
-   attaches only to `mail.google.com`.
+   attaches only to `mail.google.com`. (Since 2026-10-03 other apps can be added by the person, one at a time, as optional permissions: see `docs/multi-platform.md`. The sentence above describes the install, which is unchanged.)
 2. **Read.** The content script reads the single email currently open in
    Gmail's reading pane — not the inbox list, not older messages, not
    attachments. Nothing is read in the background; there is no polling

@@ -75,7 +75,12 @@ const FlowPersonModel = (() => {
   }
 
   // ---- observations from the stored loops ------------------------------------------------
-  function who(w) { return String((w && w.counterpart && w.counterpart.email) || '').toLowerCase(); }
+  // One person, whatever app the loop came from: the key chosen when the loop was opened (core/identity-graph.js), else the
+  // address, else the phone number.
+  function who(w) {
+    const cp = (w && w.counterpart) || {};
+    return String((w && w.personKey) || cp.email || (cp.phone ? 'phone:' + cp.phone : '') || '').toLowerCase();
+  }
   function kindOf(w) { return w && w.kind === 'payment' ? 'payment' : 'reply'; }
   function theirs(w) { return w && w.direction !== 'mine' && w.direction !== 'clock'; }
 

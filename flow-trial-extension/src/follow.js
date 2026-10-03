@@ -208,27 +208,36 @@ const FlowFollow = (() => {
   // ---- one story, many threads ---------------------------------------------------
   // The loop this message belongs to when it arrived in a thread of its own.
   async function storyFor(ctx, last, sender) {
-    if (typeof FlowStory === 'undefined' || !sender || !sender.email) return null;
+    if (typeof FlowStory === 'undefined' || !sender) return null;
     const list = await FlowStorage.getWatches();
     if (!list.some((w) => FlowFollowUp.isActive(w) && !FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w))) return null;
-    const hit = FlowStory.match(list, { email: sender.email, subject: ctx.subject, text: ctx.messageText(last) }, { extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+    // The same person may be an address in one app and a phone number in another (core/identity-graph.js).
+    let samePerson = null;
+    if (typeof FlowIdentity !== 'undefined' && typeof FlowStorage.getIdentityGraph === 'function') {
+      const graph = await FlowStorage.getIdentityGraph();
+      const party = Object.assign({ channel: channelOf(ctx) }, sender);
+      samePerson = (cp) => FlowIdentity.same(graph, cp, party);
+    }
+    if (!sender.email && !samePerson) return null;
+    const hit = FlowStory.match(list, { email: sender.email, subject: ctx.subject, text: ctx.messageText(last) }, { extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null, samePerson });
     return hit ? hit.watch : null;
   }
 
   // ---- 3. what the answer did ------------------------------------------------------
-  async function closed(watch, sender, how) {
+  async function closed(watch, sender, how, via) {
     if (typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('autoClosed', watch.id + '|' + (watch.resolvedAt || '')).catch(() => {});
     if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
     track('follow_resolved');
     const name = whoOf(sender);
     const amt = amountLabel(watch);
+    const on = via && via !== 'gmail' && typeof FlowChannel !== 'undefined' ? ' on ' + FlowChannel.label(via) : '';
     const line = how === 'paid'
-      ? name + ' says it is paid' + (amt ? ' (' + amt + ')' : '') + took(watch) + '. Loop closed.'
+      ? name + ' says it is paid' + on + (amt ? ' (' + amt + ')' : '') + took(watch) + '. Loop closed.'
       : how === 'file'
         ? name + ' sent the ' + ((watch.file && watch.file.label) || 'file') + (watch.deliveredFiles && watch.deliveredFiles[0] ? ' (' + watch.deliveredFiles[0] + ')' : '') + took(watch) + '. Loop closed.'
       : how === 'declined'
         ? name + ' said no' + took(watch) + '. Nothing left to chase, so I closed it.'
-        : name + ' replied' + took(watch) + '. Loop closed.';
+        : name + ' replied' + on + took(watch) + '. Loop closed.';
     receipt(line, null, { label: 'Reopen', run: () => reopen(watch) });
     timingNote(watch, sender);
   }
@@ -283,10 +292,7 @@ const FlowFollow = (() => {
       if (typeof FlowFilePath === 'undefined') return null;
       if (w.yoursReason === 'blocked') {
         if (!ctx || !ctx.attachmentsOf) return null;
-        const own = Array.from(ctx.messages).filter((m) => {
-          const e = (ctx.extractSender(m).email || '').toLowerCase();
-          return e && e === String(ctx.ownEmail).toLowerCase();
-        });
+        const own = Array.from(ctx.messages).filter((m) => isOwnNode(ctx, m));
         for (let i = own.length - 1; i >= 0; i--) {
           const atts = ctx.attachmentsOf(own[i]);
           if (atts && atts.length) {
@@ -360,13 +366,13 @@ const FlowFollow = (() => {
     const msgs = Array.from(ctx.messages);
     let from = msgs.length - 1;
     if (watch.messageId) {
-      const at = msgs.findIndex((m) => m.getAttribute('data-legacy-message-id') === watch.messageId);
+      const at = msgs.findIndex((m) => idOf(ctx, m) === watch.messageId);
       if (at >= 0) from = at + 1;
     }
     let best = null;
     for (let i = from; i < msgs.length; i++) {
       const sender = ctx.extractSender(msgs[i]);
-      if (sender.email && sender.email.toLowerCase() === String(ctx.ownEmail).toLowerCase()) continue;
+      if (isOwnNode(ctx, msgs[i])) continue;
       const text = ctx.messageText(msgs[i]);
       // Did a real file come with it? Only asked of a file-backed loop, and only when the page can tell.
       const evidence = typeof FlowFilePath !== 'undefined' && ctx.attachmentsOf && FlowFilePath.isFileBacked(watch)
@@ -388,10 +394,12 @@ const FlowFollow = (() => {
     const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
     if (res.none) return;
     recordReply(watch, best.reply, lastId);
-    const patch = Object.assign({}, res.patch, { lastReplyMessageId: lastId });
+    // An answer that came in another app than the one the loop was opened in says so, in the loop and in the receipt.
+    const via = (watch.channel || 'gmail') !== channelOf(ctx) ? channelOf(ctx) : null;
+    const patch = Object.assign({}, res.patch, { lastReplyMessageId: lastId }, via ? { viaChannel: via } : {});
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
     if (res.close && next.tier === 'model' && best.reply.outcome !== 'declined') confirmAsk(next, 'confirmedAsk', 'ASK');
-    if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : best.reply.delivered === 'file' ? 'file' : 'replied');
+    if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : best.reply.delivered === 'file' ? 'file' : 'replied', via);
     else if (res.yours) await yours(watch, best.sender, patch, ctx);
     else if (res.claimedOnly) {
       // They wrote "attached" and nothing came through. Say so once; the loop stays open.
@@ -473,6 +481,69 @@ const FlowFollow = (() => {
     } catch (e) { /* optional */ }
   }
 
+  // ---- one person across apps (core/identity-graph.js, core/cross-channel.js) ---------------------
+  // Every person seen is remembered by hard keys only (address, number) plus a name hint; nothing of the message is kept.
+  async function observeWho(ctx, last, lastIsOwn) {
+    try {
+      if (typeof FlowStorage.observeIdentity !== 'function' || typeof FlowChannel === 'undefined') return;
+      const party = lastIsOwn ? Object.assign({ channel: channelOf(ctx) }, counterpartIn(ctx, last)) : partyOfNode(ctx, last);
+      await FlowStorage.observeIdentity(party);
+    } catch (e) { /* optional */ }
+  }
+
+  // The one key that stands for this person in every app: their address if we know one, else their number.
+  async function personKeyFor(party) {
+    try {
+      if (typeof FlowIdentity === 'undefined' || typeof FlowStorage.getIdentityGraph !== 'function') return null;
+      const a = FlowIdentity.aliasesOf(await FlowStorage.getIdentityGraph(), party);
+      return a.emails[0] || (a.phones[0] ? 'phone:' + a.phones[0] : null) || (party && party.email) || (party && party.phone ? 'phone:' + FlowChannel.normalizePhone(party.phone) : null) || null;
+    } catch (e) { return null; }
+  }
+
+  async function applyCrossDecision(watch, d, sender, channel, lastId) {
+    const patch = FlowCrossChannel.patchFor(watch, d, channel, Date.now());
+    if (!patch) return;
+    const full = Object.assign({}, patch, { lastReplyMessageId: lastId });
+    const next = (await FlowStorage.updateWatch(watch.id, full)) || Object.assign({}, watch, full);
+    if (d.action === 'promised' || next.status !== 'resolved') { await promised(watch, sender, full); return; }
+    const how = d.reply.outcome === 'paid' ? 'paid' : d.reply.outcome === 'declined' ? 'declined' : d.reply.delivered === 'file' ? 'file' : 'replied';
+    await closed(next, sender, how, channel);
+  }
+
+  function crossCard(watch, d, sender, channel, lastId) {
+    const h = card(watch.lang === 'he');
+    h.appendChild(el('div', 'flow-fu-title', whoOf(sender) + ' wrote on ' + FlowChannel.label(channel) + '.'));
+    h.appendChild(el('div', 'flow-fu-line', 'Does this settle \u201c' + String(watch.what || 'your request').slice(0, 80) + '\u201d? I kept the loop open.'));
+    const row = el('div', 'flow-fu-actions');
+    row.appendChild(button('Yes, close it', 'primary', async () => { dismiss(); await applyCrossDecision(watch, d, sender, channel, lastId); }));
+    row.appendChild(button('Not yet', 'ghost', dismiss));
+    h.appendChild(row);
+  }
+
+  // Their message in this app might settle a loop opened in another. Close only when the evidence is hard; otherwise ask once.
+  async function crossChannel(ctx, last, sender, threadId, lastId) {
+    try {
+      if (typeof FlowCrossChannel === 'undefined' || typeof FlowIdentity === 'undefined' || typeof FlowStorage.getIdentityGraph !== 'function') return false;
+      const channel = channelOf(ctx);
+      const list = await FlowStorage.getWatches();
+      if (!list.some((w) => FlowFollowUp.isActive(w) && !FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w))) return false;
+      const graph = await FlowStorage.getIdentityGraph();
+      const party = partyOfNode(ctx, last);
+      const d = FlowCrossChannel.judge(list, graph, party, ctx.messageText(last), { channel, thread: threadId }, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+      if (!d) return false;
+      const watch = list.find((w) => w.id === d.watchId);
+      if (!watch || (watch.lastReplyMessageId && watch.lastReplyMessageId === lastId) || settling.has(watch.id)) return false;
+      settling.add(watch.id);
+      try {
+        if (d.action === 'ask') {
+          await FlowStorage.updateWatch(watch.id, { crossAskedAt: Date.now() });
+          crossCard(watch, d, party, channel, lastId);
+        } else await applyCrossDecision(watch, d, party, channel, lastId);
+      } finally { settling.delete(watch.id); }
+      return true;
+    } catch (e) { return false; }
+  }
+
   // ---- 4. settled outside the thread (core/outside-signals.js) ----------------------------
   // Money arrived at a bank or payment provider, a calendar entry now exists, a file was shared. Strong evidence
   // closes the loop with a receipt and Reopen; weaker evidence asks once and never closes alone. Nothing from the
@@ -536,8 +607,7 @@ const FlowFollow = (() => {
       const at = msgs.indexOf(last);
       const own = [];
       for (let i = at - 1; i >= 0; i--) {
-        const e = (ctx.extractSender(msgs[i]).email || '').toLowerCase();
-        if (e && e === String(ctx.ownEmail).toLowerCase()) own.push({ text: ctx.ownMessageText(msgs[i]), key: msgs[i].getAttribute('data-legacy-message-id') || String(i) });
+        if (isOwnNode(ctx, msgs[i])) own.push({ text: ctx.ownMessageText(msgs[i]), key: idOf(ctx, msgs[i]) || String(i) });
       }
       const found = finder(own, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
       if (!found) return;
@@ -570,6 +640,24 @@ const FlowFollow = (() => {
   }
 
   // ---- 1. offer ---------------------------------------------------------------
+  // ---- which app is this? (core/channel.js) -------------------------------------------------------
+  // Gmail is the default. Another surface (src/content-whatsapp.js) hands in the same ctx with a few extra hooks:
+  //   channel, messageId(node), isOwn(node), counterpart(node), partyOf(node)
+  // so everything below this line works on a chat exactly as it does on an email thread.
+  function channelOf(ctx) { return (ctx && ctx.channel) || 'gmail'; }
+  function idOf(ctx, node) { return ctx && ctx.messageId ? ctx.messageId(node) : (node.getAttribute('data-legacy-message-id') || null); }
+  function isOwnNode(ctx, node) {
+    if (ctx && ctx.isOwn) return Boolean(ctx.isOwn(node));
+    const e = (ctx.extractSender(node).email || '').toLowerCase();
+    return Boolean(e && e === String(ctx.ownEmail).toLowerCase());
+  }
+  function counterpartIn(ctx, node) { return ctx && ctx.counterpart ? ctx.counterpart(node) : counterpartOf(node, ctx.ownEmail); }
+  // The sender as a core/channel.js party (name, email, phone), whatever the app calls it.
+  function partyOfNode(ctx, node) {
+    const base = ctx && ctx.partyOf ? ctx.partyOf(node) : ctx.extractSender(node);
+    return { channel: channelOf(ctx), name: (base && base.name) || null, email: (base && base.email) || null, phone: (base && base.phone) || null };
+  }
+
   function counterpartOf(lastNode, ownEmail) {
     const els = lastNode.querySelectorAll('[email]');
     for (const e of els) {
@@ -590,7 +678,7 @@ const FlowFollow = (() => {
       const cands = FlowActiveQuestion.candidates(text, { model: FlowIntentModel, pipeline: FlowIntentPipeline });
       if (!cands.length) return;
       const state = await FlowStorage.getActiveQuestion();
-      const next = FlowActiveQuestion.offer(state, cands, { threadId, messageId: lastId, subject: ctx.subject, counterpart: counterpartOf(last, ctx.ownEmail), threadUrl: ctx.threadUrl(lastId) }, Date.now());
+      const next = FlowActiveQuestion.offer(state, cands, { threadId, messageId: lastId, subject: ctx.subject, counterpart: counterpartIn(ctx, last), threadUrl: ctx.threadUrl(lastId), channel: channelOf(ctx) }, Date.now());
       if (JSON.stringify(next.pending) !== JSON.stringify(state.pending)) await FlowStorage.setActiveQuestion(next);
     } catch (e) { /* a question is optional */ }
   }
@@ -728,14 +816,15 @@ const FlowFollow = (() => {
   async function considerClock(ctx) {
     if (typeof FlowExpiry === 'undefined' || typeof FlowFollowUp === 'undefined' || typeof FlowStorage === 'undefined') return;
     const msgs = ctx && ctx.messages;
+    if (channelOf(ctx) !== 'gmail') return;              // an offer or a trial that runs out is an email thing
     if (!msgs || !msgs.length || !ctx.ownEmail) return;
     const last = msgs[msgs.length - 1];
     const sender = ctx.extractSender(last);
-    if (!sender.email || sender.email.toLowerCase() === String(ctx.ownEmail).toLowerCase()) return;
+    if (!sender.email || isOwnNode(ctx, last)) return;
     if (FlowFollowUp.isAutoReply('', sender.email)) return; // noreply senders never get a card
     const threadId = ctx.threadIdFrom(last);
     if (!threadId) return;
-    const lastId = last.getAttribute('data-legacy-message-id') || null;
+    const lastId = idOf(ctx, last);
     const key = threadId + '|' + lastId;
     if (examinedClock.has(key)) return;
     examinedClock.add(key);
@@ -762,19 +851,20 @@ const FlowFollow = (() => {
     if (typeof FlowFollowUp === 'undefined' || typeof FlowStorage === 'undefined') return;
     await loadAdapt();
     const msgs = ctx && ctx.messages;
-    if (!msgs || !msgs.length || !ctx.ownEmail) return;
+    if (!msgs || !msgs.length || !(ctx.ownEmail || ctx.isOwn)) return;
 
     const last = msgs[msgs.length - 1];
     const sender = ctx.extractSender(last);
-    const lastIsOwn = Boolean(sender.email && sender.email.toLowerCase() === String(ctx.ownEmail).toLowerCase());
+    const lastIsOwn = isOwnNode(ctx, last);
     const threadId = ctx.threadIdFrom(last);
     if (!threadId) return;
-    const lastId = last.getAttribute('data-legacy-message-id') || null;
+    const lastId = idOf(ctx, last);
     const stateKey = threadId + '|' + lastId + '|' + (lastIsOwn ? 'own' : 'theirs');
     if (examined.has(stateKey)) return;
     examined.add(stateKey);
     if (examined.size > 400) examined.clear();
     if (lastIsOwn) learnStyle(ctx.ownMessageText(last));
+    await observeWho(ctx, last, lastIsOwn);
     const watch = await FlowStorage.getWatch(threadId);
 
     // They wrote last. What did the answer do to the loop?
@@ -785,6 +875,8 @@ const FlowFollow = (() => {
       // Their answer came in a thread of its own ("Re:" dropped, a fresh message):
       // follow the story, not the thread.
       if (!target) target = await storyFor(ctx, last, sender);
+      // Not a loop of this conversation at all: it may still be the answer to one opened in another app.
+      if (!target && (await crossChannel(ctx, last, sender, threadId, lastId))) return;
       if (target && target.status === 'waiting' && !FlowFollowUp.isMine(target) && !FlowFollowUp.isClock(target) && !(target.lastReplyMessageId && target.lastReplyMessageId === lastId) && !settling.has(target.id)) {
         settling.add(target.id);
         try { await handleReply(ctx, target, lastId); } finally { settling.delete(target.id); }
@@ -826,13 +918,15 @@ const FlowFollow = (() => {
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
     let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
-    if (!ask && !watch) ask = await lmAsk(mineText);
+    // A new surface (a chat) is stricter than Gmail until it has been measured: word-list asks only, no model tiers, no question.
+    if (!ask && !watch && !ctx.strict) ask = await lmAsk(mineText);
     recordDecision(mineText, Boolean(ask), key);
-    if (!ask) { if (!watch) considerQuestion(ctx, last, mineText, threadId, lastId); return; }
+    if (!ask) { if (!watch && !ctx.strict) considerQuestion(ctx, last, mineText, threadId, lastId); return; }
+    if (ctx.strict && (ask.tier === 'model' || ask.tier === 'lm')) return;
     offered.add(key);
 
     // The same story already has a loop in another thread: never a second one.
-    const kin = ask.direction === 'theirs' ? await storyFor(ctx, last, counterpartOf(last, ctx.ownEmail)) : null;
+    const kin = ask.direction === 'theirs' ? await storyFor(ctx, last, counterpartIn(ctx, last)) : null;
     if (kin) {
       if (FlowFollowUp.looksLikeChase(mineText)) {
         const patch = FlowFollowUp.recordNudge(kin, Date.now());
@@ -847,14 +941,16 @@ const FlowFollow = (() => {
       threadId,
       messageId: lastId,
       subject: ctx.subject,
-      counterpart: counterpartOf(last, ctx.ownEmail),
+      counterpart: counterpartIn(ctx, last),
+      channel: channelOf(ctx),
       threadUrl: ctx.threadUrl(lastId)
     };
+    base.personKey = await personKeyFor(Object.assign({ channel: channelOf(ctx) }, base.counterpart));
 
     const status = await send({ type: 'flow:pro-status' });
     const list = await FlowStorage.getWatches();
     // When to look again, learned from how long THIS person has taken before (new people: the default).
-    ask = FlowFollowUp.personalChase(ask, list, base.counterpart && base.counterpart.email, Date.now());
+    ask = FlowFollowUp.personalChase(ask, list, base.personKey || (base.counterpart && base.counterpart.email), Date.now());
     const active = list.filter(FlowFollowUp.isActive).length;
     const gate = FlowEntitlements.watchGate(active, status && status.record, Date.now());
     if (!gate.allowed) { await capCard(gate.used, gate.cap); return; }

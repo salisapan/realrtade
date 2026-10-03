@@ -92,7 +92,8 @@ function load(stored, opts) {
           if (cb) { cb(result); return; }
           return Promise.resolve(result);
         },
-        set: (patch, cb) => { Object.assign(store, patch); if (cb) { cb(); return; } return Promise.resolve(); }
+        set: (patch, cb) => { Object.assign(store, patch); if (cb) { cb(); return; } return Promise.resolve(); },
+        remove: (k, cb) => { [].concat(k).forEach((x) => { delete store[x]; }); if (cb) { cb(); return; } return Promise.resolve(); }
       }
     },
     runtime: {
@@ -142,7 +143,8 @@ function load(stored, opts) {
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
-    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js']
+    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
+    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -629,6 +631,34 @@ async function run() {
     check('the row says it is likely to slip and why', metas.some((m) => /likely to slip, Dana usually takes ~\d+ days/.test(m)), metas);
     const sumTxt = document.getElementById('waitingSummary').children.map((n) => n.textContent).join('');
     check('the summary line counts it', /1likely to slip|1 likely to slip/.test(sumTxt), sumTxt);
+  }
+
+  console.log('\n--- popup.js: "Stay on this" from a page opens a loop that knows it came from the web ---\n');
+  {
+    const { sandbox, document, store } = load({ captureNow: { text: 'Can you send me the signed lease by Friday?', pageUrl: 'https://app.slack.com/client/T1/C2', at: Date.now() } });
+    // The sandbox's URL is a two-method stub for the recipe export; the capture card parses real addresses.
+    sandbox.URL = class extends URL { static createObjectURL() { return 'blob:test'; } static revokeObjectURL() {} };
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 14; i++) await new Promise((r) => setTimeout(r, 0));
+    const block = document.getElementById('captureBlock');
+    check('the card shows when a selection is waiting', block.hidden === false, block.hidden);
+    const card = document.getElementById('capture-card');
+    const texts = find(card, 'wait-what').map((n) => n.textContent);
+    check('it shows the sentence the person selected', texts.some((t) => /signed lease by Friday/.test(t)), texts);
+    const btns = find(card, 'ghost');
+    const go = btns.find((b) => b.textContent === 'Stay on it');
+    check('and offers Stay on it / Not now', Boolean(go) && btns.some((b) => b.textContent === 'Not now'), btns.map((b) => b.textContent));
+    (go.listeners.click || []).forEach((fn) => fn());
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const w = (store().followWatches || [])[0];
+    check('Stay on it stores a waiting web loop with the clean address and no email', w && w.status === 'waiting' && w.channel === 'web' && w.threadUrl === 'https://app.slack.com/client/T1/C2' && !w.counterpart.email, w);
+    check('and the pending selection is gone', !store().captureNow, store().captureNow);
+  }
+  {
+    const { sandbox, document, store } = load({ captureNow: { text: 'old selection from yesterday that nobody answered', pageUrl: 'https://x.com/a', at: Date.now() - 2 * 24 * 3600 * 1000 } });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 14; i++) await new Promise((r) => setTimeout(r, 0));
+    check('a selection older than a day is not offered, and is cleared', document.getElementById('captureBlock').hidden === true && !store().captureNow);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

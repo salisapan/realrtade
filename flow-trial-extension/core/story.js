@@ -47,19 +47,21 @@ const FlowStory = (() => {
 
   const lower = (v) => String(v || '').toLowerCase();
 
-  // watches: stored watches. msg: { email, subject, text }. opts: { extract? }.
+  // watches: stored watches. msg: { email, subject, text }. opts: { extract?, samePerson? }. samePerson(counterpart) says whether a
+  // loop's counterpart is the sender, across apps (core/identity-graph.js); without it the email address decides, as before.
   // Returns { watch, score, why } or null.
   function match(watches, msg, opts) {
     const m = msg || {};
     const email = lower(m.email);
-    if (!email) return null;
+    const samePerson = opts && typeof opts.samePerson === 'function' ? opts.samePerson : null;
+    if (!email && !samePerson) return null;
     const ex = opts && opts.extract;
     const subj = normalizeSubject(m.subject);
     const mrefs = refs((m.subject || '') + ' ' + (m.text || ''));
     const scored = [];
     (Array.isArray(watches) ? watches : []).forEach((w) => {
       if (!w || w.status !== 'waiting' || w.direction === 'mine' || w.direction === 'clock') return;
-      if (lower(w.counterpart && w.counterpart.email) !== email) return;
+      if (samePerson ? !samePerson(w.counterpart || {}) : lower(w.counterpart && w.counterpart.email) !== email) return;
       let score = 0; const why = [];
       const ws = normalizeSubject(w.subject);
       if (subj && ws && subj.length >= 8 && !GENERIC.test(subj) && subj === ws) { score += 3; why.push('subject'); }

@@ -147,6 +147,117 @@ try {
   console.error('[Glance] chrome.sidePanel.setPanelBehavior unavailable — side panel will not open on click, but the rest of the extension is unaffected', error);
 }
 
+
+/* ------------------------------------------------------- stay on this (any page) */
+// A right-click on a selection, on ANY page, offers "Glance: stay on this". Nothing is read from the page but the selection the
+// person chose and the page's address; both are kept only until the popup asks its one question (core/capture.js, 24 hours).
+function ensureCaptureMenu() {
+  try {
+    chrome.contextMenus.removeAll(() => {
+      chrome.contextMenus.create({ id: 'flow-stay-on', title: 'Glance: stay on this', contexts: ['selection'] }, () => void chrome.runtime.lastError);
+    });
+  } catch (e) { /* the menu is optional */ }
+}
+function addressWithoutQuery(raw) {
+  try { const u = new URL(String(raw || '')); return (u.protocol === 'https:' || u.protocol === 'http:') ? u.origin + u.pathname : ''; } catch (e) { return ''; }
+}
+try {
+  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (info.menuItemId !== 'flow-stay-on') return;
+    const text = String(info.selectionText || '').slice(0, 600);
+    if (!text.trim()) return;
+    await chrome.storage.local.set({ captureNow: { text, pageUrl: addressWithoutQuery(info.pageUrl), at: Date.now() } });
+    try { if (tab && tab.id != null && chrome.sidePanel && chrome.sidePanel.open) await chrome.sidePanel.open({ tabId: tab.id }); } catch (e) { /* the popup shows it the next time it opens */ }
+  });
+} catch (e) { console.error('[Glance] right-click menu unavailable', e); }
+chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
+
+/* ---------------------------------------------------- other apps (opt-in) */
+// Glance starts in Gmail. Another app is added only when the person turns it on in the popup, which asks the browser for that one
+// site's permission (an OPTIONAL host permission: the install itself asks for nothing new) and then registers the content scripts for
+// it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
+const SURFACES = {
+  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] }
+};
+// The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
+const GMAIL_ONLY_SCRIPTS = ['src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
+
+function surfaceScripts(id) {
+  const base = (chrome.runtime.getManifest().content_scripts[0].js || []).filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0);
+  return base.concat(SURFACES[id].extra);
+}
+
+async function registerSurface(id) {
+  const def = SURFACES[id];
+  if (!def || !chrome.scripting || !chrome.scripting.registerContentScripts) return { ok: false, reason: 'unsupported' };
+  const granted = await chrome.permissions.contains({ origins: def.origins });
+  if (!granted) return { ok: false, reason: 'no-permission' };
+  const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: ['src/follow.css'], runAt: 'document_idle', persistAcrossSessions: true };
+  try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered yet */ }
+  await chrome.scripting.registerContentScripts([script]);
+  return { ok: true };
+}
+
+async function readSurfaces() {
+  const st = await chrome.storage.local.get({ surfaces: {} });
+  return st.surfaces || {};
+}
+
+async function enableSurface(id) {
+  if (!SURFACES[id]) return { ok: false, reason: 'unknown' };
+  const r = await registerSurface(id);
+  if (!r.ok) return r;
+  const all = await readSurfaces();
+  all[id] = { enabled: true, at: Date.now() };
+  await chrome.storage.local.set({ surfaces: all });
+  return { ok: true };
+}
+
+async function disableSurface(id) {
+  if (!SURFACES[id]) return { ok: false, reason: 'unknown' };
+  try { await chrome.scripting.unregisterContentScripts({ ids: ['flow-' + id] }); } catch (e) { /* already gone */ }
+  try { await chrome.permissions.remove({ origins: SURFACES[id].origins }); } catch (e) { /* the browser may refuse; the scripts are gone either way */ }
+  const all = await readSurfaces();
+  all[id] = { enabled: false, at: Date.now() };
+  await chrome.storage.local.set({ surfaces: all });
+  const h = (await chrome.storage.local.get({ surfaceHealth: {} })).surfaceHealth || {};
+  delete h[id];
+  await chrome.storage.local.set({ surfaceHealth: h });
+  return { ok: true };
+}
+
+// Registered scripts do not survive an extension update, and a person can revoke a permission in the browser's own settings.
+async function restoreSurfaces() {
+  try {
+    const all = await readSurfaces();
+    for (const id of Object.keys(all)) {
+      if (!all[id] || !all[id].enabled || !SURFACES[id]) continue;
+      const r = await registerSurface(id);
+      if (!r.ok && r.reason === 'no-permission') { all[id] = { enabled: false, at: Date.now(), revoked: true }; await chrome.storage.local.set({ surfaces: all }); }
+    }
+  } catch (e) { console.error('[Glance] could not restore the apps that were turned on', e); }
+}
+restoreSurfaces();
+chrome.runtime.onInstalled.addListener(() => { restoreSurfaces(); });
+
+async function surfaceStatus() {
+  const surfaces = await readSurfaces();
+  const health = (await chrome.storage.local.get({ surfaceHealth: {} })).surfaceHealth || {};
+  const out = {};
+  for (const id of Object.keys(SURFACES)) {
+    out[id] = { label: SURFACES[id].label, enabled: Boolean(surfaces[id] && surfaces[id].enabled), revoked: Boolean(surfaces[id] && surfaces[id].revoked), health: health[id] || null, origins: SURFACES[id].origins };
+  }
+  return { ok: true, surfaces: out };
+}
+
+async function noteSurfaceHealth(id, ok, reason) {
+  if (!SURFACES[id]) return { ok: false };
+  const h = (await chrome.storage.local.get({ surfaceHealth: {} })).surfaceHealth || {};
+  h[id] = { ok: Boolean(ok), reason: ok ? null : String(reason || 'unknown').slice(0, 60), at: Date.now() };
+  await chrome.storage.local.set({ surfaceHealth: h });
+  return { ok: true };
+}
+
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     chrome.tabs.create({ url: chrome.runtime.getURL('popup/popup.html') });
@@ -2779,6 +2890,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:classify-remote') {
     return reply(sendResponse, classifyViaBackend(msg.payload || {}));
   }
+
+  if (msg.type === 'flow:surface-status') return reply(sendResponse, surfaceStatus());
+  if (msg.type === 'flow:surface-enable') return reply(sendResponse, enableSurface(msg.id));
+  if (msg.type === 'flow:surface-disable') return reply(sendResponse, disableSurface(msg.id));
+  if (msg.type === 'flow:surface-health') return reply(sendResponse, noteSurfaceHealth(msg.id, msg.ok, msg.reason));
 
   // Outside signals (core/outside-signals.js): did a calendar event or a shared file settle a loop? These two read
   // metadata only (ids, times, invitee and sharee addresses), never titles or file contents, and the caller sends

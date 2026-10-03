@@ -374,7 +374,10 @@ const FlowFollowUp = (() => {
       threadId: String(a.threadId),
       messageId: a.messageId ? String(a.messageId) : null,
       subject: clip(a.subject || '', 160),
-      counterpart: { email: (a.counterpart && a.counterpart.email) || null, name: (a.counterpart && a.counterpart.name) || null },
+      counterpart: { email: (a.counterpart && a.counterpart.email) || null, name: (a.counterpart && a.counterpart.name) || null, phone: (a.counterpart && a.counterpart.phone) || null },
+      // Which app the loop was opened in, and the one key that stands for this person across apps (core/identity-graph.js).
+      channel: a.channel || 'gmail',
+      personKey: a.personKey || null,
       kind: ask.kind,
       what: ask.what,
       amount: ask.amount || null,
