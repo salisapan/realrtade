@@ -468,12 +468,12 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   await t.ctx.close();
 
   // 31. learning from what happens next: free labels, no UI
-  const SERVER_Q = 'Is the server back up? Nothing loads on my side.';
+  const SERVER_Q = 'Could use a heads-up on whether the courier collected the crate. Nothing shows on mine.';
   t = await open(browser, 'missed-ask', [msg(theirs, 'Hi, on it.'), msg(mine, SERVER_Q), msg(theirs, 'Looking now.'), msg(mine, 'Any update?')]);
   s = await t.state();
   let lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels, adapt: window.__store.intentAdapt }));
   check('a hand-made chase after an ask we missed is counted as a missed ask, once', lab.labels && lab.labels.missedAsk === 1, lab.labels);
-  check('the model moved, and nothing of the sentence was stored', lab.adapt && Object.keys(lab.adapt.act || {}).length > 0 && !/server|loads/i.test(JSON.stringify(lab)), lab.adapt && Object.keys(lab.adapt.act || {}).length);
+  check('the model moved, and nothing of the sentence was stored', lab.adapt && Object.keys(lab.adapt.act || {}).length > 0 && !/courier|crate|shows/i.test(JSON.stringify(lab)), lab.adapt && Object.keys(lab.adapt.act || {}).length);
   await t.ctx.close();
   t = await open(browser, 'missed-none', [msg(theirs, 'Hi.'), msg(mine, ASK), msg(theirs, 'Looking now.'), msg(mine, 'Any update?')]);
   lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels }));
@@ -495,10 +495,47 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('with no history of her own, a colleague-based day is offered and attributed to the colleagues, not to her', /people at acme\.com usually take about \d+ business days/.test(s.card || '') && !/Dana usually/.test(s.card || ''), s.card);
   await t.ctx.close();
 
+  // 34. closes from outside the thread: money arrived at a payment provider, in an email of its own
+  const BANK = { from: 'service@paypal.com', fromName: 'PayPal', to: 'me@x.com', toIsMe: true };
+  const PAYOUT = Object.assign({}, PAYW, { id: 't9', threadId: 't9' });
+  t = await open(browser, 'pay-signal', [msg(BANK, 'You have received $4,200.00 from Dana Cole. The money is now in your PayPal balance.')], { watches: [PAYOUT] });
+  s = await t.state();
+  let w9 = await t.p.evaluate(() => (window.__store.followWatches || []).find((w) => w.id === 't9'));
+  check('a payment provider email for the amount a payment loop waits on closes it as paid, by signal', w9 && w9.status === 'resolved' && w9.closedAs === 'paid' && w9.resolvedBy === 'signal', w9);
+  check('with a receipt that says what arrived and offers Reopen', /a payment of \$4,200 arrived/.test(s.card || '') && /Reopen/.test(s.card || ''), s.card);
+  check('no script errors', s.errs.length === 0, s.errs);
+  await t.ctx.close();
+  t = await open(browser, 'pay-signal-client', [msg(theirs, 'Hi, you have received $4,200.00 from Dana Cole, sent this morning.')], { watches: [PAYOUT] });
+  s = await t.state();
+  w9 = await t.p.evaluate(() => (window.__store.followWatches || []).find((w) => w.id === 't9'));
+  check('the same words from the client (not a payment provider) only ask, and the loop stays open', /Looks paid/.test(s.card || '') && /Mark paid/.test(s.card || '') && w9.status === 'waiting', { card: s.card, w9 });
+  await t.p.click('.flow-fu-btn.ghost'); await t.p.waitForTimeout(300);
+  w9 = await t.p.evaluate(() => (window.__store.followWatches || []).find((w) => w.id === 't9'));
+  check('"Not yet" is remembered and the loop is untouched', w9.status === 'waiting' && (w9.signalDismissed || []).includes('payment'), w9);
+  await t.ctx.close();
+  t = await open(browser, 'pay-signal-other', [msg(BANK, 'You have received $999.00 from Dana Cole. The money is now in your PayPal balance.')], { watches: [PAYOUT] });
+  s = await t.state();
+  w9 = await t.p.evaluate(() => (window.__store.followWatches || []).find((w) => w.id === 't9'));
+  check('a different amount closes nothing', w9.status === 'waiting' && s.card === null, { card: s.card, w9 });
+  await t.ctx.close();
+
+  // 35. how you write is learned as counts only; and one undecided sentence is kept as the single question
+  t = await open(browser, 'style', [msg(theirs, 'Can you send the numbers for the vendor?'), msg(mine, 'Hi Dana,<br><br>' + ASK + '<br><br>Best,<br>Alex')]);
+  const sp = await t.p.evaluate(() => window.__store.styleProfile);
+  check('an own message teaches the style profile (counts only, no text)', sp && sp.n.en === 1 && !/Dana|vendor|figure|Alex/.test(JSON.stringify(sp)), sp);
+  await t.ctx.close();
+  t = await open(browser, 'question', [msg(theirs, 'Hi, ok.'), msg(mine, 'can u approve my leave request? its been pending 4 days')]);
+  s = await t.state();
+  const aq = await t.p.evaluate(() => window.__store.activeQuestion);
+  check('a sentence of mine the engine is torn about is kept as the one pending question, and Gmail stays quiet', aq && aq.pending && /approve my leave request/.test(aq.pending.sentence) && s.card === null, { aq, card: s.card });
+  check('and the question knows its thread, not just the words', aq && aq.pending && aq.pending.threadId === 't1' && aq.pending.counterpart && aq.pending.counterpart.email === 'dana@acme.com', aq && aq.pending);
+  check('no script errors', s.errs.length === 0, s.errs);
+  await t.ctx.close();
+
   // 33. more signals from outcomes: a missed promise, and closing carefully when its own closes keep being corrected
-  t = await open(browser, 'missed-promise', [msg(theirs, 'Hi, thanks.'), msg(mine, 'i book you for thursday at 9, see you then'), msg(theirs, 'ok'), msg(mine, 'Attached the confirmation, here it is.')]);
+  t = await open(browser, 'missed-promise', [msg(theirs, 'Hi, thanks.'), msg(mine, 'ill pencil you in for thursday at nine, see you then'), msg(theirs, 'ok'), msg(mine, 'Attached the confirmation, here it is.')]);
   lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels, adapt: window.__store.intentAdapt }));
-  check('delivering where no promise loop existed teaches the model the earlier promise, once, as numbers only', lab.labels && lab.labels.missedPromise === 1 && Object.keys((lab.adapt || {}).act || {}).length > 0 && !/thursday|book/i.test(JSON.stringify(lab)), lab);
+  check('delivering where no promise loop existed teaches the model the earlier promise, once, as numbers only', lab.labels && lab.labels.missedPromise === 1 && Object.keys((lab.adapt || {}).act || {}).length > 0 && !/thursday|pencil/i.test(JSON.stringify(lab)), lab);
   await t.ctx.close();
 
   const VAGUE = 'Let us see how this evolves over the coming quarter, there are many factors.';

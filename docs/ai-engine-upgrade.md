@@ -170,10 +170,48 @@ take part, and even a noiseless oracle gained nothing measurable in this simulat
 (one noiseless run broke ask precision on the blind set), which is exactly what the canary is for. See that document for the
 numbers, the threat model, the launch checklist, and one thing that was NOT built: the on-device upload and fetch wiring.
 
-## 6. Needs the owner
+## 6. Done since (third pass, 2026-10-03)
 
-- A real, human-written evaluation set: with your explicit OK I can sample sent mail through the Gmail connector, mask it
-  locally and use it ONLY to measure (never committed raw). Every number here still comes from sentences a model wrote.
-- Run `encoder-experiment.py` with the real model (section 4.3) and send me the output.
+Details and numbers for the first item are in `docs/human-eval.md`.
+
+1. **A human-text evaluation on the owner's own sent mail** (approved by the owner on 2026-10-03; outgoing mail only, masked,
+   never committed). First contact: ask recall **0.45** on real Hebrew business and institutional mail (against 0.89 on the
+   model-written sets); formal polite requests ("אודה ל…", "אבקש…", "ברצוני לדעת…") were missing from the lexicon and from the
+   training grammar. Fixed as general grammar, retrained; ask recall 0.74 to 0.88 afterwards on the two sets, with the caveats
+   that one set was used for the fix, the labels are model-assigned and unchecked, and PROMISE has 5 and 2 examples (no number).
+2. **An on-device language model as a third tier** (`core/local-lm.js`). It only proposes; it is asked only about wording the two tiers
+   above left silent; it must give the same answer to two differently worded instructions, with the right party doing the
+   thing; dates and amounts it points at are re-read by code and dropped if they are not literally in the sentence; and it runs on a
+   device and in a language only after passing a precision self-test THERE (`FlowLocalLMAudit`, 100 fixed sentences, precision
+   at least 0.97). **Not measured on a real model**: this environment has no browser with a built-in model, so every number
+   in its tests comes from mock sessions. Chrome's Prompt API may not reach a Gmail content script, and Hebrew may not be supported;
+   the self-test decides, per language, and a device where it fails keeps the product exactly as before. It never starts a model download.
+3. **Loops that close from signals outside the thread** (`core/outside-signals.js`): a bank or payment-provider email that money
+   arrived for the amount a payment loop waits on (strong when the sender is a known provider AND the person's name is in it;
+   otherwise one question); a calendar event that now exists with the person on the invite (closes a "pick a time" loop, with
+   Reopen); a Drive file named for what you promised and shared with that person (one question, never closes alone). One loop
+   or silence; a dismissal is remembered. No new OAuth scopes; metadata only.
+4. **"What Glance learned from you"** (`core/learning-ledger.js`): a plain sentence for every adjustment, in the Activity tab,
+   with a Reset that forgets the adjustments and the list (and tells open Gmail tabs, so a later lesson cannot write old numbers back).
+5. **One active question** (`core/active-question.js`): the sentence of your own message the engine is most torn about (binary
+   entropy), asked once in the popup, rationed (one a day, three a week, paused after two skips). A yes opens the loop and is the
+   strongest label there is; a no is a gentle one.
+6. **Voice-matched drafts, Pro** (`core/style-profile.js`): counts of how you open and close a note, per language; follow-up drafts and
+   Draft-It follow them. Draft-It's server only ever receives a fixed vocabulary and re-validates it, so no client text can
+   reach a prompt.
+
+What these do NOT prove: items 2 and 5 have not been run in a real browser; items 3 to 6 are covered by corpus tests and by the
+existing Gmail harness, not by a person using them on real mail. Treat the first week of real use as the test.
+
+## 7. Needs the owner
+
+- Check the labels in `human-eval.tsv` / `human-blind.tsv` (about 175 sentences; only the owner's machine has them). Until then
+  the human numbers mean "agrees with a careful model reading real text".
+- Run Chrome with its built-in model and watch the Activity tab: whether the self-test passes, for which language, and whether it
+  ever proposes a wrong loop. If it fails on every machine you try, delete the tier rather than keep it.
+- Run `encoder-experiment.py` with the real model (section 4.3) and send me the output. I probed three more sources this session
+  (TF-Hub objects on storage.googleapis.com, HuggingFace, the spaCy models) and the network policy refused them; I did not try to
+  get around that. Adoption would also need a store-permission and size decision from you.
 - Real-Gmail steps 45-50 in `docs/open-loops.md` §9a-iv.
-- The community-learning decisions in `docs/community-learning.md` §8.
+- Community learning: you approved it in principle, with consent and a privacy-text change, for when there are users. It stays
+  dormant (`docs/community-learning.md`; the measured gain at any privacy level was zero, and the on-device wiring is not built).

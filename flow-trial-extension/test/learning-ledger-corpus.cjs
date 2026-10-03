@@ -11,7 +11,7 @@ const cp = { name: 'Dana Cohen', email: 'dana.cohen@acme.example' };
 
 console.log('\n--- the phrase an entry may show ---\n');
 {
-  const p = L.phrase('Dana, could you send the signed lease to Acme Corp by Friday 10/12? Call 054-234-1998 or dana.cohen@acme.example', cp);
+  const p = L.phrase('Dana, could you send the signed lease to Acme Corp by Friday 10/12? Call 052-000-0000 or dana.cohen@acme.example', cp);
   check('the salutation name, the phone, the address and the date are gone', p && !/Dana|054|acme|10\/12|@/i.test(p), p);
   check('digits never survive', !/\d/.test(L.phrase('Please pay invoice 3049 for 4,200 dollars this week, thanks a lot', cp)));
   check('the other person\'s name is removed wherever it appears', !/Cohen|Dana/.test(L.phrase('Please ask Cohen and Dana whether the lease is ready this week', cp)));
