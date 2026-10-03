@@ -91,6 +91,7 @@ async function open(browser, name, thread, opts) {
   fs.writeFileSync(file, html(thread));
   await p.goto('file://' + file);
   if (opts.watches) await p.evaluate((w) => { window.__store.followWatches = w; }, opts.watches);
+  if (opts.store) await p.evaluate((st) => { Object.assign(window.__store, st); }, opts.store);
   for (const src of cs.js) await p.addScriptTag({ path: path.join(ROOT, src) });
   await p.waitForTimeout(1000);
   const state = async () => ({
@@ -459,7 +460,7 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   const NODL = 'Could you send me the final figure so I can book the vendor?';
   t = await open(browser, 'person-slow', [msg(theirs, 'Happy to proceed.'), msg(mine, NODL)], { watches: SLOWHIST });
   s = await t.state();
-  check('with a slow replier the look-again day is later and says why', /usually takes about \d/.test(s.card || '') && !/Fri, Oct 2/.test(s.card || ''), s.card);
+  check('with a slow replier the look-again day is later and says why', /usually takes about \d+ business days/.test(s.card || '') && !/Fri, Oct 2/.test(s.card || ''), s.card);
   await t.ctx.close();
   t = await open(browser, 'person-new', [msg(theirs, 'Happy to proceed.'), msg(mine, NODL)]);
   s = await t.state();
@@ -485,6 +486,40 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   t = await open(browser, 'confirm-rule', ASKTHREAD.concat([msg(theirs, 'Confirmed, the final figure is 4,200.')]), { watches: [W2] });
   lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels }));
   check('a word-list loop teaches the model nothing (it already knew)', !lab.labels || !lab.labels.confirmedAsk, lab.labels);
+  await t.ctx.close();
+
+  // 32. a new person at a company Glance already knows starts from their colleagues, and says so
+  const corpHist = (who2, ds) => ds.map((d, i) => ({ id: 'c' + who2 + i, threadId: 'c' + who2 + i, direction: 'theirs', kind: 'reply', counterpart: { email: who2 + '@acme.com', name: who2 }, status: 'resolved', closedAs: 'replied', subject: 'old', what: 'x', createdAt: new Date(2026, 7, 3 + i * 7, 12).getTime(), resolvedAt: new Date(2026, 7, 3 + i * 7 + d, 12).getTime() }));
+  t = await open(browser, 'person-colleagues', [msg(theirs, 'Happy to proceed.'), msg(mine, NODL)], { watches: corpHist('eli', [8, 9, 10, 8, 9]).concat(corpHist('noa', [9, 10, 8, 9, 10])) });
+  s = await t.state();
+  check('with no history of her own, a colleague-based day is offered and attributed to the colleagues, not to her', /people at acme\.com usually take about \d+ business days/.test(s.card || '') && !/Dana usually/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 33. more signals from outcomes: a missed promise, and closing carefully when its own closes keep being corrected
+  t = await open(browser, 'missed-promise', [msg(theirs, 'Hi, thanks.'), msg(mine, 'i book you for thursday at 9, see you then'), msg(theirs, 'ok'), msg(mine, 'Attached the confirmation, here it is.')]);
+  lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels, adapt: window.__store.intentAdapt }));
+  check('delivering where no promise loop existed teaches the model the earlier promise, once, as numbers only', lab.labels && lab.labels.missedPromise === 1 && Object.keys((lab.adapt || {}).act || {}).length > 0 && !/thursday|book/i.test(JSON.stringify(lab)), lab);
+  await t.ctx.close();
+
+  const VAGUE = 'Let us see how this evolves over the coming quarter, there are many factors.';
+  t = await open(browser, 'strict-off', ASKTHREAD.concat([msg(theirs, VAGUE)]), { watches: [W2] });
+  s = await t.state();
+  check('normally a reply that rests only on "they wrote back" closes the loop (as before)', s.watches[0].status === 'resolved', s.watches);
+  await t.ctx.close();
+  const strictStore = await (async () => { return { outcomeLabels: { missedAsk: 0, missedPromise: 0, confirmedAsk: 0, confirmedPromise: 0, autoClosed: 12, reopened: 4, seen: [] } }; })();
+  t = await open(browser, 'strict-on', ASKTHREAD.concat([msg(theirs, VAGUE)]), { watches: [W2], store: strictStore });
+  s = await t.state();
+  check('once a third of its own closes were reopened, the same reply no longer closes the loop', s.watches[0].status === 'waiting', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'strict-rule', ASKTHREAD.concat([msg(theirs, 'Confirmed, the final figure is 4,200.')]), { watches: [W2], store: strictStore });
+  s = await t.state();
+  check('but a reply a rule understood (a real confirmation) still closes it', s.watches[0].status === 'resolved', s.watches);
+  await t.ctx.close();
+
+  t = await open(browser, 'reopen-counts', ASKTHREAD.concat([msg(theirs, 'Confirmed, the final figure is 4,200.')]), { watches: [W2] });
+  await t.p.click('.flow-fu-btn.ghost'); await t.p.waitForTimeout(500);
+  lab = await t.p.evaluate(() => window.__store.outcomeLabels);
+  check('an auto-close and its reopen are both counted, so the error rate is measured', lab && lab.autoClosed === 1 && lab.reopened === 1, lab);
   await t.ctx.close();
 
   await browser.close();

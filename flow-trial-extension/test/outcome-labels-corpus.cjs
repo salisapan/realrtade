@@ -39,6 +39,28 @@ console.log('\n--- when the thread says an ask was missed ---');
   check('a courtesy-only earlier message teaches nothing', F.missedAskIn(own('Thanks for the call today, talk soon.'), ctx) === null);
 }
 
+console.log('\n--- the mirror: a promise the engine missed ---');
+{
+  const ctx = Object.assign({ now: Date.now() }, PIPE);
+  const LETTER = 'I write the letter this weekend and upload it';
+  check('the fixture is a promise the engine stays silent on', F.classifyCommitment(LETTER, ctx) === null && F.classifyOutgoing(LETTER, ctx) === null);
+  const hit = F.missedPromiseIn([{ text: LETTER, key: 'm3' }], ctx);
+  check('delivering later labels the earlier promise sentence', hit && /write the letter/.test(hit.sentence) && hit.key === 'm3', hit);
+  check('if an earlier promise WAS recognised, nothing was missed', F.missedPromiseIn([{ text: LETTER, key: 'a' }, { text: 'I will send you the signed contract by Friday.', key: 'b' }], ctx) === null);
+  check('a message with no promise-like sentence earns nothing', F.missedPromiseIn([{ text: 'Thanks for the call today, talk soon.', key: 'x' }], ctx) === null);
+  check('a model that is not ready earns nothing', L.pickMissedPromise(LETTER, { ready: () => false }) === null && L.pickMissedPromise(LETTER, null) === null);
+}
+
+console.log('\n--- how well is the closing going (and what it does about it) ---');
+{
+  check('no closes, no rate, not strict', (() => { const q = L.closureQuality({}); return q.errorRate === 0 && q.strict === false; })());
+  check('a few closes are never enough to turn strict', L.closureQuality({ autoClosed: 4, reopened: 4 }).strict === false);
+  check('few corrections: not strict', L.closureQuality({ autoClosed: 20, reopened: 2 }).strict === false);
+  const q = L.closureQuality({ autoClosed: 12, reopened: 4 });
+  check('a third of eight-plus closes corrected: strict, and the rate is reported', q.strict === true && q.errorRate === 0.333, q);
+  check('the boundary is exactly 25% of at least 8', L.closureQuality({ autoClosed: 8, reopened: 2 }).strict === true && L.closureQuality({ autoClosed: 8, reopened: 1 }).strict === false);
+}
+
 console.log('\n--- what a label does to the model ---');
 {
   M.setAdaptation({});

@@ -6,6 +6,10 @@
 //                   loop. So an earlier message of yours WAS an ask and the local engine stayed
 //                   silent on it. That earlier sentence is a labelled false negative, the exact
 //                   kind the model needs, and it is YOURS: your phrasing, your contacts' domain.
+//   missed promise  You later delivered something in a thread with no promise loop: the earlier
+//                   sentence that promised it is a labelled false negative too.
+//   closure quality Loops Glance closed by itself that you then reopened: its own error rate, which
+//                   makes it more careful (stricter) when it is high.
 //   confirmed ask   A loop the model alone proposed got a real reply: the proposal was right.
 //   confirmed promise  Same for a promise the model alone proposed and you then kept.
 //
@@ -21,6 +25,22 @@ const FlowOutcomeLabels = (() => {
 
   function sentences(text) {
     return String(text || '').replace(/\r/g, '').split(/(?<=[.!?؟])\s+|\n+/).map((x) => x.trim()).filter(Boolean);
+  }
+
+  // The same for a promise: you later DELIVERED something (a message with the file, "here it is") in a thread
+  // where no promise loop was opened, so an earlier sentence of yours promised it and the engine missed it.
+  function pickMissedPromise(text, model) {
+    if (!model || !model.ready || !model.ready()) return null;
+    const list = sentences(text).filter((s) => (s.match(/\S+/g) || []).length >= MIN_WORDS);
+    if (!list.length || list.length > MAX_SENTENCES) return null;
+    let best = null;
+    for (const s of list) {
+      const p = model.predict(s);
+      const pr = p.probs && typeof p.probs.PROMISE === 'number' ? p.probs.PROMISE : 0;
+      if ((p.act === 'ACK' || p.act === 'ASK') && p.actProb >= 0.97 && pr < 0.01) continue;
+      if (!best || pr > best.prob) best = { sentence: s, prob: pr };
+    }
+    return best && best.prob >= MIN_ASK_PROB ? best : null;
   }
 
   // Which sentence of an earlier own message of yours was the ask the engine missed?
@@ -56,7 +76,30 @@ const FlowOutcomeLabels = (() => {
     return null;
   }
 
-  return { pickMissedAsk, missedAskIn, RATE_MISSED, RATE_CONFIRMED };
+  function missedPromiseIn(earlierOwnNewestFirst, silentOn, model) {
+    const list = Array.isArray(earlierOwnNewestFirst) ? earlierOwnNewestFirst : [];
+    if (!list.length) return null;
+    for (const m of list) if (!silentOn(m.text)) return null;
+    for (const m of list) {
+      const pick = pickMissedPromise(m.text, model);
+      if (pick) return { key: m.key || null, sentence: pick.sentence, prob: pick.prob };
+    }
+    return null;
+  }
+
+  // ---- how well is the closing going? ------------------------------------------------------------
+  // A loop Glance closed by itself that the person then REOPENED is a closure mistake: the one mistake
+  // this product must not make. The rate is a real production quality number, and it feeds back: when
+  // closes are being corrected often, Glance stops closing on a reply it understood only by default
+  // ("they wrote back, so it is answered") and keeps the loop open instead.
+  const STRICT_MIN_CLOSES = 8, STRICT_RATE = 0.25;
+  function closureQuality(counts) {
+    const c = counts || {};
+    const closes = c.autoClosed || 0, reopened = c.reopened || 0;
+    return { autoClosed: closes, reopened, errorRate: closes ? Math.round((reopened / closes) * 1000) / 1000 : 0, strict: closes >= STRICT_MIN_CLOSES && reopened / closes >= STRICT_RATE };
+  }
+
+  return { pickMissedAsk, missedAskIn, pickMissedPromise, missedPromiseIn, closureQuality, RATE_MISSED, RATE_CONFIRMED, STRICT_MIN_CLOSES, STRICT_RATE };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutcomeLabels };

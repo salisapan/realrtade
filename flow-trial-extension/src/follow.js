@@ -158,6 +158,7 @@ const FlowFollow = (() => {
     const list = await FlowStorage.getWatches();
     const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
     if (!gate.allowed) { await capCard(gate.used, gate.cap, true); return; }
+    if ((watch.resolvedBy === 'reply' || watch.resolvedBy === 'delivered') && typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('reopened', watch.id + '|' + (watch.resolvedAt || '')).catch(() => {});
     const patch = FlowFollowUp.reopenPatch(watch, Date.now());
     const next = await FlowStorage.updateWatch(watch.id, patch);
     if (watch.taskRef) {
@@ -197,6 +198,7 @@ const FlowFollow = (() => {
 
   // ---- 3. what the answer did ------------------------------------------------------
   async function closed(watch, sender, how) {
+    if (typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('autoClosed', watch.id + '|' + (watch.resolvedAt || '')).catch(() => {});
     if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
     track('follow_resolved');
     const name = whoOf(sender);
@@ -343,8 +345,13 @@ const FlowFollow = (() => {
   }
 
   async function handleReply(ctx, watch, lastId) {
-    const best = judge(ctx, watch);
+    let best = judge(ctx, watch);
     if (!best) return;
+    // Closing wrongly is the one mistake this product must not make. If this person has been reopening
+    // Glance's own closes often, a close that rests only on "they wrote back" (no rule fired) is not made.
+    if (best.reply.outcome === 'closed' && best.reply.basis === 'default' && typeof FlowOutcomeLabels !== 'undefined' && FlowStorage.getOutcomeLabels) {
+      try { if (FlowOutcomeLabels.closureQuality(await FlowStorage.getOutcomeLabels()).strict) best = { reply: Object.assign({}, best.reply, { outcome: 'ack' }), sender: best.sender }; } catch (e) { /* quality is advisory */ }
+    }
     const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
     if (res.none) return;
     recordReply(watch, best.reply, lastId);
@@ -374,9 +381,11 @@ const FlowFollow = (() => {
 
   // You chased by hand in a thread where no loop exists: an earlier message of yours was an ask
   // the engine stayed silent on. Teach the model that sentence, once.
-  async function learnMissedAsk(ctx, last, threadId) {
+  async function learnMissed(ctx, last, threadId, kind) {
     try {
-      if (typeof FlowOutcomeLabels === 'undefined' || typeof FlowStorage.recordOutcomeLabel !== 'function' || !FlowFollowUp.missedAskIn) return;
+      if (typeof FlowOutcomeLabels === 'undefined' || typeof FlowStorage.recordOutcomeLabel !== 'function') return;
+      const finder = kind === 'missedPromise' ? FlowFollowUp.missedPromiseIn : FlowFollowUp.missedAskIn;
+      if (!finder) return;
       await loadAdapt();
       const msgs = Array.from(ctx.messages);
       const at = msgs.indexOf(last);
@@ -385,20 +394,22 @@ const FlowFollow = (() => {
         const e = (ctx.extractSender(msgs[i]).email || '').toLowerCase();
         if (e && e === String(ctx.ownEmail).toLowerCase()) own.push({ text: ctx.ownMessageText(msgs[i]), key: msgs[i].getAttribute('data-legacy-message-id') || String(i) });
       }
-      const found = FlowFollowUp.missedAskIn(own, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+      const found = finder(own, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
       if (!found) return;
-      if (await FlowStorage.recordOutcomeLabel('missedAsk', threadId + '|' + found.key)) {
-        await teach(found.sentence, 'ASK', FlowOutcomeLabels.RATE_MISSED);
-        track('follow_learned_missed_ask');
+      if (await FlowStorage.recordOutcomeLabel(kind, threadId + '|' + found.key)) {
+        await teach(found.sentence, kind === 'missedPromise' ? 'PROMISE' : 'ASK', FlowOutcomeLabels.RATE_MISSED);
+        track(kind === 'missedPromise' ? 'follow_learned_missed_promise' : 'follow_learned_missed_ask');
       }
     } catch (e) { /* learning is optional */ }
   }
+  const learnMissedAsk = (ctx, last, threadId) => learnMissed(ctx, last, threadId, 'missedAsk');
 
   async function kept(watch, lastId) {
     const patch = Object.assign({ messageId: lastId }, FlowFollowUp.closeAsKept(watch, Date.now()));
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
     if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
     track('follow_resolved');
+    if (typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('autoClosed', watch.id + '|' + (next.resolvedAt || '')).catch(() => {});
     if (watch.tier === 'model') confirmAsk(watch, 'confirmedPromise', 'PROMISE');
     receipt('Promise kept' + took(watch) + '. Loop closed.', null, { label: 'Reopen', run: () => reopen(next) });
   }
@@ -486,7 +497,7 @@ const FlowFollow = (() => {
     }
     h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : ask.file ? 'Waiting on the ' + ask.file.label + '?' : 'Waiting on a reply?'));
     h.appendChild(el('div', 'flow-fu-quote', ask.what));
-    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + (ask.personal ? ' (' + ((FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) || '') ? FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) + ' usually takes' : 'they usually take') + ' about ' + Math.max(1, Math.round(ask.personal.typical)) + ' days)' : '') + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
+    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + (ask.personal ? ' (' + (ask.personal.level === 'colleagues' ? 'people at ' + ask.personal.domain + ' usually take' : ((FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) || '') ? FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) + ' usually takes' : 'they usually take')) + ' about ' + Math.max(1, Math.round(ask.personal.typical)) + ' business days)' : '') + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
     const row = el('div', 'flow-fu-actions');
     row.appendChild(button('Stay on it', 'primary', () => { track1(ask, base); }));
     row.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
@@ -645,6 +656,8 @@ const FlowFollow = (() => {
     const mineText = ctx.ownMessageText(last);
     // A hand-made chase with no loop behind it: whatever you asked earlier was an ask we missed.
     if (!watch && FlowFollowUp.looksLikeChase(mineText)) learnMissedAsk(ctx, last, threadId);
+    // You delivered something where no promise loop exists: an earlier sentence of yours promised it.
+    if (!watch && FlowFollowUp.deliversPromise(mineText)) learnMissed(ctx, last, threadId, 'missedPromise');
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
     let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);

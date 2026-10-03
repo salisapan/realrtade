@@ -61,7 +61,8 @@ const ALLOWED_EVENTS = new Set([
   'follow_yours',
   'follow_reply_prepared',
   'follow_file_prepared',
-  'follow_learned_missed_ask'
+  'follow_learned_missed_ask',
+  'follow_learned_missed_promise'
 ]);
 
 // Each allowed param key validates its own value rather than sharing one

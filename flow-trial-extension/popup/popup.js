@@ -951,6 +951,8 @@
           return;
         }
         const patch = FlowFollowUp.reopenPatch(w, Date.now());
+        // Reopening a loop Glance closed by itself is a correction: it feeds the closure-quality rate.
+        if ((w.resolvedBy === 'reply' || w.resolvedBy === 'delivered') && FlowStorage.recordOutcomeLabel) FlowStorage.recordOutcomeLabel('reopened', w.id + '|' + (w.resolvedAt || '')).catch(() => {});
         await FlowStorage.updateWatch(w.id, patch);
         if (w.taskRef) {
           const r = await send({ type: 'flow:follow-reopen', ref: w.taskRef, dueIso: patch.chaseIso });

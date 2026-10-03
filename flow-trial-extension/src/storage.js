@@ -212,7 +212,7 @@ const FlowStorage = (() => {
     recognitionSeen: [],
     // core/outcome-labels.js: how many labels the product earned from what happened next (counts
     // and opaque keys only, never text), so the same moment is not counted twice.
-    outcomeLabels: { missedAsk: 0, confirmedAsk: 0, confirmedPromise: 0, seen: [] }
+    outcomeLabels: { missedAsk: 0, missedPromise: 0, confirmedAsk: 0, confirmedPromise: 0, autoClosed: 0, reopened: 0, seen: [] }
   };
 
   function get() {
@@ -1021,13 +1021,13 @@ const FlowStorage = (() => {
 
   async function getOutcomeLabels() {
     const state = await get();
-    return state.outcomeLabels || { missedAsk: 0, confirmedAsk: 0, confirmedPromise: 0, seen: [] };
+    return state.outcomeLabels || { missedAsk: 0, missedPromise: 0, confirmedAsk: 0, confirmedPromise: 0, autoClosed: 0, reopened: 0, seen: [] };
   }
   // Returns true when the label is NEW (so the caller teaches the model exactly once per moment).
   const recordOutcomeLabel = serialize(async function recordOutcomeLabel(kind, key) {
-    if (['missedAsk', 'confirmedAsk', 'confirmedPromise'].indexOf(kind) < 0) return false;
+    if (['missedAsk', 'missedPromise', 'confirmedAsk', 'confirmedPromise', 'autoClosed', 'reopened'].indexOf(kind) < 0) return false;
     const state = await get();
-    const cur = Object.assign({ missedAsk: 0, confirmedAsk: 0, confirmedPromise: 0, seen: [] }, state.outcomeLabels || {});
+    const cur = Object.assign({ missedAsk: 0, missedPromise: 0, confirmedAsk: 0, confirmedPromise: 0, autoClosed: 0, reopened: 0, seen: [] }, state.outcomeLabels || {});
     const id = kind + '|' + key;
     let seen = Array.isArray(cur.seen) ? cur.seen.slice() : [];
     if (key && seen.indexOf(id) >= 0) return false;

@@ -604,12 +604,17 @@ const FlowFollowUp = (() => {
     return outcomeLabels.missedAskIn(own, silentOn, model);
   }
 
-  // A calendar-day count from today, landing on a weekday.
+  function missedPromiseIn(own, ctx) {
+    if (!outcomeLabels) return null;
+    const c = ctx || {};
+    const model = c.model || intentModel;
+    const silentOn = (text) => !(classifyOutgoing(text, c) || classifyCommitment(text, c));
+    return outcomeLabels.missedPromiseIn(own, silentOn, model);
+  }
+
+  // `n` business days from today (weekends do not count).
   function afterDays(now, n) {
-    const d = new Date(today(now).getTime());
-    d.setDate(d.getDate() + Math.max(1, Math.round(n)));
-    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
-    return isoDay(d);
+    return isoDay(addBusinessDays(today(now), Math.max(1, Math.round(n))));
   }
 
   // The look-again day for a NEW loop, learned from how long THIS person has taken before
@@ -619,7 +624,7 @@ const FlowFollowUp = (() => {
     if (!ask || !personModel || ask.direction !== 'theirs' || ask.deadlineIso || !email) return ask;
     const sug = personModel.suggestChaseDays(watches, email, ask.kind, typeof now === 'number' ? now : Date.now());
     if (!sug) return ask;
-    return Object.assign({}, ask, { chaseIso: afterDays(now, sug.days), personal: { days: sug.days, typical: sug.typical, n: sug.n } });
+    return Object.assign({}, ask, { chaseIso: afterDays(now, sug.days), personal: { days: sug.days, typical: sug.typical, n: sug.n, level: sug.level, domain: personModel.domainOf(email) } });
   }
 
   // Is this loop likely to miss its date, judged by how long this person usually takes?
@@ -849,7 +854,7 @@ const FlowFollowUp = (() => {
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, deliversFor, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
-    nextNudgeLevel, missedAskIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
+    nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };
 })();
 

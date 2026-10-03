@@ -16,6 +16,13 @@
 //     EM: replace it by its expected log-time under the current fit).
 // Forecasts are conditional on the loop's age: P(done within h more days | still open after a).
 //
+// Two refinements make the estimate honest about how people actually work:
+//   - time is counted in BUSINESS days: an ask sent on Friday and answered on Monday took one business
+//     day, not three. Weekends are not slowness;
+//   - partial pooling by organisation: a brand-new person at a company where Glance has already seen
+//     colleagues starts from THEIR habits (a department answers alike), not from the whole population.
+//     Free-mail domains (gmail.com...) are never pooled: those are strangers, not colleagues.
+//
 // Honest limits (also in docs/person-model.md): it needs a few closed loops with the person
 // before it is personal; it models time to close, not whether they are willing; replies closed
 // by hand ("Mark done") are not used because the person may have settled it outside email.
@@ -23,9 +30,11 @@ const FlowPersonModel = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   // Population prior, days. Deliberately broad. n0 = how many pseudo-observations it is worth.
   const PRIOR = {
-    reply: { mu: Math.log(2.5), sigma: 1.0, n0: 2 },
-    payment: { mu: Math.log(9), sigma: 0.85, n0: 2 }
+    reply: { mu: Math.log(2), sigma: 1.0, n0: 2 },
+    payment: { mu: Math.log(6.5), sigma: 0.85, n0: 2 }
   };
+  const FREEMAIL = /^(?:gmail|googlemail|yahoo|ymail|outlook|hotmail|live|msn|icloud|me|aol|proton|protonmail|walla|012|bezeqint|netvision|zahav|gmx|mail|yandex)\.[a-z.]+$/i;
+  const DOMAIN_N0 = 3;                  // how many pseudo-observations a colleague group is worth
   const MIN_SIGMA = 0.35, MAX_SIGMA = 1.8;
   const MAX_AGE_DAYS = 120;           // older than this and a loop is abandoned, not slow
   const REAL_CLOSES = { replied: 1, paid: 1, delivered: 1, declined: 1 };
@@ -45,6 +54,26 @@ const FlowPersonModel = (() => {
     return (lo + hi) / 2;
   }
 
+  // ---- business time ------------------------------------------------------------------------
+  const isBiz = (d) => d.getDay() !== 0 && d.getDay() !== 6;
+  // Fractional business days between two instants (weekends count as zero).
+  let CLOCK = 'business';   // 'calendar' exists only so scripts/person-model-sim.cjs can measure what business time buys
+  function setClock(c) { CLOCK = c === 'calendar' ? 'calendar' : 'business'; }
+  function bizDays(startMs, endMs) {
+    if (!(endMs > startMs)) return 0;
+    if (CLOCK === 'calendar') return (endMs - startMs) / DAY_MS;
+    let total = 0;
+    const d = new Date(startMs);
+    let cursor = startMs;
+    for (let i = 0; i < 400 && cursor < endMs; i++) {
+      const next = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+      const segEnd = Math.min(next, endMs);
+      if (isBiz(new Date(cursor))) total += (segEnd - cursor) / DAY_MS;
+      cursor = segEnd; d.setTime(next);
+    }
+    return total;
+  }
+
   // ---- observations from the stored loops ------------------------------------------------
   function who(w) { return String((w && w.counterpart && w.counterpart.email) || '').toLowerCase(); }
   function kindOf(w) { return w && w.kind === 'payment' ? 'payment' : 'reply'; }
@@ -56,9 +85,9 @@ const FlowPersonModel = (() => {
     (Array.isArray(watches) ? watches : []).forEach((w) => {
       if (!theirs(w) || who(w) !== String(email || '').toLowerCase() || kindOf(w) !== kind || !w.createdAt) return;
       if (w.status === 'resolved' && REAL_CLOSES[w.closedAs] && w.resolvedAt > w.createdAt) {
-        events.push(Math.max(0.25, (w.resolvedAt - w.createdAt) / DAY_MS));
+        events.push(Math.max(0.25, bizDays(w.createdAt, w.resolvedAt)));
       } else if (w.status === 'waiting') {
-        const age = (now - w.createdAt) / DAY_MS;
+        const age = bizDays(w.createdAt, now);
         if (age >= 1 && age <= MAX_AGE_DAYS) censored.push(age);
       }
     });
@@ -66,8 +95,8 @@ const FlowPersonModel = (() => {
   }
 
   // ---- the fit: EM for a log-normal with a prior and right-censoring ------------------------
-  function fit(obs, kind) {
-    const pr = PRIOR[kind] || PRIOR.reply;
+  function fit(obs, kind, priorOverride) {
+    const pr = priorOverride || PRIOR[kind] || PRIOR.reply;
     const xs = obs.events.map(Math.log), cs = obs.censored.map(Math.log);
     let mu = pr.mu, sigma = pr.sigma;
     const n = xs.length, m = cs.length, N = pr.n0 + n + m;
@@ -90,12 +119,42 @@ const FlowPersonModel = (() => {
       if (done) break;
     }
     const level = n >= 3 ? 'personal' : n >= 1 ? 'learning' : 'prior';
-    return { mu, sigma, n, censored: m, level };
+    return { mu, sigma, n, censored: m, level, pooled: Boolean(priorOverride) };
+  }
+
+  function domainOf(email) {
+    const m = String(email || '').toLowerCase().match(/@([^@\s]+)$/);
+    return m && !FREEMAIL.test(m[1]) ? m[1] : null;
+  }
+
+  // What colleagues at the same organisation suggest, as a prior for someone new: the fit over
+  // everyone ELSE at the domain (open and closed loops), worth DOMAIN_N0 observations. Needs at least
+  // two real closes from at least two other people, otherwise the population prior stays.
+  function domainPrior(watches, email, kind, now) {
+    const dom = domainOf(email);
+    if (!dom) return null;
+    const me = String(email).toLowerCase();
+    const others = {};
+    (Array.isArray(watches) ? watches : []).forEach((w) => {
+      const e = who(w);
+      if (!e || e === me || domainOf(e) !== dom) return;
+      others[e] = true;
+    });
+    const emails = Object.keys(others);
+    if (emails.length < 2) return null;
+    const events = [], censored = [];
+    emails.forEach((e) => { const o = observe(watches, e, kind, now); events.push.apply(events, o.events); censored.push.apply(censored, o.censored); });
+    if (events.length < 2) return null;
+    const f = fit({ events, censored }, kind);
+    return { mu: f.mu, sigma: f.sigma, n0: DOMAIN_N0 };
   }
 
   function model(watches, email, kind, now) {
     const k = kind === 'payment' ? 'payment' : 'reply';
-    return Object.assign({ kind: k, email: String(email || '').toLowerCase() }, fit(observe(watches, email, k, now), k));
+    const own = observe(watches, email, k, now);
+    // The domain prior only matters while there is little data about the person themself.
+    const dp = own.events.length < 6 ? domainPrior(watches, email, k, now) : null;
+    return Object.assign({ kind: k, email: String(email || '').toLowerCase() }, fit(own, k, dp));
   }
 
   // ---- forecasts -----------------------------------------------------------------------------
@@ -125,10 +184,10 @@ const FlowPersonModel = (() => {
   function suggestChaseDays(watches, email, kind, now) {
     if (!email) return null;
     const f = model(watches, email, kind, now);
-    if (f.n < 2) return null;
-    // Look when a reply is "late for this person": about the 70th percentile of how long they take.
+    if (f.n < 2 && !f.pooled) return null;
+    // Look when a reply is "late for this person": about the 70th percentile of how long they take, in business days.
     const days = Math.min(21, Math.max(1, Math.round(quantile(f, 0.7))));
-    return { days, level: f.level, n: f.n, typical: Math.round(quantile(f, 0.5) * 10) / 10 };
+    return { days, level: f.pooled && f.n < 2 ? 'colleagues' : f.level, n: f.n, typical: Math.round(quantile(f, 0.5) * 10) / 10 };
   }
 
   // After a chase: how long to give them before looking again. Conditional on the age of the loop.
@@ -137,7 +196,7 @@ const FlowPersonModel = (() => {
     if (!email) return null;
     const f = model(watches, email, kindOf(w), now);
     if (f.n < 2) return null;
-    const age = (now - (w.createdAt || now)) / DAY_MS;
+    const age = bizDays(w.createdAt || now, now);
     return { days: Math.min(14, Math.max(1, Math.ceil(remainingMedian(f, age)))), level: f.level, n: f.n };
   }
 
@@ -148,9 +207,9 @@ const FlowPersonModel = (() => {
     const f = model(watches, who(w), kindOf(w), now);
     if (f.level !== 'personal') return null;
     const due = new Date(w.deadlineIso + 'T23:59:59').getTime();
-    const daysLeft = (due - now) / DAY_MS;
-    if (daysLeft < 0) return null;                        // already late: the deadline-passed label says so
-    const age = (now - (w.createdAt || now)) / DAY_MS;
+    if (due < now) return null;                           // already late: the deadline-passed label says so
+    const daysLeft = bizDays(now, due);
+    const age = bizDays(w.createdAt || now, now);
     const pOnTime = pWithin(f, age, daysLeft);
     return { slip: pOnTime < 0.35, pOnTime: Math.round(pOnTime * 100) / 100, typical: Math.round(quantile(f, 0.5) * 10) / 10, n: f.n };
   }
@@ -161,7 +220,7 @@ const FlowPersonModel = (() => {
     return f.level === 'personal' ? Math.max(1, Math.round(quantile(f, 0.5))) : null;
   }
 
-  return { model, observe, fit, pWithin, remainingMedian, quantile, suggestChaseDays, suggestWaitDays, risk, typicalDays, PRIOR };
+  return { model, observe, fit, domainOf, domainPrior, bizDays, setClock, pWithin, remainingMedian, quantile, suggestChaseDays, suggestWaitDays, risk, typicalDays, PRIOR };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowPersonModel };
