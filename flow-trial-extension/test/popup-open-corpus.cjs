@@ -662,7 +662,7 @@ async function run() {
     check('a selection older than a day is not offered, and is cleared', document.getElementById('captureBlock').hidden === true && !store().captureNow);
   }
 
-  console.log('\n--- popup.js: Outlook says plainly when it is not set up ---\n');
+  console.log('\n--- popup.js: Outlook is off until the person turns it on ---\n');
   {
     const { sandbox, document } = load({});
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
@@ -670,11 +670,10 @@ async function run() {
     const host = document.getElementById('surface-list');
     const states = find(host, 'wait-state').map((n) => n.textContent);
     const notes = find(host, 'wait-note').map((n) => n.textContent);
-    check('the Outlook row is there and says it is not set up yet (no client id)', states.includes('Not set up yet'), states);
+    check('the Outlook row is there and is off until turned on', states.includes('Off') && !states.includes('Not set up yet'), states);
     check('it says what it does, read-only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Read-only/.test(t) && /nothing is sent to Glance/.test(t)), notes);
-    check('it shows the redirect address the Microsoft app registration needs', notes.some((t) => /chromiumapp\.org/.test(t)), notes);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('and offers no Turn on button until it is set up', !buttons.includes('Turn on'), buttons);
+    check('and offers Turn on once a client id is set', buttons.includes('Turn on'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
   }
 

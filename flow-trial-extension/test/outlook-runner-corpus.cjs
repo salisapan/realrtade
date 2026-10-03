@@ -64,7 +64,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
 (async () => {
   console.log('\n--- before anything is set up ---\n');
   {
-    const w = world({ cfgOverride: C });
+    const w = world({ cfgOverride: Object.assign({}, C, { CLIENT_ID: '' }) });
     const o = O.create(w.deps());
     const st = await o.status();
     check('with no client id it says it is not set up and offers nothing to connect', st.configured === false && st.connected === false, st);
