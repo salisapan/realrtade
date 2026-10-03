@@ -1,0 +1,124 @@
+{
+ "dev": {
+  "n": 96,
+  "modelAccuracy": 0.979,
+  "en": 0.982,
+  "he": 0.976,
+  "ASK": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.438
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.938,
+    "fp": 0,
+    "fn": 2
+   }
+  },
+  "PROMISE": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.524
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.952,
+    "fp": 0,
+    "fn": 1
+   }
+  }
+ },
+ "blind": {
+  "n": 108,
+  "modelAccuracy": 0.889,
+  "en": 0.908,
+  "he": 0.86,
+  "ASK": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.265
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.941,
+    "fp": 0,
+    "fn": 2
+   }
+  },
+  "PROMISE": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.333
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.75,
+    "fp": 0,
+    "fn": 6
+   }
+  }
+ },
+ "teacherEval": {
+  "n": 278,
+  "modelAccuracy": 0.906,
+  "en": 0.899,
+  "he": 0.914,
+  "actionAccuracy": 0.663,
+  "ASK": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.508
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.885,
+    "fp": 0,
+    "fn": 14
+   }
+  },
+  "PROMISE": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.549
+   },
+   "pipeline": {
+    "p": 0.984,
+    "r": 0.859,
+    "fp": 1,
+    "fn": 10
+   }
+  }
+ },
+ "teacherEval2": {
+  "n": 243,
+  "modelAccuracy": 0.86,
+  "en": 0.844,
+  "he": 0.876,
+  "actionAccuracy": 0.586,
+  "ASK": {
+   "lexicon": {
+    "p": 0.956,
+    "r": 0.381
+   },
+   "pipeline": {
+    "p": 0.979,
+    "r": 0.814,
+    "fp": 2,
+    "fn": 21
+   }
+  },
+  "PROMISE": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.464
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.696,
+    "fp": 0,
+    "fn": 17
+   }
+  }
+ }
+}

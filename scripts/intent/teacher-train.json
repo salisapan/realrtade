@@ -4723,5 +4723,2623 @@
 "action": "none",
 "lang": "he",
 "src": "teacher"
+},
+{
+"t": "Your June bill is overdue, please pay it before we suspend the line.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you cover the studio rental for Saturday? It's 300.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "pls settle the outstanding fee for the translation, it's been 45 days",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you wire the pledge by the end of the campaign? The platform closes at midnight.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We need the retainer for the tax filing before we can start.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Would you mind paying the vet bill by Friday, the clinic is chasing us.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "monthly membership failed again, can you update the card or pay at the desk?",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please clear the invoice for the ad spend, the agency is holding the campaign.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I still need the 50% deposit for the shoot, can you send it today?",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Are you going to pay the supplier this week? They keep emailing me.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please countersign the SLA and send it back to your account manager.",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you sign the model release for the photos?",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "we need your sig on the e-file authorization form before we submit",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you sign the term sheet so we can start the data room?",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please sign the lease addendum for the new dog.",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Would you e-sign the translation agreement tonight?",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The bank needs your signature on the loan documents, can you come by?",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you approve the creative so we can go live Monday?",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please give the green light on the floor plan, the contractor is waiting.",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Do I have your OK to publish the episode?",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you approve the credit limit increase request?",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We need sign-off on the final cut before the festival deadline.",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "pls approve my expense claim from the conference",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Would you authorize the refund for the annual plan?",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you confirm your new phone number for the account?",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please confirm that the invoice address is correct.",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you verify the spelling of the guest's name before we record?",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you double check the tax ID on the filing?",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Just checking that the swatches arrived, can you confirm?",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please confirm whether the trial users should be migrated.",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you reconfirm the rate for the Hebrew-to-English batch?",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can we set up a call with your CFO about the renewal?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "When would you like the photographer to arrive?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please book your onboarding session using the calendar link.",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could we move the recording to Thursday afternoon?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "What times work for a design review next week?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Let's schedule your annual tax meeting, are you free in the second week of March?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you come in for a fitting on Tuesday?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Which slot do you want for the dog grooming, 10 or 2?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Do you want to upgrade to the premium plan or stay on basic?",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Which of the three logo directions should we develop further?",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please choose a payout schedule, monthly or at the end of the campaign.",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Are you taking the early-bird offer? It expires tonight.",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We need to know whether to include the Arabic translation.",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Should we pause the campaign until the new landing page is ready?",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Which fabric do you prefer for the sofa, linen or velvet?",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you go through the draft translation and flag awkward phrases?",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please review the media plan and tell me if the budget split looks right.",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you check the audio levels on the first ten minutes?",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Would you read the pitch deck and send me any red flags?",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can someone sanity check the workout program before I send it to the client?",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'd love your honest take on the mood board.",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please look over the K-1 and tell me if anything seems off.",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you join the investor call tomorrow at 10?",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please attend the product training on Wednesday.",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Are you coming to the premiere on Friday? I need a headcount.",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you sit in on the client workshop?",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please register for the quarterly business review.",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We would love for you to speak at the meetup, can you confirm?",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please fill in the intake form for your pet before the visit.",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you finish the subtitles for episode 4 by Wednesday?",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you prepare the investor update for the end of the month?",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We need the onboarding checklist completed by your team.",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please sort out the SSO configuration on your side.",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you draft the campaign brief and share it with the agency?",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Would you update the contact info in the portal?",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please build the budget model for the second year.",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you send the raw files from the shoot?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please share the style guide with the translators.",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you email me last year's return so I can prepare this one?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I need the usage report for April, can you pull it?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please upload your ID and proof of address to the portal.",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you forward the contract to your legal team and copy me?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Do you have the high-res logo? Could you send it over?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Send me the vaccination record please.",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could you provide the VAT number of your company?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Any news on the proposal? We'd like to lock in the date.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Have you had a chance to test the new release? Let us know how it went.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Why was I charged twice this month? Please explain.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Just bumping this, can you let me know where things stand?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "What's the ETA for the install? The customer is waiting at home.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Hi, did you receive the invoice I sent on Monday?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Do you know if the venue allows drones?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Is the translation going to be ready by Friday?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Can you tell me what the cancellation policy is?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "How do I reset my password? The link in the email doesn't work.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please advise how you want us to proceed.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Is anyone looking at my ticket? It's been three days.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "What is the status of the refund?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Where do I send the documents?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please update me on the campaign results when you can.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll settle the bill tonight, sorry for the delay.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We will pay the supplier on Friday as agreed.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The pledge will be wired from our account this afternoon.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll cover the studio rental, no problem.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll countersign the SLA and send it today.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We'll sign the term sheet once legal is done.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I will e-sign the authorization this evening.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll approve the creative once I see the final colours.",
+"act": "PROMISE",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We'll give you the green light on Monday morning.",
+"act": "PROMISE",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I will authorize the refund today.",
+"act": "PROMISE",
+"action": "approve",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll confirm my new number by email.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We'll double check the tax ID and let you know.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I will verify the guest's name before the recording.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll book the onboarding session this week.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We will set up the call with our CFO.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll arrange the photographer for ten o'clock.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Let me find a slot for the fitting and message you.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We'll pick a logo direction by Thursday.",
+"act": "PROMISE",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll decide about the premium plan after the trial.",
+"act": "PROMISE",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We will let you know about the Arabic translation on Monday.",
+"act": "PROMISE",
+"action": "decide",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll go through the translation tonight and flag anything odd.",
+"act": "PROMISE",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We'll review the media plan tomorrow morning.",
+"act": "PROMISE",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Let me take a look at the mood board over the weekend.",
+"act": "PROMISE",
+"action": "review",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll join the investor call at 10.",
+"act": "PROMISE",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We will attend the training on Wednesday.",
+"act": "PROMISE",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll be at the premiere on Friday.",
+"act": "PROMISE",
+"action": "join",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll finish the subtitles by Wednesday.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We will prepare the investor update before month end.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll sort out the SSO setup this week.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I will draft the campaign brief tomorrow.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll send the raw files via WeTransfer in an hour.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We will share the style guide today.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll email last year's return tonight.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Will pull the usage report and send it over.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll forward the contract to legal and copy you.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "You'll get the high-res logo by end of day.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll come back to you on the proposal by Thursday.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We will look into the double charge and let you know.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll find out the ETA and tell you.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Our support team will get back to you within 24 hours.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'll check the cancellation policy and reply.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I will update you on the campaign results next week.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Your June bill was issued on the 3rd and is due on the 24th.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The studio is booked on Saturday from 10 to 6.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The pledge campaign has reached 80% of its goal.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The annual plan renews automatically every March.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We sent the invoice to the address on file.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The final cut runs for 94 minutes.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Interest on the loan is fixed for five years.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The photographer is based in Lisbon and shoots on film.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Our translators work Sunday to Thursday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The sofa takes eight weeks to arrive.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The tax deadline for individuals is April 15.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Episode 4 was published on Tuesday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Your dog's appointment is on Thursday at 11.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The gym is closed on public holidays.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Support hours are 9 to 5, Monday to Friday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The new release adds single sign-on and fixes two bugs.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Revenue from the campaign was lower than forecast.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "She sent the model release yesterday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The agency has already approved the budget.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I'm sorry to hear that, that must have been stressful.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Please be advised that the office will relocate next month.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "As requested, the report is attached.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We regret to inform you that the offer has expired.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I did not receive your payment yet.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "He will probably call you tomorrow, he said.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "You will find the details in the attached document.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Our records indicate that the account was last accessed in May.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Let me be clear, this is not what we agreed.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "The meeting has been moved to Thursday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "I have a headache today so I'll be slow.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Could be a bug, could be user error, hard to say.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Everything is on track for the launch.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "We might need more time, depends on legal.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Thanks, that clears it up.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Great, thank you for the quick fix.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Awesome work on the episode!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Thanks a lot for fitting me in.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Perfect, that works for me.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Understood, thank you.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Congratulations on closing the round!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Thank you for choosing us, we appreciate your business.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Cheers, speak soon.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Good to hear, thanks for letting me know.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Best of luck with the launch!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Love the new design, well done.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Thanks for the warm welcome.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "No rush at all, whenever you can.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Thanks again, have a great evening.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Merry Christmas and a happy new year!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Hope the move went smoothly.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Thanks, noted.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "Sounds like a plan.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "All good here, thanks for asking.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher"
+},
+{
+"t": "החשבונית של יוני באיחור אנא שלמו לפני שננתק את הקו",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לכסות את שכירות האולפן בשבת? זה 300",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תסדירו בבקשה את התשלום על התרגום עברו 45 יום",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תעביר את התרומה עד סוף הקמפיין הפלטפורמה נסגרת בחצות",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "צריך את המקדמה לדוח המס לפני שמתחילים",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לשלם את חשבון הווטרינר עד יום שישי המרפאה רודפת אחרינו",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "החיוב על המנוי נכשל שוב תעדכן כרטיס או תשלם בדלפק",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא לנקות את החשבונית על ההוצאה במדיה הסוכנות מעכבת את הקמפיין",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "עדיין חסרה לי המקדמה של 50 אחוז לצילומים תוכל לשלוח היום?",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אתה משלם לספק השבוע? הם כותבים לי כל הזמן",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא לחתום על ההסכם ולהחזיר למנהל החשבון שלך",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תוכלי לחתום על טופס שחרור התמונות?",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "צריך חתימה שלך על הרשאת ההגשה לפני שמגישים",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תחתום על התנאים כדי שנתחיל חדר נתונים",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "בבקשה תחתמי על התוספת לשכירות בגלל הכלב",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לחתום דיגיטלית על הסכם התרגום הערב?",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הבנק צריך חתימה שלך על מסמכי ההלוואה תוכל לקפוץ?",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תאשר את הקריאייטיב כדי שנעלה ביום שני?",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אנא תן אור ירוק לתוכנית הרצפה הקבלן מחכה",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "יש אישור שלך לפרסם את הפרק?",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לאשר את בקשת הגדלת המסגרת?",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "צריך אישור על הגרסה הסופית לפני הדדליין של הפסטיבל",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תאשר לי את התביעה להוצאות מהכנס",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תאשרו את ההחזר על המנוי השנתי?",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תוכל לאשר את מספר הטלפון החדש שלך לחשבון?",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא לאשר שכתובת החשבונית נכונה",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לוודא את האיות של שם האורח לפני ההקלטה?",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תבדוק שוב את מספר העוסק בדוח",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "רק לבדוק שדגימות הבדים הגיעו תאשר?",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא לאשר אם להעביר את משתמשי הניסיון",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לאשר את התעריף לאצווה מעברית לאנגלית?",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לקבוע שיחה עם הסמנכ\"ל כספים על החידוש?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מתי תרצה שהצלם יגיע?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא לקבוע את מפגש ההטמעה דרך הקישור",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר להעביר את ההקלטה ליום חמישי אחר הצהריים?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "איזה שעות מתאימות לסקירת עיצוב בשבוע הבא?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "בוא נקבע את פגישת המס השנתית אתה פנוי בשבוע השני של מרץ?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תוכלי לבוא להתאמה ביום שלישי?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "איזה תור אתה רוצה לטיפוח הכלב 10 או 2?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אתה רוצה לשדרג לחבילה המורחבת או להישאר בבסיסית?",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "איזה משלושת כיווני הלוגו להמשיך לפתח?",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "בחרו לוח זמנים לתשלום חודשי או בסוף הקמפיין",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אתה לוקח את מבצע הציפור המוקדמת? הוא פג הערב",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "צריך לדעת אם לכלול את התרגום לערבית",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "להשהות את הקמפיין עד שדף הנחיתה החדש מוכן?",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "איזה בד אתה מעדיף לספה פשתן או קטיפה?",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תעבור על התרגום ותסמן ניסוחים מוזרים?",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "בבקשה תבדוק את תוכנית המדיה ותגיד אם חלוקת התקציב נכונה",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לבדוק את רמות האודיו בעשר הדקות הראשונות?",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תקרא את המצגת למשקיעים ותשלח לי דגלים אדומים",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מישהו יכול להסתכל על תוכנית האימונים לפני שאני שולח ללקוח?",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אשמח לחוות דעתך הכנה על לוח ההשראה",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תסתכל על טופס 1099 ותגיד אם משהו נראה לא תקין",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר להצטרף לשיחת המשקיעים מחר בעשר?",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא להגיע להכשרת המוצר ביום רביעי",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אתה בא לבכורה ביום שישי? צריך ספירה",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תוכל לשבת בסדנת הלקוחות?",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא להירשם לסקירה העסקית הרבעונית",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נשמח שתרצה בפגישת המיטאפ תאשר?",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא למלא את טופס הקליטה של החיה לפני הביקור",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לסיים את הכתוביות לפרק 4 עד רביעי?",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תכין את עדכון המשקיעים עד סוף החודש",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "צריך שהצוות שלך ישלים את רשימת ההטמעה",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תסדר את הגדרת ה-SSO אצלכם",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תנסח את בריף הקמפיין ותשתף עם הסוכנות",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תעדכן את פרטי הקשר בפורטל בבקשה",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תבנה את מודל התקציב לשנה השנייה",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לשלוח את הקבצים הגולמיים מהצילומים?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא לשתף את מדריך הסגנון עם המתרגמים",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תוכל לשלוח לי את הדוח משנה שעברה כדי שאכין את הנוכחי?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אני צריך את דוח השימוש לאפריל תוכל למשוך?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא להעלות תעודת זהות ואישור כתובת לפורטל",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תעביר את החוזה לצוות המשפטי שלך ותעתיק אותי",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "יש לך את הלוגו ברזולוציה גבוהה? תשלח?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תשלח לי את פנקס החיסונים בבקשה",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תספק את מספר העוסק של החברה שלך",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "יש חדש לגבי ההצעה? נשמח לסגור את התאריך",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הספקת לבדוק את הגרסה החדשה? תגיד לנו איך היה",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "למה חויבתי פעמיים החודש? אשמח להסבר",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "רק מזכיר את זה תוכל להגיד לי איפה זה עומד?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מה זמן ההגעה להתקנה? הלקוח מחכה בבית",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "היי קיבלת את החשבונית ששלחתי ביום שני?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אתה יודע אם האולם מאפשר רחפנים?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "התרגום יהיה מוכן עד שישי?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אפשר לדעת מה מדיניות הביטולים?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "איך מאפסים סיסמה? הקישור במייל לא עובד",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נא ליידע אותנו איך להמשיך",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מישהו מסתכל על הפנייה שלי? שלושה ימים",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מה הסטטוס של ההחזר?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "לאן שולחים את המסמכים?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תעדכן אותי בתוצאות הקמפיין כשתוכל",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אסדר את החשבון הערב סליחה על העיכוב",
+"act": "PROMISE",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נשלם לספק ביום שישי כמו שסיכמנו",
+"act": "PROMISE",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "התרומה תועבר מהחשבון שלנו אחר הצהריים",
+"act": "PROMISE",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אני מכסה את שכירות האולפן אין בעיה",
+"act": "PROMISE",
+"action": "pay",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אחתום על ההסכם ואשלח היום",
+"act": "PROMISE",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נחתום על התנאים כשהמשפטי יסיים",
+"act": "PROMISE",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אחתום דיגיטלית על ההרשאה הערב",
+"act": "PROMISE",
+"action": "sign",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אאשר את הקריאייטיב ברגע שאראה את הצבעים הסופיים",
+"act": "PROMISE",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "ניתן לך אור ירוק ביום שני בבוקר",
+"act": "PROMISE",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אאשר את ההחזר היום",
+"act": "PROMISE",
+"action": "approve",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אאשר את המספר החדש במייל",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נבדוק את מספר העוסק ונעדכן",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אוודא את האיות של שם האורח לפני ההקלטה",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אקבע את מפגש ההטמעה השבוע",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נארגן את השיחה עם הסמנכ\"ל כספים",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אסדר צלם לעשר",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תן לי למצוא שעה להתאמה ואשלח לך",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נבחר כיוון לוגו עד חמישי",
+"act": "PROMISE",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אחליט לגבי החבילה המורחבת אחרי הניסיון",
+"act": "PROMISE",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נעדכן אותך לגבי התרגום לערבית ביום שני",
+"act": "PROMISE",
+"action": "decide",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אעבור על התרגום הערב ואסמן דברים מוזרים",
+"act": "PROMISE",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נבדוק את תוכנית המדיה מחר בבוקר",
+"act": "PROMISE",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תן לי להסתכל על לוח ההשראה בסוף השבוע",
+"act": "PROMISE",
+"action": "review",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אצטרף לשיחת המשקיעים בעשר",
+"act": "PROMISE",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נגיע להכשרה ביום רביעי",
+"act": "PROMISE",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אהיה בבכורה ביום שישי",
+"act": "PROMISE",
+"action": "join",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אסיים את הכתוביות עד רביעי",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נכין את עדכון המשקיעים לפני סוף החודש",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אסדר את ה-SSO השבוע",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אנסח את בריף הקמפיין מחר",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אשלח את הקבצים הגולמיים בוויטרנספר בעוד שעה",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נשתף את מדריך הסגנון היום",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אשלח את הדוח משנה שעברה הערב",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אמשוך את דוח השימוש ואשלח",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אעביר את החוזה לצוות המשפטי ואעתיק אותך",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תקבל את הלוגו ברזולוציה גבוהה עד סוף היום",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אחזור אליך לגבי ההצעה עד חמישי",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נבדוק את החיוב הכפול ונעדכן אותך",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אברר מה זמן ההגעה ואגיד לך",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "צוות התמיכה שלנו יחזור אליך תוך 24 שעות",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אבדוק את מדיניות הביטולים ואענה",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אעדכן אותך בתוצאות הקמפיין בשבוע הבא",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "החשבונית של יוני הונפקה ב-3 לחודש ותשלומה ב-24.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "האולפן תפוס בשבת משעה 10 עד 6.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "קמפיין התרומות הגיע ל-80 אחוז מהיעד.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "המנוי השנתי מתחדש אוטומטית כל מרץ.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "שלחנו את החשבונית לכתובת שרשומה אצלנו.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הגרסה הסופית נמשכת 94 דקות.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הריבית על ההלוואה קבועה לחמש שנים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הצלם יושב בליסבון וצולם על פילם.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "המתרגמים שלנו עובדים מראשון עד חמישי.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הספה מגיעה אחרי שמונה שבועות.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "המועד האחרון להגשת דוח מס ליחידים הוא 15 באפריל.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "פרק 4 פורסם ביום שלישי.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "התור של הכלב שלך ביום חמישי בשעה 11.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "חדר הכושר סגור בחגים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "שעות התמיכה הן 9 עד 5 מיום ראשון עד חמישי.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הגרסה החדשה מוסיפה כניסה אחידה ומתקנת שני באגים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "ההכנסה מהקמפיין הייתה נמוכה מהתחזית.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "היא שלחה את טופס השחרור אתמול.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הסוכנות כבר אישרה את התקציב.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "צר לי לשמוע זה בטח היה מלחיץ.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "שימו לב שהמשרד עובר דירה בחודש הבא.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "כפי שביקשת הדוח מצורף.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "לצערנו ההצעה פגה.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "עוד לא קיבלתי את התשלום שלך.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הוא כנראה יתקשר אליך מחר הוא אמר.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הפרטים נמצאים במסמך המצורף.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "לפי הרישומים שלנו נכנסו לחשבון לאחרונה במאי.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הדמים אינם ניתנים להחזר אחרי 14 יום.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תן לי להיות ברור זה לא מה שסיכמנו.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הפגישה הועברה ליום חמישי.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "יש לי כאב ראש היום אז אהיה איטי.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "יכול להיות באג יכול להיות טעות משתמש קשה לדעת.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הכל בדרך להשקה.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אולי נצטרך עוד זמן תלוי במשפטי.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תודה זה מבהיר את זה.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מעולה תודה על התיקון המהיר.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "עבודה מדהימה על הפרק!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תודה רבה ששילבת אותי.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מושלם זה מתאים לי.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הבנתי תודה.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מזל טוב על סגירת הסבב!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תודה שבחרתם בנו אנחנו מעריכים את העסק שלכם.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "ביי נדבר בקרוב.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "טוב לשמוע תודה שעדכנת.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "בהצלחה עם ההשקה!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אהבתי את העיצוב החדש כל הכבוד.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תודה על קבלת הפנים החמה.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "אין לחץ בכלל מתי שנוח לך.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "סוף שבוע נפלא.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תודה שוב ערב מקסים.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "חג שמח ושנה טובה!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "תמיד בשמחה.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "מקווה שהמעבר עבר חלק.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "נשמע כמו תוכנית.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
+},
+{
+"t": "הכל טוב פה תודה ששאלת.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher"
 }
 ]

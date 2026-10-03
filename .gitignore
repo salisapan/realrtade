@@ -34,3 +34,4 @@ flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip.parti
 *.njsproj
 *.sln
 *.sw?
+flow-trial-extension/core/dense-prior-data.js

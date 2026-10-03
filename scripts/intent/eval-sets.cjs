@@ -16,7 +16,8 @@ const gold = fx('intent-gold.json');
 const sets = {
   dev: gold.filter((_, i) => i % 2 === 1),
   blind: fx('intent-blind.json'),
-  teacherEval: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-teacher-eval.json')) ? fx('intent-teacher-eval.json') : []
+  teacherEval: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-teacher-eval.json')) ? fx('intent-teacher-eval.json') : [],
+  teacherEval2: fs.existsSync(path.join(ROOT, 'test', 'fixtures', 'intent-teacher-eval-2.json')) ? fx('intent-teacher-eval-2.json') : []
 };
 function prf(set, pred, cls) {
   let tp = 0, fp = 0, fn = 0;

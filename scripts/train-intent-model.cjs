@@ -16,6 +16,10 @@ const path = require('path');
 const { makeGenerator } = require('./intent/generate.cjs');
 const ROOT = path.join(__dirname, '..', 'flow-trial-extension');
 const M = require(path.join(ROOT, 'core', 'intent-model.js')).FlowIntentModel;
+const DP = (() => { try { return require(path.join(ROOT, 'core', 'dense-prior.js')).FlowDensePrior; } catch (e) { return null; } })();
+// The pretrained English prior is OPT-IN (--dense): measured at +0.8 points in the shipped pipeline, not worth 1 MB (docs/ai-engine-upgrade.md).
+const USE_DENSE = Boolean(DP && DP.ready()) && process.argv.includes('--dense');
+const DD = USE_DENSE ? DP.DIM() : 0;
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 ? Number(process.argv[i + 1]) : d; };
 const N_EN = arg('en', 16000), N_HE = arg('he', 12000), SEED = arg('seed', 11), EPOCHS = arg('epochs', 10);
@@ -43,13 +47,14 @@ function augment(row, k, rnd) {
 }
 const ACTS = M.ACTS, ACTIONS = M.ACTIONS;
 
-let data, idx, ya, yc;
+let data, idx, ya, yc, dvec;
 function prepare(seed) {
   data = makeGenerator(seed).dataset(N_EN, N_HE);
   let rs = seed * 7919 + 3;
   const rnd = () => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 4294967296; };
   for (const row of TEACHER) for (let k = 0; k < REP; k++) data.push({ t: augment(row, k, rnd), act: row.act, action: row.action });
   idx = data.map((d) => M.features(d.t, DIM));
+  dvec = USE_DENSE ? data.map((d) => DP.vector(d.t)) : null;
   ya = data.map((d) => ACTS.indexOf(d.act));
   yc = data.map((d) => Math.max(0, ACTIONS.indexOf(d.action || 'none')));
 }
@@ -58,6 +63,8 @@ function trainHead(y, K, label, seedOffset) {
   const W = []; for (let c = 0; c < K; c++) W.push(new Float32Array(DIM));
   const G = []; for (let c = 0; c < K; c++) G.push(new Float32Array(DIM).fill(1e-6));
   const b = new Float32Array(K);
+  const Wd = []; const Gd = [];
+  for (let c = 0; c < K; c++) { Wd.push(new Float32Array(DD)); Gd.push(new Float32Array(DD).fill(1e-6)); }
   const lr = 0.35, l2 = 2e-6;
   const order = data.map((_, i) => i);
   let seed = (SEED + (seedOffset || 0)) * 977;
@@ -68,7 +75,8 @@ function trainHead(y, K, label, seedOffset) {
     for (const n of order) {
       const f = idx[n];
       const z = new Array(K);
-      for (let c = 0; c < K; c++) { let s = b[c]; for (const k of f) s += W[c][k]; z[c] = s; }
+      const dv = USE_DENSE ? dvec[n] : null;
+      for (let c = 0; c < K; c++) { let s = b[c]; for (const k of f) s += W[c][k]; if (dv) for (let j = 0; j < DD; j++) s += Wd[c][j] * dv[j]; z[c] = s; }
       const p = M.softmax(z, 1);
       loss -= Math.log(Math.max(p[y[n]], 1e-9));
       let best = 0; for (let c = 1; c < K; c++) if (p[c] > p[best]) best = c;
@@ -77,6 +85,7 @@ function trainHead(y, K, label, seedOffset) {
         const g = p[c] - (c === y[n] ? 1 : 0);
         if (Math.abs(g) < 1e-4) continue;
         b[c] -= 0.05 * g;
+        if (dv) for (let j = 0; j < DD; j++) { const gj = g * dv[j]; Gd[c][j] += gj * gj; Wd[c][j] -= lr * gj / Math.sqrt(Gd[c][j]); }
         for (const k of f) {
           const gg = g + l2 * W[c][k];
           G[c][k] += gg * gg;
@@ -86,7 +95,7 @@ function trainHead(y, K, label, seedOffset) {
     }
     if (ep === EPOCHS - 1) console.log(label, 'final epoch loss', (loss / order.length).toFixed(4), 'train acc', (correct / order.length).toFixed(4));
   }
-  return { W, b };
+  return { W, b, Wd };
 }
 
 function quantize(head) {
@@ -104,12 +113,15 @@ function quantize(head) {
 // A bag of models: each trained on its own generated dataset (different seed),
 // weights averaged. Averaging cuts the run-to-run variance of any single fit.
 function average(list) {
-  const K = list[0].W.length, out = { W: [], b: new Float32Array(K) };
+  const K = list[0].W.length, out = { W: [], b: new Float32Array(K), Wd: [] };
   for (let c = 0; c < K; c++) {
     const row = new Float32Array(DIM);
     for (const m of list) for (let i = 0; i < DIM; i++) row[i] += m.W[c][i] / list.length;
     out.W.push(row);
     for (const m of list) out.b[c] += m.b[c] / list.length;
+    const dr = new Float32Array(DD);
+    for (const m of list) for (let j = 0; j < DD; j++) dr[j] += m.Wd[c][j] / list.length;
+    out.Wd.push(dr);
   }
   return out;
 }
@@ -121,7 +133,9 @@ for (let k = 0; k < MODELS; k++) {
   actions.push(trainHead(yc, ACTIONS.length, 'action', k * 13));
 }
 const act = average(acts), action = average(actions);
-const weights = { version: M.FEATURE_VERSION, dim: DIM, temp: 1, trainedOn: { seed: SEED, models: MODELS, en: N_EN, he: N_HE, epochs: EPOCHS, teacher: TEACHER.length, teacherRep: USE_TEACHER ? REP : 0 }, act: quantize(act), action: quantize(action) };
+const denseOut = (h) => h.Wd.map((row) => Array.from(row, (x) => Number(x.toFixed(4))));
+const weights = { version: M.FEATURE_VERSION, dim: DIM, temp: 1, trainedOn: { seed: SEED, models: MODELS, en: N_EN, he: N_HE, epochs: EPOCHS, teacher: TEACHER.length, teacherRep: USE_TEACHER ? REP : 0, dense: USE_DENSE }, act: quantize(act), action: quantize(action) };
+if (USE_DENSE) weights.dense = { dim: DD, scale: DP.SCALE, source: 'core/dense-prior.js', act: denseOut(act), action: denseOut(action) };
 
 // ---- evaluation on the hand-written sets (never trained on) --------------------
 M.load(weights);

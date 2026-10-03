@@ -679,13 +679,6 @@
 "src": "teacher-eval"
 },
 {
-"t": "The clinic is closed on public holidays.",
-"act": "INFORM",
-"action": "none",
-"lang": "en",
-"src": "teacher-eval"
-},
-{
 "t": "Lab results usually take three to five business days.",
 "act": "INFORM",
 "action": "none",

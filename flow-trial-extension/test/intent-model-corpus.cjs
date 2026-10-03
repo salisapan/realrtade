@@ -68,6 +68,17 @@ check('act accuracy on the teacher evaluation set is at least 0.86 (was 0.81 bef
   check('and at least 1.4x the word lists', pt.ASK.r >= 1.4 * lt.ASK.r && pt.PROMISE.r >= 1.4 * lt.PROMISE.r, [pt.ASK.r, lt.ASK.r, pt.PROMISE.r, lt.PROMISE.r]);
 }
 
+const teacherEval2 = require('./fixtures/intent-teacher-eval-2.json');
+check('no second-evaluation sentence is in any training set', teacherEval2.every((x) => !trainNorm.has(normText(x.t)) && !teacherEval.some((y) => normText(y.t) === normText(x.t))));
+{
+  const acc2 = teacherEval2.filter((g) => M.predict(g.t).act === g.act).length / teacherEval2.length;
+  const p2 = pr(teacherEval2, (t) => { const r = P.recognize(t); return r.unsure ? 'X' : r.act; });
+  console.log('  eval-2 (written before the second training batch; first-contact 0.848 model accuracy): accuracy ' + acc2.toFixed(3) + ' | ASK P=' + p2.ASK.p.toFixed(2) + ' R=' + p2.ASK.r.toFixed(2) + ' | PROMISE P=' + p2.PROMISE.p.toFixed(2) + ' R=' + p2.PROMISE.r.toFixed(2));
+  check('second evaluation set (new domains AND new styles): accuracy at least 0.83', acc2 >= 0.83, acc2);
+  check('its precision stays at least 0.95 (non-native English, ALL CAPS, slang)', p2.ASK.p >= 0.95 && p2.PROMISE.p >= 0.95, [p2.ASK, p2.PROMISE]);
+  check('its recall is at least 0.78 for asks and 0.65 for promises', p2.ASK.r >= 0.78 && p2.PROMISE.r >= 0.65, [p2.ASK.r, p2.PROMISE.r]);
+}
+
 console.log('\n--- structure must permit what the model alone proposes ---\n');
 ['The school bus leaves at 7:40 from the corner of Elm Street.', 'Customs clearance can take up to 48 hours.', 'I will not be available this Thursday.', 'I read through the term sheet and it looks reasonable overall.', 'בעל הבית אמר שהמקדמה תוחזר תוך שלושים יום מהפינוי.', 'You will receive a confirmation email shortly.'].forEach((t) => {
   const r = P.recognize(t);

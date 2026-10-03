@@ -32,6 +32,7 @@ const FlowIntentModel = (() => {
   const FEATURE_VERSION = 4;
 
   const lang = typeof FlowLang !== 'undefined' ? FlowLang : (typeof require !== 'undefined' ? require('./lang-normalize.js').FlowLang : null);
+  const densePrior = typeof FlowDensePrior !== 'undefined' ? FlowDensePrior : (typeof require !== 'undefined' ? (() => { try { return require('./dense-prior.js').FlowDensePrior; } catch (e) { return null; } })() : null);
   const types = typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : (typeof require !== 'undefined' ? require('./request-types.js').FlowRequestTypes : null);
 
   let weights = null;       // { version, dim, temp, act:{...}, action:{...} }
@@ -125,13 +126,17 @@ const FlowIntentModel = (() => {
     return e.map((x) => x / sum);
   }
 
-  function scoreHead(headName, idxs, labels) {
+  // dv: the pretrained dense sentence vector (core/dense-prior.js), or null. Its weights are learned
+  // next to the n-gram weights; absent (older weights, no vector table) it contributes nothing.
+  function scoreHead(headName, idxs, labels, dv) {
     const head = weights[headName];
     const dense = decode(head);
     const delta = adapt[headName] || {};
+    const dw = dv && weights.dense && weights.dense[headName];
     const z = labels.map((_, c) => {
       let s = head.bias[c] || 0;
       for (const i of idxs) s += dense[c][i] + (delta[c + '|' + i] || 0);
+      if (dw && dw[c]) for (let j = 0; j < dv.length; j++) s += dw[c][j] * dv[j];
       return s;
     });
     return softmax(z, weights.temp || 1);
@@ -145,8 +150,9 @@ const FlowIntentModel = (() => {
     if (!weights) return null;
     const idxs = features(text, weights.dim);
     if (!lang || lang.tokenize(text).filter((t) => t.w[0] !== '<' || t.w === '<money>').length < 1) return { act: 'INFORM', actProb: 0, probs: {}, topic: 'other', topicProb: 0, action: null, actionProb: 0, unsure: true, n: idxs.length };
-    const pa = scoreHead('act', idxs, ACTS);
-    const pc = weights.action ? scoreHead('action', idxs, ACTIONS) : null;
+    const dv = weights.dense && densePrior && densePrior.ready() ? densePrior.vector(text) : null;
+    const pa = scoreHead('act', idxs, ACTS, dv);
+    const pc = weights.action ? scoreHead('action', idxs, ACTIONS, dv) : null;
     let ci = 0;
     if (pc) pc.forEach((p, i) => { if (p > pc[ci]) ci = i; });
     let ai = 0;
@@ -169,7 +175,8 @@ const FlowIntentModel = (() => {
     const target = labels.indexOf(label);
     if (target < 0) return adapt;
     const idxs = features(text, weights.dim);
-    const p = scoreHead(headName, idxs, labels);
+    const dv = weights.dense && densePrior && densePrior.ready() ? densePrior.vector(text) : null;
+    const p = scoreHead(headName, idxs, labels, dv);
     const step = (typeof lr === 'number' ? lr : 1) / Math.max(1, idxs.length);
     const d = adapt[headName] || (adapt[headName] = {});
     for (let c = 0; c < labels.length; c++) {
