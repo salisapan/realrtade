@@ -401,6 +401,56 @@ const FlowFollow = (() => {
     else if (res.confirm) paidCard(next, best.sender);
   }
 
+  // ---- the on-device language model (core/local-lm.js) ------------------------------------------
+  // A third tier for wording the lexicon and the learned model left silent. It only proposes (the person still taps),
+  // and it is asked only on a device where it passed the precision self-test, per language. If this browser has no
+  // built-in model, all of this is a no-op. The self-test runs in the background, once a month (once a day while the
+  // model is missing), never blocks a message and never downloads a model.
+  const LM_BUDGET_MS = 8000;
+  let lmSession = null;
+  let lmStatus; // undefined = not read yet
+  let lmTesting = false;
+
+  async function runLmSelfTest() {
+    if (lmTesting) return;
+    lmTesting = true;
+    try {
+      const now = Date.now();
+      const prev = await FlowStorage.getLocalLm();
+      if (prev && prev.testingAt && now - prev.testingAt < 15 * 60 * 1000) return;     // another tab is on it
+      const avail = await FlowLocalLMChrome.availability();
+      if (avail !== 'available') { lmStatus = { checkedAt: now, nextCheckAt: now + 24 * 3600 * 1000, reason: avail, en: { ok: false }, he: { ok: false } }; await FlowStorage.setLocalLm(lmStatus); return; }
+      await FlowStorage.setLocalLm(Object.assign({}, prev || {}, { testingAt: now }));
+      const session = await FlowLocalLMChrome.open();
+      const res = await FlowLocalLM.selfTest(session, typeof FlowLocalLMAudit !== 'undefined' ? FlowLocalLMAudit : [], { now: Date.now() });
+      if (session && session.destroy) session.destroy();
+      lmStatus = Object.assign({}, res, { nextCheckAt: res.checkedAt + FlowLocalLM.TEST_MAX_AGE_MS, reason: res.en.ok || res.he.ok ? 'passed' : 'failed' });
+      await FlowStorage.setLocalLm(lmStatus);
+    } catch (e) { /* the tier simply stays off */ } finally { lmTesting = false; }
+  }
+
+  async function lmAsk(text) {
+    try {
+      if (typeof FlowLocalLM === 'undefined' || typeof FlowLocalLMChrome === 'undefined' || typeof FlowStorage.getLocalLm !== 'function') return null;
+      if (lmStatus === undefined) lmStatus = await FlowStorage.getLocalLm();
+      if (!lmStatus || Date.now() > (lmStatus.nextCheckAt || 0)) { runLmSelfTest(); }
+      if (!lmStatus || !((lmStatus.en && lmStatus.en.ok) || (lmStatus.he && lmStatus.he.ok)) || FlowLocalLM.stale(lmStatus, Date.now())) return null;
+      if (!lmSession) lmSession = await FlowLocalLMChrome.open();
+      if (!lmSession) return null;
+      const work = (async () => {
+        let tried = 0;
+        for (const s of FlowIntentPipeline.sentences(text)) {
+          if (tried >= 3) break;
+          const p = await FlowLocalLM.propose(s, { session: lmSession, pipeline: FlowIntentPipeline, model: FlowIntentModel, status: lmStatus, extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null, now: Date.now() });
+          tried++;
+          if (p) return FlowFollowUp.fromProposal(p, Date.now());
+        }
+        return null;
+      })();
+      return await Promise.race([work, new Promise((r) => setTimeout(() => r(null), LM_BUDGET_MS))]);
+    } catch (e) { return null; }
+  }
+
   // Voice-matched drafts (core/style-profile.js): Pro only; a template draft opens and closes the way this person does.
   async function voiced(text, w) {
     try {
@@ -776,6 +826,7 @@ const FlowFollow = (() => {
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
     let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
+    if (!ask && !watch) ask = await lmAsk(mineText);
     recordDecision(mineText, Boolean(ask), key);
     if (!ask) { if (!watch) considerQuestion(ctx, last, mineText, threadId, lastId); return; }
     offered.add(key);

@@ -322,6 +322,29 @@ const FlowFollowUp = (() => {
     };
   }
 
+  // A proposal from the on-device language model (core/local-lm.js) -> the `ask` object buildWatch() takes.
+  // It is offered like any other ask: the person taps Stay on it / Remind me, and nothing is written before that.
+  function fromProposal(pr, now) {
+    if (!pr || (pr.act !== 'ASK' && pr.act !== 'PROMISE') || !pr.sentence) return null;
+    const t = typeof now === 'number' ? now : Date.now();
+    const mine = pr.act === 'PROMISE';
+    const kind = !mine && pr.action === 'pay' ? KINDS.PAYMENT : KINDS.REPLY;
+    const act = requestTypes && requestTypes.ACTIONS ? requestTypes.ACTIONS.find((a) => a.id === pr.action) : null;
+    return {
+      kind,
+      what: clip(pr.sentence, MAX_WHAT),
+      amount: mine ? null : (pr.amount || null),
+      deadlineIso: pr.deadlineIso || null,
+      chaseIso: chaseDate(kind, pr.deadlineIso || null, t, act ? act.days : undefined),
+      lang: hasHebrew(pr.sentence) ? 'he' : 'en',
+      subtype: mine ? 'owe:' + pr.action : pr.action,
+      subtypeLabel: mine || !act ? null : act.noun,
+      tier: 'lm',
+      file: null,
+      direction: mine ? 'mine' : 'theirs'
+    };
+  }
+
   // Did your own newer message deliver what you promised?
   const DELIVERS = /\b(?:attached|attaching|enclosed|here(?:'s| is| are)|please find|as promised|sent (?:it|them|over)|done|finished|completed|just sent)\b|(?:מצורף|מצורפת|שלחתי|סיימתי|הנה|כפי שהבטחתי)/i;
   function deliversPromise(text) {
@@ -852,7 +875,7 @@ const FlowFollowUp = (() => {
   }
 
   return {
-    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, deliversFor, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
+    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, fromProposal, deliversPromise, deliversFor, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
     nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };

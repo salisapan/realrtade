@@ -1207,6 +1207,20 @@
   // about — see the Magic Moment's own "nothing to prove yet" precedent.
   // "What Glance learned from you" (core/learning-ledger.js): the last few adjustments, in plain words, and a reset.
   // A function with a property, not a let: it runs during init, before a later `let` would initialise.
+  // Whether the language model built into this browser is reading unusual wording for Glance, said plainly.
+  // It is only ever on after it passed a precision check on this device (core/local-lm.js).
+  async function renderLmStat() {
+    const wrap = document.getElementById('lmStat');
+    if (!wrap || !FlowStorage.getLocalLm) return;
+    const st = await FlowStorage.getLocalLm();
+    if (!st || !st.checkedAt) { wrap.hidden = true; return; }
+    const on = [st.en && st.en.ok ? 'English' : null, st.he && st.he.ok ? 'Hebrew' : null].filter(Boolean);
+    if (on.length) wrap.textContent = 'The model built into this browser also reads wording nothing else recognises, for ' + on.join(' and ') + ' (it passed a precision check on this device). It only suggests; you decide.';
+    else if (st.reason === 'failed') wrap.textContent = 'The model built into this browser did not pass the precision check on this device, so it stays off.';
+    else { wrap.hidden = true; return; }
+    wrap.hidden = false;
+  }
+
   async function renderLedger() {
     const block = document.getElementById('ledgerBlock');
     if (!block || typeof FlowLedger === 'undefined' || !FlowStorage.getLedger) return;
@@ -1226,6 +1240,7 @@
       btn.addEventListener('click', async () => {
         await FlowStorage.resetLearning();
         await renderLedger();
+    await renderLmStat();
         const stat = document.getElementById('learnedStat');
         if (stat) stat.hidden = true;
       });
