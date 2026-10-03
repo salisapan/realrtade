@@ -59,6 +59,7 @@
         "core/person-model.js",
         "core/outcome-labels.js",
         "core/follow-up.js",
+        "core/outside-signals.js",
         "core/expiry.js",
         "core/meeting-debrief.js",
         "core/recurrence.js",

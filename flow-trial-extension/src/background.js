@@ -2780,6 +2780,43 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return reply(sendResponse, classifyViaBackend(msg.payload || {}));
   }
 
+  // Outside signals (core/outside-signals.js): did a calendar event or a shared file settle a loop? These two read
+  // metadata only (ids, times, invitee and sharee addresses), never titles or file contents, and the caller sends
+  // the one address it is asking about.
+  if (msg.type === 'flow:outside-calendar') {
+    return reply(sendResponse, (async () => {
+      if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+      const email = String(msg.email || '').slice(0, 200);
+      const since = Number(msg.sinceMs);
+      if (!email || !(since > 0)) return { ok: false, reason: 'bad-request' };
+      const q = new URLSearchParams({ q: email, timeMin: new Date(since - 24 * 3600 * 1000).toISOString(), singleEvents: 'true', maxResults: '25', orderBy: 'startTime',
+        fields: 'items(id,status,created,start,attendees(email))' });
+      const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events?' + q.toString(), { method: 'GET' });
+      if (!res.ok) return { ok: false, reason: 'error' };
+      const data = await res.json();
+      const events = (data.items || []).map((e) => ({ id: e.id, status: e.status || 'confirmed', startIso: (e.start && (e.start.dateTime || e.start.date)) || null,
+        createdMs: e.created ? Date.parse(e.created) : null, attendees: (e.attendees || []).map((a) => a.email).filter(Boolean) }));
+      return { ok: true, events };
+    })());
+  }
+
+  if (msg.type === 'flow:outside-drive') {
+    return reply(sendResponse, (async () => {
+      if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
+      const since = Number(msg.sinceMs);
+      const terms = (Array.isArray(msg.terms) ? msg.terms : []).map((t) => String(t).replace(/['\\]/g, '')).filter((t) => t.length >= 2).slice(0, 8);
+      if (!(since > 0) || !terms.length) return { ok: false, reason: 'bad-request' };
+      const q = "trashed = false and modifiedTime > '" + new Date(since).toISOString() + "' and (" + terms.map((t) => "name contains '" + t + "'").join(' or ') + ')';
+      const path = '/files?q=' + encodeURIComponent(q) + '&pageSize=25&corpora=user&fields=' + encodeURIComponent('files(id,name,modifiedTime,permissions(emailAddress))');
+      const res = await googleAuthedFetch(GOOGLE_DRIVE_API, path);
+      if (!res.ok) return { ok: false, reason: 'error' };
+      const data = await res.json();
+      const files = (data.files || []).map((f) => ({ id: f.id, name: f.name, modifiedMs: f.modifiedTime ? Date.parse(f.modifiedTime) : null,
+        sharedWith: (f.permissions || []).map((x) => x.emailAddress).filter(Boolean) }));
+      return { ok: true, files };
+    })());
+  }
+
   if (msg.type === 'flow:search-drive') {
     return reply(sendResponse, (async () => {
       if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };

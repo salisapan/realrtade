@@ -158,7 +158,7 @@ const FlowFollow = (() => {
     const list = await FlowStorage.getWatches();
     const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
     if (!gate.allowed) { await capCard(gate.used, gate.cap, true); return; }
-    if ((watch.resolvedBy === 'reply' || watch.resolvedBy === 'delivered') && typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('reopened', watch.id + '|' + (watch.resolvedAt || '')).catch(() => {});
+    if ((watch.resolvedBy === 'reply' || watch.resolvedBy === 'delivered' || watch.resolvedBy === 'signal') && typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('reopened', watch.id + '|' + (watch.resolvedAt || '')).catch(() => {});
     const patch = FlowFollowUp.reopenPatch(watch, Date.now());
     const next = await FlowStorage.updateWatch(watch.id, patch);
     if (watch.taskRef) {
@@ -366,6 +366,43 @@ const FlowFollow = (() => {
     }
     else if (res.rescheduled) await promised(watch, best.sender, patch);
     else if (res.confirm) paidCard(next, best.sender);
+  }
+
+  // ---- 4. settled outside the thread (core/outside-signals.js) ----------------------------
+  // Money arrived at a bank or payment provider, a calendar entry now exists, a file was shared. Strong evidence
+  // closes the loop with a receipt and Reopen; weaker evidence asks once and never closes alone. Nothing from the
+  // evidence (no text, no sender) is stored on the loop.
+  async function settledBy(watch, prop, strong) {
+    const next = (await FlowStorage.updateWatch(watch.id, prop.patch)) || Object.assign({}, watch, prop.patch);
+    if (strong && typeof FlowStorage.recordOutcomeLabel === 'function') FlowStorage.recordOutcomeLabel('autoClosed', watch.id + '|' + (next.resolvedAt || '')).catch(() => {});
+    if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
+    track('follow_resolved');
+    receipt(prop.receipt + took(watch) + '. Loop closed.', null, { label: 'Reopen', run: () => reopen(next) });
+  }
+
+  function signalCard(watch, prop, signal) {
+    const h = card(watch.lang === 'he');
+    h.appendChild(el('div', 'flow-fu-title', prop.question));
+    h.appendChild(el('div', 'flow-fu-line', 'The loop stays open until you say so.'));
+    const row = el('div', 'flow-fu-actions');
+    row.appendChild(button(prop.yes, 'primary', () => settledBy(watch, prop, false)));
+    row.appendChild(button(prop.no, 'ghost', async () => { await FlowStorage.updateWatch(watch.id, FlowOutsideSignals.dismissPatch(watch, signal.kind)); dismiss(); }));
+    h.appendChild(row);
+  }
+
+  async function paymentSignal(ctx, last, sender) {
+    if (typeof FlowOutsideSignals === 'undefined') return false;
+    const ev = FlowOutsideSignals.paymentEvidence(ctx.messageText(last), sender && sender.email);
+    if (!ev) return false;
+    const list = await FlowStorage.getWatches();
+    const m = FlowOutsideSignals.matchPayment(list, ev, Date.now());
+    if (!m) return false;
+    const watch = list.find((w) => w.id === m.watchId);
+    if (!watch) return false;
+    const prop = FlowOutsideSignals.proposal(watch, m, Date.now(), { amountLabel: amountLabel(watch) });
+    if (m.strength === 'strong') await settledBy(watch, prop, true);
+    else signalCard(watch, prop, m);
+    return true;
   }
 
   // ---- a promise of yours, kept ------------------------------------------------
@@ -616,6 +653,8 @@ const FlowFollow = (() => {
 
     // They wrote last. What did the answer do to the loop?
     if (!lastIsOwn) {
+      // A bank or payment provider telling you money arrived settles a payment loop in another thread.
+      if (await paymentSignal(ctx, last, sender)) return;
       let target = watch;
       // Their answer came in a thread of its own ("Re:" dropped, a fresh message):
       // follow the story, not the thread.

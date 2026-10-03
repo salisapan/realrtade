@@ -71,6 +71,11 @@
         <p class="hint" id="recurUpsell" hidden></p>
       </div>
 
+      <div class="waiting" id="signalBlock" hidden>
+        <p class="label">Looks finished</p>
+        <div id="signal-list" class="log-list"></div>
+      </div>
+
       <div class="waiting" id="waitingBlock" hidden>
         <p class="label">Open loops</p>
         <div class="seg" id="loopView" hidden>
@@ -177,6 +182,7 @@
   <script src="../core/person-model.js"></script>
   <script src="../core/outcome-labels.js"></script>
   <script src="../core/follow-up.js"></script>
+  <script src="../core/outside-signals.js"></script>
   <script src="../core/expiry.js"></script>
   <script src="../core/meeting-debrief.js"></script>
   <script src="../core/recurrence.js"></script>

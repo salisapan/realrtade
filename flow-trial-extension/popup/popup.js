@@ -53,6 +53,7 @@
   await renderLog();
   await renderOpen();
   await renderWaiting();
+  checkOutsideSignals().catch(() => {});
 
 
   // ---- Glance Pro -----------------------------------------------------------
@@ -577,6 +578,79 @@
 
   function plural(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
 
+  // ---- Loops settled outside the thread (core/outside-signals.js) -------------------------
+  // A calendar entry that now exists closes a "pick a time" loop; a file named for what you promised and shared
+  // with that person asks once. Metadata only; at most a few lookups per popup open. (Money arriving is handled
+  // in Gmail, where the confirmation email is opened.) A function with a property, not a let: renderWaiting()
+  // runs before any later `let` would initialise.
+  async function checkOutsideSignals() {
+    if (typeof FlowOutsideSignals === 'undefined' || typeof FlowStorage === 'undefined') return;
+    const now = Date.now();
+    const seen = checkOutsideSignals.seen || (checkOutsideSignals.seen = {});
+    const all = await FlowStorage.getWatches();
+    const todo = all.filter(FlowFollowUp.isActive).filter((w) => (FlowOutsideSignals.wantsCalendar(w) || FlowOutsideSignals.wantsDrive(w)) && !(seen[w.id] && now - seen[w.id] < 10 * 60 * 1000)).slice(0, 6);
+    if (!todo.length) return;
+    const asks = [];
+    let changed = false;
+    for (const w of todo) {
+      seen[w.id] = now;
+      if (FlowOutsideSignals.wantsCalendar(w)) {
+        const r = await send({ type: 'flow:outside-calendar', email: w.counterpart.email, sinceMs: w.createdAt });
+        const m = r && r.ok ? FlowOutsideSignals.matchCalendar(w, r.events, now) : null;
+        if (m) {
+          const prop = FlowOutsideSignals.proposal(w, m, now);
+          await FlowStorage.updateWatch(w.id, prop.patch);
+          if (w.taskRef) await send({ type: 'flow:follow-complete', ref: w.taskRef });
+          if (FlowStorage.recordOutcomeLabel) FlowStorage.recordOutcomeLabel('autoClosed', w.id + '|' + now).catch(() => {});
+          changed = true;
+        }
+      } else if (FlowOutsideSignals.wantsDrive(w)) {
+        const ent = (FlowRequestTypes.OBJECTS || []).find((o) => o.id === String(w.subtype).split(':')[1]);
+        const terms = ent ? ent.en.filter((x) => /^[a-z]+$/.test(x)).concat(ent.he.filter((x) => x.length >= 2)) : [];
+        const r = await send({ type: 'flow:outside-drive', sinceMs: w.createdAt, terms });
+        const m = r && r.ok ? FlowOutsideSignals.matchDrive(w, r.files) : null;
+        if (m) asks.push({ w, m, prop: FlowOutsideSignals.proposal(w, m, now) });
+      }
+    }
+    if (changed) await renderWaiting();
+    renderSignalAsks(asks);
+  }
+
+  function renderSignalAsks(asks) {
+    const block = document.getElementById('signalBlock');
+    const host = document.getElementById('signal-list');
+    host.replaceChildren();
+    block.hidden = asks.length === 0;
+    for (const a of asks) {
+      const item = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', whoLabel(a.w)));
+      top.appendChild(el('span', 'wait-state', a.prop.question));
+      item.appendChild(top);
+      item.appendChild(el('div', 'wait-what', a.w.what));
+      const acts = el('div', 'wait-acts');
+      const yes = el('button', 'ghost sm', a.prop.yes);
+      yes.type = 'button';
+      yes.addEventListener('click', async () => {
+        await FlowStorage.updateWatch(a.w.id, a.prop.patch);
+        if (a.w.taskRef) await send({ type: 'flow:follow-complete', ref: a.w.taskRef });
+        await renderWaiting();
+        item.remove();
+        block.hidden = !host.children.length;
+      });
+      const no = el('button', 'ghost sm', a.prop.no);
+      no.type = 'button';
+      no.addEventListener('click', async () => {
+        await FlowStorage.updateWatch(a.w.id, FlowOutsideSignals.dismissPatch(a.w, a.m.kind));
+        item.remove();
+        block.hidden = !host.children.length;
+      });
+      acts.appendChild(yes); acts.appendChild(no);
+      item.appendChild(acts);
+      host.appendChild(item);
+    }
+  }
+
   async function renderWaiting() {
     const all = await FlowStorage.getWatches();
     const now = Date.now();
@@ -935,7 +1009,7 @@
       const amt = w.kind === 'payment' && w.amount && w.amount.raw ? w.amount.raw + ' · ' : '';
       top.appendChild(el('span', 'wait-who', whoLabel(w)));
       const days = FlowFollowUp.daysOpen(w, w.resolvedAt || now);
-      top.appendChild(el('span', 'wait-state ok', (w.closedAs === 'paid' ? 'Paid' : w.closedAs === 'kept' ? 'Kept' : 'Closed') + (days >= 1 ? ' · ' + plural(days, 'day', 'days') : '')));
+      top.appendChild(el('span', 'wait-state ok', (w.closedAs === 'paid' ? 'Paid' : w.closedAs === 'kept' ? 'Kept' : w.closedAs === 'scheduled' ? 'Scheduled' : 'Closed') + (days >= 1 ? ' · ' + plural(days, 'day', 'days') : '')));
       item.appendChild(top);
       item.appendChild(el('div', 'wait-what', amt + w.what));
       const note = el('p', 'wait-note');
@@ -952,7 +1026,7 @@
         }
         const patch = FlowFollowUp.reopenPatch(w, Date.now());
         // Reopening a loop Glance closed by itself is a correction: it feeds the closure-quality rate.
-        if ((w.resolvedBy === 'reply' || w.resolvedBy === 'delivered') && FlowStorage.recordOutcomeLabel) FlowStorage.recordOutcomeLabel('reopened', w.id + '|' + (w.resolvedAt || '')).catch(() => {});
+        if ((w.resolvedBy === 'reply' || w.resolvedBy === 'delivered' || w.resolvedBy === 'signal') && FlowStorage.recordOutcomeLabel) FlowStorage.recordOutcomeLabel('reopened', w.id + '|' + (w.resolvedAt || '')).catch(() => {});
         await FlowStorage.updateWatch(w.id, patch);
         if (w.taskRef) {
           const r = await send({ type: 'flow:follow-reopen', ref: w.taskRef, dueIso: patch.chaseIso });
