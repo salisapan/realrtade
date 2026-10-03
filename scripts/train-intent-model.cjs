@@ -135,6 +135,21 @@ for (let k = 0; k < MODELS; k++) {
 const act = average(acts), action = average(actions);
 const denseOut = (h) => h.Wd.map((row) => Array.from(row, (x) => Number(x.toFixed(4))));
 const weights = { version: M.FEATURE_VERSION, dim: DIM, temp: 1, trainedOn: { seed: SEED, models: MODELS, en: N_EN, he: N_HE, epochs: EPOCHS, teacher: TEACHER.length, teacherRep: USE_TEACHER ? REP : 0, dense: USE_DENSE }, act: quantize(act), action: quantize(action) };
+// Which feature buckets are common in the PUBLIC training text (document frequency over the unique grammar and
+// teacher sentences)? Only those may ever be contributed to community learning (core/community.js): a bucket hit by
+// a rare word, a name or an address is never shared. Stored as a 2 KB bitset.
+{
+  const MIN_DF = arg('commondf', 40);
+  const df = new Int32Array(DIM);
+  const seen = new Set();
+  [].concat(makeGenerator(SEED).dataset(N_EN, N_HE).map((d) => d.t), TEACHER.map((r) => r.t)).forEach((t) => { if (seen.has(t)) return; seen.add(t); for (const k of M.features(t, DIM)) df[k]++; });
+  const bits = Buffer.alloc(DIM / 8);
+  let count = 0;
+  for (let i = 0; i < DIM; i++) if (df[i] >= MIN_DF) { bits[i >> 3] |= 1 << (i & 7); count++; }
+  weights.common = bits.toString('base64');
+  weights.commonMinDf = MIN_DF;
+  console.log('community allowlist:', count, 'of', DIM, 'buckets are common in public text (df >=', MIN_DF + ')');
+}
 if (USE_DENSE) weights.dense = { dim: DD, scale: DP.SCALE, source: 'core/dense-prior.js', act: denseOut(act), action: denseOut(action) };
 
 // ---- evaluation on the hand-written sets (never trained on) --------------------

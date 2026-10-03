@@ -1,0 +1,579 @@
+{
+ "baseline": {
+  "newUser": {
+   "ASK": {
+    "p": 0.99,
+    "r": 0.888,
+    "fp": 1,
+    "fn": 13
+   },
+   "PROMISE": {
+    "p": 1,
+    "r": 0.844,
+    "fp": 0,
+    "fn": 10
+   }
+  },
+  "blind": {
+   "ASK": {
+    "p": 1,
+    "r": 0.941,
+    "fp": 0,
+    "fn": 2
+   },
+   "PROMISE": {
+    "p": 1,
+    "r": 0.792,
+    "fp": 0,
+    "fn": 5
+   }
+  }
+ },
+ "missedInWorld": 39,
+ "runs": [
+  {
+   "epsilon": "inf",
+   "devices": 1000,
+   "boost": 10,
+   "published": 47,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": "inf",
+   "devices": 5000,
+   "boost": 10,
+   "published": 47,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": "inf",
+   "devices": 20000,
+   "boost": 10,
+   "published": 47,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": "inf",
+   "devices": 60000,
+   "boost": 10,
+   "published": 47,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 16,
+   "devices": 1000,
+   "boost": 10,
+   "published": 33,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 16,
+   "devices": 5000,
+   "boost": 10,
+   "published": 330,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 16,
+   "devices": 20000,
+   "boost": 10,
+   "published": 2234,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 16,
+   "devices": 60000,
+   "boost": 10,
+   "published": 4000,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 8,
+   "devices": 1000,
+   "boost": 10,
+   "published": 0,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 1,
+     "r": 0.941,
+     "fp": 0,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 8,
+   "devices": 5000,
+   "boost": 10,
+   "published": 33,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 8,
+   "devices": 20000,
+   "boost": 10,
+   "published": 490,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 8,
+   "devices": 60000,
+   "boost": 10,
+   "published": 2239,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 4,
+   "devices": 1000,
+   "boost": 10,
+   "published": 0,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 1,
+     "r": 0.941,
+     "fp": 0,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 4,
+   "devices": 5000,
+   "boost": 10,
+   "published": 12,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 4,
+   "devices": 20000,
+   "boost": 10,
+   "published": 33,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  },
+  {
+   "epsilon": 4,
+   "devices": 60000,
+   "boost": 10,
+   "published": 487,
+   "newUser": {
+    "ASK": {
+     "p": 0.99,
+     "r": 0.888,
+     "fp": 1,
+     "fn": 13
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.844,
+     "fp": 0,
+     "fn": 10
+    }
+   },
+   "blind": {
+    "ASK": {
+     "p": 0.97,
+     "r": 0.941,
+     "fp": 1,
+     "fn": 2
+    },
+    "PROMISE": {
+     "p": 1,
+     "r": 0.792,
+     "fp": 0,
+     "fn": 5
+    }
+   }
+  }
+ ]
+}

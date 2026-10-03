@@ -96,16 +96,84 @@ set from 0.94 to 0.97 with no loss of precision; learning-rate 4 saturates. That
 nine labels cannot do much, and the point of this signal is that a real user generates hundreds. Its value
 cannot be demonstrated without real use.
 
-## 4. What this still is not
+## 1b. Second teacher batch and a second held-out set (2026-10-03)
 
-A pretrained multilingual sentence encoder running on the device (the real step up in language
-understanding, expected to fix the confident-wrong class), federated or aggregated learning across
-users (the data moat, needs users and a privacy-copy change), and a human-written evaluation set. All
-three are proposed, none is built. See `docs/open-tasks.md`.
+The teacher wrote a second batch (1,049 training sentences in all, domains disjoint from BOTH evaluation sets) and a
+**second held-out set written before that batch**, in new domains AND new styles (non-native English, ALL CAPS, WhatsApp
+style, slang, Hebrew with English words): `test/fixtures/intent-teacher-eval-2.json`, 243 sentences. Its first-contact
+number was recorded BEFORE the second batch existed (`docs/intent-eval2-first-contact.json`): model accuracy 84.8%, ask
+precision/recall 0.98/0.80, promise 1.00/0.70.
 
-## 5. Needs the owner
+| Set (n) | Model accuracy | Ask P / R | Promise P / R | EN / HE accuracy |
+|---|---|---|---|---|
+| Dev, odd rows (96) | 99% | 1.00 / 0.94 | 1.00 / 0.95 | 98% / 100% |
+| Blind (108) | 88% | 1.00 / 0.94 | 1.00 / 0.79 | 89% / 86% |
+| Teacher-eval, new domains (278) | 90% | 1.00 / 0.89 | 1.00 / 0.84 | 89% / 91% |
+| Teacher-eval-2, new domains and styles (243) | 86% | 0.97 / 0.81 | 1.00 / 0.70 | 84% / 88% |
 
-- A real, human-written evaluation set: with your explicit OK I can sample sent mail through the Gmail
-  connector, mask it locally and use it ONLY to measure (never committed raw). Without it every number
-  here comes from sentences a model wrote.
+What the second batch bought, honestly: +1.2 points of model accuracy and +1.8 of ask recall on the set that never saw it
+(84.8% -> 86.0%), none on promise recall; it also LOWERED model accuracy on the old blind set (92% -> 88%) while the pipeline's
+precision and recall there did not move. More teacher data of the same kind is hitting diminishing returns for a bag of
+n-grams: the remaining errors are non-native grammar ("I check the contract this evening" is a promise), imperatives with no
+"please" ("pay the parking ticket by friday or theres a fine" read as a statement), and confident wrong answers. That is the
+capacity limit of the model, not of the data.
+
+## 2b. The person model, second version
+
+- **Business time.** Durations are counted in business days. In simulation the effect is small (log error 0.201 against 0.210
+  in calendar days): weekends matter less than expected. It is kept because it is the right clock.
+- **Colleagues (partial pooling).** A brand-new person at a company where Glance has already seen two or more colleagues starts
+  from THEIR habits. Free-mail domains are never pooled. In simulation, where colleagues share a habit by construction, a person with
+  no history of their own lands in a sensible chase window 51% of the time instead of 26%, and the error halves (0.34 against
+  0.70). The card says "people at acme.com usually take about N business days", never claims it of the person.
+- Calibration improved (2.6 -> 1.9 points mean gap). Open-loop censoring still halves the error for slow people (0.54 -> 0.25).
+  All of this remains simulation: it shows the estimator works if people behave as modelled.
+
+## 3b. Outcome signals, second version
+
+- **Missed promise:** a later delivery in a thread with no promise loop labels the earlier promise sentence (the mirror of the missed ask).
+- **Closure quality:** loops Glance closed by itself that the person then reopened are counted (`outcomeLabels.autoClosed`,
+  `reopened`). When at least 8 closes exist and a quarter or more were reopened, Glance stops closing on a reply it understood
+  only by default ("they wrote back, so it is answered") and keeps the loop open instead. This is the first place the
+  product changes its own behaviour from measuring its own mistakes.
+- A finding that matters: outcome labels teach the MODEL, not the rule gates around it. A promise missed because of a rule
+  ("future tense needed") is labelled but the model already scored it high, so nothing moves. Learning the gates themselves is
+  not built.
+
+## 4. The encoder question (what could and could not be done here)
+
+**Hugging Face is blocked by the build sandbox's egress policy**, and no multilingual pretrained encoder with Hebrew is
+published on npm or PyPI with weights. So the pretrained multilingual encoder you asked about was NOT built or measured. What was done:
+
+1. **A dense neural student trained from scratch** (hashed n-gram embeddings, 64-d, one hidden layer, numpy,
+   `scripts/intent/nn/train.py`) on the same data: **worse** than the shipped linear model on every held-out set (accuracy
+   84.2% against 89.9% on teacher-eval, 81.5% against 86.0% on teacher-eval-2; ask precision 0.91 against 1.00). Not shipped.
+   Without pretraining, a dense network has nothing the n-grams do not already have.
+2. **A pretrained English prior** (GloVe 100-d, public domain, 20,000 words, PCA 32, int8, about 1 MB):
+   in a single linear model it gave +1.5 to +4 points of English accuracy on the held-out sets (`scripts/intent/nn/dense-prior.py`);
+   in the shipped pipeline (a bag of four models plus teacher data) it gave +0.8, and Hebrew gets nothing. **Not adopted**: not
+   worth 1 MB and an English-only gain. The code stays opt-in (`node scripts/train-intent-model.cjs --dense` after
+   `scripts/intent/nn/build-dense-prior.py`; the data file is git-ignored).
+3. **A ready-to-run multilingual encoder experiment for you** (`scripts/intent/nn/encoder-experiment.py`; see the README there):
+   embeds all sentences with `intfloat/multilingual-e5-small` (or any sentence-transformers model), trains a head on
+   (a) the embedding, (b) embedding plus n-grams, and prints accuracy and ask/promise precision and recall per set and per
+   language against the n-gram model, with the adoption rule: at least +3 points on both new sets in BOTH languages with no
+   loss of precision, within about 30 MB and 60 ms per sentence. I checked the script end to end with a stub encoder only;
+   its numbers mean nothing until you run it with the real model.
+
+## 5. Learning across users (`docs/community-learning.md`): built, dormant, and not worth turning on yet
+
+Mechanism built and tested: on-device clipped, noisy, hashed sketch of the model's learning (local differential privacy),
+server-side summing, significance and cohort thresholds, a canary that refuses a delta that hurts, a signed release. Measured in
+simulation: **with the privacy noise a real deployment needs, nothing becomes publishable until tens of thousands of devices
+take part, and even a noiseless oracle gained nothing measurable in this simulation (see `docs/community-learning.md` §5)**. A candidate delta that does appear can HURT
+(one noiseless run broke ask precision on the blind set), which is exactly what the canary is for. See that document for the
+numbers, the threat model, the launch checklist, and one thing that was NOT built: the on-device upload and fetch wiring.
+
+## 6. Needs the owner
+
+- A real, human-written evaluation set: with your explicit OK I can sample sent mail through the Gmail connector, mask it
+  locally and use it ONLY to measure (never committed raw). Every number here still comes from sentences a model wrote.
+- Run `encoder-experiment.py` with the real model (section 4.3) and send me the output.
 - Real-Gmail steps 45-50 in `docs/open-loops.md` §9a-iv.
+- The community-learning decisions in `docs/community-learning.md` §8.

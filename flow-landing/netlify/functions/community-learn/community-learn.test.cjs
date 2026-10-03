@@ -1,0 +1,51 @@
+// community-learn: dormant by default, accepts only a valid noisy sketch, never stores anything identifying.
+// Run: node netlify/functions/community-learn/community-learn.test.cjs
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'k';
+let calls = [], sb = () => ({ ok: true, status: 201 });
+global.fetch = async (url, o) => { calls.push({ url: String(url), body: o && o.body ? JSON.parse(o.body) : null, headers: o && o.headers }); if (String(url).includes('supabase.co')) return sb(); throw new Error('unexpected ' + url); };
+const { FlowCommunity: C } = require('./community.js');
+let fails = 0; const check = (n, c, d) => { if (c) console.log('PASS:', n); else { fails++; console.log('FAIL:', n, JSON.stringify(d)); } };
+let seed = 5; const rng = () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const good = () => C.buildUpdate({ act: { '0|10': 0.2 } }, {}, { common: () => true, rng, epsilon: 8 });
+let n = 0;
+async function post(body, ip) { calls = []; const { handler } = require('./community-learn.js'); const r = await handler({ httpMethod: 'POST', body: typeof body === 'string' ? body : JSON.stringify(body), headers: { 'x-nf-client-connection-ip': ip || '7.7.7.' + (++n) } }); let j = {}; try { j = JSON.parse(r.body); } catch (e) { /* empty */ } return { r, j }; }
+(async () => {
+  delete process.env.COMMUNITY_ENABLED;
+  let { r, j } = await post({ update: good() });
+  check('DORMANT: without COMMUNITY_ENABLED the endpoint accepts nothing and stores nothing', r.statusCode === 503 && j.reason === 'disabled' && calls.length === 0, { r, calls });
+  process.env.COMMUNITY_ENABLED = '1';
+  ({ r, j } = await post({ update: good() }));
+  check('an enabled endpoint stores one row', r.statusCode === 200 && j.ok && calls.length === 1 && calls[0].url.endsWith('/rest/v1/community_sketches'), { r, calls });
+  const row = calls[0].body;
+  check('the row holds only the round, the noise scale and the sketch: no ip, no id, no text', Object.keys(row).sort().join() === 'round,sigma,sketch' && row.sketch.length === C.M, Object.keys(row));
+  check('the service key is used server-side only', calls[0].headers.apikey === 'k');
+  ({ r } = await post({ update: good() }, '1.2.3.4'));
+  ({ r } = await post({ update: good() }, '1.2.3.4'));
+  ({ r } = await post({ update: good() }, '1.2.3.4'));
+  check('a caller is limited to two uploads a day', r.statusCode === 429, r);
+  ({ r } = await post('{not json'));
+  check('bad JSON is a 400', r.statusCode === 400);
+  ({ r } = await post({ update: Object.assign(good(), { sketch: [1, 2, 3] }) }));
+  check('a sketch of the wrong size is refused', r.statusCode === 400 && calls.length === 0, r);
+  ({ r } = await post({ update: Object.assign(good(), { sketch: good().sketch.map((x, i) => (i === 3 ? NaN : x)) }) }));
+  check('a non-finite number is refused', r.statusCode === 400);
+  ({ r } = await post({ update: C.buildUpdate({ act: { '0|10': 0.2 } }, {}, { common: () => true, rng, noScale: true }) }));
+  check('an upload made with NO noise is refused outright', r.statusCode === 400 && calls.length === 0, r);
+  ({ r, j } = await post({ update: Object.assign(good(), { sigma: 0.3 }) }));
+  check('and so is one that claims less noise than the floor', r.statusCode === 400 && j.error === 'Not enough noise');
+  ({ r } = await post('x'.repeat(70 * 1024)));
+  check('an oversized body is refused before it is parsed', r.statusCode === 413);
+  const { handler } = require('./community-learn.js');
+  check('only POST', (await handler({ httpMethod: 'GET', headers: {} })).statusCode === 405);
+  sb = () => ({ ok: false, status: 503 });
+  ({ r } = await post({ update: good() }));
+  check('a database failure is a 502, never a silent success', r.statusCode === 502);
+  sb = () => ({ ok: true, status: 201 });
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  ({ r } = await post({ update: good() }));
+  check('no database configured is a 503 and nothing is attempted', r.statusCode === 503 && calls.length === 0);
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'community-learn.js'), 'utf8');
+  check('the source never logs an address and never stores one', !/console\.\w+\([^)]*\bip\b/.test(src) && !/ip:\s*ip/.test(src));
+  console.log('\nTOTAL FAILURES: ' + fails);
+  process.exit(fails ? 1 : 0);
+})();

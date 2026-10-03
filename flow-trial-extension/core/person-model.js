@@ -23,7 +23,7 @@
 //     colleagues starts from THEIR habits (a department answers alike), not from the whole population.
 //     Free-mail domains (gmail.com...) are never pooled: those are strangers, not colleagues.
 //
-// Honest limits (also in docs/person-model.md): it needs a few closed loops with the person
+// Honest limits (docs/ai-engine-upgrade.md §2, §2b): it needs a few closed loops with the person
 // before it is personal; it models time to close, not whether they are willing; replies closed
 // by hand ("Mark done") are not used because the person may have settled it outside email.
 const FlowPersonModel = (() => {

@@ -37,6 +37,7 @@ const FlowIntentModel = (() => {
 
   let weights = null;       // { version, dim, temp, act:{...}, action:{...} }
   let adapt = { act: {}, topic: {}, action: {} }; // sparse per-device deltas: { head: { 'class|idx': delta } }
+  let community = null;     // optional published community delta { 'class|idx': delta } for the act head (core/community.js); null = none
 
   // ---- hashing ---------------------------------------------------------------
   function hash(str, dim) {
@@ -132,10 +133,11 @@ const FlowIntentModel = (() => {
     const head = weights[headName];
     const dense = decode(head);
     const delta = adapt[headName] || {};
+    const comm = headName === 'act' && community ? community : null;
     const dw = dv && weights.dense && weights.dense[headName];
     const z = labels.map((_, c) => {
       let s = head.bias[c] || 0;
-      for (const i of idxs) s += dense[c][i] + (delta[c + '|' + i] || 0);
+      for (const i of idxs) s += dense[c][i] + (delta[c + '|' + i] || 0) + (comm ? (comm[c + '|' + i] || 0) : 0);
       if (dw && dw[c]) for (let j = 0; j < dv.length; j++) s += dw[c][j] * dv[j];
       return s;
     });
@@ -192,6 +194,15 @@ const FlowIntentModel = (() => {
     if (keys.length > MAX_ENTRIES) keys.slice(0, keys.length - MAX_ENTRIES).forEach((k) => { delete d[k]; });
     return adapt;
   }
+  // The community layer: a signed, validated, published delta shared by many devices (core/community.js).
+  function setCommunity(entries) { community = entries && typeof entries === 'object' ? entries : null; }
+  function getCommunity() { return community; }
+  // Is this feature bucket common in the PUBLIC training text? Only common buckets may ever be shared.
+  function isCommon(idx) {
+    if (!weights || !weights.common) return false;
+    if (!weights._commonBits) weights._commonBits = typeof Buffer !== 'undefined' ? Buffer.from(weights.common, 'base64') : Uint8Array.from(atob(weights.common), (c) => c.charCodeAt(0));
+    return Boolean(weights._commonBits[idx >> 3] & (1 << (idx & 7)));
+  }
   function setAdaptation(a) { adapt = { act: (a && a.act) || {}, topic: (a && a.topic) || {}, action: (a && a.action) || {} }; }
   function getAdaptation() { return adapt; }
 
@@ -201,7 +212,7 @@ const FlowIntentModel = (() => {
     else if (typeof require !== 'undefined') load(require('./intent-model-weights.js').FlowIntentWeights);
   } catch (e) { /* no weights yet: the model reports not ready and callers stay silent */ }
 
-  return { ACTS, TOPICS, ACTIONS, FEATURE_VERSION, features, predict, load, ready, learn, setAdaptation, getAdaptation, hash, softmax };
+  return { ACTS, TOPICS, ACTIONS, FEATURE_VERSION, features, predict, load, ready, learn, setAdaptation, getAdaptation, setCommunity, getCommunity, isCommon, hash, softmax };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntentModel };
