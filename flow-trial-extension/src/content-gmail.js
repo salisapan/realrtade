@@ -841,6 +841,14 @@
       recordSilence(messageId, 'file');
       return;
     }
+    // A request for something that certifies a payment (a receipt) takes more than one step: whether it already exists,
+    // whether the payment is real, who issues it, and only a real attachment closes it (core/resolution.js). The loop card
+    // from src/follow.js owns that message, so no Do It chip appears and none claims "Handled" for a draft.
+    if (fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowResolution !== 'undefined' && typeof FlowFollow !== 'undefined' && FlowResolution.owns(fileGate.ask.id)) {
+      recordSilence(messageId, 'file');
+      return;
+    }
+
     // Execution Memory is fetched once here, not once per process — which
     // process this message needs isn't known until after classification,
     // and actions.js's planFor() does the per-process lookup itself from

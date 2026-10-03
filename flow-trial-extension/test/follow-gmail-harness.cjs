@@ -98,7 +98,7 @@ async function open(browser, name, thread, opts) {
     errs,
     card: await p.evaluate(() => { const h = document.getElementById('flow-follow-host'); return h ? h.innerText.replace(/\n+/g, ' | ') : null; }),
     msgs: await p.evaluate(() => window.__msgs.map((m) => m.type)),
-    watches: await p.evaluate(() => (window.__store.followWatches || []).map((w) => ({ id: w.id, status: w.status, chase: w.chaseIso, task: w.taskRef && w.taskRef.taskId, stage: w.stage, nudges: w.nudges, closedAs: w.closedAs, promised: w.promisedIso, file: w.file && w.file.object, preparedAt: w.preparedAt, preparedFile: w.preparedFile, fileChoice: w.fileChoice })))
+    watches: await p.evaluate(() => (window.__store.followWatches || []).map((w) => ({ id: w.id, status: w.status, chase: w.chaseIso, task: w.taskRef && w.taskRef.taskId, stage: w.stage, nudges: w.nudges, closedAs: w.closedAs, promised: w.promisedIso, file: w.file && w.file.object, preparedAt: w.preparedAt, preparedFile: w.preparedFile, fileChoice: w.fileChoice, resolution: w.resolution, direction: w.direction, resolvedBy: w.resolvedBy })))
   });
   return { p, ctx, state };
 }
@@ -558,6 +558,89 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   lab = await t.p.evaluate(() => window.__store.outcomeLabels);
   check('an auto-close and its reopen are both counted, so the error rate is measured', lab && lab.autoClosed === 1 && lab.reopened === 1, lab);
   await t.ctx.close();
+
+  // 32. a request that takes several steps (core/resolution.js): "can you send me the receipt?"
+  const RASK = 'Hi, could you send me the receipt for the ₪3,850 retainer payment?';
+  const RT = [msg(theirs, RASK)];
+  const PAYLOOP = { id: 'pay1', threadId: 'pay1', messageId: 'p1', subject: 'Retainer', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, kind: 'payment', what: 'Please pay the retainer', amount: { value: 3850, currency: 'ILS', raw: '₪3,850' }, chaseIso: '2026-10-10', lang: 'en', createdAt: new Date(2026, 8, 20, 12).getTime(), status: 'waiting', direction: 'theirs', nudges: 0 };
+  const SEEN = { paymentsSeen: [{ value: 3850, currency: 'ILS', at: new Date(2026, 9, 1, 9).getTime(), trusted: true }] };
+  const ISSUER = { issuers: { receipt: { email: 'books@my-accountant.co.il', name: 'Noa Books' } } };
+
+  // 32a. found existing: one receipt in Drive. No Do It chip claims "Handled"; the loop card says what it did and that nothing was sent.
+  t = await open(browser, 'res-found', RT, { drive: [{ id: 'F1', name: 'Receipt - Dana retainer.pdf', mimeType: 'application/pdf' }, { id: 'F9', name: 'Budget.xlsx', mimeType: 'application/vnd.ms-excel' }] });
+  s = await t.state();
+  check('found existing: one card, naming the file and what "done" means', /Next: receipt/.test(s.card || '') && /Found Receipt - Dana retainer\.pdf/.test(s.card || '') && /Done when: A receipt for ₪3,850 sent to Dana, as a real attachment/.test(s.card || ''), s.card);
+  check('and no Do It chip competes with it', await t.p.evaluate(() => !document.querySelector('.flow-chip-host')));
+  check('nothing was opened before a tap', s.watches.length === 0, s.watches);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(600);
+  const rd = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  s = await t.state();
+  check('the draft attaches exactly that Drive file and says so', rd && rd.payload.driveFileId === 'F1' && /Attached is the receipt for ₪3,850: Receipt - Dana retainer\.pdf/.test(rd.payload.body), rd && rd.payload);
+  check('the draft goes to the person who asked, and is a draft', rd && rd.payload.to === 'dana@acme.com' && !s.msgs.some((m) => /send/.test(m) && m !== 'flow:search-drive'));
+  check('one loop of mine opened, carrying the path; preparing did not close it', s.watches.length === 1 && s.watches[0].direction === 'mine' && s.watches[0].status === 'waiting' && s.watches[0].resolution && s.watches[0].resolution.stage === 'prepare' && s.watches[0].resolution.preparedFile === 'Receipt - Dana retainer.pdf', s.watches);
+  check('the receipt in the page says nothing was sent and when it will close', /Nothing was sent\. I will close this when you send the receipt\./.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 32b. not found, nothing confirmed: the next step is a question, not silence and not a made-up receipt
+  t = await open(browser, 'res-none', RT, {});
+  s = await t.state();
+  check('not found: it says what it could not find and asks the one question', /cannot find a payment of ₪3,850 from Dana\. Was it paid\?/.test(s.card || '') && /Yes, it is paid/.test(s.card || '') && /Not yet/.test(s.card || ''), s.card);
+  check('no draft, no file, no loop yet', !s.msgs.includes('flow:follow-draft') && s.watches.length === 0, s);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(700);
+  s = await t.state();
+  check('"paid" advances the path at once: no receipt exists and none is made, so it asks who issues them', /Who issues your receipts\?/.test(s.card || '') && /cannot issue/.test(s.card || '') && /Save and ask them/.test(s.card || ''), s.card);
+  check('the loop is open and says why', s.watches.length === 1 && s.watches[0].resolution.assertedPaidAt && s.watches[0].resolution.stage === 'verify' && s.watches[0].status === 'waiting', s.watches);
+  await t.p.fill('.flow-fu-input', 'not an address'); await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(400);
+  check('a non-address is not saved', await t.p.evaluate(() => !(window.__store.issuers && window.__store.issuers.receipt)));
+  await t.p.fill('.flow-fu-input', 'books@my-accountant.co.il'); await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(700);
+  s = await t.state();
+  check('with an issuer saved, the same path continues: ask them (a draft)', /Ask books@my-accountant\.co\.il to issue it/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 32c. needs a request to someone else
+  t = await open(browser, 'res-request', RT, { store: Object.assign({}, SEEN, ISSUER) });
+  s = await t.state();
+  check('payment seen at the bank and an issuer known: ask them, no question about payment', /Ask Noa Books to issue it/.test(s.card || '') && !/Was it paid/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(700);
+  const rq = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  s = await t.state();
+  check('the draft goes to the issuer and asks for the file, naming payer and amount', rq && rq.payload.to === 'books@my-accountant.co.il' && /issue a receipt for Dana Cole for ₪3,850/.test(rq.payload.body) && !/attached|enclosed/i.test(rq.payload.body), rq && rq.payload);
+  check('the loop waits on the issuer and is not closed', s.watches[0].status === 'waiting' && s.watches[0].resolution.requestedTo === 'Noa Books' && s.watches[0].resolution.stage === 'request', s.watches);
+  await t.ctx.close();
+
+  // 32d. cannot complete yet: the money is still being chased
+  t = await open(browser, 'res-blocked', RT, { watches: [PAYLOOP] });
+  s = await t.state();
+  check('a payment still being chased: no receipt path, it says the payment is not confirmed', !/Prepare|Ask .* to issue/.test(s.card || '') && s.card && /not confirmed/.test(s.card), s.card);
+  check('nothing was drafted', !s.msgs.includes('flow:follow-draft'));
+  await t.ctx.close();
+
+  // 32e. a bank email opened earlier is remembered as numbers, and used
+  t = await open(browser, 'res-bank', [msg({ from: 'noreply@bankhapoalim.co.il', fromName: 'Bank Hapoalim', to: 'me@x.com', toIsMe: true }, 'התקבל תשלום על סך ₪3,850 לחשבונך')], {});
+  s = await t.state();
+  const seen = await t.p.evaluate(() => window.__store.paymentsSeen);
+  check('a payment confirmation opened in Gmail is kept as an amount and a day, never its text', Array.isArray(seen) && seen.length === 1 && seen[0].value === 3850 && Object.keys(seen[0]).sort().join() === 'at,currency,trusted,value' && !/התקבל/.test(JSON.stringify(seen)), seen);
+  await t.ctx.close();
+
+  // 32f. closes only when it was really delivered
+  const RW = { id: 't1', threadId: 't1', messageId: 'm1', subject: 'Vendor booking', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, kind: 'reply', what: RASK, amount: { value: 3850, currency: 'ILS', raw: '₪3,850' }, chaseIso: '2026-10-05', lang: 'en', createdAt: new Date(2026, 8, 28, 12).getTime(), status: 'waiting', direction: 'mine', taskRef: { taskListId: 'L', taskId: 'T9' }, nudges: 0, file: { object: 'receipt', label: 'receipt', lang: 'en', synonym: ['receipt', 'קבלה'] }, resolution: { v: 1, object: 'receipt', label: 'receipt', lang: 'en', done: 'A receipt for ₪3,850 sent to Dana, as a real attachment', stage: 'prepare', preparedAt: 1, preparedFile: 'Receipt.pdf', trail: [] } };
+  t = await open(browser, 'res-claim', RT.concat([msg(mine, 'Hi Dana, the receipt is attached.')]), { watches: [RW] });
+  s = await t.state();
+  check('"attached" with nothing attached does not close it, and says so', s.watches[0].status === 'waiting' && /nothing is attached/.test(s.card || ''), { w: s.watches, card: s.card });
+  await t.ctx.close();
+  t = await open(browser, 'res-wrongfile', RT.concat([msg(mine, 'See attached.', ['IMG_2231.pdf'])]), { watches: [RW] });
+  s = await t.state();
+  check('a file not named for it: kept open with one question', s.watches[0].status === 'waiting' && /Did the receipt go out\?/.test(s.card || ''), { w: s.watches, card: s.card });
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(500);
+  s = await t.state();
+  check('"yes, it is done" closes it, labelled as the person\'s own call', s.watches[0].status === 'resolved' && s.watches[0].resolvedBy === 'manual', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'res-delivered', RT.concat([msg(mine, 'Hi Dana, here you go.', ['Receipt-Dana-Oct.pdf'])]), { watches: [RW] });
+  s = await t.state();
+  check('a real receipt attached to a message I sent: closed, with what was sent', s.watches[0].status === 'resolved' && s.watches[0].resolvedBy === 'delivered' && s.watches[0].resolution.stage === 'close' && s.watches[0].resolution.deliveredFiles[0] === 'Receipt-Dana-Oct.pdf' && /Receipt-Dana-Oct\.pdf\. Loop closed\./.test(s.card || ''), { w: s.watches, card: s.card });
+  check('its reminder is completed', s.msgs.includes('flow:follow-complete'));
+  await t.ctx.close();
+
 
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });

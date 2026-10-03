@@ -56,6 +56,7 @@
         "core/story.js",
         "core/recognition-stats.js",
         "core/file-path.js",
+        "core/resolution.js",
         "core/person-model.js",
         "core/outcome-labels.js",
         "core/reply-model-weights.js",

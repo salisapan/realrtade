@@ -212,6 +212,9 @@ const FlowStorage = (() => {
     localLm: null,
     // core/identity-graph.js: which names, addresses and numbers are the same person across apps. No message text. Local, capped.
     identityGraph: null,
+    // core/resolution.js: payments seen in bank/processor mail (amount, currency, day: numbers only, never text; capped, expire) and who issues the person's receipts (an address they typed).
+    paymentsSeen: [],
+    issuers: {},
     // src/outlook.js: the Microsoft sign-in (kept only on this device), the last check, and what waits for an answer. Never message text beyond the loop's own sentence.
     outlookAuth: null,
     outlookSync: {},
@@ -1044,6 +1047,36 @@ const FlowStorage = (() => {
     await set({ identityGraph: FlowIdentity.answer(state.identityGraph, a, b, Boolean(same)) });
     return true;
   });
+  // A payment confirmation was opened: keep the amount and the day, nothing else. Same amount within a day is one sighting.
+  const PAYMENTS_SEEN_CAP = 40;
+  const recordPaymentSeen = serialize(async function recordPaymentSeen(p) {
+    if (!p || typeof p.value !== 'number' || !(p.value > 0)) return false;
+    const now = typeof p.at === 'number' ? p.at : Date.now();
+    const state = await get();
+    const list = (state.paymentsSeen || []).filter((x) => x && now - x.at < 120 * 24 * 3600 * 1000);
+    if (list.some((x) => x.value === p.value && (x.currency || null) === (p.currency || null) && Math.abs(now - x.at) < 24 * 3600 * 1000)) return false;
+    list.unshift({ value: p.value, currency: p.currency || null, at: now, trusted: p.trusted !== false });
+    await set({ paymentsSeen: list.slice(0, PAYMENTS_SEEN_CAP) });
+    return true;
+  });
+  async function getPaymentsSeen() {
+    const state = await get();
+    return (state.paymentsSeen || []).filter(Boolean);
+  }
+  async function getIssuer(object) {
+    const state = await get();
+    return (state.issuers && state.issuers[object]) || null;
+  }
+  // The address the person typed for "who issues your receipts". Only a plausible address is kept.
+  const setIssuer = serialize(async function setIssuer(object, who) {
+    const email = String((who && who.email) || '').trim();
+    if (!object || !/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(email)) return null;
+    const state = await get();
+    const issuers = Object.assign({}, state.issuers || {});
+    issuers[object] = { email, name: who.name ? String(who.name).slice(0, 80) : null };
+    await set({ issuers });
+    return issuers[object];
+  });
   async function getActiveQuestion() {
     const state = await get();
     return Object.assign({ pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 }, state.activeQuestion || {});
@@ -1172,7 +1205,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getIdentityGraph, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

@@ -410,6 +410,8 @@ const FlowFollowUp = (() => {
       subtype: ask.subtype || null,
       // The one file object that finishes this intention, or null (core/file-path.js).
       file: ask.file || null,
+      // The multi-step path for a request that takes more than one step (core/resolution.js), or null.
+      resolution: ask.resolution || null,
       // How the loop was recognised ('model' = the on-device model alone, no word-list frame).
       tier: ask.tier || null,
       stage: 'waiting',

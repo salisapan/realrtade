@@ -592,6 +592,8 @@ const FlowFollow = (() => {
     if (typeof FlowOutsideSignals === 'undefined') return false;
     const ev = FlowOutsideSignals.paymentEvidence(ctx.messageText(last), sender && sender.email);
     if (!ev) return false;
+    // The amount and the day, nothing else: a later request for a receipt can tell the payment really arrived (core/resolution.js).
+    if (FlowStorage.recordPaymentSeen) FlowStorage.recordPaymentSeen({ value: ev.amount.value, currency: ev.amount.currency, trusted: ev.trusted, at: Date.now() }).catch(() => {});
     const list = await FlowStorage.getWatches();
     const m = FlowOutsideSignals.matchPayment(list, ev, Date.now());
     if (!m) return false;
@@ -867,6 +869,222 @@ const FlowFollow = (() => {
     clockCard(found, base);
   }
 
+
+  // ---- a request that takes more than one step (core/resolution.js) ---------------------------------
+  // "Can you send me the receipt?" is not one action. The path: what "done" means, an existing file first, whether
+  // the payment is real, a draft or a request to whoever issues it, and only a real attachment in a message YOU sent
+  // closes it. One loop (direction 'mine') carries the whole path; every card is one move, never a workflow.
+  const examinedResolution = new Set();
+
+  function needOf(ask) { return { object: ask.id, label: ask.label, lang: ask.lang, synonym: ask.synonym || [] }; }
+  function sameSenderNode(ctx, a, b) { const x = (ctx.extractSender(a).email || '').toLowerCase(); return Boolean(x) && x === (b.email || '').toLowerCase(); }
+
+  async function resolutionWorld(ctx, sender, env) {
+    const need = env.need;
+    let threadFiles = null;
+    if (ctx.attachmentsOf) {
+      threadFiles = [];
+      Array.from(ctx.messages).forEach((m) => {
+        const atts = ctx.attachmentsOf(m);
+        if (!atts || !atts.length) return;
+        const by = isOwnNode(ctx, m) ? 'me' : (sameSenderNode(ctx, m, sender) ? 'requester' : 'other');
+        atts.forEach((a) => { if (a && a.filename) threadFiles.push({ filename: a.filename, by }); });
+      });
+    }
+    const found = typeof FlowFilePath !== 'undefined' ? await send({ type: 'flow:search-drive', query: FlowFilePath.driveQuery({ label: need.label }) }) : null;
+    const watches = await FlowStorage.getWatches();
+    const person = { email: sender.email, personKey: env.personKey || null };
+    const payment = FlowResolution.paymentStatus({ facts: env.facts, person, watches, paymentsSeen: await FlowStorage.getPaymentsSeen(), state: env.state, now: Date.now() });
+    const issuer = await FlowStorage.getIssuer(need.object);
+    return { evidence: { threadFiles, driveFiles: found && found.ok ? found.files : null }, payment, issuer };
+  }
+
+  function planFor(env, world) {
+    return FlowResolution.plan({ need: env.need, facts: env.facts, evidence: world.evidence, payment: world.payment, issuer: world.issuer, state: env.state, sourceText: env.text });
+  }
+
+  // The loop that carries the path. Opened on the first tap, never before. Returns the stored watch, or null (cap, or Google not connected).
+  async function resolutionLoop(env) {
+    if (env.watch) return env.watch;
+    const status = await send({ type: 'flow:pro-status' });
+    const list = await FlowStorage.getWatches();
+    const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
+    if (!gate.allowed) { await capCard(gate.used, gate.cap); return null; }
+    const chaseIso = FlowFollowUp.chaseDate(FlowFollowUp.KINDS.REPLY, null, Date.now(), 2);
+    const ask = {
+      kind: FlowFollowUp.KINDS.REPLY, what: env.what, amount: env.facts.amount || null, deadlineIso: null, chaseIso, lang: env.need.lang,
+      subtype: 'owe:send', subtypeLabel: null, tier: 'rule', direction: 'mine', file: { object: env.need.object, label: env.need.label, lang: env.need.lang, synonym: env.need.synonym },
+      resolution: env.state
+    };
+    const watch = FlowFollowUp.buildWatch({ ask, threadId: env.threadId, messageId: env.lastId, subject: env.subject, counterpart: { email: env.sender.email, name: env.sender.name || null }, channel: 'gmail', personKey: env.personKey || null, now: Date.now() });
+    watch.threadUrl = env.threadUrl || null;
+    const res = await send({ type: 'flow:follow-task', payload: taskPayload(watch) });
+    if (!res || !res.ok) { receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not add the reminder. Try again in a moment.', null); return null; }
+    watch.taskRef = res.ref || null;
+    await FlowStorage.upsertWatch(watch);
+    FlowStorage.recordLoopOpen(watch).catch(() => {});
+    track('follow_resolution_opened');
+    return watch;
+  }
+
+  // Keep the one status truth on the loop: the state, plus the line the popup shows for it.
+  async function saveResolution(env, state, plan) {
+    const stored = Object.assign({}, state, plan ? { line: plan.line, move: plan.move } : {});
+    const watch = await resolutionLoop(Object.assign({}, env, { state: stored }));
+    if (!watch) return null;
+    const next = (await FlowStorage.updateWatch(watch.id, { resolution: stored })) || Object.assign({}, watch, { resolution: stored });
+    return Object.assign({}, env, { watch: next, state: stored });
+  }
+
+  // After a tap: advance the state, plan again at once, and show the NEXT move (the path moves, the person does not re-ask).
+  async function advanceResolution(ctx, env, nextState) {
+    const world = await resolutionWorld(ctx, env.sender, Object.assign({}, env, { state: nextState }));
+    const plan = planFor(env, world);
+    const saved = await saveResolution(Object.assign({}, env, { state: nextState }), nextState, plan);
+    if (!saved) return;
+    resolutionCard(ctx, saved, plan, world);
+  }
+
+  async function draftTo(to, toName, subject, body, extra) {
+    return send({ type: 'flow:follow-draft', payload: Object.assign({ to, toName, subject, body }, extra || {}) });
+  }
+
+  function resolutionCard(ctx, env, plan, world) {
+    const he = env.need.lang === 'he';
+    const quiet = plan.actions && plan.actions.length === 1 && plan.actions[0] === 'hold';
+    if (quiet || !plan.actions || !plan.actions.length) { dismiss(); return; }
+    const h = card(he);
+    h.appendChild(el('div', 'flow-fu-title', (he ? 'צעד הבא: ' : 'Next: ') + env.need.label + (env.facts.senderName ? ' · ' + env.facts.senderName : '')));
+    h.appendChild(el('div', 'flow-fu-line', plan.line));
+    h.appendChild(el('div', 'flow-fu-line', (he ? 'סגור כש: ' : 'Done when: ') + plan.doneWhen + '.'));
+    const row = el('div', 'flow-fu-actions');
+    h.appendChild(row);
+    const t = Date.now();
+    const st = env.state;
+    const reply = (extra, withFile) => async () => {
+      const used = withFile ? plan.file : null;
+      const payload = {};
+      if (used && used.source === 'drive') payload.driveFileId = used.id;
+      else if (used && used.source === 'thread' && ctx.fetchAttachment) { const f = await ctx.fetchAttachment(used.meta); if (f) payload.attachment = f; }
+      const voice = { counterpart: { email: env.sender.email, name: env.sender.name }, lang: env.need.lang };
+      const attached = used && (payload.driveFileId || payload.attachment) ? used.name : null;
+      let res = await draftTo(env.sender.email, env.sender.name, env.subject, await voiced(FlowResolution.replyDraft(env.need, env.facts, { fileName: attached }), voice), payload);
+      let withoutFile = Boolean(used && !attached);
+      if (attached && res && res.reason === 'attach') { withoutFile = true; res = await draftTo(env.sender.email, env.sender.name, env.subject, await voiced(FlowResolution.replyDraft(env.need, env.facts, {}), voice), {}); }
+      if (!(res && res.ok)) { receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null); return; }
+      const next = FlowResolution.recordPrepared(st, t, attached && !withoutFile ? attached : null);
+      const saved = await saveResolution(env, next, Object.assign({}, plan, { line: 'Draft ready' + (attached && !withoutFile ? ' with ' + attached : '') + '. Not sent; I will close this when you send it with the file.' }));
+      track('follow_resolution_prepared');
+      if (saved) receipt('Draft ready in Gmail' + (attached && !withoutFile ? ' with ' + attached : '') + '. Nothing was sent. I will close this when you send the ' + env.need.label + '.' + (withoutFile ? ' I could not attach the file, so add it yourself.' : ''), null);
+    };
+    const move = (fn) => () => { fn().catch((e) => { console.error('[Glance] resolution step failed', e); receipt('Something did not work. Try again in a moment.', null); }); };
+    plan.actions.forEach((a, idx) => {
+      const primary = idx === 0 ? 'primary' : 'ghost';
+      if (a === 'prepare-reply-with-file') row.appendChild(button('Prepare reply with file', primary, move(reply({}, true))));
+      else if (a === 'prepare-plain-reply') row.appendChild(button('Prepare my reply', primary, move(reply({}, false))));
+      else if (a === 'mark-paid') row.appendChild(button(plan.move === 'verify-payment' ? 'Yes, it is paid' : 'It is paid now', primary, move(async () => { const saved = await saveResolution(env, FlowResolution.markPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
+      else if (a === 'not-paid') row.appendChild(button('Not yet', 'ghost', move(async () => { const saved = await saveResolution(env, FlowResolution.markNotPaid(st, t), null); if (saved) await advanceResolution(ctx, saved, saved.state); })));
+      else if (a === 'request-issuer') row.appendChild(button('Ask ' + (plan.issuer.name || plan.issuer.email) + ' to issue it', primary, move(async () => {
+        const dateText = null;
+        const body = FlowResolution.issuerRequestDraft(env.need, env.facts, plan.issuer, { dateText });
+        const res = await draftTo(plan.issuer.email, plan.issuer.name, (he ? 'בקשה: ' : 'Request: ') + env.need.label + (env.facts.senderName ? ' - ' + env.facts.senderName : ''), body, {});
+        if (!(res && res.ok)) { receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null); return; }
+        const next = FlowResolution.recordRequest(st, t, plan.issuer.name || plan.issuer.email);
+        await saveResolution(env, next, { line: 'Draft to ' + (plan.issuer.name || plan.issuer.email) + ' is ready. Not sent. I will look again when you open this thread.', move: 'await-issuer' });
+        track('follow_resolution_requested');
+        receipt('Draft to ' + (plan.issuer.name || plan.issuer.email) + ' is ready in Gmail. Nothing was sent. This stays open until the ' + env.need.label + ' reaches ' + (env.facts.senderName || 'them') + '.', null);
+      })));
+      else if (a === 'issue-myself') row.appendChild(button('I will issue it', 'ghost', move(async () => { const next = FlowResolution.recordOwnerIssuing(st, t); await saveResolution(env, next, { line: 'Waiting for you to issue the ' + env.need.label + '.', move: 'await-owner-issue' }); receipt('Noted. I will close this when you send the ' + env.need.label + ' as a file.', null); })));
+      else if (a === 'set-issuer') {
+        const input = el('input', 'flow-fu-input');
+        input.type = 'email'; input.placeholder = he ? 'כתובת מי שמפיק לכם קבלות' : 'Address of whoever issues your receipts'; input.setAttribute('aria-label', input.placeholder);
+        h.insertBefore(input, row);
+        row.appendChild(button('Save and ask them', primary, move(async () => {
+          const saved = await FlowStorage.setIssuer(env.need.object, { email: input.value, name: null });
+          if (!saved) { input.setAttribute('aria-invalid', 'true'); return; }
+          await advanceResolution(ctx, env, st);
+        })));
+      }
+      else if (a === 'create-from-template' && ctx.openCreateCard) row.appendChild(button('Fill in the details', primary, () => { dismiss(); ctx.openCreateCard({ ask: { id: env.need.object, creatable: true, lang: env.need.lang, label: env.need.label, synonym: env.need.synonym, line: plan.line }, decision: plan.template, sender: env.sender, subject: env.subject, bodyText: env.text, threadId: env.threadId }); }));
+    });
+    row.appendChild(button('Not now', 'ghost', dismiss));
+  }
+
+  // An ask for a financial artifact in a thread with no loop, or a new message in a thread that carries a resolution.
+  // Returns true when the resolution owns this message (nothing else should offer anything on it).
+  async function considerResolution(ctx, last, sender, threadId, lastId, watch) {
+    if (typeof FlowResolution === 'undefined' || typeof FlowFileAttach === 'undefined' || channelOf(ctx) !== 'gmail' || ctx.strict) return false;
+    if (!sender.email || FlowFollowUp.isAutoReply('', sender.email)) return false;
+    if (watch && !(watch.resolution && watch.status === 'waiting')) return false;
+    const text = ctx.messageText(last);
+    let need = null;
+    let facts = null;
+    let state = null;
+    if (watch) {
+      // The path is already open: plan it again from what is true now.
+      state = watch.resolution;
+      const m = FlowFileAttach.mention(state.label || state.object);
+      need = { object: state.object, label: state.label, lang: state.lang || 'en', synonym: m ? m.synonym : [state.label] };
+      facts = { senderName: (watch.counterpart && watch.counterpart.name) || sender.name || null, amount: watch.amount || null };
+    } else {
+      const g = FlowFileAttach.gate(text);
+      if (g.kind !== 'clear' || !FlowResolution.owns(g.ask.id)) return false;
+      need = needOf(g.ask);
+      const ex = typeof FlowExtract !== 'undefined' ? FlowExtract : null;
+      const money = ex && ex.parseMoney ? ex.parseMoney(text) : null;
+      facts = { senderName: sender.name || null, amount: money ? { value: money.value, currency: money.currency || null, raw: money.raw } : null };
+      state = FlowResolution.open(need, facts, Date.now());
+    }
+    const key = threadId + '|' + lastId;
+    if (examinedResolution.has(key)) return true;
+    examinedResolution.add(key);
+    const env = { need, facts, state, watch, sender, threadId, lastId, subject: ctx.subject, threadUrl: ctx.threadUrl(lastId), text, what: String(text).replace(/\s+/g, ' ').trim().slice(0, 160), personKey: (watch && watch.personKey) || null };
+    const world = await resolutionWorld(ctx, sender, env);
+    const plan = planFor(env, world);
+    if (watch) {
+      // Say it again only when the move changed, and keep the stored line true. A held loop stays quiet.
+      if (state.move === plan.move) return true;
+      const saved = await saveResolution(env, state, plan);
+      if (saved) resolutionCard(ctx, saved, plan, world);
+      return true;
+    }
+    track('follow_resolution_planned');
+    resolutionCard(ctx, env, plan, world);
+    return true;
+  }
+
+  // The newest message is mine, in a thread that carries a resolution: did I really deliver it?
+  async function resolutionDelivery(ctx, watch, last, lastId) {
+    const text = ctx.ownMessageText(last);
+    const attachments = ctx.attachmentsOf ? ctx.attachmentsOf(last) : null;
+    const verdict = FlowResolution.judgeDelivery(watch.resolution, { text, attachments });
+    if (verdict.close) {
+      const patch = Object.assign({ messageId: lastId }, FlowResolution.closePatch(watch.resolution, Date.now(), verdict));
+      const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+      if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
+      track('follow_resolved');
+      const to = FlowFollowUp.firstName(watch.counterpart && watch.counterpart.name, watch.counterpart && watch.counterpart.email);
+      receipt('Sent' + (to ? ' to ' + to : '') + ': ' + (verdict.files && verdict.files[0] ? verdict.files[0] : watch.resolution.label) + '. Loop closed.', null, { label: 'Reopen', run: () => reopen(next) });
+      return;
+    }
+    await FlowStorage.updateWatch(watch.id, { messageId: lastId });
+    if (verdict.reason === 'claimed-not-attached') receipt('Your message says the ' + watch.resolution.label + ' is attached, but nothing is attached. I kept this open.', null);
+    else if (verdict.ask) {
+      const h = card(watch.lang === 'he');
+      h.appendChild(el('div', 'flow-fu-title', 'Did the ' + watch.resolution.label + ' go out?'));
+      h.appendChild(el('div', 'flow-fu-line', verdict.reason === 'cannot-see-attachments' ? 'I cannot see what was attached to your message, so I kept this open.' : 'The file you sent is not named as a ' + watch.resolution.label + ', so I kept this open.'));
+      const row = el('div', 'flow-fu-actions');
+      row.appendChild(button('Yes, it is done', 'primary', async () => {
+        const patch = FlowResolution.closePatch(watch.resolution, Date.now(), { files: verdict.files || [], manual: true });
+        const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+        if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
+        receipt('Marked done by you. Loop closed.', null, { label: 'Reopen', run: () => reopen(next) });
+      }));
+      row.appendChild(button('Not yet', 'ghost', dismiss));
+      h.appendChild(row);
+    }
+  }
+
   // ctx: { messages, ownEmail, extractSender(node), ownMessageText(node),
   //        messageText(node), threadIdFrom(node), subject, threadUrl(id) }
   async function consider(ctx) {
@@ -894,6 +1112,8 @@ const FlowFollow = (() => {
     if (!lastIsOwn) {
       // A bank or payment provider telling you money arrived settles a payment loop in another thread.
       if (await paymentSignal(ctx, last, sender)) return;
+      // A request that takes more than one step (a receipt): plan the path, or plan it again.
+      if (await considerResolution(ctx, last, sender, threadId, lastId, watch)) return;
       let target = watch;
       // Their answer came in a thread of its own ("Re:" dropped, a fresh message):
       // follow the story, not the thread.
@@ -915,6 +1135,7 @@ const FlowFollow = (() => {
           // They had asked me something; this message is my answer. The ball goes back.
           if (FlowFollowUp.isYours(watch)) { await handedBack(watch, lastId); return; }
           // A promise of mine: a newer message that delivers it keeps it.
+          if (FlowFollowUp.isMine(watch) && watch.resolution && typeof FlowResolution !== 'undefined') { await resolutionDelivery(ctx, watch, last, lastId); return; }
           if (FlowFollowUp.isMine(watch)) {
             const ev = typeof FlowFilePath !== 'undefined' && ctx.attachmentsOf ? FlowFilePath.evidence({ text, attachments: ctx.attachmentsOf(last) }) : null;
             if (FlowFollowUp.deliversFor(watch, text, ev)) await kept(watch, lastId);

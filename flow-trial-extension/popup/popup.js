@@ -1110,6 +1110,8 @@
       const left = FlowExpiry.daysLeft(w.expiresIso, now);
       return left < 0 ? 'Lapsed ' + dayShort(w.expiresIso) : 'Ends ' + dayShort(w.expiresIso) + ' · ' + (left === 0 ? 'today' : left === 1 ? '1 day left' : left + ' days left');
     }
+    // A request that takes several steps carries its own status line (core/resolution.js): the same words as the card in Gmail.
+    if (w.resolution && w.resolution.line) return 'Owed to ' + whoLabel(w).split(' ')[0] + ' · ' + w.resolution.line + ' · ' + age;
     if (FlowFollowUp.isMine(w)) return 'You promised' + (w.preparedAt ? ' · draft ready' : '') + ' · ' + age;
     if (FlowFollowUp.deadlinePassed(w, now) && stage !== 'yours') return 'Deadline passed ' + dayShort(w.deadlineIso) + ' · ' + age;
     if (stage === 'yours') return 'Your turn · ' + (w.yoursReason === 'blocked' ? 'they could not open it' : 'they asked you something') + (w.preparedAt ? ' · draft ready' : '') + ' · ' + age;
