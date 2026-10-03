@@ -203,6 +203,15 @@ Details and numbers for the first item are in `docs/human-eval.md`.
 What these do NOT prove: items 2 and 5 have not been run in a real browser; items 3 to 6 are covered by corpus tests and by the
 existing Gmail harness, not by a person using them on real mail. Treat the first week of real use as the test.
 
+## 6b. Fourth pass (2026-10-03): closing on understanding
+
+1. **A reply model** (`core/reply-model.js`, `docs/reply-model.md`): replaces the assumption "they wrote back, so it is answered". It only holds a loop
+   open when it is confident the reply was not an answer. On model-written replies it cut false closes from 42 to 15 and kept 45 of 48 real answers closing.
+2. **Calendar closes only on acceptance** (`core/outside-signals.js`): an event you created and invited them to is preparation, not completion.
+3. **A reminder ticked done in Google Tasks closes its loop** (`FlowFollowUp.closeFromTask`): one status read per reminder, only while the panel is open or the thread is.
+4. **Cross-app asks need answer-like evidence**: a message from the same person with no link to the loop and no answer in it is silence, not a question.
+5. **Chat wording in the word lists** (`test/chat-corpus.cjs`): strict-mode recall on chat sentences 0.28 to 1.00 at precision 1.00 (model-written sentences).
+
 ## 7. Needs the owner
 
 - Check the labels in `human-eval.tsv` / `human-blind.tsv` (about 175 sentences; only the owner's machine has them). Until then

@@ -53,9 +53,12 @@ const FlowFollowUp = (() => {
   const intentModel = sibling(typeof FlowIntentModel !== 'undefined' ? FlowIntentModel : null, './intent-model.js', 'FlowIntentModel');
   const outcomeLabels = sibling(typeof FlowOutcomeLabels !== 'undefined' ? FlowOutcomeLabels : null, './outcome-labels.js', 'FlowOutcomeLabels');
   const filePath = sibling(typeof FlowFilePath !== 'undefined' ? FlowFilePath : null, './file-path.js', 'FlowFilePath');
+  const replyModel = sibling(typeof FlowReplyModel !== 'undefined' ? FlowReplyModel : null, './reply-model.js', 'FlowReplyModel');
   const personModel = sibling(typeof FlowPersonModel !== 'undefined' ? FlowPersonModel : null, './person-model.js', 'FlowPersonModel');
   const requestTypes = sibling(typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null, './request-types.js', 'FlowRequestTypes');
   const KINDS = { REPLY: 'reply', PAYMENT: 'payment' };
+  const NOT_ANSWER_MAX_WORDS = 18;
+  const NOT_ANSWER_MIN = 0.9;   // how sure core/reply-model.js must be that a reply is not an answer before it holds a loop open
   const MIN_WORDS = 6;
   const MAX_WHAT = 140;
   const REPLY_BUSINESS_DAYS = 2;
@@ -362,6 +365,19 @@ const FlowFollowUp = (() => {
     return { status: 'resolved', resolvedAt: t, resolvedBy: 'delivered', closedAs: 'kept' };
   }
 
+  // The person ticked the reminder done in Google Tasks: they have closed it themselves, wherever they were. A deliberate human
+  // act, so it is a close (kept, when it was your own promise), but never counted as Glance's own close (it cannot be a false one).
+  function closeFromTask(w, now) {
+    const t = typeof now === 'number' ? now : Date.now();
+    return { status: 'resolved', resolvedAt: t, resolvedBy: 'task', closedAs: w && w.direction === 'mine' ? 'kept' : 'manual' };
+  }
+  // Which waiting loops are worth asking Google Tasks about: they have a reminder, and it was not asked about in the last ten minutes.
+  function taskRefsToCheck(watches, now, lastAsked) {
+    const t = typeof now === 'number' ? now : Date.now();
+    const asked = lastAsked || {};
+    return (Array.isArray(watches) ? watches : []).filter((w) => w && w.status === 'waiting' && w.taskRef && w.taskRef.taskId && !(asked[w.id] && t - asked[w.id] < 10 * 60 * 1000)).slice(0, 10);
+  }
+
   function isMine(w) { return Boolean(w) && w.direction === 'mine'; }
   // A 'clock' loop is a date that runs out (an offer, a trial), not a person to chase.
   function isClock(w) { return Boolean(w) && w.direction === 'clock'; }
@@ -550,8 +566,15 @@ const FlowFollowUp = (() => {
     if (isAck(body) || (n <= SOFT_ACK_MAX_WORDS && !/\d/.test(body) && !CONFIRM.test(body) && (SOFT_ACK_EN.test(body) || SOFT_ACK_HE.test(body)))) return { outcome: 'ack', promisedIso: null, basis: 'rule' };
     if (promise && n <= 30) return { outcome: 'promised', promisedIso: null, basis: 'rule' };
     if (kind === KINDS.PAYMENT) return { outcome: n >= 4 ? 'answered' : 'ack', promisedIso: null, basis: 'default' };
-    // No cue fired. A delivered-looking message is a rule; anything else is the
-    // old assumption ("they wrote back, so it is answered") and is counted as such.
+    // No cue fired. A delivered-looking message is a rule. Anything else used to be the old assumption ("they wrote back, so it is
+    // answered"), which is where loops were wrongly closed: "looking into it", "thanks for letting me know", an unrelated note. A small
+    // on-device model (core/reply-model.js) now reads such a reply, and when it is confident the reply is NOT an answer the loop stays
+    // open and silent. The model never closes anything: it only holds a loop open, so it can make a close rarer, never wronger.
+    // Only short replies: a long, substantive message is almost never "thanks" or "looking into it", and the model was trained mostly on short ones.
+    if (!delivered && replyModel && replyModel.ready() && n <= NOT_ANSWER_MAX_WORDS) {
+      const na = replyModel.notAnAnswer(body);
+      if (na && na.p >= NOT_ANSWER_MIN) return { outcome: 'ack', promisedIso: null, basis: 'model', why: 'not an answer: ' + na.cls.toLowerCase() };
+    }
     return { outcome: 'closed', promisedIso: null, basis: delivered ? 'rule' : 'default' };
   }
 
@@ -884,7 +907,7 @@ const FlowFollowUp = (() => {
   }
 
   return {
-    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, fromProposal, deliversPromise, deliversFor, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
+    KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, fromProposal, deliversPromise, deliversFor, closeAsKept, closeFromTask, taskRefsToCheck, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
     nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };

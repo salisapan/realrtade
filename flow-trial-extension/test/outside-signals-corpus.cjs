@@ -51,11 +51,13 @@ console.log('\n--- matching evidence to ONE payment loop ---\n');
 console.log('\n--- calendar ---\n');
 {
   const sched = (over) => Object.assign({ id: 'c1', status: 'waiting', kind: 'reply', direction: 'theirs', subtype: 'schedule:meeting', counterpart: { name: 'Dana', email: 'Dana@Acme.example' }, createdAt: NOW - 3 * DAY, lang: 'en' }, over || {});
-  const ev = (over) => Object.assign({ id: 'e1', summary: 'Kickoff', startIso: new Date(NOW + 2 * DAY).toISOString(), createdMs: NOW - DAY, attendees: ['dana@acme.example', 'me@x.example'], status: 'confirmed' }, over || {});
+  const ev = (over) => Object.assign({ id: 'e1', startIso: new Date(NOW + 2 * DAY).toISOString(), createdMs: NOW - DAY, organizer: 'me@x.example', attendees: [{ email: 'dana@acme.example', response: 'accepted' }, { email: 'me@x.example', response: 'accepted' }], status: 'confirmed' }, over || {});
   const m = S.matchCalendar(sched(), [ev()], NOW);
-  check('a new event with the person on the invite settles a "pick a time" loop (email compared case-insensitively)', m && m.strength === 'strong' && m.eventId === 'e1', m);
+  check('a new event the person ACCEPTED settles a "pick a time" loop (email compared case-insensitively)', m && m.strength === 'strong' && m.eventId === 'e1', m);
   check('an event created BEFORE the loop does not count', S.matchCalendar(sched(), [ev({ createdMs: NOW - 10 * DAY })], NOW) === null);
-  check('an event without the person on the invite does not count', S.matchCalendar(sched(), [ev({ attendees: ['someone@else.example'] })], NOW) === null);
+  check('an event without the person on the invite does not count', S.matchCalendar(sched(), [ev({ attendees: [{ email: 'someone@else.example', response: 'accepted' }] })], NOW) === null);
+  check('an event YOU created and invited them to, not yet accepted, is preparation and does not close it', S.matchCalendar(sched(), [ev({ attendees: [{ email: 'dana@acme.example', response: 'needsAction' }] })], NOW) === null && S.matchCalendar(sched(), [ev({ attendees: [{ email: 'dana@acme.example', response: 'tentative' }] })], NOW) === null && S.matchCalendar(sched(), [ev({ attendees: [{ email: 'dana@acme.example', response: 'declined' }] })], NOW) === null);
+  check('an event THEY organised counts: they proposed it', (S.matchCalendar(sched(), [ev({ organizer: 'dana@acme.example', attendees: [{ email: 'me@x.example', response: 'needsAction' }] })], NOW) || {}).eventId === 'e1');
   check('a cancelled event does not count', S.matchCalendar(sched(), [ev({ status: 'cancelled' })], NOW) === null);
   check('two matching events: no guess', S.matchCalendar(sched(), [ev(), ev({ id: 'e2' })], NOW) === null);
   check('a loop that is not about scheduling is left alone', S.matchCalendar(sched({ subtype: 'send:document' }), [ev()], NOW) === null);

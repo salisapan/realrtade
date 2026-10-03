@@ -1283,6 +1283,26 @@ async function followTaskComplete(ref) {
   return { ok: res.ok || res.status === 404 };
 }
 
+// Did the person tick a reminder done in Google Tasks (on their phone, say)? One read per reminder, status only.
+// 'completed' = they closed it themselves; 'open' = still open; 'gone' = deleted (the loop is NOT closed by a deletion).
+async function followTaskStatuses(refs) {
+  const list = (Array.isArray(refs) ? refs : []).filter((r) => r && r.taskId).slice(0, 10);
+  if (!list.length) return { ok: true, statuses: [] };
+  const auth = await getGoogleTasksAuth();
+  if (!auth) return { ok: false, reason: 'not-connected' };
+  const out = [];
+  for (const ref of list) {
+    const listId = ref.taskListId || auth.taskListId;
+    if (!listId) continue;
+    const res = await googleTasksAuthedFetch('/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId) + '?fields=status,deleted', { method: 'GET' });
+    if (res.status === 404) { out.push({ taskId: ref.taskId, status: 'gone' }); continue; }
+    if (!res.ok) continue;
+    const t = await res.json();
+    out.push({ taskId: ref.taskId, status: t.deleted ? 'gone' : t.status === 'completed' ? 'completed' : 'open' });
+  }
+  return { ok: true, statuses: out };
+}
+
 // The chase day moved (they promised a date, or you chased and it slid out).
 // Same midnight-UTC convention as the create. A Task that was deleted is
 // reported as 'gone' so the caller can create a fresh one instead of silently
@@ -2878,6 +2898,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:follow-task') return reply(sendResponse, followTaskCreate(msg.payload || {}));
   if (msg.type === 'flow:follow-complete') return reply(sendResponse, followTaskComplete(msg.ref));
+  if (msg.type === 'flow:follow-task-status') return reply(sendResponse, followTaskStatuses(msg.refs));
   if (msg.type === 'flow:follow-reschedule') return reply(sendResponse, followTaskSchedule(msg.ref, msg.dueIso, msg.title));
   if (msg.type === 'flow:follow-reopen') return reply(sendResponse, followTaskReopen(msg.ref, msg.dueIso));
   if (msg.type === 'flow:follow-draft') return reply(sendResponse, followDraftCreate(msg.payload || {}));
@@ -2906,12 +2927,13 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       const since = Number(msg.sinceMs);
       if (!email || !(since > 0)) return { ok: false, reason: 'bad-request' };
       const q = new URLSearchParams({ q: email, timeMin: new Date(since - 24 * 3600 * 1000).toISOString(), singleEvents: 'true', maxResults: '25', orderBy: 'startTime',
-        fields: 'items(id,status,created,start,attendees(email))' });
+        fields: 'items(id,status,created,start,organizer(email),attendees(email,responseStatus))' });
       const res = await googleAuthedFetch(GOOGLE_CALENDAR_API, '/calendars/primary/events?' + q.toString(), { method: 'GET' });
       if (!res.ok) return { ok: false, reason: 'error' };
       const data = await res.json();
       const events = (data.items || []).map((e) => ({ id: e.id, status: e.status || 'confirmed', startIso: (e.start && (e.start.dateTime || e.start.date)) || null,
-        createdMs: e.created ? Date.parse(e.created) : null, attendees: (e.attendees || []).map((a) => a.email).filter(Boolean) }));
+        createdMs: e.created ? Date.parse(e.created) : null, organizer: (e.organizer && e.organizer.email) || null,
+        attendees: (e.attendees || []).filter((a) => a && a.email).map((a) => ({ email: a.email, response: a.responseStatus || 'needsAction' })) }));
       return { ok: true, events };
     })());
   }

@@ -91,17 +91,21 @@ const FlowOutsideSignals = (() => {
   }
 
   // ---- calendar evidence --------------------------------------------------------------
-  // events: [{ id, summary, startIso, createdMs, attendees:[email,...], status }]. A "pick a time" loop is
-  // settled when an event exists, created after the loop opened, that has the person on the invite.
+  // events: [{ id, startIso, createdMs, organizer, attendees:[{ email, response }], status }]. A "pick a time" loop is settled when a
+  // meeting with the person EXISTS BECAUSE THEY AGREED: they accepted the invite, or they organised it. An event you created and invited
+  // them to is preparation, not completion: until they accept it, the loop stays open (and Glance never counts its own Do It events).
   function isScheduleLoop(w) { return Boolean(w) && /^schedule(?::|$)/.test(String(w.subtype || '')); }
+  function agreed(e, email) {
+    if (String(e.organizer || '').toLowerCase() === email) return true;
+    return (e.attendees || []).some((a) => a && String(a.email || a).toLowerCase() === email && a.response === 'accepted');
+  }
   function matchCalendar(watch, events, now) {
     if (!watch || watch.status !== 'waiting' || watch.direction === 'clock' || !isScheduleLoop(watch)) return null;
     if ((watch.signalDismissed || []).includes('calendar')) return null;
     const email = String((watch.counterpart && watch.counterpart.email) || '').toLowerCase();
     if (!email) return null;
     const t = typeof now === 'number' ? now : Date.now();
-    const hits = (events || []).filter((e) => e && e.status !== 'cancelled'
-      && (e.attendees || []).some((a) => String(a).toLowerCase() === email)
+    const hits = (events || []).filter((e) => e && e.status !== 'cancelled' && agreed(e, email)
       && typeof e.createdMs === 'number' && e.createdMs >= (watch.createdAt || 0) && e.createdMs <= t
       && e.startIso && Date.parse(e.startIso) >= (watch.createdAt || 0) - 24 * 3600 * 1000);
     if (hits.length !== 1) return null;
@@ -145,8 +149,8 @@ const FlowOutsideSignals = (() => {
     }
     if (signal.kind === 'calendar') {
       return {
-        question: he ? 'נקבע ביומן' : 'On your calendar now',
-        receipt: he ? 'נקבע · האירוע ביומן' : 'Scheduled · it is on your calendar',
+        question: he ? 'הם אישרו ביומן' : 'They accepted: it is on your calendar',
+        receipt: he ? 'נקבע · הם אישרו את האירוע' : 'Scheduled · they accepted the invite',
         yes: he ? 'סיימתי' : 'Done', no: he ? 'עדיין לא' : 'Not yet',
         patch: { status: 'resolved', resolvedAt: t, resolvedBy: 'signal', closedAs: 'scheduled', signalKind: 'calendar', signalEventId: signal.eventId || null }
       };

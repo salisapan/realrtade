@@ -6,8 +6,9 @@
 //   - only loops that wait on THEM are considered; your own promises and clocks are never settled by someone else's message;
 //   - a message that names the same reference number, or the same amount on a payment loop, belongs to that loop ('topical');
 //   - a topical message that reads as an answer, a payment or a "no" closes the loop with a receipt and Reopen ('close');
-//   - a message with no such link only ASKS, and only when that person has exactly one open loop and the message is a real sentence;
-//     "ok", "thanks", an out-of-office and anything that hands the ball back to you never ask and never close;
+//   - a message with no such link only ASKS, and only when that person has exactly one open loop, the message is a real sentence AND
+//     it reads like an answer (a delivery, a payment, a "no", a promised day); "ok", "thanks", chat and an out-of-office never ask,
+//     and anything that hands the ball back to you never asks or closes;
 //   - two loops that fit equally: silence. A loop that was asked about recently is not asked about again.
 const FlowCrossChannel = (() => {
   function sibling(globalValue, file, name) {
@@ -69,7 +70,9 @@ const FlowCrossChannel = (() => {
       // No topical link: at most a question, never an action, and not for a loop asked about lately or for a throwaway message.
       if (words(body) < MIN_WORDS) return null;
       if (pick.w.crossAskedAt && now - pick.w.crossAskedAt < ASK_COOLDOWN_MS) return null;
-      if (reply.outcome === 'promised') return { watchId: pick.w.id, action: 'ask', reply, link: 'person' };
+      // Silence is better than a weak question: with no link to the loop, the message must at least READ like an answer
+      // (a stated delivery, payment, decline or a promised day), never just "they wrote something".
+      if (reply.outcome === 'closed' && reply.basis === 'default') return null;
       return { watchId: pick.w.id, action: 'ask', reply, link: 'person' };
     }
     if (reply.outcome === 'promised') return { watchId: pick.w.id, action: 'promised', reply, link: pick.link };

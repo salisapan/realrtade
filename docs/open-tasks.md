@@ -34,6 +34,7 @@ Last updated: 2026-10-03
 | 19 | Outlook: register the Microsoft Entra app and paste its Application (client) ID into `flow-trial-extension/core/outlook-config.js`, then rebuild the package and try it | blocked | owner | - | Built 2026-10-03 and tested against a fake Microsoft only (read-only, last 14 days, while the panel is open). Steps and limits: `docs/multi-platform.md` §5. Nothing connects until the client id is set. Privacy page and store justifications already updated. |
 | 20 | In a real Chrome profile: turn an app on and off in the popup (the permission prompt), and right-click a selection on any page ("Glance: stay on this" opens the side panel card) | open | owner + Claude | - | Neither the browser permission prompt nor the context menu can be driven by the automated tests. |
 | 21 | After the client id is set: connect a real Outlook mailbox, check that a reply closes a loop and that nothing is ever written to the mailbox; report what the Outlook row says if sign-in fails | open | owner + Claude | after #19 | Never run against the real Microsoft. Work and school accounts may need an administrator's consent. |
+| 22 | Validate the reply model on real threads: ask something, get "looking into it" or "thanks for letting me know", check the loop stays in Waiting on with no card and the Activity list says why; report any real answer it held open (with the sentence) | open | owner + Claude | first week of use | `docs/reply-model.md` §4. Trained and measured only on model-written sentences. |
 
 ## Decisions waiting for an answer
 

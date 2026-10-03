@@ -33,6 +33,8 @@ console.log('\n--- entries ---\n');
   const all = L.KINDS.map((k) => L.make(k, { text: 'Could you send the report', who: 'Dana', days: 3, expectDays: 2, note: 'short, no greeting', about: 'a file' }, NOW));
   check('every kind has a sentence', all.every((x) => x && x.line.length > 10), all);
   check('no sentence claims cleverness (docs/product-identity.md)', all.every((x) => !/\bAI\b|smart|intelligen|understands|assistant|copilot|chatbot|sparkle/i.test(x.line)), all.map((x) => x.line));
+  const held = L.make('heldOpen', { text: 'Still going through the documents, give me a few days.', reason: 'still working on it' }, NOW);
+  check('a reply held open says what it read as, in plain words', /did not answer it \(still working on it\), so I kept the loop open/.test(held.line) && /documents/.test(held.line), held);
   const timing = L.make('timing', { who: 'Dana', days: 1, expectDays: 2 }, NOW);
   check('timing says days in the right number', /took 1 day to answer/.test(timing.line) && /about 2 from them/.test(timing.line), timing);
 }

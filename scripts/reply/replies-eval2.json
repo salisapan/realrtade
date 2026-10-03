@@ -1,0 +1,247 @@
+[
+{
+"t": "Yes, that is correct.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "OK, I've approved it.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The signed contract is attached.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "It's done, enjoy.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Alright, booked for Wednesday at 2.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I have paid the invoice, here is the receipt.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Sure, you can start.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Great, we agree on 5,000.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "כן, זה נכון.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אוקיי, אישרתי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "החוזה החתום מצורף.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "זה בוצע, בהצלחה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "טוב, קבענו ליום רביעי בשתיים.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שילמתי את החשבונית, הנה הקבלה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "בטח, אפשר להתחיל.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מעולה, מסכימים על 5,000.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "I'll look at it tomorrow.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Haven't gotten to it yet, been swamped.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Need a few more days, sorry.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Let me ask around and come back to you.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Sorry for the delay, still on it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'll review it properly and let you know.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "אסתכל על זה מחר.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עוד לא הגעתי לזה, הייתי מוצף.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "צריך עוד כמה ימים, סליחה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "תן לי לשאול ולחזור אליך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "סליחה על העיכוב, עדיין על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אעבור על זה כמו שצריך ואעדכן.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "Thanks, got it.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Appreciate it.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Perfect, thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "תודה, הבנתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "מעריך.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "I'm away this week, back Monday.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Loved your talk yesterday!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Forwarding to Mike.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "אני לא כאן השבוע, חוזר ביום שני.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהבתי את ההרצאה שלך אתמול!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "מעביר למיכאל.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "Which invoice number?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "I can't see the attachment.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "What time did you have in mind?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "איזה מספר חשבונית?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אני לא רואה את הקובץ המצורף.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "באיזו שעה חשבת?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "We're not able to proceed, apologies.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "I decline.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "אנחנו לא יכולים להתקדם, מתנצל.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אני מסרב.",
+"c": "DECLINED",
+"lang": "he"
+}
+]

@@ -55,6 +55,7 @@
   await renderOpen();
   await renderWaiting();
   checkOutsideSignals().catch(() => {});
+  syncTaskCompletions().catch(() => {});
   renderQuestion().catch(() => {});
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
@@ -849,6 +850,26 @@
     const r = await o.sync();
     if (r.ok && !r.skipped) { await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); }
     if (!outlookAutoSync.timer) outlookAutoSync.timer = setInterval(() => { outlookAutoSync().catch(() => {}); }, 10 * 60 * 1000 + 5000);
+  }
+
+  // A reminder ticked done in Google Tasks closes its loop: the person closed it themselves, on whatever device they had.
+  // One status read per reminder, at most every ten minutes, only while this panel is open.
+  async function syncTaskCompletions() {
+    if (!FlowFollowUp.taskRefsToCheck || !FlowFollowUp.closeFromTask) return;
+    const asked = syncTaskCompletions.asked || (syncTaskCompletions.asked = {});
+    const now = Date.now();
+    const all = await FlowStorage.getWatches();
+    const todo = FlowFollowUp.taskRefsToCheck(all, now, asked);
+    if (!todo.length) return;
+    todo.forEach((w) => { asked[w.id] = now; });
+    const r = await send({ type: 'flow:follow-task-status', refs: todo.map((w) => w.taskRef) });
+    if (!r || !r.ok) return;
+    let changed = false;
+    for (const st of r.statuses || []) {
+      const w = todo.find((x) => x.taskRef.taskId === st.taskId);
+      if (w && st.status === 'completed') { await FlowStorage.updateWatch(w.id, FlowFollowUp.closeFromTask(w, now)); changed = true; }
+    }
+    if (changed) await renderWaiting();
   }
 
   // ---- Where Glance watches (other apps, opt-in) -------------------------------------------------

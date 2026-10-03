@@ -378,7 +378,7 @@ const FlowFollow = (() => {
       const evidence = typeof FlowFilePath !== 'undefined' && ctx.attachmentsOf && FlowFilePath.isFileBacked(watch)
         ? FlowFilePath.evidence({ text, attachments: ctx.attachmentsOf(msgs[i]) }) : null;
       const reply = FlowFollowUp.classifyReply(text, watch, { now: Date.now(), email: sender.email, evidence });
-      if (!best || (RANK[reply.outcome] || 0) > (RANK[best.reply.outcome] || 0)) best = { reply, sender };
+      if (!best || (RANK[reply.outcome] || 0) > (RANK[best.reply.outcome] || 0)) best = { reply, sender, text };
     }
     return best;
   }
@@ -390,6 +390,11 @@ const FlowFollow = (() => {
     // Glance's own closes often, a close that rests only on "they wrote back" (no rule fired) is not made.
     if (best.reply.outcome === 'closed' && best.reply.basis === 'default' && typeof FlowOutcomeLabels !== 'undefined' && FlowStorage.getOutcomeLabels) {
       try { if (FlowOutcomeLabels.closureQuality(await FlowStorage.getOutcomeLabels()).strict) best = { reply: Object.assign({}, best.reply, { outcome: 'ack' }), sender: best.sender }; } catch (e) { /* quality is advisory */ }
+    }
+    // The reply model read it as "not an answer" and held the loop open: say so in the learning list, so it can be checked on real threads.
+    if (best.reply.basis === 'model') {
+      const why = String(best.reply.why || '');
+      note('heldOpen', { text: best.text, counterpart: watch.counterpart, reason: /interim/.test(why) ? 'still working on it' : /ack/.test(why) ? 'only a thank-you' : 'unrelated' });
     }
     const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
     if (res.none) return;
@@ -540,6 +545,23 @@ const FlowFollow = (() => {
           crossCard(watch, d, party, channel, lastId);
         } else await applyCrossDecision(watch, d, party, channel, lastId);
       } finally { settling.delete(watch.id); }
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // The reminder for this loop was ticked done in Google Tasks (on a phone, say): the person closed it themselves.
+  const taskChecked = new Set();
+  async function taskDone(watch) {
+    try {
+      if (!watch || watch.status !== 'waiting' || !watch.taskRef || !watch.taskRef.taskId || taskChecked.has(watch.id) || !FlowFollowUp.closeFromTask) return false;
+      taskChecked.add(watch.id);
+      const r = await send({ type: 'flow:follow-task-status', refs: [watch.taskRef] });
+      const st = r && r.ok && (r.statuses || []).find((x) => x.taskId === watch.taskRef.taskId);
+      if (!st || st.status !== 'completed') return false;
+      const patch = FlowFollowUp.closeFromTask(watch, Date.now());
+      const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+      track('follow_resolved');
+      receipt('You ticked the reminder done, so I closed the loop' + took(watch) + '.', null, { label: 'Reopen', run: () => reopen(next) });
       return true;
     } catch (e) { return false; }
   }
@@ -866,6 +888,7 @@ const FlowFollow = (() => {
     if (lastIsOwn) learnStyle(ctx.ownMessageText(last));
     await observeWho(ctx, last, lastIsOwn);
     const watch = await FlowStorage.getWatch(threadId);
+    if (watch && (await taskDone(watch))) return;
 
     // They wrote last. What did the answer do to the loop?
     if (!lastIsOwn) {

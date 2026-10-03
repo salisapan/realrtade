@@ -1,0 +1,6037 @@
+[
+{
+"t": "Hi Dana, confirmed, the agreement is approved. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, confirmed, the contract is approved.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, confirmed, the agreement is approved.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, confirmed, the contract is approved. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Confirmed, the invoice is approved. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, done, I just sent you the document.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, done, I just sent you the proposal. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Done, I just sent you the document.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, done, I just sent you the budget. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, done, I just sent you the report.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, go ahead with the budget. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, yes, go ahead with the schedule.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, yes, go ahead with the budget.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, yes, go ahead with the schedule. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, yes, go ahead with the budget. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, attached is the signed schedule.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, attached is the signed proposal.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, attached is the signed invoice. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, attached is the signed agreement. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Attached is the signed report. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, the document is 4,200 as discussed, all good on our side.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, the presentation is 4,200 as discussed, all good on our side. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, the agreement is 4,200 as discussed, all good on our side. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, the invoice is 4,200 as discussed, all good on our side. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The order is 4,200 as discussed, all good on our side. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, i've signed the order and returned it. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, i've signed the form and returned it. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I've signed the document and returned it. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, i've signed the agreement and returned it.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I've signed the payment and returned it.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, approved, please proceed. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Approved, please proceed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, approved, please proceed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, sorted, the report has been paid this morning.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, sorted, the order has been paid this morning. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Sorted, the document has been paid this morning.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Sorted, the report has been paid this morning. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, sorted, the proposal has been paid this morning. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, yes that works, see you next week.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, yes that works, see you the 12th.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes that works, see you tomorrow. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, yes that works, see you Monday. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, yes that works, see you the 12th. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, all set, the document is in your inbox now. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "All set, the document is in your inbox now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "All set, the proposal is in your inbox now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "All set, the agreement is in your inbox now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, all set, the schedule is in your inbox now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "We've confirmed it with the team, it is fine.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "We've confirmed it with the team, it is fine. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, we've confirmed it with the team, it is fine.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Here it is, the final payment. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, here it is, the final payment.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Here it is, the final invoice. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, here it is, the final agreement. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Here it is, the final report. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, just uploaded the agreement to the shared folder, it's there. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, just uploaded the contract to the shared folder, it's there.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, just uploaded the order to the shared folder, it's there.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Just uploaded the report to the shared folder, it's there. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, just uploaded the budget to the shared folder, it's there.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, the schedule is correct. Nothing to change. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, the order is correct. Nothing to change. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, yes, the payment is correct. Nothing to change.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, yes, the contract is correct. Nothing to change.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, yes, the proposal is correct. Nothing to change. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Booked for tomorrow at 10, you'll get the invite.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, booked for Friday at 10, you'll get the invite.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, booked for Friday at 10, you'll get the invite. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, booked for Monday at 10, you'll get the invite. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, booked for Tuesday at 10, you'll get the invite.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, received and approved. Thanks for the quick turnaround, we're good to go.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Received and approved. Thanks for the quick turnaround, we're good to go. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, received and approved. Thanks for the quick turnaround, we're good to go. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The invoice was transferred, reference 88213.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, the contract was transferred, reference 88213. Thanks",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, the presentation was transferred, reference 88213. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The payment was transferred, reference 88213. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The budget was transferred, reference 88213.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, yes, I can confirm the presentation for Tuesday. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, I can confirm the report for the 12th.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, I can confirm the contract for next week.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, yes, I can confirm the budget for Friday.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, I can confirm the quote for the 12th.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, finished, you have the final version of the order now. Regards",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, finished, you have the final version of the schedule now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, finished, you have the final version of the budget now. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Finished, you have the final version of the contract now. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Finished, you have the final version of the contract now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, okay, signed and sent back to you.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Okay, signed and sent back to you. Best, Alex",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Okay, signed and sent back to you.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "שלום, אישרתי את החוזה, אפשר להמשיך. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אישרתי את התקציב, אפשר להמשיך. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, אישרתי את ההסכם, אפשר להמשיך.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, אישרתי את התשלום, אפשר להמשיך.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, אישרתי את ההזמנה, אפשר להמשיך.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלחתי לך עכשיו את הטיוטה. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, שלחתי לך עכשיו את החשבונית.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלחתי לך עכשיו את ההצעה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלחתי לך עכשיו את ההזמנה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלחתי לך עכשיו את הדוח. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, כן, תתקדמו עם החשבונית.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, תתקדמו עם הטופס. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, כן, תתקדמו עם המסמך. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, כן, תתקדמו עם ההצעה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, תתקדמו עם ההזמנה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, מצורף התקציב החתום. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, מצורף החוזה החתום. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, מצורף הלוח זמנים החתום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מצורף החשבונית החתום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מצורף ההצעת מחיר החתום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, ההצעת מחיר על 4,200 כמו שסיכמנו, הכול טוב מבחינתנו. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, הטיוטה על 4,200 כמו שסיכמנו, הכול טוב מבחינתנו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, התקציב על 4,200 כמו שסיכמנו, הכול טוב מבחינתנו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "החשבונית על 4,200 כמו שסיכמנו, הכול טוב מבחינתנו. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הדוח על 4,200 כמו שסיכמנו, הכול טוב מבחינתנו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, חתמתי על החוזה והחזרתי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "חתמתי על הלוח זמנים והחזרתי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, חתמתי על הטיוטה והחזרתי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, חתמתי על ההסכם והחזרתי. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, חתמתי על הדוח והחזרתי. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מאושר, אפשר להתקדם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, מאושר, אפשר להתקדם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, מאושר, אפשר להתקדם. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, סגור, שילמתי את הדוח הבוקר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "סגור, שילמתי את ההצעת מחיר הבוקר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, סגור, שילמתי את ההזמנה הבוקר. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "סגור, שילמתי את ההצעה הבוקר. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, סגור, שילמתי את הטיוטה הבוקר. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, כן זה מתאים, נתראה ב-12.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן זה מתאים, נתראה ביום שישי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, כן זה מתאים, נתראה ביום חמישי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן זה מתאים, נתראה ביום חמישי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, כן זה מתאים, נתראה בשבוע הבא.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, הכול מוכן, החוזה אצלך במייל. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, הכול מוכן, הטיוטה אצלך במייל.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הכול מוכן, ההזמנה אצלך במייל. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, הכול מוכן, הדוח אצלך במייל. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, הכול מוכן, החוזה אצלך במייל.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אישרנו מול הצוות, זה בסדר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, אישרנו מול הצוות, זה בסדר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אישרנו מול הצוות, זה בסדר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, הנה זה, התשלום הסופי. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, הנה זה, ההצעה הסופי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הנה זה, החשבונית הסופי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, הנה זה, המסמך הסופי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, הנה זה, ההצעת מחיר הסופי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, העליתי את החשבונית לתיקייה המשותפת, הוא שם. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, העליתי את המצגת לתיקייה המשותפת, הוא שם. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, העליתי את התשלום לתיקייה המשותפת, הוא שם. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "העליתי את הלוח זמנים לתיקייה המשותפת, הוא שם. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, העליתי את התקציב לתיקייה המשותפת, הוא שם. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, כן, המצגת נכון, אין מה לשנות. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, כן, הלוח זמנים נכון, אין מה לשנות. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, המצגת נכון, אין מה לשנות.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, כן, החוזה נכון, אין מה לשנות.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, כן, החשבונית נכון, אין מה לשנות. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, נקבע לביום שני בעשר, תקבל זימון. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, נקבע לביום שישי בעשר, תקבל זימון.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "נקבע לביום ראשון בעשר, תקבל זימון. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, נקבע לביום שלישי בעשר, תקבל זימון. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, נקבע לביום ראשון בעשר, תקבל זימון.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "קיבלתי ואישרתי, תודה על המהירות, אנחנו בסדר. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, קיבלתי ואישרתי, תודה על המהירות, אנחנו בסדר. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, קיבלתי ואישרתי, תודה על המהירות, אנחנו בסדר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, המצגת הועבר, אסמכתא 88213. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הטופס הועבר, אסמכתא 88213. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, הדוח הועבר, אסמכתא 88213. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, ההזמנה הועבר, אסמכתא 88213. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, הדוח הועבר, אסמכתא 88213.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, כן, אני מאשר את התשלום לבשבוע הבא.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, כן, אני מאשר את ההזמנה לביום שישי. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, כן, אני מאשר את ההצעת מחיר לבשבוע הבא. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, כן, אני מאשר את התשלום לביום שלישי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, כן, אני מאשר את ההצעת מחיר לביום שלישי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "סיימתי, יש לך את הגרסה הסופית של ההצעת מחיר. בברכה, אלכס",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, סיימתי, יש לך את הגרסה הסופית של התשלום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, סיימתי, יש לך את הגרסה הסופית של ההצעה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, סיימתי, יש לך את הגרסה הסופית של הדוח.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "סיימתי, יש לך את הגרסה הסופית של הלוח זמנים. ממני",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אוקיי, חתמתי ושלחתי בחזרה. תודה",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אוקיי, חתמתי ושלחתי בחזרה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אוקיי, חתמתי ושלחתי בחזרה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "Hi Dana, looking into the order now, will update you.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Looking into the document now, will update you.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, looking into the contract now, will update you. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, looking into the invoice now, will update you.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, looking into the order now, will update you.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, let me check on the invoice and see what I can do. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, let me check on the invoice and see what I can do.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, let me check on the draft and see what I can do.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, let me check on the contract and see what I can do.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, let me check on the proposal and see what I can do. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, working on the agreement, not finished yet. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, working on the contract, not finished yet. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Working on the proposal, not finished yet. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, working on the document, not finished yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, working on the form, not finished yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I've started on the budget but need a bit more time. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, i've started on the document but need a bit more time.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, i've started on the quote but need a bit more time. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, i've started on the proposal but need a bit more time. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I've started on the form but need a bit more time.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Still waiting on the form from our finance team.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, still waiting on the budget from our finance team.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, still waiting on the payment from our finance team. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Still waiting on the report from our finance team.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, still waiting on the report from our finance team.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, i'll look at it when I get a chance.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'll look at it when I get a chance. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, i'll look at it when I get a chance. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, thanks, I'll look into it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Thanks, I'll look into it. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Thanks, I'll look into it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I passed the proposal to my manager, no answer yet. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, I passed the payment to my manager, no answer yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I passed the report to my manager, no answer yet. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, I passed the presentation to my manager, no answer yet. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I passed the contract to my manager, no answer yet. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, not sure yet about the draft, I'll find out.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Not sure yet about the presentation, I'll find out.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, not sure yet about the report, I'll find out. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Not sure yet about the form, I'll find out. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, not sure yet about the proposal, I'll find out. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, it's on my list, haven't got to the quote yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, it's on my list, haven't got to the budget yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, it's on my list, haven't got to the invoice yet. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, it's on my list, haven't got to the schedule yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "It's on my list, haven't got to the proposal yet. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, checking with legal on the quote.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, checking with legal on the form. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Checking with legal on the proposal. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Checking with legal on the order.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, checking with legal on the proposal. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, sent half of the document, the rest is still missing.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, sent half of the form, the rest is still missing.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, sent half of the payment, the rest is still missing.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, sent half of the order, the rest is still missing. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Sent half of the document, the rest is still missing.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "We're still reviewing the order internally. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "We're still reviewing the proposal internally.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, we're still reviewing the payment internally.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, we're still reviewing the invoice internally.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, we're still reviewing the proposal internally. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, haven't had time for the contract this week, sorry.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, haven't had time for the proposal this week, sorry.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, haven't had time for the document this week, sorry.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, haven't had time for the report this week, sorry. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Haven't had time for the agreement this week, sorry.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'm gathering the details for the agreement. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'm gathering the details for the budget.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, i'm gathering the details for the form.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'm gathering the details for the payment.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'm gathering the details for the invoice.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, waiting to hear back from the vendor about the document.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, waiting to hear back from the vendor about the document. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, waiting to hear back from the vendor about the invoice. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, waiting to hear back from the vendor about the proposal. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, waiting to hear back from the vendor about the proposal. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, will get to it, been a crazy few days. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Will get to it, been a crazy few days. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Will get to it, been a crazy few days.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, the quote is almost ready, a few things left.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, the schedule is almost ready, a few things left.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, the agreement is almost ready, a few things left. Regards",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, the order is almost ready, a few things left.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "The contract is almost ready, a few things left.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, need to double check some things before I can give you the invoice. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, need to double check some things before I can give you the presentation. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Need to double check some things before I can give you the draft. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, need to double check some things before I can give you the report.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, need to double check some things before I can give you the draft.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, let me see what the others think about the agreement.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, let me see what the others think about the presentation.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Let me see what the others think about the document. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, let me see what the others think about the invoice. Best, Alex",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Let me see what the others think about the budget. Thanks",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "היי, בודק את החשבונית עכשיו, אעדכן. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "בודק את החשבונית עכשיו, אעדכן. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "בודק את התשלום עכשיו, אעדכן.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, בודק את הדוח עכשיו, אעדכן. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, בודק את הטופס עכשיו, אעדכן. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, תן לי לבדוק מה אפשר לעשות עם הטיוטה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, תן לי לבדוק מה אפשר לעשות עם ההצעת מחיר.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "תן לי לבדוק מה אפשר לעשות עם ההזמנה. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "תן לי לבדוק מה אפשר לעשות עם ההצעה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, תן לי לבדוק מה אפשר לעשות עם הדוח.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, עובד על ההסכם, עוד לא סיימתי.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, עובד על ההצעה, עוד לא סיימתי.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עובד על הטופס, עוד לא סיימתי.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עובד על החוזה, עוד לא סיימתי. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, עובד על ההסכם, עוד לא סיימתי.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "התחלתי עם החשבונית אבל צריך עוד קצת זמן. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "התחלתי עם הטיוטה אבל צריך עוד קצת זמן.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, התחלתי עם התקציב אבל צריך עוד קצת זמן. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "התחלתי עם ההצעת מחיר אבל צריך עוד קצת זמן. ממני",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "התחלתי עם הלוח זמנים אבל צריך עוד קצת זמן.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עדיין מחכה להסכם מהכספים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עדיין מחכה להצעה מהכספים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עדיין מחכה להזמנה מהכספים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עדיין מחכה למסמך מהכספים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עדיין מחכה להצעת מחיר מהכספים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אסתכל על זה כשיהיה לי רגע. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אסתכל על זה כשיהיה לי רגע. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, אסתכל על זה כשיהיה לי רגע. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, תודה, אבדוק את זה. ממני",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, תודה, אבדוק את זה. ממני",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "תודה, אבדוק את זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, העברתי את ההזמנה למנהל, עוד אין תשובה. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, העברתי את החוזה למנהל, עוד אין תשובה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "העברתי את המסמך למנהל, עוד אין תשובה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, העברתי את המסמך למנהל, עוד אין תשובה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, העברתי את הטיוטה למנהל, עוד אין תשובה. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עוד לא בטוח לגבי ההסכם, אברר.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, עוד לא בטוח לגבי החוזה, אברר.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עוד לא בטוח לגבי הטופס, אברר. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, עוד לא בטוח לגבי הלוח זמנים, אברר. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, עוד לא בטוח לגבי הדוח, אברר.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "זה ברשימה שלי, לא הגעתי לדוח עדיין.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "זה ברשימה שלי, לא הגעתי למסמך עדיין.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, זה ברשימה שלי, לא הגעתי לדוח עדיין.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "זה ברשימה שלי, לא הגעתי לחוזה עדיין. ממני",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, זה ברשימה שלי, לא הגעתי ללוח זמנים עדיין.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, מתייעץ עם המשפטי לגבי הלוח זמנים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "מתייעץ עם המשפטי לגבי הטיוטה. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, מתייעץ עם המשפטי לגבי ההצעה. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, מתייעץ עם המשפטי לגבי הדוח.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, מתייעץ עם המשפטי לגבי הדוח.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, שלחתי חצי מהחוזה, השאר עוד חסר.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, שלחתי חצי מהחשבונית, השאר עוד חסר. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, שלחתי חצי מהתקציב, השאר עוד חסר. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, שלחתי חצי מההצעת מחיר, השאר עוד חסר. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, שלחתי חצי מהטופס, השאר עוד חסר. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אנחנו עדיין בוחנים את התשלום פנימית.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, אנחנו עדיין בוחנים את הלוח זמנים פנימית.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אנחנו עדיין בוחנים את התשלום פנימית. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אנחנו עדיין בוחנים את המסמך פנימית.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, אנחנו עדיין בוחנים את ההסכם פנימית.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, לא היה לי זמן למצגת השבוע, סליחה. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "לא היה לי זמן לטופס השבוע, סליחה. ממני",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, לא היה לי זמן לדוח השבוע, סליחה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "לא היה לי זמן למצגת השבוע, סליחה. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "לא היה לי זמן למסמך השבוע, סליחה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אוסף את הפרטים בשביל הלוח זמנים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אוסף את הפרטים בשביל התשלום. ממני",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אוסף את הפרטים בשביל המצגת.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, אוסף את הפרטים בשביל הלוח זמנים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אוסף את הפרטים בשביל ההצעת מחיר. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, מחכה לתשובה מהספק על ההצעת מחיר.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "מחכה לתשובה מהספק על החוזה. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, מחכה לתשובה מהספק על הדוח.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, מחכה לתשובה מהספק על המסמך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, מחכה לתשובה מהספק על המצגת.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אגיע לזה, היו כמה ימים מטורפים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, אגיע לזה, היו כמה ימים מטורפים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, אגיע לזה, היו כמה ימים מטורפים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, ההצעת מחיר כמעט מוכן, נשארו כמה דברים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, הדוח כמעט מוכן, נשארו כמה דברים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "התשלום כמעט מוכן, נשארו כמה דברים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, ההזמנה כמעט מוכן, נשארו כמה דברים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, ההצעת מחיר כמעט מוכן, נשארו כמה דברים. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, צריך לבדוק עוד כמה דברים לפני שאוכל לתת לך את הטופס.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "צריך לבדוק עוד כמה דברים לפני שאוכל לתת לך את ההזמנה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, צריך לבדוק עוד כמה דברים לפני שאוכל לתת לך את ההצעת מחיר. בברכה, אלכס",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "צריך לבדוק עוד כמה דברים לפני שאוכל לתת לך את ההסכם. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "צריך לבדוק עוד כמה דברים לפני שאוכל לתת לך את ההצעה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, אשמע מה האחרים חושבים על החוזה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אשמע מה האחרים חושבים על התקציב.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אשמע מה האחרים חושבים על המסמך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אשמע מה האחרים חושבים על ההצעה. תודה",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אשמע מה האחרים חושבים על הדוח.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "Hi Dana, got it, thanks!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, got it, thanks!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Got it, thanks!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hello, thanks for sending that. Regards",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hello, thanks for sending that. Best, Alex",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Thanks for sending that.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Noted, thank you. Best, Alex",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Noted, thank you.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Noted, thank you. Thanks",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hello, ok thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Ok thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, ok thanks. Thanks",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, received, thank you. Thanks",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Received, thank you. Regards",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Received, thank you.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Thank you, appreciate it. Regards",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, thank you, appreciate it. Regards",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, thank you, appreciate it.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, sounds good. Best, Alex",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, sounds good.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Sounds good.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Great, thanks for the heads up. Regards",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, great, thanks for the heads up.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, great, thanks for the heads up. Regards",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, thanks, will keep that in mind. Best, Alex",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Thanks, will keep that in mind. Thanks",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hello, thanks, will keep that in mind.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, perfect, thank you. Best, Alex",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hello, perfect, thank you.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Perfect, thank you.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, cheers!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Cheers!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, cheers!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Understood. Best, Alex",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, understood. Thanks",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Understood.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Thanks for the update. Regards",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, thanks for the update.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, thanks for the update.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, ok, got your message. Thanks",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, ok, got your message.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, ok, got your message.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, much appreciated. Best, Alex",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, much appreciated.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, much appreciated. Thanks",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "שלום, קיבלתי, תודה! בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, קיבלתי, תודה!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "קיבלתי, תודה! בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה ששלחת.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה ששלחת. תודה",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, תודה ששלחת. בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, רשמתי, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, רשמתי, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "רשמתי, תודה. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, אוקיי תודה. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, אוקיי תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, אוקיי תודה. תודה",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, התקבל, תודה. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "התקבל, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, התקבל, תודה. בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תודה רבה, מעריך.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, תודה רבה, מעריך. בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי, תודה רבה, מעריך. בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, נשמע טוב. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "נשמע טוב. תודה",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, נשמע טוב.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, מעולה, תודה על העדכון. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, מעולה, תודה על העדכון.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, מעולה, תודה על העדכון. בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה, אקח את זה בחשבון. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה, אקח את זה בחשבון.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי, תודה, אקח את זה בחשבון. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, מושלם, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "מושלם, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי, תודה!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תודה!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, הבנתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, הבנתי. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, הבנתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תודה על העדכון. בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה על העדכון. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תודה על העדכון.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, אוקיי, קיבלתי את ההודעה. תודה",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, אוקיי, קיבלתי את ההודעה. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אוקיי, קיבלתי את ההודעה. תודה",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי, מעריך מאוד. תודה",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "מעריך מאוד. בברכה, אלכס",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, מעריך מאוד. ממני",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "Hey, I am out of the office until Thursday with limited access to email.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I am out of the office until Monday with limited access to email. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, I am out of the office until Monday with limited access to email. Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "I am out of the office until tomorrow with limited access to email. Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, I am out of the office until Friday with limited access to email. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, hi, by the way, are you free for lunch next week?",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, hi, by the way, are you free for lunch next week? Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, hi, by the way, are you free for lunch next week? Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, forwarding this to the right person.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Forwarding this to the right person.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, forwarding this to the right person. Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hello, great to meet you at the conference!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, great to meet you at the conference! Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, great to meet you at the conference! Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Happy new year to you and your family.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, happy new year to you and your family. Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, happy new year to you and your family.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, can I ask you about something completely different?",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, can I ask you about something completely different? Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, can I ask you about something completely different? Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "FYI, we're moving offices next month. Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, fYI, we're moving offices next month.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, fYI, we're moving offices next month. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hello, please see my colleague Dan for this, he handles it now. Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Please see my colleague Dan for this, he handles it now.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Please see my colleague Dan for this, he handles it now. Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, have a great weekend! Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Have a great weekend!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, have a great weekend! Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Did you see the game last night?",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, did you see the game last night?",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hello, did you see the game last night?",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, i've added you to the newsletter list. Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "I've added you to the newsletter list. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hello, i've added you to the newsletter list.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, our summer schedule starts in June.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, our summer schedule starts in June. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, our summer schedule starts in June. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, just wanted to share this article with you. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Just wanted to share this article with you. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Just wanted to share this article with you.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, by the way, my new number is in the signature.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, by the way, my new number is in the signature. Thanks",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "By the way, my new number is in the signature. Regards",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Thanks for the invite to the event, I'll think about it. Best, Alex",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Thanks for the invite to the event, I'll think about it.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, thanks for the invite to the event, I'll think about it.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "אהלן, אני לא במשרד עד ביום שלישי, גישה מוגבלת למייל.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, אני לא במשרד עד ביום ראשון, גישה מוגבלת למייל. בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, אני לא במשרד עד ביום שישי, גישה מוגבלת למייל. תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, אני לא במשרד עד ב-12, גישה מוגבלת למייל. בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, אני לא במשרד עד בשבוע הבא, גישה מוגבלת למייל.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, היי, דרך אגב, אתה פנוי לארוחת צהריים בשבוע הבא?",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, היי, דרך אגב, אתה פנוי לארוחת צהריים בשבוע הבא?",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, דרך אגב, אתה פנוי לארוחת צהריים בשבוע הבא?",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, מעביר את זה לאדם הנכון.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "מעביר את זה לאדם הנכון. תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, מעביר את זה לאדם הנכון. בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, היה כיף להכיר בכנס!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היה כיף להכיר בכנס! תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, היה כיף להכיר בכנס! בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, שנה טובה לך ולמשפחה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שנה טובה לך ולמשפחה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, שנה טובה לך ולמשפחה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אפשר לשאול אותך משהו אחר לגמרי? תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, אפשר לשאול אותך משהו אחר לגמרי?",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, אפשר לשאול אותך משהו אחר לגמרי? בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, לידיעתך, אנחנו עוברים משרדים בחודש הבא.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, לידיעתך, אנחנו עוברים משרדים בחודש הבא. בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "לידיעתך, אנחנו עוברים משרדים בחודש הבא. תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, תפנה בבקשה לדן, הוא מטפל בזה עכשיו.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, תפנה בבקשה לדן, הוא מטפל בזה עכשיו. בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, תפנה בבקשה לדן, הוא מטפל בזה עכשיו. תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "סוף שבוע נעים! ממני",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "סוף שבוע נעים!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "ראית את המשחק אתמול? תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, ראית את המשחק אתמול? בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, ראית את המשחק אתמול? ממני",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, הוספתי אותך לרשימת התפוצה. ממני",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, הוספתי אותך לרשימת התפוצה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, הוספתי אותך לרשימת התפוצה. ממני",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, לוח הזמנים של הקיץ מתחיל ביוני.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "לוח הזמנים של הקיץ מתחיל ביוני. ממני",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, לוח הזמנים של הקיץ מתחיל ביוני.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, רציתי לשתף אותך במאמר הזה. בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, רציתי לשתף אותך במאמר הזה. בברכה, אלכס",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, רציתי לשתף אותך במאמר הזה. ממני",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "דרך אגב, המספר החדש שלי בחתימה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, דרך אגב, המספר החדש שלי בחתימה. תודה",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, דרך אגב, המספר החדש שלי בחתימה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, תודה על ההזמנה לאירוע, אחשוב על זה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, תודה על ההזמנה לאירוע, אחשוב על זה. ממני",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, תודה על ההזמנה לאירוע, אחשוב על זה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "Which schedule do you mean? Thanks",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, which document do you mean?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, which presentation do you mean? Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, which contract do you mean?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, which quote do you mean?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, can you resend the quote? I couldn't open it. Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, can you resend the invoice? I couldn't open it.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, can you resend the presentation? I couldn't open it. Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, can you resend the contract? I couldn't open it. Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, can you resend the proposal? I couldn't open it.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I never got the presentation, can you send it again? Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "I never got the invoice, can you send it again?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, I never got the document, can you send it again?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "I never got the payment, can you send it again?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "I never got the proposal, can you send it again? Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, the link to the quote is broken. Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, the link to the agreement is broken.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, the link to the proposal is broken.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, the link to the draft is broken. Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "The link to the payment is broken.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, what's the budget for the schedule?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "What's the budget for the budget?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, what's the budget for the proposal? Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, what's the budget for the proposal? Thanks",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, what's the budget for the invoice? Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Could you clarify what you need from me on the report?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, could you clarify what you need from me on the proposal?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Could you clarify what you need from me on the contract? Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, could you clarify what you need from me on the agreement?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Could you clarify what you need from me on the draft? Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, do you want the invoice in PDF or Word? Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, do you want the proposal in PDF or Word? Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, do you want the document in PDF or Word?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, do you want the agreement in PDF or Word?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, do you want the report in PDF or Word?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "The file came through empty, please send again.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, the file came through empty, please send again. Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, who should I address the payment to?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, who should I address the agreement to?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Who should I address the payment to? Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, who should I address the contract to?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Who should I address the presentation to?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, I need the account number before I can pay the invoice.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "I need the account number before I can pay the presentation. Thanks",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, I need the account number before I can pay the draft.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, I need the account number before I can pay the payment.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, I need the account number before I can pay the payment.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Can you tell me which date you prefer for the report? Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, can you tell me which date you prefer for the contract? Thanks",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, can you tell me which date you prefer for the budget?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, can you tell me which date you prefer for the quote?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, can you tell me which date you prefer for the report? Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, which version of the draft is the latest one?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Which version of the quote is the latest one?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Which version of the payment is the latest one?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, which version of the budget is the latest one? Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, which version of the proposal is the latest one?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, I don't have access to the quote, can you share it? Thanks",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "I don't have access to the quote, can you share it?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I don't have access to the document, can you share it?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "I don't have access to the contract, can you share it? Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, I don't have access to the contract, can you share it?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, what exactly should the budget include?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "What exactly should the presentation include?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, what exactly should the document include?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "What exactly should the quote include?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, what exactly should the budget include?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Please send me the details first, then I can do the proposal. Best, Alex",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, please send me the details first, then I can do the order.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, please send me the details first, then I can do the proposal. Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, please send me the details first, then I can do the order.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Please send me the details first, then I can do the proposal. Regards",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "אהלן, לאיזה הזמנה אתה מתכוון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, לאיזה תקציב אתה מתכוון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "לאיזה טיוטה אתה מתכוון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "לאיזה מסמך אתה מתכוון? ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "לאיזה הצעת מחיר אתה מתכוון? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אפשר לשלוח שוב את הטיוטה? לא הצלחתי לפתוח.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, אפשר לשלוח שוב את ההזמנה? לא הצלחתי לפתוח. בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, אפשר לשלוח שוב את הטיוטה? לא הצלחתי לפתוח. בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אפשר לשלוח שוב את התשלום? לא הצלחתי לפתוח.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, אפשר לשלוח שוב את ההזמנה? לא הצלחתי לפתוח. ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, לא קיבלתי את הטיוטה, תוכל לשלוח שוב?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, לא קיבלתי את ההצעת מחיר, תוכל לשלוח שוב? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, לא קיבלתי את התשלום, תוכל לשלוח שוב? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "לא קיבלתי את הדוח, תוכל לשלוח שוב?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "לא קיבלתי את ההצעה, תוכל לשלוח שוב?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, הקישור להצעת מחיר שבור.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, הקישור לחוזה שבור. ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "הקישור להצעה שבור. בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, הקישור לטופס שבור.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "הקישור להזמנה שבור.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, מה התקציב לטיוטה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "מה התקציב לחוזה? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "מה התקציב לתשלום?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "מה התקציב לחשבונית? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "מה התקציב ללוח זמנים?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תוכל להבהיר מה אתה צריך ממני לגבי הטופס? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תוכל להבהיר מה אתה צריך ממני לגבי הדוח? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, תוכל להבהיר מה אתה צריך ממני לגבי ההזמנה? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, תוכל להבהיר מה אתה צריך ממני לגבי התקציב?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, תוכל להבהיר מה אתה צריך ממני לגבי המצגת? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, אתה רוצה את ההצעה ב-PDF או בוורד? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, אתה רוצה את הטיוטה ב-PDF או בוורד? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, אתה רוצה את החוזה ב-PDF או בוורד?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אתה רוצה את הטופס ב-PDF או בוורד? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, אתה רוצה את הטופס ב-PDF או בוורד?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "הקובץ הגיע ריק, תשלח שוב בבקשה.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, הקובץ הגיע ריק, תשלח שוב בבקשה. ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "הקובץ הגיע ריק, תשלח שוב בבקשה. תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, על שם מי לכתוב את המסמך?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "על שם מי לכתוב את המצגת? ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, על שם מי לכתוב את הלוח זמנים? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, על שם מי לכתוב את ההצעת מחיר?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "על שם מי לכתוב את המסמך?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, אני צריך את מספר החשבון לפני שאוכל לשלם את החשבונית. ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אני צריך את מספר החשבון לפני שאוכל לשלם את הדוח. בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אני צריך את מספר החשבון לפני שאוכל לשלם את התקציב. תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, אני צריך את מספר החשבון לפני שאוכל לשלם את הלוח זמנים.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, אני צריך את מספר החשבון לפני שאוכל לשלם את התקציב. תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, תגיד לי איזה תאריך מתאים לך ללוח זמנים?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תגיד לי איזה תאריך מתאים לך להזמנה? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, תגיד לי איזה תאריך מתאים לך להצעת מחיר? ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תגיד לי איזה תאריך מתאים לך ללוח זמנים? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, תגיד לי איזה תאריך מתאים לך להצעה? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, איזו גרסה של ההצעת מחיר היא העדכנית?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, איזו גרסה של החוזה היא העדכנית?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, איזו גרסה של ההצעה היא העדכנית? תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "איזו גרסה של החוזה היא העדכנית?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, איזו גרסה של ההסכם היא העדכנית?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, אין לי גישה להצעת מחיר, אפשר לשתף?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אין לי גישה למצגת, אפשר לשתף? בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, אין לי גישה לחשבונית, אפשר לשתף? ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, אין לי גישה לחוזה, אפשר לשתף?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, אין לי גישה להזמנה, אפשר לשתף?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, מה בדיוק צריך להיות בטופס?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "מה בדיוק צריך להיות בטופס? ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, מה בדיוק צריך להיות בהצעה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, מה בדיוק צריך להיות בהזמנה? ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, מה בדיוק צריך להיות בהזמנה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, שלח לי קודם את הפרטים ואז אוכל לעשות את החוזה. בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, שלח לי קודם את הפרטים ואז אוכל לעשות את החשבונית. בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, שלח לי קודם את הפרטים ואז אוכל לעשות את הדוח. בברכה, אלכס",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, שלח לי קודם את הפרטים ואז אוכל לעשות את הלוח זמנים. תודה",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, שלח לי קודם את הפרטים ואז אוכל לעשות את ההזמנה. ממני",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "Hi, sorry, we're not going ahead with the agreement. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, sorry, we're not going ahead with the budget.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, sorry, we're not going ahead with the contract. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, sorry, we're not going ahead with the quote.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, sorry, we're not going ahead with the presentation. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "I can't sign the document, it doesn't work for us.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, I can't sign the agreement, it doesn't work for us.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, I can't sign the quote, it doesn't work for us. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, I can't sign the presentation, it doesn't work for us. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I can't sign the document, it doesn't work for us. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, we've decided to pass on the agreement. Regards",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "We've decided to pass on the agreement. Regards",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "We've decided to pass on the invoice. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, we've decided to pass on the agreement. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "We've decided to pass on the schedule. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, unfortunately the answer is no. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, unfortunately the answer is no. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Unfortunately the answer is no.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "That won't be possible, we have to decline the agreement.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "That won't be possible, we have to decline the budget. Regards",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, that won't be possible, we have to decline the quote. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, that won't be possible, we have to decline the form.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, that won't be possible, we have to decline the draft.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "We went with another vendor for the document. Regards",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, we went with another vendor for the schedule. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, we went with another vendor for the form. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, we went with another vendor for the contract. Regards",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, we went with another vendor for the order. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, i'm afraid I can't approve the draft.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "I'm afraid I can't approve the form.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, i'm afraid I can't approve the payment. Best, Alex",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, i'm afraid I can't approve the budget.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "I'm afraid I can't approve the document.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "No, we are not interested in the budget.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, no, we are not interested in the invoice. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, no, we are not interested in the draft. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, no, we are not interested in the presentation.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "No, we are not interested in the form. Regards",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, we won't be able to do the proposal, sorry.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, we won't be able to do the contract, sorry.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, we won't be able to do the draft, sorry.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "We won't be able to do the payment, sorry.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, we won't be able to do the proposal, sorry.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, after thinking about it, we are cancelling the payment.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "After thinking about it, we are cancelling the proposal.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, after thinking about it, we are cancelling the schedule.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, after thinking about it, we are cancelling the draft. Thanks",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, after thinking about it, we are cancelling the schedule.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "אהלן, סליחה, לא מתקדמים עם ההצעה. ממני",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, סליחה, לא מתקדמים עם הלוח זמנים.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "סליחה, לא מתקדמים עם המסמך.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "סליחה, לא מתקדמים עם החשבונית.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, סליחה, לא מתקדמים עם התקציב. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אני לא יכול לחתום על הטופס, זה לא מתאים לנו. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, אני לא יכול לחתום על הטיוטה, זה לא מתאים לנו.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אני לא יכול לחתום על המסמך, זה לא מתאים לנו.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אני לא יכול לחתום על ההסכם, זה לא מתאים לנו.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, אני לא יכול לחתום על ההצעת מחיר, זה לא מתאים לנו.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "החלטנו לוותר על ההצעה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, החלטנו לוותר על ההצעת מחיר. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "החלטנו לוותר על התשלום.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, החלטנו לוותר על ההסכם. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, החלטנו לוותר על המסמך. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לצערי התשובה היא לא. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, לצערי התשובה היא לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, לצערי התשובה היא לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, זה לא יהיה אפשרי, אנחנו מסרבים לתקציב. בברכה, אלכס",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "זה לא יהיה אפשרי, אנחנו מסרבים לתקציב.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, זה לא יהיה אפשרי, אנחנו מסרבים לטופס.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "זה לא יהיה אפשרי, אנחנו מסרבים להזמנה. ממני",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, זה לא יהיה אפשרי, אנחנו מסרבים להזמנה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, בחרנו ספק אחר למסמך.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, בחרנו ספק אחר למצגת.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "בחרנו ספק אחר לטופס. בברכה, אלכס",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "בחרנו ספק אחר להסכם.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "בחרנו ספק אחר להזמנה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, אני חושש שאני לא יכול לאשר את ההצעת מחיר. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אני חושש שאני לא יכול לאשר את ההצעת מחיר. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, אני חושש שאני לא יכול לאשר את המצגת.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, אני חושש שאני לא יכול לאשר את החוזה. ממני",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אני חושש שאני לא יכול לאשר את ההזמנה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא, אנחנו לא מעוניינים בטופס. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא, אנחנו לא מעוניינים בהסכם.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, לא, אנחנו לא מעוניינים בחשבונית. ממני",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, לא, אנחנו לא מעוניינים בהצעה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, לא, אנחנו לא מעוניינים בלוח זמנים.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא נוכל לעשות את המצגת, סליחה. תודה",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, לא נוכל לעשות את ההזמנה, סליחה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, לא נוכל לעשות את הטופס, סליחה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, לא נוכל לעשות את הלוח זמנים, סליחה. בברכה, אלכס",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, לא נוכל לעשות את ההצעת מחיר, סליחה. ממני",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אחרי מחשבה, אנחנו מבטלים את הלוח זמנים.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אחרי מחשבה, אנחנו מבטלים את הטיוטה. בברכה, אלכס",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אחרי מחשבה, אנחנו מבטלים את הלוח זמנים. ממני",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, אחרי מחשבה, אנחנו מבטלים את החשבונית.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, אחרי מחשבה, אנחנו מבטלים את המצגת.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "Confirmed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, Confirmed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Done.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, Done.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Approved.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Approved.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, Yes.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Sure, go ahead.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, Sure, go ahead.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Signed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, Signed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Paid.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, Paid.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, confirmed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, Yes, confirmed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Sent, please check.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, Sent, please check.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Fine by me.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, Fine by me.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "That works for us.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, That works for us.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "It's approved, thanks for waiting.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, It's approved, thanks for waiting.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "You're all set.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, You're all set.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, I received it and it's all correct.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Yes, I received it and it's all correct.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Go ahead, you have my approval.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, Go ahead, you have my approval.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I've transferred the money, it should show tomorrow.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I've transferred the money, it should show tomorrow.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, I'll be there, count me in.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, Yes, I'll be there, count me in.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Delivered this morning, tracking says signed for.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, Delivered this morning, tracking says signed for.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "All good, I made the changes you asked for.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, All good, I made the changes you asked for.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, the price is fine.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Yes, the price is fine.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Done and dusted, nothing else needed from you.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Done and dusted, nothing else needed from you.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Never mind, found it. Thanks!",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, Never mind, found it. Thanks!",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Found it, thanks!",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Found it, thanks!",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Nevermind, I got it sorted.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, Nevermind, I got it sorted.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I figured it out, no need to resend.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I figured it out, no need to resend.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "It's resolved now, thanks for your help.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, It's resolved now, thanks for your help.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Ignore my last message, it works now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, Ignore my last message, it works now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "We reviewed the numbers with finance and the vendor can be booked at the lower rate, so go ahead on your side.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, We reviewed the numbers with finance and the vendor can be booked at the lower rate, so go ahead on your side.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "After going through everything with the board we are happy to accept the revised terms, please send the final paperwork over.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, After going through everything with the board we are happy to accept the revised terms, please send the final paperwork over.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I checked with the warehouse and your order left this morning, the tracking number is 8831 and it should arrive by Thursday.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I checked with the warehouse and your order left this morning, the tracking number is 8831 and it should arrive by Thursday.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "We looked at both options and decided on the second one, so you can proceed with that and invoice us at the quoted price.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hello, We looked at both options and decided on the second one, so you can proceed with that and invoice us at the quoted price.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The inspection went fine and the landlord signed the lease addendum yesterday, you will find the scanned copy attached to this email.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, The inspection went fine and the landlord signed the lease addendum yesterday, you will find the scanned copy attached to this email.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, after speaking with legal everything is cleared, the clause stays as it was and we can close this on Friday as planned.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Yes, after speaking with legal everything is cleared, the clause stays as it was and we can close this on Friday as planned.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Thanks for waiting, I went through your proposal in detail and the scope and the price are both acceptable to us, so let us start next month.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, Thanks for waiting, I went through your proposal in detail and the scope and the price are both acceptable to us, so let us start next month.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The invoice is settled as of today.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hey, The invoice is settled as of today.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yes, 10am works.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Yes, 10am works.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "OK, I confirm the booking.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, OK, I confirm the booking.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I've reviewed it and it's good to go.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Hi, I've reviewed it and it's good to go.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "מאושר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, מאושר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "בוצע.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, בוצע.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אושר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, אושר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, כן.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "בטח, תתקדם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, בטח, תתקדם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "חתום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, חתום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שולם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, שולם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, מאושר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, כן, מאושר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "נשלח, תבדוק.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, נשלח, תבדוק.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מקובל עליי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, מקובל עליי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "זה מתאים לנו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, זה מתאים לנו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אושר, תודה שחיכית.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אושר, תודה שחיכית.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אתה מסודר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, אתה מסודר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, קיבלתי והכול נכון.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, כן, קיבלתי והכול נכון.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "תתקדם, יש לך אישור ממני.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, תתקדם, יש לך אישור ממני.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "העברתי את הכסף, אמור להופיע מחר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, העברתי את הכסף, אמור להופיע מחר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, אהיה שם, תחשיב אותי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, כן, אהיה שם, תחשיב אותי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "נמסר הבוקר, המעקב אומר שנחתם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, נמסר הבוקר, המעקב אומר שנחתם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הכול טוב, עשיתי את השינויים שביקשת.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, הכול טוב, עשיתי את השינויים שביקשת.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, המחיר בסדר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, כן, המחיר בסדר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "סיימנו, לא צריך ממך עוד כלום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, סיימנו, לא צריך ממך עוד כלום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "עזוב, מצאתי. תודה!",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, עזוב, מצאתי. תודה!",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מצאתי, תודה!",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, מצאתי, תודה!",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "לא משנה, הסתדרתי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, לא משנה, הסתדרתי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הבנתי איך עושים את זה, אין צורך לשלוח שוב.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, הבנתי איך עושים את זה, אין צורך לשלוח שוב.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "זה נפתר עכשיו, תודה על העזרה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, זה נפתר עכשיו, תודה על העזרה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "תתעלם מההודעה הקודמת, זה עובד עכשיו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, תתעלם מההודעה הקודמת, זה עובד עכשיו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "עברנו על המספרים עם הכספים והספק יכול להיסגר במחיר הנמוך, אז תתקדם מהצד שלך.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, עברנו על המספרים עם הכספים והספק יכול להיסגר במחיר הנמוך, אז תתקדם מהצד שלך.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אחרי שעברנו על הכול עם ההנהלה אנחנו שמחים לקבל את התנאים המעודכנים, שלח בבקשה את המסמכים הסופיים.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, אחרי שעברנו על הכול עם ההנהלה אנחנו שמחים לקבל את התנאים המעודכנים, שלח בבקשה את המסמכים הסופיים.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "בדקתי מול המחסן וההזמנה שלך יצאה הבוקר, מספר המעקב 8831 וזה אמור להגיע עד יום חמישי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, בדקתי מול המחסן וההזמנה שלך יצאה הבוקר, מספר המעקב 8831 וזה אמור להגיע עד יום חמישי.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "בחנו את שתי האפשרויות והחלטנו על השנייה, אז אפשר להתקדם איתה ולחייב אותנו במחיר שהוצע.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, בחנו את שתי האפשרויות והחלטנו על השנייה, אז אפשר להתקדם איתה ולחייב אותנו במחיר שהוצע.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הבדיקה עברה בסדר והבעלים חתם אתמול על תוספת החוזה, תמצא את העותק הסרוק מצורף למייל הזה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, הבדיקה עברה בסדר והבעלים חתם אתמול על תוספת החוזה, תמצא את העותק הסרוק מצורף למייל הזה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, אחרי שדיברתי עם המשפטי הכול מאושר, הסעיף נשאר כמו שהיה ונוכל לסגור את זה ביום שישי כמתוכנן.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, כן, אחרי שדיברתי עם המשפטי הכול מאושר, הסעיף נשאר כמו שהיה ונוכל לסגור את זה ביום שישי כמתוכנן.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "תודה שחיכית, עברתי על ההצעה שלך לפרטים והיקף העבודה והמחיר שניהם מקובלים עלינו, אז נתחיל בחודש הבא.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אהלן, תודה שחיכית, עברתי על ההצעה שלך לפרטים והיקף העבודה והמחיר שניהם מקובלים עלינו, אז נתחיל בחודש הבא.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "החשבונית סגורה מהיום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, החשבונית סגורה מהיום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, עשר בבוקר מתאים.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "שלום, כן, עשר בבוקר מתאים.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "אוקיי, אני מאשר את ההזמנה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אוקיי, אני מאשר את ההזמנה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "עברתי על זה וזה מוכן.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "היי, עברתי על זה וזה מוכן.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "Looking into it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, Looking into it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "On it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, On it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Will check.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, Will check.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Let me check.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, Let me check.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Checking.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, Checking.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'll get back to you.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, I'll get back to you.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Working on it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, Working on it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Let me think about it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, Let me think about it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Give me a day or two.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, Give me a day or two.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Will let you know.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, Will let you know.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Not yet, still working on it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hey, Not yet, still working on it.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'm on it, nothing yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I'm on it, nothing yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Bear with me, almost there.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, Bear with me, almost there.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Let me look and revert.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, Let me look and revert.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hold on, I'm checking with my team.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, Hold on, I'm checking with my team.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "In progress.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, In progress.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Still pending on our side.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, Still pending on our side.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I'll see what I can do.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hello, I'll see what I can do.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Can't say yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Can't say yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Under review.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Hi, Under review.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "בודק.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, בודק.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אבדוק.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, אבדוק.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "תן לי לבדוק.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, תן לי לבדוק.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "בבדיקה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, בבדיקה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אחזור אליך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אחזור אליך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עובד על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, עובד על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "תן לי לחשוב על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, תן לי לחשוב על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "תן לי יום או יומיים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, תן לי יום או יומיים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אעדכן.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי, אעדכן.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עוד לא, עדיין עובד על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, עוד לא, עדיין עובד על זה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אני על זה, אין עדיין כלום.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אני על זה, אין עדיין כלום.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "סבלנות, כמעט שם.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אהלן, סבלנות, כמעט שם.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אסתכל ואחזור.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, אסתכל ואחזור.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "רגע, בודק עם הצוות.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, רגע, בודק עם הצוות.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "בתהליך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, בתהליך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עדיין תלוי בצד שלנו.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, עדיין תלוי בצד שלנו.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אראה מה אפשר לעשות.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, אראה מה אפשר לעשות.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אי אפשר לומר עדיין.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "היי דנה, אי אפשר לומר עדיין.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "בבחינה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "שלום, בבחינה.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "Thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hello, Thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Thx!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Thx!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "OK.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, OK.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Ok!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, Ok!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Alright.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, Alright.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Got it.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, Got it.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Noted.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi, Noted.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Thank you!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Thank you!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Roger that.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, Roger that.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Will do, thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Hey, Will do, thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תנקס!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, תנקס!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אוקיי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "שלום, אוקיי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אוקי!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי, אוקי!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "בסדר.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, בסדר.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "הבנתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, הבנתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "נרשם.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, נרשם.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "תודה רבה!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, תודה רבה!",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "קיבלתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, קיבלתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "סבבה, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "אהלן, סבבה, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "Hope you're well.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, Hope you're well.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Happy holidays!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, Happy holidays!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Out of office until Monday.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, Out of office until Monday.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Automatic reply: I am away.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, Automatic reply: I am away.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "See attached newsletter.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, See attached newsletter.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Congrats on the launch!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Congrats on the launch!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "How was your trip?",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hello, How was your trip?",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Let's catch up soon.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, Let's catch up soon.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Sent from my iPhone.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hi, Sent from my iPhone.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Unsubscribe from this list.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hey, Unsubscribe from this list.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "מקווה שאתה בסדר.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, מקווה שאתה בסדר.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "חג שמח!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, חג שמח!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "לא במשרד עד יום שני.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, לא במשרד עד יום שני.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "מענה אוטומטי: אני לא זמין.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, מענה אוטומטי: אני לא זמין.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "ראה מצורף את הניוזלטר.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, ראה מצורף את הניוזלטר.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "מזל טוב על ההשקה!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "שלום, מזל טוב על ההשקה!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "איך היה הטיול?",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, איך היה הטיול?",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "בוא נתעדכן בקרוב.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "אהלן, בוא נתעדכן בקרוב.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "נשלח מהאייפון.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי, נשלח מהאייפון.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "הסר אותי מהרשימה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "היי דנה, הסר אותי מהרשימה.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "What's the deadline?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, What's the deadline?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Which one?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, Which one?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Can you clarify?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, Can you clarify?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Where should I send it?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, Where should I send it?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "How much is it?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, How much is it?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "What do you mean?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, What do you mean?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Who is this for?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Who is this for?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Please resend.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, Please resend.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Can't open it.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, Can't open it.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Which date works for you?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hello, Which date works for you?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Do you have the account details?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, Do you have the account details?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "What's the reference number?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, What's the reference number?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Is it the new version?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Is it the new version?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Could you explain what you need?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hey, Could you explain what you need?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "The file is corrupted.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Hi, The file is corrupted.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "מה המועד האחרון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, מה המועד האחרון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "איזה מהם?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, איזה מהם?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אפשר להבהיר?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, אפשר להבהיר?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "לאן לשלוח?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, לאן לשלוח?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "כמה זה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, כמה זה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "למה אתה מתכוון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, למה אתה מתכוון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "בשביל מי זה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, בשביל מי זה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלח שוב בבקשה.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, שלח שוב בבקשה.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "לא נפתח.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "שלום, לא נפתח.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "איזה תאריך מתאים לך?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, איזה תאריך מתאים לך?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "יש לך את פרטי החשבון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, יש לך את פרטי החשבון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "מה מספר האסמכתא?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, מה מספר האסמכתא?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "זו הגרסה החדשה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "אהלן, זו הגרסה החדשה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "תוכל להסביר מה אתה צריך?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי, תוכל להסביר מה אתה צריך?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "הקובץ פגום.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "היי דנה, הקובץ פגום.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "No.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, No.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Not interested.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, Not interested.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Sorry, no.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, Sorry, no.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "We'll pass.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, We'll pass.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Can't do it.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, Can't do it.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Declined.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hey, Declined.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "No thanks.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hello, No thanks.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "That's not going to happen.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi, That's not going to happen.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "I have to say no.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, I have to say no.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Not for us.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Hi Dana, Not for us.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא מעוניין.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, לא מעוניין.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "סליחה, לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, סליחה, לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "נוותר.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, נוותר.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא יכול.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי, לא יכול.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "נדחה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, נדחה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא תודה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "שלום, לא תודה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "זה לא יקרה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, זה לא יקרה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אני חייב לומר לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "היי דנה, אני חייב לומר לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא בשבילנו.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אהלן, לא בשבילנו.",
+"c": "DECLINED",
+"lang": "he"
+}
+]

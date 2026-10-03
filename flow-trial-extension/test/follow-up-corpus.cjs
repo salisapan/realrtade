@@ -236,5 +236,14 @@ check('the oldest open loop is reported in days', sm.oldestOpenDays === 19, sm);
 const rc = F.recentlyClosed([closedPaid, closedPaidOld, closedReply, w], nowM, 5);
 check('recently closed is newest first and within a month', rc.length === 2 && rc[0].id === 'c1' && rc[1].id === 'c3', rc.map((x) => x.id));
 
+console.log('\n--- a reminder ticked done in Google Tasks ---\n');
+{
+  const w = { id: 't1', status: 'waiting', direction: 'theirs', taskRef: { taskId: 'T1' } };
+  const p = F.closeFromTask(w, NOW);
+  check('it closes the loop as the person\'s own close, never as Glance\'s', p.status === 'resolved' && p.resolvedBy === 'task' && p.closedAs === 'manual', p);
+  check('on your own promise it is "kept"', F.closeFromTask(Object.assign({}, w, { direction: 'mine' }), NOW).closedAs === 'kept');
+  check('only waiting loops with a reminder are asked about, and not again within ten minutes', F.taskRefsToCheck([w, { id: 'x', status: 'waiting' }, { id: 'y', status: 'resolved', taskRef: { taskId: 'Y' } }], NOW, {}).length === 1 && F.taskRefsToCheck([w], NOW, { t1: NOW - 60000 }).length === 0 && F.taskRefsToCheck([w], NOW, { t1: NOW - 11 * 60000 }).length === 1);
+}
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

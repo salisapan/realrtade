@@ -19,7 +19,7 @@ const FlowLedger = (() => {
 
   const CAP = 40;
   const PHRASE_MAX = 60;
-  const KINDS = ['askConfirmed', 'promiseConfirmed', 'askMissed', 'promiseMissed', 'accepted', 'turnedDown', 'reopened', 'timing', 'answered', 'style'];
+  const KINDS = ['heldOpen', 'askConfirmed', 'promiseConfirmed', 'askMissed', 'promiseMissed', 'accepted', 'turnedDown', 'reopened', 'timing', 'answered', 'style'];
 
   function hasHebrew(t) { return /[֐-׿]/.test(String(t || '')); }
   function esc(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -46,6 +46,7 @@ const FlowLedger = (() => {
     const q = quote(p);
     const about = info.about ? info.about : 'something';
     switch (kind) {
+      case 'heldOpen': return 'A reply' + (q ? ' ' + q : '') + ' did not answer it (' + (info.reason || 'not an answer') + '), so I kept the loop open.';
       case 'askConfirmed': return 'A reply closed a request of yours' + (q ? ' ' + q : ' about ' + about) + ', so requests phrased like it count more.';
       case 'promiseConfirmed': return 'You kept a promise' + (q ? ' ' + q : ' about ' + about) + ', so promises phrased like it count more.';
       case 'askMissed': return 'You chased by hand where I had no loop' + (q ? ' for ' + q : '') + '. Requests phrased like that now count.';

@@ -1,0 +1,387 @@
+[
+{
+"t": "Yes, that's fine with me, go ahead.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Signed copy attached.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "The numbers are correct, approved.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "I sent the transfer an hour ago, confirmation number 55120.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Perfect, Thursday at 4 works. See you then.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Here's the updated document with your changes.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "All done on my end, you should see it now.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "It's 3,850 for the whole project, as agreed.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "Yep, the meeting is set for Monday at 9.",
+"c": "ANSWERED",
+"lang": "en"
+},
+{
+"t": "כן, מצוין מבחינתי, תתקדם.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מצורף העותק החתום.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "המספרים נכונים, מאושר.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "העברתי את התשלום לפני שעה, אסמכתא 55120.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "מצוין, יום חמישי בארבע מתאים. נתראה.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "הנה המסמך המעודכן עם התיקונים שלך.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "סיימתי מצדי, אתה אמור לראות את זה עכשיו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "זה 3,850 לכל הפרויקט, כמו שסיכמנו.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "כן, הפגישה קבועה ליום שני בתשע.",
+"c": "ANSWERED",
+"lang": "he"
+},
+{
+"t": "I'll try to get to this over the weekend.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Still going through the documents, give me a few days.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Need to run it by my partner first.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I haven't looked at it yet but I will.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Let me talk to the team and see where we are.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Looking into it, nothing to report yet.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "We are in the middle of our quarterly close, I'll come back to this after.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Almost there, just waiting on one signature from my side.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "Can't promise anything yet, checking.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "I opened the file but didn't have time to read it properly.",
+"c": "INTERIM",
+"lang": "en"
+},
+{
+"t": "אנסה להגיע לזה בסוף השבוע.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עדיין עובר על המסמכים, תן לי כמה ימים.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "צריך להתייעץ קודם עם השותף שלי.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "עוד לא הסתכלתי על זה אבל אסתכל.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אדבר עם הצוות ואראה איפה אנחנו.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "בודק את זה, אין מה לדווח עדיין.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אנחנו באמצע סגירת רבעון, אחזור לזה אחר כך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "כמעט שם, מחכה לחתימה אחת מצידי.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "אי אפשר להבטיח כלום עדיין, בודק.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "פתחתי את הקובץ אבל לא הספקתי לקרוא כמו שצריך.",
+"c": "INTERIM",
+"lang": "he"
+},
+{
+"t": "Thanks a lot!",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "OK, noted.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Got your email, thank you.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Great, thank you for letting me know.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "Alright, thanks.",
+"c": "ACK",
+"lang": "en"
+},
+{
+"t": "בסדר, רשמתי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "קיבלתי את המייל, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "מעולה, תודה שהודעת לי.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "טוב, תודה.",
+"c": "ACK",
+"lang": "he"
+},
+{
+"t": "I'm on vacation until the 20th, I'll respond when I'm back.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "By the way, congratulations on the new office!",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Please direct this to our accounting department.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Hope you're doing well, it's been a while.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "Adding Sarah to this thread.",
+"c": "OTHER",
+"lang": "en"
+},
+{
+"t": "אני בחופשה עד ה-20, אענה כשאחזור.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "דרך אגב, מזל טוב על המשרד החדש!",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "תפנה את זה בבקשה למחלקת הנהלת החשבונות.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "מקווה שאתה בסדר, עבר הרבה זמן.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "מוסיף את שרה לשרשור.",
+"c": "OTHER",
+"lang": "he"
+},
+{
+"t": "Can you remind me what the deadline is?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Which account should I use?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "The attachment didn't open on my computer.",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "Is this the final version or the draft?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "What do you need me to do exactly?",
+"c": "HANDBACK",
+"lang": "en"
+},
+{
+"t": "אתה יכול להזכיר לי מה המועד האחרון?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "באיזה חשבון להשתמש?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "הקובץ המצורף לא נפתח אצלי במחשב.",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "זו הגרסה הסופית או הטיוטה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "מה בדיוק אתה צריך שאעשה?",
+"c": "HANDBACK",
+"lang": "he"
+},
+{
+"t": "We've decided not to move forward, thank you for your time.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "I won't be signing this.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "Not at this price, no.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "We're unable to commit to that date or any other.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "That's a no from me, sorry.",
+"c": "DECLINED",
+"lang": "en"
+},
+{
+"t": "החלטנו לא להתקדם, תודה על הזמן שלך.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אני לא אחתום על זה.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "לא במחיר הזה, לא.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "אנחנו לא יכולים להתחייב לתאריך הזה או לאחר.",
+"c": "DECLINED",
+"lang": "he"
+},
+{
+"t": "זה לא אצלי, סליחה.",
+"c": "DECLINED",
+"lang": "he"
+}
+]

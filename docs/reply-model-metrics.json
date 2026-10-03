@@ -1,0 +1,97 @@
+{
+ "temperature": 0.8,
+ "trainRows": 1207,
+ "eval2": {
+  "n": 49,
+  "accuracy": 0.857,
+  "answered": {
+   "n": 13,
+   "precision": 1
+  },
+  "notAnswer": {
+   "n": 19,
+   "precision": 0.895
+  },
+  "errors": [
+   [
+    "said not-answer",
+    "ANSWERED",
+    "אוקיי, אישרתי."
+   ],
+   [
+    "said not-answer",
+    "ANSWERED",
+    "טוב, קבענו ליום רביעי בשתיים."
+   ]
+  ]
+ },
+ "eval": {
+  "n": 77,
+  "accuracy": 0.831,
+  "answered": {
+   "n": 19,
+   "precision": 0.895
+  },
+  "notAnswer": {
+   "n": 27,
+   "precision": 0.963
+  },
+  "errors": [
+   [
+    "said not-answer",
+    "ANSWERED",
+    "All done on my end, you should see it now."
+   ],
+   [
+    "said answer",
+    "INTERIM",
+    "אדבר עם הצוות ואראה איפה אנחנו."
+   ],
+   [
+    "said answer",
+    "OTHER",
+    "Hope you're doing well, it's been a while."
+   ]
+  ],
+  "confusion": {
+   "ANSWERED>ANSWERED": 17,
+   "ANSWERED>INTERIM": 1,
+   "INTERIM>INTERIM": 13,
+   "INTERIM>OTHER": 1,
+   "INTERIM>HANDBACK": 1,
+   "INTERIM>ANSWERED": 3,
+   "INTERIM>DECLINED": 2,
+   "ACK>ACK": 9,
+   "OTHER>INTERIM": 1,
+   "OTHER>OTHER": 5,
+   "OTHER>ANSWERED": 3,
+   "OTHER>HANDBACK": 1,
+   "HANDBACK>HANDBACK": 10,
+   "DECLINED>DECLINED": 10
+  }
+ },
+ "byLanguage": {
+  "en": {
+   "accuracy": 0.872,
+   "answered": {
+    "n": 9,
+    "precision": 0.889
+   },
+   "notAnswer": {
+    "n": 16,
+    "precision": 0.938
+   }
+  },
+  "he": {
+   "accuracy": 0.789,
+   "answered": {
+    "n": 10,
+    "precision": 0.9
+   },
+   "notAnswer": {
+    "n": 11,
+    "precision": 1
+   }
+  }
+ }
+}

@@ -58,6 +58,8 @@
         "core/file-path.js",
         "core/person-model.js",
         "core/outcome-labels.js",
+        "core/reply-model-weights.js",
+        "core/reply-model.js",
         "core/follow-up.js",
         "core/outside-signals.js",
         "core/channel.js",
