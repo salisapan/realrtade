@@ -96,6 +96,7 @@ function load(stored, opts) {
         remove: (k, cb) => { [].concat(k).forEach((x) => { delete store[x]; }); if (cb) { cb(); return; } return Promise.resolve(); }
       }
     },
+    identity: { getRedirectURL: () => 'https://testextensionidtestextensionid12.chromiumapp.org/' },
     runtime: {
       sendMessage: (msg, cb) => {
         // popup.js's only two-way call is flow:connector-status; everything
@@ -144,7 +145,7 @@ function load(stored, opts) {
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
     [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
-    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
+    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -659,6 +660,22 @@ async function run() {
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
     for (let i = 0; i < 14; i++) await new Promise((r) => setTimeout(r, 0));
     check('a selection older than a day is not offered, and is cleared', document.getElementById('captureBlock').hidden === true && !store().captureNow);
+  }
+
+  console.log('\n--- popup.js: Outlook says plainly when it is not set up ---\n');
+  {
+    const { sandbox, document } = load({});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('surface-list');
+    const states = find(host, 'wait-state').map((n) => n.textContent);
+    const notes = find(host, 'wait-note').map((n) => n.textContent);
+    check('the Outlook row is there and says it is not set up yet (no client id)', states.includes('Not set up yet'), states);
+    check('it says what it does, read-only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Read-only/.test(t) && /nothing is sent to Glance/.test(t)), notes);
+    check('it shows the redirect address the Microsoft app registration needs', notes.some((t) => /chromiumapp\.org/.test(t)), notes);
+    const buttons = find(host, 'ghost').map((b) => b.textContent);
+    check('and offers no Turn on button until it is set up', !buttons.includes('Turn on'), buttons);
+    check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

@@ -567,8 +567,9 @@ foundation, not the feature.
   contract (`core/channel.js`), are off until the person turns them on, and are
   stricter than Gmail until measured: WhatsApp Web (read-only, one-to-one chats,
   `src/content-whatsapp.js`), a right-click "stay on this" on any page
-  (`core/capture.js`), and Outlook through Microsoft's mail API (normalisation
-  only, not wired: `core/graph-mail.js`). See `docs/multi-platform.md`.
+  (`core/capture.js`), and Outlook through Microsoft's own mail API (read-only, last 14
+  days, while the panel is open: `src/outlook.js`, needs a Microsoft app registration
+  and its client id in `core/outlook-config.js`). See `docs/multi-platform.md`.
 - **The passive judgment engine is not a language model, and sends nothing
   anywhere.** `core/judgment.js`'s scorer is a transparent, explainable
   weighting, which is why the popup can show why Glance spoke — this has not

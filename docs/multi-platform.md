@@ -40,7 +40,7 @@ stricter than Gmail, and silent when it cannot read its page**. The first measur
 | WhatsApp Web, read-only, 1:1 only | `src/content-whatsapp.js`, `src/whatsapp-parse.js` | Built; parsing corpus + a browser harness on a page that **imitates** WhatsApp's structure. **Not verified on the real WhatsApp Web.** |
 | Opt-in plumbing: optional host permission, scripts registered on request, re-registered after an update, removed on "off" | `src/background.js`, popup "Where Glance watches" | Built; the popup call to the browser's permission prompt is not exercised in an automated test (it needs a real browser profile). |
 | "Stay on this" on any page (right-click menu, popup question, loop opens) | `core/capture.js`, `src/background.js`, popup | Built; core and popup logic tested. The right-click item and side-panel opening are not exercised in an automated test. |
-| Outlook through Microsoft Graph: message to utterance, HTML to text, quoted history cut | `core/graph-mail.js` | Library + tests only. **Not wired to anything**: it needs a Microsoft app registration and the person's consent (section 5). |
+| Outlook through Microsoft Graph: sign-in (PKCE), a bounded read of the last 14 days of inbox and sent, planning with the same rules as Gmail, offers and questions in the popup | `core/outlook-config.js`, `outlook-auth.js`, `graph-mail.js`, `outlook-sync.js`, `src/outlook.js`, popup | Built and tested against a **fake Microsoft** (75 checks: PKCE vector, read-only, bounded, honest failure, never creates a loop without a tap). **Dormant until the owner registers the Microsoft app and pastes its client id** (section 5). Never run against the real Microsoft. |
 
 ## 4. The hard rules
 
@@ -73,16 +73,36 @@ stricter than Gmail, and silent when it cannot read its page**. The first measur
   - **Sensitivity**: chats are more intimate than business email. The opt-in text says exactly what is read; nothing leaves the device.
 - To measure it properly: a labelled set of real chat sentences (like `docs/human-eval.md`) from consenting people, and only then relax `strict`.
 
-### Outlook (through Microsoft Graph; not wired)
+### Outlook (through Microsoft Graph; built, waiting for the owner's app registration)
 
-Reading Outlook's page would repeat WhatsApp's fragility, so the path is Microsoft's own API. What the owner has to do:
-1. Register an application in Microsoft Entra ID (single-page / public client), redirect URI `https://<extension-id>.chromiumapp.org/`.
-2. Delegated scope `Mail.Read` (and `offline_access`); no write scopes.
-3. Decide the consent copy: this reads the mailbox on the person's behalf, which is a bigger change to "we only read what you open"
-   than anything above (a poll, not an opened message). The privacy page and the store listing change first.
-4. Then wire: `chrome.identity.launchWebAuthFlow`, an alarm-driven poll of recent sent and received messages, `FlowGraphMail.toUtterance`,
-   and feed `FlowFollow.consider` through a context that implements the same hooks as `src/content-whatsapp.js`.
-Until then `core/graph-mail.js` is a tested library and nothing more.
+Reading Outlook's page would repeat WhatsApp's fragility, so the path is Microsoft's own API.
+
+What it does: sign in with the person's own Microsoft account (OAuth code flow with PKCE, `chrome.identity.launchWebAuthFlow`), read the
+last 14 days of the inbox and the sent folder (50 per page, two pages, text bodies), hand them to `core/outlook-sync.js`, and apply what it
+decides: a reply closes or moves a loop exactly as in Gmail, your chase moves the day, and a new ask or promise of yours is only OFFERED in
+the popup ("Waiting on a reply? Stay on it"). A reply that cannot be linked to a loop for sure only asks ("Does this settle it?"). An answer
+that arrives in Outlook can settle a Gmail or WhatsApp loop for the same person, and the other way round.
+
+What it does not do: it never writes to the mailbox (only read permissions are requested, and the tests assert that the only non-GET call is
+the token exchange); it does not run while the panel is closed (on open, every ten minutes, and "Check now"; the runner refuses to check
+more often than every ten minutes); nothing is sent to Glance's servers.
+
+This is a bigger change than anything before it to "Glance reads only the message you open". It is opt-in, disclosed on the privacy
+page in the same commit (a dedicated bullet), and the store justification rows for the two optional Microsoft hosts are written.
+
+**What the owner has to do (the only manual step):**
+1. Microsoft Entra admin center, App registrations, New registration. Supported account types: "Accounts in any organizational directory and
+   personal Microsoft accounts".
+2. Authentication, Add a platform, **Mobile and desktop applications**, custom redirect URI = the address the Outlook row in the popup shows
+   (`https://<extension id>.chromiumapp.org/`), and "Allow public client flows: Yes".
+3. API permissions, Microsoft Graph, Delegated: `Mail.Read`, `User.Read`, `offline_access`. Nothing else, ever.
+4. Paste the Application (client) ID into `CLIENT_ID` in `flow-trial-extension/core/outlook-config.js` (it is not a secret) and rebuild the package.
+5. Turn Outlook on in the popup, sign in, and watch "Last checked". Tell me what the row says if it fails.
+
+**Honest limits:** never run against the real Microsoft. The platform type matters (a "Single-page application" registration rejects a
+token request that does not come from a web origin, so use "Mobile and desktop"); if Microsoft behaves differently from the documentation the
+sign-in is where it will show. Personal and work accounts may need different consent, and some organisations block user consent for apps
+(their administrator then has to approve it).
 
 ### Slack, Teams and others
 
@@ -110,6 +130,6 @@ Not before: (a) a human-labelled set of real WhatsApp sentences measured at ask 
 
 ## 8. Decisions for the owner
 
-- Ship WhatsApp Web as an experimental opt-in, or hold it until the platform-policy question and a chat test set exist?
-- Outlook through Graph: register the Microsoft app and approve the consent copy, or leave it?
+- **Decided 2026-10-03 (owner):** WhatsApp Web ships as an experimental opt-in (off by default, read-only, 1:1 only). The platform-policy risk in section 5 is accepted by the owner; it is still not a legal opinion.
+- **Decided 2026-10-03 (owner):** Outlook through Graph is wired. It stays dormant until the Microsoft app is registered and its client id is set (section 5).
 - Whether "same person?" questions are acceptable in the popup (rationed to one at a time).

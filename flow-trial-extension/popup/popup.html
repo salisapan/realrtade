@@ -77,6 +77,11 @@
         <p class="hint" id="recurUpsell" hidden></p>
       </div>
 
+      <div class="waiting" id="outlookBlock" hidden>
+        <p class="label">From Outlook</p>
+        <div id="outlook-card" class="log-list"></div>
+      </div>
+
       <div class="waiting" id="captureBlock" hidden>
         <p class="label">From a page</p>
         <div id="capture-card" class="log-list"></div>
@@ -213,6 +218,11 @@
   <script src="../core/outside-signals.js"></script>
   <script src="../core/channel.js"></script>
   <script src="../core/capture.js"></script>
+  <script src="../core/graph-mail.js"></script>
+  <script src="../core/outlook-config.js"></script>
+  <script src="../core/outlook-auth.js"></script>
+  <script src="../core/outlook-sync.js"></script>
+  <script src="../src/outlook.js"></script>
   <script src="../core/identity-graph.js"></script>
   <script src="../core/cross-channel.js"></script>
   <script src="../core/privacyShield.js"></script>

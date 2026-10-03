@@ -59,6 +59,8 @@
   renderIdentityLinks().catch(() => {});
   renderCapture().catch(() => {});
   renderSurfaces().catch(() => {});
+  renderOutlookCards().catch(() => {});
+  outlookAutoSync().catch(() => {});
 
 
   // ---- Glance Pro -----------------------------------------------------------
@@ -733,6 +735,122 @@
     host.appendChild(item);
   }
 
+  // ---- Outlook (src/outlook.js) ---------------------------------------------------------------------------------
+  // Read-only, last 14 days, only while this panel is open. The runner is built once with the browser's own pieces handed in.
+  function outlookDeps() {
+    return {
+      storage: FlowStorage, cfg: FlowOutlookConfig, auth: FlowOutlookAuth, plan: FlowOutlookSync.plan,
+      fetch: (u, i) => fetch(u, i), redirectUri: () => chrome.identity.getRedirectURL(),
+      launch: (url) => new Promise((resolve, reject) => { chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => { if (chrome.runtime.lastError || !r) reject(new Error('cancelled')); else resolve(r); }); }),
+      permissions: { request: (o) => chrome.permissions.request(o), contains: (o) => chrome.permissions.contains(o), remove: (o) => chrome.permissions.remove(o) },
+      send, random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b), now: () => Date.now(),
+      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline }, identity: FlowIdentity, followUp: FlowFollowUp
+    };
+  }
+  function outlook() {
+    if (typeof FlowOutlook === 'undefined' || typeof FlowOutlookSync === 'undefined') return null;
+    return outlook.inst || (outlook.inst = FlowOutlook.create(outlookDeps()));
+  }
+
+  const OUTLOOK_COPY = 'Reads the last 14 days of your inbox and sent mail, only while this panel is open, to see whether something you asked was answered. Read-only: Glance never changes your mailbox. It uses your own Microsoft sign-in, and nothing is sent to Glance.';
+  const OUTLOOK_ERRORS = { permission: 'The browser did not grant access, so it stays off.', cancelled: 'The sign-in window was closed.', profile: 'Signed in, but Microsoft did not say whose mailbox this is. Try again.', 'not-configured': 'Not set up yet.' };
+
+  async function renderOutlookRow(host) {
+    const o = outlook();
+    if (!o) return;
+    const st = await o.status();
+    const row = el('div', 'wait-item');
+    const top = el('div', 'wait-top');
+    top.appendChild(el('span', 'wait-who', 'Outlook'));
+    const label = !st.configured ? 'Not set up yet' : st.connected ? (st.needsSignIn ? 'Sign in again' : 'On') : 'Off';
+    top.appendChild(el('span', 'wait-state' + (st.connected && !st.needsSignIn ? ' ok' : ''), label));
+    row.appendChild(top);
+    row.appendChild(el('div', 'wait-note', OUTLOOK_COPY));
+    if (!st.configured) row.appendChild(el('div', 'wait-note', 'It needs a Microsoft app registration first. Redirect address for it: ' + st.redirectUri));
+    if (st.connected) row.appendChild(el('div', 'wait-note', (st.account && st.account.address ? 'Signed in as ' + st.account.address + '. ' : '') + (st.lastAt ? 'Last checked ' + new Date(st.lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + st.lastCount + ' conversations.' : 'Not checked yet.')));
+    if (st.error) row.appendChild(el('div', 'wait-note', 'Last check: ' + (OUTLOOK_ERRORS[st.error] || st.error)));
+    const note = el('p', 'wait-note');
+    note.hidden = true;
+    const acts = el('div', 'wait-acts');
+    if (st.configured && !st.connected) {
+      const c = el('button', 'ghost sm', 'Turn on');
+      c.type = 'button';
+      c.addEventListener('click', async () => {
+        c.disabled = true;
+        const r = await o.connect();
+        if (!r.ok) { c.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || 'Could not turn it on (' + r.error + ').'; return; }
+        await renderSurfaces(); await renderOutlookCards(); await renderWaiting();
+      });
+      acts.appendChild(c);
+    } else if (st.connected) {
+      const chk = el('button', 'ghost sm', st.needsSignIn ? 'Sign in again' : 'Check now');
+      chk.type = 'button';
+      chk.addEventListener('click', async () => {
+        chk.disabled = true;
+        const r = st.needsSignIn ? await o.connect() : await o.sync({ force: true });
+        if (!r.ok) { chk.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
+        await renderSurfaces(); await renderOutlookCards(); await renderWaiting();
+      });
+      const off = el('button', 'ghost sm', 'Turn off');
+      off.type = 'button';
+      off.addEventListener('click', async () => { off.disabled = true; await o.disconnect(); await renderSurfaces(); await renderOutlookCards(); });
+      acts.appendChild(chk); acts.appendChild(off);
+    }
+    row.appendChild(acts);
+    row.appendChild(note);
+    host.appendChild(row);
+  }
+
+  // What Outlook is waiting on the person to answer: new offers, and questions that need a yes or a no.
+  async function renderOutlookCards() {
+    const block = document.getElementById('outlookBlock');
+    const o = outlook();
+    if (!block || !o) return;
+    const pend = (await FlowStorage.get()).outlookPending || { offers: [], asks: [] };
+    const host = document.getElementById('outlook-card');
+    host.replaceChildren();
+    const offers = pend.offers || [], asks = pend.asks || [];
+    block.hidden = offers.length + asks.length === 0;
+    const mk = (label, fn) => { const b = el('button', 'ghost sm', label); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; await fn(); await renderOutlookCards(); await renderWaiting(); }); return b; };
+    for (const x of offers) {
+      const item = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', (x.base.counterpart && (x.base.counterpart.name || x.base.counterpart.email)) || 'Outlook'));
+      top.appendChild(el('span', 'wait-state', x.ask.direction === 'mine' ? 'You promised something' : 'Waiting on a reply?'));
+      item.appendChild(top);
+      item.appendChild(el('div', 'wait-what', '\u201c' + x.ask.what + '\u201d'));
+      const acts = el('div', 'wait-acts');
+      acts.appendChild(mk(x.ask.direction === 'mine' ? 'Remind me' : 'Stay on it', () => o.acceptOffer(x.key)));
+      acts.appendChild(mk('Not now', () => o.declineOffer(x.key)));
+      item.appendChild(acts);
+      host.appendChild(item);
+    }
+    for (const x of asks) {
+      const item = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      top.appendChild(el('span', 'wait-who', 'Outlook'));
+      top.appendChild(el('span', 'wait-state', x.title));
+      item.appendChild(top);
+      item.appendChild(el('div', 'wait-what', x.detail));
+      const acts = el('div', 'wait-acts');
+      acts.appendChild(mk('Yes, close it', () => o.answerAsk(x.key, true)));
+      acts.appendChild(mk('Not yet', () => o.answerAsk(x.key, false)));
+      item.appendChild(acts);
+      host.appendChild(item);
+    }
+  }
+
+  // On open and every ten minutes while the panel is open (the runner itself refuses to check more often than that).
+  async function outlookAutoSync() {
+    const o = outlook();
+    if (!o) return;
+    const st = await o.status();
+    if (!st.connected || st.needsSignIn) return;
+    const r = await o.sync();
+    if (r.ok && !r.skipped) { await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); }
+    if (!outlookAutoSync.timer) outlookAutoSync.timer = setInterval(() => { outlookAutoSync().catch(() => {}); }, 10 * 60 * 1000 + 5000);
+  }
+
   // ---- Where Glance watches (other apps, opt-in) -------------------------------------------------
   // Gmail is always on. Another app is off until you turn it on here: the browser asks for that one site (an optional permission,
   // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
@@ -746,7 +864,7 @@
     const st = await send({ type: 'flow:surface-status' });
     host.replaceChildren();
     if (!st || !st.ok) return;
-    for (const id of Object.keys(st.surfaces)) {
+    for (const id of Object.keys(st.surfaces || {})) {
       const s = st.surfaces[id];
       const row = el('div', 'wait-item');
       const top = el('div', 'wait-top');
@@ -776,6 +894,7 @@
       row.appendChild(note);
       host.appendChild(row);
     }
+    await renderOutlookRow(host);
   }
 
   // Two entries that might be one person (the same full name in two apps): asked once, never merged on a guess.

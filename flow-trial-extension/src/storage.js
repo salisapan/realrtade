@@ -212,6 +212,10 @@ const FlowStorage = (() => {
     localLm: null,
     // core/identity-graph.js: which names, addresses and numbers are the same person across apps. No message text. Local, capped.
     identityGraph: null,
+    // src/outlook.js: the Microsoft sign-in (kept only on this device), the last check, and what waits for an answer. Never message text beyond the loop's own sentence.
+    outlookAuth: null,
+    outlookSync: {},
+    outlookPending: { offers: [], asks: [] },
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.
     activeQuestion: { pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 },
     // core/recognition-stats.js: how many decisions our own code made versus left
