@@ -35,7 +35,7 @@
    "epsilon": "inf",
    "devices": 1000,
    "boost": 10,
-   "published": 47,
+   "published": 2,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -69,7 +69,7 @@
    "epsilon": "inf",
    "devices": 5000,
    "boost": 10,
-   "published": 47,
+   "published": 2,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -103,7 +103,7 @@
    "epsilon": "inf",
    "devices": 20000,
    "boost": 10,
-   "published": 47,
+   "published": 2,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -135,9 +135,9 @@
   },
   {
    "epsilon": "inf",
-   "devices": 60000,
+   "devices": 80000,
    "boost": 10,
-   "published": 47,
+   "published": 2,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -171,7 +171,7 @@
    "epsilon": 16,
    "devices": 1000,
    "boost": 10,
-   "published": 33,
+   "published": 0,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -188,9 +188,9 @@
    },
    "blind": {
     "ASK": {
-     "p": 0.97,
+     "p": 1,
      "r": 0.941,
-     "fp": 1,
+     "fp": 0,
      "fn": 2
     },
     "PROMISE": {
@@ -205,7 +205,7 @@
    "epsilon": 16,
    "devices": 5000,
    "boost": 10,
-   "published": 330,
+   "published": 5,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -239,7 +239,7 @@
    "epsilon": 16,
    "devices": 20000,
    "boost": 10,
-   "published": 2234,
+   "published": 85,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -271,9 +271,9 @@
   },
   {
    "epsilon": 16,
-   "devices": 60000,
+   "devices": 80000,
    "boost": 10,
-   "published": 4000,
+   "published": 1952,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -341,7 +341,7 @@
    "epsilon": 8,
    "devices": 5000,
    "boost": 10,
-   "published": 33,
+   "published": 0,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -358,9 +358,9 @@
    },
    "blind": {
     "ASK": {
-     "p": 0.97,
+     "p": 1,
      "r": 0.941,
-     "fp": 1,
+     "fp": 0,
      "fn": 2
     },
     "PROMISE": {
@@ -375,7 +375,7 @@
    "epsilon": 8,
    "devices": 20000,
    "boost": 10,
-   "published": 490,
+   "published": 6,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -407,9 +407,9 @@
   },
   {
    "epsilon": 8,
-   "devices": 60000,
+   "devices": 80000,
    "boost": 10,
-   "published": 2239,
+   "published": 214,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -477,7 +477,7 @@
    "epsilon": 4,
    "devices": 5000,
    "boost": 10,
-   "published": 12,
+   "published": 0,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -494,9 +494,9 @@
    },
    "blind": {
     "ASK": {
-     "p": 0.97,
+     "p": 1,
      "r": 0.941,
-     "fp": 1,
+     "fp": 0,
      "fn": 2
     },
     "PROMISE": {
@@ -511,7 +511,7 @@
    "epsilon": 4,
    "devices": 20000,
    "boost": 10,
-   "published": 33,
+   "published": 0,
    "newUser": {
     "ASK": {
      "p": 0.99,
@@ -528,9 +528,9 @@
    },
    "blind": {
     "ASK": {
-     "p": 0.97,
+     "p": 1,
      "r": 0.941,
-     "fp": 1,
+     "fp": 0,
      "fn": 2
     },
     "PROMISE": {
@@ -543,9 +543,9 @@
   },
   {
    "epsilon": 4,
-   "devices": 60000,
+   "devices": 80000,
    "boost": 10,
-   "published": 487,
+   "published": 10,
    "newUser": {
     "ASK": {
      "p": 0.99,

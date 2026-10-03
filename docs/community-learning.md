@@ -64,10 +64,23 @@ on this device before it leaves."
 
 Setup: the two held-out teacher sets pooled; the even rows are what simulated devices write, each device labelling three asks or
 promises the engine missed; the odd rows are a NEW user's mail, never shared. The real code path is used (`learn`, `buildUpdate`,
-mean, `decode`). **Interim, measured so far (the eps 8 and eps 4 rows are still running and will replace this paragraph):** with NO noise (eps inf), at 1,000 to 80,000
-simulated devices the published delta had 2 coordinates, the new user's ASK/PROMISE precision and recall did not move from baseline (0.99/0.888, 1/0.844), and the
-blind set's ask precision FELL from 1.00 to 0.97. With eps 16 nothing was published at 1,000 devices and 5 coordinates at 5,000, again with no gain. So the gain
-measured here is zero, not "about one point", and one delta would have broken the precision bar without the canary.
+mean, `decode`). Baseline for the new user: ASK precision/recall 0.99 / 0.888, PROMISE 1.00 / 0.844 (39 of 182 asks and promises missed in the world). Coordinates published per round, by privacy level and device count (the budget per upload is epsilon, delta 1e-6):
+
+| epsilon | 1,000 devices | 5,000 | 20,000 | 80,000 |
+|---|---|---|---|---|
+| none (oracle) | 2 | 2 | 2 | 2 |
+| 16 | 0 | 5 | 85 | 1,952 |
+| 8 | 0 | 0 | 6 | 214 |
+| 4 | 0 | 0 | 0 | 10 |
+
+What the numbers say, without softening:
+
+- **The new user's recall and precision did not move in any of the 16 runs**, not even the noiseless oracle at 80,000 devices. Measured gain from community learning in this simulation: zero.
+- **Whenever anything was published, blind-set ASK precision fell from 1.00 to 0.97.** That is the failure the canary exists to refuse (precision loss above half a point); it is refused in the aggregator, so nothing would have shipped. It is also why a delta must never be applied without the canary.
+- **Noise decides when anything appears at all:** epsilon 8 needs about 20,000 devices to publish a handful of coordinates, epsilon 4 needs more than 80,000.
+- Caveats: a small world (the two teacher sets pooled, written by a model), three labelled misses per device, one seed per cell. This is a mechanism check, not a forecast of real traffic; real devices will see more varied phrasings, which could help or hurt.
+
+Conclusion: keep it dormant. The mechanism is sound and tested, but there is nothing here worth the privacy cost, and the product should not say it "learns from the community".
 
 ## 6. What is built, and what is NOT
 
