@@ -24,6 +24,9 @@ const FlowIntentPipeline = (() => {
   const UNSURE_BELOW = 0.6;
   const QUESTION_MIN = 0.9;    // a question with no nameable action is an ask for a reply only when the model is this sure
 
+  // A formal request that names no action ("I would be grateful for your help on this") still waits on an answer.
+  const POLITE_ASK = /(?:אודה|נודה|אבקש|נבקש|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|אני מבקש|אנו מבקשים)|\b(?:i would (?:appreciate|be grateful)|i(?:'d| would) be grateful|i(?:'d| would) kindly ask|we(?:'d| would) (?:appreciate|be grateful))\b/i;
+
   // The request a model-proposed ask stands for: a known verb wins; otherwise
   // the model's own action head, if it is clear about it.
   function topicRequest(m, s) {
@@ -31,7 +34,7 @@ const FlowIntentPipeline = (() => {
     let a = hits.actions[0] || (m.action && m.action !== 'none' && m.actionProb >= ACTION_MIN ? m.action : null);
     // A question the model is very sure is an ask, with no particular action in it ("Has the container
     // cleared customs yet?", "What is the status of my ticket?"), is a request for an answer.
-    if (!a && m.act === 'ASK' && m.actProb >= QUESTION_MIN && /[?؟]/.test(s)) a = 'reply';
+    if (!a && m.act === 'ASK' && m.actProb >= QUESTION_MIN && (/[?؟]/.test(s) || POLITE_ASK.test(s))) a = 'reply';
     if (!a) return null;
     const act = types.ACTIONS.find((x) => x.id === a);
     if (!act) return null;
@@ -46,7 +49,7 @@ const FlowIntentPipeline = (() => {
   // person, however confident a statistical model is. Deterministic, language-aware, cheap.
   const ASK_SHAPE_EN = /\?|\b(?:you|your|yours|u|ya|pls|please|kindly|need|needs|needed|waiting|awaiting|let me know|tell me)\b|\b(?:could|would|can|shall|will)\s+(?:we|someone|anyone|somebody|anybody|they)\b/i;
   const ASK_START_EN = /^(?:send|share|forward|provide|attach|upload|return|submit|resend|sign|approve|confirm|verify|check|review|look|read|pay|wire|transfer|settle|book|schedule|pick|choose|decide|reply|respond|update|fix|prepare|draft|write|complete|finish|fill|get|give|make|take|tell|let|come|join|register|rsvp|advise|clarify|remember|don't forget)\b/i;
-  const ASK_SHAPE_HE = /\?|(?:תוכל|תוכלי|תוכלו|אפשר|נא |בבקשה|אנא|אשמח|צריך|צריכה|צריכים|ממתין|ממתינה|מחכה|מחכים|שלך|שלכם|אתה|אתם|לך |לכם|תגיד|תעדכנו|תעדכן)/;
+  const ASK_SHAPE_HE = /\?|(?:אודה|נודה|אבקש|נבקש|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|מבקש|מבקשת|מבקשים|תוכל|תוכלי|תוכלו|אפשר|נא |בבקשה|אנא|אשמח|צריך|צריכה|צריכים|ממתין|ממתינה|מחכה|מחכים|שלך|שלכם|אתה|אתם|לך |לכם|תגיד|תעדכנו|תעדכן)/;
   const ASK_START_HE = /^ת(?!ו[א-ת]*ר\b)[א-ת]{2,}|^(?:נא|אנא|בבקשה|שלח|שלחו|חזור|אשר|חתום|בדוק|עדכן|הצטרף|הגש|העבר|תן|תני)(?:\s|$)/;
   const PROMISE_PERSON_EN = /\b(?:i|we|our|us|me|my)\b|['’]ll\b/i;
   const PROMISE_FUTURE_EN = /\b(?:will|shall|going to|gonna|let me|count me|on it|expect|sending|approving|can get|can send)\b|['’]ll\b/i;

@@ -151,12 +151,18 @@ function makeGenerator(seed) {
     (inf, np, t) => `תוכל ${inf} ${np} ${t}?`, (inf, np, t) => `תוכלי ${inf} ${np} ${t}?`, (inf, np, t) => `תוכלו ${inf} ${np} ${t}?`, (inf, np, t) => `אפשר ${inf} ${np} ${t}?`,
     (inf, np, t) => `נא ${inf} ${np} ${t}.`, (inf, np, t) => `בבקשה ${inf} ${np} ${t}.`, (inf, np, t) => `אשמח אם תוכל ${inf} ${np} ${t}.`, (inf, np, t) => `צריך ש${hfut2(inf)} ${np} ${t}.`,
     (inf, np, t) => `הספקת ${inf} ${np}?`, (inf, np, t) => `יש סיכוי שתוכל ${inf} ${np} ${t}?`, (inf, np, t) => `אפשר בבקשה ${inf} ${np} ${t}?`, (inf, np, t) => `האם תוכל ${inf} ${np} ${t}?`,
-    (inf, np, t) => `מבקש ${inf} ${np} ${t}.`, (inf, np, t) => `אני צריך ${inf} ${np} ${t}.`
+    (inf, np, t) => `מבקש ${inf} ${np} ${t}.`, (inf, np, t) => `אני צריך ${inf} ${np} ${t}.`,
+    // Formal register (letters to offices, landlords, schools): first-person polite requests.
+    (inf, np, t) => `אבקש ${inf} ${np} ${t}.`, (inf, np, t) => `אני מבקש ${inf} ${np} ${t}.`, (inf, np, t) => `נבקש ${inf} ${np} ${t}.`, (inf, np, t) => `אודה אם תוכל ${inf} ${np} ${t}.`,
+    (inf, np, t) => `ברצוני לבקש ${inf} ${np} ${t}.`, (inf, np, t) => `הייתי מבקש ${inf} ${np} ${t}.`
   ];
+  // Formulaic polite requests that name no object at all; they still wait on an answer.
+  const HASK_FORMULAE = ['אודה לטיפולך בנושא.', 'אודה לעזרתך בעניין.', 'נודה לתשובתך בהקדם.', 'אודה לעדכון עד סוף השבוע.', 'אבקש את תשובתך.', 'אבקש לדעת מה הלאה.', 'נבקש את התייחסותכם לנושא.', 'ברצוני לדעת מה הסטטוס.', 'אודה לך אם תחזור אליי בהקדם.', 'אודה לתגובה מהירה.'];
   const HASK_IMP = [(imp, np, t) => `${imp} לי ${np} ${t}.`, (imp, np, t) => `${imp} ${np} ${t}, בבקשה.`, (imp, np, t) => `בבקשה ${imp} ${np} ${t}.`];
   const HASK_NP = [
     (np, t) => `אשמח לקבל ${np} ${t}.`, (np, t) => `עדיין מחכה ל${strip(np)} ${t}.`, (np, t) => `ממתין ל${strip(np)} ממך.`, (np, t) => `חסר לנו ${strip(np)} מהצד שלכם.`, (np, t) => `יש לך ${strip(np)}?`,
-    (np, t) => `מתי אפשר לקבל ${np}?`, (np, t) => `מה המצב עם ${strip(np)}?`, (np, t) => `תזכורת: ${strip(np)} עדיין פתוח.`, (np, t) => `יש עדכון לגבי ${strip(np)}?`, (np, t) => `אפשר לקבל ${np} ${t}?`, (np, t) => `צריך ${strip(np)} ${t}.`
+    (np, t) => `מתי אפשר לקבל ${np}?`, (np, t) => `מה המצב עם ${strip(np)}?`, (np, t) => `תזכורת: ${strip(np)} עדיין פתוח.`, (np, t) => `יש עדכון לגבי ${strip(np)}?`, (np, t) => `אפשר לקבל ${np} ${t}?`, (np, t) => `צריך ${strip(np)} ${t}.`,
+    (np, t) => `אודה ל${strip(np)} ${t}.`, (np, t) => `נודה ל${strip(np)} ${t}.`, (np, t) => `אבקש לקבל ${np} ${t}.`, (np, t) => `נשמח לקבל ${np} ${t}.`, (np, t) => `ברצוני לדעת מה המצב עם ${strip(np)}.`, (np, t) => `אבקש לדעת מתי ${strip(np)} יהיה מוכן.`
   ];
   const HPROM_FRAMES = [
     (fut, np, t) => `${fut} ${np} ${t}.`, (fut, np, t) => `אני ${fut} ${np} ${t}.`, (fut, np, t) => `אני על זה, ${fut} ${np} ${t}.`, (fut, np, t) => `בטח, ${fut} ${np} ${t}.`, (fut, np, t) => `אדאג ש${strip(np)} יהיה מוכן ${t}.`,
@@ -269,7 +275,8 @@ function makeGenerator(seed) {
     let core, t = topic, action = 'none';
     if (act === 'ASK') {
       const r = rnd();
-      if (topic === 'meeting' && r < 0.4) {
+      if (r > 0.94) { core = pick(HASK_FORMULAE); t = 'info'; action = 'reply'; }
+      else if (topic === 'meeting' && r < 0.4) {
         action = 'schedule';
         core = pick(['אתה פנוי ' + pick(['ביום חמישי', 'מחר', 'ביום שלישי בבוקר']) + ' ל' + strip(np) + '?', 'מה מתאים לך ל' + strip(np) + '?', 'איזה יום נוח ל' + strip(np) + '?', 'בוא נקבע זמן ל' + strip(np) + ', מה אתה אומר?', 'אפשר להזיז את ' + strip(np) + ' ל' + pick(['מחר', 'יום רביעי']) + '?']);
       }

@@ -35,3 +35,6 @@ flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip.parti
 *.sln
 *.sw?
 flow-trial-extension/core/dense-prior-data.js
+
+# Human-text eval set built from the owner's own sent mail (masked, local only, never committed)
+flow-trial-extension/test/fixtures/private/

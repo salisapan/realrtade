@@ -37,13 +37,13 @@ const FlowRequestTypes = (() => {
       he: ['לוודא', 'תוודא', 'לאמת', 'תאמת', 'וידוא'] },
     { id: 'schedule', days: 1, noun: 'a time',
       en: ['schedule', 'book', 'set up', 'arrange', 'propose a time', 'pick a time', 'reschedule', 'your availability', 'are you available', 'when (?:are|can) you'],
-      he: ['לקבוע', 'תקבע', 'תקבעו', 'לתאם', 'תתאם', 'תתאמו', 'פנוי', 'פנויה', 'לדחות', 'זמינות'] },
+      he: ['לקבוע', 'תקבע', 'תקבעו', 'לתאם', 'תתאם', 'תתאמו', 'פנוי', 'פנויה', 'לדחות', 'זמינות', 'תאריך נוסף', 'מועד נוסף', 'הארכה', 'הארכת'] },
     { id: 'decide', days: 2, noun: 'a decision',
       en: ['decide', 'decision', 'choose', 'pick', 'select', 'advise', 'let me know whether'],
       he: ['להחליט', 'תחליט', 'תחליטו', 'החלטה', 'לבחור', 'תבחר', 'תבחרו'] },
     { id: 'review', days: 2, noun: 'a review',
       en: ['review', 'check', 'look at', 'look over', 'take a look', 'proofread', 'read', 'comment on', 'feedback', 'thoughts', 'input'],
-      he: ['לבדוק', 'תבדוק', 'תבדקו', 'לעבור על', 'תעבור על', 'להסתכל', 'תסתכל', 'משוב', 'הערות', 'חוות דעת'] },
+      he: ['לבדוק', 'תבדוק', 'תבדקו', 'לעבור על', 'תעבור על', 'להסתכל', 'תסתכל', 'משוב', 'הערות', 'חוות דעת', 'בדיקת', 'בדיקה'] },
     { id: 'join', days: 2, noun: 'attendance',
       en: ['join', 'attend', 'rsvp', 'register', 'sign up', 'come to'],
       he: ['להצטרף', 'תצטרף', 'להגיע', 'תגיע', 'תגיעו', 'להירשם', 'תירשם', 'אישור הגעה'] },
@@ -52,10 +52,10 @@ const FlowRequestTypes = (() => {
       he: ['להשלים', 'תשלים', 'תשלימו', 'למלא', 'תמלא', 'תמלאו', 'לסיים', 'תסיים', 'להכין', 'תכין', 'תכינו', 'לכתוב', 'תכתוב', 'לתקן', 'תתקן'] },
     { id: 'send', days: 2, noun: 'a file',
       en: ['send', 'share', 'forward', 'provide', 'attach', 'upload', 'return', 'submit', 'resend', 'e-?mail me', 'give me', 'get me'],
-      he: ['לשלוח', 'תשלח', 'תשלחו', 'שלח', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי'] },
+      he: ['לקבל', 'לשלוח', 'תשלח', 'תשלחו', 'שלח', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי'] },
     { id: 'reply', days: 2, noun: 'a reply',
       en: ['reply', 'respond', 'get back', 'revert', 'answer', 'response', 'update me', 'an update', 'let me know', 'follow up', 'be in touch', 'hear (?:back )?from you', 'hear your'],
-      he: ['להשיב', 'תשיב', 'תשיבו', 'לענות', 'תענה', 'תענו', 'תחזור', 'תחזרו', 'תחזרי', 'לחזור אליי', 'לעדכן', 'תעדכן', 'תעדכנו', 'תודיע', 'תודיעו', 'תשובה', 'עדכון'] }
+      he: ['להשיב', 'תשיב', 'תשיבו', 'לענות', 'תענה', 'תענו', 'תחזור', 'תחזרו', 'תחזרי', 'לחזור אליי', 'לעדכן', 'תעדכן', 'תעדכנו', 'תודיע', 'תודיעו', 'תשובה', 'עדכון', 'סיוע', 'עזרתך', 'עזרה', 'בירור', 'לברר', 'הבהרה', 'להבהיר', 'לדעת', 'סטטוס', 'להודיע'] }
   ];
 
   // What the action is about. Order: specific first.
@@ -79,7 +79,7 @@ const FlowRequestTypes = (() => {
   // How a request is framed. A sentence with an ACTION but no FRAME is a
   // statement, not an ask.
   const FRAME_EN = /\b(?:could|can|would|will) you\b|\b(?:can|could|shall) we\b|\bplease\b|\bkindly\b|\b(?:i|we)(?:'d| would) (?:like|appreciate|love)\b|\b(?:i|we) (?:need|require|want|expect)\b|\bneed you to\b|\b(?:waiting|awaiting) (?:for|on)\b|\bany chance\b|\bwhen (?:can|could|will) you\b|\bdo you have\b|\bby when\b|\bwould you mind\b|\bit would help (?:if|to)\b|\bstill need\b|\bhave you (?:had a chance|been able)\b/i;
-  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך)/;
+  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך|אודה|נודה|אבקש|נבקש|אני מבקש|אנו מבקשים|אנחנו מבקשים|מבקשת|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|הייתי מבקש|הייתי מודה|אצטרך|נצטרך|נשמח)/;
 
   // English entries are regex fragments joined into one word-bounded pattern.
   // Hebrew has no \b, so each Hebrew entry is its own pattern.
@@ -126,7 +126,7 @@ const FlowRequestTypes = (() => {
 
   // ---- the mirror: what YOU promised -------------------------------------------
   const COMMIT_EN = /\b(?:i|we)(?:'ll| will| shall)\b|\b(?:i|we)(?:'m|'re| am| are) (?:going to|gonna)\b|\blet me (?:check|look|review|get|send|find|confirm|come back|revert|run|see|loop|work|pull|put|dig)\b/i;
-  const COMMIT_HE = /(?:אשלח|נשלח|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אכין|נכין|אעביר|נעביר|אתאם|נתאם|אחזיר|נחזיר|אשיב|נשיב|אאשר|נאשר|אספק|נספק|אכתוב|נכתוב|אסגור|נסגור|אסיים|נסיים|אתקן|נתקן)/;
+  const COMMIT_HE = /(?<![א-ת])ו?(?:אדאג|נדאג|אעשה|נעשה|אחתום|נחתום|אפנה|נפנה|אבצע|נבצע|אגיש|נגיש|אפעל|נפעל|אשלם|נשלם|אקבע|נקבע|אסדר|נסדר|אטפל|נטפל|אשלח|נשלח|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אכין|נכין|אעביר|נעביר|אתאם|נתאם|אחזיר|נחזיר|אשיב|נשיב|אאשר|נאשר|אספק|נספק|אכתוב|נכתוב|אסגור|נסגור|אסיים|נסיים|אתקן|נתקן)/;
   // Not a promise: conditional, hedged, or an invitation for THEM to act.
   const COMMIT_NOT = /\b(?:maybe|might|perhaps|probably|hopefully|try to|if you|unless|in case|when you|once you|let me know)\b|(?:אולי|בערך|אם תרצו|אם תרצה|ברגע שתשלח|תודיע לי)/i;
   const COMMIT_NOT_ACTION = /\b(?:thank|thanks|happy|glad|be there|see you|call you|talk to you|speak)\b/i;

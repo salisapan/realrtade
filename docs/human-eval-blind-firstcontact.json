@@ -1,0 +1,191 @@
+{
+ "sentences": 79,
+ "byAct": {
+  "INFORM": 33,
+  "PROMISE": 2,
+  "ASK": 35,
+  "ACK": 9
+ },
+ "subsets": {
+  "all": {
+   "n": 79,
+   "ASK": {
+    "lexicon": {
+     "p": 0.85,
+     "r": 0.486
+    },
+    "pipeline": {
+     "tp": 27,
+     "fp": 3,
+     "fn": 8,
+     "precision": 0.9,
+     "recall": 0.771,
+     "precisionCI95": [
+      0.74,
+      0.97
+     ],
+     "recallCI95": [
+      0.61,
+      0.88
+     ]
+    }
+   },
+   "PROMISE": {
+    "lexicon": {
+     "p": null,
+     "r": 0
+    },
+    "pipeline": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 2,
+     "precision": 0,
+     "recall": 0,
+     "precisionCI95": [
+      0,
+      0.79
+     ],
+     "recallCI95": [
+      0,
+      0.66
+     ]
+    }
+   }
+  },
+  "clearOnly": {
+   "n": 74,
+   "ASK": {
+    "lexicon": {
+     "p": 0.889,
+     "r": 0.516
+    },
+    "pipeline": {
+     "tp": 25,
+     "fp": 2,
+     "fn": 6,
+     "precision": 0.926,
+     "recall": 0.806,
+     "precisionCI95": [
+      0.77,
+      0.98
+     ],
+     "recallCI95": [
+      0.64,
+      0.91
+     ]
+    }
+   },
+   "PROMISE": {
+    "lexicon": {
+     "p": null,
+     "r": 0
+    },
+    "pipeline": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 2,
+     "precision": 0,
+     "recall": 0,
+     "precisionCI95": [
+      0,
+      0.79
+     ],
+     "recallCI95": [
+      0,
+      0.66
+     ]
+    }
+   }
+  },
+  "hebrew": {
+   "n": 78,
+   "ASK": {
+    "lexicon": {
+     "p": 0.85,
+     "r": 0.486
+    },
+    "pipeline": {
+     "tp": 27,
+     "fp": 3,
+     "fn": 8,
+     "precision": 0.9,
+     "recall": 0.771,
+     "precisionCI95": [
+      0.74,
+      0.97
+     ],
+     "recallCI95": [
+      0.61,
+      0.88
+     ]
+    }
+   },
+   "PROMISE": {
+    "lexicon": {
+     "p": null,
+     "r": 0
+    },
+    "pipeline": {
+     "tp": 0,
+     "fp": 1,
+     "fn": 2,
+     "precision": 0,
+     "recall": 0,
+     "precisionCI95": [
+      0,
+      0.79
+     ],
+     "recallCI95": [
+      0,
+      0.66
+     ]
+    }
+   }
+  },
+  "english": {
+   "n": 1,
+   "ASK": {
+    "lexicon": {
+     "p": null,
+     "r": null
+    },
+    "pipeline": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": null,
+     "recall": null,
+     "precisionCI95": [
+      0,
+      1
+     ],
+     "recallCI95": [
+      0,
+      1
+     ]
+    }
+   },
+   "PROMISE": {
+    "lexicon": {
+     "p": null,
+     "r": null
+    },
+    "pipeline": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": null,
+     "recall": null,
+     "precisionCI95": [
+      0,
+      1
+     ],
+     "recallCI95": [
+      0,
+      1
+     ]
+    }
+   }
+  }
+ }
+}
