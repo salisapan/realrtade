@@ -142,7 +142,7 @@ function load(stored, opts) {
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
-    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js']
+    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -615,6 +615,20 @@ async function run() {
       const shown = find(document.getElementById('waiting-list'), 'sm').filter((n) => !n.hidden).map((n) => n.textContent);
       check('promise row, ' + label + ': no file button (never a guess)', !shown.includes('Prepare reply with file'), shown);
     }
+  }
+
+  console.log('\n--- popup.js: a loop with a date this person usually misses says so ---\n');
+  {
+    const D = 86400000;
+    const hist = [6, 8, 5, 9, 7].map((d, i) => ({ id: 'h' + i, threadId: 'h' + i, direction: 'theirs', kind: 'reply', counterpart: { name: 'Dana Cole', email: 'dana@acme.com' }, status: 'resolved', closedAs: 'replied', createdAt: Date.now() - 80 * D + i * 3 * D, resolvedAt: Date.now() - 80 * D + i * 3 * D + d * D }));
+    const loop = { id: 'r1', threadId: 'r1', kind: 'reply', status: 'waiting', direction: 'theirs', createdAt: Date.now() - D, nudges: 0, lang: 'en', counterpart: { name: 'Dana Cole', email: 'dana@acme.com' }, subject: 'Figures', what: 'Please confirm the figures by Friday', deadlineIso: isoDaysFromNow(1), chaseIso: isoDaysFromNow(1), taskRef: null };
+    const { sandbox, document } = load({ followWatches: hist.concat([loop]) });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const metas = find(document.getElementById('waiting-list'), 'wait-meta').map((n) => n.textContent);
+    check('the row says it is likely to slip and why', metas.some((m) => /likely to slip, Dana usually takes ~\d+ days/.test(m)), metas);
+    const sumTxt = document.getElementById('waitingSummary').children.map((n) => n.textContent).join('');
+    check('the summary line counts it', /1likely to slip|1 likely to slip/.test(sumTxt), sumTxt);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

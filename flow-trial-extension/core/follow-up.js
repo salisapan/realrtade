@@ -51,6 +51,7 @@ const FlowFollowUp = (() => {
   }
   const replyMeaning = sibling(typeof FlowReplyMeaning !== 'undefined' ? FlowReplyMeaning : null, './reply-meaning.js', 'FlowReplyMeaning');
   const filePath = sibling(typeof FlowFilePath !== 'undefined' ? FlowFilePath : null, './file-path.js', 'FlowFilePath');
+  const personModel = sibling(typeof FlowPersonModel !== 'undefined' ? FlowPersonModel : null, './person-model.js', 'FlowPersonModel');
   const requestTypes = sibling(typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null, './request-types.js', 'FlowRequestTypes');
   const KINDS = { REPLY: 'reply', PAYMENT: 'payment' };
   const MIN_WORDS = 6;
@@ -260,7 +261,10 @@ const FlowFollowUp = (() => {
     const req = typed && (typed.line === chosen || !isPayment) ? typed.req : null;
     // Does this intention carry enough weight to deserve a loop? (A soft "let me
     // know what you think" with no money, date or concrete action does not.)
-    const weight = intentionWeight({ line: chosen, money: Boolean(money), deadline: Boolean(deadlineIso), payment: kind === KINDS.PAYMENT, req });
+    // The date must belong to the ask itself: "Thanks for the call today. Let me know what you
+    // think." has a date in the courtesy, not in the ask.
+    const lineDate = ex && ex.parseDate ? ex.parseDate(chosen, new Date(typeof c.now === 'number' ? c.now : Date.now())) : null;
+    const weight = intentionWeight({ line: chosen, money: Boolean(money), deadline: Boolean(lineDate && lineDate.iso), payment: kind === KINDS.PAYMENT, req });
     if (weight.level === 'light') return null;
     return {
       weight,
@@ -584,10 +588,38 @@ const FlowFollowUp = (() => {
     return Boolean(requestTypes && requestTypes.detectShortAsk(stripGreeting(t)));
   }
 
+  // A calendar-day count from today, landing on a weekday.
+  function afterDays(now, n) {
+    const d = new Date(today(now).getTime());
+    d.setDate(d.getDate() + Math.max(1, Math.round(n)));
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+    return isoDay(d);
+  }
+
+  // The look-again day for a NEW loop, learned from how long THIS person has taken before
+  // (core/person-model.js). Only when there is no stated deadline (a deadline sets the day) and
+  // only with at least two real closes with them; otherwise the ask is returned as it was.
+  function personalChase(ask, watches, email, now) {
+    if (!ask || !personModel || ask.direction !== 'theirs' || ask.deadlineIso || !email) return ask;
+    const sug = personModel.suggestChaseDays(watches, email, ask.kind, typeof now === 'number' ? now : Date.now());
+    if (!sug) return ask;
+    return Object.assign({}, ask, { chaseIso: afterDays(now, sug.days), personal: { days: sug.days, typical: sug.typical, n: sug.n } });
+  }
+
+  // Is this loop likely to miss its date, judged by how long this person usually takes?
+  function riskOf(watches, w, now) {
+    return personModel ? personModel.risk(watches, w, typeof now === 'number' ? now : Date.now()) : null;
+  }
+  function typicalDays(watches, w, now) {
+    return personModel ? personModel.typicalDays(watches, w, typeof now === 'number' ? now : Date.now()) : null;
+  }
+
   // Patch for "I chased". The chase day moves out and the next nudge is firmer.
-  function recordNudge(w, now) {
+  // waitDays (optional): how long this person usually needs from here, from the person model.
+  function recordNudge(w, now, watches) {
     const t = typeof now === 'number' ? now : Date.now();
-    return { stage: 'nudged', nudges: (w.nudges || 0) + 1, nudgedAt: t, chaseIso: rechaseDate(w.kind, t, null) };
+    const wait = personModel && Array.isArray(watches) ? personModel.suggestWaitDays(watches, w, t) : null;
+    return { stage: 'nudged', nudges: (w.nudges || 0) + 1, nudgedAt: t, chaseIso: wait ? afterDays(t, wait.days) : rechaseDate(w.kind, t, null) };
   }
 
   // Patch for putting a closed loop back on the list.
@@ -619,6 +651,11 @@ const FlowFollowUp = (() => {
       owed[cur] = (owed[cur] || 0) + w.amount.value;
     });
     const moneyOwed = Object.keys(owed).sort().map((currency) => ({ currency, value: owed[currency] }));
+    // Loops with a date that this person usually misses (needs personal evidence).
+    const nowMs = typeof now === 'number' ? now : Date.now();
+    const atRiskLoops = active.filter((w) => { const r = riskOf(list, w, nowMs); return Boolean(r && r.slip); });
+    const riskMoney = {};
+    atRiskLoops.forEach((w) => { if (w.kind === KINDS.PAYMENT && w.amount && w.amount.value > 0) { const cur = w.amount.currency || '?'; riskMoney[cur] = (riskMoney[cur] || 0) + w.amount.value; } });
 
     // What got closed this calendar month, and what was paid.
     const t = today(now);
@@ -640,6 +677,8 @@ const FlowFollowUp = (() => {
       nudged: active.filter((w) => stageOf(w) === 'nudged').length,
       promised: active.filter((w) => stageOf(w) === 'promised').length,
       yours: active.filter(isYours).length,
+      atRisk: atRiskLoops.length,
+      moneyAtRisk: Object.keys(riskMoney).sort().map((currency) => ({ currency, value: riskMoney[currency] })),
       oldestOpenDays: active.reduce((m, w) => Math.max(m, daysOpen(w, now)), 0),
       moneyOwed,
       closedThisMonth: closed.length,
@@ -794,7 +833,7 @@ const FlowFollowUp = (() => {
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, deliversFor, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
-    nextNudgeLevel, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
+    nextNudgeLevel, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };
 })();
 

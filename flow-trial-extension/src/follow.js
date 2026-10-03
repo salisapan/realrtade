@@ -371,7 +371,8 @@ const FlowFollow = (() => {
 
   // ---- 2. you chased -----------------------------------------------------------------
   async function chased(watch, lastId) {
-    const patch = Object.assign({ messageId: lastId }, FlowFollowUp.recordNudge(watch, Date.now()));
+    const all = await FlowStorage.getWatches();
+    const patch = Object.assign({ messageId: lastId }, FlowFollowUp.recordNudge(watch, Date.now(), all));
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
     await moveTask(next, patch.chaseIso);
     receipt('Chase noted. I will look again on ' + dayLabel(patch.chaseIso) + '.', null);
@@ -451,7 +452,7 @@ const FlowFollow = (() => {
     }
     h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : ask.file ? 'Waiting on the ' + ask.file.label + '?' : 'Waiting on a reply?'));
     h.appendChild(el('div', 'flow-fu-quote', ask.what));
-    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
+    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + (ask.personal ? ' (' + (FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) || 'they') + ' usually take about ' + Math.max(1, Math.round(ask.personal.typical)) + ' days)' : '') + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
     const row = el('div', 'flow-fu-actions');
     row.appendChild(button('Stay on it', 'primary', () => { track1(ask, base); }));
     row.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
@@ -610,7 +611,7 @@ const FlowFollow = (() => {
     const mineText = ctx.ownMessageText(last);
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
-    const ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
+    let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
     recordDecision(mineText, Boolean(ask), key);
     if (!ask) return;
     offered.add(key);
@@ -637,6 +638,8 @@ const FlowFollow = (() => {
 
     const status = await send({ type: 'flow:pro-status' });
     const list = await FlowStorage.getWatches();
+    // When to look again, learned from how long THIS person has taken before (new people: the default).
+    ask = FlowFollowUp.personalChase(ask, list, base.counterpart && base.counterpart.email, Date.now());
     const active = list.filter(FlowFollowUp.isActive).length;
     const gate = FlowEntitlements.watchGate(active, status && status.record, Date.now());
     if (!gate.allowed) { await capCard(gate.used, gate.cap); return; }

@@ -1,0 +1,93 @@
+{
+ "dev": {
+  "n": 96,
+  "modelAccuracy": 0.979,
+  "en": 0.982,
+  "he": 0.976,
+  "ASK": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.438
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.906,
+    "fp": 0,
+    "fn": 3
+   }
+  },
+  "PROMISE": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.524
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.905,
+    "fp": 0,
+    "fn": 2
+   }
+  }
+ },
+ "blind": {
+  "n": 108,
+  "modelAccuracy": 0.917,
+  "en": 0.954,
+  "he": 0.86,
+  "ASK": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.265
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.882,
+    "fp": 0,
+    "fn": 4
+   }
+  },
+  "PROMISE": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.333
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.792,
+    "fp": 0,
+    "fn": 5
+   }
+  }
+ },
+ "teacherEval": {
+  "n": 279,
+  "modelAccuracy": 0.885,
+  "en": 0.899,
+  "he": 0.871,
+  "actionAccuracy": 0.617,
+  "ASK": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.508
+   },
+   "pipeline": {
+    "p": 0.989,
+    "r": 0.77,
+    "fp": 1,
+    "fn": 28
+   }
+  },
+  "PROMISE": {
+   "lexicon": {
+    "p": 1,
+    "r": 0.549
+   },
+   "pipeline": {
+    "p": 1,
+    "r": 0.803,
+    "fp": 0,
+    "fn": 14
+   }
+  }
+ }
+}

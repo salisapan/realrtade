@@ -607,6 +607,7 @@
     const segs = [[String(sum.active), ' open']];
     if (sum.overdue) segs.push([String(sum.overdue), ' overdue']);
     if (sum.youOwe) segs.push([String(sum.youOwe), ' you promised']);
+    if (sum.atRisk) segs.push([String(sum.atRisk), ' likely to slip' + (pro && sum.moneyAtRisk.length ? ' (' + sum.moneyAtRisk.map(FlowFollowUp.formatMoney).join(' + ') + ')' : '')]);
     const payments = active.filter((w) => w.kind === 'payment' && w.amount && w.amount.value > 0);
     if (payments.length && pro) segs.push(['owed to you ', sum.moneyOwed.map(FlowFollowUp.formatMoney).join(' + ')]);
     if (sum.closedThisMonth) segs.push([String(sum.closedThisMonth), ' closed this month']);
@@ -642,10 +643,10 @@
         if (g.money.length && pro) bits.push('owes ' + g.money.map(FlowFollowUp.formatMoney).join(' + '));
         head.appendChild(el('small', null, bits.join(' · ')));
         host.appendChild(head);
-        for (const w of g.loops) host.appendChild(waitingItem(w, now, record));
+        for (const w of g.loops) host.appendChild(waitingItem(w, now, record, all));
       }
     } else {
-      for (const w of active) host.appendChild(waitingItem(w, now, record));
+      for (const w of active) host.appendChild(waitingItem(w, now, record, all));
     }
   }
 
@@ -694,15 +695,18 @@
     return pick;
   }
 
-  function waitingItem(w, now, record) {
+  function waitingItem(w, now, record, all) {
     const state = FlowFollowUp.watchState(w, now);
     const isPay = w.kind === 'payment';
     const item = el('div', 'wait-item');
     const top = el('div', 'wait-top');
     top.appendChild(el('span', 'wait-who', whoLabel(w)));
+    // How long this person usually takes, and whether this loop is likely to miss its date because of it.
+    const risk = all ? FlowFollowUp.riskOf(all, w, now) : null;
+    const usual = all ? FlowFollowUp.typicalDays(all, w, now) : null;
     top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : state === 'lapsed' ? ' lapsed' : ''), state === 'lapsed' ? 'Lapsed' : state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : (FlowFollowUp.isClock(w) ? 'Look ' : FlowFollowUp.isYours(w) ? 'Answer ' : 'Chase ') + dayShort(w.chaseIso)));
     item.appendChild(top);
-    item.appendChild(el('div', 'wait-meta', stageLabel(w, now)));
+    item.appendChild(el('div', 'wait-meta', stageLabel(w, now) + (risk && risk.slip ? ' · likely to slip, ' + whoLabel(w).split(' ')[0] + ' usually takes ~' + Math.round(risk.typical) + ' days' : usual ? ' · usually ~' + usual + ' days' : '')));
     const what = el('div', 'wait-what');
     if (isPay && w.amount && w.amount.raw) what.appendChild(el('span', 'wait-amt', w.amount.raw + ' · '));
     what.appendChild(document.createTextNode(w.what));

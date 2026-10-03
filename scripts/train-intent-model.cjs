@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Trains the on-device intent model and writes core/intent-model-weights.js.
 //
-//   node scripts/train-intent-model.cjs [--en 16000] [--he 12000] [--seed 11] [--models 4]
+//   node scripts/train-intent-model.cjs [--en 16000] [--he 12000] [--seed 11] [--models 4] [--rep 10] [--no-teacher]
 //
-// Training data is generated (scripts/intent/generate.cjs). The hand-written
+// Training data is generated (scripts/intent/generate.cjs) plus, unless --no-teacher, the teacher-authored
+// sentences in scripts/intent/teacher-train.json (written by hand by a large model, not from the grammar),
+// each repeated --rep times with light augmentation (case, punctuation, a greeting). The hand-written
 // evaluation sets (flow-trial-extension/test/fixtures/) are never used to learn
 // weights. The EVEN rows of the dev set (intent-gold.json) set one number, the
 // softmax temperature (how much to trust the model's own confidence); its ODD
@@ -19,11 +21,34 @@ const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > -1 
 const N_EN = arg('en', 16000), N_HE = arg('he', 12000), SEED = arg('seed', 11), EPOCHS = arg('epochs', 10);
 const MODELS = arg('models', 4);
 const DIM = 16384;
+const REP = arg('rep', 10);
+const TEACHER_FILE = path.join(__dirname, 'intent', 'teacher-train.json');
+const USE_TEACHER = !process.argv.includes('--no-teacher') && fs.existsSync(TEACHER_FILE);
+const TEACHER = USE_TEACHER ? JSON.parse(fs.readFileSync(TEACHER_FILE, 'utf8')) : [];
+
+// Light, label-preserving variations so a repeated sentence is not seen identically every time.
+function augment(row, k, rnd) {
+  const t = row.t;
+  if (k === 0) return t;
+  const he = row.lang === 'he';
+  const variants = [
+    () => t.replace(/[.!]+$/, ''),
+    () => t.toLowerCase().replace(/[,.!]+/g, ''),
+    () => (he ? 'היי, ' : 'Hi, ') + t.charAt(0).toLowerCase() + t.slice(1),
+    () => t.replace(/[\u2019']/g, ''),
+    () => (he ? 'שלום, ' : 'Hello, ') + t,
+    () => t.replace(/\s+/g, ' ').replace(/,/g, '')
+  ];
+  return variants[Math.floor(rnd() * variants.length)]();
+}
 const ACTS = M.ACTS, ACTIONS = M.ACTIONS;
 
 let data, idx, ya, yc;
 function prepare(seed) {
   data = makeGenerator(seed).dataset(N_EN, N_HE);
+  let rs = seed * 7919 + 3;
+  const rnd = () => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 4294967296; };
+  for (const row of TEACHER) for (let k = 0; k < REP; k++) data.push({ t: augment(row, k, rnd), act: row.act, action: row.action });
   idx = data.map((d) => M.features(d.t, DIM));
   ya = data.map((d) => ACTS.indexOf(d.act));
   yc = data.map((d) => Math.max(0, ACTIONS.indexOf(d.action || 'none')));
@@ -96,7 +121,7 @@ for (let k = 0; k < MODELS; k++) {
   actions.push(trainHead(yc, ACTIONS.length, 'action', k * 13));
 }
 const act = average(acts), action = average(actions);
-const weights = { version: M.FEATURE_VERSION, dim: DIM, temp: 1, trainedOn: { seed: SEED, models: MODELS, en: N_EN, he: N_HE, epochs: EPOCHS }, act: quantize(act), action: quantize(action) };
+const weights = { version: M.FEATURE_VERSION, dim: DIM, temp: 1, trainedOn: { seed: SEED, models: MODELS, en: N_EN, he: N_HE, epochs: EPOCHS, teacher: TEACHER.length, teacherRep: USE_TEACHER ? REP : 0 }, act: quantize(act), action: quantize(action) };
 
 // ---- evaluation on the hand-written sets (never trained on) --------------------
 M.load(weights);
@@ -159,7 +184,10 @@ function localShare(c) {
 comparison.devSet.localShare = localShare(comparison.devSet);
 comparison.blindSet.localShare = localShare(comparison.blindSet);
 console.log('blind set  lexicon', JSON.stringify(comparison.blindSet.lexicon), '\n           pipeline', JSON.stringify(comparison.blindSet.pipeline));
-const report = { comparison, generatedAt: new Date().toISOString().slice(0, 10), config: weights.trainedOn, temperature: weights.temp, devHeldOut: evaluate(evalSet), dev: evaluate(gold), blind: evaluate(blind) };
+const TE_FILE = path.join(ROOT, 'test', 'fixtures', 'intent-teacher-eval.json');
+const teacherEvalSet = fs.existsSync(TE_FILE) ? JSON.parse(fs.readFileSync(TE_FILE, 'utf8')) : [];
+if (teacherEvalSet.length) { comparison.teacherEvalSet = { n: teacherEvalSet.length, lexicon: prf(teacherEvalSet, lexPred), pipeline: prf(teacherEvalSet, pipePred) }; comparison.teacherEvalSet.localShare = localShare(comparison.teacherEvalSet); }
+const report = { comparison, generatedAt: new Date().toISOString().slice(0, 10), config: weights.trainedOn, temperature: weights.temp, devHeldOut: evaluate(evalSet), dev: evaluate(gold), blind: evaluate(blind), teacherEval: teacherEvalSet.length ? evaluate(teacherEvalSet) : null };
 fs.writeFileSync(path.join(__dirname, '..', 'docs', 'intent-model-metrics.json'), JSON.stringify(report, null, 1));
 console.log('held-out dev accuracy', report.devHeldOut.accuracy, '| blind act accuracy', report.blind.accuracy);
 

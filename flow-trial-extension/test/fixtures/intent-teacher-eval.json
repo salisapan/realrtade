@@ -1,0 +1,1955 @@
+[
+{
+"t": "Please settle the copay before your next appointment.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The tuition for term two is due on the 5th, can you transfer it?",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Could you pay the customs duty so the container can be released?",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We still need the sponsorship fee to print your logo on the banner.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Is the licence renewal fee going to be paid this month? It expires Friday.",
+"act": "ASK",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Could you sign the consent form before the procedure?",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please have a parent sign the permission slip and send it back.",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The carrier needs a signed delivery note, can you sign and return it?",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please sign the acceptable use policy so IT can activate your account.",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Would you sign the volunteer waiver at the front desk?",
+"act": "ASK",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you approve the pre-authorization request for the MRI?",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please approve my access request to the finance folder.",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We need your sign-off on the shipping manifest before it leaves the dock.",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can the principal approve the field trip budget by Wednesday?",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Would the committee approve the grant application this round?",
+"act": "ASK",
+"action": "approve",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please confirm your date of birth so we can pull up your file.",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you confirm the pallet count? The driver says there are 14, not 16.",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Could you verify that the lab sent the results to the right clinic?",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please confirm your VPN token works after the reset.",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you confirm how many volunteers are coming Saturday?",
+"act": "ASK",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can we book a follow-up with Dr. Cohen for next week?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please schedule the parent-teacher conference using the link.",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "When can the truck come back to collect the returns?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can IT visit your desk tomorrow morning to swap the laptop?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Let's find a date for the fundraiser dinner, what works for the board?",
+"act": "ASK",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Do you want the generic or the brand-name prescription?",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Which elective would you like to take next semester?",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Should we ship by air or by sea? The price difference is large.",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Do you want to keep the old licence or upgrade to the team plan?",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Pick a venue: the hall downtown or the garden pavilion.",
+"act": "ASK",
+"action": "decide",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Could you review the discharge summary for errors?",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please look over the report card comments before they go out.",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you check the customs declaration for mistakes?",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Would you test the fix and tell me if the printer works now?",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please read the draft grant narrative and flag anything unclear.",
+"act": "ASK",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you attend the staff meeting at 8 on Monday?",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please register your child for the science fair by Friday.",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Will you join us for the volunteer orientation?",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you dial in to the incident call? We need someone from networking.",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please come to the front office to collect the form.",
+"act": "ASK",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please complete the intake questionnaire before your visit.",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you fill in the incident report for the ER?",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Could you finish the inventory count by closing time?",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We need the ticket updated with the steps you tried.",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please prepare the thank-you letters for the donors.",
+"act": "ASK",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Could you send us your insurance card, front and back?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please email the vaccination records to the school office.",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you forward the bill of lading to the broker?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please send a screenshot of the error.",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you share the guest list with the caterer?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I need the serial number of the laptop, could you find it and send it?",
+"act": "ASK",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Any news on the biopsy results?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Has the container cleared customs yet?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "What is the status of my ticket? It has been open for a week.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Could you let me know whether my daughter's application was received?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Do you know when the venue will confirm our booking?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Why was my claim denied? Please explain.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Can you tell me if the sponsors have replied?",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Is the server back up? Nothing loads on my side.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Where is my parcel? It said delivered but I never got it.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please get back to me regarding the open position.",
+"act": "ASK",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll pay the copay at the desk tomorrow.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We will transfer the tuition on the 4th.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The duty will be paid by our broker today.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll sign the consent form when I arrive.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "My wife will sign the permission slip tonight and I'll send it back.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll sign for the delivery on arrival.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll approve your access request in the next hour.",
+"act": "PROMISE",
+"action": "approve",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The principal said she'll approve the trip budget on Wednesday and I'll let you know.",
+"act": "PROMISE",
+"action": "approve",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll confirm the pallet count with the driver.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I will verify with the lab and tell you.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll confirm the volunteer headcount on Thursday.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll book the follow-up and call you with the time.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll set up IT's visit for tomorrow morning.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll fix a date for the dinner once the board replies.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll decide on the venue after the site visit.",
+"act": "PROMISE",
+"action": "decide",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll choose my electives by Friday.",
+"act": "PROMISE",
+"action": "decide",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll go through the discharge summary this afternoon.",
+"act": "PROMISE",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I will test the fix and report back.",
+"act": "PROMISE",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll look at the grant narrative on Monday.",
+"act": "PROMISE",
+"action": "review",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll be at the staff meeting.",
+"act": "PROMISE",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll register for the science fair tonight.",
+"act": "PROMISE",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll dial in to the incident call.",
+"act": "PROMISE",
+"action": "join",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll fill in the intake form tonight.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll finish the count before closing.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll update the ticket right away.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I will write the thank-you letters this week.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll send my insurance card when I get home.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We will email the vaccination records tomorrow.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll forward the bill of lading in a minute.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Screenshot coming right up.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I can send the guest list by tonight.",
+"act": "PROMISE",
+"action": "send",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll call you as soon as the results are in.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "We'll let you know once customs clears it.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'll look into your ticket and get back to you today.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Our admissions team will contact you within a week.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Your appointment is on Tuesday at 10:15 with Dr. Cohen.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The clinic is closed on public holidays.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Lab results usually take three to five business days.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The school bus leaves at 7:40 from the corner of Elm Street.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Report cards go home on the 20th.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The container arrived at the port on Monday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Customs clearance can take up to 48 hours.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The warehouse is open from 6 to 4.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Your ticket number is 88231.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The outage was caused by a failed switch.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The password policy changed last month.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The gala raised over $40,000 last year.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Volunteers received a free t-shirt.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Doors open at 6:30 and the show starts at 7.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I'm on leave until the 3rd.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "He was admitted on Friday and discharged on Sunday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Your claim was denied because the policy had lapsed.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The printer on the second floor has been replaced.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Please note the front gate closes at 5 pm.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Attached is the schedule for the week.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The package was marked delivered at 2:14 pm.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Our sponsors this year include three local banks.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "I will not be available this Thursday.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "The doctor said the results look normal.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Fundraising is behind target by about ten percent.",
+"act": "INFORM",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Thank you, doctor, I feel much better.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Great, we'll see you Tuesday!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Thanks for the update, much appreciated.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Got it.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Good morning everyone!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Wishing you a speedy recovery.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Congratulations on the award!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Thank you for volunteering, it meant a lot.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Happy holidays from all of us.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Sounds great, thanks.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Thanks for your help with the shipment.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "No problem at all!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Safe journey!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Great event last night!",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Thanks, will do.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Hope the kids enjoyed the trip.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "Take care.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "That's wonderful news.",
+"act": "ACK",
+"action": "none",
+"lang": "en",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר להסדיר את ההשתתפות העצמית לפני התור הבא?",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "שכר הלימוד לסמסטר ב' לתשלום ב-5 לחודש, תוכל להעביר?",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תשלמו את המכס כדי שהמכולה תשתחרר?",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "עוד צריך את דמי החסות כדי להדפיס את הלוגו שלכם על הבאנר.",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תשלמו את אגרת החידוש החודש? היא פוקעת ביום שישי.",
+"act": "ASK",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר לחתום על טופס ההסכמה לפני הטיפול?",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "בבקשה שאחד ההורים יחתום על אישור היציאה ויחזיר.",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "הנהג צריך תעודת משלוח חתומה, תחתום ותחזיר?",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נא לחתום על נוהל השימוש כדי שה-IT יפעיל לך חשבון.",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תחתמי על הצהרת המתנדב בדלפק הקבלה?",
+"act": "ASK",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר לאשר את הבקשה לאישור מוקדם לבדיקת MRI?",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תאשר לי בבקשה גישה לתיקיית הכספים.",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "צריך אישור שלך על מניפסט המשלוח לפני שהוא יוצא מהרציף.",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המנהלת יכולה לאשר את תקציב הטיול עד רביעי?",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "הוועדה תאשר את בקשת המענק הפעם?",
+"act": "ASK",
+"action": "approve",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נא לאשר תאריך לידה כדי שנוכל לפתוח את התיק.",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוכל לאשר את מספר המשטחים? הנהג אומר 14 ולא 16.",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוכלי לוודא שהמעבדה שלחה את התוצאות למרפאה הנכונה?",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תבדוק שהטוקן של ה-VPN עובד אחרי האיפוס.",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר לאשר כמה מתנדבים מגיעים בשבת?",
+"act": "ASK",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר לקבוע מעקב אצל ד\"ר כהן בשבוע הבא?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תקבעו בבקשה את אספת ההורים דרך הקישור.",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מתי המשאית יכולה לחזור לאסוף את ההחזרות?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר שה-IT יגיעו אליך מחר בבוקר להחליף את הלפטופ?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "בואו נמצא תאריך לארוחת התרומות, מה מתאים לוועד?",
+"act": "ASK",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אתה רוצה את התרופה הגנרית או את המקורית?",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "איזה קורס בחירה תרצה לקחת בסמסטר הבא?",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "לשלוח באוויר או בים? יש הבדל גדול במחיר.",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אתם רוצים להישאר ברישיון הישן או לעבור לחבילת הצוות?",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תבחרו מקום: האולם במרכז או הביתן בגן.",
+"act": "ASK",
+"action": "decide",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוכלי לעבור על סיכום השחרור ולחפש טעויות?",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תעבור בבקשה על הערות תעודת הגמר לפני שהן יוצאות.",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר שתבדוק את הצהרת המכס אם יש טעויות?",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תבדקי את התיקון ותגידי לי אם המדפסת עובדת?",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תקראו את טיוטת הבקשה למענק ותסמנו מה לא ברור.",
+"act": "ASK",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר להגיע לישיבת הצוות ביום שני בשמונה?",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נא לרשום את הילד לירידת המדע עד יום שישי.",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תצטרף אלינו להכנה למתנדבים?",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוכל להתחבר לשיחת התקלה? צריך מישהו מהרשתות.",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אנא הגיעו למשרד הקבלה לאסוף את הטופס.",
+"act": "ASK",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נא למלא את שאלון הקליטה לפני הביקור.",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוכלי למלא את דוח האירוע של המיון?",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תסיימו את ספירת המלאי עד הסגירה?",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "צריך שתעדכן את הפנייה עם הצעדים שניסית.",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תכינו בבקשה את מכתבי התודה לתורמים.",
+"act": "ASK",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוכל לשלוח לנו את כרטיס הביטוח, צד קדמי ואחורי?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר לשלוח את אישורי החיסונים למזכירות בבקשה.",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תעביר את שטר המטען לעמיל המכס?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תשלחו צילום מסך של השגיאה.",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר לשתף את רשימת האורחים עם הקייטרינג?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אני צריך את המספר הסידורי של הלפטופ, תוכל למצוא ולשלוח?",
+"act": "ASK",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "יש חדש לגבי תוצאות הביופסיה?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המכולה כבר עברה מכס?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מה הסטטוס של הפנייה שלי? היא פתוחה כבר שבוע.",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוכלו לעדכן אם הבקשה של הבת שלי התקבלה?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אתם יודעים מתי האולם יאשר את ההזמנה שלנו?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "למה התביעה שלי נדחתה? אשמח להסבר.",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אפשר לדעת אם החסויות ענו?",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "השרת חזר לעבוד? אצלי שום דבר לא נטען.",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "איפה החבילה שלי? כתוב שנמסרה ואני לא קיבלתי.",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תחזרו אליי בנוגע למשרה הפנויה.",
+"act": "ASK",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אשלם את ההשתתפות העצמית בדלפק מחר.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נעביר את שכר הלימוד ב-4 לחודש.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "עמיל המכס שלנו ישלם את המכס היום.",
+"act": "PROMISE",
+"action": "pay",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אחתום על טופס ההסכמה כשאגיע.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אשתי תחתום על האישור הערב ואחזיר.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נחתום על המשלוח בקבלה.",
+"act": "PROMISE",
+"action": "sign",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אאשר את בקשת הגישה שלך בשעה הקרובה.",
+"act": "PROMISE",
+"action": "approve",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המנהלת אמרה שתאשר את תקציב הטיול ביום רביעי ואעדכן אותך.",
+"act": "PROMISE",
+"action": "approve",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אוודא את מספר המשטחים מול הנהג.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אבדוק מול המעבדה ואגיד לך.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נאשר את מספר המתנדבים ביום חמישי.",
+"act": "PROMISE",
+"action": "confirm",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אקבע את המעקב ואתקשר אליך עם השעה.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אסדר ביקור של ה-IT מחר בבוקר.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נקבע תאריך לארוחה כשהוועד יענה.",
+"act": "PROMISE",
+"action": "schedule",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נחליט על המקום אחרי הסיור.",
+"act": "PROMISE",
+"action": "decide",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אבחר את הקורסים עד יום שישי.",
+"act": "PROMISE",
+"action": "decide",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אעבור על סיכום השחרור אחר הצהריים.",
+"act": "PROMISE",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אבדוק את התיקון ואדווח.",
+"act": "PROMISE",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נסתכל על הבקשה למענק ביום שני.",
+"act": "PROMISE",
+"action": "review",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אהיה בישיבת הצוות.",
+"act": "PROMISE",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נרשום אותנו לירידת המדע הערב.",
+"act": "PROMISE",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אתחבר לשיחת התקלה.",
+"act": "PROMISE",
+"action": "join",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אמלא את שאלון הקליטה הערב.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נסיים את הספירה לפני הסגירה.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אעדכן את הפנייה מיד.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אכתוב את מכתבי התודה השבוע.",
+"act": "PROMISE",
+"action": "complete",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אשלח את כרטיס הביטוח כשאגיע הביתה.",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נשלח את אישורי החיסונים מחר.",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אעביר את שטר המטען בעוד דקה.",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "צילום מסך בדרך.",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אוכל לשלוח את רשימת האורחים עד הערב.",
+"act": "PROMISE",
+"action": "send",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אתקשר אליך ברגע שהתוצאות יגיעו.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נעדכן אותך כשהמכס ישחרר.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אבדוק את הפנייה שלך ואחזור אליך היום.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "צוות הקבלה שלנו ייצור איתך קשר בתוך שבוע.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אלחץ על האולם ואעדכן אותך.",
+"act": "PROMISE",
+"action": "reply",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "התור שלך ביום שלישי בעשר ורבע אצל ד\"ר כהן.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המרפאה סגורה בחגים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תוצאות מעבדה לרוב לוקחות שלושה עד חמישה ימי עסקים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "האוטובוס יוצא ב-7:40 מהפינה של רחוב האלונים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תעודות יוצאות הביתה ב-20.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המכולה הגיעה לנמל ביום שני.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "שחרור מהמכס יכול לקחת עד 48 שעות.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המחסן פתוח משש עד ארבע.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מספר הפנייה שלך הוא 88231.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "התקלה נגרמה בגלל מתג שקרס.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מדיניות הסיסמאות השתנתה בחודש שעבר.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "הגאלה גייסה בשנה שעברה מעל 150 אלף שקל.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המתנדבים קיבלו חולצה במתנה.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "הדלתות נפתחות ב-6:30 וההופעה מתחילה בשבע.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "אני בחופשה עד ה-3.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "הוא אושפז ביום שישי ושוחרר ביום ראשון.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "התביעה נדחתה כי הפוליסה פקעה.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "המדפסת בקומה השנייה הוחלפה.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "לידיעתכם, השער הקדמי נסגר בחמש.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מצורף לוח הזמנים לשבוע.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "החבילה סומנה כנמסרה ב-14:14.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "בין התומכים שלנו השנה שלושה בנקים מקומיים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "לא אהיה זמין ביום חמישי הקרוב.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "הרופא אמר שהתוצאות נראות תקינות.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "גיוס התרומות מפגר אחרי היעד בכעשרה אחוזים.",
+"act": "INFORM",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תודה דוקטור, אני מרגיש הרבה יותר טוב.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מעולה, נתראה ביום שלישי!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תודה על העדכון, מעריך מאוד.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "קיבלתי.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "בוקר טוב לכולם!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "רפואה שלמה.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מזל טוב על הפרס!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תודה על ההתנדבות, זה היה חשוב מאוד.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "חגים שמחים מכולנו.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "נשמע מצוין, תודה.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תודה על העזרה עם המשלוח.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "בכיף!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "דרך צלחה!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "איזה אירוע היה אתמול!",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "תודה, אעשה.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "מקווה שהילדים נהנו מהטיול.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "שמור על עצמך.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+},
+{
+"t": "איזה חדשות מצוינות.",
+"act": "ACK",
+"action": "none",
+"lang": "he",
+"src": "teacher-eval"
+}
+]

@@ -453,6 +453,19 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('a real attachment that says so keeps it, and the loop closes', s.watches[0].status === 'resolved' && s.watches[0].closedAs === 'kept', s.watches);
   await t.ctx.close();
 
+  // 30. it learns how long THIS person takes
+  const histDay = (i, d) => ({ id: 'h' + i, threadId: 'h' + i, direction: 'theirs', kind: 'reply', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, status: 'resolved', closedAs: 'replied', subject: 'old ' + i, what: 'x', createdAt: new Date(2026, 7, 1 + i * 3, 12).getTime(), resolvedAt: new Date(2026, 7, 1 + i * 3 + d, 12).getTime() });
+  const SLOWHIST = [6, 8, 5, 9, 7].map((d, i) => histDay(i, d));
+  const NODL = 'Could you send me the final figure so I can book the vendor?';
+  t = await open(browser, 'person-slow', [msg(theirs, 'Happy to proceed.'), msg(mine, NODL)], { watches: SLOWHIST });
+  s = await t.state();
+  check('with a slow replier the look-again day is later and says why', /usually take about \d/.test(s.card || '') && !/Fri, Oct 2/.test(s.card || ''), s.card);
+  await t.ctx.close();
+  t = await open(browser, 'person-new', [msg(theirs, 'Happy to proceed.'), msg(mine, NODL)]);
+  s = await t.state();
+  check('a person Glance has no history with keeps the default day and says nothing about habits', /Fri, Oct 2/.test(s.card || '') && !/usually take/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);

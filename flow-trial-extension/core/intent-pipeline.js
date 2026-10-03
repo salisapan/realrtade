@@ -35,6 +35,30 @@ const FlowIntentPipeline = (() => {
     return { type: a + (obj ? ':' + obj : ''), action: a, object: obj, label: act.noun + (obj ? ' · ' + obj : ''), days: act.days, viaModel: true };
   }
 
+  // ---- structure must permit what the model proposes ---------------------------------
+  // The model alone may propose an ask or a promise only when the sentence is SHAPED like one.
+  // A timetable ("The bus leaves at 7:40") or a report of someone else's future ("the deposit will
+  // be returned in thirty days") is not addressed to anyone and promises nothing in the first
+  // person, however confident a statistical model is. Deterministic, language-aware, cheap.
+  const ASK_SHAPE_EN = /\?|\b(?:you|your|yours|u|ya|pls|please|kindly|could|would|can|shall|need|needs|needed|waiting|awaiting|let me know|tell me)\b/i;
+  const ASK_START_EN = /^(?:send|share|forward|provide|attach|upload|return|submit|resend|sign|approve|confirm|verify|check|review|look|read|pay|wire|transfer|settle|book|schedule|pick|choose|decide|reply|respond|update|fix|prepare|draft|write|complete|finish|fill|get|give|make|take|tell|let|come|join|register|rsvp|advise|clarify|remember|don't forget)\b/i;
+  const ASK_SHAPE_HE = /\?|(?:תוכל|תוכלי|תוכלו|אפשר|נא |בבקשה|אנא|אשמח|צריך|צריכה|צריכים|ממתין|ממתינה|מחכה|מחכים|שלך|שלכם|אתה|אתם|לך |לכם|תגיד|תעדכנו|תעדכן)/;
+  const ASK_START_HE = /^ת(?!ו[א-ת]*ר\b)[א-ת]{2,}|^(?:נא|אנא|בבקשה|שלח|שלחו|חזור|אשר|חתום|בדוק|עדכן|הצטרף|הגש|העבר|תן|תני)(?:\s|$)/;
+  const PROMISE_PERSON_EN = /\b(?:i|we|our|us|me|my)\b|['’]ll\b/i;
+  const PROMISE_FUTURE_EN = /\b(?:will|shall|going to|gonna|let me|count me|on it|expect|sending|approving|can get|can send)\b|['’]ll\b/i;
+  const PROMISE_START_EN = /^(?:will|sending|approving|on it|consider it|screenshot coming|expect)\b/i;
+  const PROMISE_SHAPE_HE = /(?:^|\s)[אנ][א-ת]{2,}(?=\s|$)|(?:^|\s)תקבל|(?:^|\s)תשמע/;
+  const NEGATED = /\b(?:not|never|no longer|won't|will not|can't|cannot|couldn't|unable|wouldn't)\b|n't\b|(?:^|\s)לא(?:\s|$)|אין(?:\s|$)/i;
+  function shapedAsk(s) {
+    const he = /[֐-׿]/.test(s);
+    return he ? (ASK_SHAPE_HE.test(s) || ASK_START_HE.test(s.trim())) : (ASK_SHAPE_EN.test(s) || ASK_START_EN.test(s.trim()));
+  }
+  function shapedPromise(s) {
+    const he = /[֐-׿]/.test(s);
+    if (NEGATED.test(s)) return false;
+    return he ? PROMISE_SHAPE_HE.test(s) : (PROMISE_START_EN.test(s.trim()) || (PROMISE_PERSON_EN.test(s) && PROMISE_FUTURE_EN.test(s)));
+  }
+
   // One sentence -> { act, confidence, tier, topic, unsure, request, commitment, why, evidence }
   function recognize(sentence, ctx) {
     const out = recognizeCore(sentence, ctx);
@@ -77,14 +101,14 @@ const FlowIntentPipeline = (() => {
 
     // ---- the model alone: the sentence is phrased in a way no frame lists ----------
     const hedged = types.lexHits(s).hedged;
-    if (m.act === 'ASK' && m.actProb >= MODEL_MIN && !hedged) {
+    if (m.act === 'ASK' && m.actProb >= MODEL_MIN && !hedged && shapedAsk(s)) {
       const req = topicRequest(m, s);
       if (req) {
         out.act = 'ASK'; out.request = req; out.unsure = false; out.tier = 'model'; out.confidence = m.actProb; out.why = 'model: ask, action ' + req.action;
         return out;
       }
     }
-    if (m.act === 'PROMISE' && m.actProb >= MODEL_MIN && !hedged) {
+    if (m.act === 'PROMISE' && m.actProb >= MODEL_MIN && !hedged && shapedPromise(s)) {
       const hits = types.lexHits(s);
       const a = hits.actions[0] || (m.action && m.action !== 'none' && m.actionProb >= ACTION_MIN ? m.action : null);
       if (a) {

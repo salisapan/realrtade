@@ -20,37 +20,37 @@
    },
    "pipeline": {
     "ASK": {
-     "precision": 0.983,
-     "recall": 0.906,
-     "tp": 58,
+     "precision": 0.984,
+     "recall": 0.953,
+     "tp": 61,
      "fp": 1,
-     "fn": 6
+     "fn": 3
     },
     "PROMISE": {
-     "precision": 1,
-     "recall": 0.881,
-     "tp": 37,
-     "fp": 0,
-     "fn": 5
+     "precision": 0.976,
+     "recall": 0.952,
+     "tp": 40,
+     "fp": 1,
+     "fn": 2
     }
    },
    "localShare": {
     "ASK": {
      "real": 64,
-     "solvedLocally": 58,
-     "solvedShare": 0.906,
-     "residual": 6,
-     "residualShare": 0.094,
+     "solvedLocally": 61,
+     "solvedShare": 0.953,
+     "residual": 3,
+     "residualShare": 0.047,
      "wrongCards": 1,
      "remoteShare": 0
     },
     "PROMISE": {
      "real": 42,
-     "solvedLocally": 37,
-     "solvedShare": 0.881,
-     "residual": 5,
-     "residualShare": 0.119,
-     "wrongCards": 0,
+     "solvedLocally": 40,
+     "solvedShare": 0.952,
+     "residual": 2,
+     "residualShare": 0.048,
+     "wrongCards": 1,
      "remoteShare": 0
     }
    }
@@ -75,51 +75,108 @@
    },
    "pipeline": {
     "ASK": {
-     "precision": 1,
-     "recall": 0.676,
-     "tp": 23,
-     "fp": 0,
-     "fn": 11
+     "precision": 0.938,
+     "recall": 0.882,
+     "tp": 30,
+     "fp": 2,
+     "fn": 4
     },
     "PROMISE": {
-     "precision": 1,
-     "recall": 0.75,
-     "tp": 18,
-     "fp": 0,
-     "fn": 6
+     "precision": 0.957,
+     "recall": 0.917,
+     "tp": 22,
+     "fp": 1,
+     "fn": 2
     }
    },
    "localShare": {
     "ASK": {
      "real": 34,
-     "solvedLocally": 23,
-     "solvedShare": 0.676,
-     "residual": 11,
-     "residualShare": 0.324,
-     "wrongCards": 0,
+     "solvedLocally": 30,
+     "solvedShare": 0.882,
+     "residual": 4,
+     "residualShare": 0.118,
+     "wrongCards": 2,
      "remoteShare": 0
     },
     "PROMISE": {
      "real": 24,
-     "solvedLocally": 18,
-     "solvedShare": 0.75,
-     "residual": 6,
-     "residualShare": 0.25,
-     "wrongCards": 0,
+     "solvedLocally": 22,
+     "solvedShare": 0.917,
+     "residual": 2,
+     "residualShare": 0.083,
+     "wrongCards": 1,
+     "remoteShare": 0
+    }
+   }
+  },
+  "teacherEvalSet": {
+   "n": 279,
+   "lexicon": {
+    "ASK": {
+     "precision": 1,
+     "recall": 0.508,
+     "tp": 62,
+     "fp": 0,
+     "fn": 60
+    },
+    "PROMISE": {
+     "precision": 1,
+     "recall": 0.549,
+     "tp": 39,
+     "fp": 0,
+     "fn": 32
+    }
+   },
+   "pipeline": {
+    "ASK": {
+     "precision": 0.969,
+     "recall": 0.77,
+     "tp": 94,
+     "fp": 3,
+     "fn": 28
+    },
+    "PROMISE": {
+     "precision": 0.983,
+     "recall": 0.817,
+     "tp": 58,
+     "fp": 1,
+     "fn": 13
+    }
+   },
+   "localShare": {
+    "ASK": {
+     "real": 122,
+     "solvedLocally": 94,
+     "solvedShare": 0.77,
+     "residual": 28,
+     "residualShare": 0.23,
+     "wrongCards": 3,
+     "remoteShare": 0
+    },
+    "PROMISE": {
+     "real": 71,
+     "solvedLocally": 58,
+     "solvedShare": 0.817,
+     "residual": 13,
+     "residualShare": 0.183,
+     "wrongCards": 1,
      "remoteShare": 0
     }
    }
   }
  },
- "generatedAt": "2026-10-02",
+ "generatedAt": "2026-10-03",
  "config": {
   "seed": 11,
   "models": 4,
   "en": 16000,
   "he": 12000,
-  "epochs": 10
+  "epochs": 10,
+  "teacher": 675,
+  "teacherRep": 10
  },
- "temperature": 2.5,
+ "temperature": 1.7,
  "devHeldOut": {
   "n": 96,
   "accuracy": 0.979,
@@ -130,17 +187,17 @@
     "n": 32
    },
    "PROMISE": {
-    "precision": 1,
-    "recall": 0.905,
+    "precision": 0.952,
+    "recall": 0.952,
     "n": 21
    },
    "INFORM": {
     "precision": 1,
-    "recall": 1,
+    "recall": 0.962,
     "n": 26
    },
    "ACK": {
-    "precision": 0.944,
+    "precision": 1,
     "recall": 1,
     "n": 17
    }
@@ -154,14 +211,14 @@
    },
    "PROMISE": {
     "ASK": 1,
-    "PROMISE": 19,
+    "PROMISE": 20,
     "INFORM": 0,
-    "ACK": 1
+    "ACK": 0
    },
    "INFORM": {
     "ASK": 0,
-    "PROMISE": 0,
-    "INFORM": 26,
+    "PROMISE": 1,
+    "INFORM": 25,
     "ACK": 0
    },
    "ACK": {
@@ -173,16 +230,16 @@
   },
   "wrong": [
    {
-    "t": "תקבל את הקבצים לתיבה לפני הצהריים.",
-    "want": "PROMISE",
-    "got": "ASK",
-    "p": 0.82
+    "t": "I think the customer is mostly happy with the outcome.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.91
    },
    {
-    "t": "אשלח הזמנה ליומן ליום שלישי בקרוב.",
+    "t": "הנה\"ח יעבירו את הכסף עד העשירי.",
     "want": "PROMISE",
-    "got": "ACK",
-    "p": 0.56
+    "got": "ASK",
+    "p": 0.89
    }
   ]
  },
@@ -191,43 +248,43 @@
   "accuracy": 0.984,
   "per": {
    "ASK": {
-    "precision": 0.984,
-    "recall": 0.984,
+    "precision": 0.985,
+    "recall": 1,
     "n": 64
    },
    "PROMISE": {
-    "precision": 1,
-    "recall": 0.952,
+    "precision": 0.953,
+    "recall": 0.976,
     "n": 42
    },
    "INFORM": {
-    "precision": 0.981,
-    "recall": 1,
+    "precision": 1,
+    "recall": 0.962,
     "n": 53
    },
    "ACK": {
-    "precision": 0.971,
+    "precision": 1,
     "recall": 1,
     "n": 34
    }
   },
   "confusion": {
    "ASK": {
-    "ASK": 63,
+    "ASK": 64,
     "PROMISE": 0,
-    "INFORM": 1,
+    "INFORM": 0,
     "ACK": 0
    },
    "PROMISE": {
     "ASK": 1,
-    "PROMISE": 40,
+    "PROMISE": 41,
     "INFORM": 0,
-    "ACK": 1
+    "ACK": 0
    },
    "INFORM": {
     "ASK": 0,
-    "PROMISE": 0,
-    "INFORM": 53,
+    "PROMISE": 2,
+    "INFORM": 51,
     "ACK": 0
    },
    "ACK": {
@@ -239,68 +296,68 @@
   },
   "wrong": [
    {
-    "t": "תעדכן אותי איפה זה עומד מול הלקוח.",
-    "want": "ASK",
-    "got": "INFORM",
-    "p": 0.63
+    "t": "I think the customer is mostly happy with the outcome.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.91
    },
    {
-    "t": "תקבל את הקבצים לתיבה לפני הצהריים.",
+    "t": "הנה\"ח יעבירו את הכסף עד העשירי.",
     "want": "PROMISE",
     "got": "ASK",
-    "p": 0.82
+    "p": 0.89
    },
    {
-    "t": "אשלח הזמנה ליומן ליום שלישי בקרוב.",
-    "want": "PROMISE",
-    "got": "ACK",
-    "p": 0.56
+    "t": "הדירקטוריון אישר את התקציב ביום שני.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.77
    }
   ]
  },
  "blind": {
   "n": 108,
-  "accuracy": 0.898,
+  "accuracy": 0.917,
   "per": {
    "ASK": {
-    "precision": 0.939,
-    "recall": 0.912,
+    "precision": 0.85,
+    "recall": 1,
     "n": 34
    },
    "PROMISE": {
-    "precision": 0.885,
+    "precision": 0.92,
     "recall": 0.958,
     "n": 24
    },
    "INFORM": {
-    "precision": 0.897,
-    "recall": 0.813,
+    "precision": 1,
+    "recall": 0.781,
     "n": 32
    },
    "ACK": {
-    "precision": 0.85,
+    "precision": 0.944,
     "recall": 0.944,
     "n": 18
    }
   },
   "confusion": {
    "ASK": {
-    "ASK": 31,
+    "ASK": 34,
     "PROMISE": 0,
-    "INFORM": 2,
-    "ACK": 1
+    "INFORM": 0,
+    "ACK": 0
    },
    "PROMISE": {
-    "ASK": 0,
+    "ASK": 1,
     "PROMISE": 23,
-    "INFORM": 1,
+    "INFORM": 0,
     "ACK": 0
    },
    "INFORM": {
-    "ASK": 1,
-    "PROMISE": 3,
-    "INFORM": 26,
-    "ACK": 2
+    "ASK": 4,
+    "PROMISE": 2,
+    "INFORM": 25,
+    "ACK": 1
    },
    "ACK": {
     "ASK": 1,
@@ -311,70 +368,304 @@
   },
   "wrong": [
    {
-    "t": "Why hasn't the refund hit my account yet?",
-    "want": "ASK",
-    "got": "INFORM",
-    "p": 0.95
-   },
-   {
-    "t": "I have been working with the contractor on the plan since January.",
-    "want": "INFORM",
-    "got": "PROMISE",
-    "p": 0.99
-   },
-   {
     "t": "The refund was issued on Tuesday and should show up within a week.",
     "want": "INFORM",
     "got": "PROMISE",
-    "p": 0.87
+    "p": 0.77
+   },
+   {
+    "t": "I read through the term sheet and it looks reasonable overall.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 0.94
    },
    {
     "t": "All the best with the move!",
     "want": "ACK",
     "got": "ASK",
-    "p": 0.76
+    "p": 0.9
    },
    {
-    "t": "חתמת כבר על מכתב ההצעה?",
-    "want": "ASK",
-    "got": "INFORM",
-    "p": 0.6
-   },
-   {
-    "t": "תגיד לי איזה מועמד אתה רוצה להתקדם איתו.",
-    "want": "ASK",
-    "got": "ACK",
-    "p": 0.8
-   },
-   {
-    "t": "תשמע מהמגייס שלנו תוך יומיים.",
+    "t": "אבקש מהנהלת החשבונות להוציא את הצ'ק היום ואעדכן אותך.",
     "want": "PROMISE",
-    "got": "INFORM",
-    "p": 1
+    "got": "ASK",
+    "p": 0.69
    },
    {
     "t": "בעל הבית אמר שהמקדמה תוחזר תוך שלושים יום מהפינוי.",
     "want": "INFORM",
-    "got": "PROMISE",
-    "p": 0.65
+    "got": "ASK",
+    "p": 0.99
    },
    {
     "t": "מכתב ההצעה מתאריך 3 במרץ ותקף לשבוע.",
     "want": "INFORM",
     "got": "ASK",
-    "p": 0.45
+    "p": 0.99
+   },
+   {
+    "t": "רואי החשבון סיימו את העבודה בשטח וכותבים את הדוח.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 1
    },
    {
     "t": "הבניין סגור בסופי שבוע.",
     "want": "INFORM",
     "got": "ACK",
-    "p": 0.92
+    "p": 0.89
    },
    {
     "t": "נראה לי שההערכה קצת אופטימית.",
     "want": "INFORM",
+    "got": "ASK",
+    "p": 0.55
+   }
+  ]
+ },
+ "teacherEval": {
+  "n": 279,
+  "accuracy": 0.885,
+  "per": {
+   "ASK": {
+    "precision": 0.925,
+    "recall": 0.91,
+    "n": 122
+   },
+   "PROMISE": {
+    "precision": 0.97,
+    "recall": 0.901,
+    "n": 71
+   },
+   "INFORM": {
+    "precision": 0.76,
+    "recall": 0.76,
+    "n": 50
+   },
+   "ACK": {
+    "precision": 0.791,
+    "recall": 0.944,
+    "n": 36
+   }
+  },
+  "confusion": {
+   "ASK": {
+    "ASK": 111,
+    "PROMISE": 1,
+    "INFORM": 8,
+    "ACK": 2
+   },
+   "PROMISE": {
+    "ASK": 1,
+    "PROMISE": 64,
+    "INFORM": 2,
+    "ACK": 4
+   },
+   "INFORM": {
+    "ASK": 8,
+    "PROMISE": 1,
+    "INFORM": 38,
+    "ACK": 3
+   },
+   "ACK": {
+    "ASK": 0,
+    "PROMISE": 0,
+    "INFORM": 2,
+    "ACK": 34
+   }
+  },
+  "wrong": [
+   {
+    "t": "Is the licence renewal fee going to be paid this month? It expires Friday.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 0.5
+   },
+   {
+    "t": "Should we ship by air or by sea? The price difference is large.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 1
+   },
+   {
+    "t": "Will you join us for the volunteer orientation?",
+    "want": "ASK",
     "got": "ACK",
-    "p": 0.45
+    "p": 0.89
+   },
+   {
+    "t": "Please email the vaccination records to the school office.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 1
+   },
+   {
+    "t": "Where is my parcel? It said delivered but I never got it.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 1
+   },
+   {
+    "t": "Screenshot coming right up.",
+    "want": "PROMISE",
+    "got": "ACK",
+    "p": 0.53
+   },
+   {
+    "t": "Your appointment is on Tuesday at 10:15 with Dr. Cohen.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.98
+   },
+   {
+    "t": "Lab results usually take three to five business days.",
+    "want": "INFORM",
+    "got": "ACK",
+    "p": 0.53
+   },
+   {
+    "t": "The school bus leaves at 7:40 from the corner of Elm Street.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.99
+   },
+   {
+    "t": "Customs clearance can take up to 48 hours.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.82
+   },
+   {
+    "t": "Please note the front gate closes at 5 pm.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 1
+   },
+   {
+    "t": "I will not be available this Thursday.",
+    "want": "INFORM",
+    "got": "PROMISE",
+    "p": 1
+   },
+   {
+    "t": "Fundraising is behind target by about ten percent.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.96
+   },
+   {
+    "t": "Great event last night!",
+    "want": "ACK",
+    "got": "INFORM",
+    "p": 0.7
+   },
+   {
+    "t": "תבדוק שהטוקן של ה-VPN עובד אחרי האיפוס.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 0.7
+   },
+   {
+    "t": "תצטרף אלינו להכנה למתנדבים?",
+    "want": "ASK",
+    "got": "ACK",
+    "p": 0.99
+   },
+   {
+    "t": "אנא הגיעו למשרד הקבלה לאסוף את הטופס.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 0.82
+   },
+   {
+    "t": "השרת חזר לעבוד? אצלי שום דבר לא נטען.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 1
+   },
+   {
+    "t": "איפה החבילה שלי? כתוב שנמסרה ואני לא קיבלתי.",
+    "want": "ASK",
+    "got": "INFORM",
+    "p": 0.99
+   },
+   {
+    "t": "תחזרו אליי בנוגע למשרה הפנויה.",
+    "want": "ASK",
+    "got": "PROMISE",
+    "p": 0.74
+   },
+   {
+    "t": "אוודא את מספר המשטחים מול הנהג.",
+    "want": "PROMISE",
+    "got": "INFORM",
+    "p": 0.84
+   },
+   {
+    "t": "נקבע תאריך לארוחה כשהוועד יענה.",
+    "want": "PROMISE",
+    "got": "ACK",
+    "p": 0.83
+   },
+   {
+    "t": "נסתכל על הבקשה למענק ביום שני.",
+    "want": "PROMISE",
+    "got": "INFORM",
+    "p": 0.74
+   },
+   {
+    "t": "אתחבר לשיחת התקלה.",
+    "want": "PROMISE",
+    "got": "ACK",
+    "p": 0.55
+   },
+   {
+    "t": "צילום מסך בדרך.",
+    "want": "PROMISE",
+    "got": "ACK",
+    "p": 0.62
+   },
+   {
+    "t": "אוכל לשלוח את רשימת האורחים עד הערב.",
+    "want": "PROMISE",
+    "got": "ASK",
+    "p": 0.87
+   },
+   {
+    "t": "האוטובוס יוצא ב-7:40 מהפינה של רחוב האלונים.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.66
+   },
+   {
+    "t": "המחסן פתוח משש עד ארבע.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.86
+   },
+   {
+    "t": "המתנדבים קיבלו חולצה במתנה.",
+    "want": "INFORM",
+    "got": "ACK",
+    "p": 0.53
+   },
+   {
+    "t": "התביעה נדחתה כי הפוליסה פקעה.",
+    "want": "INFORM",
+    "got": "ASK",
+    "p": 0.93
+   },
+   {
+    "t": "הרופא אמר שהתוצאות נראות תקינות.",
+    "want": "INFORM",
+    "got": "ACK",
+    "p": 0.51
+   },
+   {
+    "t": "חגים שמחים מכולנו.",
+    "want": "ACK",
+    "got": "INFORM",
+    "p": 0.69
    }
   ]
  }
