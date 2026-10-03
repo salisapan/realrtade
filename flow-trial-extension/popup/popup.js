@@ -652,6 +652,18 @@
     }
   }
 
+  // Voice-matched drafts (core/style-profile.js): Pro only. A template draft opens and closes the way this person does.
+  // Nothing else in the draft changes, and with no profile (or not Pro) the text is returned exactly as written.
+  async function voiced(text, w) {
+    try {
+      if (!text || typeof FlowStyle === 'undefined' || !FlowStorage.getStyleProfile) return text;
+      const status = await send({ type: 'flow:pro-status' });
+      if (!FlowEntitlements.isActive(status && status.record, Date.now())) return text;
+      const sum = FlowStyle.summary(await FlowStorage.getStyleProfile(), w && w.lang === 'he' ? 'he' : 'en');
+      return FlowStyle.restyle(text, sum, { name: FlowFollowUp.firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email) });
+    } catch (e) { return text; }
+  }
+
   // ---- One question (core/active-question.js) ------------------------------------------------
   // At most one, rationed by the core. A yes opens the loop (the free limit applies) and is a label for the
   // on-device model; a no is a gentler label; the x skips. Functions with properties, not lets (init order).
@@ -873,7 +885,7 @@
           return;
         }
         nudge.disabled = true; nudge.textContent = 'Drafting…';
-        const res = await send({ type: 'flow:follow-draft', payload: { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject, body: FlowFollowUp.nudgeText(w, level, now) } });
+        const res = await send({ type: 'flow:follow-draft', payload: { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject, body: await voiced(FlowFollowUp.nudgeText(w, level, now), w) } });
         nudge.disabled = false; nudge.textContent = label;
         if (res && res.ok) {
           note.textContent = 'A draft is waiting in Gmail. Nothing was sent. Send it and I will move the next look out.';
@@ -891,11 +903,12 @@
       note.hidden = false;
       btn.disabled = true; btn.textContent = 'Preparing…';
       const base = { to: w.counterpart.email, toName: w.counterpart.name, subject: w.subject };
+      body = await voiced(body, w);
       let res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, base, { body }, driveFileId ? { driveFileId } : {}) });
       let used = driveFileId ? fileName : null;
       if (driveFileId && res && res.reason === 'attach') {
         used = null;
-        res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, base, { body: FlowFollowUp.isMine(w) ? null : FlowFollowUp.replyDraft(w, {}) }) });
+        res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, base, { body: FlowFollowUp.isMine(w) ? null : await voiced(FlowFollowUp.replyDraft(w, {}), w) }) });
         if (res && res.ok) note.textContent = 'A draft is waiting in Gmail, but I could not attach the file, so add it yourself. Nothing was sent.';
       }
       btn.disabled = false; btn.textContent = label;

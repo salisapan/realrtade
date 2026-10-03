@@ -316,12 +316,12 @@ const FlowFollow = (() => {
     } else if (choice && choice.source === 'drive') {
       payload.driveFileId = choice.id; used = choice.name;
     }
-    let res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, payload, { body: FlowFollowUp.replyDraft(watch, { fileName: used }) }) });
+    let res = await send({ type: 'flow:follow-draft', payload: Object.assign({}, payload, { body: await voiced(FlowFollowUp.replyDraft(watch, { fileName: used }), watch) }) });
     let withoutFile = false;
     if (used && res && res.reason === 'attach') {
       // The file could not be read: the plain draft, never a body that claims a file.
       used = null; withoutFile = true;
-      res = await send({ type: 'flow:follow-draft', payload: { to: payload.to, toName: payload.toName, subject: payload.subject, body: FlowFollowUp.replyDraft(watch, {}) } });
+      res = await send({ type: 'flow:follow-draft', payload: { to: payload.to, toName: payload.toName, subject: payload.subject, body: await voiced(FlowFollowUp.replyDraft(watch, {}), watch) } });
     }
     track(used ? 'follow_file_prepared' : 'follow_reply_prepared');
     if (res && res.ok) {
@@ -399,6 +399,28 @@ const FlowFollow = (() => {
     }
     else if (res.rescheduled) await promised(watch, best.sender, patch);
     else if (res.confirm) paidCard(next, best.sender);
+  }
+
+  // Voice-matched drafts (core/style-profile.js): Pro only; a template draft opens and closes the way this person does.
+  async function voiced(text, w) {
+    try {
+      if (!text || typeof FlowStyle === 'undefined' || typeof FlowStorage.getStyleProfile !== 'function') return text;
+      const status = await send({ type: 'flow:pro-status' });
+      if (!FlowEntitlements.isActive(status && status.record, Date.now())) return text;
+      const sum = FlowStyle.summary(await FlowStorage.getStyleProfile(), w && w.lang === 'he' ? 'he' : 'en');
+      return FlowStyle.restyle(text, sum, { name: FlowFollowUp.firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email) });
+    } catch (e) { return text; }
+  }
+
+  // Every message you send teaches the style profile how you open and close. Counts only (core/style-profile.js).
+  async function learnStyle(text) {
+    try {
+      if (typeof FlowStyle === 'undefined' || typeof FlowStorage.observeStyle !== 'function') return;
+      const r = await FlowStorage.observeStyle(text);
+      if (!r || !r.after) return;
+      const a = r.after, b = r.before;
+      if (!b || b.greeting !== a.greeting || b.signoff !== a.signoff || b.length !== a.length) note('style', { note: FlowStyle.note(a) });
+    } catch (e) { /* optional */ }
   }
 
   // ---- 4. settled outside the thread (core/outside-signals.js) ----------------------------
@@ -702,6 +724,7 @@ const FlowFollow = (() => {
     if (examined.has(stateKey)) return;
     examined.add(stateKey);
     if (examined.size > 400) examined.clear();
+    if (lastIsOwn) learnStyle(ctx.ownMessageText(last));
     const watch = await FlowStorage.getWatch(threadId);
 
     // They wrote last. What did the answer do to the loop?

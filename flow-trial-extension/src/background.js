@@ -2618,7 +2618,7 @@ async function callGlanceAssist(body) {
 // payload: { lang: 'en'|'he', entries: [{ position, maskedBody }] } — all
 // already masked by the caller; see glance-assist.js's draftReply().
 async function draftReplyViaBackend(payload) {
-  const data = await callGlanceAssist({ action: 'draft-reply', lang: payload.lang, entries: payload.entries });
+  const data = await callGlanceAssist({ action: 'draft-reply', lang: payload.lang, entries: payload.entries, style: payload.style || null });
   return { ok: true, draftText: data.draftText };
 }
 

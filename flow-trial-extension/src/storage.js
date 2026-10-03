@@ -206,6 +206,8 @@ const FlowStorage = (() => {
     intentAdapt: { act: {}, topic: {}, action: {} },
     // core/learning-ledger.js: one plain sentence per time the engine moved because of this person. Capped; local.
     learningLedger: [],
+    // core/style-profile.js: counts of how this person opens and closes a note. No text, no names. Local.
+    styleProfile: null,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.
     activeQuestion: { pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 },
     // core/recognition-stats.js: how many decisions our own code made versus left
@@ -995,6 +997,19 @@ const FlowStorage = (() => {
     const state = await get();
     return Array.isArray(state.learningLedger) ? state.learningLedger : [];
   }
+  async function getStyleProfile() {
+    const state = await get();
+    return state.styleProfile || null;
+  }
+  // Returns { before, after } summaries so the caller can say when a habit became clear. Counts only.
+  const observeStyle = serialize(async function observeStyle(text) {
+    if (typeof FlowStyle === 'undefined') return null;
+    const state = await get();
+    const before = state.styleProfile || null;
+    const after = FlowStyle.observe(before, text);
+    await set({ styleProfile: after });
+    return { before: FlowStyle.summary(before, 'en') || FlowStyle.summary(before, 'he'), after: FlowStyle.summary(after, 'en') || FlowStyle.summary(after, 'he') };
+  });
   async function getActiveQuestion() {
     const state = await get();
     return Object.assign({ pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 }, state.activeQuestion || {});
@@ -1011,7 +1026,7 @@ const FlowStorage = (() => {
   });
   // "Reset": forget every adjustment and the list that explains them. Counts of outcomes stay (they are metrics).
   const resetLearning = serialize(async function resetLearning() {
-    await set({ intentAdapt: { act: {}, topic: {}, action: {} }, learningLedger: [] });
+    await set({ intentAdapt: { act: {}, topic: {}, action: {} }, learningLedger: [], styleProfile: null });
     return true;
   });
   const setIntentAdapt = serialize(async function setIntentAdapt(a) {
@@ -1123,7 +1138,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

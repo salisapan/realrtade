@@ -2469,7 +2469,10 @@
     const entries = batch.maskedTexts.map((maskedText, i) => ({ position: i === 0 ? 'current' : 'previous', maskedBody: maskedText }));
     const lang = FlowSidebar.isRTLText(bodies[0]) ? 'he' : 'en';
 
-    chrome.runtime.sendMessage({ type: 'flow:draft-reply', payload: { lang, entries } }, (response) => {
+    // How this person opens and closes a note, as a fixed vocabulary only (core/style-profile.js): never text, never counts.
+    let style = null;
+    try { if (typeof FlowStyle !== 'undefined' && typeof FlowStorage !== 'undefined' && FlowStorage.getStyleProfile) style = FlowStyle.hints(FlowStyle.summary(await FlowStorage.getStyleProfile(), lang)); } catch (e) { style = null; }
+    chrome.runtime.sendMessage({ type: 'flow:draft-reply', payload: { lang, entries, style } }, (response) => {
       if (!response || !response.ok) {
         FlowSidebar.renderDraft('error', { message: aiErrorMessage(response, 'Could not draft a reply.'), onDraft: handleDraftIt });
         return;

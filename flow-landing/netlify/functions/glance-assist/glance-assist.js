@@ -40,6 +40,7 @@
 const crypto = require('crypto');
 const { callRoutedLlm, silenceResult } = require('./model-router.js');
 const license = require('../verify-license/license-core.js');
+const { styleLine } = require('./style-hints.js');
 
 const LOG_PREFIX = '[glance-assist]';
 
@@ -102,7 +103,7 @@ async function draftReply(payload) {
     })
     .join('\n\n');
 
-  const system = lang === 'he' ? DRAFT_SYSTEM_HE : DRAFT_SYSTEM_EN;
+  const system = (lang === 'he' ? DRAFT_SYSTEM_HE : DRAFT_SYSTEM_EN) + styleLine(payload.style, lang);
   const out = await callRoutedLlm({ action: 'draft-reply', system, userText: threadText, maxTokens: 1200 });
   return { draftText: out.text, route: out.route };
 }
