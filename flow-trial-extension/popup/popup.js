@@ -54,6 +54,7 @@
   await renderOpen();
   await renderWaiting();
   checkOutsideSignals().catch(() => {});
+  renderQuestion().catch(() => {});
 
 
   // ---- Glance Pro -----------------------------------------------------------
@@ -649,6 +650,72 @@
       item.appendChild(acts);
       host.appendChild(item);
     }
+  }
+
+  // ---- One question (core/active-question.js) ------------------------------------------------
+  // At most one, rationed by the core. A yes opens the loop (the free limit applies) and is a label for the
+  // on-device model; a no is a gentler label; the x skips. Functions with properties, not lets (init order).
+  async function teachFromPopup(text, label, rate) {
+    try {
+      if (typeof FlowIntentModel === 'undefined' || !FlowIntentModel.ready()) return;
+      FlowIntentModel.setAdaptation(await FlowStorage.getIntentAdapt());
+      FlowIntentModel.learn(text, 'act', label, rate);
+      await FlowStorage.setIntentAdapt(FlowIntentModel.getAdaptation());
+    } catch (e) { /* learning is optional */ }
+  }
+
+  async function renderQuestion() {
+    const block = document.getElementById('questionBlock');
+    if (!block || typeof FlowActiveQuestion === 'undefined' || !FlowStorage.getActiveQuestion) return;
+    const now = Date.now();
+    const state = FlowActiveQuestion.active(await FlowStorage.getActiveQuestion(), now);
+    const p = state.pending;
+    const host = document.getElementById('question-card');
+    host.replaceChildren();
+    block.hidden = !p;
+    if (!p) return;
+    const item = el('div', 'wait-item');
+    const top = el('div', 'wait-top');
+    top.appendChild(el('span', 'wait-who', p.counterpart && (p.counterpart.name || p.counterpart.email) || 'Your message'));
+    top.appendChild(el('span', 'wait-state', FlowActiveQuestion.questionText(p)));
+    item.appendChild(top);
+    item.appendChild(el('div', 'wait-what', '\u201c' + p.sentence + '\u201d'));
+    const note = el('p', 'wait-note');
+    note.hidden = true;
+    const acts = el('div', 'wait-acts');
+    const finish = async (ans) => {
+      const res = FlowActiveQuestion.answer(state, ans, Date.now());
+      if (ans === 'yes') {
+        const list = await FlowStorage.getWatches();
+        const status = await send({ type: 'flow:pro-status' });
+        const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
+        if (!gate.allowed) { note.hidden = false; note.textContent = 'You are following ' + gate.used + ' of ' + gate.cap + ' open loops. Close one first, or see Glance Pro.'; return; }
+        let ask = FlowActiveQuestion.askFor(p, FlowFollowUp.chaseDate('reply', null, Date.now()));
+        if (ask.direction === 'theirs') ask = FlowFollowUp.personalChase(ask, list, p.counterpart && p.counterpart.email, Date.now());
+        const watch = FlowFollowUp.buildWatch({ ask, threadId: p.threadId, messageId: p.messageId, subject: p.subject, counterpart: p.counterpart, now: Date.now() });
+        watch.threadUrl = p.threadUrl || null;
+        if (!list.some((w) => w.id === watch.id && FlowFollowUp.isActive(w))) {
+          const made = await send({ type: 'flow:follow-task', payload: { title: FlowFollowUp.taskTitle(watch), dueIso: watch.chaseIso, what: watch.what, counterpart: p.counterpart && (p.counterpart.name ? p.counterpart.name + (p.counterpart.email ? ' <' + p.counterpart.email + '>' : '') : p.counterpart.email), threadUrl: watch.threadUrl } });
+          if (made && made.ok && made.ref) watch.taskRef = made.ref;
+          await FlowStorage.upsertWatch(watch);
+        }
+      }
+      if (res.teach) {
+        await teachFromPopup(p.sentence, res.teach.label, res.teach.rate);
+        if (typeof FlowLedger !== 'undefined' && FlowStorage.appendLedger) { const e = FlowLedger.make('answered', { text: p.sentence, counterpart: p.counterpart, yes: ans === 'yes' }, Date.now()); if (e) FlowStorage.appendLedger(e).catch(() => {}); }
+      }
+      await FlowStorage.setActiveQuestion(res.state);
+      await renderQuestion();
+      await renderWaiting();
+      if (renderLedger) await renderLedger();
+    };
+    const mk = (label, ans) => { const b = el('button', 'ghost sm', label); b.type = 'button'; b.addEventListener('click', () => { finish(ans); }); return b; };
+    acts.appendChild(mk(p.kind === 'promise' ? 'Yes, remind me' : 'Yes, stay on it', 'yes'));
+    acts.appendChild(mk('No', 'no'));
+    acts.appendChild(mk('Skip', 'skip'));
+    item.appendChild(acts);
+    item.appendChild(note);
+    host.appendChild(item);
   }
 
   async function renderWaiting() {

@@ -68,6 +68,7 @@
         "src/storage.js",
         "core/privacyShield.js",
         "core/learning-ledger.js",
+        "core/active-question.js",
         "core/docwriter.js",
         "core/docreader.js",
         "src/sidebar.js",

@@ -509,6 +509,20 @@ const FlowFollow = (() => {
     return { email: null, name: null };
   }
 
+  // The engine could not decide on a sentence of yours: keep the most undecided one as the single question the popup
+  // may ask (core/active-question.js). Nothing is shown here; Gmail stays quiet.
+  async function considerQuestion(ctx, last, text, threadId, lastId) {
+    try {
+      if (typeof FlowActiveQuestion === 'undefined' || typeof FlowIntentModel === 'undefined' || typeof FlowIntentPipeline === 'undefined' || !FlowIntentModel.ready() || typeof FlowStorage.getActiveQuestion !== 'function') return;
+      await loadAdapt();
+      const cands = FlowActiveQuestion.candidates(text, { model: FlowIntentModel, pipeline: FlowIntentPipeline });
+      if (!cands.length) return;
+      const state = await FlowStorage.getActiveQuestion();
+      const next = FlowActiveQuestion.offer(state, cands, { threadId, messageId: lastId, subject: ctx.subject, counterpart: counterpartOf(last, ctx.ownEmail), threadUrl: ctx.threadUrl(lastId) }, Date.now());
+      if (JSON.stringify(next.pending) !== JSON.stringify(state.pending)) await FlowStorage.setActiveQuestion(next);
+    } catch (e) { /* a question is optional */ }
+  }
+
   async function track1(ask, base) {
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
     watch.threadUrl = base.threadUrl || null;
@@ -740,7 +754,7 @@ const FlowFollow = (() => {
     // What I asked of them comes first; if I asked nothing, what I promised them.
     let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);
     recordDecision(mineText, Boolean(ask), key);
-    if (!ask) return;
+    if (!ask) { if (!watch) considerQuestion(ctx, last, mineText, threadId, lastId); return; }
     offered.add(key);
 
     // The same story already has a loop in another thread: never a second one.

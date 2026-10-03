@@ -206,6 +206,8 @@ const FlowStorage = (() => {
     intentAdapt: { act: {}, topic: {}, action: {} },
     // core/learning-ledger.js: one plain sentence per time the engine moved because of this person. Capped; local.
     learningLedger: [],
+    // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.
+    activeQuestion: { pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 },
     // core/recognition-stats.js: how many decisions our own code made versus left
     // unresolved. Counts only, never any text.
     recognitionStats: { localHit: 0, localSilence: 0, residual: 0, remote: 0, byTier: {}, since: null },
@@ -993,6 +995,14 @@ const FlowStorage = (() => {
     const state = await get();
     return Array.isArray(state.learningLedger) ? state.learningLedger : [];
   }
+  async function getActiveQuestion() {
+    const state = await get();
+    return Object.assign({ pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 }, state.activeQuestion || {});
+  }
+  const setActiveQuestion = serialize(async function setActiveQuestion(q) {
+    await set({ activeQuestion: q });
+    return true;
+  });
   const appendLedger = serialize(async function appendLedger(entry) {
     if (typeof FlowLedger === 'undefined' || !entry) return false;
     const state = await get();
@@ -1113,7 +1123,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };
