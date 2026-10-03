@@ -735,12 +735,18 @@ const FlowFollowUp = (() => {
 
   // Everything open with each person, both directions, most urgent first.
   // Loops with no known person are grouped under 'Other'.
-  function groupByPerson(watches, now) {
+  // opts.keyOf(watch) -> one key per PERSON across apps (core/identity-graph.js); without it the address, then the number, then the name.
+  function groupByPerson(watches, now, opts) {
     const groups = {};
+    const keyOf = opts && typeof opts.keyOf === 'function' ? opts.keyOf : null;
     (Array.isArray(watches) ? watches : []).filter(isActive).forEach((w) => {
-      const email = (w.counterpart && w.counterpart.email) ? String(w.counterpart.email).toLowerCase() : '';
-      const key = email || (w.counterpart && w.counterpart.name) || '';
-      const g = groups[key] || (groups[key] = { key, name: firstName(w.counterpart && w.counterpart.name, email) || 'Other', email: email || null, loops: [], overdue: 0, youOwe: 0, owed: {} });
+      const cp = (w && w.counterpart) || {};
+      const email = cp.email ? String(cp.email).toLowerCase() : '';
+      const key = (keyOf && keyOf(w)) || w.personKey || email || (cp.phone ? 'phone:' + cp.phone : '') || cp.name || '';
+      const g = groups[key] || (groups[key] = { key, name: firstName(cp.name, email) || 'Other', email: email || null, apps: [], loops: [], overdue: 0, youOwe: 0, owed: {} });
+      if (!g.email && email) g.email = email;
+      const app = w.channel || 'gmail';
+      if (g.apps.indexOf(app) < 0) g.apps.push(app);
       g.loops.push(w);
       if (watchState(w, now) === 'overdue') g.overdue++;
       if (isClock(w)) g.clock = (g.clock || 0) + 1;

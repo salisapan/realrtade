@@ -1,0 +1,464 @@
+[
+ {
+  "t": "can u send me the contract today?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "pls send the invoice",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "plz send me the address",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "did you send the money?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "have you signed it yet?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "did u get my email?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "can you confirm the time for tomorrow?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "hey can you call me when you're free",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "could u share the file again",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "any news on the permit?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "what time works for you tomorrow?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "can we move it to thursday?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "when can you pay me back?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "need the signed copy by friday pls",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "please confirm you got it",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "u able to send the photos?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "let me know if you can make it",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "can you check the numbers and tell me?",
+  "act": "ASK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "תשלח לי את החוזה בבקשה",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "שלחת כבר את החשבונית?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "תעביר לי את הכסף היום",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "מתי תעביר את התשלום?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אפשר לקבל את המסמכים עד מחר?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "תוכל לשלוח לי את הכתובת?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "מתי נוח לך מחר?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "תאשר לי שקיבלת",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "חתמת כבר על החוזה?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "תבדוק את זה ותחזור אליי",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אחי תשלח לי תמונה של הקבלה",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "תעדכן אותי מה קורה עם האישור",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אפשר לקבוע לשבוע הבא?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "קיבלת את ההודעה שלי?",
+  "act": "ASK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "i will send it tonight",
+  "act": "PROMISE",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "i'll transfer the money tomorrow",
+  "act": "PROMISE",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "will sign it today",
+  "act": "PROMISE",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "i'll get back to you by friday",
+  "act": "PROMISE",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "sending the file now",
+  "act": "PROMISE",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "i'll check and let you know",
+  "act": "PROMISE",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "ill pay you on sunday",
+  "act": "PROMISE",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אשלח לך את זה הערב",
+  "act": "PROMISE",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אני מעביר היום",
+  "act": "PROMISE",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אחזור אליך מחר",
+  "act": "PROMISE",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אחתום עליו היום",
+  "act": "PROMISE",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אבדוק ואעדכן אותך",
+  "act": "PROMISE",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אעביר לך את הכסף ביום ראשון",
+  "act": "PROMISE",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אני שולח לך עכשיו",
+  "act": "PROMISE",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "sent it, check your inbox",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "the meeting is at 5",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "i paid already",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "traffic is crazy today",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "she said the permit is approved",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "the shipment arrives monday",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "i'm at the office",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "it's 4,200 for the whole thing",
+  "act": "INFORM",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "שלחתי לך את זה במייל",
+  "act": "INFORM",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "הפגישה ב-5",
+  "act": "INFORM",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "כבר שילמתי",
+  "act": "INFORM",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "יש המון פקקים היום",
+  "act": "INFORM",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "היא אמרה שהאישור אושר",
+  "act": "INFORM",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "המשלוח מגיע ביום שני",
+  "act": "INFORM",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אני במשרד",
+  "act": "INFORM",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "ok thanks",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "got it",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "sounds good",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "thank you so much!",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "haha nice",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "np",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "cool see you then",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "great thanks for the update",
+  "act": "ACK",
+  "lang": "en",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אוקיי תודה",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "קיבלתי",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "מעולה",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "תודה רבה!",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "חחח יפה",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "סבבה",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אין בעיה",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ },
+ {
+  "t": "אחלה תודה על העדכון",
+  "act": "ACK",
+  "lang": "he",
+  "src": "chat-gold"
+ }
+]

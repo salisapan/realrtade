@@ -110,6 +110,22 @@ console.log('\n--- an answer in another app ---\n');
   check('the close patch says where the answer came from', patch && patch.status === 'resolved' && patch.resolvedBy === 'reply' && patch.viaChannel === 'whatsapp', patch);
 }
 
+console.log('\n--- one heading per person, across apps ---\n');
+{
+  const { FlowFollowUp: F } = require('../core/follow-up.js');
+  let g = I.empty();
+  g = I.observe(g, { channel: 'gmail', name: 'Dana Cole', email: 'dana@acme.com' }, NOW).graph;
+  g = I.observe(g, { channel: 'web', email: 'dana@acme.com', phone: '0541234567' }, NOW).graph;
+  const mk = (id, channel, cp, over) => Object.assign({ id, threadId: id, channel, status: 'waiting', direction: 'theirs', kind: 'reply', what: 'x', subject: 's', counterpart: cp, createdAt: NOW - DAY, lang: 'en', chaseIso: '2026-10-05', stage: 'waiting', nudges: 0 }, over || {});
+  const loops = [mk('a', 'gmail', { name: 'Dana Cole', email: 'dana@acme.com' }), mk('b', 'whatsapp', { name: 'Dana Cole', phone: '972541234567' }), mk('c', 'gmail', { name: 'Omer', email: 'omer@x.com' })];
+  const keyOf = (w) => { const a = I.aliasesOf(g, Object.assign({ channel: w.channel }, w.counterpart)); return a.emails[0] || (a.phones[0] ? 'phone:' + a.phones[0] : null); };
+  const groups = F.groupByPerson(loops, NOW, { keyOf });
+  const dana = groups.find((x) => x.name === 'Dana');
+  check('the same person by email and on WhatsApp is one heading with both loops', groups.length === 2 && dana.loops.length === 2 && dana.apps.sort().join() === 'gmail,whatsapp', groups.map((x) => [x.name, x.loops.length, x.apps]));
+  check('without the identity graph they stay apart (nothing is guessed)', F.groupByPerson(loops, NOW).length === 3);
+  check('a loop that has only a phone number still gets a heading', F.groupByPerson([mk('d', 'whatsapp', { name: null, phone: '972501112222' })], NOW)[0].key === 'phone:972501112222');
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

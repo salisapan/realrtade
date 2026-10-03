@@ -25,19 +25,19 @@ const FlowRequestTypes = (() => {
   const ACTIONS = [
     { id: 'pay', days: 7, noun: 'payment',
       en: ['pay', 'wire', 'transfer', 'settle', 'remit', 'reimburse'],
-      he: ['לשלם', 'תשלם', 'תשלמו', 'להחזיר כסף', 'החזר כספי'] },
+      he: ['לשלם', 'תשלם', 'תשלמו', 'להחזיר כסף', 'החזר כספי', 'העברת', 'שילמת', 'תעביר', 'תעבירי'] },
     { id: 'sign', days: 2, noun: 'signature',
-      en: ['sign', 'countersign', 'initial', 'signature', 'signed copy'],
-      he: ['לחתום', 'תחתום', 'תחתמו', 'חתימה', 'חתימתך'] },
+      en: ['sign', 'signed it', 'countersign', 'initial', 'signature', 'signed copy'],
+      he: ['לחתום', 'תחתום', 'תחתמו', 'חתימה', 'חתימתך', 'חתמת', 'תחתמי'] },
     { id: 'approve', days: 2, noun: 'approval',
       en: ['approve', 'authori[sz]e', 'sign off', 'green-?light', 'approval', 'go-ahead', 'accept'],
-      he: ['לאשר', 'תאשר', 'תאשרו', 'אישור', 'אישורך'] },
+      he: ['לאשר', 'תאשר', 'תאשרו', 'אישור', 'אישורך', 'אישרת', 'תאשרי'] },
     { id: 'confirm', days: 2, noun: 'confirmation',
       en: ['confirm', 'confirmation', 'verify', 'validate', 'double-?check'],
       he: ['לוודא', 'תוודא', 'לאמת', 'תאמת', 'וידוא'] },
     { id: 'schedule', days: 1, noun: 'a time',
-      en: ['schedule', 'book', 'set up', 'arrange', 'propose a time', 'pick a time', 'reschedule', 'your availability', 'are you available', 'when (?:are|can) you'],
-      he: ['לקבוע', 'תקבע', 'תקבעו', 'לתאם', 'תתאם', 'תתאמו', 'פנוי', 'פנויה', 'לדחות', 'זמינות', 'תאריך נוסף', 'מועד נוסף', 'הארכה', 'הארכת'] },
+      en: ['schedule', 'book', 'set up', 'arrange', 'propose a time', 'pick a time', 'reschedule', 'move (?:it|this|that|the \\w+) to', 'what time (?:works|is good|suits)', 'call me', 'your availability', 'are you available', 'when (?:are|can) you'],
+      he: ['לקבוע', 'תקבע', 'תקבעו', 'לתאם', 'תתאם', 'תתאמו', 'פנוי', 'פנויה', 'לדחות', 'זמינות', 'נוח לך', 'מתאים לך', 'תאריך נוסף', 'מועד נוסף', 'הארכה', 'הארכת'] },
     { id: 'decide', days: 2, noun: 'a decision',
       en: ['decide', 'decision', 'choose', 'pick', 'select', 'advise', 'let me know whether'],
       he: ['להחליט', 'תחליט', 'תחליטו', 'החלטה', 'לבחור', 'תבחר', 'תבחרו'] },
@@ -51,11 +51,11 @@ const FlowRequestTypes = (() => {
       en: ['complete', 'fill out', 'fill in', 'finish', 'finali[sz]e', 'prepare', 'draft', 'write', 'create', 'build', 'fix', 'update the', 'deliver'],
       he: ['להשלים', 'תשלים', 'תשלימו', 'למלא', 'תמלא', 'תמלאו', 'לסיים', 'תסיים', 'להכין', 'תכין', 'תכינו', 'לכתוב', 'תכתוב', 'לתקן', 'תתקן'] },
     { id: 'send', days: 2, noun: 'a file',
-      en: ['send', 'share', 'forward', 'provide', 'attach', 'upload', 'return', 'submit', 'resend', 'e-?mail me', 'give me', 'get me'],
-      he: ['לקבל', 'לשלוח', 'תשלח', 'תשלחו', 'שלח', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי'] },
+      en: ['send', 'sending', 'sent', 'share', 'forward', 'provide', 'attach', 'upload', 'return', 'submit', 'resend', 'e-?mail me', 'give me', 'get me'],
+      he: ['לקבל', 'שלחת', 'שלחתם', 'לשלוח', 'תשלח', 'תשלחו', 'שלח', 'להעביר', 'תעביר', 'תעבירו', 'להעלות', 'תעלה', 'להגיש', 'תגיש', 'להחזיר', 'תחזיר', 'לספק', 'תספק', 'תן לי', 'תני לי'] },
     { id: 'reply', days: 2, noun: 'a reply',
-      en: ['reply', 'respond', 'get back', 'revert', 'answer', 'response', 'update me', 'an update', 'let me know', 'follow up', 'be in touch', 'hear (?:back )?from you', 'hear your'],
-      he: ['להשיב', 'תשיב', 'תשיבו', 'לענות', 'תענה', 'תענו', 'תחזור', 'תחזרו', 'תחזרי', 'לחזור אליי', 'לעדכן', 'תעדכן', 'תעדכנו', 'תודיע', 'תודיעו', 'תשובה', 'עדכון', 'סיוע', 'עזרתך', 'עזרה', 'בירור', 'לברר', 'הבהרה', 'להבהיר', 'לדעת', 'סטטוס', 'להודיע'] }
+      en: ['get my (?:email|message|text)', 'reply', 'respond', 'get back', 'revert', 'answer', 'response', 'update me', 'an update', 'let me know', 'follow up', 'be in touch', 'hear (?:back )?from you', 'hear your'],
+      he: ['קיבלת', 'להשיב', 'תשיב', 'תשיבו', 'לענות', 'תענה', 'תענו', 'תחזור', 'תחזרו', 'תחזרי', 'לחזור אליי', 'לעדכן', 'תעדכן', 'תעדכנו', 'תודיע', 'תודיעו', 'תשובה', 'עדכון', 'סיוע', 'עזרתך', 'עזרה', 'בירור', 'לברר', 'הבהרה', 'להבהיר', 'לדעת', 'סטטוס', 'להודיע'] }
   ];
 
   // What the action is about. Order: specific first.
@@ -78,8 +78,8 @@ const FlowRequestTypes = (() => {
 
   // How a request is framed. A sentence with an ACTION but no FRAME is a
   // statement, not an ask.
-  const FRAME_EN = /\b(?:could|can|would|will) you\b|\b(?:can|could|shall) we\b|\bplease\b|\bkindly\b|\b(?:i|we)(?:'d| would) (?:like|appreciate|love)\b|\b(?:i|we) (?:need|require|want|expect)\b|\bneed you to\b|\b(?:waiting|awaiting) (?:for|on)\b|\bany chance\b|\bwhen (?:can|could|will) you\b|\bdo you have\b|\bby when\b|\bwould you mind\b|\bit would help (?:if|to)\b|\bstill need\b|\bhave you (?:had a chance|been able)\b/i;
-  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך|אודה|נודה|אבקש|נבקש|אני מבקש|אנו מבקשים|אנחנו מבקשים|מבקשת|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|הייתי מבקש|הייתי מודה|אצטרך|נצטרך|נשמח)/;
+  const FRAME_EN = /\b(?:could|can|would|will) you\b|\b(?:can|could|shall) we\b|\bplease\b|\bkindly\b|\b(?:i|we)(?:'d| would) (?:like|appreciate|love)\b|\b(?:i|we) (?:need|require|want|expect)\b|\bneed you to\b|\b(?:waiting|awaiting) (?:for|on)\b|\bany chance\b|\bwhen (?:can|could|will) you\b|\bdo you have\b|\bby when\b|\bwould you mind\b|\bit would help (?:if|to)\b|\bstill need\b|\bhave you (?:had a chance|been able)\b|\b(?:can|could|would|will) (?:u|ya)\b|\b(?:pls|plz|pleez)\b|\b(?:did|have|had) (?:you|u) (?:\w+ )?(?:sent|send|paid|pay|signed|sign|confirmed|confirm|got|get|received|receive|transferred|transfer|checked|check|seen|see)\b|\b(?:u|you) able to\b|\bwhat time (?:works|is good|suits)\b|\blet me know if (?:you|u)\b|\bneed (?:the )?[\w ]{1,30} by\b/i;
+  const FRAME_HE = /(?:תוכל|תוכלי|תוכלו|אפשר|ניתן|נא |בבקשה|אשמח|צריך ש|צריכים|אני צריך|אנחנו צריכים|ממתין|ממתינה|ממתינים|מחכה|מחכים|מתי תוכל|יש לך|היית יכול|האם תוכל|עדיין צריך|אודה|נודה|אבקש|נבקש|אני מבקש|אנו מבקשים|אנחנו מבקשים|מבקשת|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|ברצוננו (?:לדעת|לברר|לקבל|לוודא|לבקש)|הייתי מבקש|הייתי מודה|אצטרך|נצטרך|נשמח|^(?:(?:אחי|אחותי|חבר|חבר'ה|יקירי|היי|הי|שלום|נו|אז|ו)[,\s]+)*ת(?:שלח|שלחי|עביר|עבירי|חתום|חתמי|אשר|אשרי|בדוק|בדקי|עדכן|עדכני|חזור|חזרי|תן|תני|ביא|בואי|גיד|גידי|אשר)(?=[\s,.!?]|$)|(?:שלחת|שלחתם|העברת|חתמת|אישרת|שילמת|בדקת|קיבלת|ראית)(?:\s+כבר)?(?=[\s,.!?]|$)|מתי (?:ת(?:עביר|שלח|חתום|אשר|חזור|עדכן|שלם|בוא|גיע)|נוח|מתאים|אפשר|זה יהיה)|אפשר (?:ל|ש)\S+)/;
 
   // English entries are regex fragments joined into one word-bounded pattern.
   // Hebrew has no \b, so each Hebrew entry is its own pattern.
@@ -125,10 +125,10 @@ const FlowRequestTypes = (() => {
   }
 
   // ---- the mirror: what YOU promised -------------------------------------------
-  const COMMIT_EN = /\b(?:i|we)(?:'ll| will| shall)\b|\b(?:i|we)(?:'m|'re| am| are) (?:going to|gonna)\b|\blet me (?:check|look|review|get|send|find|confirm|come back|revert|run|see|loop|work|pull|put|dig)\b/i;
-  const COMMIT_HE = /(?<![א-ת])ו?(?:אדאג|נדאג|אעשה|נעשה|אחתום|נחתום|אפנה|נפנה|אבצע|נבצע|אגיש|נגיש|אפעל|נפעל|אשלם|נשלם|אקבע|נקבע|אסדר|נסדר|אטפל|נטפל|אשלח|נשלח|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אכין|נכין|אעביר|נעביר|אתאם|נתאם|אחזיר|נחזיר|אשיב|נשיב|אאשר|נאשר|אספק|נספק|אכתוב|נכתוב|אסגור|נסגור|אסיים|נסיים|אתקן|נתקן)/;
+  const COMMIT_EN = /^(?:will|sending|paying|transferring|signing)\b(?:\s+\w+){0,3}\s+(?:it|this|that|the|you|them|now|today|tonight|tomorrow|on|by|in)\b|\bill (?:send|pay|sign|check|call|do|transfer|confirm|get)\b|\b(?:i|we)(?:'ll| will| shall)\b|\b(?:i|we)(?:'m|'re| am| are) (?:going to|gonna)\b|\blet me (?:check|look|review|get|send|find|confirm|come back|revert|run|see|loop|work|pull|put|dig)\b/i;
+  const COMMIT_HE = /אני (?:מעביר|שולח|חותם|משלם|מאשר|בודק|מעדכן|חוזר)(?![א-ת])(?:\s+\S+){0,3}?\s+(?:היום|עכשיו|הערב|מחר|עוד מעט)|(?<![א-ת])ו?(?:אדאג|נדאג|אעשה|נעשה|אחתום|נחתום|אפנה|נפנה|אבצע|נבצע|אגיש|נגיש|אפעל|נפעל|אשלם|נשלם|אקבע|נקבע|אסדר|נסדר|אטפל|נטפל|אשלח|נשלח|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אכין|נכין|אעביר|נעביר|אתאם|נתאם|אחזיר|נחזיר|אשיב|נשיב|אאשר|נאשר|אספק|נספק|אכתוב|נכתוב|אסגור|נסגור|אסיים|נסיים|אתקן|נתקן)/;
   // Not a promise: conditional, hedged, or an invitation for THEM to act.
-  const COMMIT_NOT = /\b(?:maybe|might|perhaps|probably|hopefully|try to|if you|unless|in case|when you|once you|let me know)\b|(?:אולי|בערך|אם תרצו|אם תרצה|ברגע שתשלח|תודיע לי)/i;
+  const COMMIT_NOT = /\b(?:maybe|might|perhaps|probably|hopefully|try to|if you|unless|in case|when you|once you|let me know)\b|(?:אולי|בערך|בוא נ|בואו נ|בואי נ|אם תרצו|אם תרצה|ברגע שתשלח|תודיע לי)/i;
   const COMMIT_NOT_ACTION = /\b(?:thank|thanks|happy|glad|be there|see you|call you|talk to you|speak)\b/i;
 
   // One sentence -> { type, action, object } or null.

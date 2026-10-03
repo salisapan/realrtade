@@ -1048,10 +1048,17 @@
     const toggle = document.getElementById('loopView');
     toggle.hidden = active.length < 2;
     if (loopView === 'person' && active.length > 1) {
-      for (const g of FlowFollowUp.groupByPerson(all, now)) {
+      // One person across apps: the same Dana by email and on WhatsApp is one heading (core/identity-graph.js).
+      let keyOf = null;
+      if (typeof FlowIdentity !== 'undefined' && FlowStorage.getIdentityGraph) {
+        const graph = await FlowStorage.getIdentityGraph();
+        keyOf = (w) => { const a = FlowIdentity.aliasesOf(graph, Object.assign({ channel: w.channel }, w.counterpart || {})); return a.emails[0] || (a.phones[0] ? 'phone:' + a.phones[0] : null); };
+      }
+      for (const g of FlowFollowUp.groupByPerson(all, now, { keyOf })) {
         const head = el('div', 'person-head');
         head.appendChild(el('span', null, g.name));
         const bits = [plural(g.loops.length, 'open', 'open')];
+        if (g.apps.length > 1 || (g.apps[0] && g.apps[0] !== 'gmail')) bits.push(g.apps.map((a) => (typeof FlowChannel !== 'undefined' ? FlowChannel.label(a) : a)).join(' + '));
         if (g.overdue) bits.push(g.overdue + ' overdue');
         if (g.youOwe) bits.push(g.youOwe + ' you promised');
         if (g.money.length && pro) bits.push('owes ' + g.money.map(FlowFollowUp.formatMoney).join(' + '));
@@ -1120,7 +1127,7 @@
     const usual = all ? FlowFollowUp.typicalDays(all, w, now) : null;
     top.appendChild(el('span', 'wait-state' + (state === 'overdue' ? ' overdue' : state === 'lapsed' ? ' lapsed' : ''), state === 'lapsed' ? 'Lapsed' : state === 'overdue' ? 'Overdue · ' + dayShort(w.chaseIso) : (FlowFollowUp.isClock(w) ? 'Look ' : FlowFollowUp.isYours(w) ? 'Answer ' : 'Chase ') + dayShort(w.chaseIso)));
     item.appendChild(top);
-    item.appendChild(el('div', 'wait-meta', stageLabel(w, now) + (risk && risk.slip ? ' · likely to slip, ' + whoLabel(w).split(' ')[0] + ' usually takes ~' + Math.round(risk.typical) + ' days' : usual ? ' · usually ~' + usual + ' days' : '')));
+    item.appendChild(el('div', 'wait-meta', (w.channel && w.channel !== 'gmail' && typeof FlowChannel !== 'undefined' ? FlowChannel.label(w.channel) + ' · ' : '') + stageLabel(w, now) + (risk && risk.slip ? ' · likely to slip, ' + whoLabel(w).split(' ')[0] + ' usually takes ~' + Math.round(risk.typical) + ' days' : usual ? ' · usually ~' + usual + ' days' : '')));
     const what = el('div', 'wait-what');
     if (isPay && w.amount && w.amount.raw) what.appendChild(el('span', 'wait-amt', w.amount.raw + ' · '));
     what.appendChild(document.createTextNode(w.what));
