@@ -49,6 +49,33 @@ check('it says "unsure" about noise, not something confident', M.predict('zxq vb
 check('an empty input is unsure, never a guess', M.predict('').unsure === true && M.predict('   ').unsure === true);
 check('it is fast enough to run on every sentence (1000 in under 3 seconds)', (() => { const t0 = Date.now(); for (let i = 0; i < 1000; i++) M.predict('Could you please send me the signed contract by Friday ' + i + '?'); return Date.now() - t0 < 3000; })());
 
+console.log('\n--- the teacher-authored sets: no leakage, and held-out domains ---\n');
+const teacherTrain = require('../../scripts/intent/teacher-train.json');
+const teacherEval = require('./fixtures/intent-teacher-eval.json');
+const normText = (t) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const trainNorm = new Set(teacherTrain.map((x) => normText(x.t)));
+check('no teacher evaluation sentence is in the teacher training set', teacherEval.every((x) => !trainNorm.has(normText(x.t))), teacherEval.filter((x) => trainNorm.has(normText(x.t))).map((x) => x.t));
+check('no teacher training sentence is in the older dev or blind sets', teacherTrain.every((x) => !gold.concat(blind).some((g) => normText(g.t) === normText(x.t))), teacherTrain.filter((x) => gold.concat(blind).some((g) => normText(g.t) === normText(x.t))).map((x) => x.t));
+check('the teacher evaluation set is large enough to mean something (> 250) and has both languages', teacherEval.length > 250 && teacherEval.some((x) => x.lang === 'he') && teacherEval.some((x) => x.lang === 'en'));
+const teAcc = teacherEval.filter((g) => M.predict(g.t).act === g.act).length / teacherEval.length;
+check('act accuracy on the teacher evaluation set is at least 0.86 (was 0.81 before the teacher data)', teAcc >= 0.86, teAcc);
+{
+  const pt = pr(teacherEval, (t) => { const r = P.recognize(t); return r.unsure ? 'X' : r.act; });
+  const lt = pr(teacherEval, (t) => (T.detectRequest(t) ? 'ASK' : T.detectCommitmentSentence(t) ? 'PROMISE' : 'X'));
+  console.log('  teacher-eval pipeline ASK P=' + pt.ASK.p.toFixed(2) + ' R=' + pt.ASK.r.toFixed(2) + ' | PROMISE P=' + pt.PROMISE.p.toFixed(2) + ' R=' + pt.PROMISE.r.toFixed(2) + ' | lexicon ASK R=' + lt.ASK.r.toFixed(2) + ' PROMISE R=' + lt.PROMISE.r.toFixed(2));
+  check('precision on teacher-eval asks and promises stays at least 0.97', pt.ASK.p >= 0.97 && pt.PROMISE.p >= 0.97, [pt.ASK, pt.PROMISE]);
+  check('recall on teacher-eval is at least 0.80 for asks and 0.75 for promises (was 0.66 / 0.69)', pt.ASK.r >= 0.80 && pt.PROMISE.r >= 0.75, [pt.ASK.r, pt.PROMISE.r]);
+  check('and at least 1.4x the word lists', pt.ASK.r >= 1.4 * lt.ASK.r && pt.PROMISE.r >= 1.4 * lt.PROMISE.r, [pt.ASK.r, lt.ASK.r, pt.PROMISE.r, lt.PROMISE.r]);
+}
+
+console.log('\n--- structure must permit what the model alone proposes ---\n');
+['The school bus leaves at 7:40 from the corner of Elm Street.', 'Customs clearance can take up to 48 hours.', 'I will not be available this Thursday.', 'I read through the term sheet and it looks reasonable overall.', 'בעל הבית אמר שהמקדמה תוחזר תוך שלושים יום מהפינוי.', 'You will receive a confirmation email shortly.'].forEach((t) => {
+  const r = P.recognize(t);
+  check('not an ask or a promise, however the model feels: ' + t.slice(0, 50), r.unsure || (r.act !== 'ASK' && r.act !== 'PROMISE'), r);
+});
+check('a question the model is sure about, with no named action, is an ask for a reply', (() => { const r = P.recognize('Has the container cleared customs yet?'); return r.act === 'ASK' && r.request && r.request.action === 'reply'; })());
+check('a social question is still not a task', P.recognize('How was the trip?').act !== 'ASK' && P.recognize('Will you be at the conference this year?').act !== 'ASK');
+
 console.log('\n--- the pipeline against the word lists (blind set) ---\n');
 function pr(set, pred) {
   const r = { ASK: [0, 0, 0], PROMISE: [0, 0, 0] };

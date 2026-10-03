@@ -1,0 +1,77 @@
+// Learning from outcomes (core/outcome-labels.js): which earlier sentence was the ask the engine
+// missed, when NOT to label, and what a label does to the on-device model. Run:
+//   node test/outcome-labels-corpus.cjs
+const fs = require('fs'), path = require('path');
+const { FlowOutcomeLabels: L } = require('../core/outcome-labels.js');
+const { FlowFollowUp: F } = require('../core/follow-up.js');
+const { FlowIntentModel: M } = require('../core/intent-model.js');
+const { FlowExtract } = require('../core/extract.js');
+const { FlowIntentPipeline: P } = require('../core/intent-pipeline.js');
+const PIPE = { extract: FlowExtract, pipeline: P };
+
+let failures = 0;
+function check(name, cond, detail) {
+  if (cond) console.log('PASS:', name);
+  else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
+}
+M.setAdaptation({});
+
+console.log('\n--- which sentence was the missed ask ---');
+const SERVER = 'Is the server back up? Nothing loads on my side.';
+const LICENCE = 'Is the licence renewal fee going to be paid this month? It expires Friday.';
+check('the fixtures really are asks the engine stays silent on (otherwise nothing was "missed")', [SERVER, LICENCE].every((t) => F.classifyOutgoing(t, Object.assign({ now: Date.now() }, PIPE)) === null), [SERVER, LICENCE].map((t) => F.classifyOutgoing(t, Object.assign({ now: Date.now() }, PIPE))));
+check('the ask-like sentence is picked out of a message with chatter', (() => { const p = L.pickMissedAsk('Thanks for your time yesterday. ' + SERVER + ' Best regards, Alex', M); return p && /server back up/.test(p.sentence); })());
+check('a message that is only thanks earns no label', L.pickMissedAsk('Thanks so much for the quick reply, really appreciate it.', M) === null);
+check('a long letter earns no label', L.pickMissedAsk(Array.from({ length: 12 }, (_, i) => 'This is sentence number ' + i + ' about the weather.').join(' '), M) === null);
+check('no model, no label', L.pickMissedAsk(SERVER, null) === null && L.pickMissedAsk(SERVER, { ready: () => false }) === null);
+check('an empty message earns no label', L.pickMissedAsk('', M) === null);
+
+console.log('\n--- when the thread says an ask was missed ---');
+{
+  const ctx = Object.assign({ now: Date.now() }, PIPE);
+  const own = (...texts) => texts.map((t, i) => ({ text: t, key: 'm' + i }));
+  const hit = F.missedAskIn(own(SERVER), ctx);
+  check('one silent earlier message: its ask is the label', hit && /server back up/.test(hit.sentence) && hit.key === 'm0', hit);
+  check('the nearest message with an ask-like sentence wins', (() => { const h = F.missedAskIn(own(SERVER, LICENCE), ctx); return h && /server back up/.test(h.sentence) && h.key === 'm0'; })());
+  check('a nearer message with nothing ask-like is skipped, not blamed', (() => { const h = F.missedAskIn(own('Sounds good, talk soon then.', SERVER), ctx); return h && /server back up/.test(h.sentence) && h.key === 'm1'; })());
+  check('if an earlier message of yours WAS recognised, nothing was missed', F.missedAskIn(own(SERVER, 'Please confirm the final figure by Monday so I can book the vendor.'), ctx) === null);
+  check('no earlier message of yours, nothing to learn', F.missedAskIn([], ctx) === null);
+  check('a courtesy-only earlier message teaches nothing', F.missedAskIn(own('Thanks for the call today, talk soon.'), ctx) === null);
+}
+
+console.log('\n--- what a label does to the model ---');
+{
+  M.setAdaptation({});
+  const before = M.predict(SERVER).probs.ASK;
+  M.learn(SERVER, 'act', 'ASK', L.RATE_MISSED);
+  const after = M.predict(SERVER).probs.ASK;
+  check('the missed ask becomes more ask-like', after > before, [before, after]);
+  const near = 'Is the printer back up? Nothing prints on my side.';
+  M.setAdaptation({});
+  const nb = M.predict(near).probs.ASK; M.learn(SERVER, 'act', 'ASK', L.RATE_MISSED);
+  check('and so do sentences that share its phrasing', M.predict(near).probs.ASK >= nb, [nb, M.predict(near).probs.ASK]);
+  check('only feature numbers are stored: no word of the sentence', !/server|loads|nothing/i.test(JSON.stringify(M.getAdaptation())));
+  check('every nudge is clipped', Object.values(M.getAdaptation().act).every((v) => Math.abs(v) <= 0.5));
+  M.setAdaptation({});
+  const clear = 'Could you please send me the signed contract by Friday?';
+  for (let i = 0; i < 6; i++) M.learn(clear, 'act', 'INFORM', 1.5);
+  M.setAdaptation({});
+  check('labels are gentle: a clear ask is not flipped by one mistaken label', (() => { M.learn(clear, 'act', 'INFORM', L.RATE_MISSED); return M.predict(clear).act === 'ASK'; })());
+  M.setAdaptation({});
+}
+
+console.log('\n--- recognition tier is remembered, so only model-alone loops are confirmed ---');
+{
+  const now = new Date('2026-10-05T12:00:00').getTime();
+  const lex = F.classifyOutgoing('Please confirm the final figure by Monday so I can book the vendor.', Object.assign({ now }, PIPE));
+  check('a word-list loop is tier "rule"/lexicon, never "model"', lex.tier !== 'model', lex.tier);
+  const model = F.classifyOutgoing('Do you mind taking another pass at the clause on indemnity before Friday? Legal wants it tight.', Object.assign({ now }, PIPE));
+  check('a loop only the model found says so', model && model.tier === 'model', model && model.tier);
+  check('the watch carries it', F.buildWatch({ threadId: 't', messageId: 'm', subject: 's', counterpart: { email: 'a@x.com' }, ask: model, now }).tier === 'model');
+}
+
+console.log('\n--- no external reach ---');
+check('outcome-labels.js never reaches outside the device', !/\bfetch\s*\(|XMLHttpRequest|chrome\.(?:runtime|storage)|sendMessage\s*\(|\bdocument\.\w|\bwindow\.\w/.test(fs.readFileSync(path.join(__dirname, '..', 'core', 'outcome-labels.js'), 'utf8')));
+
+console.log('\nTOTAL FAILURES:', failures);
+process.exit(failures ? 1 : 0);

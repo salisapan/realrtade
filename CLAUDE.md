@@ -114,3 +114,5 @@ the persona inline.
 ## The local intent engine — read before touching recognition
 
 `docs/intent-model.md` describes the on-device recognition stack (lexicon tier, learned model, pipeline), how it is measured and what the numbers do not prove. Retrain with `node scripts/train-intent-model.cjs` after changing `scripts/intent/generate.cjs` or the features; `flow-trial-extension/test/intent-model-corpus.cjs` enforces the precision and recall gates. Never lower a precision gate to raise recall, and never add an external model call to this path.
+
+How the engine learns (teacher data, per-person timing, labels from outcomes), how it is measured, and what the numbers do not prove: `docs/ai-engine-upgrade.md`.

@@ -273,6 +273,25 @@ Real-Gmail steps:
 43. **Hebrew.** Repeat 36, 37 and 39 in Hebrew (`תשלח לי את החוזה החתום`, `לא קיבלתי את הקובץ`).
 44. **Google disconnected.** The file buttons never appear without Google; the plain button says to connect Google.
 
+### 9a-iv. It learns (built 2026-10-03, `docs/ai-engine-upgrade.md`)
+
+- **How long each person takes.** After two real closes with someone, a new loop with no stated date is
+  looked at on the day that fits THEM (the card says "Dana usually takes about N days"). With three or
+  more, a loop with a date that they usually miss says "likely to slip, Dana usually takes ~N days",
+  the summary line counts it, and Pro adds the money on those loops. A new person keeps the old default.
+- **Learning from what happens next.** A hand-made chase in a thread where no loop was opened teaches the
+  model the earlier ask it missed; a loop only the model proposed that gets answered confirms it. Nothing is
+  shown. Only numbers are stored.
+
+Real-Gmail steps:
+
+45. **A fast and a slow person.** With two correspondents, close three loops with each (one who replies in a day, one in a week). Send each a new ask with no date. Expect an earlier look-again day for the fast one, a later one for the slow one, and the card to say how long they usually take.
+46. **Likely to slip.** Send the slow one an ask with a date tomorrow. Expect the row to say "likely to slip" and the summary line to count it. The fast one: nothing.
+47. **A new person.** A person with no history: the default day, no claim about habits.
+48. **Missed ask.** Send *"Is the server back up? Nothing loads on my side."* (no card should appear), wait, then send *"Any update?"* in the same thread. Nothing visible changes; in `chrome.storage.local` `outcomeLabels.missedAsk` is 1 and `intentAdapt` holds only numbers (no word of the sentence).
+49. **Not twice.** Open the same thread again: the count stays 1.
+50. **No false lesson.** Send an ask that gets a card, then *"Any update?"*: `missedAsk` stays 0.
+
 ## 9b. Still not built
 
 - Reading the Calendar itself to find meetings Glance did not create.

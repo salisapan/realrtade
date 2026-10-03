@@ -118,3 +118,13 @@ and any language other than English and Hebrew. Topic-style questions
   understanding (`core/reply-meaning.js`, `core/story.js`) is described in
   `docs/open-loops.md` §9a and measured in `docs/local-detection-plan.md`.
 
+## 9. Added 2026-10-03: teacher data, structure gate, new-domain evaluation
+
+Superseded headline numbers and the full method are in `docs/ai-engine-upgrade.md`. In short: 675
+teacher-authored sentences are mixed into training (`--rep 10`, `--no-teacher` to switch off), the pipeline only
+lets the model alone propose an ask or promise when the sentence is shaped like one, and a question the model is
+very sure about with no named action is an ask for a reply. Current pipeline numbers: blind set ask recall 0.94,
+promise 0.79; held-out new domains (279 sentences) ask 0.85, promise 0.80; precision 1.00 on all sets, all
+measured on sentences a model (not a person) wrote, and partly tuned. `scripts/intent/eval-sets.cjs` prints the
+current table; `test/intent-model-corpus.cjs` enforces precision >= 0.97 and the recall floors on every set.
+

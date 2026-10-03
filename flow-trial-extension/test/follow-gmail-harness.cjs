@@ -459,11 +459,32 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   const NODL = 'Could you send me the final figure so I can book the vendor?';
   t = await open(browser, 'person-slow', [msg(theirs, 'Happy to proceed.'), msg(mine, NODL)], { watches: SLOWHIST });
   s = await t.state();
-  check('with a slow replier the look-again day is later and says why', /usually take about \d/.test(s.card || '') && !/Fri, Oct 2/.test(s.card || ''), s.card);
+  check('with a slow replier the look-again day is later and says why', /usually takes about \d/.test(s.card || '') && !/Fri, Oct 2/.test(s.card || ''), s.card);
   await t.ctx.close();
   t = await open(browser, 'person-new', [msg(theirs, 'Happy to proceed.'), msg(mine, NODL)]);
   s = await t.state();
   check('a person Glance has no history with keeps the default day and says nothing about habits', /Fri, Oct 2/.test(s.card || '') && !/usually take/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 31. learning from what happens next: free labels, no UI
+  const SERVER_Q = 'Is the server back up? Nothing loads on my side.';
+  t = await open(browser, 'missed-ask', [msg(theirs, 'Hi, on it.'), msg(mine, SERVER_Q), msg(theirs, 'Looking now.'), msg(mine, 'Any update?')]);
+  s = await t.state();
+  let lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels, adapt: window.__store.intentAdapt }));
+  check('a hand-made chase after an ask we missed is counted as a missed ask, once', lab.labels && lab.labels.missedAsk === 1, lab.labels);
+  check('the model moved, and nothing of the sentence was stored', lab.adapt && Object.keys(lab.adapt.act || {}).length > 0 && !/server|loads/i.test(JSON.stringify(lab)), lab.adapt && Object.keys(lab.adapt.act || {}).length);
+  await t.ctx.close();
+  t = await open(browser, 'missed-none', [msg(theirs, 'Hi.'), msg(mine, ASK), msg(theirs, 'Looking now.'), msg(mine, 'Any update?')]);
+  lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels }));
+  check('if an earlier ask of mine WAS recognised, nothing was missed and nothing is learned', !lab.labels || !lab.labels.missedAsk, lab.labels);
+  await t.ctx.close();
+  t = await open(browser, 'confirm-model', ASKTHREAD.concat([msg(theirs, 'Confirmed, the final figure is 4,200.')]), { watches: [Object.assign({}, W2, { tier: 'model', what: SERVER_Q })] });
+  lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels, adapt: window.__store.intentAdapt }));
+  check('a loop only the model proposed (and was unsure about), then answered, is confirmed once and the model moves', lab.labels && lab.labels.confirmedAsk === 1 && Object.keys((lab.adapt || {}).act || {}).length > 0, lab);
+  await t.ctx.close();
+  t = await open(browser, 'confirm-rule', ASKTHREAD.concat([msg(theirs, 'Confirmed, the final figure is 4,200.')]), { watches: [W2] });
+  lab = await t.p.evaluate(() => ({ labels: window.__store.outcomeLabels }));
+  check('a word-list loop teaches the model nothing (it already knew)', !lab.labels || !lab.labels.confirmedAsk, lab.labels);
   await t.ctx.close();
 
   await browser.close();

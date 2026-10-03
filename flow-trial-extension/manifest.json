@@ -57,6 +57,7 @@
         "core/recognition-stats.js",
         "core/file-path.js",
         "core/person-model.js",
+        "core/outcome-labels.js",
         "core/follow-up.js",
         "core/expiry.js",
         "core/meeting-debrief.js",

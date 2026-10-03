@@ -50,6 +50,8 @@ const FlowFollowUp = (() => {
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
   const replyMeaning = sibling(typeof FlowReplyMeaning !== 'undefined' ? FlowReplyMeaning : null, './reply-meaning.js', 'FlowReplyMeaning');
+  const intentModel = sibling(typeof FlowIntentModel !== 'undefined' ? FlowIntentModel : null, './intent-model.js', 'FlowIntentModel');
+  const outcomeLabels = sibling(typeof FlowOutcomeLabels !== 'undefined' ? FlowOutcomeLabels : null, './outcome-labels.js', 'FlowOutcomeLabels');
   const filePath = sibling(typeof FlowFilePath !== 'undefined' ? FlowFilePath : null, './file-path.js', 'FlowFilePath');
   const personModel = sibling(typeof FlowPersonModel !== 'undefined' ? FlowPersonModel : null, './person-model.js', 'FlowPersonModel');
   const requestTypes = sibling(typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null, './request-types.js', 'FlowRequestTypes');
@@ -268,6 +270,7 @@ const FlowFollowUp = (() => {
     if (weight.level === 'light') return null;
     return {
       weight,
+      tier: typed && typed.line === chosen && typed.tier ? typed.tier : 'rule',
       file: filePath ? filePath.askNeed(chosen) : null,
       kind,
       what: clip(chosen, MAX_WHAT),
@@ -297,7 +300,7 @@ const FlowFollowUp = (() => {
     const lines = sentences(body).filter((s) => words(s) >= 4 && !COURTESY.test(s));
     let hit = null;
     for (const s of lines) {
-      if (pipe) { const r = pipe.recognize(s); if (r.act === 'PROMISE' && r.commitment) { hit = { line: s, t: r.commitment }; break; } }
+      if (pipe) { const r = pipe.recognize(s); if (r.act === 'PROMISE' && r.commitment) { hit = { line: s, t: r.commitment, tier: r.tier }; break; } }
       else { const t = types.detectCommitmentSentence(s); if (t) { hit = { line: s, t }; break; } }
     }
     if (!hit) return null;
@@ -313,6 +316,7 @@ const FlowFollowUp = (() => {
       lang: hasHebrew(body) ? 'he' : 'en',
       subtype: hit.t.type,
       subtypeLabel: null,
+      tier: hit.tier || 'rule',
       file: filePath ? filePath.promiseNeed(hit.line, hit.t.action) : null,
       direction: 'mine'
     };
@@ -364,6 +368,8 @@ const FlowFollowUp = (() => {
       subtype: ask.subtype || null,
       // The one file object that finishes this intention, or null (core/file-path.js).
       file: ask.file || null,
+      // How the loop was recognised ('model' = the on-device model alone, no word-list frame).
+      tier: ask.tier || null,
       stage: 'waiting',
       nudges: 0,
       nudgedAt: null,
@@ -586,6 +592,16 @@ const FlowFollowUp = (() => {
     if (words(t) >= 4 && (CHASE_EN.test(t) || CHASE_HE.test(t))) return true;
     // "Any update?", "Signed yet?", "?מה הסטטוס": a chase in two words.
     return Boolean(requestTypes && requestTypes.detectShortAsk(stripGreeting(t)));
+  }
+
+  // The ask Glance missed: in a thread where you chase by hand and no loop exists, find the earlier
+  // sentence of yours that WAS the ask (core/outcome-labels.js). `own` = earlier own messages, newest first.
+  function missedAskIn(own, ctx) {
+    if (!outcomeLabels) return null;
+    const c = ctx || {};
+    const model = c.model || intentModel;
+    const silentOn = (text) => !(classifyOutgoing(text, c) || classifyCommitment(text, c));
+    return outcomeLabels.missedAskIn(own, silentOn, model);
   }
 
   // A calendar-day count from today, landing on a weekday.
@@ -833,7 +849,7 @@ const FlowFollowUp = (() => {
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, deliversPromise, deliversFor, closeAsKept, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
-    nextNudgeLevel, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
+    nextNudgeLevel, missedAskIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
   };
 })();
 

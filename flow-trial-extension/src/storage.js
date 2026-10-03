@@ -209,7 +209,10 @@ const FlowStorage = (() => {
     recognitionStats: { localHit: 0, localSilence: 0, residual: 0, remote: 0, byTier: {}, since: null },
     // Keys of messages already counted, so a re-render or a page reload does not
     // count one message twice. Opaque ids only, capped.
-    recognitionSeen: []
+    recognitionSeen: [],
+    // core/outcome-labels.js: how many labels the product earned from what happened next (counts
+    // and opaque keys only, never text), so the same moment is not counted twice.
+    outcomeLabels: { missedAsk: 0, confirmedAsk: 0, confirmedPromise: 0, seen: [] }
   };
 
   function get() {
@@ -1016,6 +1019,25 @@ const FlowStorage = (() => {
     return cur;
   });
 
+  async function getOutcomeLabels() {
+    const state = await get();
+    return state.outcomeLabels || { missedAsk: 0, confirmedAsk: 0, confirmedPromise: 0, seen: [] };
+  }
+  // Returns true when the label is NEW (so the caller teaches the model exactly once per moment).
+  const recordOutcomeLabel = serialize(async function recordOutcomeLabel(kind, key) {
+    if (['missedAsk', 'confirmedAsk', 'confirmedPromise'].indexOf(kind) < 0) return false;
+    const state = await get();
+    const cur = Object.assign({ missedAsk: 0, confirmedAsk: 0, confirmedPromise: 0, seen: [] }, state.outcomeLabels || {});
+    const id = kind + '|' + key;
+    let seen = Array.isArray(cur.seen) ? cur.seen.slice() : [];
+    if (key && seen.indexOf(id) >= 0) return false;
+    if (key) { seen.push(id); if (seen.length > 300) seen = seen.slice(-300); }
+    cur[kind] = (cur[kind] || 0) + 1;
+    cur.seen = seen;
+    await set({ outcomeLabels: cur });
+    return true;
+  });
+
   const ackRecurrence = serialize(async function ackRecurrence(key, nextIso) {
     const state = await get();
     const acked = Object.assign({}, state.recurrenceAck || {}, { [key]: nextIso });
@@ -1074,7 +1096,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getRecognitionStats, recordRecognition, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

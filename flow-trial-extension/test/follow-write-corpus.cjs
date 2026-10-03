@@ -68,6 +68,9 @@ async function storageTests() {
   await S.recordLoopOpen(open('2026-07-12')); await S.recordLoopOpen(open('2026-08-12')); await S.recordLoopOpen(open('2026-09-12')); await S.recordLoopOpen(open('2026-09-12'));
   const lh = await S.getLoopHistory();
   check('opening loops records only dates, per person and kind, once per day', Object.keys(lh.history).length === 1 && Object.values(lh.history)[0].dates.length === 3 && !/Please confirm/.test(JSON.stringify(lh.history)), lh.history);
+  check('an outcome label is new once per moment', (await S.recordOutcomeLabel('missedAsk', 'thr|m1')) === true && (await S.recordOutcomeLabel('missedAsk', 'thr|m1')) === false && (await S.recordOutcomeLabel('missedAsk', 'thr|m2')) === true);
+  check('labels are counted by kind, with opaque keys only', (await S.getOutcomeLabels()).missedAsk === 2 && !/Please confirm/.test(JSON.stringify(await S.getOutcomeLabels())));
+  check('an unknown label kind is refused', (await S.recordOutcomeLabel('whatever', 'x')) === false);
   await S.ackRecurrence('k', '2026-10-12');
   check('an acknowledged prediction is remembered', (await S.getLoopHistory()).acked.k === '2026-10-12');
 

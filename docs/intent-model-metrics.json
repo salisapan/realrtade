@@ -20,36 +20,36 @@
    },
    "pipeline": {
     "ASK": {
-     "precision": 0.984,
-     "recall": 0.953,
-     "tp": 61,
-     "fp": 1,
-     "fn": 3
+     "precision": 1,
+     "recall": 0.938,
+     "tp": 60,
+     "fp": 0,
+     "fn": 4
     },
     "PROMISE": {
-     "precision": 0.976,
-     "recall": 0.952,
-     "tp": 40,
+     "precision": 0.975,
+     "recall": 0.929,
+     "tp": 39,
      "fp": 1,
-     "fn": 2
+     "fn": 3
     }
    },
    "localShare": {
     "ASK": {
      "real": 64,
-     "solvedLocally": 61,
-     "solvedShare": 0.953,
-     "residual": 3,
-     "residualShare": 0.047,
-     "wrongCards": 1,
+     "solvedLocally": 60,
+     "solvedShare": 0.938,
+     "residual": 4,
+     "residualShare": 0.063,
+     "wrongCards": 0,
      "remoteShare": 0
     },
     "PROMISE": {
      "real": 42,
-     "solvedLocally": 40,
-     "solvedShare": 0.952,
-     "residual": 2,
-     "residualShare": 0.048,
+     "solvedLocally": 39,
+     "solvedShare": 0.929,
+     "residual": 3,
+     "residualShare": 0.071,
      "wrongCards": 1,
      "remoteShare": 0
     }
@@ -75,37 +75,37 @@
    },
    "pipeline": {
     "ASK": {
-     "precision": 0.938,
-     "recall": 0.882,
-     "tp": 30,
-     "fp": 2,
-     "fn": 4
+     "precision": 1,
+     "recall": 0.941,
+     "tp": 32,
+     "fp": 0,
+     "fn": 2
     },
     "PROMISE": {
-     "precision": 0.957,
-     "recall": 0.917,
-     "tp": 22,
-     "fp": 1,
-     "fn": 2
+     "precision": 1,
+     "recall": 0.792,
+     "tp": 19,
+     "fp": 0,
+     "fn": 5
     }
    },
    "localShare": {
     "ASK": {
      "real": 34,
-     "solvedLocally": 30,
-     "solvedShare": 0.882,
-     "residual": 4,
-     "residualShare": 0.118,
-     "wrongCards": 2,
+     "solvedLocally": 32,
+     "solvedShare": 0.941,
+     "residual": 2,
+     "residualShare": 0.059,
+     "wrongCards": 0,
      "remoteShare": 0
     },
     "PROMISE": {
      "real": 24,
-     "solvedLocally": 22,
-     "solvedShare": 0.917,
-     "residual": 2,
-     "residualShare": 0.083,
-     "wrongCards": 1,
+     "solvedLocally": 19,
+     "solvedShare": 0.792,
+     "residual": 5,
+     "residualShare": 0.208,
+     "wrongCards": 0,
      "remoteShare": 0
     }
    }
@@ -130,37 +130,37 @@
    },
    "pipeline": {
     "ASK": {
-     "precision": 0.969,
-     "recall": 0.77,
-     "tp": 94,
-     "fp": 3,
-     "fn": 28
+     "precision": 1,
+     "recall": 0.852,
+     "tp": 104,
+     "fp": 0,
+     "fn": 18
     },
     "PROMISE": {
-     "precision": 0.983,
-     "recall": 0.817,
-     "tp": 58,
-     "fp": 1,
-     "fn": 13
+     "precision": 1,
+     "recall": 0.803,
+     "tp": 57,
+     "fp": 0,
+     "fn": 14
     }
    },
    "localShare": {
     "ASK": {
      "real": 122,
-     "solvedLocally": 94,
-     "solvedShare": 0.77,
-     "residual": 28,
-     "residualShare": 0.23,
-     "wrongCards": 3,
+     "solvedLocally": 104,
+     "solvedShare": 0.852,
+     "residual": 18,
+     "residualShare": 0.148,
+     "wrongCards": 0,
      "remoteShare": 0
     },
     "PROMISE": {
      "real": 71,
-     "solvedLocally": 58,
-     "solvedShare": 0.817,
-     "residual": 13,
-     "residualShare": 0.183,
-     "wrongCards": 1,
+     "solvedLocally": 57,
+     "solvedShare": 0.803,
+     "residual": 14,
+     "residualShare": 0.197,
+     "wrongCards": 0,
      "remoteShare": 0
     }
    }

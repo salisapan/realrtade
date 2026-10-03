@@ -350,6 +350,7 @@ const FlowFollow = (() => {
     recordReply(watch, best.reply, lastId);
     const patch = Object.assign({}, res.patch, { lastReplyMessageId: lastId });
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
+    if (res.close && next.tier === 'model' && best.reply.outcome !== 'declined') confirmAsk(next, 'confirmedAsk', 'ASK');
     if (res.close) await closed(next, best.sender, best.reply.outcome === 'paid' ? 'paid' : best.reply.outcome === 'declined' ? 'declined' : best.reply.delivered === 'file' ? 'file' : 'replied');
     else if (res.yours) await yours(watch, best.sender, patch, ctx);
     else if (res.claimedOnly) {
@@ -361,11 +362,44 @@ const FlowFollow = (() => {
   }
 
   // ---- a promise of yours, kept ------------------------------------------------
+  // ---- learning from what happened next (core/outcome-labels.js) ---------------------------
+  // The on-device model alone proposed this loop and reality agreed (they answered / you kept it):
+  // a small confirmation, once. Only feature numbers move; no text is stored.
+  async function confirmAsk(watch, kind, label) {
+    try {
+      if (typeof FlowStorage.recordOutcomeLabel !== 'function' || typeof FlowOutcomeLabels === 'undefined') return;
+      if (await FlowStorage.recordOutcomeLabel(kind, watch.id)) await teach(watch.what, label, FlowOutcomeLabels.RATE_CONFIRMED);
+    } catch (e) { /* learning is optional */ }
+  }
+
+  // You chased by hand in a thread where no loop exists: an earlier message of yours was an ask
+  // the engine stayed silent on. Teach the model that sentence, once.
+  async function learnMissedAsk(ctx, last, threadId) {
+    try {
+      if (typeof FlowOutcomeLabels === 'undefined' || typeof FlowStorage.recordOutcomeLabel !== 'function' || !FlowFollowUp.missedAskIn) return;
+      await loadAdapt();
+      const msgs = Array.from(ctx.messages);
+      const at = msgs.indexOf(last);
+      const own = [];
+      for (let i = at - 1; i >= 0; i--) {
+        const e = (ctx.extractSender(msgs[i]).email || '').toLowerCase();
+        if (e && e === String(ctx.ownEmail).toLowerCase()) own.push({ text: ctx.ownMessageText(msgs[i]), key: msgs[i].getAttribute('data-legacy-message-id') || String(i) });
+      }
+      const found = FlowFollowUp.missedAskIn(own, { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null });
+      if (!found) return;
+      if (await FlowStorage.recordOutcomeLabel('missedAsk', threadId + '|' + found.key)) {
+        await teach(found.sentence, 'ASK', FlowOutcomeLabels.RATE_MISSED);
+        track('follow_learned_missed_ask');
+      }
+    } catch (e) { /* learning is optional */ }
+  }
+
   async function kept(watch, lastId) {
     const patch = Object.assign({ messageId: lastId }, FlowFollowUp.closeAsKept(watch, Date.now()));
     const next = (await FlowStorage.updateWatch(watch.id, patch)) || Object.assign({}, watch, patch);
     if (watch.taskRef) await send({ type: 'flow:follow-complete', ref: watch.taskRef });
     track('follow_resolved');
+    if (watch.tier === 'model') confirmAsk(watch, 'confirmedPromise', 'PROMISE');
     receipt('Promise kept' + took(watch) + '. Loop closed.', null, { label: 'Reopen', run: () => reopen(next) });
   }
 
@@ -452,7 +486,7 @@ const FlowFollow = (() => {
     }
     h.appendChild(el('div', 'flow-fu-title', isPay ? 'Waiting on a payment?' : ask.file ? 'Waiting on the ' + ask.file.label + '?' : 'Waiting on a reply?'));
     h.appendChild(el('div', 'flow-fu-quote', ask.what));
-    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + (ask.personal ? ' (' + (FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) || 'they') + ' usually take about ' + Math.max(1, Math.round(ask.personal.typical)) + ' days)' : '') + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
+    h.appendChild(el('div', 'flow-fu-line', 'I can stay on this until it is closed: look again on ' + dayLabel(ask.chaseIso) + (ask.personal ? ' (' + ((FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) || '') ? FlowFollowUp.firstName(base.counterpart && base.counterpart.name, base.counterpart && base.counterpart.email) + ' usually takes' : 'they usually take') + ' about ' + Math.max(1, Math.round(ask.personal.typical)) + ' days)' : '') + ', and close it myself when ' + (isPay ? 'it is paid.' : ask.file ? 'the ' + ask.file.label + ' arrives.' : 'they answer.')));
     const row = el('div', 'flow-fu-actions');
     row.appendChild(button('Stay on it', 'primary', () => { track1(ask, base); }));
     row.appendChild(button('Not now', 'ghost', () => { declined(ask, base); }));
@@ -609,6 +643,8 @@ const FlowFollow = (() => {
     if (offered.has(key)) return;
 
     const mineText = ctx.ownMessageText(last);
+    // A hand-made chase with no loop behind it: whatever you asked earlier was an ask we missed.
+    if (!watch && FlowFollowUp.looksLikeChase(mineText)) learnMissedAsk(ctx, last, threadId);
     const cls = { now: Date.now(), extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null };
     // What I asked of them comes first; if I asked nothing, what I promised them.
     let ask = FlowFollowUp.classifyOutgoing(mineText, cls) || FlowFollowUp.classifyCommitment(mineText, cls);

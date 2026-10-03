@@ -22,12 +22,16 @@ const FlowIntentPipeline = (() => {
   const MODEL_MIN = 0.75;      // model confidence needed to propose on its own
   const ACTION_MIN = 0.5;      // how sure the model's action head must be to name the action itself
   const UNSURE_BELOW = 0.6;
+  const QUESTION_MIN = 0.9;    // a question with no nameable action is an ask for a reply only when the model is this sure
 
   // The request a model-proposed ask stands for: a known verb wins; otherwise
   // the model's own action head, if it is clear about it.
   function topicRequest(m, s) {
     const hits = types.lexHits(s);
-    const a = hits.actions[0] || (m.action && m.action !== 'none' && m.actionProb >= ACTION_MIN ? m.action : null);
+    let a = hits.actions[0] || (m.action && m.action !== 'none' && m.actionProb >= ACTION_MIN ? m.action : null);
+    // A question the model is very sure is an ask, with no particular action in it ("Has the container
+    // cleared customs yet?", "What is the status of my ticket?"), is a request for an answer.
+    if (!a && m.act === 'ASK' && m.actProb >= QUESTION_MIN && /[?؟]/.test(s)) a = 'reply';
     if (!a) return null;
     const act = types.ACTIONS.find((x) => x.id === a);
     if (!act) return null;
@@ -40,7 +44,7 @@ const FlowIntentPipeline = (() => {
   // A timetable ("The bus leaves at 7:40") or a report of someone else's future ("the deposit will
   // be returned in thirty days") is not addressed to anyone and promises nothing in the first
   // person, however confident a statistical model is. Deterministic, language-aware, cheap.
-  const ASK_SHAPE_EN = /\?|\b(?:you|your|yours|u|ya|pls|please|kindly|could|would|can|shall|need|needs|needed|waiting|awaiting|let me know|tell me)\b/i;
+  const ASK_SHAPE_EN = /\?|\b(?:you|your|yours|u|ya|pls|please|kindly|need|needs|needed|waiting|awaiting|let me know|tell me)\b|\b(?:could|would|can|shall|will)\s+(?:we|someone|anyone|somebody|anybody|they)\b/i;
   const ASK_START_EN = /^(?:send|share|forward|provide|attach|upload|return|submit|resend|sign|approve|confirm|verify|check|review|look|read|pay|wire|transfer|settle|book|schedule|pick|choose|decide|reply|respond|update|fix|prepare|draft|write|complete|finish|fill|get|give|make|take|tell|let|come|join|register|rsvp|advise|clarify|remember|don't forget)\b/i;
   const ASK_SHAPE_HE = /\?|(?:תוכל|תוכלי|תוכלו|אפשר|נא |בבקשה|אנא|אשמח|צריך|צריכה|צריכים|ממתין|ממתינה|מחכה|מחכים|שלך|שלכם|אתה|אתם|לך |לכם|תגיד|תעדכנו|תעדכן)/;
   const ASK_START_HE = /^ת(?!ו[א-ת]*ר\b)[א-ת]{2,}|^(?:נא|אנא|בבקשה|שלח|שלחו|חזור|אשר|חתום|בדוק|עדכן|הצטרף|הגש|העבר|תן|תני)(?:\s|$)/;
