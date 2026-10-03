@@ -166,7 +166,7 @@ console.log('\n--- one loop, one status truth ---');
 
 console.log('\n--- the boundary ---');
 {
-  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'core', 'resolution.js'), 'utf8');
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'core', 'resolution.js'), 'utf8').split('\n').map((l) => l.replace(/^\s*\/\/.*$/, '')).join('\n');
   check('resolution.js never reaches outside the device and has no send, issue or generate path', !/\bfetch\s*\(|XMLHttpRequest|chrome\.|sendMessage\s*\(|messages\/send|drafts\/send|\bdocument\.\w|\bwindow\.\w|\bcreateReceipt\b|\bissueReceipt\b/.test(src));
 }
 
