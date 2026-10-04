@@ -900,7 +900,7 @@ const FlowFollow = (() => {
   }
 
   function planFor(env, world) {
-    return FlowResolution.plan({ need: env.need, facts: env.facts, evidence: world.evidence, payment: world.payment, issuer: world.issuer, state: env.state, sourceText: env.text });
+    return FlowResolution.plan({ need: env.need, facts: env.facts, evidence: world.evidence, payment: world.payment, issuer: world.issuer, state: env.state, sourceText: env.text, now: Date.now() });
   }
 
   // The loop that carries the path. Opened on the first tap, never before. Returns the stored watch, or null (cap, or Google not connected).
@@ -994,6 +994,15 @@ const FlowFollow = (() => {
         track('follow_resolution_requested');
         receipt('Draft to ' + (plan.issuer.name || plan.issuer.email) + ' is ready in Gmail. Nothing was sent. This stays open until the ' + env.need.label + ' reaches ' + (env.facts.senderName || 'them') + '.', null);
       })));
+      else if (a === 'chase-issuer') row.appendChild(button('Remind ' + (plan.issuer.name || plan.issuer.email), primary, move(async () => {
+        const days = plan.quietDays || Math.max(1, Math.floor((t - (st.requestedAt || t)) / 86400000));
+        const body = FlowResolution.issuerChaseDraft(env.need, env.facts, plan.issuer, { days });
+        const res = await draftTo(plan.issuer.email, plan.issuer.name, (he ? 'תזכורת: ' : 'Reminder: ') + env.need.label + (env.facts.senderName ? ' - ' + env.facts.senderName : ''), body, {});
+        if (!(res && res.ok)) { receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null); return; }
+        await saveResolution(env, FlowResolution.recordChase(st, t), { line: 'Reminder to ' + (plan.issuer.name || plan.issuer.email) + ' is ready. Not sent. I will look again in a few days.', move: 'await-issuer' });
+        track('follow_resolution_chased');
+        receipt('Reminder to ' + (plan.issuer.name || plan.issuer.email) + ' is ready in Gmail. Nothing was sent.', null);
+      })));
       else if (a === 'issue-myself') row.appendChild(button('I will issue it', 'ghost', move(async () => { const next = FlowResolution.recordOwnerIssuing(st, t); await saveResolution(env, next, { line: 'Waiting for you to issue the ' + env.need.label + '.', move: 'await-owner-issue' }); receipt('Noted. I will close this when you send the ' + env.need.label + ' as a file.', null); })));
       else if (a === 'set-issuer') {
         const input = el('input', 'flow-fu-input');
@@ -1058,16 +1067,16 @@ const FlowFollow = (() => {
   // Nothing is attached or sent without the tap, and the loop stays open until you send it.
   const examinedIssuer = new Set();
   async function issuerReply(ctx, last, sender, threadId, lastId) {
-    if (typeof FlowResolution === 'undefined' || channelOf(ctx) !== 'gmail' || ctx.strict || !sender.email || !ctx.attachmentsOf) return false;
+    if (typeof FlowResolution === 'undefined' || channelOf(ctx) !== 'gmail' || ctx.strict || !sender.email) return false;
     const key = threadId + '|' + lastId;
     if (examinedIssuer.has(key)) return false;
     examinedIssuer.add(key);
     if (examinedIssuer.size > 400) examinedIssuer.clear();
-    const atts = ctx.attachmentsOf(last);
-    if (!atts || !atts.length) return false;
     const watches = await FlowStorage.getWatches();
-    const m = FlowResolution.matchIssuerReply(watches, { senderEmail: sender.email, text: ctx.messageText(last), attachments: atts });
-    if (!m) return false;
+    const text = ctx.messageText(last);
+    const atts = ctx.attachmentsOf ? ctx.attachmentsOf(last) : null;
+    const m = atts && atts.length ? FlowResolution.matchIssuerReply(watches, { senderEmail: sender.email, text, attachments: atts }) : null;
+    if (!m) return await issuerWords(ctx, watches, sender, text, atts);
     const w = m.watch;
     const need = { object: w.resolution.object, label: w.resolution.label, lang: w.resolution.lang || 'en' };
     const facts = { senderName: (w.counterpart && w.counterpart.name) || null, amount: w.amount || null };
@@ -1089,6 +1098,29 @@ const FlowFollow = (() => {
     }));
     row.appendChild(button('Not now', 'ghost', dismiss));
     h.appendChild(row);
+    return true;
+  }
+
+
+  // The issuer wrote back WITHOUT a file that fits: read what they said with the same reply reader every loop uses. A promised day moves the
+  // reminder to that day, a no sends the path looking for someone else, a question is flagged as yours. Nothing is attached, sent or closed.
+  async function issuerWords(ctx, watches, sender, text, atts) {
+    const mm = FlowResolution.matchIssuerMessage(watches, { senderEmail: sender.email, text });
+    if (!mm) return false;
+    const w = mm.watch;
+    const now = Date.now();
+    const m0 = typeof FlowFileAttach !== 'undefined' ? FlowFileAttach.mention(w.resolution.label || w.resolution.object) : null;
+    const pseudo = { direction: 'theirs', kind: FlowFollowUp.KINDS.REPLY, lang: w.resolution.lang || 'en', what: 'Please issue the ' + w.resolution.label, file: { object: w.resolution.object, label: w.resolution.label, lang: w.resolution.lang || 'en', synonym: m0 ? m0.synonym : [w.resolution.label] } };
+    const evidence = typeof FlowFilePath !== 'undefined' && atts ? FlowFilePath.evidence({ text, attachments: atts }) : null;
+    const reply = FlowFollowUp.classifyReply(text, pseudo, { now, email: sender.email, evidence });
+    const r = FlowResolution.readIssuerAnswer(w.resolution, reply, now, text);
+    if (r.kind === 'none' || r.kind === 'file') return false;
+    const move = r.kind === 'declined' ? 'name-issuer' : 'await-issuer';
+    const resolution = Object.assign({}, r.state, { line: r.line, move });
+    const next = (await FlowStorage.updateWatch(w.id, { resolution })) || Object.assign({}, w, { resolution });
+    if (r.kind === 'promised' && r.state.issuerPromisedIso) await moveTask(next, r.state.issuerPromisedIso);
+    track('follow_resolution_issuer_' + r.kind);
+    receipt(r.line, null);
     return true;
   }
 

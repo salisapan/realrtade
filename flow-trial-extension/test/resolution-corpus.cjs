@@ -4,6 +4,8 @@
 // plus the precision rules around them. Run: node test/resolution-corpus.cjs
 const { FlowResolution: R } = require('../core/resolution.js');
 const { FlowFileAttach: FA } = require('../core/file-attach.js');
+const { FlowFollowUp: F } = require('../core/follow-up.js');
+const { FlowExtract } = require('../core/extract.js');
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -202,6 +204,56 @@ console.log('\n--- the issuer answers in another thread ---');
   const amtText = (txt) => m([w('a', st), w('b', R.recordRequest(R.markPaid(R.open(need, { senderName: 'Omer', amount: { value: 900, currency: 'ILS', raw: '₪900' } }, NOW), NOW), NOW, 'Noa Books', 'books@my-accountant.co.il'), { value: 900, currency: 'ILS' })], { text: txt });
   check('two loops on one issuer: the message naming one amount picks that loop', (() => { const r = amtText('Hi, the receipt for ₪900 is attached'); return r && r.watch.id === 'b'; })(), amtText('Hi, the receipt for ₪900 is attached'));
   check('and a message naming no amount still picks nothing', amtText('Receipt attached') === null);
+}
+
+console.log('\n--- reading what the issuer says back (they are not an attachment, they are a person) ---');
+{
+  const MON = new Date('2026-10-05T12:00:00').getTime();   // a Monday
+  const base = R.recordRequest(R.markPaid(R.open(need, facts, MON - 4 * DAY), MON - 4 * DAY), MON - 4 * DAY, 'Noa Books', 'books@my-accountant.co.il');
+  // the issuer's words go through the same reply reader every loop uses, as a request to issue a file
+  const pseudo = { direction: 'theirs', kind: 'reply', lang: 'en', what: 'Please issue the receipt', file: { object: 'receipt', label: 'receipt', synonym: need.synonym } };
+  const read = (text, atts) => R.readIssuerAnswer(base, F.classifyReply(text, pseudo, { now: MON, extract: FlowExtract, email: 'books@my-accountant.co.il', evidence: { known: Array.isArray(atts), attached: !!(atts && atts.length), names: atts || [], claims: /attached/i.test(text) } }), MON, text);
+  const p1 = read('Sure, I will send it on Thursday.');
+  check('"I will send it on Thursday": a promised day is recorded, the request stays open', p1.kind === 'promised' && p1.state.issuerPromisedIso === '2026-10-08' && p1.state.requestedAt === base.requestedAt, p1);
+  const pp = plan({ payment: pay('bank-email'), issuer, state: p1.state, now: MON });
+  check('and the path says it, with the day, and does not chase before it', pp.move === 'await-issuer' && /Thu, Oct 8/.test(pp.line), pp);
+  const late = plan({ payment: pay('bank-email'), issuer, state: p1.state, now: new Date('2026-10-09T12:00:00').getTime() });
+  check('the day passed with no file: it offers one reminder to them (a draft)', late.move === 'chase-issuer' && /promised Thu, Oct 8/.test(late.line) && late.actions.join() === 'chase-issuer', late);
+  const d1 = read('We do not issue receipts for that, sorry. Please ask the bank.');
+  check('"we do not issue these": declined, so it reroutes instead of waiting forever', d1.kind === 'declined' && d1.state.issuerDeclinedEmail === 'books@my-accountant.co.il' && !d1.state.requestedAt, d1);
+  const dp = plan({ payment: pay('bank-email'), issuer, state: d1.state, now: MON });
+  check('the plan does not ask the same person again: it asks who else issues receipts', dp.move === 'name-issuer' && /Noa Books said they cannot issue/.test(dp.line) && dp.actions.join() === 'set-issuer,issue-myself', dp);
+  const other = plan({ payment: pay('bank-email'), issuer: { email: 'ron@other.co.il', name: 'Ron' }, state: d1.state, now: MON });
+  check('a different issuer saved afterwards is asked normally', other.move === 'request-issuer' && other.issuer.email === 'ron@other.co.il', other);
+  check('a condition makes it a delay, not a no: "we do not issue receipts until it clears"', read('We do not issue receipts until the payment clears.').kind !== 'declined', read('We do not issue receipts until the payment clears.'));
+  check('a promise in the same message wins over a no about today', read('We cannot issue it today, but I will send it on Thursday.').kind === 'promised');
+  check('Hebrew: "we do not issue these"', read('אנחנו לא מנפיקים קבלות על זה.').kind === 'declined');
+  check('an interim "I will check what we can do" is never read as a no', read('Thanks, I will check what we can do.').kind !== 'declined');
+  const q1 = read('Which name should it be issued under?');
+  check('"which name should it be under?": they asked YOU something, and it is said once', q1.kind === 'asked' && q1.state.issuerAskedAt === MON && /asked you/.test(q1.line), q1);
+  check('a thank-you changes nothing', read('Thanks!').kind === 'none' && read('Thanks!').state === base);
+  const nf = read('Done, it is issued.');
+  check('"done" with no file is not a file: kept open, says so', nf.kind === 'no-file' && /no file came/.test(nf.line) && nf.state.requestedAt === base.requestedAt, nf);
+  const real = read('Here it is.', ['Receipt-7731.pdf']);
+  check('a real file is the file path (matchIssuerReply), not this one', real.kind === 'file', real);
+  const out = read('Out of office until Monday');
+  check('an out-of-office changes nothing', out.kind === 'none');
+}
+
+console.log('\n--- no answer from the issuer: one reminder, then it waits ---');
+{
+  const T0 = new Date('2026-10-05T12:00:00').getTime();
+  const asked = R.recordRequest(R.markPaid(R.open(need, facts, T0), T0), T0, 'Noa Books', 'books@my-accountant.co.il');
+  const at = (days) => plan({ payment: pay('bank-email'), issuer, state: asked, now: T0 + days * DAY });
+  check('two days after asking: still waiting, quiet', at(2).move === 'await-issuer');
+  const c = at(4);
+  check('four days: one reminder to the issuer is offered, and says how long', c.move === 'chase-issuer' && /4 days/.test(c.line) && c.done === false, c);
+  const d = R.issuerChaseDraft(need, facts, issuer, { days: 4 });
+  check('the reminder names the payer and the amount, asks for the file, claims nothing', /Hi Noa,/.test(d) && /receipt for Dana Levi for ₪3,850/.test(d) && !/attached|enclosed/i.test(d), d);
+  const chased = R.recordChase(asked, T0 + 4 * DAY);
+  check('after the reminder it waits again, not at once again', plan({ payment: pay('bank-email'), issuer, state: chased, now: T0 + 5 * DAY }).move === 'await-issuer' && plan({ payment: pay('bank-email'), issuer, state: chased, now: T0 + 8 * DAY }).move === 'chase-issuer');
+  check('the reminder is one step in the same trail', chased.trail.slice(-1)[0].note === 'chased-issuer' && chased.chasedAt === T0 + 4 * DAY);
+  check('without a clock the plan never invents a chase', R.plan({ canCreate: true, need, facts, evidence: { threadFiles: [], driveFiles: [] }, payment: pay('bank-email'), issuer, state: asked }).move === 'await-issuer');
 }
 
 console.log('\n--- one loop, one status truth ---');

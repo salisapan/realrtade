@@ -673,6 +673,33 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('Omer still owes the same amount: the bank email is not taken for Dana\'s, so it asks', /Was it paid\?/.test(s.card || '') && !/Ask .* to issue/.test(s.card || ''), s.card);
   await t.ctx.close();
 
+  // 32k. the issuer is a person: what they SAY moves the path (a day, a no, a question), and silence earns one reminder
+  const ISSUER_PRM = await (async () => { t = await open(browser, 'res-issuer-promise', [msg(ISSUERMSG, 'Sure, I will send it on Wednesday.')], { watches: [REQUESTED] }); s = await t.state(); return s; })();
+  check('"I will send it on Wednesday": the day is recorded, the reminder moves to it, nothing else', ISSUER_PRM.watches[0].resolution.issuerPromisedIso === '2026-10-07' && ISSUER_PRM.watches[0].status === 'waiting' && /said they will send it by Wed, Oct 7/.test(ISSUER_PRM.card || '') && ISSUER_PRM.msgs.includes('flow:follow-reschedule'), ISSUER_PRM);
+  await t.ctx.close();
+  t = await open(browser, 'res-issuer-no', [msg(ISSUERMSG, 'Sorry, we do not issue receipts for that.')], { watches: [REQUESTED] });
+  s = await t.state();
+  check('"we do not issue these": the request is released and the path looks for someone else', s.watches[0].resolution.issuerDeclinedEmail === 'books@my-accountant.co.il' && !s.watches[0].resolution.requestedAt && /cannot issue the receipt\. Who else issues your receipts\?/.test(s.card || '') && s.watches[0].status === 'waiting', s);
+  await t.ctx.close();
+  t = await open(browser, 'res-issuer-ask', [msg(ISSUERMSG, 'Which name should it be issued under?')], { watches: [REQUESTED] });
+  s = await t.state();
+  check('a question from the issuer is flagged as yours, once, and nothing is closed', s.watches[0].resolution.issuerAskedAt && /asked you something/.test(s.card || '') && s.watches[0].status === 'waiting', s);
+  await t.ctx.close();
+  t = await open(browser, 'res-issuer-thanks', [msg(ISSUERMSG, 'Thanks!')], { watches: [REQUESTED] });
+  s = await t.state();
+  check('a thank-you from them changes nothing', !s.watches[0].resolution.issuerReplyAt && !/Noa/.test(s.card || ''), s);
+  await t.ctx.close();
+  const OLDREQ = Object.assign({}, RW, { resolution: Object.assign({}, RW.resolution, { stage: 'request', move: 'await-issuer', requestedAt: new Date(2026, 8, 26, 12).getTime(), requestedTo: 'Noa Books', requestedToEmail: 'books@my-accountant.co.il', assertedPaidAt: 1 }) });
+  t = await open(browser, 'res-chase', RT, { watches: [OLDREQ] });
+  s = await t.state();
+  check('five quiet days after asking the issuer: one reminder is offered, with how long', /Asked Noa Books 5 days ago and no file has come\. Remind them\?/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(700);
+  const ch = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  s = await t.state();
+  check('the reminder is a draft to the issuer that asks for the file and claims none', ch && ch.payload.to === 'books@my-accountant.co.il' && /reminder about the receipt for Dana Cole for ₪3,850/.test(ch.payload.body) && /5 days ago/.test(ch.payload.body) && !/attached|enclosed/i.test(ch.payload.body), ch && ch.payload);
+  check('and the loop waits again, still open', s.watches[0].status === 'waiting' && s.watches[0].resolution.chasedAt > 0, s.watches);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);

@@ -3,7 +3,7 @@
 > Written 2026-10-03. Companion to `docs/file-backed-closure-plan.md` (single-file closure), `docs/open-loops.md`,
 > `docs/decision-filter.md` (§5.8 of `docs/product-architecture.md`), `docs/local-first-principle.md`.
 > Code: `flow-trial-extension/core/resolution.js` (pure), `src/follow.js` (the card and the loop),
-> tests: `test/resolution-corpus.cjs` (93 checks), `test/follow-gmail-harness.cjs` section 32.
+> tests: `test/resolution-corpus.cjs` (114 checks), `test/follow-gmail-harness.cjs` section 32.
 
 ## 1. The problem, in one example
 
@@ -62,7 +62,7 @@ move). Direction `mine`, one Google Task reminder, one place in the popup. A ste
 
 Built: the pure planner and delivery judge; payments-seen and issuer storage; the follow card (one card, one move at a time,
 the path advances after each tap); the loop with its status line; popup row; Do It chip steps aside for receipts and transfer proofs
-so nothing says "Handled." over an unsent draft; the issuer's file arriving in another thread advances the same loop; privacy page and store copy; 93 core checks and 31 browser checks.
+so nothing says "Handled." over an unsent draft; the issuer's file arriving in another thread advances the same loop; privacy page and store copy; 114 core checks and 38 browser checks.
 
 Wired to receipts and transfer proofs only. The planner already speaks invoice, tax invoice and statement (tested), but
 those keep the existing Do It chip until the receipt path has been used on real mail. Contracts and other documents are
@@ -87,6 +87,22 @@ untouched.
 | Dana is still being chased for that money | Template card offered | "The payment of ₪3,850 from Dana is not confirmed, so no receipt yet. I will keep this open." No draft |
 | You send "Receipt attached." with nothing attached | Some paths closed on the words | "Your message says the receipt is attached, but nothing is attached. I kept this open." |
 | You send IMG_2231.pdf with "See attached" | Closed or ignored | "Did the receipt go out?" (one tap either way); "yes" closes it as your own call |
+
+## 6b. The issuer is a person, not an attachment (2026-10-04)
+
+Asking someone to issue a receipt hands the loop to them, so what they SAY now moves the path (core/resolution.js
+`readIssuerAnswer`, using the same reply reader every loop uses, plus a narrow "we do not issue" lexicon that a condition
+("until it clears") turns back into a delay):
+
+| They write | The path does | Never |
+|---|---|---|
+| a file named for it | offers the reply to the original requester with that file (draft) | attaches or sends |
+| "I will send it on Wednesday" | records the day, moves the reminder to it, no chase before it | closes |
+| "we do not issue these" | releases the request, never asks them again, asks who else issues receipts | waits forever |
+| a question ("which name?") | says once that they asked YOU something | answers for you |
+| "done" with nothing attached | says no file came, keeps it open | closes |
+| thanks / out of office | nothing | - |
+| nothing for 3 days (or the promised day passed) | one reminder to them, a draft, then waits again | sends it |
 
 ## 7. Decision filter (§5.8)
 

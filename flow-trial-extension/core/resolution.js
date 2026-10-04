@@ -49,6 +49,12 @@ const FlowResolution = (() => {
   const PAYMENT_MAX_AGE_MS = 120 * 24 * 3600 * 1000;
   const TRAIL_MAX = 8;
 
+  const DAYN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MONN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function dayShort(iso) { const d = new Date(String(iso) + 'T12:00:00'); return isNaN(d.getTime()) ? String(iso) : DAYN[d.getDay()] + ', ' + MONN[d.getMonth()] + ' ' + d.getDate(); }
+  function isoOf(ms) { const d = new Date(ms); const z = (n) => (n < 10 ? '0' : '') + n; return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); }
+  const CHASE_AFTER_DAYS = 3;
+  const DAY_MS = 24 * 3600 * 1000;
   function handles(objectId) { return Object.prototype.hasOwnProperty.call(CLASSES, objectId); }
   // The artifacts the host surfaces WIRE to this path first: the ones that attest a payment, where one action is most often wrong.
   function owns(objectId) { return handles(objectId) && CLASSES[objectId].attests === 'payment'; }
@@ -176,6 +182,8 @@ const FlowResolution = (() => {
     const label = need.label;
     const to = who(facts);
     const base = { done: false, doneWhen: doneDefinition(need, facts).text };
+    // Someone who already said they cannot issue it is not asked again.
+    const issuer = i.issuer && state.issuerDeclinedEmail && String(i.issuer.email || '').toLowerCase() === state.issuerDeclinedEmail ? null : i.issuer;
 
     // 2. find
     const found = findExisting(need, i.evidence, facts, i.sourceText);
@@ -213,19 +221,37 @@ const FlowResolution = (() => {
 
     // 4. prepare / request. The issuer is asked before anything is generated.
     if (state.requestedAt) {
+      const who = state.requestedTo || 'the issuer';
+      const now = typeof i.now === 'number' ? i.now : null;
+      const lastTouch = Math.max(state.chasedAt || 0, state.issuerReplyAt || 0, state.requestedAt || 0);
+      // A reminder is due when the day they promised has passed with no file, or (no promise) after a few quiet days. Never without a clock.
+      const promiseLapsed = now !== null && state.issuerPromisedIso && isoOf(now) > state.issuerPromisedIso && (state.chasedAt || 0) < new Date(state.issuerPromisedIso + 'T00:00:00').getTime();
+      const quietDays = now !== null ? Math.floor((now - lastTouch) / DAY_MS) : 0;
+      if (promiseLapsed) {
+        return Object.assign({}, base, { stage: 'request', move: 'chase-issuer', why: 'promise-lapsed', issuer: issuer || { email: state.requestedToEmail, name: state.requestedTo }, requestedTo: who,
+          line: line(need, who + ' promised ' + dayShort(state.issuerPromisedIso) + ' and no file has come. Remind them? A draft, not sent.', who + ' הבטיח/ה ' + dayShort(state.issuerPromisedIso) + ' ועדיין אין קובץ. להזכיר? טיוטה, לא נשלחת.'),
+          actions: ['chase-issuer'] });
+      }
+      if (!state.issuerPromisedIso && now !== null && quietDays >= CHASE_AFTER_DAYS) {
+        return Object.assign({}, base, { stage: 'request', move: 'chase-issuer', why: 'no-answer', issuer: issuer || { email: state.requestedToEmail, name: state.requestedTo }, requestedTo: who, quietDays,
+          line: line(need, 'Asked ' + who + ' ' + quietDays + ' days ago and no file has come. Remind them? A draft, not sent.', 'ביקשתי מ' + who + ' לפני ' + quietDays + ' ימים ועדיין אין קובץ. להזכיר? טיוטה, לא נשלחת.'),
+          actions: ['chase-issuer'] });
+      }
       return Object.assign({}, base, { stage: 'request', move: 'await-issuer', why: 'requested', requestedTo: state.requestedTo || null,
-        line: line(need, 'Asked ' + (state.requestedTo || 'the issuer') + ' for the ' + label + '. Waiting for the file; I will look again when you open this.',
-          'ביקשתי מ' + (state.requestedTo || 'המנפיק') + ' את ' + label + '. ממתין לקובץ.'), actions: ['hold'] });
+        line: state.issuerPromisedIso
+          ? line(need, who + ' said they will send it by ' + dayShort(state.issuerPromisedIso) + '. I will look again then.', who + ' אמר/ה שישלח/תשלח עד ' + dayShort(state.issuerPromisedIso) + '.')
+          : line(need, 'Asked ' + who + ' for the ' + label + '. Waiting for the file; I will look again when you open this.', 'ביקשתי מ' + who + ' את ' + label + '. ממתין לקובץ.'),
+        actions: ['hold'] });
     }
     if (state.ownerIssuing) {
       return Object.assign({}, base, { stage: 'deliver', move: 'await-owner-issue', why: 'owner-issues',
         line: line(need, 'Waiting for you to issue the ' + label + '. I will close this when you send it with the file.',
           'ממתין שתפיקו את ' + label + '. אסגור כשתשלחו אותו עם הקובץ.'), actions: ['hold'] });
     }
-    if (cls.source === 'issuer' && i.issuer && i.issuer.email) {
-      return Object.assign({}, base, { stage: 'request', move: 'request-issuer', why: 'ask-the-issuer', issuer: i.issuer, basis: payment.basis,
-        line: line(need, 'No ' + label + ' yet. Ask ' + (i.issuer.name || i.issuer.email) + ' to issue it? A draft, not sent.',
-          'עדיין אין ' + label + '. לבקש מ' + (i.issuer.name || i.issuer.email) + ' להפיק? טיוטה, לא נשלחת.'),
+    if (cls.source === 'issuer' && issuer && issuer.email) {
+      return Object.assign({}, base, { stage: 'request', move: 'request-issuer', why: 'ask-the-issuer', issuer, basis: payment.basis,
+        line: line(need, 'No ' + label + ' yet. Ask ' + (issuer.name || issuer.email) + ' to issue it? A draft, not sent.',
+          'עדיין אין ' + label + '. לבקש מ' + (issuer.name || issuer.email) + ' להפיק? טיוטה, לא נשלחת.'),
         actions: ['request-issuer'] });
     }
     // an existing template, and a payment confirmed by something other than the person's say-so
@@ -242,8 +268,10 @@ const FlowResolution = (() => {
     }
     // FUTURE: a billing connector (invoicing system API) would issue the receipt here. It does not exist, so:
     return Object.assign({}, base, { stage: 'request', move: 'name-issuer', why: 'no-issuer-known', basis: payment.basis,
-      line: line(need, 'Payment is confirmed, but no ' + label + ' exists and I cannot issue one. Who issues your receipts?',
-        'התשלום אושר, אבל אין ' + label + ' ואני לא יכול להפיק. מי מפיק לכם קבלות?'),
+      line: state.issuerDeclinedEmail
+        ? line(need, (state.issuerDeclinedName || 'They') + ' said they cannot issue the ' + label + '. Who else issues your receipts?', (state.issuerDeclinedName || 'הם') + ' אמרו שאי אפשר להפיק. מי עוד מפיק לכם קבלות?')
+        : line(need, 'Payment is confirmed, but no ' + label + ' exists and I cannot issue one. Who issues your receipts?',
+          'התשלום אושר, אבל אין ' + label + ' ואני לא יכול להפיק. מי מפיק לכם קבלות?'),
       actions: ['set-issuer', 'issue-myself'], future: 'billing-connector' });
   }
 
@@ -274,8 +302,50 @@ const FlowResolution = (() => {
   const markPaid = (state, now) => advance(state, 'verify', now, { assertedPaidAt: typeof now === 'number' ? now : Date.now(), notPaidAt: null }, 'owner-said-paid');
   const markNotPaid = (state, now) => advance(state, 'verify', now, { notPaidAt: typeof now === 'number' ? now : Date.now(), assertedPaidAt: null }, 'owner-said-not-paid');
   const recordRequest = (state, now, to, toEmail) => advance(state, 'request', now, { requestedAt: typeof now === 'number' ? now : Date.now(), requestedTo: to ? String(to).slice(0, 120) : null, requestedToEmail: toEmail ? String(toEmail).trim().toLowerCase().slice(0, 200) : null }, 'asked-issuer');
+  const recordChase = (state, now) => advance(state, 'request', now, { chasedAt: typeof now === 'number' ? now : Date.now() }, 'chased-issuer');
   const recordOwnerIssuing = (state, now) => advance(state, 'deliver', now, { ownerIssuing: true }, 'owner-issues');
   const recordPrepared = (state, now, fileName) => advance(state, 'prepare', now, { preparedAt: typeof now === 'number' ? now : Date.now(), preparedFile: fileName ? String(fileName).slice(0, 120) : null }, 'prepared');
+
+  // What a delegate says when it is NOT their job or not possible for them. Narrow on purpose (the general reply reader holds the
+  // general refusals): the verb must be the issuing itself, and any condition ("until", "unless", "if", "once", "after") means it is
+  // a delay, not a no. A promise in the same message always wins.
+  const ISSUER_NO_EN = /\b(?:we|i)\s+(?:do ?n[o']t|don['’]t|do not|can['’]?t|cannot|are not able to|aren['’]t able to|am not able to|won['’]t|will not)\s+(?:issue|provide|produce|generate|create|handle|do)\b|\bnot something (?:we|i) (?:do|issue|provide|handle)\b|\b(?:that|this|it)(?:['’]s| is) not (?:our|my) (?:job|area|department|responsibility)\b|\bwe(?:['’]re| are) not the (?:ones|right (?:people|place))\b/i;
+  const ISSUER_NO_HE = /(?:לא|אין לנו אפשרות|אין לי אפשרות)\s+(?:מנפיקים|מנפיק|מפיקים|מפיק|להנפיק|להפיק)|לא (?:בתחום|באחריות) שלנו/;
+  const CONDITION = /\b(?:until|unless|if|once|after|before|when)\b|(?:עד ש|אלא אם|אחרי ש|ברגע ש|כש)/i;
+  function issuerSaysNo(text) {
+    const parts = String(text || '').split(/(?<=[.!?])\s+|\n+/);
+    return parts.some((p) => (ISSUER_NO_EN.test(p) || ISSUER_NO_HE.test(p)) && !CONDITION.test(p));
+  }
+
+  // ---- reading the issuer's answer ---------------------------------------------------------------------------
+  // `reply` is what core/follow-up.js's classifyReply made of the issuer's message (asked as a request to issue a file). A person
+  // answering is not an attachment: they may promise a day, say no, ask you something, or say "done" with nothing attached. Each moves
+  // the path differently, and none of them closes it. Returns { kind, state, line }; kind 'file' means a real file came (matchIssuerReply's job).
+  function readIssuerAnswer(state, reply, now, text) {
+    const s = state || {};
+    const t = typeof now === 'number' ? now : Date.now();
+    const who = s.requestedTo || 'They';
+    const none = { kind: 'none', state: s, line: null };
+    if (!reply || !s.requestedAt) return none;
+    if (reply.outcome === 'closed' && reply.delivered === 'file') return { kind: 'file', state: s, line: null };
+    if (reply.outcome === 'declined' || (reply.outcome !== 'promised' && issuerSaysNo(text))) {
+      const next = advance(s, 'request', t, { issuerDeclinedEmail: s.requestedToEmail || null, issuerDeclinedName: s.requestedTo || null, requestedAt: null, requestedTo: null, requestedToEmail: null, issuerPromisedIso: null, issuerReplyAt: null, chasedAt: null }, 'issuer-declined');
+      return { kind: 'declined', state: next, line: who + ' said they cannot issue the ' + (s.label || 'receipt') + '. Who else issues your receipts?' };
+    }
+    if (reply.outcome === 'promised') {
+      const next = advance(s, 'request', t, { issuerPromisedIso: reply.promisedIso || null, issuerReplyAt: t }, 'issuer-promised');
+      return { kind: 'promised', state: next, line: reply.promisedIso ? who + ' said they will send it by ' + dayShort(reply.promisedIso) + '.' : who + ' said they will send it.' };
+    }
+    if (reply.outcome === 'yours') {
+      const next = advance(s, 'request', t, { issuerAskedAt: t, issuerReplyAt: t }, 'issuer-asked');
+      return { kind: 'asked', state: next, line: who + ' asked you something about the ' + (s.label || 'receipt') + '. Open their reply to answer.' };
+    }
+    if (reply.outcome === 'closed' || reply.claimedOnly) {
+      const next = advance(s, 'request', t, { issuerReplyAt: t }, 'issuer-no-file');
+      return { kind: 'no-file', state: next, line: who + ' replied, but no file came with it. I kept this open.' };
+    }
+    return none;
+  }
 
   // ---- 6. is it really done? -------------------------------------------------------------------------------
   // The person's OWN message in the thread. sent: { text, attachments: [{filename}] | null }. Returns { close, reason, ... }.
@@ -334,6 +404,18 @@ const FlowResolution = (() => {
     return file ? { watch: pool[0], file } : null;
   }
 
+  // A message from someone Glance asked, with or without a file: the one loop that asked that address (amounts break a tie), or null.
+  function matchIssuerMessage(watches, msg) {
+    const m = msg || {};
+    const from = String(m.senderEmail || '').trim().toLowerCase();
+    if (!from) return null;
+    const cands = (watches || []).filter((w) => w && w.status === 'waiting' && w.resolution && w.resolution.requestedAt && w.resolution.requestedToEmail === from);
+    if (cands.length <= 1) return cands[0] ? { watch: cands[0] } : null;
+    const mo = extract && extract.parseMoney ? extract.parseMoney(String(m.text || '')) : null;
+    const pool = mo && mo.value > 0 ? cands.filter((w) => w.amount && typeof w.amount.value === 'number' && sameAmount(mo.value, w.amount.value)) : [];
+    return pool.length === 1 ? { watch: pool[0] } : null;
+  }
+
   // ---- drafts (never sent) ----------------------------------------------------------------------------------
   // The reply to the person who asked. It says a file is attached only when one is: with none, it leaves a visible placeholder.
   function replyDraft(need, facts, opts) {
@@ -344,6 +426,16 @@ const FlowResolution = (() => {
       return (name ? 'היי ' + name + ',' : 'שלום,') + '\n\n' + (fileName ? 'מצורפת ' + need.label + (amt ? ' על ' + amt : '') + ': ' + fileName + '.' : '[צרפו את ' + need.label + ' כאן ושלחו]') + '\n\nתודה,';
     }
     return (name ? 'Hi ' + name + ',' : 'Hi,') + '\n\n' + (fileName ? 'Attached is the ' + need.label + (amt ? ' for ' + amt : '') + ': ' + fileName + '.' : '[Attach the ' + need.label + ' here, then send]') + '\n\nThanks,';
+  }
+
+  // One reminder to the issuer. Same facts as the request; asks for the file; claims nothing.
+  function issuerChaseDraft(need, facts, issuer, opts) {
+    const o = opts || {};
+    const amt = amountText(facts);
+    const payer = facts && facts.senderName ? facts.senderName : null;
+    const name = issuer && issuer.name ? String(issuer.name).split(/\s+/)[0] : null;
+    if (he(need)) return (name ? 'היי ' + name + ',' : 'שלום,') + '\n\nתזכורת קטנה: ' + need.label + (payer ? ' עבור ' + payer : '') + (amt ? ' על סך ' + amt : '') + (o.days ? ' (ביקשתי לפני ' + o.days + ' ימים)' : '') + '. אפשר לשלוח לי אותה כקובץ?\n\nתודה,';
+    return (name ? 'Hi ' + name + ',' : 'Hi,') + '\n\nA quick reminder about the ' + need.label + (payer ? ' for ' + payer : '') + (amt ? ' for ' + amt : '') + (o.days ? ' (I asked ' + o.days + ' days ago)' : '') + '. Could you send it to me as a file?\n\nThanks,';
   }
 
   // Asking the one who issues it. Names the amount, the payer and the date when known; asks for the file, nothing else.
@@ -358,7 +450,7 @@ const FlowResolution = (() => {
     return (name ? 'Hi ' + name + ',' : 'Hi,') + '\n\nCould you issue a ' + need.label + (payer ? ' for ' + payer : '') + (amt ? ' for ' + amt : '') + (o.dateText ? ' (payment received ' + o.dateText + ')' : '') + ' and send it to me as a file?\n\nThanks,';
   }
 
-  return { CLASSES, handles, owns, doneDefinition, paymentStatus, findExisting, matchIssuerReply, nameAmounts, plan, open, markPaid, markNotPaid, recordRequest, recordOwnerIssuing, recordPrepared, judgeDelivery, closePatch, replyDraft, issuerRequestDraft };
+  return { CLASSES, handles, owns, doneDefinition, paymentStatus, findExisting, matchIssuerReply, nameAmounts, plan, open, markPaid, markNotPaid, recordRequest, recordOwnerIssuing, recordPrepared, recordChase, readIssuerAnswer, matchIssuerMessage, judgeDelivery, closePatch, replyDraft, issuerRequestDraft, issuerChaseDraft };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowResolution };
