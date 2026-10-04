@@ -23,7 +23,7 @@ ap.add_argument('dir')
 ap.add_argument('--model', default='Xenova/multilingual-e5-small')
 ap.add_argument('--prefix', default='query: ')
 ap.add_argument('--backend', default='onnx', choices=['onnx', 'st'])
-ap.add_argument('--onnx-file', default='onnx/model_quantized.onnx')
+ap.add_argument('--onnx-file', default='auto', help="'auto' picks the int8 export when the repo has one")
 ap.add_argument('--stub', action='store_true')
 ap.add_argument('--epochs', type=int, default=8)
 ap.add_argument('--out', default=None)
@@ -50,7 +50,14 @@ elif a.backend == 'onnx':
     import onnxruntime as ort
     from tokenizers import Tokenizer
     from huggingface_hub import hf_hub_download
-    onnx_path = hf_hub_download(a.model, a.onnx_file)
+    from huggingface_hub import list_repo_files
+    files = list_repo_files(a.model)
+    print('onnx files in', a.model, ':', [f for f in files if f.endswith('.onnx')], flush=True)
+    chosen = a.onnx_file
+    if chosen == 'auto':
+        chosen = next((f for f in ('onnx/model_quantized.onnx', 'onnx/model_int8.onnx', 'onnx/model_uint8.onnx', 'onnx/model.onnx') if f in files), None)
+        if chosen is None: sys.exit('no ONNX export in ' + a.model)
+    onnx_path = hf_hub_download(a.model, chosen)
     tok_path = hf_hub_download(a.model, 'tokenizer.json')
     size_mb = os.path.getsize(onnx_path) / 1e6
     tk = Tokenizer.from_file(tok_path)
