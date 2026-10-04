@@ -1,4 +1,4 @@
-# A small open language model on the device, before any external model: the experiment and the rule fixed before any number
+# A small open language model on the device, before any external model: the experiment, the rule fixed before any number, and the result (NOT MET, stopped)
 
 > Written 2026-10-04, BEFORE any model was run. Owner's decision (2026-10-04): strengthen the base with free, downloadable open models
 > that run inside the extension, ahead of any external model; no integration before a measured comparison against the existing engine
@@ -104,4 +104,29 @@ Same models, same prompts, same rule, same scoring; the only change, applied to 
 No further change to the harness, the prompts or the rule is allowed after this run: whatever it gives is the result of this experiment.
 (Said now because this is the third attempt; a harness fixed until a model passes would prove nothing.)
 
-(result pending)
+**Result (2026-10-04, GitHub Actions run 37217686927): NOT MET in either language, for all four models. Stop; nothing is integrated.**
+
+Device test (the audit set, the product's own bar: precision >= 0.97, at least 12 proposals, recall >= 0.4), right / wrong / missed of ~28 real asks and promises per language:
+
+| Model (4-bit estimate) | English | Hebrew | Median s per call on a CI CPU |
+|---|---|---|---|
+| Qwen2.5-0.5B-Instruct (~270 MB) | 5 / 21 / 12 (precision 0.19) | 14 / 33 / 1 (precision 0.30) | 2.8 |
+| Qwen3-0.6B (~330 MB) | 1 / 1 / 26 | 2 / 2 / 24 | 2.3 |
+| Qwen2.5-1.5B-Instruct (~850 MB) | 2 / 0 / 26 | 0 / 0 / 28 | 10.2 |
+| Qwen3-1.7B (~950 MB) | 4 / 0 / 24 | 1 / 0 / 27 | 6.3 |
+
+On the fixed corpus (pooled blind + te2 + chat), added correct / added wrong versus the engine alone, under the shipped gates: 0.5B en +2/+2, he +3/+3
+(precision falls to 0.969 / 0.958); 1.5B en +2/0, he 0/0; Qwen3-0.6B en +1/0, he 0/0; Qwen3-1.7B en +1/0, he 0/0. The "no shape gate" question gave the same or worse
+(0.5B: 7 wrong in each language; the other three the same numbers as above). The ceiling was 5 (en) and 4 (he) under the shipped gates, 15 and 6 without the shape gate.
+
+What this says, and what it does not:
+- Models of this size, asked the way the product asks (two wordings that must agree on the act, the action and the right party), are either silent
+  (recall 0-14%, precision 1.0 when they do speak) or too eager (0.5B: precision 0.19 in English). No one of them comes near the bar, and Hebrew is no better than English.
+- This is not a verdict on every small model. Not tried: models of 3B and up (too large to ship), Gemma and Llama (gated behind a licence token), 4-bit browser quality,
+  prompts written for these models rather than for Chrome's built-in one. Tuning the prompts or the agreement rule against these models would be a new experiment with a new rule, and the audit set would no longer be a clean test.
+- The first two runs were harness defects (6a, 6b); this run is the one that counts. It was not tuned after the fact.
+- On these sets the ceiling is small even for a perfect model; the real mail ceiling is unknown (the owner's 163-sentence Hebrew set was not in a public run).
+
+**Decision: no open model is added to the extension.** The on-device slot stays as built (`core/local-lm.js`: Chrome's built-in model or the person's own Ollama / LM Studio,
+each switched on per language only after the same test). Where more recall can come from is a different list: the structural shape gate (15 English and 6 Hebrew misses
+sit behind it on these sets) and an external model with consent and a quota (open-tasks row 29), both of which need the owner's decision and their own measurement.
