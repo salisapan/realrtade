@@ -97,7 +97,12 @@ const gpu = (o) => ({ requestAdapter: async () => (o === null ? null : { feature
   check('the server is refused without server consent', (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, tab)).reason === 'needs-consent' && assistCalls.length === 0);
   await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, popup);
   const ex = await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'Pay [CLIENT_NAME_1]', lang: 'en' } }, tab);
-  check('with consent the masked prompt goes through the licence-checked call', ex.ok && assistCalls.length === 1 && assistCalls[0].action === 'execute' && assistCalls[0].maskedPrompt === 'Pay [CLIENT_NAME_1]');
+  check('with consent the masked prompt goes through the licence-checked call, and only that', ex.ok && assistCalls.length === 1 && assistCalls[0].action === 'execute' && assistCalls[0].maskedPrompt === 'Pay [CLIENT_NAME_1]' && Object.keys(assistCalls[0]).sort().join() === 'action,lang,maskedPrompt', assistCalls[0]);
+  assistCalls.length = 0;
+  const rawTry = await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'Please email dana@acme.com about $3,850 due 2026-10-09', lang: 'en' } }, tab);
+  check('the worker does not trust a content script to have masked: raw contact details, amounts and dates are refused and never forwarded', rawTry.reason === 'pii-blocked' && assistCalls.length === 0, rawTry);
+  check('an oversize or non-string prompt is refused', (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x'.repeat(13000) } }, tab)).reason === 'bad-request' && (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: { toString: () => 'x' } } }, tab)).reason === 'bad-request' && assistCalls.length === 0);
+  check('the worker\'s copy of the leak patterns equals the router\'s (same source, same flags)', SW.LEAK_PATTERNS.length === Router.LEAK_PATTERNS.length && SW.LEAK_PATTERNS.every((re, i) => re.source === Router.LEAK_PATTERNS[i].source && re.flags === Router.LEAK_PATTERNS[i].flags));
   const failing = SW.create(f.chrome, { config: ON, callAssist: async () => { const e = new Error('This feature is part of Glance Pro.'); e.status = 402; throw e; } });
   check('a free user (no licence) gets the reason, not a crash', (await failing.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, tab)).status === 402);
   check('asking the local model before it is loaded is a clear refusal', (await sw.handle({ type: 'flow:hybrid-infer', prompt: 'x' }, tab)).reason === 'not-loaded');
@@ -135,6 +140,24 @@ const gpu = (o) => ({ requestAdapter: async () => (o === null ? null : { feature
   f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
   await sw.boot(); await new Promise((r) => setTimeout(r, 5));
   check('without autoDownload or consent nothing is downloaded', starts(f) === 0);
+
+  console.log('--- the diagnostics reach extension storage, and only there ---');
+  f = fakeChrome(); sw = mk(f, ON);
+  const diag = { adapter: { vendor: 'intel', architecture: 'gen-12lp', device: null, description: null, isFallbackAdapter: false, infoAvailable: true }, features: ['timestamp-query'], limits: { maxBufferSize: 268435456 }, device: { deviceMemoryGB: 8, hardwareConcurrency: 8, platform: 'Windows' }, storage: { freeBytes: 5e10 } };
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? { ok: true, eligible: false, reason: 'no-shader-f16', permanent: true, diagnostics: diag, trace: ['[glance:hybrid:gpu] shader-f16: FAIL (the 4-bit f16 build needs it)'] } : { ok: true });
+  await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
+  const rec = f.store[SW.KEY_DIAG];
+  check('a failed probe keeps the GPU details, the reason and the trace in extension storage', rec && rec.eligible === false && rec.reason === 'no-shader-f16' && rec.permanent === true && rec.diagnostics.adapter.vendor === 'intel' && /shader-f16: FAIL/.test(rec.trace[0]), rec);
+  check('the status call returns them (for a debug view), the popup\'s state manager ignores them', (await sw.status()).diagnostics.reason === 'no-shader-f16' && !JSON.stringify(require('../core/hybrid-status.js').FlowHybridStatus.describe(await sw.status())).includes('intel'));
+  await sw.handle({ type: 'hybrid:state', state: { status: 'unsupported', unsupportedReason: 'engine-failed:out of memory', diagnostics: diag, trace: ['x'] } }, page);
+  check('a diagnosis that arrives with a state is split off: the mirrored state stays small', f.store[SW.KEY_STATE].diagnostics === undefined && f.store[SW.KEY_DIAG].source === 'start');
+  assistCalls.length = 0;
+  const swSrv = SW.create(f.chrome, { config: { enabled: true, autoDownload: false, serverFallback: true }, callAssist: async (b) => { assistCalls.push(b); return { text: '{}' }; } });
+  const noConsent = await swSrv.handle({ type: 'flow:execute', payload: { maskedPrompt: 'Pay [CLIENT_NAME_1]' } }, tab);
+  check('without the person\'s server consent nothing is sent', noConsent.reason === 'needs-consent' && assistCalls.length === 0);
+  await swSrv.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, popup);
+  await swSrv.handle({ type: 'flow:execute', payload: { maskedPrompt: 'Pay [CLIENT_NAME_1]' } }, tab);
+  check('the diagnostics never travel with a server call: the body is the action, the language and the masked prompt', assistCalls.length === 1 && Object.keys(assistCalls[0]).sort().join() === 'action,lang,maskedPrompt' && !JSON.stringify(assistCalls[0]).includes('intel'));
 
   console.log('--- a failing download backs off, then gives up after three attempts ---');
   f = fakeChrome(); sw = mk(f, ON);

@@ -45,6 +45,7 @@ global.FlowGoogleCloses = FlowGoogleCloses;
 global.FlowCloseFamilies = FlowCloseFamilies;
 const { FlowIntent } = require('../../../../flow-trial-extension/core/intent.js');
 const { FlowPrivacyShield } = require('../../../../flow-trial-extension/core/privacyShield.js');
+const { FlowMaskIds } = require('../../../../flow-trial-extension/core/mask-ids.js');
 
 const ENV_KEYS = ['ANTHROPIC_API_KEY', 'XAI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'LLAMA_API_KEY'];
 
@@ -86,7 +87,7 @@ const EXECUTE_ORDER = ['mistralLarge', 'llama70b', 'sonnet', 'grokStrong', 'deep
 
 const EMAIL_LEAK = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 const PHONE_LEAK = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/;
-const MONEY_LEAK = /(?:\$|€|£|₪|₹)\s?\d|\b\d[\d.,]*\s?(?:USD|EUR|GBP|ILS|NIS)\b/i;
+const MONEY_LEAK = /(?:\$|€|£|₪|₹)\s?\d|\b\d[\d.,]*\s?(?:USD|EUR|GBP|ILS|NIS)\b|\b(?:USD|EUR|GBP|ILS|NIS)\s?\d/i;
 const ISO_LEAK = /\b\d{4}-\d{2}-\d{2}\b/;
 const MONTH_LEAK = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}\b/i;
 
@@ -428,7 +429,9 @@ async function callRoutedLlm(opts) {
     if (judged.kind === 'hit') return { local: true, result: judged.result, route: { provider: 'local', model: 'judgment.js', slot: null } };
   }
 
-  const masked = FlowPrivacyShield.mask(String(opts.userText || '')).maskedText;
+  // The server masks again whatever it receives, so a client that skipped masking still cannot put a name, amount, date, contact detail or labelled
+  // identifier in front of a provider. 'execute' also gets the identifier pass (the one the extension runs); the others keep the shield alone.
+  const masked = (action === 'execute' ? FlowMaskIds.maskAll(String(opts.userText || ''), FlowPrivacyShield) : FlowPrivacyShield.mask(String(opts.userText || ''))).maskedText;
   if (leaksPii(masked, 'outbound')) {
     if (action === 'classify') return { silence: true, local: true, result: silenceResult() };
     throw piiError();

@@ -37,6 +37,27 @@ The one-line change is deliberately the owner's.
 
 The repository's default branch is `main`, not `master`; this work was pushed only to its feature branch and is not merged.
 
+## 0c. The third pass: package size, GPU diagnostics, scrubbing audit (2026-10-04)
+
+**1. Package size (open-tasks row 32). The runtime is NOT fetched from a CDN; the zip is split into two profiles instead.** The brief asked to pull the WebLLM library and the WASM from a remote bucket at run time. That is not done, for four reasons that are the product's, not a preference:
+- Manifest V3 pins `script-src 'self' 'wasm-unsafe-eval'`. A JavaScript file fetched at run time cannot execute in an extension page at all; `vendor/web-llm.js` (6.03 MB) has to be in the package.
+- The Chrome Web Store's remotely-hosted-code policy forbids executable code (WASM included, on my reading; verify before relying on it) that is not in the package. A store rejection costs more than 5 MB.
+- No CDN or bucket exists, and a new third-party host would be a new place the person's browser calls out to, which the privacy page does not say and `docs/product-identity.md` and §13 would have to.
+- The data that CAN be fetched already is: the 2.15 GB of model weights come at run time, hash-verified, into Cache Storage (`webllm/model`), downloaded once. The runtime's own `model-lib-not-bundled` guard refuses a library that is not in the package.
+
+What was built instead (`scripts/package_trial_extension.py --profile auto|lite|full [--out path]`):
+- **lite**: no on-device runtime. The packager does not follow the `OFFSCREEN_URL` door, so `src/offscreen.*`, `vendor/*` and the licence files are simply not reachable. **876,268 B (1,168,360 B as a base64 body) against the 6,291,456 B cap**, versus 3,881,485 B (5,175,316 B) for full. This is what the download function serves while `config/hybrid.public.js` has `enabled: false` (`auto`).
+- **full**: with the runtime. `auto` picks it once the switch is on, and it is the Chrome Web Store upload (`--profile full --out ...`). Its vendored binaries are re-hashed against `vendor/VENDOR.json` and the build refuses a mismatch or a missing file.
+- Guards: `lite` with the switch on is refused (a switch that is on without its files); a zip whose base64 body exceeds 90% of the response cap is deleted and the build fails, so a heavier package can never reach a function that would answer 500; `lite` still reaching the runtime, or `full` reaching none, fails the build.
+- `scripts/verify_trial_install.py` builds both profiles, checks contents, the size ratio and the budget, and runs the refusals above as negative tests.
+- Not solved, and said so: the **full** build still goes through the function (5.18 MB of the 5.66 MB budget). The first thing that adds weight (a second library, Gemma) must move it to a signed static file or Netlify Blobs; the guard makes that impossible to forget.
+
+**2. GPU diagnostics.** `core/capability.js` now returns `diagnostics` and a `trace` and writes each step to the log with the tag `[glance:hybrid:gpu]`: adapter vendor, architecture, device, description, `isFallbackAdapter`, the features that matter (`shader-f16`), the limits that matter, device memory, cores, platform and free storage (strings sanitised and capped; never the full user agent, no identifier of the person). The offscreen page publishes them with an unsupported state; the worker keeps the last one under `glanceHybridDiag` (`status().diagnostics`). They stay in extension storage and the console and never travel with a server call (a test pins the request body to action, language, masked prompt). To read them on a live device: open `chrome://extensions`, Glance, the offscreen page under "Inspect views" (it is listed only while the page is open; unverified on a real browser), filter the console by `[glance:hybrid:gpu]`; the first FAIL line is the reason it fell back to server mode.
+
+**3. Scrubbing audit of `executeTask`.** The router refuses, instead of sending, in every case where the mask could be bypassed: no shield, a shield without `mask`, a masker without the combined pass, a custom schema, a masker output that is not text, a leftover e-mail, phone, amount (symbol or code, in either order), ISO or month-name date, any token-map original found inside the wire payload, and any sensitive span that independent detectors find in the ORIGINAL prompt and that is still in the payload. The wire body is exactly `{maskedPrompt, lang}`; a caller cannot add `instructions` or any other field (the server builds its own). A prompt that is not a string, empty or over 12,000 characters is `bad-request`. The worker repeats the leak check on what it receives (a copy of the same patterns, pinned equal by a test) and the server masks again. The audit found one real gap, "USD 3,850" (code before the number), now closed in all three copies. `flow-landing/netlify/functions/glance-assist/scrub-e2e.test.cjs` runs the real client masker into the real server router with a fuzz set and mutation checks (15 checks). Still true and pinned as known limits: a first name alone, and an unlabelled number, pass the mask.
+
+Not verified from this environment: any provider model id, a pre-seeded Cache Storage entry being accepted by the engine, and everything that needs a real GPU.
+
 ## 1. What was asked
 
 Three tiers for the `[Do It]` / `[Draft It]` action, plus strict JSON:

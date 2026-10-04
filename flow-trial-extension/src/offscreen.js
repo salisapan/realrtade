@@ -26,6 +26,10 @@
   };
   const sha256 = async (buf) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', buf))).map((b) => b.toString(16).padStart(2, '0')).join('');
 
+  // The silent capability check writes every step to this page's console and returns the same lines; the worker keeps the last result in extension
+  // storage (glanceHybridDiag) so a live device session can read why a machine is server-backed. Local only: nothing here is sent anywhere.
+  const gpuEnv = () => ({ navigator, storage: navigator.storage, log: (line) => console.info(line) });
+
   async function publish(state) { try { await chrome.runtime.sendMessage({ type: 'hybrid:state', state }); } catch (e) { /* the worker is asleep; it re-reads on wake */ } }
 
   async function manifestFor(key) {
@@ -44,9 +48,10 @@
   }
 
   async function start(preferred) {
-    const caps = await R.capabilities({ navigator, storage: navigator.storage }, 2.2e9);
-    if (!caps.ok && caps.permanent) { const s0 = await (await ensureStore('phi-3-mini')).markUnsupported(caps.reason); await publish(s0); return s0; }
-    if (!caps.ok) { const s1 = Object.assign({}, await (await ensureStore('phi-3-mini')).getState(), { status: 'paused', pausedReason: caps.reason }); await publish(s1); return s1; }   // not enough disk: waits, the person can free space
+    const caps = await R.capabilities(gpuEnv(), 2.2e9);
+    const diag = { diagnostics: caps.diagnostics, trace: caps.trace };
+    if (!caps.ok && caps.permanent) { const s0 = Object.assign(await (await ensureStore('phi-3-mini')).markUnsupported(caps.reason), diag); await publish(s0); return s0; }
+    if (!caps.ok) { const s1 = Object.assign({}, await (await ensureStore('phi-3-mini')).getState(), { status: 'paused', pausedReason: caps.reason }, diag); await publish(s1); return s1; }   // not enough disk: waits, the person can free space
     const key = R.pick(preferred, caps, navigator);
     const st = await ensureStore(key);
     let s = await st.run();
@@ -56,7 +61,7 @@
       const manifest = await manifestFor(key);
       const r = await R.start({ modelKey: key, manifest, libUrl: LIB_URL[key], importer: () => import(RUNTIME_URL),
         onProgress: () => {} });
-      if (!r.ok) { s = await st.markUnsupported(r.reason); await publish(s); return s; }
+      if (!r.ok) { console.warn('[glance:hybrid:engine] the engine did not start: ' + r.reason); s = Object.assign(await st.markUnsupported(r.reason), diag); await publish(s); return s; }
       engine = r.engine;
     }
     s = await st.markLoaded(true);
@@ -70,11 +75,11 @@
       try {
         if (msg.type === 'hybrid:probe') {
           // Capability and size only: nothing is downloaded and nothing is stored.
-          const caps = await R.capabilities({ navigator, storage: navigator.storage }, 2.2e9);
-          if (!caps.ok) { reply({ ok: true, eligible: false, reason: caps.reason, permanent: caps.permanent === true }); return; }
+          const caps = await R.capabilities(gpuEnv(), 2.2e9);
+          if (!caps.ok) { reply({ ok: true, eligible: false, reason: caps.reason, permanent: caps.permanent === true, diagnostics: caps.diagnostics, trace: caps.trace }); return; }
           const key = R.pick(msg.modelKey, caps, navigator);
           const m = await manifestFor(key);
-          reply({ ok: true, eligible: true, model: key, label: R.CATALOG[key].label, downloadBytes: m.files.reduce((n, f) => n + f.bytes, 0), network: S.networkConditions(navigator) });
+          reply({ ok: true, eligible: true, model: key, label: R.CATALOG[key].label, downloadBytes: m.files.reduce((n, f) => n + f.bytes, 0), network: S.networkConditions(navigator), diagnostics: caps.diagnostics, trace: caps.trace });
           return;
         }
         if (msg.type === 'hybrid:consent') { const st = await ensureStore(modelKey || 'phi-3-mini'); reply({ ok: true, state: await st.setConsent(msg.given === true) }); return; }

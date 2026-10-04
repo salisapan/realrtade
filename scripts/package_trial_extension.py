@@ -9,6 +9,8 @@ are packaged. See flow-trial-extension/docs/SETUP.md.
 
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
 import os
 import re
@@ -26,6 +28,17 @@ ZIP_PATH = (
     / "download-trial-zip"
     / "flow-trial-extension.zip"
 )
+
+# The download function returns the zip as a base64 body, and Netlify caps a synchronous function response at 6 MiB. Base64 adds a third, so the zip itself
+# has to stay under 4.5 MiB or the download breaks with a 500 nobody sees until a person tries it. The budget leaves 10% headroom under the cap.
+FUNCTION_RESPONSE_LIMIT = 6 * 1024 * 1024
+FUNCTION_RESPONSE_BUDGET = int(FUNCTION_RESPONSE_LIMIT * 0.9)
+
+# Everything the on-device model needs lives behind one door: the offscreen page the service worker opens by the OFFSCREEN_URL constant. The "lite" profile
+# does not follow that door, so the page, the runtime, the 6 MB library and the 5 MB WASM are simply not reachable and are not packaged.
+PROFILES = ("auto", "lite", "full")
+HYBRID_CONFIG = EXTENSION_ROOT / "config" / "hybrid.public.js"
+HYBRID_ENABLED_RE = re.compile(r"""\benabled\s*:\s*(true|false)\b""")
 
 IMPORT_RE = re.compile(r"""(?:import|export)\s+(?:[^'"\n]+?\s+from\s+)?['"](\.[^'"]+)['"]""")
 HTML_REF_RE = re.compile(r"""(?:src|href)\s*=\s*['"]([^'"]+)['"]""", re.I)
@@ -93,14 +106,51 @@ def html_local_refs(html_path: Path) -> list[Path]:
     return out
 
 
-def module_imports(js_path: Path) -> list[Path]:
+def hybrid_enabled() -> bool:
+    """Whether config/hybrid.public.js switches the on-device path on. Anything that is not a plain true/false is an error, never a guess."""
+    if not HYBRID_CONFIG.is_file():
+        return False
+    match = HYBRID_ENABLED_RE.search(HYBRID_CONFIG.read_text(encoding="utf-8"))
+    if not match:
+        die(f"cannot read the enabled switch in {HYBRID_CONFIG.relative_to(REPO_ROOT)}")
+    return match.group(1) == "true"
+
+
+def resolve_profile(requested: str) -> str:
+    """lite = no on-device runtime; full = with it. A build must never ship a switch that is on without the files behind it."""
+    enabled = hybrid_enabled()
+    if requested == "auto":
+        return "full" if enabled else "lite"
+    if requested == "lite" and enabled:
+        die("profile 'lite' leaves out the on-device runtime but config/hybrid.public.js has enabled: true; ship 'full' or switch the path off")
+    return requested
+
+
+def verify_vendor_integrity() -> None:
+    """The full profile ships vendored binaries; they must be exactly the ones scripts/hybrid/vendor-runtime.cjs recorded."""
+    record_path = EXTENSION_ROOT / "vendor" / "VENDOR.json"
+    if not record_path.is_file():
+        die("profile 'full' needs vendor/VENDOR.json; run scripts/hybrid/vendor-runtime.cjs")
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    for entry in (record.get("webLlm"), record.get("modelLibrary")):
+        if not isinstance(entry, dict) or not entry.get("file"):
+            die("vendor/VENDOR.json is missing an entry")
+        path = EXTENSION_ROOT / "vendor" / entry["file"]
+        if not path.is_file():
+            die(f"profile 'full' needs vendor/{entry['file']}; run scripts/hybrid/vendor-runtime.cjs")
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest != entry.get("sha256"):
+            die(f"vendor/{entry['file']} does not match the sha256 recorded in VENDOR.json")
+
+
+def module_imports(js_path: Path, profile: str = "full") -> list[Path]:
     text = js_path.read_text(encoding="utf-8")
     # import specifiers are relative to the module. chrome.runtime.getURL
     # paths are relative to the extension root.
     imported = [resolve_relative(js_path, spec) for spec in IMPORT_RE.findall(text)]
     opened = [resolve_relative(EXTENSION_ROOT / "manifest.json", spec) for spec in GETURL_RE.findall(text)]
     offscreen = [resolve_relative(EXTENSION_ROOT / "manifest.json", spec) for spec in OFFSCREEN_RE.findall(text)]
-    return imported + opened + offscreen
+    return imported + opened + (offscreen if profile == "full" else [])
 
 
 def manifest_pages(manifest: dict) -> list[str]:
@@ -135,7 +185,7 @@ def manifest_pages(manifest: dict) -> list[str]:
     return pages
 
 
-def collect() -> dict[str, Path]:
+def collect(profile: str = "full") -> dict[str, Path]:
     manifest_path = EXTENSION_ROOT / "manifest.json"
     if not manifest_path.is_file():
         die(f"no manifest at {manifest_path}")
@@ -183,11 +233,17 @@ def collect() -> dict[str, Path]:
         if resolved.suffix.lower() == ".html":
             pending.extend(html_local_refs(resolved))
         if resolved.suffix.lower() == ".js":
-            pending.extend(module_imports(resolved))
+            pending.extend(module_imports(resolved, profile))
 
-    # Vendored third-party code travels with its licence text and the record of what it is (scripts/hybrid/vendor-runtime.cjs).
+    # Vendored third-party code travels with its licence text and the record of what it is (scripts/hybrid/vendor-runtime.cjs). Only the full profile has any.
     vendor = EXTENSION_ROOT / "vendor"
-    if vendor.is_dir():
+    if profile == "full":
+        verify_vendor_integrity()
+        if not any(key.startswith("vendor/") and key.endswith((".js", ".wasm")) for key in files):
+            die("profile 'full' packaged no runtime: nothing reaches src/offscreen.html; the OFFSCREEN_URL constant moved")
+    elif any(key.startswith("vendor/") or key.startswith("src/offscreen") for key in files):
+        die("profile 'lite' still reaches the on-device runtime; something other than OFFSCREEN_URL pulls it in")
+    if profile == "full" and vendor.is_dir():
         for extra in sorted(vendor.glob("*.LICENSE")) + [vendor / "VENDOR.json"]:
             if extra.is_file():
                 add_file(files, extra)
@@ -209,9 +265,9 @@ def collect() -> dict[str, Path]:
     return files
 
 
-def write_zip(files: dict[str, Path]) -> None:
-    ZIP_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = ZIP_PATH.with_suffix(".zip.partial")
+def write_zip(files: dict[str, Path], out: Path) -> int:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
         tmp.unlink()
     # Fixed timestamps keep two builds of the same tree byte-identical.
@@ -222,13 +278,33 @@ def write_zip(files: dict[str, Path]) -> None:
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
             archive.writestr(info, files[rel].read_bytes())
-    os.replace(tmp, ZIP_PATH)
+    os.replace(tmp, out)
+    return out.stat().st_size
 
 
-def main() -> None:
-    files = collect()
-    write_zip(files)
-    print(f"Wrote {ZIP_PATH.relative_to(REPO_ROOT)} ({ZIP_PATH.stat().st_size} bytes, {len(files)} files)")
+def encoded_size(size: int) -> int:
+    """Length of the base64 text for `size` bytes (padding included)."""
+    return ((size + 2) // 3) * 4
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--profile", choices=PROFILES, default="auto",
+                        help="auto: lite while config/hybrid.public.js has the on-device path off, full once it is on")
+    parser.add_argument("--out", type=Path, default=None,
+                        help="write somewhere else (e.g. the Chrome Web Store upload); the function-size guard applies only to the default path")
+    args = parser.parse_args(argv)
+    profile = resolve_profile(args.profile)
+    out = args.out.resolve() if args.out else ZIP_PATH
+    files = collect(profile)
+    size = write_zip(files, out)
+    wire = encoded_size(size)
+    shown = out.relative_to(REPO_ROOT) if out.is_relative_to(REPO_ROOT) else out
+    print(f"Wrote {shown} ({size} bytes, {len(files)} files, profile {profile}; as a base64 function body {wire} of {FUNCTION_RESPONSE_LIMIT})")
+    if out == ZIP_PATH and wire > FUNCTION_RESPONSE_BUDGET:
+        out.unlink()
+        die(f"the zip would be {wire} bytes as a function response; the budget is {FUNCTION_RESPONSE_BUDGET} of the {FUNCTION_RESPONSE_LIMIT} cap. "
+            "Serve the full build from storage instead of the function, or cut the zip.")
 
 
 if __name__ == "__main__":

@@ -19,9 +19,15 @@ const FlowExecRouter = (() => {
   const LOCAL_TIMEOUT_MS = 45000;
   const SERVER_TIMEOUT_MS = 20000;
 
+  // What must NOT be in anything that leaves the device. The same set the server checks on outbound text (glance-assist/model-router.js), so a prompt
+  // that would be refused there is refused here first. The service worker keeps a copy of this list (it has no core imports); a test pins them equal.
   const EMAIL_LEAK = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
   const PHONE_LEAK = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/;
-  const MONEY_LEAK = /(?:\$|€|£|₪|₹)\s?\d|\b\d[\d.,]*\s?(?:USD|EUR|GBP|ILS|NIS)\b/i;
+  const MONEY_LEAK = /(?:\$|€|£|₪|₹)\s?\d|\b\d[\d.,]*\s?(?:USD|EUR|GBP|ILS|NIS)\b|\b(?:USD|EUR|GBP|ILS|NIS)\s?\d/i;
+  const ISO_LEAK = /\b\d{4}-\d{2}-\d{2}\b/;
+  const MONTH_LEAK = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}\b/i;
+  const LEAK_PATTERNS = [EMAIL_LEAK, PHONE_LEAK, MONEY_LEAK, ISO_LEAK, MONTH_LEAK];
+  const MAX_PROMPT_CHARS = 12000;
   const TOKEN = /\[[A-Z][A-Z_]*_[A-Z0-9]+\]/g;
 
   function withTimeout(promise, ms, label) {
@@ -76,13 +82,36 @@ const FlowExecRouter = (() => {
     return { accepted: true, value: parsed[0], confidence: c.value, detail: c };
   }
 
+  function leaks(text) { const t = String(text == null ? '' : text); return LEAK_PATTERNS.some((re) => re.test(t)); }
+
+  // Every sensitive-looking span in the ORIGINAL prompt, found by detectors that do not depend on the shield: if any of them is still in what is about to be
+  // sent, the shield failed, whatever its own token map says.
+  function sensitiveSpans(original) {
+    const out = [];
+    const t = String(original);
+    for (const re of LEAK_PATTERNS) {
+      const g = new RegExp(re.source, re.flags.indexOf('g') >= 0 ? re.flags : re.flags + 'g');
+      let m;
+      while ((m = g.exec(t)) !== null) { if (m[0].length >= 4) out.push(m[0]); if (m[0].length === 0) g.lastIndex++; }
+    }
+    return out;
+  }
+
+  const sameSchema = (a, b) => canonical(a) === canonical(b);
+
   async function askServer(request, schema, d, enforce, masker) {
+    // Fail closed on every way the masking could be skipped: no shield, a shield that is not one, a masker without the combined pass, a custom schema.
+    if (!d.shield || typeof d.shield.mask !== 'function' || typeof masker.maskAll !== 'function' || typeof masker.unmask !== 'function') return refuse('mask-unavailable');
+    if (!sameSchema(schema, enforce.ACTION_SCHEMA)) return refuse('schema-not-allowed-for-server');           // the server asks the model for the built-in actions only
     const m = masker.maskAll(request.prompt, d.shield);
-    const text = m.maskedText;
-    if (EMAIL_LEAK.test(text) || PHONE_LEAK.test(text) || MONEY_LEAK.test(text)) return refuse('pii-blocked');
-    const payload = { maskedPrompt: text, instructions: enforce.instructions(schema, 'A'), lang: request.lang || null };
+    const text = m && m.maskedText;
+    if (typeof text !== 'string' || !m.tokenMap || typeof m.tokenMap !== 'object') return refuse('mask-failed');
+    if (leaks(text)) return refuse('pii-blocked');
+    // The wire payload is exactly these two fields. No instructions (the server builds its own from the schema), nothing the caller can smuggle text through.
+    const payload = { maskedPrompt: text, lang: request.lang === 'he' ? 'he' : request.lang === 'en' ? 'en' : null };
     const wire = JSON.stringify(payload);
     for (const raw of Object.values(m.tokenMap)) if (String(raw).length >= 4 && wire.indexOf(String(raw)) >= 0) return refuse('mask-failed');
+    for (const span of sensitiveSpans(request.prompt)) if (wire.indexOf(span) >= 0) return refuse('mask-failed');
     let res;
     try { res = await withTimeout(d.server.call(payload), d.timeouts && d.timeouts.server || SERVER_TIMEOUT_MS, 'server'); }
     catch (e) { return refuse('server-error', { detail: String(e && e.message || e).slice(0, 80) }); }
@@ -111,7 +140,7 @@ const FlowExecRouter = (() => {
       const d = deps || {};
       const enforce = d.enforce, masker = d.maskIds;
       if (!enforce || !masker) return refuse('misconfigured', { trace });
-      if (!request || typeof request.prompt !== 'string' || !request.prompt.trim()) return refuse('bad-request', { trace });
+      if (!request || typeof request.prompt !== 'string' || !request.prompt.trim() || request.prompt.length > MAX_PROMPT_CHARS) return refuse('bad-request', { trace });
       const schema = request.schema || enforce.ACTION_SCHEMA;
       const st = (typeof d.state === 'function' ? await d.state() : d.state) || {};
       let triedLocal = false;
@@ -138,7 +167,7 @@ const FlowExecRouter = (() => {
     }
   }
 
-  return { MIN_CONFIDENCE, route, confidence, agreement, canonical };
+  return { MIN_CONFIDENCE, MAX_PROMPT_CHARS, LEAK_PATTERNS, route, confidence, agreement, canonical, leaks, sensitiveSpans };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExecRouter };

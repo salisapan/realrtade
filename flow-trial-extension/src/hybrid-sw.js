@@ -16,12 +16,23 @@ const FlowHybridSW = (() => {
   const KEY_CONSENT = 'glanceHybridConsent';
   const KEY_STATE = 'glanceHybridState';
   const KEY_FLAGS = 'glanceHybridFlags';
+  const KEY_DIAG = 'glanceHybridDiag';            // the last capability check: GPU details and one line per step. Local only, read it in this worker's console.
   const ALARM_TICK = 'glance-hybrid-tick';       // wakes a download that is only PAUSED (offline, metered, data saver); not a failure
   const ALARM_RETRY = 'glance-hybrid-retry';     // the back-off after a FAILED attempt
   const OFFSCREEN_URL = 'src/offscreen.html';
   const TICK_MINUTES = 30;
   const RETRY_MINUTES = [15, 60];                // after failure 1 and failure 2; failure 3 gives up
   const MAX_ATTEMPTS = 3;
+  // The worker does not trust a content script to have masked: whatever arrives for the server is checked once more, with the same patterns as
+  // core/exec-router.js (a test pins the two lists equal; this file has no core imports). Anything that looks like a contact detail, an amount or a date is refused.
+  const LEAK_PATTERNS = [
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/,
+    /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/,
+    /(?:\$|€|£|₪|₹)\s?\d|\b\d[\d.,]*\s?(?:USD|EUR|GBP|ILS|NIS)\b|\b(?:USD|EUR|GBP|ILS|NIS)\s?\d/i,
+    /\b\d{4}-\d{2}-\d{2}\b/,
+    /\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{1,2}\b/i
+  ];
+  const MAX_PROMPT_CHARS = 12000;
 
   function create(chromeApi, deps) {
     const c = chromeApi;
@@ -35,6 +46,13 @@ const FlowHybridSW = (() => {
       return { localModel: v.localModel === undefined ? cfg.autoDownload === true : v.localModel === true, server: v.server === undefined ? cfg.serverFallback === true : v.server === true };
     }
     async function mirror() { return (await read(KEY_STATE)) || null; }
+    // Keep the last capability check (bounded) so a live session can see why a machine is server-backed. Never forwarded anywhere.
+    async function rememberDiag(r, source) {
+      if (!r || !r.diagnostics) return;
+      const rec = { at: now(), source, eligible: r.eligible !== undefined ? r.eligible === true : r.ok === true, reason: r.reason || null, permanent: r.permanent === true, diagnostics: r.diagnostics, trace: Array.isArray(r.trace) ? r.trace.slice(0, 24) : [] };
+      await c.storage.local.set({ [KEY_DIAG]: rec });
+      try { console.info('[glance:hybrid] capability check (' + source + '): ' + (rec.eligible ? 'can run the on-device model' : 'cannot (' + rec.reason + ')')); } catch (e) { /* no console */ }
+    }
     async function flags() { return Object.assign({ disabled: null, attempts: 0, nextRetryAt: null }, (await read(KEY_FLAGS)) || {}); }
     async function saveFlags(f) { await c.storage.local.set({ [KEY_FLAGS]: f }); return f; }
 
@@ -75,6 +93,7 @@ const FlowHybridSW = (() => {
 
     // ---- the state the offscreen page reports ---------------------------------------------------------------------------------------------------
     async function onState(state) {
+      if (state && state.diagnostics) { await rememberDiag({ diagnostics: state.diagnostics, trace: state.trace, reason: state.unsupportedReason || state.pausedReason || null, eligible: false, permanent: state.status === 'unsupported' }, 'start'); state = Object.assign({}, state); delete state.diagnostics; delete state.trace; }
       await c.storage.local.set({ [KEY_STATE]: state || null });
       if (!state) return;
       const f = await flags();
@@ -100,7 +119,7 @@ const FlowHybridSW = (() => {
     async function status() {
       const [k, s, f] = await Promise.all([consent(), mirror(), flags()]);
       const active = cfg.enabled && !f.disabled;
-      return { ok: true, enabled: cfg.enabled, consent: k, flags: f, state: s,
+      return { ok: true, enabled: cfg.enabled, consent: k, flags: f, state: s, diagnostics: (await read(KEY_DIAG)) || null,
         isModelLoaded: Boolean(active && k.localModel && s && s.isModelLoaded === true),
         serverConsent: Boolean(cfg.enabled && k.server) };
     }
@@ -110,6 +129,7 @@ const FlowHybridSW = (() => {
       if (!cfg.enabled) return { ok: false, reason: 'not-enabled' };
       if ((await flags()).disabled) return { ok: true, eligible: false, disabled: true };
       const r = await toOffscreen({ type: 'hybrid:probe' });
+      if (r && r.ok) await rememberDiag(r, 'probe');
       if (r && r.ok && r.eligible === false && r.permanent === true) await disable('incapable', r.reason);
       return r;
     }
@@ -182,8 +202,11 @@ const FlowHybridSW = (() => {
           const k = await consent();
           if (!cfg.enabled || !k.server) return { ok: false, reason: 'needs-consent' };
           const p = msg.payload || {};
+          const text = typeof p.maskedPrompt === 'string' ? p.maskedPrompt : '';
+          if (!text.trim() || text.length > MAX_PROMPT_CHARS) return { ok: false, reason: 'bad-request' };
+          if (LEAK_PATTERNS.some((re) => re.test(text))) return { ok: false, reason: 'pii-blocked' };        // never forwarded, never logged
           try {
-            const data = await d.callAssist({ action: 'execute', lang: p.lang === 'he' ? 'he' : 'en', maskedPrompt: String(p.maskedPrompt || ''), instructions: String(p.instructions || '') });
+            const data = await d.callAssist({ action: 'execute', lang: p.lang === 'he' ? 'he' : 'en', maskedPrompt: text });
             return { ok: true, text: data.text };
           } catch (e) { return { ok: false, error: String(e && e.message || e).slice(0, 120), status: e && e.status }; }
         })();
@@ -206,7 +229,7 @@ const FlowHybridSW = (() => {
     return { handle, status, tick, boot, probe, setConsent, reset, install, ensureOffscreen, disable, onState };
   }
 
-  return { KEY_CONSENT, KEY_STATE, KEY_FLAGS, ALARM_TICK, ALARM_RETRY, OFFSCREEN_URL, RETRY_MINUTES, MAX_ATTEMPTS, create };
+  return { KEY_CONSENT, KEY_STATE, KEY_FLAGS, KEY_DIAG, ALARM_TICK, ALARM_RETRY, OFFSCREEN_URL, RETRY_MINUTES, MAX_ATTEMPTS, LEAK_PATTERNS, create };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowHybridSW };

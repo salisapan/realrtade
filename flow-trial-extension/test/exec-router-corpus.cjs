@@ -32,8 +32,8 @@ const run = (over, req) => { const r = rig(over); return R.route(req || { prompt
   x = await run({ state: { isModelLoaded: false, serverConsent: true } });
   check('no model, consent: the server answers (Tier 1)', x.res.ok === true && x.res.tier === 'server' && x.res.action.action === 'create_task', x.res);
   check('what the server received is masked: no name, amount, account, date or phone', x.calls.server.length === 1 && !/Dana|3,850|99887766|2026-10-09|972/.test(JSON.stringify(x.calls.server[0])), x.calls.server[0]);
-  check('the payload carries only the masked prompt, the instructions and the language: no token map', Object.keys(x.calls.server[0]).sort().join() === 'instructions,lang,maskedPrompt');
-  check('the server was told to answer in JSON only', /ONLY valid JSON/.test(x.calls.server[0].instructions));
+  check('the payload is exactly the masked prompt and the language: no token map, and no free-text channel such as instructions', Object.keys(x.calls.server[0]).sort().join() === 'lang,maskedPrompt');
+  check('the language is a closed value (en, he or null), never caller text', (await run({ state: { isModelLoaded: false, serverConsent: true } }, { prompt: PROMPT, lang: 'Dana Levi 555-123-4567' })).calls.server[0].lang === null);
   check('no consent and no server wired: no-route / needs-consent, not a throw', (await run({ server: null })).res.reason === 'needs-consent' || (await run({ server: null })).res.reason === 'no-route');
 
   console.log('\n--- the device model answers (Tier 2) ---\n');
@@ -75,6 +75,30 @@ const run = (over, req) => { const r = rig(over); return R.route(req || { prompt
   const idTok = (x.calls.server[0].maskedPrompt.match(/\[ID_\d+\]/) || [])[0];
   x = await run({ state: { isModelLoaded: false, serverConsent: true }, serverRun: () => ({ text: task(((idTok || '[ID_1]') + ' ').repeat(28).trim()) }) }, { prompt: 'Please file under ID 123456789012345678901234567890 today.' });
   check('restoring real values can push a field past its limit: refused after the restore, never truncated silently', x.res.ok === false && x.res.reason === 'invalid-output' && x.res.detail === 'after-restore', x.res);
+
+  console.log('\n--- the guardrails: no way round the mask ---\n');
+  const consent = { isModelLoaded: false, serverConsent: true };
+  x = await run({ state: consent, shield: null });
+  check('NO shield at all: the server path refuses (names and dates would otherwise pass)', x.res.reason === 'mask-unavailable' && x.calls.server.length === 0, x.res);
+  x = await run({ state: consent, shield: {} });
+  check('a shield that cannot mask: refused', x.res.reason === 'mask-unavailable' && x.calls.server.length === 0);
+  x = await run({ state: consent, maskIds: { unmask: M.unmask } });
+  check('a masker without the combined pass: refused', x.res.reason === 'mask-unavailable' && x.calls.server.length === 0);
+  x = await run({ state: consent, maskIds: { maskAll: () => null, unmask: M.unmask } });
+  check('a masker that returns nothing: refused', x.res.reason === 'mask-failed' && x.calls.server.length === 0, x.res);
+  x = await run({ state: consent, maskIds: { maskAll: () => ({ maskedText: 'ok', tokenMap: 'nope' }), unmask: M.unmask } });
+  check('a masker that returns a broken token map: refused', x.res.reason === 'mask-failed' && x.calls.server.length === 0);
+  x = await run({ state: consent }, { prompt: PROMPT, schema: { type: 'object', description: 'Dana Levi 99887766', properties: {} } });
+  check('a caller-supplied schema cannot reach the server (its text would be a free channel)', x.res.reason === 'schema-not-allowed-for-server' && x.calls.server.length === 0, x.res);
+  x = await run({ state: { isModelLoaded: true, serverConsent: true }, localRun: () => ({ text: JSON.stringify({ kind: 'x' }), tokenProb: 0.99 }) }, { prompt: PROMPT, schema: { type: 'object', additionalProperties: false, required: ['kind'], properties: { kind: { type: 'string' } } } });
+  check('a custom schema may still use the DEVICE (nothing leaves)', x.res.ok === true && x.res.tier === 'local' && x.calls.server.length === 0, x.res);
+  x = await run({ state: consent, maskIds: { maskAll: (t) => ({ maskedText: t.replace('Dana Levi', '[CLIENT_NAME_1]'), tokenMap: { '[CLIENT_NAME_1]': 'Dana Levi' }, counts: {} }), unmask: M.unmask } }, { prompt: 'Call Dana Levi tomorrow. Her mail is dana.levi@acme.com' });
+  check('a masker that misses an e-mail: refused by the router\'s own detector', x.res.reason === 'pii-blocked' && x.calls.server.length === 0, x.res);
+  x = await run({ state: consent, maskIds: { maskAll: (t) => ({ maskedText: t.replace(/\$/g, '') , tokenMap: {}, counts: {} }), unmask: M.unmask } }, { prompt: 'Please wire USD 3,850 today.' });
+  check('a masker that leaves "USD 3,850": the independent detector finds it in the original and in the payload', x.res.ok === false && x.calls.server.length === 0, x.res);
+  x = await run({ state: consent }, { prompt: 'x'.repeat(R.MAX_PROMPT_CHARS + 1) });
+  check('a prompt over the size cap is refused before anything else', x.res.reason === 'bad-request' && x.calls.server.length === 0);
+  check('the leak patterns are exported for the worker\'s copy to be pinned against', Array.isArray(R.LEAK_PATTERNS) && R.LEAK_PATTERNS.length === 5 && R.leaks('write to a@b.co') && !R.leaks('Please confirm the meeting'));
 
   console.log('\n--- the server misbehaves ---\n');
   for (const [label, run1] of [['prose', () => ({ text: 'Sure, I will do that.' })], ['truncated JSON', () => ({ text: '{"action":"create_task","ti' })], ['an unknown action', () => ({ text: '{"action":"wire_funds","amount":1}' })], ['null', () => null], ['an empty body', () => ({ text: '' })]]) {

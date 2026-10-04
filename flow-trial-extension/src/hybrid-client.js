@@ -40,6 +40,7 @@ const FlowHybrid = (() => {
   async function executeTask(payload) {
     try {
       const p = payload || {};
+      if (typeof p.prompt !== 'string') return { ok: false, reason: 'bad-request', proposal: false, trace: [] };
       const t = p.tiers || {};
       const d = deps();
       if (t.local === false) d.local = null;
