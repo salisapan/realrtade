@@ -152,6 +152,58 @@ console.log('\n--- scenario 5: it closes only when it was actually delivered ---
   check('requesting does not close either', asked.status === undefined && asked.stage === 'request');
 }
 
+console.log('\n--- a file whose name carries ANOTHER amount is not the one ---');
+{
+  const other = plan({ evidence: { threadFiles: [], driveFiles: [file('F1', 'Receipt Dana ₪2,000.pdf')] } });
+  check('a Drive receipt named for another amount is not offered', other.move !== 'prepare-reply-with-file', other);
+  const same = plan({ evidence: { threadFiles: [], driveFiles: [file('F1', 'Receipt Dana ₪3,850.pdf')] } });
+  check('named for this amount: offered', same.move === 'prepare-reply-with-file' && same.file.id === 'F1', same);
+  const seq = plan({ evidence: { threadFiles: [], driveFiles: [file('F1', 'Receipt-7731.pdf')] } });
+  check('a receipt NUMBER (no currency, no thousands separator) is not read as an amount', seq.move === 'prepare-reply-with-file', seq);
+  const two = plan({ evidence: { threadFiles: [], driveFiles: [file('F1', 'Receipt Dana ₪2,000.pdf'), file('F2', 'Receipt Dana ₪3,850.pdf')] } });
+  check('of two receipts, the one for this amount wins instead of a conflict', two.move === 'prepare-reply-with-file' && two.file.id === 'F2', two);
+  const thr = plan({ evidence: { threadFiles: [{ filename: 'receipt $1,200.pdf', by: 'other' }], driveFiles: [] } });
+  check('same rule for a file already in the thread', thr.move !== 'prepare-reply-with-file', thr);
+  const noAmt = R.plan({ canCreate: true, need, facts: { senderName: 'Dana' }, evidence: { threadFiles: [], driveFiles: [file('F1', 'Receipt Dana ₪2,000.pdf')] }, payment: NOPAY, issuer: null, state: null, sourceText: ASK });
+  check('with no amount in the ask there is nothing to compare: the file is judged by name only', noAmt.move === 'prepare-reply-with-file', noAmt);
+}
+
+console.log('\n--- the same amount from two different people is not proof for either ---');
+{
+  const other = [{ kind: 'payment', direction: 'theirs', status: 'waiting', counterpart: { email: 'omer@beta.com', personKey: 'e:omer@beta.com' }, amount: { value: 3850, currency: 'ILS' } }];
+  const seenOne = [{ value: 3850, currency: 'ILS', at: NOW - DAY }];
+  const amb = R.paymentStatus({ facts, person: dana, watches: other, paymentsSeen: seenOne, now: NOW });
+  check('another person is still being chased for the same amount: the bank email may be theirs, so ask', amb.status === 'unconfirmed' && amb.ambiguous === true, amb);
+  const twoSeen = R.paymentStatus({ facts, person: dana, watches: [], paymentsSeen: [{ value: 3850, currency: 'ILS', at: NOW - DAY }, { value: 3850, currency: 'ILS', at: NOW - 9 * DAY }], now: NOW });
+  check('two payments of that amount seen, and no loop to tell them apart: still confirmed (a payment did arrive)', twoSeen.status === 'confirmed', twoSeen);
+  const mineClosed = R.paymentStatus({ facts, person: dana, watches: other.concat([{ kind: 'payment', status: 'resolved', closedAs: 'paid', counterpart: dana, amount: { value: 3850, currency: 'ILS' } }]), paymentsSeen: seenOne, now: NOW });
+  check('a loop closed as paid for THIS person still confirms, whatever others owe', mineClosed.basis === 'loop-paid', mineClosed);
+  const p = plan({ payment: amb });
+  check('the plan asks, and says why', p.move === 'verify-payment', p);
+}
+
+console.log('\n--- the issuer answers in another thread ---');
+{
+  const st = R.recordRequest(R.markPaid(R.open(need, facts, NOW), NOW), NOW, 'Noa Books', 'Books@My-Accountant.co.il');
+  check('the request remembers the address it went to, lower-cased', st.requestedToEmail === 'books@my-accountant.co.il', st);
+  const w = (id, state, amount) => ({ id, threadId: id, status: 'waiting', direction: 'mine', counterpart: { email: 'dana@acme.com', name: 'Dana Levi' }, amount: amount || { value: 3850, currency: 'ILS' }, resolution: state });
+  const m = (watches, over) => R.matchIssuerReply(watches, Object.assign({ senderEmail: 'books@my-accountant.co.il', attachments: [{ filename: 'Receipt-7731.pdf' }] }, over || {}));
+  const hit = m([w('orig', st)]);
+  check('their receipt arrives: matched to the one loop that asked them, with the file', hit && hit.watch.id === 'orig' && hit.file.filename === 'Receipt-7731.pdf', hit);
+  check('someone else sending a receipt matches nothing', m([w('orig', st)], { senderEmail: 'dana@acme.com' }) === null);
+  check('an address that was never asked matches nothing', m([w('orig', st)], { senderEmail: 'spam@x.com' }) === null);
+  check('a message with no attachment matches nothing (a promise is not a file)', m([w('orig', st)], { attachments: [] }) === null);
+  check('attachments the page could not list: nothing', m([w('orig', st)], { attachments: null }) === null);
+  check('a file not named for it: nothing', m([w('orig', st)], { attachments: [{ filename: 'IMG_1.pdf' }] }) === null);
+  check('two files named for it: no guess', m([w('orig', st)], { attachments: [{ filename: 'Receipt-1.pdf' }, { filename: 'Receipt-2.pdf' }] }) === null);
+  check('two loops waiting on the same issuer: no guess', m([w('a', st), w('b', st)]) === null);
+  check('a loop already closed is not matched', m([Object.assign(w('orig', st), { status: 'resolved' })]) === null);
+  check('a loop that never asked anyone is not matched', m([w('orig', R.open(need, facts, NOW))]) === null);
+  const amtText = (txt) => m([w('a', st), w('b', R.recordRequest(R.markPaid(R.open(need, { senderName: 'Omer', amount: { value: 900, currency: 'ILS', raw: '₪900' } }, NOW), NOW), NOW, 'Noa Books', 'books@my-accountant.co.il'), { value: 900, currency: 'ILS' })], { text: txt });
+  check('two loops on one issuer: the message naming one amount picks that loop', (() => { const r = amtText('Hi, the receipt for ₪900 is attached'); return r && r.watch.id === 'b'; })(), amtText('Hi, the receipt for ₪900 is attached'));
+  check('and a message naming no amount still picks nothing', amtText('Receipt attached') === null);
+}
+
 console.log('\n--- one loop, one status truth ---');
 {
   const s0 = R.open(need, facts, NOW);

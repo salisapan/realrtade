@@ -31,6 +31,7 @@ const FlowResolution = (() => {
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
   }
   const attach = sibling(typeof FlowFileAttach !== 'undefined' ? FlowFileAttach : null, './file-attach.js', 'FlowFileAttach');
+  const extract = sibling(typeof FlowExtract !== 'undefined' ? FlowExtract : null, './extract.js', 'FlowExtract');
 
   // What each artifact IS, who can make it, and whether it attests that money moved. Data, not code.
   //   attests:  'payment' = it certifies a payment, so the payment is a precondition of making one
@@ -98,6 +99,10 @@ const FlowResolution = (() => {
     // a bank or processor email seen for this amount, recently. The amount must be known to match one.
     const seen = amt && (i.paymentsSeen || []).some((p) => p && typeof p.value === 'number' && now - (p.at || 0) <= PAYMENT_MAX_AGE_MS
       && sameAmount(amt.value, p.value) && sameCurrency(amt.currency, p.currency) && p.trusted !== false);
+    // The same amount is still being chased from SOMEONE ELSE: the bank email may be theirs, so it proves nothing for this person.
+    const rival = seen && (i.watches || []).some((w) => w && w.kind === 'payment' && w.direction === 'theirs' && w.status === 'waiting' && !samePerson(w.counterpart)
+      && w.amount && sameAmount(amt.value, w.amount.value) && sameCurrency(amt.currency, w.amount.currency));
+    if (seen && rival) return { status: 'unconfirmed', basis: null, ambiguous: true };
     if (seen) return { status: 'confirmed', basis: 'bank-email' };
     if (state.assertedPaidAt) return { status: 'confirmed', basis: 'owner' };
     return { status: 'unconfirmed', basis: null };
@@ -107,21 +112,39 @@ const FlowResolution = (() => {
   // threadFiles: [{ filename, by: 'me'|'requester'|'other' }] or null when the page cannot list them.
   // driveFiles: the Drive search result, or null when it could not run. A file the requester themselves sent is never a
   // candidate: it is their document, not the one they asked for.
+  // Amounts a file NAME states: only a number with a currency mark or a thousands separator counts. A bare run of digits is
+  // a receipt or invoice number ("Receipt-7731"), never an amount.
+  const NAME_AMOUNT = /(?:[₪$€£]\s?(\d[\d,]*(?:\.\d+)?))|(\d{1,3}(?:,\d{3})+(?:\.\d+)?)|(?:(\d[\d,]*(?:\.\d+)?)\s?(?:₪|\$|€|£|ILS|NIS|USD|EUR|ש"ח|שח))/g;
+  function nameAmounts(name) {
+    const out = [];
+    const t = String(name || '');
+    let m;
+    NAME_AMOUNT.lastIndex = 0;
+    while ((m = NAME_AMOUNT.exec(t))) { const v = parseFloat(String(m[1] || m[2] || m[3]).replace(/,/g, '')); if (v > 0) out.push(v); }
+    return out;
+  }
+  // A file named for ANOTHER amount than the one asked about is a different receipt. No amount in the name, or none asked: no opinion.
+  function nameContradictsAmount(name, facts) {
+    const want = facts && facts.amount && typeof facts.amount.value === 'number' ? facts.amount.value : null;
+    const has = nameAmounts(name);
+    return want !== null && has.length > 0 && !has.some((v) => sameAmount(want, v));
+  }
   function nameFits(name, synonym) { const n = norm(name); return (synonym || []).some((t) => n.includes(norm(t))); }
   function findExisting(need, evidence, facts, sourceText) {
     const e = evidence || {};
-    const threadHits = (Array.isArray(e.threadFiles) ? e.threadFiles : []).filter((f) => f && f.filename && f.by !== 'requester' && nameFits(f.filename, need.synonym));
+    const threadHits = (Array.isArray(e.threadFiles) ? e.threadFiles : []).filter((f) => f && f.filename && f.by !== 'requester' && nameFits(f.filename, need.synonym) && !nameContradictsAmount(f.filename, facts));
+    const driveFiles = Array.isArray(e.driveFiles) ? e.driveFiles.filter((f) => !(f && f.name && nameContradictsAmount(f.name, facts))) : e.driveFiles;
     let drive = null;
     let driveConflict = false;
     let template = null;
-    if (attach && Array.isArray(e.driveFiles)) {
+    if (attach && Array.isArray(driveFiles)) {
       const ask = { id: need.object, creatable: false, lang: need.lang, label: need.label, query: need.label, synonym: need.synonym || [], line: attach.cardLine(need.lang, need.label) };
       const ctx = { senderName: facts && facts.senderName, amount: amountText(facts), when: facts && facts.when };
-      const d = attach.decide(ask, e.driveFiles, ctx, sourceText || '');
+      const d = attach.decide(ask, driveFiles, ctx, sourceText || '');
       if (d && d.action === 'attach' && d.file) drive = { source: 'drive', id: d.file.id, name: d.file.name, mimeType: d.file.mimeType };
       if (d && d.action === 'silence' && d.reason === 'conflict') driveConflict = true;
       const tplAsk = Object.assign({}, ask, { creatable: true });
-      const t = attach.decide(tplAsk, e.driveFiles, ctx, sourceText || '');
+      const t = attach.decide(tplAsk, driveFiles, ctx, sourceText || '');
       if (t && t.action === 'create') template = t;
     }
     const uniqThread = [];
@@ -133,7 +156,7 @@ const FlowResolution = (() => {
     else if (drive) { const at = cands.findIndex((c) => norm(c.name) === norm(drive.name)); cands[at] = drive; }
     if (driveConflict || cands.length > 1) return { kind: 'conflict', count: Math.max(cands.length, 2), template };
     if (cands.length === 1) return { kind: 'one', file: cands[0], template };
-    return { kind: 'none', template, searched: Array.isArray(e.driveFiles), threadKnown: Array.isArray(e.threadFiles) };
+    return { kind: 'none', template, searched: Array.isArray(driveFiles), threadKnown: Array.isArray(e.threadFiles) };
   }
 
   // ---- the plan ----------------------------------------------------------------------------------------------
@@ -250,7 +273,7 @@ const FlowResolution = (() => {
   }
   const markPaid = (state, now) => advance(state, 'verify', now, { assertedPaidAt: typeof now === 'number' ? now : Date.now(), notPaidAt: null }, 'owner-said-paid');
   const markNotPaid = (state, now) => advance(state, 'verify', now, { notPaidAt: typeof now === 'number' ? now : Date.now(), assertedPaidAt: null }, 'owner-said-not-paid');
-  const recordRequest = (state, now, to) => advance(state, 'request', now, { requestedAt: typeof now === 'number' ? now : Date.now(), requestedTo: to ? String(to).slice(0, 120) : null }, 'asked-issuer');
+  const recordRequest = (state, now, to, toEmail) => advance(state, 'request', now, { requestedAt: typeof now === 'number' ? now : Date.now(), requestedTo: to ? String(to).slice(0, 120) : null, requestedToEmail: toEmail ? String(toEmail).trim().toLowerCase().slice(0, 200) : null }, 'asked-issuer');
   const recordOwnerIssuing = (state, now) => advance(state, 'deliver', now, { ownerIssuing: true }, 'owner-issues');
   const recordPrepared = (state, now, fileName) => advance(state, 'prepare', now, { preparedAt: typeof now === 'number' ? now : Date.now(), preparedFile: fileName ? String(fileName).slice(0, 120) : null }, 'prepared');
 
@@ -283,6 +306,34 @@ const FlowResolution = (() => {
     };
   }
 
+  // ---- the answer comes from somewhere else ------------------------------------------------------------------
+  // A message from someone Glance asked to issue a receipt, carrying one file named for it. Matches ONE waiting loop that asked
+  // that address, or none: two loops on one issuer need the message to name an amount to be told apart. Returns { watch, file } or null.
+  // It only proposes the next move (a reply to the original requester with this file); nothing is attached or sent here.
+  function matchIssuerReply(watches, msg) {
+    const m = msg || {};
+    const from = String(m.senderEmail || '').trim().toLowerCase();
+    if (!from || !Array.isArray(m.attachments) || !attach) return null;
+    const cands = (watches || []).filter((w) => w && w.status === 'waiting' && w.resolution && w.resolution.requestedAt && w.resolution.requestedToEmail === from);
+    if (!cands.length) return null;
+    const fitFor = (w) => {
+      const mention = attach.mention(w.resolution.label || w.resolution.object);
+      const syn = mention && mention.synonym && mention.synonym.length ? mention.synonym : [w.resolution.label || w.resolution.object];
+      const fits = m.attachments.filter((a) => a && a.filename && nameFits(a.filename, syn) && !nameContradictsAmount(a.filename, { amount: w.amount }));
+      return fits.length === 1 ? fits[0] : null;
+    };
+    let pool = cands;
+    if (pool.length > 1) {
+      const asked = [];
+      const t = String(m.text || '');
+      if (extract && extract.parseMoney) { const mo = extract.parseMoney(t); if (mo && mo.value > 0) asked.push(mo.value); }
+      pool = cands.filter((w) => w.amount && typeof w.amount.value === 'number' && asked.some((v) => sameAmount(v, w.amount.value)));
+      if (pool.length !== 1) return null;
+    }
+    const file = fitFor(pool[0]);
+    return file ? { watch: pool[0], file } : null;
+  }
+
   // ---- drafts (never sent) ----------------------------------------------------------------------------------
   // The reply to the person who asked. It says a file is attached only when one is: with none, it leaves a visible placeholder.
   function replyDraft(need, facts, opts) {
@@ -307,7 +358,7 @@ const FlowResolution = (() => {
     return (name ? 'Hi ' + name + ',' : 'Hi,') + '\n\nCould you issue a ' + need.label + (payer ? ' for ' + payer : '') + (amt ? ' for ' + amt : '') + (o.dateText ? ' (payment received ' + o.dateText + ')' : '') + ' and send it to me as a file?\n\nThanks,';
   }
 
-  return { CLASSES, handles, owns, doneDefinition, paymentStatus, findExisting, plan, open, markPaid, markNotPaid, recordRequest, recordOwnerIssuing, recordPrepared, judgeDelivery, closePatch, replyDraft, issuerRequestDraft };
+  return { CLASSES, handles, owns, doneDefinition, paymentStatus, findExisting, matchIssuerReply, nameAmounts, plan, open, markPaid, markNotPaid, recordRequest, recordOwnerIssuing, recordPrepared, judgeDelivery, closePatch, replyDraft, issuerRequestDraft };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowResolution };

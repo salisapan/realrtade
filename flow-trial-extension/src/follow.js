@@ -989,7 +989,7 @@ const FlowFollow = (() => {
         const body = FlowResolution.issuerRequestDraft(env.need, env.facts, plan.issuer, { dateText });
         const res = await draftTo(plan.issuer.email, plan.issuer.name, (he ? 'בקשה: ' : 'Request: ') + env.need.label + (env.facts.senderName ? ' - ' + env.facts.senderName : ''), body, {});
         if (!(res && res.ok)) { receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null); return; }
-        const next = FlowResolution.recordRequest(st, t, plan.issuer.name || plan.issuer.email);
+        const next = FlowResolution.recordRequest(st, t, plan.issuer.name || plan.issuer.email, plan.issuer.email);
         await saveResolution(env, next, { line: 'Draft to ' + (plan.issuer.name || plan.issuer.email) + ' is ready. Not sent. I will look again when you open this thread.', move: 'await-issuer' });
         track('follow_resolution_requested');
         receipt('Draft to ' + (plan.issuer.name || plan.issuer.email) + ' is ready in Gmail. Nothing was sent. This stays open until the ' + env.need.label + ' reaches ' + (env.facts.senderName || 'them') + '.', null);
@@ -1053,6 +1053,45 @@ const FlowFollow = (() => {
     return true;
   }
 
+
+  // The issuer you asked answers in a thread of its own, with the file. One card: reply to the person who asked, with that file.
+  // Nothing is attached or sent without the tap, and the loop stays open until you send it.
+  const examinedIssuer = new Set();
+  async function issuerReply(ctx, last, sender, threadId, lastId) {
+    if (typeof FlowResolution === 'undefined' || channelOf(ctx) !== 'gmail' || ctx.strict || !sender.email || !ctx.attachmentsOf) return false;
+    const key = threadId + '|' + lastId;
+    if (examinedIssuer.has(key)) return false;
+    examinedIssuer.add(key);
+    if (examinedIssuer.size > 400) examinedIssuer.clear();
+    const atts = ctx.attachmentsOf(last);
+    if (!atts || !atts.length) return false;
+    const watches = await FlowStorage.getWatches();
+    const m = FlowResolution.matchIssuerReply(watches, { senderEmail: sender.email, text: ctx.messageText(last), attachments: atts });
+    if (!m) return false;
+    const w = m.watch;
+    const need = { object: w.resolution.object, label: w.resolution.label, lang: w.resolution.lang || 'en' };
+    const facts = { senderName: (w.counterpart && w.counterpart.name) || null, amount: w.amount || null };
+    const who = FlowFollowUp.firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email) || 'them';
+    const h = card(need.lang === 'he');
+    h.appendChild(el('div', 'flow-fu-title', (sender.name || sender.email) + ' sent the ' + need.label));
+    h.appendChild(el('div', 'flow-fu-line', m.file.filename + ' answers your request for ' + who + '. Reply to ' + who + ' with it? A draft, not sent.'));
+    const row = el('div', 'flow-fu-actions');
+    row.appendChild(button('Prepare reply to ' + who + ' with it', 'primary', async () => {
+      const fetched = ctx.fetchAttachment ? await ctx.fetchAttachment(m.file) : null;
+      const voice = { counterpart: w.counterpart, lang: need.lang };
+      const attached = fetched ? m.file.filename : null;
+      const res = await draftTo(w.counterpart.email, w.counterpart.name, w.subject, await voiced(FlowResolution.replyDraft(need, facts, { fileName: attached }), voice), fetched ? { attachment: fetched } : {});
+      if (!(res && res.ok)) { receipt(res && res.reason === 'not-connected' ? 'Open the Glance panel and connect Google first, then try again.' : 'Could not create the draft. Try again in a moment.', null); return; }
+      const next = Object.assign({}, FlowResolution.recordPrepared(w.resolution, Date.now(), attached), { line: 'Draft to ' + who + ' is ready with ' + (attached || 'no file') + '. Not sent; I will close this when you send it.', move: 'prepare-reply-with-file' });
+      await FlowStorage.updateWatch(w.id, { resolution: next });
+      track('follow_resolution_issuer_file');
+      receipt('Draft to ' + who + ' is ready in Gmail' + (attached ? ' with ' + attached : '') + '. Nothing was sent. I will close this when you send the ' + need.label + '.' + (attached ? '' : ' I could not read the file, so attach it yourself.'), null);
+    }));
+    row.appendChild(button('Not now', 'ghost', dismiss));
+    h.appendChild(row);
+    return true;
+  }
+
   // The newest message is mine, in a thread that carries a resolution: did I really deliver it?
   async function resolutionDelivery(ctx, watch, last, lastId) {
     const text = ctx.ownMessageText(last);
@@ -1112,6 +1151,8 @@ const FlowFollow = (() => {
     if (!lastIsOwn) {
       // A bank or payment provider telling you money arrived settles a payment loop in another thread.
       if (await paymentSignal(ctx, last, sender)) return;
+      // The issuer you asked for a receipt answered here, with the file.
+      if (await issuerReply(ctx, last, sender, threadId, lastId)) return;
       // A request that takes more than one step (a receipt): plan the path, or plan it again.
       if (await considerResolution(ctx, last, sender, threadId, lastId, watch)) return;
       let target = watch;

@@ -3,7 +3,7 @@
 > Written 2026-10-03. Companion to `docs/file-backed-closure-plan.md` (single-file closure), `docs/open-loops.md`,
 > `docs/decision-filter.md` (§5.8 of `docs/product-architecture.md`), `docs/local-first-principle.md`.
 > Code: `flow-trial-extension/core/resolution.js` (pure), `src/follow.js` (the card and the loop),
-> tests: `test/resolution-corpus.cjs` (69 checks), `test/follow-gmail-harness.cjs` section 32.
+> tests: `test/resolution-corpus.cjs` (93 checks), `test/follow-gmail-harness.cjs` section 32.
 
 ## 1. The problem, in one example
 
@@ -62,7 +62,7 @@ move). Direction `mine`, one Google Task reminder, one place in the popup. A ste
 
 Built: the pure planner and delivery judge; payments-seen and issuer storage; the follow card (one card, one move at a time,
 the path advances after each tap); the loop with its status line; popup row; Do It chip steps aside for receipts and transfer proofs
-so nothing says "Handled." over an unsent draft; privacy page and store copy; 69 core checks and 24 browser checks.
+so nothing says "Handled." over an unsent draft; the issuer's file arriving in another thread advances the same loop; privacy page and store copy; 93 core checks and 31 browser checks.
 
 Wired to receipts and transfer proofs only. The planner already speaks invoice, tax invoice and statement (tested), but
 those keep the existing Do It chip until the receipt path has been used on real mail. Contracts and other documents are
@@ -95,9 +95,14 @@ You intend, we execute: the ask now becomes a path to the real artifact, not one
 ## 8. Known limits and open checks
 
 - Never run on real Gmail; the browser harness imitates Gmail's structure (like the others).
-- Matching a file is by name, not content: a file called "Receipt Oct.pdf" that is for another payment would be offered. The draft is
-  reviewed by the person and says the amount; a wrong-amount guard on file names is not built.
-- Payment evidence matches on amount and recency, not on who paid: two clients paying the same amount in a week would not be told apart.
-  The loop-paid basis does check the person.
-- The issuer's reply is picked up only when the original thread is opened again.
+- Matching a file is by name, not content. One guard exists: a name that states ANOTHER amount ("Receipt ₪2,000.pdf" for a ₪3,850
+  request) is dropped; only a number with a currency mark or a thousands separator counts, so "Receipt-7731" is a number, not a price.
+  A file called "Receipt Oct.pdf" for another payment, with no amount in its name, would still be offered. The draft says the amount
+  and the person reviews it before sending.
+- Payment evidence matches on amount and recency, not on who paid (the bank email's text is deliberately not kept). Guard: when
+  someone else is still being chased for the same amount, a bank email is not taken as proof for this person and Glance asks. Two
+  clients who both paid the same amount in the same week, with no loop to tell them apart, would still both read as paid.
+- The issuer's reply is picked up when ANY thread with it is opened (one loop that asked that address, one file named for it; two
+  loops on one issuer need the message to name an amount). It only offers the reply to the original requester with that file; the
+  person taps, the draft is not sent, the loop stays open.
 - Several requests for different receipts in one thread are one loop (the first clear ask).

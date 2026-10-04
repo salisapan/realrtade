@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 
 ## Open
 
@@ -78,4 +78,5 @@ Last updated: 2026-10-03
 - 2026-09-30: Glance setup questions (work domain, caution, team size) removed from `trial.html`; popup "Save & start" step removed.
 - 2026-09-30: Homepage restructured with Flow as the front door; 5-link navigation on all 47 pages; plain-English Pricing; unbuilt capabilities (Flow-Edge, audit trail) no longer stated as live.
 - 2026-09-30: Branch brought up to date with `origin/main` (was 123 commits behind).
-- 2026-10-03: Multi-step resolution (receipt as the north star): `core/resolution.js` (define done, find existing, verify the payment, prepare or ask the issuer, close only on a real attachment in a message the person sent), the loop card and status line, payments-seen and issuer storage, the Do It chip stepping aside for receipts, privacy copy, `docs/resolution-paths.md`. 69 core checks + 24 browser checks.
+- 2026-10-03: Multi-step resolution (receipt as the north star): `core/resolution.js` (define done, find existing, verify the payment, prepare or ask the issuer, close only on a real attachment in a message the person sent), the loop card and status line, payments-seen and issuer storage, the Do It chip stepping aside for receipts, privacy copy, `docs/resolution-paths.md`. 93 core checks + 31 browser checks.
+- 2026-10-04: Resolution slice hardened: a file named for another amount is not offered; a bank email is not proof when someone else owes the same amount; the issuer's receipt arriving in another thread is offered as a reply to the original requester (draft, not sent, loop stays open). Core + browser checks added.

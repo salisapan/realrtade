@@ -642,6 +642,37 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   await t.ctx.close();
 
 
+  // 32h. the issuer answers in a thread of its own, with the file: the path advances without reopening the original thread
+  const ISSUERMSG = { from: 'books@my-accountant.co.il', fromName: 'Noa Books', to: 'me@x.com', toIsMe: true };
+  const REQUESTED = Object.assign({}, RW, { id: 'orig', threadId: 'orig', messageId: 'o1', subject: 'Retainer receipt', resolution: Object.assign({}, RW.resolution, { stage: 'request', requestedAt: 1, requestedTo: 'Noa Books', requestedToEmail: 'books@my-accountant.co.il', assertedPaidAt: 1 }) });
+  t = await open(browser, 'res-issuer-file', [msg(ISSUERMSG, 'Hi, here is the receipt you asked for.', ['Receipt-7731.pdf'])], { watches: [REQUESTED] });
+  s = await t.state();
+  check('the issuer you asked sends the receipt: one card offering the reply to the requester with it', /Noa Books sent the receipt/.test(s.card || '') && /Prepare reply to Dana with it/.test(s.card || '') && /Receipt-7731\.pdf/.test(s.card || ''), s.card);
+  check('nothing happens before the tap', !s.msgs.includes('flow:follow-draft') && s.watches[0].status === 'waiting', s);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(700);
+  const ri = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  s = await t.state();
+  check('the draft goes to the ORIGINAL requester with the issuer\'s file attached', ri && ri.payload.to === 'dana@acme.com' && ri.payload.subject === 'Retainer receipt' && ri.payload.attachment && ri.payload.attachment.filename === 'Receipt-7731.pdf' && /Attached is the receipt for ₪3,850: Receipt-7731\.pdf/.test(ri.payload.body), ri && Object.assign({}, ri.payload, { attachment: ri.payload.attachment && ri.payload.attachment.filename }));
+  check('the loop is still open: a draft is not a delivery', s.watches[0].status === 'waiting' && s.watches[0].resolution.stage === 'prepare' && s.watches[0].resolution.preparedFile === 'Receipt-7731.pdf', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'res-issuer-other', [msg({ from: 'someone@else.com', fromName: 'Someone', to: 'me@x.com', toIsMe: true }, 'Here is a receipt.', ['Receipt-1.pdf'])], { watches: [REQUESTED] });
+  s = await t.state();
+  check('a receipt from someone nobody asked is not offered for the loop', !/sent the receipt/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 32i. a Drive file named for ANOTHER amount is not the receipt
+  t = await open(browser, 'res-wrong-amount', RT, { drive: [{ id: 'F2', name: 'Receipt Dana ₪2,000.pdf', mimeType: 'application/pdf' }] });
+  s = await t.state();
+  check('a receipt named for ₪2,000 is not offered for a ₪3,850 request: it asks about the payment instead', !/Found/.test(s.card || '') && /Was it paid\?/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
+  // 32j. the same amount owed by someone else: a bank email proves nothing for Dana
+  const OMER = Object.assign({}, PAYLOOP, { id: 'pay2', threadId: 'pay2', counterpart: { email: 'omer@beta.com', name: 'Omer Beta' } });
+  t = await open(browser, 'res-ambiguous', RT, { watches: [OMER], store: SEEN });
+  s = await t.state();
+  check('Omer still owes the same amount: the bank email is not taken for Dana\'s, so it asks', /Was it paid\?/.test(s.card || '') && !/Ask .* to issue/.test(s.card || ''), s.card);
+  await t.ctx.close();
+
   await browser.close();
   fs.rmSync(TMP, { recursive: true, force: true });
   console.log('\nTOTAL FAILURES: ' + failures);
