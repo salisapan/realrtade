@@ -2,6 +2,7 @@
 # development sandbox's network policy refuses huggingface.co. Public data only: the fixed corpus in the repo. The owner's private
 # human set is gitignored and is NOT here. Nothing here ships anything or changes the product; it prints numbers and uploads result.json.
 # Runs on a push that touches this file (see below); manual runs otherwise.
+# Run 1 (unconstrained decoding) was a harness defect; run 2 constrains the answer to the schema's keys and values like the product does.
 name: Language model experiment
 
 on:

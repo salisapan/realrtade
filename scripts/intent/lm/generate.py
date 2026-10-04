@@ -6,8 +6,8 @@ Scoring is NOT done here: score.cjs replays these raw answers through the real c
     python3 scripts/intent/lm/generate.py /tmp/fixed --stub --out /tmp/raw.json        # plumbing check only, meaningless numbers
 
 Honest differences from the product (written in docs/lm-fallback-evaluation-plan.md): full precision on a CPU instead of 4-bit in the
-browser (so quality here is, if anything, an upper bound); decoding is not grammar-constrained (an off-vocabulary answer is a null, i.e.
-silence, which can only cost recall, never precision); the model is not asked for the `when` and `amount` spans (they never change
+browser (so quality here is, if anything, an upper bound); decoding IS constrained to the schema's keys and values (as the product's session does); the first run of this experiment was not,
+and the small models then broke the format on every answer, which measured the harness and not the model (docs/lm-fallback-evaluation-plan.md section 6); the model is not asked for the `when` and `amount` spans (they never change
 whether a sentence is proposed; code re-reads dates and money itself).
 """
 import json, argparse, time, os, sys, re
@@ -40,15 +40,41 @@ else:
     model.eval()
     params = sum(p.numel() for p in model.parameters())
     print(f'loaded {a.model}: {params / 1e9:.2f}B parameters, {torch.get_num_threads()} threads', flush=True)
+    import copy
+    ACTS = ['ASK', 'PROMISE', 'INFORM', 'ACK']
+    ACTIONS = ['pay', 'sign', 'approve', 'confirm', 'schedule', 'decide', 'review', 'join', 'complete', 'send', 'reply', 'none']
+    WHO = ['you', 'me', 'other', 'none']
+    FIELDS = [('act', ACTS, '", "action": "'), ('action', ACTIONS, '", "who": "'), ('who', WHO, '", ')]
+    opt_ids = {o: tok(o, add_special_tokens=False).input_ids for _, opts, _ in FIELDS for o in opts}
+    def advance(past, text):
+        ids = tok(text, return_tensors='pt', add_special_tokens=False).input_ids
+        out = model(ids, past_key_values=past, use_cache=True)
+        return out.past_key_values, out.logits[0, -1]
     def run(prompt):
+        """Constrained decoding, the way the product's session works (Chrome's responseConstraint, Ollama's format, a JSON schema):
+        the keys are fixed and each field can only take one of its listed values. Each value is the one the model finds most likely."""
         msgs = [{'role': 'user', 'content': prompt}]
         text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False) + PREFILL
-        ids = tok(text, return_tensors='pt', add_special_tokens=False)
+        ids = tok(text, return_tensors='pt', add_special_tokens=False).input_ids
         with torch.no_grad():
-            out = model.generate(**ids, max_new_tokens=40, do_sample=False, stop_strings=['"when"'], tokenizer=tok, pad_token_id=tok.eos_token_id)
-        body = PREFILL + tok.decode(out[0, ids['input_ids'].shape[1]:], skip_special_tokens=True)
-        cut = body.find('"when"')
-        return body[:cut] + '"when": null, "amount": null}' if cut >= 0 else body
+            o = model(ids, use_cache=True)
+            past, logits = o.past_key_values, o.logits[0, -1]
+            chosen = []
+            for _, opts, sep in FIELDS:
+                lp0 = torch.log_softmax(logits.float(), -1)
+                best, best_score = None, None
+                for opt in opts:
+                    t = opt_ids[opt]
+                    score = lp0[t[0]].item()
+                    if len(t) > 1:
+                        branch = copy.deepcopy(past)
+                        out = model(torch.tensor([t[:-1]]), past_key_values=branch, use_cache=True)
+                        lps = torch.log_softmax(out.logits[0].float(), -1)
+                        score += sum(lps[i, t[i + 1]].item() for i in range(len(t) - 1))
+                    if best_score is None or score > best_score: best, best_score = opt, score
+                chosen.append(best)
+                past, logits = advance(past, best + sep)
+        return '{"act": "%s", "action": "%s", "who": "%s", "when": null, "amount": null}' % tuple(chosen)
 
 results, t0 = {}, time.time()
 for i, p in enumerate(prompts):

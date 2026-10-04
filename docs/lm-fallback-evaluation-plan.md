@@ -75,4 +75,16 @@ laptops, and the 30-60 s a first download takes. A pass here is permission to bu
 
 ## 6. Result
 
-(not run yet)
+### 6a. First run (2026-10-04, GitHub Actions run 37206317874): a defect in the harness, NOT a verdict on any model
+
+All four models failed the device test in both languages and added nothing. For Qwen2.5-0.5B the log shows why: with free-form decoding it
+did not keep the schema (`{"act": "pay", "to": "you"}`, `{"act": "test", ...}`), so every one of the 294 answers was rejected by the strict
+parser and counted as silence ("0 right, 0 wrong, 28 missed"). The product never decodes this way: its session constrains the keys and the
+allowed values (Chrome's `responseConstraint`, Ollama's `format`, a JSON schema). Section 2 had listed "not grammar-constrained" as a difference
+that "can only cost recall"; it turned out to cost all of it for small models, so that run measured our harness. I did not inspect the
+1.5B and 1.7B answers one by one, so I do not claim their cause. **No rule or threshold was changed.** Only the decoding was fixed
+(the model's most likely allowed value per field, in schema order) and checked for plumbing on a random tiny model before the second run.
+
+### 6b. Second run (constrained decoding)
+
+(pending)
