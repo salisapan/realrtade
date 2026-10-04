@@ -28,6 +28,6 @@ const recorder = { prompt: async (text) => { asked[bucket].add(text); return '{"
   const status = { en: { ok: true }, he: { ok: true }, checkedAt: NOW };
   for (const pipeline of [P, shapeFree(P)]) for (const r of corpus) await L.propose(r.t, { session: recorder, pipeline, model: M, status, now: NOW });
   const all = Array.from(new Set([...asked.audit, ...asked.fallback]));
-  fs.writeFileSync(path.join(dir, 'prompts.json'), JSON.stringify({ prompts: all, counts: { audit: asked.audit.size, fallback: asked.fallback.size, total: all.length } }));
+  fs.writeFileSync(path.join(dir, 'prompts.json'), JSON.stringify({ schema: L.SCHEMA, prompts: all, counts: { audit: asked.audit.size, fallback: asked.fallback.size, total: all.length } }));
   console.log('prompts the shipped code would send:', all.length, '(audit', asked.audit.size, ', fallback on engine-silent sentences', asked.fallback.size, ')');
 })();

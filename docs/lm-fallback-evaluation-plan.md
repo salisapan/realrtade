@@ -85,6 +85,23 @@ that "can only cost recall"; it turned out to cost all of it for small models, s
 1.5B and 1.7B answers one by one, so I do not claim their cause. **No rule or threshold was changed.** Only the decoding was fixed
 (the model's most likely allowed value per field, in schema order) and checked for plumbing on a random tiny model before the second run.
 
-### 6b. Second run (constrained decoding)
+### 6b. Second run (constrained decoding): all four still proposed almost nothing, and a traced diagnosis found the second harness defect
 
-(pending)
+Qwen2.5-0.5B, Qwen2.5-1.5B, Qwen3-0.6B and Qwen3-1.7B each got 0 or 1 right of ~28 real asks/promises per language on the device test
+(Qwen3-1.7B: English 1 right 1 wrong, Hebrew 0 right 1 wrong); no language reached the rule; nothing was added to the engine's proposals.
+Because a 1.5B-1.7B instruction model should not be that blind, a short traced run (Qwen2.5-1.5B, first 60 prompts) printed what it
+chose and its score per act. Findings: (1) the product's prompt A never names the key `act` (it lists `action`, `who`, `when`, `amount` only), so after
+my forced `{"act": "` every act scored about -10 and the pick was close to noise ("ALL PARTNERS MUST SIGN..." read as ACK); (2) on prompt B the
+model was confident and mostly right on the act (ASK at -0.03 for "Can IT visit your desk tomorrow morning...") but filled `who` with "me" for
+asks and `action` with "send", which the product's two-asking rule (act, action and the right party must all agree) correctly refuses.
+Neither is a quality verdict on the model. (1) is the harness not telling the model the schema that constrained decoding enforces.
+**This also applies to the product's own Ollama / LM Studio session** (`core/local-lm-server.js` passes the schema as a constraint only): putting the
+schema text in the prompt is a pending, separate improvement (open-tasks row 28).
+
+### 6c. Third and LAST run (declared before it ran)
+
+Same models, same prompts, same rule, same scoring; the only change, applied to every model alike, is that the schema text is appended to each prompt.
+No further change to the harness, the prompts or the rule is allowed after this run: whatever it gives is the result of this experiment.
+(Said now because this is the third attempt; a harness fixed until a model passes would prove nothing.)
+
+(result pending)

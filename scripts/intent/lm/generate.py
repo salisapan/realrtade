@@ -21,7 +21,11 @@ ap.add_argument('--limit', type=int, default=0)
 ap.add_argument('--trace', type=int, default=0, help='print the first N prompts with the model\'s scores per act (diagnosis)')
 a = ap.parse_args()
 
-prompts = json.load(open(f'{a.dir}/prompts.json'))['prompts']
+pj = json.load(open(f'{a.dir}/prompts.json'))
+prompts = pj['prompts']
+# Constrained decoding forces the keys and values but does not TELL the model what they are; the usual practice (and the vendors' own advice) is
+# to put the schema in the prompt too. Run 1 and 2 did not, and the first act key is not even named in the product's prompt A.
+SCHEMA_NOTE = '\n\nReply with one JSON object that matches this JSON schema:\n' + json.dumps(pj.get('schema', {}))
 if a.limit: prompts = prompts[:a.limit]
 PREFILL = '{"act": "'
 params = None
@@ -55,7 +59,7 @@ else:
     def run(prompt):
         """Constrained decoding, the way the product's session works (Chrome's responseConstraint, Ollama's format, a JSON schema):
         the keys are fixed and each field can only take one of its listed values. Each value is the one the model finds most likely."""
-        msgs = [{'role': 'user', 'content': prompt}]
+        msgs = [{'role': 'user', 'content': prompt + SCHEMA_NOTE}]
         text = tok.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True, enable_thinking=False) + PREFILL
         ids = tok(text, return_tensors='pt', add_special_tokens=False).input_ids
         with torch.no_grad():

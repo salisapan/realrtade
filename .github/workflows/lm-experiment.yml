@@ -2,7 +2,8 @@
 # development sandbox's network policy refuses huggingface.co. Public data only: the fixed corpus in the repo. The owner's private
 # human set is gitignored and is NOT here. Nothing here ships anything or changes the product; it prints numbers and uploads result.json.
 # Runs on a push that touches this file (see below); manual runs otherwise.
-# Run 1 (unconstrained decoding) was a harness defect; run 2 constrains the answer to the schema's keys and values like the product does.
+# Run 1 (unconstrained decoding) and run 2 (constrained, schema not shown to the model) were harness defects (docs/lm-fallback-evaluation-plan.md 6a, 6b).
+# Run 3 is the last: same models, prompts and rule, the schema text is added to each prompt.
 name: Language model experiment
 
 on:
