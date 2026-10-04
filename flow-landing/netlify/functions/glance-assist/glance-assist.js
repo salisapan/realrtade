@@ -41,6 +41,7 @@ const crypto = require('crypto');
 const { callRoutedLlm, silenceResult } = require('./model-router.js');
 const license = require('../verify-license/license-core.js');
 const { styleLine } = require('./style-hints.js');
+const { FlowJsonEnforce } = require('../../../../flow-trial-extension/core/json-enforce.js');
 
 const LOG_PREFIX = '[glance-assist]';
 
@@ -245,6 +246,31 @@ async function classify(payload) {
   return { result: result || silenceResult(), route: out.route || null };
 }
 
+// ---- Tier 1 of the hybrid execution path: a strong model proposes ONE Do It action, as strict JSON -------------------------------------
+// docs/hybrid-execution-architecture.md. The extension sends only masked text (core/exec-router.js refuses to send anything else, and the router
+// below masks again). The system prompt is built HERE from the shared schema: the client's own "instructions" field is ignored, so a modified
+// client cannot change what the model is told. The answer is validated against the same schema before it is returned, and returned as canonical
+// JSON text; the extension parses and validates it again, restores the placeholders on the device, and shows it as a proposal.
+async function execute(payload) {
+  const maskedPrompt = clean(payload.maskedPrompt, LIMITS.threadEntry * 2);
+  if (!maskedPrompt) throw badRequest('No text provided.');
+  const system =
+    'You propose exactly one action for an email assistant. The text you receive has had names, companies, amounts, dates, e-mail addresses, phone numbers and ' +
+    'identifiers replaced with placeholder tokens like [CLIENT_NAME_1], [CURRENCY_VAL_1], [DATE_1], [ID_1]. Use those tokens exactly as given wherever the real value ' +
+    'would appear; never invent a value. Dates are never written as dates: quote the words or the token (for example "by Friday" or "[DATE_1]").\n' +
+    FlowJsonEnforce.instructions(FlowJsonEnforce.ACTION_SCHEMA, 'A');
+  const out = await callRoutedLlm({
+    action: 'execute',
+    system,
+    userText: maskedPrompt,
+    maxTokens: 400,
+    accept: (raw) => FlowJsonEnforce.parse(raw, FlowJsonEnforce.ACTION_SCHEMA).ok
+  });
+  const parsed = FlowJsonEnforce.parse(out.text, FlowJsonEnforce.ACTION_SCHEMA);
+  if (!parsed.ok) throw Object.assign(new Error('The model did not return a valid action.'), { status: 502 });
+  return { text: JSON.stringify(parsed.value), route: out.route || null };
+}
+
 function badRequest(message) {
   const err = new Error(message);
   err.status = 400;
@@ -308,6 +334,11 @@ exports.handler = async function (event) {
       const result = await classify(payload);
       log('classified', { lang: payload.lang, type: result.result.type, provider: result.route && result.route.provider, model: result.route && result.route.model });
       return { statusCode: 200, body: JSON.stringify({ ok: true, result: result.result }) };
+    }
+    if (action === 'execute') {
+      const result = await execute(payload);
+      log('action proposed', { lang: payload.lang, provider: result.route && result.route.provider, model: result.route && result.route.model });
+      return { statusCode: 200, body: JSON.stringify({ ok: true, text: result.text }) };
     }
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid action' }) };
   } catch (err) {

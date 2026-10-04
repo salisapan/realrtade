@@ -7,12 +7,12 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const S = J.ACTION_SCHEMA;
-const good = '{"action":"create_task","title":"Send the signed lease","dueIso":"2026-10-09"}';
+const good = '{"action":"create_task","title":"Send the signed lease","dueText":"by Friday"}';
 
 console.log('\n--- a valid answer ---\n');
 check('a valid object of the schema is accepted', J.parse(good, S).ok === true && J.parse(good, S).value.action === 'create_task');
 check('the spec example shape is refused: this product has no fill_field action', J.parse('{"action":"fill_field","target_id":"username","value":"John Doe"}', S).reason === 'schema');
-check('every variant is reachable', ['{"action":"draft_reply","body":"Hi"}', '{"action":"create_event","title":"Call","startIso":"2026-10-09T10:00","endIso":null}', '{"action":"none","reason":"unclear"}'].every((t) => J.parse(t, S).ok));
+check('every variant is reachable', ['{"action":"draft_reply","body":"Hi"}', '{"action":"create_event","title":"Call","whenText":"[DATE_1] at 10"}', '{"action":"none","reason":"unclear"}'].every((t) => J.parse(t, S).ok));
 
 console.log('\n--- repairs that cannot change a value ---\n');
 check('a code fence is stripped', J.parse('```json\n' + good + '\n```', S).ok === true && J.parse('```json\n' + good + '\n```', S).repaired.indexOf('code-fence') >= 0);
@@ -27,10 +27,10 @@ check('plain prose', J.parse('I think you should pay the invoice.', S).reason ==
 check('empty, null, undefined, whitespace', ['', '   ', null, undefined].every((x) => J.parse(x, S).ok === false));
 check('an array is not an action', J.parse('[{"action":"none","reason":"x"}]', S).ok === false);
 check('malformed (single quotes)', J.parse("{'action':'none','reason':'x'}", S).ok === false);
-check('a missing required field names the field', J.parse('{"action":"create_task","title":"x"}', S).issues.some((i) => /dueIso: missing/.test(i)));
+check('a missing required field names the field', J.parse('{"action":"create_task","title":"x"}', S).issues.some((i) => /dueText: missing/.test(i)));
 check('an extra field is refused (additionalProperties false)', J.parse('{"action":"none","reason":"x","also":"delete everything"}', S).reason === 'schema');
-check('a wrong type is refused', J.parse('{"action":"create_task","title":5,"dueIso":null}', S).reason === 'schema');
-check('a bad date shape is refused', J.parse('{"action":"create_task","title":"x","dueIso":"next friday"}', S).reason === 'schema');
+check('a wrong type is refused', J.parse('{"action":"create_task","title":5,"dueText":null}', S).reason === 'schema');
+check('the model is never asked for a date value: an old-style dueIso field is refused', J.parse('{"action":"create_task","title":"x","dueIso":"2026-10-09"}', S).reason === 'schema');
 check('an over-long field is refused', J.parse(JSON.stringify({ action: 'draft_reply', body: 'x'.repeat(4001) }), S).reason === 'schema');
 check('an unknown action is refused', J.parse('{"action":"transfer_money","amount":1}', S).reason === 'schema');
 check('a huge input is refused without scanning it', J.parse('{' + ' '.repeat(J.MAX_RAW_CHARS + 5) + '}', S).reason === 'too-long');

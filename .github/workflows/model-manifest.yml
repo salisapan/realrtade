@@ -32,3 +32,30 @@ jobs:
         with:
           name: manifest-${{ strategy.job-index }}
           path: /tmp/manifest.json
+
+  # The manifests are the trust root of the download (what each file must hash to), so they are put into the repo by this job, from the
+  # builder's own output, and not typed in by hand. A push by the Actions token does not start another workflow run.
+  commit:
+    needs: manifest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: manifest-*
+          path: /tmp/m
+      - run: |
+          mkdir -p flow-trial-extension/core/model-manifests
+          for f in /tmp/m/*/manifest.json; do
+            id=$(node -p "require('$f').id")
+            cp "$f" "flow-trial-extension/core/model-manifests/$id.json"
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add flow-trial-extension/core/model-manifests
+          git diff --cached --quiet && exit 0
+          git commit -m "Pinned model manifests (file sizes and SHA-256 at an exact commit), built by scripts/hybrid/build-model-manifest.cjs"
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"

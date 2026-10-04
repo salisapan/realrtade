@@ -10,7 +10,7 @@ function check(name, cond, detail) {
   else { failures++; console.log('FAIL:', name, detail !== undefined ? JSON.stringify(detail) : ''); }
 }
 const PROMPT = 'Email from Dana Levi: "Please wire $3,850 for account 99887766 by 2026-10-09 and call +972-54-123-4567."';
-const task = (title) => JSON.stringify({ action: 'create_task', title, dueIso: '2026-10-09' });
+const task = (title) => JSON.stringify({ action: 'create_task', title, dueText: null });
 
 function rig(over) {
   const calls = { local: [], server: [] };

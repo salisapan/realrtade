@@ -186,7 +186,8 @@ function planRoute(action, opts) {
     models = (slotC ? [slotC] : []).concat(fastPair(env, state, now));
   } else if (action === 'draft-reply') {
     models = fastPair(env, state, now);
-  } else if (action === 'classify') {
+  } else if (action === 'classify' || action === 'execute') {
+    // execute: the strong pair, like classify. Cheapest-first routing is an owner decision that is still open (docs/open-tasks.md row 29).
     models = [MODELS.sonnet, MODELS.grokStrong].filter((model) => available(model, env, state, now));
   }
   // Classify and draft never keep slot C, including when it is the only

@@ -21,12 +21,12 @@ const FlowJsonEnforce = (() => {
     variants: {
       draft_reply: { type: 'object', additionalProperties: false, required: ['action', 'body'], properties: {
         action: { type: 'string', enum: ['draft_reply'] }, body: { type: 'string', maxLength: 4000 } } },
-      create_task: { type: 'object', additionalProperties: false, required: ['action', 'title', 'dueIso'], properties: {
-        action: { type: 'string', enum: ['create_task'] }, title: { type: 'string', maxLength: 200 },
-        dueIso: { type: ['string', 'null'], pattern: '^\\d{4}-\\d{2}-\\d{2}$' } } },
-      create_event: { type: 'object', additionalProperties: false, required: ['action', 'title', 'startIso'], properties: {
-        action: { type: 'string', enum: ['create_event'] }, title: { type: 'string', maxLength: 200 },
-        startIso: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2})?' }, endIso: { type: ['string', 'null'] } } },
+      // Dates are never asked for as dates. The model points at the words ("by Friday", "[DATE_1]"); the device reads them with its own
+      // parsers (core/extract.js), after any placeholder has been restored. The model supplies a place, never a value.
+      create_task: { type: 'object', additionalProperties: false, required: ['action', 'title', 'dueText'], properties: {
+        action: { type: 'string', enum: ['create_task'] }, title: { type: 'string', maxLength: 200 }, dueText: { type: ['string', 'null'], maxLength: 80 } } },
+      create_event: { type: 'object', additionalProperties: false, required: ['action', 'title', 'whenText'], properties: {
+        action: { type: 'string', enum: ['create_event'] }, title: { type: 'string', maxLength: 200 }, whenText: { type: 'string', maxLength: 80 } } },
       none: { type: 'object', additionalProperties: false, required: ['action', 'reason'], properties: {
         action: { type: 'string', enum: ['none'] }, reason: { type: 'string', maxLength: 200 } } }
     }
