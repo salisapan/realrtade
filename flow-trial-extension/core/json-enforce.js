@@ -180,7 +180,14 @@ const FlowJsonEnforce = (() => {
     return head + '\n' + shape + '\nIf you cannot do it with certainty, use {"action": "none", "reason": "<short reason>"}. Never invent names, amounts, dates, e-mail addresses or phone numbers; keep any [PLACEHOLDER] tokens exactly as given.';
   }
 
-  return { ACTION_SCHEMA, validate, parse, instructions, describe, MAX_RAW_CHARS };
+  // The same schema as plain JSON Schema (oneOf for the discriminated union), for a runtime that can constrain decoding to it (WebLLM's
+  // response_format, Ollama's format, a provider's structured output). Constrained decoding makes the shape valid; parse() still checks it.
+  function toJsonSchema(schema) {
+    if (schema && schema.discriminator) return { oneOf: Object.keys(schema.variants).map((k) => toJsonSchema(schema.variants[k])) };
+    return JSON.parse(JSON.stringify(schema));
+  }
+
+  return { ACTION_SCHEMA, validate, parse, instructions, describe, toJsonSchema, MAX_RAW_CHARS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowJsonEnforce };

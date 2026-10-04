@@ -201,7 +201,19 @@ const FlowModelStore = (() => {
     };
   }
 
-  return { STATE_VERSION, DEFAULT_HOSTS, DEFAULTS, MAX_SHARD_BYTES, checkManifest, create, blank };
+  // The "may I download right now?" question, from what the browser exposes (navigator-like object, injected). Conservative on purpose:
+  // when the browser says the connection is metered, slow or in data-saver mode, the download waits.
+  function networkConditions(nav) {
+    const n = nav || {};
+    if (n.onLine === false) return { ok: false, reason: 'offline' };
+    const c = n.connection || {};
+    if (c.saveData === true) return { ok: false, reason: 'data-saver' };
+    if (c.type === 'cellular') return { ok: false, reason: 'metered' };
+    if (c.effectiveType === 'slow-2g' || c.effectiveType === '2g' || c.effectiveType === '3g') return { ok: false, reason: 'slow-network' };
+    return { ok: true };
+  }
+
+  return { STATE_VERSION, DEFAULT_HOSTS, DEFAULTS, MAX_SHARD_BYTES, checkManifest, create, blank, networkConditions };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowModelStore };
