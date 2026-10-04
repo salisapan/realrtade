@@ -144,7 +144,7 @@ function load(stored, opts) {
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
-    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
+    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'local-lm.js'], [CORE, 'local-lm-audit.js'], [CORE, 'local-lm-server.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
     [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
   ];
   for (const [dir, f] of loadOrder) {
@@ -675,6 +675,31 @@ async function run() {
     const buttons = find(host, 'ghost').map((b) => b.textContent);
     check('and offers Turn on once a client id is set', buttons.includes('Turn on'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
+  }
+
+  console.log('\n--- popup.js: a model on this computer is off until it passes the test ---\n');
+  {
+    const { sandbox, document } = load({});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('surface-list');
+    const whos = find(host, 'wait-who').map((n) => n.textContent);
+    const notes = find(host, 'wait-note').map((n) => n.textContent);
+    const buttons = find(host, 'ghost').map((b) => b.textContent);
+    check('the row is there, off by default', whos.includes('A model on your computer'));
+    check('it says it runs here, costs nothing, only proposes, and is switched on per language only after a test', notes.some((t) => /on this computer/.test(t) && /nothing leaves this computer/.test(t) && /you still tap/.test(t) && /per language only after it passes a precision test/.test(t)), notes);
+    check('Find models and Test and turn on are offered, Turn off is not (it is off)', buttons.includes('Find models') && buttons.includes('Test and turn on') && !buttons.includes('Turn off'), buttons);
+  }
+  {
+    const status = { en: { ok: true, precision: 0.98, recall: 0.61 }, he: { ok: false, precision: 0.91, recall: 0.5 }, checkedAt: Date.now(), nextCheckAt: Date.now() + 1e9 };
+    const { sandbox, document } = load({ localLmServer: { enabled: true, provider: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'llama3:8b', status } });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('surface-list');
+    const notes = find(host, 'wait-note').map((n) => n.textContent);
+    const buttons = find(host, 'ghost').map((b) => b.textContent);
+    check('once it passed, the row names the model and each language\'s honest result', notes.some((t) => /Ollama · llama3:8b/.test(t) && /English: on \(precision 0\.98, recall 0\.61\)/.test(t) && /Hebrew: off \(precision 0\.91, needs 0\.97\)/.test(t)), notes);
+    check('and offers Test again and Turn off', buttons.includes('Test again') && buttons.includes('Turn off'), buttons);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

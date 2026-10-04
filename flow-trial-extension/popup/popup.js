@@ -802,6 +802,104 @@
     host.appendChild(row);
   }
 
+
+  // ---- a model on this computer (core/local-lm-server.js) ---------------------------------------------------
+  // Optional. Ollama or LM Studio, running on THIS computer. Turned on only after it passes the same precision test as the browser's
+  // own model, per language, and only ever asked about sentences Glance could not read itself. It only proposes.
+  const LOCAL_MODEL_COPY = 'Optional. If you run Ollama or LM Studio on this computer, Glance can ask that model about a sentence it could not read itself. It runs here, costs nothing and needs no key; nothing leaves this computer, and Glance only proposes, you still tap. It is switched on per language only after it passes a precision test on your model.';
+  const LM_PROVIDER_LABEL = { ollama: 'Ollama', lmstudio: 'LM Studio' };
+
+  function fmtLm(r) { return r && r.ok ? 'on (precision ' + (r.precision == null ? '?' : r.precision) + ', recall ' + (r.recall == null ? '?' : r.recall) + ')' : r && r.precision != null ? 'off (precision ' + r.precision + ', needs ' + FlowLocalLM.TEST_MIN_PRECISION + ')' : 'off'; }
+
+  async function renderLocalModelRow(host) {
+    if (typeof FlowLocalLMServer === 'undefined' || typeof FlowLocalLM === 'undefined' || typeof FlowStorage.getLocalLmServer !== 'function') return;
+    const cfg = await FlowStorage.getLocalLmServer();
+    const on = cfg.enabled === true && cfg.status && ((cfg.status.en && cfg.status.en.ok) || (cfg.status.he && cfg.status.he.ok));
+    const row = el('div', 'wait-item');
+    const top = el('div', 'wait-top');
+    top.appendChild(el('span', 'wait-who', 'A model on your computer'));
+    top.appendChild(el('span', 'wait-state' + (on ? ' ok' : ''), on ? 'On' : 'Off'));
+    row.appendChild(top);
+    row.appendChild(el('div', 'wait-note', LOCAL_MODEL_COPY));
+    if (cfg.model && cfg.status) {
+      row.appendChild(el('div', 'wait-note', (LM_PROVIDER_LABEL[cfg.provider] || cfg.provider) + ' · ' + cfg.model + '. English: ' + fmtLm(cfg.status.en) + '. Hebrew: ' + fmtLm(cfg.status.he) + '.'));
+    }
+    const note = el('p', 'wait-note');
+    note.hidden = true;
+    const say = (t) => { note.hidden = !t; note.textContent = t || ''; };
+
+    const provider = document.createElement('select');
+    provider.setAttribute('aria-label', 'Program');
+    Object.keys(LM_PROVIDER_LABEL).forEach((k) => { const o = document.createElement('option'); o.value = k; o.textContent = LM_PROVIDER_LABEL[k]; if (k === cfg.provider) o.selected = true; provider.appendChild(o); });
+    const model = document.createElement('input');
+    model.type = 'text'; model.placeholder = 'Model name, e.g. llama3:8b'; model.value = cfg.model || ''; model.setAttribute('aria-label', 'Model name'); model.setAttribute('list', 'lm-models'); model.maxLength = 120;
+    const listEl = document.createElement('datalist'); listEl.id = 'lm-models';
+    const current = () => ({ provider: provider.value, baseUrl: '', model: model.value.trim() });
+    const need = (c) => {
+      const n = FlowLocalLMServer.normalizeConfig(c);
+      const pat = FlowLocalLMServer.originPattern(c.model ? c : Object.assign({}, c, { model: 'x' }));
+      return { n, pat };
+    };
+    const askPermission = async (pat) => {
+      if (!pat) return false;
+      try {
+        if (typeof chrome === 'undefined' || !chrome.permissions || !chrome.permissions.request) return true;
+        if (chrome.permissions.contains && await chrome.permissions.contains({ origins: [pat] })) return true;
+        return await chrome.permissions.request({ origins: [pat] });
+      } catch (e) { return false; }
+    };
+
+    const acts = el('div', 'wait-acts');
+    const find = el('button', 'ghost sm', 'Find models');
+    find.type = 'button';
+    find.addEventListener('click', async () => {
+      const { pat } = need(current());
+      if (!(await askPermission(pat))) { say('The browser did not allow Glance to reach this computer’s model server, so it stays off.'); return; }
+      find.disabled = true; say('Looking…');
+      const r = await FlowLocalLMServer.listModels({ provider: provider.value }, { fetch: (u, o) => fetch(u, o) });
+      find.disabled = false;
+      if (!r.ok) { say(r.hint || 'Could not reach it.'); return; }
+      listEl.replaceChildren();
+      r.models.forEach((m) => { const o = document.createElement('option'); o.value = m; listEl.appendChild(o); });
+      if (r.models.length && !model.value) model.value = r.models[0];
+      say(r.models.length ? 'Found ' + r.models.length + ' model' + (r.models.length === 1 ? '' : 's') + '. Pick one, then Test and turn on.' : 'The server is running but has no models yet. Pull one first (for Ollama: ollama pull llama3).');
+    });
+    const test = el('button', 'ghost sm', on ? 'Test again' : 'Test and turn on');
+    test.type = 'button';
+    test.addEventListener('click', async () => {
+      const c = current();
+      const { n, pat } = need(c);
+      if (!n) { say(c.model ? 'That address is not allowed: only a program on this computer.' : 'Type the model name first (or press Find models).'); return; }
+      if (!(await askPermission(pat))) { say('The browser did not allow Glance to reach this computer’s model server, so it stays off.'); return; }
+      test.disabled = true; find.disabled = true;
+      say('Testing this model on sentences written for the purpose. This can take a few minutes: keep this panel open.');
+      const session = FlowLocalLMServer.session(n, { fetch: (u, o) => fetch(u, o), timeoutMs: 60000 });
+      const probe = await FlowLocalLMServer.listModels(n, { fetch: (u, o) => fetch(u, o) });
+      if (!probe.ok) { test.disabled = false; find.disabled = false; say(probe.hint || 'Could not reach it.'); return; }
+      if (probe.models.length && probe.models.indexOf(n.model) < 0) { test.disabled = false; find.disabled = false; say('The server does not have a model called ' + n.model + '. Pick one from the list.'); return; }
+      let res;
+      try {
+        res = await FlowLocalLM.selfTest(session, typeof FlowLocalLMAudit !== 'undefined' ? FlowLocalLMAudit : [], { now: Date.now(), onProgress: (lang, i, total) => { if (i % 10 === 0) say('Testing ' + (lang === 'he' ? 'Hebrew' : 'English') + ': ' + i + ' of ' + total + '. Keep this panel open.'); } });
+      } catch (e) { res = null; }
+      const pass = Boolean(res && ((res.en && res.en.ok) || (res.he && res.he.ok)));
+      await FlowStorage.setLocalLmServer({ enabled: pass, provider: n.provider, baseUrl: n.baseUrl, model: n.model, status: res ? Object.assign({}, res, { provider: n.provider, baseUrl: n.baseUrl, model: n.model, nextCheckAt: res.checkedAt + FlowLocalLM.TEST_MAX_AGE_MS, reason: pass ? 'passed' : 'failed' }) : null });
+      await renderSurfaces();
+    });
+    acts.appendChild(find); acts.appendChild(test);
+    if (cfg.enabled) {
+      const off = el('button', 'ghost sm', 'Turn off');
+      off.type = 'button';
+      off.addEventListener('click', async () => { off.disabled = true; await FlowStorage.setLocalLmServer(Object.assign({}, cfg, { enabled: false })); await renderSurfaces(); });
+      acts.appendChild(off);
+    }
+    const inputs = el('div', 'wait-acts');
+    inputs.appendChild(provider); inputs.appendChild(model); inputs.appendChild(listEl);
+    row.appendChild(inputs);
+    row.appendChild(acts);
+    row.appendChild(note);
+    host.appendChild(row);
+  }
+
   // What Outlook is waiting on the person to answer: new offers, and questions that need a yes or a no.
   async function renderOutlookCards() {
     const block = document.getElementById('outlookBlock');
@@ -916,6 +1014,7 @@
       host.appendChild(row);
     }
     await renderOutlookRow(host);
+    await renderLocalModelRow(host);
   }
 
   // Two entries that might be one person (the same full name in two apps): asked once, never merged on a guess.

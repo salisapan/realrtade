@@ -210,6 +210,8 @@ const FlowStorage = (() => {
     styleProfile: null,
     // core/local-lm.js: the result of the on-device language model's self-test on THIS device (counts and flags only).
     localLm: null,
+    // core/local-lm-server.js: a model the person runs on THEIR computer (Ollama, LM Studio). Off until they turn it on AND it passes the self-test. Loopback addresses only.
+    localLmServer: { enabled: false, provider: 'ollama', baseUrl: '', model: '', status: null },
     // core/identity-graph.js: which names, addresses and numbers are the same person across apps. No message text. Local, capped.
     identityGraph: null,
     // core/resolution.js: payments seen in bank/processor mail (amount, currency, day: numbers only, never text; capped, expire) and who issues the person's receipts (an address they typed).
@@ -1029,6 +1031,15 @@ const FlowStorage = (() => {
     await set({ localLm: r });
     return true;
   });
+  async function getLocalLmServer() {
+    const state = await get();
+    return Object.assign({ enabled: false, provider: 'ollama', baseUrl: '', model: '', status: null }, state.localLmServer || {});
+  }
+  const setLocalLmServer = serialize(async function setLocalLmServer(cfg) {
+    const c = cfg || {};
+    await set({ localLmServer: { enabled: Boolean(c.enabled), provider: c.provider === 'lmstudio' ? 'lmstudio' : 'ollama', baseUrl: String(c.baseUrl || ''), model: String(c.model || '').slice(0, 120), status: c.status || null } });
+    return true;
+  });
   async function getIdentityGraph() {
     const state = await get();
     return state.identityGraph || (typeof FlowIdentity !== 'undefined' ? FlowIdentity.empty() : null);
@@ -1205,7 +1216,7 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

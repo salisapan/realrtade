@@ -161,6 +161,7 @@ const FlowLocalLM = (() => {
       const rows = (audit || []).filter((r) => (r.lang || langOf(r.t)) === lang);
       let tp = 0, fp = 0, fn = 0;
       for (const r of rows) {
+        if (typeof o.onProgress === 'function') { try { o.onProgress(lang, tp + fp + fn, rows.length); } catch (e) { /* progress is cosmetic */ } }
         const read = await classify(session, r.t);
         const proposed = read && (read.act === 'ASK' || read.act === 'PROMISE') && read.action !== 'none';
         const gold = r.act === 'ASK' || r.act === 'PROMISE';

@@ -2769,6 +2769,63 @@ async function classifyViaBackend(payload) {
   return { ok: true, result: data.result };
 }
 
+
+/* ------------------------------------------------ a model on this computer */
+//
+// core/local-lm-server.js is the portable description of this (and what popup.js uses to test it); this is the same
+// two request shapes, kept here because the service worker loads no core files. test/local-lm-server-corpus.cjs runs both
+// against one fake server and fails if they ever differ. The address is loopback-only, checked here again before every
+// request. Nothing leaves this computer, nothing is installed or downloaded, and the answer only ever feeds a proposal.
+const LM_SERVER_TIMEOUT_MS = 20000;
+let lmServerChain = Promise.resolve();
+
+function lmServerLoopback(url) {
+  let u;
+  try { u = new URL(String(url)); } catch (e) { return false; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  if (u.username || u.password) return false;
+  const h = u.hostname.toLowerCase();
+  return h === '127.0.0.1' || h === 'localhost' || h === '[::1]' || h === '::1';
+}
+
+async function lmServerPromptNow(text, schema) {
+  const stored = await new Promise((r) => chrome.storage.local.get('localLmServer', r));
+  const c = stored && stored.localLmServer;
+  if (!c || c.enabled !== true || !c.model || !c.status) return { ok: false, reason: 'off' };
+  const base = String(c.baseUrl || (c.provider === 'lmstudio' ? 'http://127.0.0.1:1234' : 'http://127.0.0.1:11434')).replace(/\/+$/, '');
+  if ((c.provider !== 'ollama' && c.provider !== 'lmstudio') || !lmServerLoopback(base)) return { ok: false, reason: 'refused' };
+  const content = String(text || '').slice(0, 4000);
+  let url, body;
+  if (c.provider === 'ollama') {
+    url = base + '/api/chat';
+    body = { model: c.model, messages: [{ role: 'user', content }], stream: false, options: { temperature: 0 } };
+    if (schema) body.format = schema;
+  } else {
+    url = base + '/v1/chat/completions';
+    body = { model: c.model, messages: [{ role: 'user', content }], temperature: 0, stream: false };
+    if (schema) body.response_format = { type: 'json_schema', json_schema: { name: 'glance', strict: true, schema } };
+  }
+  if (!lmServerLoopback(url)) return { ok: false, reason: 'refused' };
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), LM_SERVER_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
+    if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+    const json = await res.json();
+    const out = c.provider === 'ollama' ? (json && json.message && json.message.content) : (json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content);
+    return typeof out === 'string' ? { ok: true, text: out } : { ok: false, reason: 'bad-response' };
+  } catch (e) {
+    return { ok: false, reason: e && e.name === 'AbortError' ? 'timeout' : 'unreachable' };
+  } finally { clearTimeout(timer); }
+}
+
+// One question at a time: a laptop model asked several things at once only gets slower.
+function lmServerPrompt(text, schema) {
+  const run = lmServerChain.then(() => lmServerPromptNow(text, schema));
+  lmServerChain = run.catch(() => {});
+  return run;
+}
+
 /* ---------------------------------------------------------------- dispatch */
 
 // 'googleTask' (singular) is the action *kind* actions.js proposes; 'googleTasks'
@@ -2907,6 +2964,8 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:pro-activate') return reply(sendResponse, activatePro(msg.key));
   if (msg.type === 'flow:pro-deactivate') return reply(sendResponse, deactivatePro());
   if (msg.type === 'flow:pro-billing') return reply(sendResponse, openBillingPortal());
+
+  if (msg.type === 'flow:lm-server-prompt') return reply(sendResponse, lmServerPrompt(msg.text, msg.schema));
 
   if (msg.type === 'flow:classify-remote') {
     return reply(sendResponse, classifyViaBackend(msg.payload || {}));

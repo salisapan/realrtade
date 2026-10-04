@@ -61,6 +61,7 @@ function stub() {
     if (m.type === 'flow:follow-task') return { ok: true, ref: { taskListId: 'L', taskId: 'T1' } };
     if (m.type === 'flow:connector-status') return { googleTasks: { connected: true, configured: true } };
     if (m.type === 'flow:search-drive') return { ok: true, files: window.__driveFiles || [] };
+    if (m.type === 'flow:lm-server-prompt') return window.__lmReply ? { ok: true, text: JSON.stringify(window.__lmReply) } : { ok: false, reason: 'off' };
     return { ok: true };
   };
   window.chrome = {
@@ -86,6 +87,7 @@ async function open(browser, name, thread, opts) {
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 200)); });
   await p.addInitScript(stub);
   if (opts.pro) await p.addInitScript(() => { window.__pro = true; });
+  if (opts.lmReply) await p.addInitScript((r) => { window.__lmReply = r; }, opts.lmReply);
   if (opts.drive) await p.addInitScript((files) => { window.__driveFiles = files; }, opts.drive);
   const file = path.join(TMP, name + '.html');
   fs.writeFileSync(file, html(thread));
@@ -698,6 +700,33 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   s = await t.state();
   check('the reminder is a draft to the issuer that asks for the file and claims none', ch && ch.payload.to === 'books@my-accountant.co.il' && /reminder about the receipt for Dana Cole for ₪3,850/.test(ch.payload.body) && /5 days ago/.test(ch.payload.body) && !/attached|enclosed/i.test(ch.payload.body), ch && ch.payload);
   check('and the loop waits again, still open', s.watches[0].status === 'waiting' && s.watches[0].resolution.chasedAt > 0, s.watches);
+  await t.ctx.close();
+
+  // 33. a model on this computer (core/local-lm-server.js): asked only about a sentence the lists could not read, only after it passed the test
+  const LMSENT = 'Wondering whether the permit came through on your side.';
+  const LMT = [msg(theirs, 'Happy to proceed.'), msg(mine, LMSENT)];
+  const PASSED = (en, he) => ({ localLmServer: { enabled: true, provider: 'ollama', baseUrl: 'http://127.0.0.1:11434', model: 'llama3:8b', status: { en: { ok: en }, he: { ok: he }, checkedAt: new Date(2026, 9, 1, 11).getTime(), nextCheckAt: new Date(2026, 10, 1).getTime() } } });
+  const LMASK = { act: 'ASK', action: 'confirm', who: 'you', when: null, amount: null };
+  t = await open(browser, 'lm-off', LMT, { lmReply: LMASK });
+  s = await t.state();
+  check('no local model turned on: nothing is asked of it and the sentence stays silent', !s.msgs.includes('flow:lm-server-prompt') && !/Waiting on a reply/.test(s.card || ''), s);
+  await t.ctx.close();
+  t = await open(browser, 'lm-on', LMT, { lmReply: LMASK, store: PASSED(true, false) });
+  s = await t.state();
+  check('a local model that passed the test reads the sentence: an offer, with the usual Stay on it tap', s.msgs.includes('flow:lm-server-prompt') && /Waiting on a reply\?/.test(s.card || '') && /Stay on it/.test(s.card || ''), s);
+  check('nothing was opened without the tap', s.watches.length === 0, s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'lm-failed-lang', LMT, { lmReply: LMASK, store: PASSED(false, true) });
+  s = await t.state();
+  check('English failed the test (only Hebrew passed): an English sentence is never sent to it', !s.msgs.includes('flow:lm-server-prompt') && !/Waiting on a reply/.test(s.card || ''), s);
+  await t.ctx.close();
+  t = await open(browser, 'lm-disagrees', LMT, { lmReply: { act: 'INFORM', action: 'none', who: 'none', when: null, amount: null }, store: PASSED(true, true) });
+  s = await t.state();
+  check('a model that reads it as a statement: silence', s.msgs.includes('flow:lm-server-prompt') && !/Waiting on a reply/.test(s.card || ''), s);
+  await t.ctx.close();
+  t = await open(browser, 'lm-down', LMT, { store: PASSED(true, true) });
+  s = await t.state();
+  check('a model that is not running (the worker says so): silence, no error on the page', s.msgs.includes('flow:lm-server-prompt') && !/Waiting on a reply/.test(s.card || '') && s.errs.length === 0, s);
   await t.ctx.close();
 
   await browser.close();

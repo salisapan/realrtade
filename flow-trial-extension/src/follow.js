@@ -442,25 +442,58 @@ const FlowFollow = (() => {
     } catch (e) { /* the tier simply stays off */ } finally { lmTesting = false; }
   }
 
+  // A model the person runs on their own computer (Ollama, LM Studio; core/local-lm-server.js), reached through the service worker because
+  // a Gmail page may not call localhost itself. Used instead of the browser's model only when the person turned it on AND it passed
+  // the same precision self-test (done in the popup, per language). Same rules: it only proposes.
+  const LM_SERVER_BUDGET_MS = 25000;
+  function serverSession() {
+    return {
+      prompt: async (text, schema) => {
+        const r = await send({ type: 'flow:lm-server-prompt', text, schema });
+        if (!r || !r.ok) throw new Error((r && r.reason) || 'off');
+        return r.text;
+      },
+      destroy: () => {}
+    };
+  }
+  async function serverChoice() {
+    try {
+      if (typeof FlowStorage.getLocalLmServer !== 'function') return null;
+      const c = await FlowStorage.getLocalLmServer();
+      const st = c && c.status;
+      if (!c || c.enabled !== true || !c.model || !st || !((st.en && st.en.ok) || (st.he && st.he.ok)) || FlowLocalLM.stale(st, Date.now())) return null;
+      return { session: serverSession(), status: st };
+    } catch (e) { return null; }
+  }
+
   async function lmAsk(text) {
     try {
-      if (typeof FlowLocalLM === 'undefined' || typeof FlowLocalLMChrome === 'undefined' || typeof FlowStorage.getLocalLm !== 'function') return null;
-      if (lmStatus === undefined) lmStatus = await FlowStorage.getLocalLm();
-      if (!lmStatus || Date.now() > (lmStatus.nextCheckAt || 0)) { runLmSelfTest(); }
-      if (!lmStatus || !((lmStatus.en && lmStatus.en.ok) || (lmStatus.he && lmStatus.he.ok)) || FlowLocalLM.stale(lmStatus, Date.now())) return null;
-      if (!lmSession) lmSession = await FlowLocalLMChrome.open();
-      if (!lmSession) return null;
+      if (typeof FlowLocalLM === 'undefined' || typeof FlowStorage.getLocalLm !== 'function') return null;
+      let session = null;
+      let status = null;
+      const srv = await serverChoice();
+      if (srv) { session = srv.session; status = srv.status; }
+      else {
+        if (typeof FlowLocalLMChrome === 'undefined') return null;
+        if (lmStatus === undefined) lmStatus = await FlowStorage.getLocalLm();
+        if (!lmStatus || Date.now() > (lmStatus.nextCheckAt || 0)) { runLmSelfTest(); }
+        if (!lmStatus || !((lmStatus.en && lmStatus.en.ok) || (lmStatus.he && lmStatus.he.ok)) || FlowLocalLM.stale(lmStatus, Date.now())) return null;
+        if (!lmSession) lmSession = await FlowLocalLMChrome.open();
+        if (!lmSession) return null;
+        session = lmSession; status = lmStatus;
+      }
+      const maxTried = srv ? 2 : 3;
       const work = (async () => {
         let tried = 0;
         for (const s of FlowIntentPipeline.sentences(text)) {
-          if (tried >= 3) break;
-          const p = await FlowLocalLM.propose(s, { session: lmSession, pipeline: FlowIntentPipeline, model: FlowIntentModel, status: lmStatus, extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null, now: Date.now() });
+          if (tried >= maxTried) break;
+          const p = await FlowLocalLM.propose(s, { session, pipeline: FlowIntentPipeline, model: FlowIntentModel, status, extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null, now: Date.now() });
           tried++;
           if (p) return FlowFollowUp.fromProposal(p, Date.now());
         }
         return null;
       })();
-      return await Promise.race([work, new Promise((r) => setTimeout(() => r(null), LM_BUDGET_MS))]);
+      return await Promise.race([work, new Promise((r) => setTimeout(() => r(null), srv ? LM_SERVER_BUDGET_MS : LM_BUDGET_MS))]);
     } catch (e) { return null; }
   }
 
