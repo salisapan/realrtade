@@ -625,7 +625,27 @@ const FlowIntent = (() => {
     // approval would otherwise clear 50 after the hard gates declined.
     const infoOrNoise = INFO_ONLY.test(text) || EXTRA_NOISE.test(text);
     const blocked = s.flags.noise || infoOrNoise;
-    const askIsSoft = Boolean(requestWhat) && (SOFT_ASK.test(requestWhat) || SOFT_ASK_HE.test(requestWhat));
+    // Softness is about the ask that would actually chip. The quoted
+    // sentence is the first handoff, so a conditional opener ("במידה
+    // ותוכל, תשלח לי את הטיוטה") used to hide a later clear send. A later
+    // handoff sentence that is not itself soft is the close.
+    function sentenceIsSoft(sentence) {
+      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence);
+    }
+    let askIsSoft = Boolean(requestWhat) && sentenceIsSoft(requestWhat);
+    if (askIsSoft) {
+      const parts = String(text || '').split(/(?<=[.!?])\s+|\n+/);
+      for (let i = 0; i < parts.length; i++) {
+        const sentence = parts[i].trim();
+        if (sentence.length <= 12 || sentence.length >= 320) continue;
+        let handoff = false;
+        for (let p = 0; p < REQUEST_PATTERNS.length; p++) {
+          const pattern = REQUEST_PATTERNS[p];
+          if (new RegExp(pattern.source, pattern.flags).test(sentence)) { handoff = true; break; }
+        }
+        if (handoff && !sentenceIsSoft(sentence)) { askIsSoft = false; break; }
+      }
+    }
     // Names a silence the chip path already chose. It does not add a
     // return. quietHint is used only where classify already returned
     // type null with no type of its own.

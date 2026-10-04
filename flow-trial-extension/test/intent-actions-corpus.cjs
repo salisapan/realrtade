@@ -1128,6 +1128,8 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['polite ask, not a soft one', 'Please send the invoice when you get a chance.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['Hebrew hard send ask', 'תשלח לי את החשבונית עד יום שישי בבקשה.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['Hebrew please-send still a request', 'בבקשה תשלח לי את החשבונית עד יום שישי.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['Hebrew soft opener, then a hard send', 'במידה ותוכל, תשלח לי את הטיוטה. בבקשה תשלח את החשבונית עד יום שישי.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['EN soft opener, then a hard send', 'If possible, could you send the draft? Please send the invoice by Friday, September 18.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['reader reminder, not a calendar notice', 'As a reminder, you agreed to send the invoice by Friday, September 18.', FlowIntent.TYPES.COMMITMENT_OF_READER, null],
     ['current ask that mentions a past due date', 'Please send the receipt for the invoice that was due March 3, 2024.', FlowIntent.TYPES.REQUEST, 'follow-up-ask']
   ];
@@ -1137,6 +1139,18 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
       type: intent.type, personalClose: intent.personalClose, score: intent.signals && intent.signals.score
     });
     check('show Do It chip: ' + label, FlowIntent.shouldShowChip(intent) === true, intent.confidence);
+  }
+
+  // A conditional opener is not the close when a later sentence asks plainly.
+  {
+    const laterHe = classify('במידה ותוכל, תשלח לי את הטיוטה. בבקשה תשלח את החשבונית עד יום שישי.');
+    check('a later Hebrew send is the ask, not the conditional opener',
+      laterHe && laterHe.entities && /חשבונית/.test(laterHe.entities.what || '') && !/טיוטה/.test(laterHe.entities.what || ''),
+      laterHe && laterHe.entities && laterHe.entities.what);
+    const laterEn = classify('If possible, could you send the draft? Please send the invoice by Friday, September 18.');
+    check('a later English send is the ask, not the conditional opener',
+      laterEn && laterEn.entities && /invoice/i.test(laterEn.entities.what || '') && !/draft/i.test(laterEn.entities.what || ''),
+      laterEn && laterEn.entities && laterEn.entities.what);
   }
 
   // The ask is current. The March 2024 day is why the invoice was late,
