@@ -62,6 +62,15 @@
     if (!msg || typeof msg.type !== 'string' || msg.type.indexOf('hybrid:') !== 0 || (sender && sender.id && sender.id !== chrome.runtime.id)) return false;
     (async () => {
       try {
+        if (msg.type === 'hybrid:probe') {
+          // Capability and size only: nothing is downloaded and nothing is stored.
+          const caps = await R.capabilities({ navigator, storage: navigator.storage }, 2.2e9);
+          if (!caps.ok) { reply({ ok: true, eligible: false, reason: caps.reason }); return; }
+          const key = R.pick(msg.modelKey, caps, navigator);
+          const m = await manifestFor(key);
+          reply({ ok: true, eligible: true, model: key, label: R.CATALOG[key].label, downloadBytes: m.files.reduce((n, f) => n + f.bytes, 0), network: S.networkConditions(navigator) });
+          return;
+        }
         if (msg.type === 'hybrid:consent') { const st = await ensureStore(modelKey || 'phi-3-mini'); reply({ ok: true, state: await st.setConsent(msg.given === true) }); return; }
         if (msg.type === 'hybrid:start') { starting = starting || start(msg.modelKey).finally(() => { starting = null; }); reply({ ok: true, state: await starting }); return; }
         if (msg.type === 'hybrid:infer') {

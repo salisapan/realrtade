@@ -16,6 +16,9 @@ const FlowHybridSW = (() => {
   const OFFSCREEN_URL = 'src/offscreen.html';
   const TICK_MINUTES = 30;
   const RESUMABLE = ['idle', 'awaiting-consent', 'downloading', 'paused', 'failed'];
+  // A failure that retrying cannot fix (a wrong hash, a bad manifest, a redirect off the allowlist, a library that is not bundled) must not wake the
+  // download every half hour: that would burn the person's bandwidth on a file that will never verify.
+  const FATAL = /^(hash-mismatch|manifest-|redirect-host|model-lib-not-bundled|runtime-missing)/;
 
   function create(chromeApi, deps) {
     const c = chromeApi;
@@ -48,6 +51,9 @@ const FlowHybridSW = (() => {
       try { return (await c.runtime.sendMessage(msg)) || { ok: false, reason: 'no-answer' }; } catch (e) { return { ok: false, reason: 'offscreen-unreachable' }; }
     }
 
+    // Can this machine run the model, and how big is the download? Asks the offscreen page (the only place WebGPU can be asked); downloads nothing.
+    async function probe() { return toOffscreen({ type: 'hybrid:probe' }); }
+
     async function status() {
       const [k, s] = await Promise.all([consent(), mirror()]);
       return { ok: true, isModelLoaded: Boolean(k.localModel && s && s.isModelLoaded === true), serverConsent: k.server, localModelConsent: k.localModel, state: s };
@@ -72,7 +78,9 @@ const FlowHybridSW = (() => {
     async function tick() {
       const [k, s] = await Promise.all([consent(), mirror()]);
       if (!k.localModel) { await c.alarms.clear(ALARM); return { ok: true, skipped: 'no-consent' }; }
-      if (s && (s.status === 'unsupported' || s.isModelLoaded === true || s.status === 'ready')) return { ok: true, skipped: s.status };
+      if (s && s.status === 'unsupported') { await c.alarms.clear(ALARM); return { ok: true, skipped: 'unsupported' }; }     // this machine cannot run it: stop waking up
+      if (s && s.status === 'failed' && FATAL.test(String(s.lastError || ''))) { await c.alarms.clear(ALARM); return { ok: true, skipped: 'fatal' }; }
+      if (s && (s.isModelLoaded === true || s.status === 'ready')) return { ok: true, skipped: s.status };
       if (s && RESUMABLE.indexOf(s.status) < 0) return { ok: true, skipped: s.status };
       return toOffscreen({ type: 'hybrid:start' });
     }
@@ -85,6 +93,7 @@ const FlowHybridSW = (() => {
       const fromPage = Boolean(sender && sender.tab);                                   // a content script (a tab), as opposed to the popup
       switch (msg.type) {
         case 'flow:hybrid-status': return status();
+        case 'flow:hybrid-probe': return probe();
         case 'flow:hybrid-consent': return fromPage ? Promise.resolve({ ok: false, reason: 'popup-only' }) : setConsent(msg.patch || {});
         case 'flow:hybrid-infer': return (async () => {
           const s = await status();
@@ -114,7 +123,7 @@ const FlowHybridSW = (() => {
       c.runtime.onStartup.addListener(() => { tick(); });
     }
 
-    return { handle, status, tick, setConsent, install, ensureOffscreen };
+    return { handle, status, tick, setConsent, install, ensureOffscreen, probe };
   }
 
   return { KEY_CONSENT, KEY_STATE, ALARM, OFFSCREEN_URL, create };

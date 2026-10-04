@@ -437,6 +437,38 @@ async function run() {
       check('an empty request is a 400', empty.status === 400, empty);
     }
     {
+      const ALL = Object.assign({}, KEYS, { MISTRAL_API_KEY: 'test-mistral', DEEPSEEK_API_KEY: 'test-deepseek' });
+      const ids = (action) => planRoute(action, { env: ALL, state: createState(), now: CLOCK }).map((m) => m.id);
+      check('execute order with every key: Mistral Large, Sonnet, Grok-strong, DeepSeek', ids('execute').join() === ['mistral-large-latest', MODELS.sonnet.id, MODELS.grokStrong.id, 'deepseek-chat'].join(), ids('execute'));
+      check('the new providers are used for execute only: never draft, summary or classify', ['draft-reply', 'summarize-attachment', 'classify'].every((a) => ids(a).every((id) => id !== 'mistral-large-latest' && id !== 'deepseek-chat')), ['draft-reply', 'summarize-attachment', 'classify'].map(ids));
+      check('a provider with no key is never planned', planRoute('execute', { env: Object.assign({}, ALL, { MISTRAL_API_KEY: '' }), state: createState(), now: CLOCK }).every((m) => m.id !== 'mistral-large-latest'));
+      check('with only a DeepSeek key, execute still has a route', planRoute('execute', { env: { ANTHROPIC_API_KEY: '', XAI_API_KEY: '', GEMINI_API_KEY: '', OPENAI_API_KEY: '', MISTRAL_API_KEY: '', DEEPSEEK_API_KEY: 'k' }, state: createState(), now: CLOCK }).map((m) => m.id).join() === 'deepseek-chat');
+      Object.assign(process.env, { MISTRAL_API_KEY: 'test-mistral', DEEPSEEK_API_KEY: 'test-deepseek' });
+      resetState();
+      const ACTION = JSON.stringify({ action: 'create_task', title: 'Wire the money to [CLIENT_NAME_1]', dueText: null });
+      let script = scriptedFetch([chat(ACTION)]);
+      global.fetch = script.fetchImpl;
+      let res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
+      check('execute goes to Mistral Large first, with its key, in JSON mode, temperature 0', res.status === 200 && script.calls.length === 1 && /api\.mistral\.ai/.test(script.calls[0].url) && script.calls[0].headers.Authorization === 'Bearer test-mistral' && JSON.parse(script.calls[0].body).response_format.type === 'json_object' && JSON.parse(script.calls[0].body).temperature === 0, script.calls);
+      check('the Mistral request carries only masked text', !/Dana|jane/.test(script.calls[0].body) && /\[CLIENT_NAME_1\]/.test(script.calls[0].body));
+      resetState();
+      script = scriptedFetch([{ status: 500, raw: '' }, anthropic(ACTION)]);
+      global.fetch = script.fetchImpl;
+      res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
+      check('Mistral down: Sonnet answers', res.status === 200 && script.calls.length === 2 && modelOf(script.calls[1]) === MODELS.sonnet.id, script.calls.map((c) => c.url));
+      resetState();
+      script = scriptedFetch([{ status: 500, raw: '' }, { status: 500, raw: '' }, { status: 500, raw: '' }, chat(ACTION)]);
+      global.fetch = script.fetchImpl;
+      res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
+      check('the first three down: DeepSeek is the backup and answers', res.status === 200 && script.calls.length === 4 && /api\.deepseek\.com/.test(script.calls[3].url) && script.calls[3].headers.Authorization === 'Bearer test-deepseek', script.calls.map((c) => c.url));
+      resetState();
+      script = scriptedFetch([chat('I will do that.'), anthropic('{"action":"wire_funds"}'), chat('nope'), chat('still not json')]);
+      global.fetch = script.fetchImpl;
+      res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1].' });
+      check('every provider answering off-schema is a 502, never an invented action', res.status === 502 && !res.json.text, res);
+      delete process.env.MISTRAL_API_KEY; delete process.env.DEEPSEEK_API_KEY;
+    }
+    {
       resetState();
       clearEnv();
       const script = scriptedFetch([anthropic(CLASS_OK)]);

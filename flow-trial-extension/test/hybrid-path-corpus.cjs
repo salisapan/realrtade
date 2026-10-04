@@ -105,6 +105,18 @@ const gpu = (o) => ({ requestAdapter: async () => (o === null ? null : { feature
   await sw.handle({ type: 'hybrid:state', state: { status: 'unsupported', isModelLoaded: false } }, { id: 'me' });
   f.log.toOffscreen.length = 0;
   check('an unsupported machine is left alone', (await sw.tick()).skipped === 'unsupported' && f.log.toOffscreen.length === 0);
+  f.log.toOffscreen.length = 0;
+  await sw.handle({ type: 'hybrid:state', state: { status: 'failed', lastError: 'hash-mismatch:shard-1', isModelLoaded: false } }, { id: 'me' });
+  check('a failure retrying cannot fix (a wrong hash) does not wake the download every 30 minutes', (await sw.tick()).skipped === 'fatal' && f.log.toOffscreen.length === 0 && !f.alarms[SW.ALARM]);
+  f.alarms[SW.ALARM] = { periodInMinutes: 30 };
+  await sw.handle({ type: 'hybrid:state', state: { status: 'failed', lastError: 'network:shard-3', isModelLoaded: false } }, { id: 'me' });
+  check('a network failure IS retried', (await sw.tick()).ok !== false && f.log.toOffscreen.some((m) => m.type === 'hybrid:start'));
+  await sw.handle({ type: 'hybrid:state', state: { status: 'unsupported', isModelLoaded: false } }, { id: 'me' });
+  f.alarms[SW.ALARM] = { periodInMinutes: 30 };
+  check('an unsupported machine stops the alarm instead of waking up forever', (await sw.tick()).skipped === 'unsupported' && !f.alarms[SW.ALARM]);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? { ok: true, eligible: true, model: 'phi-3-mini', downloadBytes: 2152379174 } : { ok: true });
+  const pr = await sw.handle({ type: 'flow:hybrid-probe' }, popup);
+  check('the popup can ask "can this machine run it, and how big is it" before turning anything on', pr.ok && pr.eligible === true && pr.downloadBytes > 2e9 && !f.log.toOffscreen.some((m) => m.type === 'hybrid:start' && f.log.toOffscreen.indexOf(m) > f.log.toOffscreen.length - 2));
   await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: false } }, popup);
   check('turning it off removes the model, clears the alarm and forgets the state', f.log.toOffscreen.some((m) => m.type === 'hybrid:remove') && !f.alarms[SW.ALARM] && f.store[SW.KEY_STATE] === undefined && (await sw.status()).isModelLoaded === false);
   check('with consent withdrawn a stray alarm cancels itself', (await sw.tick()).skipped === 'no-consent');

@@ -46,12 +46,14 @@ global.FlowCloseFamilies = FlowCloseFamilies;
 const { FlowIntent } = require('../../../../flow-trial-extension/core/intent.js');
 const { FlowPrivacyShield } = require('../../../../flow-trial-extension/core/privacyShield.js');
 
-const ENV_KEYS = ['ANTHROPIC_API_KEY', 'XAI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY'];
+const ENV_KEYS = ['ANTHROPIC_API_KEY', 'XAI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY'];
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
 const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
+const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
 const OPEN_MS = 60 * 1000;
@@ -66,7 +68,12 @@ const MODELS = {
   grokFast: { id: 'grok-4-fast-non-reasoning', slot: 'B', provider: 'xai', env: 'XAI_API_KEY', preference: 1 },
   grokStrong: { id: 'grok-4.6', slot: 'B', provider: 'xai', env: 'XAI_API_KEY', preference: 2 },
   gemini: { id: 'gemini-3.8-flash', slot: 'C', provider: 'gemini', env: 'GEMINI_API_KEY', preference: 0 },
-  openaiMini: { id: 'gpt-5.4-mini', slot: 'C', provider: 'openai', env: 'OPENAI_API_KEY', preference: 1 }
+  openaiMini: { id: 'gpt-5.4-mini', slot: 'C', provider: 'openai', env: 'OPENAI_API_KEY', preference: 1 },
+  // Slot D: used by 'execute' only (the strict-JSON Do It proposal), never by draft, summary or classify. Both are OpenAI-compatible HTTP APIs
+  // and both are asked for JSON mode. The ids are the providers' documented aliases and are UNVERIFIED from this environment: check them in
+  // each provider's console before setting the key. A provider with no key configured is never called.
+  mistralLarge: { id: 'mistral-large-latest', slot: 'D', provider: 'mistral', env: 'MISTRAL_API_KEY', preference: 0 },
+  deepseek: { id: 'deepseek-chat', slot: 'D', provider: 'deepseek', env: 'DEEPSEEK_API_KEY', preference: 1 }
 };
 
 const EMAIL_LEAK = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
@@ -186,13 +193,17 @@ function planRoute(action, opts) {
     models = (slotC ? [slotC] : []).concat(fastPair(env, state, now));
   } else if (action === 'draft-reply') {
     models = fastPair(env, state, now);
-  } else if (action === 'classify' || action === 'execute') {
-    // execute: the strong pair, like classify. Cheapest-first routing is an owner decision that is still open (docs/open-tasks.md row 29).
+  } else if (action === 'classify') {
     models = [MODELS.sonnet, MODELS.grokStrong].filter((model) => available(model, env, state, now));
+  } else if (action === 'execute') {
+    // The owner's order for the strict-JSON proposal: Mistral Large first, then the strong pair already connected (Sonnet, Grok-strong), DeepSeek last as
+    // the backup. Each is skipped when it has no key or its circuit is open. Cheapest-first routing is a separate owner decision (open-tasks row 29).
+    models = [MODELS.mistralLarge, MODELS.sonnet, MODELS.grokStrong, MODELS.deepseek].filter((model) => available(model, env, state, now));
   }
   // Classify and draft never keep slot C, including when it is the only
   // configured provider. Summarize is the only action allowed to use it.
   if (action !== 'summarize-attachment') models = models.filter((model) => model.slot !== 'C');
+  if (action !== 'execute') models = models.filter((model) => model.slot !== 'D');
   return models.map(describe);
 }
 
@@ -333,14 +344,15 @@ function requestFor(model, env, system, userText, maxTokens) {
       }
     };
   }
-  const url = model.provider === 'openai' ? OPENAI_URL : XAI_URL;
-  const key = model.provider === 'openai' ? env.OPENAI_API_KEY : env.XAI_API_KEY;
+  const url = model.provider === 'openai' ? OPENAI_URL : model.provider === 'mistral' ? MISTRAL_URL : model.provider === 'deepseek' ? DEEPSEEK_URL : XAI_URL;
+  const key = env[model.env];
   const body = {
     model: model.id,
     messages: [{ role: 'system', content: system }, { role: 'user', content: userText }]
   };
   if (model.provider === 'openai') body.max_completion_tokens = maxTokens;
   else body.max_tokens = maxTokens;
+  if (model.slot === 'D') { body.response_format = { type: 'json_object' }; body.temperature = 0; }
   return {
     url,
     headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' },
