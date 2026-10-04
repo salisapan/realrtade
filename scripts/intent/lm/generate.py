@@ -18,6 +18,7 @@ ap.add_argument('--model', default='Qwen/Qwen2.5-1.5B-Instruct')
 ap.add_argument('--out', required=True)
 ap.add_argument('--stub', action='store_true')
 ap.add_argument('--limit', type=int, default=0)
+ap.add_argument('--trace', type=int, default=0, help='print the first N prompts with the model\'s scores per act (diagnosis)')
 a = ap.parse_args()
 
 prompts = json.load(open(f'{a.dir}/prompts.json'))['prompts']
@@ -41,6 +42,7 @@ else:
     params = sum(p.numel() for p in model.parameters())
     print(f'loaded {a.model}: {params / 1e9:.2f}B parameters, {torch.get_num_threads()} threads', flush=True)
     import copy
+    detail = {}
     ACTS = ['ASK', 'PROMISE', 'INFORM', 'ACK']
     ACTIONS = ['pay', 'sign', 'approve', 'confirm', 'schedule', 'decide', 'review', 'join', 'complete', 'send', 'reply', 'none']
     WHO = ['you', 'me', 'other', 'none']
@@ -60,9 +62,11 @@ else:
             o = model(ids, use_cache=True)
             past, logits = o.past_key_values, o.logits[0, -1]
             chosen = []
-            for _, opts, sep in FIELDS:
+            detail.clear()
+            for fname, opts, sep in FIELDS:
                 lp0 = torch.log_softmax(logits.float(), -1)
                 best, best_score = None, None
+                scores = {}
                 for opt in opts:
                     t = opt_ids[opt]
                     score = lp0[t[0]].item()
@@ -71,7 +75,9 @@ else:
                         out = model(torch.tensor([t[:-1]]), past_key_values=branch, use_cache=True)
                         lps = torch.log_softmax(out.logits[0].float(), -1)
                         score += sum(lps[i, t[i + 1]].item() for i in range(len(t) - 1))
+                    scores[opt] = round(score, 2)
                     if best_score is None or score > best_score: best, best_score = opt, score
+                detail[fname] = scores
                 chosen.append(best)
                 past, logits = advance(past, best + sep)
         return '{"act": "%s", "action": "%s", "who": "%s", "when": null, "amount": null}' % tuple(chosen)
@@ -81,8 +87,14 @@ for i, p in enumerate(prompts):
     t1 = time.time()
     text = run(p)
     results[p] = {'text': text, 'sec': round(time.time() - t1, 3)}
+    if not a.stub and a.trace and i < a.trace:
+        m = re.search(r'Sentence: (".*")\s*$', p, re.S)
+        print('TRACE', ('B' if 'You read one sentence' in p else 'A'), (json.loads(m.group(1)) if m else '')[:90], '->', text[:60], '| act scores', detail.get('act'), flush=True)
     if i < 4 or i % 25 == 0:
         print(f'[{i + 1}/{len(prompts)}] {time.time() - t0:.0f}s  {text[:110]!r}', flush=True)
+from collections import Counter
+dist = {k: Counter(json.loads(v['text'].replace('null', 'null')).get(k) for v in results.values() if v['text'].startswith('{')) for k in ('act', 'action', 'who')}
+print('chosen values over all prompts:', {k: dict(v) for k, v in dist.items()}, flush=True)
 json.dump({'model': 'stub' if a.stub else a.model, 'params': params, 'results': results}, open(a.out, 'w'))
 secs = sorted(r['sec'] for r in results.values())
 print(f'done: {len(results)} prompts in {time.time() - t0:.0f}s, median {secs[len(secs) // 2]:.2f}s per call', flush=True)
