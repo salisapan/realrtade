@@ -1,0 +1,49 @@
+# Runs the pre-registered small-language-model experiment (docs/lm-fallback-evaluation-plan.md) on GitHub's runner, because the
+# development sandbox's network policy refuses huggingface.co. Public data only: the fixed corpus in the repo. The owner's private
+# human set is gitignored and is NOT here. Nothing here ships anything or changes the product; it prints numbers and uploads result.json.
+# Manual runs only.
+name: Language model experiment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  lm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - Qwen/Qwen2.5-0.5B-Instruct
+          - Qwen/Qwen2.5-1.5B-Instruct
+          - Qwen/Qwen3-0.6B
+          - Qwen/Qwen3-1.7B
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install transformers numpy
+      - name: Fixed corpus and the prompts the shipped code would send
+        run: |
+          node scripts/intent/dump-features.cjs /tmp/fixed
+          node scripts/intent/dump-fixed-corpus.cjs /tmp/fixed
+          node scripts/intent/lm/collect-prompts.cjs /tmp/fixed
+      - name: Ask the model
+        run: python3 scripts/intent/lm/generate.py /tmp/fixed --model ${{ matrix.model }} --out /tmp/raw.json
+      - name: Score with the real core code and the pre-registered rule
+        run: node scripts/intent/lm/score.cjs /tmp/fixed /tmp/raw.json --out /tmp/result.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lm-result-${{ strategy.job-index }}
+          path: |
+            /tmp/result.json
+            /tmp/raw.json
+          if-no-files-found: ignore
