@@ -2,18 +2,27 @@
 // Two numbers, on this device only. No message body, no sender, no subject,
 // no new network pipe. Persistence is src/storage.js.
 //
-// Trusted close. Do It ran, every proposed step wrote, and the receipt
-// said Handled. (That is FlowCloseQuality.isFullWrite and
-// FlowReceipt.confirmation().full — the same full-write condition.
-// "Partly handled." is not one.) The user did not Undo that write.
-// A later Undo removes it from the trusted count for the week of the
-// write. The week's Undo count sits beside the trusted count so "low"
-// is the number itself: Undo 0 is none, a small Undo is low. There is
-// no second bar that still counts an undone write as trusted.
+// Trusted close. A Free Gmail→Google Do It: the Gmail chip ran, every
+// proposed step wrote to a Google writer (Calendar, Gmail draft, Task,
+// Doc, Sheet, or Drive file), and the receipt said Handled. / טופל.
+// (That is FlowCloseQuality.isFullWrite and FlowReceipt.confirmation()
+// .full — the same full-write condition. "Partly handled." is not one.
+// The early-close sentence under the status is not the status.) The
+// user did not Undo that write. A later Undo removes it from the
+// trusted count for the week of the write. The week's Undo count sits
+// beside the trusted count so "low" is the number itself: Undo 0 is
+// none, a small Undo is low. There is no second bar that still counts
+// an undone write as trusted.
 //
-// Trusted closes / week. How many of those writes have their Handled
-// timestamp in the current local week. The week key is the same
-// YYYY-Wnn bucket as core/pmf-metrics.js (day-of-year / 7, not ISO).
+// A Do It click alone, a dismiss, a silence decision, a partial write,
+// a shortened chain, Outlook, Pro, or a non-Google writer (Notion,
+// Slack, and the rest) is not this number. The id list does not store
+// the step kinds or the receipt words.
+//
+// Trusted closes / week. How many of those Free Gmail→Google writes
+// have their Handled timestamp in the current local week. The week
+// key is the same YYYY-Wnn bucket as core/pmf-metrics.js (day-of-year
+// / 7, not ISO). The snapshot names the path `free-gmail-google`.
 // Week buckets are counts. The id list exists only so one Undo can
 // find the week of that write, capped like the other local id lists.
 //
@@ -30,6 +39,27 @@ const FlowQuietMetrics = (() => {
   // Order is the Activity line order. Adding a code here is the only
   // way a reason can be stored — anything else is dropped.
   const REASONS = ['noise', 'hedge', 'family', 'low', 'google', 'calibrated', 'memory', 'file', 'fact'];
+  // Action kinds background.js actually writes for the Free Gmail chip.
+  // Connector ids and the other destinations stay off this count.
+  const GOOGLE_KINDS = ['calendar', 'gmailDraft', 'googleTask', 'driveDoc', 'driveSheet', 'driveFile'];
+  const HANDLED_STATUS = ['Handled.', 'טופל.'];
+
+  // The event the Gmail receipt path passes after a full write. False
+  // when this close must not move trusted closes/week.
+  function isFreeGmailGoogleReceipt(event) {
+    if (!event || event.app !== 'gmail' || event.product !== 'free') return false;
+    if (event.receiptFull !== true || HANDLED_STATUS.indexOf(event.receiptStatus) === -1) return false;
+    const proposed = event.proposed;
+    const succeeded = event.succeeded;
+    if (typeof proposed !== 'number' || typeof succeeded !== 'number') return false;
+    if (!(proposed > 0 && succeeded === proposed)) return false;
+    const kinds = event.kinds;
+    if (!Array.isArray(kinds) || kinds.length !== succeeded) return false;
+    for (let i = 0; i < kinds.length; i++) {
+      if (GOOGLE_KINDS.indexOf(kinds[i]) === -1) return false;
+    }
+    return true;
+  }
 
   function emptyCounts() {
     const byReason = {};
@@ -100,7 +130,7 @@ const FlowQuietMetrics = (() => {
     event = event || {};
     const id = cleanId(event.messageId);
     const base = state || emptyState();
-    if (!id || !Number.isFinite(event.ts)) return base;
+    if (!id || !Number.isFinite(event.ts) || !isFreeGmailGoogleReceipt(event)) return base;
     const prior = base.handled || [];
     for (let i = 0; i < prior.length; i++) {
       if (prior[i].id === id) return base;
@@ -170,6 +200,7 @@ const FlowQuietMetrics = (() => {
     const undone = bucket.undone || 0;
     return {
       week: week,
+      path: 'free-gmail-google',
       trusted: Math.max(0, handled - undone),
       handled: handled,
       undone: undone,
@@ -231,7 +262,8 @@ const FlowQuietMetrics = (() => {
 
   return {
     emptyState, weekKey, noteHandled, noteUndo, noteSilence, reasonFor,
-    trustedWeek, snapshot, activityLine, REASONS, ID_CAP, WEEK_CAP
+    isFreeGmailGoogleReceipt, trustedWeek, snapshot, activityLine,
+    REASONS, GOOGLE_KINDS, HANDLED_STATUS, ID_CAP, WEEK_CAP
   };
 })();
 
