@@ -1,0 +1,34 @@
+# Builds the pinned manifests (file sizes and SHA-256 at an exact commit) for the two candidate on-device models, on GitHub's runner, because
+# the development sandbox's network policy refuses huggingface.co. Public data only; nothing is uploaded anywhere but the job log and artifact.
+# Runs on a push that touches this file; manual runs otherwise. docs/hybrid-execution-architecture.md.
+name: Model manifest
+
+on:
+  push:
+    paths:
+      - .github/workflows/model-manifest.yml
+      - scripts/hybrid/build-model-manifest.cjs
+  workflow_dispatch:
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - repo: mlc-ai/Phi-3-mini-4k-instruct-q4f16_1-MLC
+            lib: Phi-3-mini-4k-instruct-q4f16_1_cs1k-webgpu.wasm
+          - repo: mlc-ai/Llama-3-8B-Instruct-q4f16_1-MLC
+            lib: Llama-3-8B-Instruct-q4f16_1_cs1k-webgpu.wasm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node scripts/hybrid/build-model-manifest.cjs ${{ matrix.repo }} ${{ matrix.lib }} /tmp/manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manifest-${{ strategy.job-index }}
+          path: /tmp/manifest.json
