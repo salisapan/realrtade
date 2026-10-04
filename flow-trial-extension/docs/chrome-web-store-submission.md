@@ -127,7 +127,10 @@ anywhere to decide whether to act, doesn't sell data, and doesn't use your
 data to train any AI model. The only things that ever leave your device
 are: (1) the exact fields you approve when you click Do It, written
 directly to your own Google account, (2) for the two opt-in AI features
-above, masked placeholder text only, and (3) a small number of anonymous
+above, masked placeholder text only, (3) if you turn on the "second
+reading" in the extension panel, one masked sentence at a time that Glance
+could not place on your device (monthly allowance; never the thread;
+suggestion only), and (4) a small number of anonymous
 usage counts (was a suggestion shown/clicked/dismissed/undone) tagged with
 a random per-install ID, never message content. Full detail:
 theflow-ai.com/privacy.html
@@ -202,7 +205,7 @@ based on what the code actually does:
 | Health information | No | — |
 | Financial and payment information | **Yes** (narrow) | A monetary amount extracted from the open email, only when the user clicks Do It, sent only to their chosen connector. Masked before reaching Draft-It/attachment summary. |
 | Authentication information | **Yes** | OAuth tokens for connected destinations, stored only in `chrome.storage.local` on the user's device; never transmitted to or stored by Glance. |
-| Personal communications | **Yes** (narrow) | The open Gmail message's text is read locally to score it; only the fields above (never the full message) ever leave the device, and only on explicit click. |
+| Personal communications | **Yes** (narrow) | The open Gmail message's text is read locally to score it; only the fields above (never the full message) ever leave the device, and only on explicit click. The one other path is opt-in (off until the person turns on the "second reading" in the panel): a single sentence of the person's own newest message that Glance could not place, with names, amounts, dates and contact details replaced, sent to our server for a second reading, within a monthly allowance (`docs/ai-ladder.md`). |
 | Location | No | — |
 | Web history | No | — |
 | User activity | **Yes** (aggregate only) | Anonymous, aggregate product-usage counts only — a suggestion was shown/clicked/dismissed, a write completed, an action was undone, a process closed (and by which method), a connector was set up, Draft-It generated a reply, an attachment was summarised, one ping per day the extension was active, and (at most once per install per calendar week) whether a recurring usage habit had formed — each tagged with a random per-install ID, never message content, never which specific email or record. Full allow-list: `flow-landing/netlify/functions/track-event/track-event.js`'s `ALLOWED_EVENTS`/`PARAM_VALIDATORS`, which reject anything else server-side. |

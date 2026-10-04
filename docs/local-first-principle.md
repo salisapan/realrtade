@@ -11,7 +11,9 @@ that looks at a message, and never the thing a feature depends on to work.**
    thousands of recognisable cases from data, not a handful of regexes: add
    words and frames to the lexicons, not special cases to the logic.
 2. **A model is an optional last resort,** only for what the code genuinely
-   cannot decide, only behind Pro and masking, and only when the code's own
+   cannot decide, only behind masking and the person's one-time yes (Free with
+   a monthly allowance, Pro with a larger one and a stronger model: owner
+   decision 2026-10-04, `docs/ai-ladder.md`), and only when the code's own
    answer is "unsure". It may suggest; it never closes a loop, writes a record
    or spends money on its own. A feature must still work, more quietly, with
    the model off (`REMOTE_CLASSIFY = false` is the default and stays so).

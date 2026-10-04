@@ -42,6 +42,7 @@ const { callRoutedLlm, silenceResult } = require('./model-router.js');
 const license = require('../verify-license/license-core.js');
 const { styleLine } = require('./style-hints.js');
 const { FlowJsonEnforce } = require('../../../../flow-trial-extension/core/json-enforce.js');
+const { createLadder } = require('./ladder.js');
 
 const LOG_PREFIX = '[glance-assist]';
 
@@ -300,7 +301,21 @@ exports.handler = async function (event) {
     return { statusCode: 429, body: JSON.stringify({ error: 'Too many requests. Please try again shortly.' }) };
   }
 
-  // Every action here calls a paid model, so every action needs a live Glance
+  // The deeper read is the one action that is not Pro-only: a Free person has a small monthly allowance (docs/ai-ladder.md). It does its own identity and
+  // counting (ladder.js), and it is off until the owner sets GLANCE_AI_LADDER to the languages that passed the measurement (en, he).
+  if (payload.action === 'ladder-read' || payload.action === 'ladder-status') {
+    const ladder = createLadder({ env: process.env, now: Date.now(), ip });
+    try {
+      const out = payload.action === 'ladder-read' ? await ladder.read(payload) : await ladder.status(payload);
+      if (payload.action === 'ladder-read') log('deeper read', { status: out.status, code: out.body.code || null, tier: out.body.tier || null, units: out.body.units || 0 });
+      return { statusCode: out.status, body: JSON.stringify(out.body) };
+    } catch (err) {
+      logErr('deeper read failed', String(err && err.message || err));
+      return { statusCode: 503, body: JSON.stringify({ ok: false, code: 'unavailable' }) };
+    }
+  }
+
+  // Every other action here calls a paid model, so every one of them needs a live Glance
   // Pro licence, checked on the server. The extension also checks locally to
   // avoid a pointless round trip, but this is the check that counts. It fails
   // closed: with licensing unavailable, nothing reaches the model.

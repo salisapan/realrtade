@@ -28,8 +28,9 @@ const plan = (o) => R.plan(Object.assign({ canCreate: true, need, facts, evidenc
 
 console.log('\n--- the ask is a financial artifact the resolution knows ---');
 check('a receipt ask is clear and handled', gate.kind === 'clear' && R.handles('receipt'));
-check('an ordinary document (contract) is not a resolution class: the old path keeps it', !R.handles('contract'));
-check('the surfaces wire the payment-attesting artifacts to it first (receipt, transfer proof); invoices keep the old chip', R.owns('receipt') && R.owns('transfer') && !R.owns('invoice') && !R.owns('tax-invoice') && !R.owns('statement') && !R.owns('contract'));
+check('documents the person sends (contract, quote, proposal, signed copy) are resolution classes too; a report or a deck is not', ['contract', 'quote', 'proposal', 'signed-copy'].every((o) => R.handles(o)) && !R.handles('report') && !R.handles('deck') && !R.handles('passport'));
+check('the surfaces wire the payment-attesting artifacts to it first (receipt, transfer proof); invoices keep the old chip', R.owns('receipt') && R.owns('transfer') && !R.owns('invoice') && !R.owns('tax-invoice') && !R.owns('statement') && !R.owns('report'));
+check('and the documents the person sends are wired too (a draft with the file is not a delivery)', ['contract', 'quote', 'proposal', 'signed-copy'].every((o) => R.owns(o)));
 check('"done" is defined in words before anything is done', /receipt for ₪3,850 sent to Dana/i.test(R.doneDefinition(need, facts).text), R.doneDefinition(need, facts));
 check('a receipt attests a payment', R.doneDefinition(need, facts).attests === 'payment');
 
@@ -152,6 +153,41 @@ console.log('\n--- scenario 5: it closes only when it was actually delivered ---
   check('preparing a draft does not change what plan() says is done', plan({ state: prepared, evidence: { threadFiles: [], driveFiles: [file('F1', 'Receipt Oct.pdf')] } }).done === false && prepared.preparedAt === NOW && prepared.stage === 'prepare');
   const asked = R.recordRequest(st, NOW, 'Noa');
   check('requesting does not close either', asked.status === undefined && asked.stage === 'request');
+}
+
+console.log('\n--- documents the person sends: contract, quote, proposal, signed copy ---');
+{
+  const DOCASK = 'Hi, can you send me the signed contract for the Acme engagement?';
+  const dg = FA.gate(DOCASK);
+  const dneed = { object: dg.ask.id, label: dg.ask.label, lang: dg.ask.lang, synonym: dg.ask.synonym };
+  const dfacts = { senderName: 'Dana Levi', amount: null };
+  const dplan = (o) => R.plan(Object.assign({ canCreate: false, need: dneed, facts: dfacts, evidence: { threadFiles: [], driveFiles: [] }, payment: NOPAY, issuer: null, state: null, sourceText: DOCASK }, o));
+  check('the ask is clear and owned by the path', dg.kind === 'clear' && R.owns(dg.ask.id), dg);
+  check('"done" is defined without any payment', /sent to Dana, as a real attachment/.test(R.doneDefinition(dneed, dfacts).text) && R.doneDefinition(dneed, dfacts).attests === null, R.doneDefinition(dneed, dfacts));
+  const found = dplan({ evidence: { threadFiles: [], driveFiles: [file('C1', 'Acme contract - signed.pdf')] } });
+  check('one contract in Drive: a draft with it, no payment step, and NOT done', found.move === 'prepare-reply-with-file' && found.file.id === 'C1' && found.done === false && found.skipped.indexOf('verify') >= 0, found);
+  const two = dplan({ evidence: { threadFiles: [], driveFiles: [file('C1', 'Acme contract v1.pdf'), file('C2', 'Acme contract v2.pdf')] } });
+  check('two that fit equally: nothing is chosen for the person', two.move === 'choose-file' && !two.file, two);
+  const none = dplan({});
+  check('nothing anywhere and no template: the person\'s own move, said in words, never a payment question', none.move === 'await-owner-issue' && /Write or sign it, send it/.test(none.line) && none.blockedBy === undefined, none);
+  const tpl = dplan({ canCreate: true, evidence: { threadFiles: [], driveFiles: [file('T1', 'Contract template.docx')] } });
+  check('a template is offered as a start, never as the finished contract', tpl.move === 'create-from-template' && tpl.why === 'template', tpl);
+  const noTpl = dplan({ canCreate: false, evidence: { threadFiles: [], driveFiles: [file('T1', 'Contract template.docx')] } });
+  check('a surface that cannot open the create card never gets that move', noTpl.move !== 'create-from-template', noTpl);
+  const mine = dplan({ evidence: { threadFiles: [{ filename: 'Acme-contract.pdf', by: 'requester' }], driveFiles: [] } });
+  check('a contract only THEY sent is theirs: never offered back to them', mine.move !== 'prepare-reply-with-file', mine);
+  const q = FA.gate('Could you send over the quote for the retainer?');
+  const qneed = { object: q.ask.id, label: q.ask.label, lang: q.ask.lang, synonym: q.ask.synonym };
+  const qp = R.plan({ canCreate: false, need: qneed, facts: dfacts, evidence: { threadFiles: [], driveFiles: [] }, payment: NOPAY, issuer: null, state: null, sourceText: 'x' });
+  check('a quote with nothing to send: "Write it", never "sign it"', qp.move === 'await-owner-issue' && /Write it, send it/.test(qp.line) && !/sign/i.test(qp.line), qp);
+  const hp = R.plan({ canCreate: false, need: Object.assign({}, dneed, { lang: 'he', label: 'חוזה' }), facts: dfacts, evidence: { threadFiles: [], driveFiles: [] }, payment: NOPAY, issuer: null, state: null, sourceText: 'x' });
+  check('Hebrew: the same move, in Hebrew', /כתבו או חתמו/.test(hp.line), hp.line);
+  const st = R.open(dneed, dfacts, NOW);
+  const j = (text, atts) => R.judgeDelivery(st, { text, attachments: atts });
+  check('it closes only when a message the person sent carries a file named for it', j('Here you go', [{ filename: 'Acme contract - signed.pdf' }]).close === true);
+  check('"attached" with nothing attached keeps it open', j('The signed contract is attached.', []).close !== true);
+  check('a differently named file keeps it open', j('See attached', [{ filename: 'IMG_2231.pdf' }]).close !== true);
+  check('an invoice still keeps the old chip (it was never part of this)', !R.owns('invoice') && !R.owns('tax-invoice'));
 }
 
 console.log('\n--- a file whose name carries ANOTHER amount is not the one ---');

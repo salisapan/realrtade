@@ -476,9 +476,9 @@ const FlowFollowUp = (() => {
   const ACK_EN = /^(?:ok(?:ay)?|got it|noted|received|thanks?(?: you)?|thank you|will do|sure|sounds good|on it|looking into it|will look(?: into it)?|i'?ll look(?: into it)?|let me (?:check|look|review)|checking|acknowledged|understood|much appreciated|appreciate it|thanks for (?:sending|sharing|the (?:update|note|email|heads-?up)))\b/i;
   const ACK_HE = /^(?:תודה רבה|תודה|קיבלתי|קיבלנו|רשמתי|אבדוק|בודק|בודקת|נבדוק|סבבה|אוקיי|בסדר|על זה|הבנתי)/;
   // Words that mean the reply carries the substance asked for.
-  const CONFIRM = /\b(?:confirmed?|approved?|agreed?|attached|enclosed|here(?:'s| is| are)|signed|done|yes|accepted|that works|works for me)\b|(?:אושר|מאשר|מאשרת|מצורף|חתום|חתמתי|כן|מסכים|מסכימה|סגור)/i;
-  const PROMISE_EN = /\b(?:(?:i|we)(?:'ll| will| shall| am going to|'re going to| are going to) (?:\w+ ){0,2}(?:send|pay|wire|transfer|get|reply|respond|confirm|share|return|forward|sign|approve|review|look|check|have|revert|come back|process|release|make|deliver|finali[sz]e)|(?:will|should) (?:be )?(?:paid|sent|wired|transferred|processed|released|ready|done|signed|approved)|get back to you|(?:forwarded|passed|passing|handing|handed) (?:it |this |that )?(?:to|over to|on to)|(?:looping|looped|cc'?ing|cc'?d) in|(?:my|our) (?:colleague|assistant|team|manager|accountant|lawyer) (?:will|is going to)|revert (?:to you )?(?:by|on)|scheduled for|later (?:today|this week)|not yet|still (?:working|looking|reviewing|waiting)|working on (?:it|this)|in progress|(?:this|next) (?:week|month)|tomorrow|end of (?:the )?week|eow|within \d+ (?:business )?days?)\b/i;
-  const PROMISE_HE = /(?:העבר(?:תי|נו) (?:את )?(?:זה |הכל )?ל(?:חשבות|הנה"ח|הנהלת|מנהל|עמית|גורם|אחראי|עורך)|אעביר|נעביר|אשלח|נשלח|אחזור אל|נחזור אל|אאשר|נאשר|יועבר|ישולם|יישלח|מחר|השבוע|בשבוע הבא|בחודש הבא)/;
+  const CONFIRM = /\b(?:confirmed?|approved?|agreed?|attached|enclosed|here(?:'s| is| are)|signed|done|yes|accepted|that works|works for me)\b|(?:^|[\s,.!?;:"'(])(?:אושר|מאשר|מאשרת|מצורף|חתום|חתמתי|כן|מסכים|מסכימה|סגור)(?=$|[\s,.!?;:"')])/i;     // Hebrew has no \b: bare "כן" also sits inside אעדכן, עדכן, מסכן
+  const PROMISE_EN = /\b(?:(?:i|we)(?:'ll| will| shall| am going to|'re going to| are going to) (?:\w+ ){0,2}(?:send|pay|wire|transfer|get|reply|respond|confirm|share|return|forward|sign|approve|review|look|check|have|revert|come back|process|release|make|deliver|finali[sz]e)|(?:will|should) (?:be )?(?:paid|sent|wired|transferred|processed|released|ready|done|signed|approved)|get back to you|(?:will|shall) (?:revert|update you|let you know|come back)|(?:forwarded|passed|passing|handing|handed) (?:it |this |that )?(?:to|over to|on to)|(?:looping|looped|cc'?ing|cc'?d) in|(?:my|our) (?:colleague|assistant|team|manager|accountant|lawyer) (?:will|is going to)|revert (?:to you )?(?:by|on)|scheduled for|later (?:today|this week)|not yet|still (?:working|looking|reviewing|waiting)|working on (?:it|this)|in progress|(?:this|next) (?:week|month)|tomorrow|end of (?:the )?week|eow|within \d+ (?:business )?days?)\b/i;
+  const PROMISE_HE = /(?:העבר(?:תי|נו) (?:את )?(?:זה |הכל )?ל(?:חשבות|הנה"ח|הנהלת|מנהל|עמית|גורם|אחראי|עורך)|אעביר|נעביר|אשלח|נשלח|אחזור אל|נחזור אל|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אטפל|נטפל|אברר|נברר|אאשר|נאשר|יועבר|ישולם|יישלח|מחר|השבוע|בשבוע הבא|בחודש הבא)/;
   // "I paid" / "payment was sent" — and the sentence-level guards that turn it
   // into a hypothetical or a negative ("not paid", "once it is paid").
   const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^paid\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
@@ -557,6 +557,8 @@ const FlowFollowUp = (() => {
       return { outcome: 'yours', reason: meant.meaning, line: meant.line || null, promisedIso: null, basis: 'rule', why: meant.why };
     }
 
+    // Waiting on someone else is an interim, not a delivery, unless the message also hands something over.
+    if (kind === KINDS.REPLY && (WAITING_EN.test(body) || WAITING_HE.test(body)) && !DELIVERY_WORDS.test(body)) return { outcome: 'ack', promisedIso: null, basis: 'rule', why: 'waiting on someone else' };
     // For a request for a reply, "confirmed / attached / signed" means the thing
     // was delivered even if a promise about something else is in the message.
     const delivered = kind === KINDS.REPLY && CONFIRM.test(body);
@@ -577,7 +579,26 @@ const FlowFollowUp = (() => {
       const na = replyModel.notAnAnswer(body);
       if (na && na.p >= NOT_ANSWER_MIN) return { outcome: 'ack', promisedIso: null, basis: 'model', why: 'not an answer: ' + na.cls.toLowerCase() };
     }
+    if (!delivered && kind === KINDS.REPLY && n <= SHORT_UNSURE_MAX_WORDS && !answerEvidence(body, ex, c.now)) return { outcome: 'ack', promisedIso: null, basis: 'unsure', why: 'not clearly an answer' };
     return { outcome: 'closed', promisedIso: null, basis: delivered ? 'rule' : 'default' };
+  }
+
+  // A reply that says the thing is WITH someone else, or in progress, is an interim, even when it names the act ("waiting for the CFO to approve"). Delivery words win.
+  const WAITING_EN = /\b(?:waiting (?:for|on)|awaiting|pending (?:approval|signature|review|legal)|(?:it|this) is (?:still )?with|still with|in progress|being (?:reviewed|processed|worked on))\b/i;
+  const WAITING_HE = /(?:ממתין|ממתינה|ממתינים|מחכה ל|מחכים ל|בהמתנה|בטיפול|בבדיקה|מטפל בזה|מטפלת בזה)/;
+  const DELIVERY_WORDS = /\b(?:attached|enclosed|here(?:'s| is| are)|done|signed and|sent it|completed)\b|(?:מצורף|צירפתי|שלחתי|סיימתי|בוצע)/i;
+  // Under this many words, a reply that carries no answer at all (no yes or no, no date, no amount, no number, no link) is "they wrote back", not "they answered".
+  // Held open and silent: the loop stays, the next chase day decides. A one-word "Perfect" can be a yes or a courtesy; a wrong close is never reminded about again.
+  const SHORT_UNSURE_MAX_WORDS = 3;
+  const YES_NO = /^(?:yes|yeah|yep|yup|sure|no|nope|nah|correct|right|exactly|absolutely|of course|definitely|כן|לא|נכון|בטח|בהחלט|כמובן|בדיוק)(?:\b|\s|$)/i;
+  const DONE_WORDS = /\b(?:sent|done|attached|enclosed|signed|completed|finished|paid|approved|confirmed)\b|(?:^|\s)(?:שלחתי|שלחנו|צירפתי|צירפנו|בוצע|סיימתי|סיימנו|חתמתי|חתמנו|אישרתי|אישרנו|הועבר|שולם|שילמתי|עשיתי)(?=$|[\s,.!?])/i;
+  function answerEvidence(body, ex, now) {
+    if (/\d|https?:\/\/|@/.test(body) || YES_NO.test(body) || DONE_WORDS.test(body)) return true;
+    try {
+      if (ex && ex.parseDate && ex.parseDate(body, new Date(typeof now === 'number' ? now : Date.now()))) return true;
+      if (ex && ex.parseMoney && ex.parseMoney(body)) return true;
+    } catch (e) { /* no evidence */ }
+    return false;
   }
 
   // When the ball is in your court the reminder is for YOU: the next business day.

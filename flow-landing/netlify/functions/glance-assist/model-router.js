@@ -204,6 +204,10 @@ function planRoute(action, opts) {
     models = fastPair(env, state, now);
   } else if (action === 'classify') {
     models = [MODELS.sonnet, MODELS.grokStrong].filter((model) => available(model, env, state, now));
+  } else if (action === 'ladder') {
+    // The deeper read (core/ai-ladder.js): the fast pair for every plan; the strong pair only when the caller asks for the strong tier, which glance-assist's
+    // ladder handler does for Pro alone. Cheapest-first is the order of the two calls, not of this list.
+    models = (opts.tier === 'strong' ? [MODELS.sonnet, MODELS.grokStrong].filter((model) => available(model, env, state, now)) : fastPair(env, state, now));
   } else if (action === 'execute') {
     // The owner's order for the strict-JSON proposal (EXECUTE_ORDER): Mistral Large, Llama-3-70B (serverless), Sonnet, Grok-strong, DeepSeek as the backup. Each is skipped when it has no key or its circuit is open. Cheapest-first routing is a separate owner decision (open-tasks row 29).
     models = EXECUTE_ORDER.map((key) => MODELS[key]).filter((model) => available(model, env, state, now));
@@ -410,7 +414,7 @@ function exhaustedError(refusalsOnly) {
 }
 
 function outputWhere(action) {
-  if (action === 'classify') return 'classify';
+  if (action === 'classify' || action === 'ladder') return 'classify';
   if (action === 'summarize-attachment') return 'summary';
   return 'draft';
 }
@@ -431,13 +435,13 @@ async function callRoutedLlm(opts) {
 
   // The server masks again whatever it receives, so a client that skipped masking still cannot put a name, amount, date, contact detail or labelled
   // identifier in front of a provider. 'execute' also gets the identifier pass (the one the extension runs); the others keep the shield alone.
-  const masked = (action === 'execute' ? FlowMaskIds.maskAll(String(opts.userText || ''), FlowPrivacyShield) : FlowPrivacyShield.mask(String(opts.userText || ''))).maskedText;
+  const masked = (action === 'execute' || action === 'ladder' ? FlowMaskIds.maskAll(String(opts.userText || ''), FlowPrivacyShield) : FlowPrivacyShield.mask(String(opts.userText || ''))).maskedText;
   if (leaksPii(masked, 'outbound')) {
     if (action === 'classify') return { silence: true, local: true, result: silenceResult() };
     throw piiError();
   }
 
-  const plan = planRoute(action, { env, state, now: clock });
+  const plan = planRoute(action, { env, state, now: clock, tier: opts.tier });
   if (!plan.length) {
     if (action === 'classify') return { silence: true, result: silenceResult() };
     throw configError();

@@ -81,6 +81,7 @@
         "core/active-question.js",
         "core/style-profile.js",
         "core/local-lm.js",
+        "core/ai-ladder.js",
         "core/local-lm-audit.js",
         "src/local-lm-chrome.js",
         "core/docwriter.js",

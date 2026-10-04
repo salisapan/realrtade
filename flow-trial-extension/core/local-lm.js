@@ -75,6 +75,13 @@ const FlowLocalLM = (() => {
     return (variant === 'B' ? DEFS_B : DEFS_A) + '\n\nSentence: ' + JSON.stringify(s);
   }
 
+  // The same askings split into the fixed instructions and the one line that carries the sentence, for a caller that sends them in different roles
+  // (the server's deeper read: the instructions are its own, the sentence is the only thing that came from outside).
+  function partsFor(sentence, variant) {
+    const s = String(sentence).replace(/\s+/g, ' ').trim().slice(0, 400);
+    return { system: variant === 'B' ? DEFS_B : DEFS_A, user: 'Sentence: ' + JSON.stringify(s) };
+  }
+
   // Strict reading of the model's reply. Anything outside the vocabulary is a null, never a guess.
   function parse(raw) {
     let o = null;
@@ -92,6 +99,16 @@ const FlowLocalLM = (() => {
     return flat(sentence).indexOf(flat(span)) >= 0 ? span : null;
   }
 
+  // Two readings of one sentence (from two differently worded askings) -> the agreed reading, or null. Shared by the on-device session below and by the
+  // server's deeper read (core/ai-ladder.js), so the same rule decides in both places: same act, same action, the right party doing the thing.
+  function agree(a, b, sentence) {
+    if (!a || !b || a.act !== b.act) return null;
+    if ((a.act === 'ASK' || a.act === 'PROMISE') && a.action !== b.action) return null;
+    if (a.act === 'ASK' && (a.who !== 'you' || b.who !== 'you')) return null;
+    if (a.act === 'PROMISE' && (a.who !== 'me' || b.who !== 'me')) return null;
+    return { act: a.act, action: a.action, who: a.who, when: verifySpan(sentence, a.when) || verifySpan(sentence, b.when), amount: verifySpan(sentence, a.amount) || verifySpan(sentence, b.amount) };
+  }
+
   // One sentence, two askings. Returns the agreed reading or null.
   async function classify(session, sentence) {
     if (!session || typeof session.prompt !== 'function') return null;
@@ -101,12 +118,7 @@ const FlowLocalLM = (() => {
       if (!a) return null;
       b = parse(await session.prompt(promptFor(sentence, 'B'), SCHEMA));
     } catch (e) { return null; }
-    if (!b || a.act !== b.act) return null;
-    if ((a.act === 'ASK' || a.act === 'PROMISE') && a.action !== b.action) return null;
-    // The right party must be doing the thing, in both readings.
-    if (a.act === 'ASK' && (a.who !== 'you' || b.who !== 'you')) return null;
-    if (a.act === 'PROMISE' && (a.who !== 'me' || b.who !== 'me')) return null;
-    return { act: a.act, action: a.action, who: a.who, when: verifySpan(sentence, a.when) || verifySpan(sentence, b.when), amount: verifySpan(sentence, a.amount) || verifySpan(sentence, b.amount) };
+    return agree(a, b, sentence);
   }
 
   // May the model be asked about this sentence at all? deps: { pipeline, model, status }.
@@ -180,7 +192,7 @@ const FlowLocalLM = (() => {
 
   function stale(status, now) { return !status || typeof status.checkedAt !== 'number' || (typeof now === 'number' ? now : Date.now()) - status.checkedAt > TEST_MAX_AGE_MS; }
 
-  return { ACTS, ACTIONS, WHO, SCHEMA, TEST_MIN_PRECISION, TEST_MIN_POSITIVES, TEST_MIN_RECALL, TEST_MAX_AGE_MS, promptFor, parse, verifySpan, classify, eligible, propose, selfTest, stale };
+  return { ACTS, ACTIONS, WHO, SCHEMA, TEST_MIN_PRECISION, TEST_MIN_POSITIVES, TEST_MIN_RECALL, TEST_MAX_AGE_MS, promptFor, partsFor, parse, verifySpan, agree, classify, eligible, propose, selfTest, stale };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowLocalLM };

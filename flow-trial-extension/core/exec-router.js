@@ -99,19 +99,30 @@ const FlowExecRouter = (() => {
 
   const sameSchema = (a, b) => canonical(a) === canonical(b);
 
-  async function askServer(request, schema, d, enforce, masker) {
-    // Fail closed on every way the masking could be skipped: no shield, a shield that is not one, a masker without the combined pass, a custom schema.
-    if (!d.shield || typeof d.shield.mask !== 'function' || typeof masker.maskAll !== 'function' || typeof masker.unmask !== 'function') return refuse('mask-unavailable');
-    if (!sameSchema(schema, enforce.ACTION_SCHEMA)) return refuse('schema-not-allowed-for-server');           // the server asks the model for the built-in actions only
-    const m = masker.maskAll(request.prompt, d.shield);
+  // The ONE way text is prepared to leave this device (the Do It proposal below and the deeper read in core/ai-ladder.js both go through it). Fail closed on every
+  // way the masking could be skipped: no shield, a shield that is not one, a masker without the combined pass, an output that is not text, a leftover contact
+  // detail or amount, a masked value found inside what would be sent, or a sensitive span (found by detectors that do not depend on the shield) that survived.
+  // -> { ok:true, text, tokenMap, counts } | { ok:false, reason }
+  function maskForServer(prompt, shield, masker) {
+    if (!shield || typeof shield.mask !== 'function' || !masker || typeof masker.maskAll !== 'function' || typeof masker.unmask !== 'function') return { ok: false, reason: 'mask-unavailable' };
+    if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > MAX_PROMPT_CHARS) return { ok: false, reason: 'bad-request' };
+    let m;
+    try { m = masker.maskAll(prompt, shield); } catch (e) { return { ok: false, reason: 'mask-failed' }; }
     const text = m && m.maskedText;
-    if (typeof text !== 'string' || !m.tokenMap || typeof m.tokenMap !== 'object') return refuse('mask-failed');
-    if (leaks(text)) return refuse('pii-blocked');
-    // The wire payload is exactly these two fields. No instructions (the server builds its own from the schema), nothing the caller can smuggle text through.
-    const payload = { maskedPrompt: text, lang: request.lang === 'he' ? 'he' : request.lang === 'en' ? 'en' : null };
-    const wire = JSON.stringify(payload);
-    for (const raw of Object.values(m.tokenMap)) if (String(raw).length >= 4 && wire.indexOf(String(raw)) >= 0) return refuse('mask-failed');
-    for (const span of sensitiveSpans(request.prompt)) if (wire.indexOf(span) >= 0) return refuse('mask-failed');
+    if (typeof text !== 'string' || !m.tokenMap || typeof m.tokenMap !== 'object') return { ok: false, reason: 'mask-failed' };
+    if (leaks(text)) return { ok: false, reason: 'pii-blocked' };
+    for (const raw of Object.values(m.tokenMap)) if (String(raw).length >= 4 && text.indexOf(String(raw)) >= 0) return { ok: false, reason: 'mask-failed' };
+    for (const span of sensitiveSpans(prompt)) if (text.indexOf(span) >= 0) return { ok: false, reason: 'mask-failed' };
+    return { ok: true, text, tokenMap: m.tokenMap, counts: m.counts };
+  }
+
+  async function askServer(request, schema, d, enforce, masker) {
+    if (!sameSchema(schema, enforce.ACTION_SCHEMA)) return refuse('schema-not-allowed-for-server');           // the server asks the model for the built-in actions only
+    const prepared = maskForServer(request.prompt, d.shield, masker);
+    if (!prepared.ok) return refuse(prepared.reason);
+    const m = { maskedText: prepared.text, tokenMap: prepared.tokenMap, counts: prepared.counts };
+    // The wire payload is exactly these two fields. No instructions (the server builds its own), nothing the caller can smuggle text through.
+    const payload = { maskedPrompt: m.maskedText, lang: request.lang === 'he' ? 'he' : request.lang === 'en' ? 'en' : null };
     let res;
     try { res = await withTimeout(d.server.call(payload), d.timeouts && d.timeouts.server || SERVER_TIMEOUT_MS, 'server'); }
     catch (e) { return refuse('server-error', { detail: String(e && e.message || e).slice(0, 80) }); }
@@ -167,7 +178,7 @@ const FlowExecRouter = (() => {
     }
   }
 
-  return { MIN_CONFIDENCE, MAX_PROMPT_CHARS, LEAK_PATTERNS, route, confidence, agreement, canonical, leaks, sensitiveSpans };
+  return { MIN_CONFIDENCE, MAX_PROMPT_CHARS, LEAK_PATTERNS, maskForServer, route, confidence, agreement, canonical, leaks, sensitiveSpans };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowExecRouter };

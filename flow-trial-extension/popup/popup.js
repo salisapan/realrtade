@@ -845,6 +845,40 @@
     host.appendChild(row);
   }
 
+  // The deeper read (core/ai-ladder.js): the one-time choice, how many are left, and what happens when they run out. Hidden until the server says it is running:
+  // a row for something that is not there would be a promise with nothing behind it. Words come from the core, so the corpus can hold them to the identity rules.
+  async function renderLadderRow(host) {
+    if (typeof FlowAiLadder === 'undefined') return;
+    const info = await send({ type: 'flow:ladder-info' });
+    if (!info || !info.ok || !info.enabled) return;
+    const state = FlowAiLadder.stateOf(info);
+    const c = FlowAiLadder.copy(state);
+    if (!c) return;
+    const row = el('div', 'wait-item');
+    row.id = 'ladderRow';
+    const top = el('div', 'wait-top');
+    top.appendChild(el('span', 'wait-who', 'Second reading'));
+    top.appendChild(el('span', 'wait-state' + (state.kind === 'on' || state.kind === 'low' ? ' ok' : ''), state.kind === 'needs-consent' ? 'Off' : state.kind === 'used' ? 'Used up' : state.kind === 'paused' ? 'Resting' : 'On'));
+    row.appendChild(top);
+    row.appendChild(el('div', 'wait-what', c.title));
+    row.appendChild(el('div', 'wait-note', c.detail));
+    const acts = el('div', 'wait-acts');
+    const act = (label, cls, fn) => {
+      const b = el('button', cls, label);
+      b.type = 'button';
+      b.addEventListener('click', async () => { b.disabled = true; await fn(); await renderSurfaces(); });
+      acts.appendChild(b);
+    };
+    if (state.kind === 'needs-consent') {
+      act(c.primary, 'primary sm', () => send({ type: 'flow:ladder-consent', given: true }));
+    } else {
+      if (c.primary === 'See Pro') act(c.primary, 'primary sm', async () => { chrome.tabs.create({ url: FlowEntitlements.PRICING_URL }); });
+      act(c.secondary, 'ghost sm', () => send({ type: 'flow:ladder-consent', given: false }));
+    }
+    row.appendChild(acts);
+    host.appendChild(row);
+  }
+
   async function renderLocalModelRow(host) {
     if (typeof FlowLocalLMServer === 'undefined' || typeof FlowLocalLM === 'undefined' || typeof FlowStorage.getLocalLmServer !== 'function') return;
     const cfg = await FlowStorage.getLocalLmServer();
@@ -1050,6 +1084,7 @@
     await renderOutlookRow(host);
     await renderLocalModelRow(host);
     await renderHybridRow(host);
+    await renderLadderRow(host);
   }
 
   // Two entries that might be one person (the same full name in two apps): asked once, never merged on a guess.

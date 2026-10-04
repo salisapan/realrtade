@@ -3,6 +3,9 @@
 > Written 2026-10-04 from the code, not from memory. Companion to `docs/intent-model.md`, `docs/local-first-principle.md`,
 > `docs/ai-engine-upgrade.md`.
 
+> **Update 2026-10-04: §1 and §4 are superseded.** The owner decided (open-tasks rows 25 and 29): a masked sentence may go to our server for a second reading, free for everyone with a monthly allowance,
+> local steps first. It is built and described in `docs/ai-ladder.md`; this file's description of steps 0-3 and of the Do It chip's `REMOTE_CLASSIFY` (still off) remains true.
+
 ## 1. The short answer
 
 **By default Glance calls no external model when it cannot recognise something. It stays silent, and at most asks one question.**

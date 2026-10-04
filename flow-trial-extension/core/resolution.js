@@ -43,7 +43,13 @@ const FlowResolution = (() => {
     'tax-invoice': { attests: null, source: 'issuer', strongTemplate: false },
     invoice: { attests: null, source: 'you', strongTemplate: false },
     transfer: { attests: 'payment', source: 'bank', strongTemplate: false },
-    statement: { attests: null, source: 'bank', strongTemplate: false }
+    statement: { attests: null, source: 'bank', strongTemplate: false },
+    // Documents the person writes, signs or already holds, and sends. No payment is attested, so there is no payment step: find what exists, prepare a draft with it,
+    // and close only when a message the person sent carries the file. `ownerMove` is what the person has to do when nothing exists and no template does either.
+    contract: { attests: null, source: 'you', strongTemplate: false, deliverable: true, ownerMove: { en: 'Write or sign it', he: 'כתבו או חתמו' } },
+    quote: { attests: null, source: 'you', strongTemplate: false, deliverable: true, ownerMove: { en: 'Write it', he: 'כתבו' } },
+    proposal: { attests: null, source: 'you', strongTemplate: false, deliverable: true, ownerMove: { en: 'Write it', he: 'כתבו' } },
+    'signed-copy': { attests: null, source: 'you', strongTemplate: false, deliverable: true, ownerMove: { en: 'Sign it', he: 'חתמו' } }
   };
   const PAID_BASES_STRONG = ['bank-email', 'loop-paid'];
   const PAYMENT_MAX_AGE_MS = 120 * 24 * 3600 * 1000;
@@ -57,7 +63,8 @@ const FlowResolution = (() => {
   const DAY_MS = 24 * 3600 * 1000;
   function handles(objectId) { return Object.prototype.hasOwnProperty.call(CLASSES, objectId); }
   // The artifacts the host surfaces WIRE to this path first: the ones that attest a payment, where one action is most often wrong.
-  function owns(objectId) { return handles(objectId) && CLASSES[objectId].attests === 'payment'; }
+  // Documents the person sends (a contract, a quote) are wired too: a draft with the file is not a delivery, and a chip that says "Handled." over it was a false close.
+  function owns(objectId) { return handles(objectId) && (CLASSES[objectId].attests === 'payment' || CLASSES[objectId].deliverable === true); }
   function norm(v) { return String(v || '').toLowerCase().replace(/\.[a-z0-9]{1,8}$/i, '').replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim(); }
   function he(need) { return Boolean(need && need.lang === 'he'); }
   const sameAmount = (a, b) => Math.abs(a - b) <= Math.max(0.5, a * 0.005);
@@ -166,6 +173,7 @@ const FlowResolution = (() => {
   }
 
   // ---- the plan ----------------------------------------------------------------------------------------------
+  function ownerMoveText(cls, hebrew) { const m = cls.ownerMove; return m ? (hebrew ? m.he : m.en) : (hebrew ? 'כתבו' : 'Write it'); }
   function line(need, en, hb) { return he(need) ? hb : en; }
 
   // input: { need, facts, evidence:{threadFiles,driveFiles}, payment:{status,basis}, issuer:{email,name}|null, state, sourceText }
@@ -263,8 +271,8 @@ const FlowResolution = (() => {
     if (cls.source === 'you') {
       // An invoice is the person's to write; with no template there is nothing to prepare but a reply asking nothing of anyone.
       return Object.assign({}, base, { stage: 'deliver', move: 'await-owner-issue', why: 'no-template',
-        line: line(need, 'No ' + label + ' and no template to start from. Write it, send it, and I will close this when it goes out with the file.',
-          'אין ' + label + ' ואין תבנית. כתבו, שלחו, ואסגור כשיישלח עם הקובץ.'), actions: ['hold'] });
+        line: line(need, 'No ' + label + ' and no template to start from. ' + ownerMoveText(cls, false) + ', send it, and I will close this when it goes out with the file.',
+          'אין ' + label + ' ואין תבנית. ' + ownerMoveText(cls, true) + ', שלחו, ואסגור כשיישלח עם הקובץ.'), actions: ['issue-myself'] });      // one tap opens the loop, so the request is not lost
     }
     // FUTURE: a billing connector (invoicing system API) would issue the receipt here. It does not exist, so:
     return Object.assign({}, base, { stage: 'request', move: 'name-issuer', why: 'no-issuer-known', basis: payment.basis,

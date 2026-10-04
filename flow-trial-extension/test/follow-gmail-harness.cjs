@@ -61,6 +61,8 @@ function stub() {
     if (m.type === 'flow:follow-task') return { ok: true, ref: { taskListId: 'L', taskId: 'T1' } };
     if (m.type === 'flow:connector-status') return { googleTasks: { connected: true, configured: true } };
     if (m.type === 'flow:search-drive') return { ok: true, files: window.__driveFiles || [] };
+    if (m.type === 'flow:ladder-info') return window.__ladderInfo || { ok: true, enabled: true, available: false, consent: false, pro: false, snapshot: null, pausedUntil: null };
+    if (m.type === 'flow:ladder-read') { window.__ladderSent = (window.__ladderSent || []).concat([m.maskedSentence]); return window.__ladderReply || { ok: false, code: 'off' }; }
     if (m.type === 'flow:lm-server-prompt') return window.__lmReply ? { ok: true, text: JSON.stringify(window.__lmReply) } : { ok: false, reason: 'off' };
     return { ok: true };
   };
@@ -87,6 +89,7 @@ async function open(browser, name, thread, opts) {
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text().slice(0, 200)); });
   await p.addInitScript(stub);
   if (opts.pro) await p.addInitScript(() => { window.__pro = true; });
+  if (opts.ladder) await p.addInitScript((l) => { window.__ladderInfo = l.info; window.__ladderReply = l.reply; }, opts.ladder);
   if (opts.lmReply) await p.addInitScript((r) => { window.__lmReply = r; }, opts.lmReply);
   if (opts.drive) await p.addInitScript((files) => { window.__driveFiles = files; }, opts.drive);
   const file = path.join(TMP, name + '.html');
@@ -100,6 +103,9 @@ async function open(browser, name, thread, opts) {
     errs,
     card: await p.evaluate(() => { const h = document.getElementById('flow-follow-host'); return h ? h.innerText.replace(/\n+/g, ' | ') : null; }),
     msgs: await p.evaluate(() => window.__msgs.map((m) => m.type)),
+    ladderSent: await p.evaluate(() => window.__ladderSent || []),
+    ledger: await p.evaluate(() => (window.__store.learningLedger || []).map((e) => e.text || e.line || JSON.stringify(e))),
+    ladderStats: await p.evaluate(() => (window.__store.aiLadder && window.__store.aiLadder.stats) || null),
     watches: await p.evaluate(() => (window.__store.followWatches || []).map((w) => ({ id: w.id, status: w.status, chase: w.chaseIso, task: w.taskRef && w.taskRef.taskId, stage: w.stage, nudges: w.nudges, closedAs: w.closedAs, promised: w.promisedIso, file: w.file && w.file.object, preparedAt: w.preparedAt, preparedFile: w.preparedFile, fileChoice: w.fileChoice, resolution: w.resolution, direction: w.direction, resolvedBy: w.resolvedBy })))
   });
   return { p, ctx, state };
@@ -702,6 +708,36 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   check('and the loop waits again, still open', s.watches[0].status === 'waiting' && s.watches[0].resolution.chasedAt > 0, s.watches);
   await t.ctx.close();
 
+  // 32j. documents the person sends (a contract, a quote): the same path, no payment step, closes only on delivery
+  const CASK = 'Hi, could you send me the signed contract for the Acme engagement?';
+  const DT = [msg(theirs, CASK)];
+  t = await open(browser, 'doc-found', DT, { drive: [{ id: 'C1', name: 'Acme contract - signed.pdf', mimeType: 'application/pdf' }] });
+  s = await t.state();
+  check('a contract found in Drive: one card, naming the file, no payment question, and no Do It chip saying "Handled"', /Next: contract/.test(s.card || '') && /Found Acme contract - signed\.pdf/.test(s.card || '') && !/paid|payment/i.test(s.card || '') && await t.p.evaluate(() => !document.querySelector('.flow-chip-host')), s.card);
+  check('and it says what "done" means', /Done when: A contract sent to Dana, as a real attachment/.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(600);
+  const cd = await t.p.evaluate(() => window.__msgs.find((m) => m.type === 'flow:follow-draft'));
+  s = await t.state();
+  check('the draft attaches exactly that file, goes to the person who asked, and is not sent', cd && cd.payload.driveFileId === 'C1' && cd.payload.to === 'dana@acme.com' && !s.msgs.some((m) => /send/.test(m) && m !== 'flow:search-drive'), cd && cd.payload);
+  check('one loop of mine carries the path and preparing did not close it', s.watches.length === 1 && s.watches[0].status === 'waiting' && s.watches[0].direction === 'mine' && s.watches[0].resolution.object === 'contract', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'doc-none', DT, {});
+  s = await t.state();
+  check('a contract that exists nowhere: the person\'s own move, in words, with no invented contract and no question about money', /Write or sign it, send it/.test(s.card || '') && /I will send it/.test(s.card || '') && !s.msgs.includes('flow:follow-draft') && !/paid/i.test(s.card || ''), s.card);
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(600);
+  s = await t.state();
+  check('one tap and the request is not lost: a loop of mine is open, says what it waits for, and nothing was drafted or sent', s.watches.length === 1 && s.watches[0].status === 'waiting' && s.watches[0].direction === 'mine' && /Waiting for you to send the contract/.test(await t.p.evaluate(() => (window.__store.followWatches[0].resolution || {}).line || '')) && !s.msgs.includes('flow:follow-draft'), s.watches);
+  await t.ctx.close();
+  const CW = { id: 't1', threadId: 't1', messageId: 'm1', subject: 'Vendor booking', counterpart: { email: 'dana@acme.com', name: 'Dana Cole' }, kind: 'reply', what: CASK, amount: null, chaseIso: '2026-10-05', lang: 'en', createdAt: new Date(2026, 8, 28, 12).getTime(), status: 'waiting', taskRef: { taskListId: 'L', taskId: 'T9' }, nudges: 0, direction: 'mine', resolution: { object: 'contract', label: 'contract', lang: 'en', stage: 'prepare', trail: [], openedAt: new Date(2026, 8, 28, 12).getTime(), done: 'A contract sent to Dana, as a real attachment', needsFile: true, synonym: ['contract', 'agreement', 'nda'] } };
+  t = await open(browser, 'doc-claim', DT.concat([msg(mine, 'Hi Dana, the signed contract is attached.')]), { watches: [CW] });
+  s = await t.state();
+  check('"attached" with nothing attached does not close a contract', s.watches[0].status === 'waiting', s.watches);
+  await t.ctx.close();
+  t = await open(browser, 'doc-delivered', DT.concat([msg(mine, 'Hi Dana, here you go.', ['Acme-contract-signed.pdf'])]), { watches: [CW] });
+  s = await t.state();
+  check('the signed contract attached to a message I sent: closed as delivered', s.watches[0].status === 'resolved' && s.watches[0].resolvedBy === 'delivered', s.watches);
+  await t.ctx.close();
+
   // 33. a model on this computer (core/local-lm-server.js): asked only about a sentence the lists could not read, only after it passed the test
   const LMSENT = 'Wondering whether the permit came through on your side.';
   const LMT = [msg(theirs, 'Happy to proceed.'), msg(mine, LMSENT)];
@@ -727,6 +763,58 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   t = await open(browser, 'lm-down', LMT, { store: PASSED(true, true) });
   s = await t.state();
   check('a model that is not running (the worker says so): silence, no error on the page', s.msgs.includes('flow:lm-server-prompt') && !/Waiting on a reply/.test(s.card || '') && s.errs.length === 0, s);
+  await t.ctx.close();
+
+  // 34. the deeper read (core/ai-ladder.js): the step after everything on the device, only with consent, only for a sentence nothing else could place, masked, a proposal only
+  const NOW_MS = new Date(2026, 9, 1, 12).getTime();
+  const quota = (used, plan) => ({ period: '2026-10', used, limit: plan === 'pro' ? 1500 : 120, plan: plan || 'free' });
+  const LINFO = (o) => Object.assign({ ok: true, enabled: true, available: true, languages: ['en', 'he'], consent: true, pro: false, snapshot: quota(3), pausedUntil: null, now: NOW_MS }, o || {});
+  const LREAD = { ok: true, reading: { act: 'ASK', action: 'confirm', who: 'you', when: null, amount: null }, tier: 'fast', units: 1, quota: quota(4) };
+  t = await open(browser, 'ladder-off', LMT, { ladder: { info: LINFO({ consent: false }), reply: LREAD } });
+  s = await t.state();
+  check('no consent: the server is never asked and the sentence stays silent', s.ladderSent.length === 0 && !s.msgs.includes('flow:ladder-read') && !/Waiting on a reply/.test(s.card || ''), s);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-unavailable', LMT, { ladder: { info: LINFO({ available: false }), reply: LREAD } });
+  s = await t.state();
+  check('the server says it is not running: nothing is asked, nothing is shown', s.ladderSent.length === 0 && !/Waiting on a reply/.test(s.card || ''), s);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-on', LMT, { ladder: { info: LINFO(), reply: LREAD } });
+  s = await t.state();
+  check('with consent: the one sentence is sent, an offer appears with the usual tap, nothing is opened without it', s.ladderSent.length === 1 && /Waiting on a reply\?/.test(s.card || '') && /Stay on it/.test(s.card || '') && s.watches.length === 0, s);
+  check('what was sent is the sentence and only the sentence (no thread, no names from the page)', s.ladderSent[0] === LMSENT && !/Dana|Happy to proceed|Vendor booking/.test(JSON.stringify(s.ladderSent)), s.ladderSent);
+  check('the counts say it was asked once, nothing was kept yet, and the ledger says what happened in plain words', s.ladderStats && s.ladderStats.asked === 1 && s.ladderStats.proposed === 1 && s.ladderStats.units === 1 && s.ledger.some((x) => /second reading/.test(x)), { stats: s.ladderStats, ledger: s.ledger });
+  await t.p.click('.flow-fu-btn.primary'); await t.p.waitForTimeout(400);
+  s = await t.state();
+  check('the tap opens the loop, and is counted as a kept reading', s.watches.length === 1 && s.watches[0].status === 'waiting' && s.ladderStats.accepted === 1, s);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-masked', [msg(theirs, 'Happy to proceed.'), msg(mine, 'Wondering whether Dana Cohen at Acme Corp got the permit fee of $2,500 through on your side.')], { ladder: { info: LINFO(), reply: LREAD } });
+  s = await t.state();
+  check('a sentence with a name, a company and an amount leaves masked: placeholders, never the real values', s.ladderSent.length === 1 && /\[CLIENT_NAME_1\]/.test(s.ladderSent[0]) && /\[CURRENCY_VAL_1\]/.test(s.ladderSent[0]) && !/Dana|Cohen|Acme|2,500/.test(JSON.stringify(s.ladderSent)), s.ladderSent);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-declined', LMT, { ladder: { info: LINFO(), reply: LREAD } });
+  await t.p.click('.flow-fu-btn.ghost'); await t.p.waitForTimeout(400);
+  s = await t.state();
+  check('Not now is counted as a turned-down reading', s.ladderStats && s.ladderStats.turnedDown === 1 && s.ladderStats.accepted === 0, s.ladderStats);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-statement', LMT, { ladder: { info: LINFO(), reply: { ok: true, reading: null, tier: 'fast', units: 1, quota: quota(4) } } });
+  s = await t.state();
+  check('the server reads it as a statement: silence, and it is counted as asked', s.ladderSent.length === 1 && !/Waiting on a reply/.test(s.card || '') && s.ladderStats.asked === 1 && s.ladderStats.nothing === 1, s);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-used', LMT, { ladder: { info: LINFO({ snapshot: quota(120) }), reply: LREAD } });
+  s = await t.state();
+  check('allowance used up: the page does not even ask; Glance goes on without it, quietly (no card, no error)', s.ladderSent.length === 0 && s.card === null && s.errs.length === 0, s);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-refused', LMT, { ladder: { info: LINFO(), reply: { ok: false, code: 'quota_used', quota: quota(120) } } });
+  s = await t.state();
+  check('the server says used up mid-way: silence, no error, nothing opened', s.ladderSent.length === 1 && s.card === null && s.errs.length === 0 && s.watches.length === 0, s);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-twice', LMT, { ladder: { info: LINFO(), reply: LREAD }, store: { aiLadder: { cache: [{ k: require('../core/ai-ladder.js').FlowAiLadder.hash(require('../core/exec-router.js').FlowExecRouter.maskForServer(LMSENT, require('../core/privacyShield.js').FlowPrivacyShield, require('../core/mask-ids.js').FlowMaskIds).text), at: NOW_MS - 1000, reading: { act: 'ASK', action: 'confirm', who: 'you', when: null, amount: null }, tier: 'fast' }], stats: null } } });
+  s = await t.state();
+  check('a sentence already asked is not asked again: the offer comes from memory, with no request', s.ladderSent.length === 0 && /Waiting on a reply\?/.test(s.card || ''), s);
+  await t.ctx.close();
+  t = await open(browser, 'ladder-strict', LMT, { ladder: { info: LINFO(), reply: LREAD } });
+  s = await t.state();
+  check('no script errors on any of these', s.errs.length === 0, s.errs);
   await t.ctx.close();
 
   await browser.close();

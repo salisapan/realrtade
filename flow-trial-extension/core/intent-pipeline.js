@@ -177,7 +177,9 @@ const FlowIntentPipeline = (() => {
     return sentences(text).map((s) => Object.assign({ sentence: s }, recognize(s, ctx)));
   }
 
-  return { recognize, analyze, sentences, verdictOf, evidenceOf, shapedAsk, shapedPromise, VETO_MIN, MODEL_MIN };
+  const negated = (s) => NEGATED.test(String(s == null ? '' : s));
+
+  return { recognize, analyze, sentences, verdictOf, evidenceOf, shapedAsk, shapedPromise, negated, VETO_MIN, MODEL_MIN };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntentPipeline };

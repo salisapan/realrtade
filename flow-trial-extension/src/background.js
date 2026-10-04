@@ -38,6 +38,7 @@
 import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
+import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -2772,6 +2773,94 @@ async function classifyViaBackend(payload) {
 }
 
 
+/* ------------------------------------------------------- the deeper read */
+//
+// core/ai-ladder.js decides WHETHER a sentence may be asked about (in the page, where the recognition code lives); this is only the network and the three small
+// facts that have to outlive a page: has the person said yes, did the server say it is running, and what did the server last say about this month's allowance.
+// Nothing is sent before the person says yes in the popup. The sentence arrives here already masked and is forwarded as it is; this file never sees a real name.
+// The server is the one that counts: the numbers kept here are only what it last said, so the popup can show them.
+const LADDER_CONSENT_KEY = 'glanceLadderConsent';
+const LADDER_INFO_KEY = 'glanceLadderInfo';
+const LADDER_STATUS_EVERY_MS = 30 * 60 * 1000;
+const LADDER_PAUSE_MS = 15 * 60 * 1000;
+const LADDER_TIMEOUT_MS = 25000;
+const LADDER_MAX_SENTENCE = 800;
+
+async function ladderStored() {
+  const got = await chrome.storage.local.get([LADDER_CONSENT_KEY, LADDER_INFO_KEY]);
+  return { consent: Boolean(got[LADDER_CONSENT_KEY] && got[LADDER_CONSENT_KEY].given === true), info: got[LADDER_INFO_KEY] || {} };
+}
+
+async function ladderSave(patch) {
+  const { info } = await ladderStored();
+  await chrome.storage.local.set({ [LADDER_INFO_KEY]: Object.assign({}, info, patch) });
+}
+
+// Identity for the allowance: a live Pro key when there is one, and always the random per-install id (the one the usage events already carry).
+async function ladderIdentity() {
+  const record = await refreshPro(false);
+  const pro = proIsActive(record, Date.now());
+  return { pro, body: Object.assign({ installId: await getInstallId() }, pro ? { licenseKey: record.key } : {}) };
+}
+
+async function ladderPost(body) {
+  const res = await fetch(GLANCE_ASSIST_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(LADDER_TIMEOUT_MS) });
+  const data = await res.json().catch(() => ({}));
+  return { status: res.status, data };
+}
+
+// What the page needs to decide (core/ai-ladder.js stateOf): the switch, whether the server is running it, consent, plan, and the last allowance it reported.
+async function ladderInfo(force) {
+  if (!LADDER.enabled) return { ok: true, enabled: false };
+  const now = Date.now();
+  const { consent, info } = await ladderStored();
+  const { pro, body } = await ladderIdentity();
+  let cur = info;
+  if (force || !cur.checkedAt || now - cur.checkedAt > LADDER_STATUS_EVERY_MS) {
+    try {
+      const { status, data } = await ladderPost(Object.assign({ action: 'ladder-status' }, body));
+      cur = Object.assign({}, cur, status === 200 && data && data.ok
+        ? { available: data.available === true, languages: Array.isArray(data.languages) ? data.languages : [], checkedAt: now, snapshot: data.quota || cur.snapshot || null }
+        : { available: false, checkedAt: now - LADDER_STATUS_EVERY_MS + 5 * 60 * 1000 });          // a failed look: ask again in five minutes
+    } catch (e) {
+      cur = Object.assign({}, cur, { available: false, checkedAt: now - LADDER_STATUS_EVERY_MS + 5 * 60 * 1000 });
+    }
+    await chrome.storage.local.set({ [LADDER_INFO_KEY]: cur });
+  }
+  return { ok: true, enabled: true, available: cur.available === true, languages: cur.languages || [], consent, pro, snapshot: cur.snapshot || null, pausedUntil: cur.pausedUntil || null, now };
+}
+
+async function ladderConsent(given) {
+  await chrome.storage.local.set({ [LADDER_CONSENT_KEY]: { given: given === true, at: Date.now() } });
+  return ladderInfo(true);
+}
+
+// payload: { maskedSentence } -> { ok:true, reading, tier, units, quota } | { ok:false, code, quota? }. Never throws.
+async function ladderRead(payload) {
+  try {
+    const sentence = String(payload && payload.maskedSentence || '').slice(0, LADDER_MAX_SENTENCE);
+    if (!sentence.trim()) return { ok: false, code: 'bad_request' };
+    const state = await ladderInfo(false);
+    if (!state.enabled || !state.available || !state.consent) return { ok: false, code: 'off' };
+    if (state.pausedUntil && Date.now() < state.pausedUntil) return { ok: false, code: 'paused' };
+    const { body } = await ladderIdentity();
+    let res;
+    try { res = await ladderPost(Object.assign({ action: 'ladder-read', maskedSentence: sentence }, body)); }
+    catch (e) { await ladderSave({ pausedUntil: Date.now() + LADDER_PAUSE_MS }); return { ok: false, code: 'unreachable' }; }
+    const d = res.data || {};
+    if (res.status === 200 && d.ok) {
+      if (d.quota) await ladderSave({ snapshot: d.quota });
+      return { ok: true, reading: d.reading || null, tier: d.tier === 'strong' ? 'strong' : 'fast', units: Number(d.units) || 0, quota: d.quota || null };
+    }
+    if (d.quota) await ladderSave({ snapshot: d.quota });
+    if (res.status === 503 && d.code === 'unavailable') await ladderSave({ available: false, checkedAt: Date.now() });
+    else if (res.status >= 500) await ladderSave({ pausedUntil: Date.now() + LADDER_PAUSE_MS });
+    return { ok: false, code: typeof d.code === 'string' ? d.code : 'refused', quota: d.quota || null };
+  } catch (e) {
+    return { ok: false, code: 'internal' };
+  }
+}
+
 /* ------------------------------------------------ a model on this computer */
 //
 // core/local-lm-server.js is the portable description of this (and what popup.js uses to test it); this is the same
@@ -2973,6 +3062,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:pro-activate') return reply(sendResponse, activatePro(msg.key));
   if (msg.type === 'flow:pro-deactivate') return reply(sendResponse, deactivatePro());
   if (msg.type === 'flow:pro-billing') return reply(sendResponse, openBillingPortal());
+
+  // The deeper read (docs/ai-ladder.md). Only this extension's own pages and scripts; the choice to turn it on or off is the popup's alone, never a page script's.
+  if (msg.type === 'flow:ladder-info' || msg.type === 'flow:ladder-read' || msg.type === 'flow:ladder-consent') {
+    if (sender && sender.id && sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, reason: 'foreign-sender' }));
+    if (msg.type === 'flow:ladder-info') return reply(sendResponse, ladderInfo(msg.force === true));
+    if (msg.type === 'flow:ladder-read') return reply(sendResponse, ladderRead(msg));
+    return reply(sendResponse, sender && sender.tab ? Promise.resolve({ ok: false, reason: 'popup-only' }) : ladderConsent(msg.given === true));
+  }
 
   if (msg.type === 'flow:lm-server-prompt') return reply(sendResponse, lmServerPrompt(msg.text, msg.schema));
 

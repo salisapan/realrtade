@@ -67,7 +67,7 @@ Our own code recognises requests, promises, answers and tasks BEFORE any
 external model is involved, and no feature may depend on a model to work. Build
 recognition as data (lexicons, frames) in `flow-trial-extension/core/`, with
 corpus tests, and stay silent when unsure. A model is an optional, masked,
-Pro-only last resort that never closes or writes anything alone. Full rule:
+last resort (Free with an allowance, Pro with more: `docs/ai-ladder.md`) that never closes or writes anything alone. Full rule:
 `docs/local-first-principle.md`.
 
 ## Product identity — AI is the engine, closure is the product
@@ -113,7 +113,7 @@ the persona inline.
 
 ## The local intent engine — read before touching recognition
 
-`docs/intent-model.md` describes the on-device recognition stack (lexicon tier, learned model, pipeline), how it is measured and what the numbers do not prove. Retrain with `node scripts/train-intent-model.cjs` after changing `scripts/intent/generate.cjs` or the features; `flow-trial-extension/test/intent-model-corpus.cjs` enforces the precision and recall gates. Never lower a precision gate to raise recall, and never add an external model call to this path.
+`docs/intent-model.md` describes the on-device recognition stack (lexicon tier, learned model, pipeline), how it is measured and what the numbers do not prove. Retrain with `node scripts/train-intent-model.cjs` after changing `scripts/intent/generate.cjs` or the features; `flow-trial-extension/test/intent-model-corpus.cjs` enforces the precision and recall gates. Never lower a precision gate to raise recall. The one external step on this path is the owner-approved "deeper read" (`docs/ai-ladder.md`: one masked sentence, two askings, Free allowance and Pro allowance counted on the server, a proposal only, off until the owner measures it with `scripts/ai-ladder/eval.cjs`); do not add any other external model call to recognition, and never widen that one without the same measurement and a privacy-page change in the same commit. How a loop earns a true close and why a short reply is held open: `docs/true-close.md`.
 
 How the engine learns (teacher data, per-person timing, labels from outcomes, an on-device language-model tier, the learning ledger, the one active question, voice-matched drafts, closes from outside the thread), how it is measured, and what the numbers do not prove: `docs/ai-engine-upgrade.md`. Numbers on real mail, and every disclosure about them: `docs/human-eval.md`. How a reply is judged to finish a request (and why a model may only hold a loop open): `docs/reply-model.md`. Other apps (WhatsApp Web, right-click capture, Outlook through Graph), the identity graph and cross-app closing: `docs/multi-platform.md` — read it before adding a surface; every surface is opt-in, stricter than Gmail, read-only, and changes the privacy page and store permissions in the same commit. The private human-text sentences are gitignored and must never be committed.
 Community (cross-user) learning is built but DORMANT and its on-device wiring is deliberately not built: read `docs/community-learning.md` before touching it, and never switch it on without the privacy copy changing in the same commit.

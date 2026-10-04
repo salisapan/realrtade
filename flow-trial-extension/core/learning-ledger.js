@@ -19,7 +19,7 @@ const FlowLedger = (() => {
 
   const CAP = 40;
   const PHRASE_MAX = 60;
-  const KINDS = ['heldOpen', 'askConfirmed', 'promiseConfirmed', 'askMissed', 'promiseMissed', 'accepted', 'turnedDown', 'reopened', 'timing', 'answered', 'style'];
+  const KINDS = ['heldOpen', 'askConfirmed', 'promiseConfirmed', 'askMissed', 'promiseMissed', 'accepted', 'turnedDown', 'reopened', 'timing', 'answered', 'style', 'secondReading'];
 
   function hasHebrew(t) { return /[֐-׿]/.test(String(t || '')); }
   function esc(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -56,6 +56,7 @@ const FlowLedger = (() => {
       case 'reopened': return 'You reopened a loop I had closed' + (info.who ? ' (' + info.who + ')' : '') + '. I count it as my mistake; if it keeps happening I stop closing on weak evidence.';
       case 'timing': return (info.who || 'They') + ' took ' + info.days + (info.days === 1 ? ' day' : ' days') + ' to answer. I now expect about ' + info.expectDays + ' from them.';
       case 'answered': return 'You answered my question' + (q ? ' ' + q : '') + '. That wording now counts as ' + (info.yes ? 'a request' : 'ordinary talk') + '.';
+      case 'secondReading': return 'I could not place one sentence of yours, so I sent it to our server for a second reading' + (q ? ' ' + q : '') + ', with names, amounts, dates and contact details replaced. It only suggests.';
       case 'style': return 'Drafts now follow how you write: ' + (info.note || 'your usual greeting and sign-off') + '.';
       default: return null;
     }

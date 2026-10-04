@@ -111,6 +111,13 @@ distinction matters:
   circuit is open), then Haiku or Grok-fast. Classification uses Anthropic
   Sonnet, then a stronger Grok, and is never sent to Gemini or OpenAI.
 
+  **Second reading (docs/ai-ladder.md).** One masked sentence at a time, only
+  after the person turns it on in the popup, for what Glance's own code could
+  not place. A fast model (Haiku or Grok-fast) is asked twice and must agree;
+  Pro adds a strong model (Sonnet or Grok-strong) when they disagree. Monthly
+  allowance, counted on the server: 120 on Free, 1,500 on Pro. Off at the
+  server until `GLANCE_AI_LADDER` lists the languages that passed the measurement (`en`, `he`, or `en,he`).
+
 ## Draft-It (Feature 2)
 
 Click **Draft-It** in the sidebar while a thread is open. Glance harvests the

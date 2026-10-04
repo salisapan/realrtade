@@ -392,9 +392,9 @@ const FlowFollow = (() => {
       try { if (FlowOutcomeLabels.closureQuality(await FlowStorage.getOutcomeLabels()).strict) best = { reply: Object.assign({}, best.reply, { outcome: 'ack' }), sender: best.sender }; } catch (e) { /* quality is advisory */ }
     }
     // The reply model read it as "not an answer" and held the loop open: say so in the learning list, so it can be checked on real threads.
-    if (best.reply.basis === 'model') {
+    if (best.reply.basis === 'model' || best.reply.basis === 'unsure' || best.reply.why === 'waiting on someone else') {
       const why = String(best.reply.why || '');
-      note('heldOpen', { text: best.text, counterpart: watch.counterpart, reason: /interim/.test(why) ? 'still working on it' : /ack/.test(why) ? 'only a thank-you' : 'unrelated' });
+      note('heldOpen', { text: best.text, counterpart: watch.counterpart, reason: /waiting on someone/.test(why) ? 'it is with someone else' : /not clearly/.test(why) ? 'too short to be an answer' : /interim/.test(why) ? 'still working on it' : /ack/.test(why) ? 'only a thank-you' : 'unrelated' });
     }
     const res = FlowFollowUp.applyReply(watch, best.reply, Date.now());
     if (res.none) return;
@@ -466,7 +466,7 @@ const FlowFollow = (() => {
     } catch (e) { return null; }
   }
 
-  async function lmAsk(text) {
+  async function lmAskLocal(text) {
     try {
       if (typeof FlowLocalLM === 'undefined' || typeof FlowStorage.getLocalLm !== 'function') return null;
       let session = null;
@@ -495,6 +495,58 @@ const FlowFollow = (() => {
       })();
       return await Promise.race([work, new Promise((r) => setTimeout(() => r(null), srv ? LM_SERVER_BUDGET_MS : LM_BUDGET_MS))]);
     } catch (e) { return null; }
+  }
+
+  // ---- the deeper read (core/ai-ladder.js, docs/ai-ladder.md) ---------------------------------------------------------
+  // The step after the on-device ones: one masked sentence to Glance's server, only when the person said yes in the popup, the server says it is running, and this
+  // month's allowance has room. At most two sentences of one message are asked about. The answer is a proposal; the person still taps.
+  const LADDER_PER_MESSAGE = 2;
+
+  async function ladderAsk(text) {
+    try {
+      if (typeof FlowAiLadder === 'undefined' || typeof FlowExecRouter === 'undefined' || typeof FlowStorage.getLadder !== 'function' || typeof FlowIntentModel === 'undefined') return null;
+      const info = await send({ type: 'flow:ladder-info' });
+      if (!info || !info.ok || !info.enabled) return null;
+      let state = FlowAiLadder.stateOf(info);
+      if (!FlowAiLadder.mayAsk(state)) return null;
+      const plan = FlowAiLadder.planOf(info.pro === true);
+      const kept = await FlowStorage.getLadder();
+      let cache = kept.cache, stats = kept.stats, found = null, asked = 0;
+      for (const s of FlowIntentPipeline.sentences(text)) {
+        if (asked >= LADDER_PER_MESSAGE || !FlowAiLadder.mayAsk(state)) break;
+        const r = await FlowAiLadder.read(s, {
+          pipeline: FlowIntentPipeline, model: FlowIntentModel, state, plan, cache, now: Date.now(),
+          extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null, maskIds: FlowMaskIds,
+          mask: (x) => FlowExecRouter.maskForServer(x, FlowPrivacyShield, FlowMaskIds),
+          ask: (req) => send({ type: 'flow:ladder-read', maskedSentence: req.maskedSentence })
+        });
+        if (r.why === 'read' || r.why === 'nothing') { asked++; note('secondReading', { text: s }); }
+        if (r.cache) cache = r.cache;
+        if (r.why !== 'decided' && r.why !== 'length' && r.why !== 'off' && r.why !== 'sure-not-ask' && r.why !== 'not-residual' && r.why !== 'no-model') stats = FlowAiLadder.noteRead(stats, r, Date.now());
+        if (r.quota) state = FlowAiLadder.stateOf(Object.assign({}, info, { snapshot: r.quota }));
+        if (r.why === 'quota_used' || r.why === 'unreachable' || r.why === 'paused') break;
+        if (r.proposal) { found = r.proposal; break; }
+      }
+      await FlowStorage.setLadder({ cache, stats });
+      if (!found) return null;
+      const ask = FlowFollowUp.fromProposal(found, Date.now());
+      if (ask) ask.ladder = { via: found.via, standIn: found.standIn === true };
+      return ask;
+    } catch (e) { return null; }
+  }
+
+  // The person's tap on a proposal that came from a deeper read: the label that says whether it was right. Counts only.
+  function ladderOutcome(ask, accepted) {
+    try {
+      if (!ask || !ask.ladder || typeof FlowAiLadder === 'undefined' || typeof FlowStorage.getLadder !== 'function') return;
+      FlowStorage.getLadder().then((k) => FlowStorage.setLadder({ stats: FlowAiLadder.noteOutcome(k.stats, accepted) })).catch(() => {});
+    } catch (e) { /* optional */ }
+  }
+
+  // The order: the person's own computer first (the browser's model, or Ollama / LM Studio), then, only if nothing there could place it, the server.
+  async function lmAsk(text) {
+    const local = await lmAskLocal(text);
+    return local || ladderAsk(text);
   }
 
   // Voice-matched drafts (core/style-profile.js): Pro only; a template draft opens and closes the way this person does.
@@ -741,6 +793,7 @@ const FlowFollow = (() => {
   }
 
   async function track1(ask, base) {
+    ladderOutcome(ask, true);
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
     watch.threadUrl = base.threadUrl || null;
     const res = await send({ type: 'flow:follow-task', payload: taskPayload(watch) });
@@ -779,6 +832,7 @@ const FlowFollow = (() => {
   }
 
   async function declined(ask, base) {
+    ladderOutcome(ask, false);
     teach(ask.what, 'INFORM', 0.4); // a weak signal: "not now" is not always "not a request"
     note('turnedDown', { text: ask.what, counterpart: base && base.counterpart });
     const watch = FlowFollowUp.buildWatch(Object.assign({ ask, now: Date.now() }, base));
@@ -1036,7 +1090,7 @@ const FlowFollow = (() => {
         track('follow_resolution_chased');
         receipt('Reminder to ' + (plan.issuer.name || plan.issuer.email) + ' is ready in Gmail. Nothing was sent.', null);
       })));
-      else if (a === 'issue-myself') row.appendChild(button('I will issue it', 'ghost', move(async () => { const next = FlowResolution.recordOwnerIssuing(st, t); await saveResolution(env, next, { line: 'Waiting for you to issue the ' + env.need.label + '.', move: 'await-owner-issue' }); receipt('Noted. I will close this when you send the ' + env.need.label + ' as a file.', null); })));
+      else if (a === 'issue-myself') { const issuing = FlowResolution.doneDefinition(env.need, env.facts).attests === 'payment'; row.appendChild(button(issuing ? 'I will issue it' : 'I will send it', idx === 0 ? 'primary' : 'ghost', move(async () => { const next = FlowResolution.recordOwnerIssuing(st, t); await saveResolution(env, next, { line: 'Waiting for you to ' + (issuing ? 'issue' : 'send') + ' the ' + env.need.label + '.', move: 'await-owner-issue' }); receipt('Noted. I will close this when you send the ' + env.need.label + ' as a file.', null); }))); }
       else if (a === 'set-issuer') {
         const input = el('input', 'flow-fu-input');
         input.type = 'email'; input.placeholder = he ? 'כתובת מי שמפיק לכם קבלות' : 'Address of whoever issues your receipts'; input.setAttribute('aria-label', input.placeholder);
