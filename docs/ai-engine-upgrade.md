@@ -154,7 +154,8 @@ published on npm or PyPI with weights. So the pretrained multilingual encoder yo
    in the shipped pipeline (a bag of four models plus teacher data) it gave +0.8, and Hebrew gets nothing. **Not adopted**: not
    worth 1 MB and an English-only gain. The code stays opt-in (`node scripts/train-intent-model.cjs --dense` after
    `scripts/intent/nn/build-dense-prior.py`; the data file is git-ignored).
-3. **A ready-to-run multilingual encoder experiment for you** (`scripts/intent/nn/encoder-experiment.py`; see the README there):
+3. **UPDATE 2026-10-04: the encoder experiment was run (on GitHub's runner) and the pre-registered rule was NOT met; not adopted** (`docs/encoder-evaluation-plan.md` §6).
+3. (original note) **A ready-to-run multilingual encoder experiment for you** (`scripts/intent/nn/encoder-experiment.py`; see the README there):
    embeds all sentences with `intfloat/multilingual-e5-small` (or any sentence-transformers model), trains a head on
    (a) the embedding, (b) embedding plus n-grams, and prints accuracy and ask/promise precision and recall per set and per
    language against the n-gram model, with the adoption rule: at least +3 points on both new sets in BOTH languages with no

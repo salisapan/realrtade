@@ -2,15 +2,11 @@
 # development sandbox's network policy refuses huggingface.co. Public data only: the fixed corpus in the repo. The owner's private
 # human set is gitignored and is NOT here, so this run judges the pooled sets without it (said in the plan and in the report).
 # Nothing here ships anything or changes the product; it only prints numbers and uploads result.json.
+# Run once (2026-10-04, result in docs/encoder-evaluation-plan.md section 6); manual runs only from now on.
 name: Encoder experiment
 
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/install-uiux-pro-max-skill-a4agox]
-    paths:
-      - ".github/workflows/encoder-experiment.yml"
-      - "scripts/intent/nn/encoder-fallback-eval.py"
 
 jobs:
   encoder:

@@ -5,8 +5,9 @@
 > local, no text leaves the device; it may only REINFORCE or serve as a FALLBACK, never replace the judgment layer; no clear
 > improvement means stop. Companion to `docs/ai-engine-upgrade.md` §4 (the earlier encoder question) and `docs/intent-model.md`.
 
-**Status when written: not run.** The sandbox's network policy refuses `huggingface.co`; the owner approved the host and it must be
-allowed in the environment settings (see the end). Everything below is ready so the run takes minutes.
+**Status when written: not run.** The sandbox's network policy refuses `huggingface.co`. The owner approved the host but could not change
+the environment's settings (iPhone), so the run was done on GitHub's own runner instead (`.github/workflows/encoder-experiment.yml`),
+on the PUBLIC fixed corpus only. Result: section 6.
 
 ## 1. The question
 
@@ -69,3 +70,32 @@ The reply task is reported, not gating: the encoder head would have to match the
 Environment settings -> Network access -> Custom -> Allowed domains: `huggingface.co`, `cdn-lfs.huggingface.co`,
 `cas-bridge.xethub.hf.co` (the weights are served from the last two). Keep the default package-manager list. If the session was
 already running when the change was saved, start a new session on the same branch: the policy is applied when the environment starts.
+
+## 6. Result (2026-10-04, GitHub Actions run 37195398708): the rule is NOT met. Stop.
+
+Model `Xenova/multilingual-e5-small` (int8 ONNX, the quantised export, **118 MB unpruned**), frozen encoder + 4-way head, threshold chosen on
+dev only (it came out at the grid minimum, 0.50: dev has 96 sentences and could not discriminate). Latency 4 ms per sentence (batch 1,
+2 threads, a CI runner). The private human set was NOT in this run (it never leaves the owner's machine), so pooled = blind, te2, chat.
+
+Engine alone -> engine + encoder as fallback (silent sentences only), pooled:
+
+| | precision | recall | added right | added wrong |
+|---|---|---|---|---|
+| English (n=228) | 0.984 -> 0.985 | 0.834 -> 0.883 (+4.9) | +7 | 0 |
+| Hebrew (n=200) | 0.982 -> 0.984 | 0.875 -> 0.938 (+6.3) | +8 | 0 |
+
+By set: te2 en +6 / he +8 right, 0 wrong; blind en +1 / he 0; chat 0 / 0; dev en +2 / he +0 (+1 wrong). Reply task: the encoder head held open
+24 non-answers at precision 1.0 (0 real answers held open) against the shipped reply model's 45 at 0.956 (2 held open): less coverage, not more.
+
+Rule, line by line: precision >= 0.97 PASS (both); recall gain >= +5 points en FAIL (4.9), he PASS (6.3); at least 10 more right proposals FAIL
+in both (7 and 8); at most 1 wrong per 20 right PASS (0 wrong); blind shows no gain in Hebrew FAIL; te2 PASS; latency PASS; size not
+attempted (118 MB against 30 MB needs vocabulary pruning, which the plan only does if everything else passes).
+
+**Decision: do not integrate, do not tune the rule.** Reading it fairly: the encoder added a small number of correct proposals and no wrong ones,
+nearly all of them on the model-written te2 set, and the gain is within what 7 or 8 sentences on a set of 200 can be by chance. It is
+a hint, not evidence. The bar existed to stop us building on a hint; lowering it after seeing the result would defeat the point.
+What would change the answer is not a different threshold but a different test: a large set of REAL sentences in both languages (the owner's
+labelled human set grown past a few hundred, with the labels checked), measured the same way. If that is ever built, this plan and script
+are the harness.
+
+Not tested, and still not: loop weight (no labels) and closure on real threads.
