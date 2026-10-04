@@ -1,10 +1,14 @@
 # Runs the pre-registered small-language-model experiment (docs/lm-fallback-evaluation-plan.md) on GitHub's runner, because the
 # development sandbox's network policy refuses huggingface.co. Public data only: the fixed corpus in the repo. The owner's private
 # human set is gitignored and is NOT here. Nothing here ships anything or changes the product; it prints numbers and uploads result.json.
-# Manual runs only.
+# Runs on a push that touches this file (see below); manual runs otherwise.
 name: Language model experiment
 
 on:
+  # A workflow that is not on the default branch cannot be dispatched by hand, so a push that touches THIS file starts the run. Removed after the result is in.
+  push:
+    paths:
+      - .github/workflows/lm-experiment.yml
   workflow_dispatch:
 
 jobs:
