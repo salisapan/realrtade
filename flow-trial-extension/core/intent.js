@@ -318,12 +318,23 @@ const FlowIntent = (() => {
   // Uncertainty on the ask itself. Deliberately not "would", "could", or
   // "if you could" — those are how a real request is written, and the
   // corpus keeps them. "when you get a chance" stays a request.
-  const SOFT_ASK = /\b(?:maybe|perhaps|possibly|no rush|whenever you|when convenient|at your leisure|if possible|if you want|if it helps|just a nudge|optional)\b|(?:^|\s)אולי/i;
+  // "provided that", "subject to", and "assuming" are the same open
+  // condition as "if possible": the sender has not actually asked yet.
+  const SOFT_ASK = /\b(?:maybe|perhaps|possibly|no rush|whenever you|when convenient|at your leisure|if possible|if you want|if it helps|just a nudge|optional|provided that|subject to|assuming)\b/i;
+  // Hebrew has no \b (\w is ASCII), so אולי keeps an explicit boundary.
+  // במידה ו / בהנחה ש / בכפוף ל are the conditionals judgment.js already
+  // hedges, and they never reached this gate. כשיהיה לך and מתי שנוח are
+  // "whenever you" / "when convenient".
+  const SOFT_ASK_HE = /(?:^|\s)אולי|במידה ו|בהנחה ש|בכפוף ל|כשיהיה לך|מתי שנוח/;
   // "Can you agree to the proposal by Monday" is a handoff plus a date, so
   // the request gate would draft it as a follow-up close. Agreeing is the
   // decision the reader has not made. "Could you confirm the payment by
   // Friday" stays a request: it names the work, not a yes to the deal.
   // "confirm whether" asks which way it went; it does not record one.
+  // Hebrew asks the reader to approve with תאשר / לאשר, not with "accept".
+  // "בבקשה תשלח" names the work and stays a request. תאשר also covers
+  // תאשרי and תאשרו. The frames stay specific so "התאשר" (it was approved)
+  // is not read as an ask.
   function readerDecisionAsk(text) {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
@@ -332,6 +343,10 @@ const FlowIntent = (() => {
     if (/\b(?:please|kindly)\s+confirm\b/i.test(raw) && /\bagree[ds]?\b/i.test(raw)) return true;
     if (/(?:^|\s)האם\s/.test(raw) && /מסכימ/.test(raw)) return true;
     if (/(?:^|\s)אתה\s+מסכים/.test(raw) || /(?:^|\s)אתם\s+מסכימים/.test(raw)) return true;
+    if (/בבקשה\s+תאשר/.test(raw)) return true;
+    if (/(?:^|\s)נא\s+לאשר(?![\u0590-\u05FF])/.test(raw)) return true;
+    if (/תוכל(?:י|ו)?\s+לאשר(?![\u0590-\u05FF])/.test(raw)) return true;
+    if (/אנא\s+(?:לאשר(?![\u0590-\u05FF])|תאשר|אשר(?:י|ו)?(?![\u0590-\u05FF]))/.test(raw)) return true;
     return false;
   }
   // A commitment that is still conditional. "once" and "hoping" are not in
@@ -610,7 +625,27 @@ const FlowIntent = (() => {
     // approval would otherwise clear 50 after the hard gates declined.
     const infoOrNoise = INFO_ONLY.test(text) || EXTRA_NOISE.test(text);
     const blocked = s.flags.noise || infoOrNoise;
-    const askIsSoft = Boolean(requestWhat) && SOFT_ASK.test(requestWhat);
+    // Softness is about the ask that would actually chip. The quoted
+    // sentence is the first handoff, so a conditional opener ("במידה
+    // ותוכל, תשלח לי את הטיוטה") used to hide a later clear send. A later
+    // handoff sentence that is not itself soft is the close.
+    function sentenceIsSoft(sentence) {
+      return SOFT_ASK.test(sentence) || SOFT_ASK_HE.test(sentence);
+    }
+    let askIsSoft = Boolean(requestWhat) && sentenceIsSoft(requestWhat);
+    if (askIsSoft) {
+      const parts = String(text || '').split(/(?<=[.!?])\s+|\n+/);
+      for (let i = 0; i < parts.length; i++) {
+        const sentence = parts[i].trim();
+        if (sentence.length <= 12 || sentence.length >= 320) continue;
+        let handoff = false;
+        for (let p = 0; p < REQUEST_PATTERNS.length; p++) {
+          const pattern = REQUEST_PATTERNS[p];
+          if (new RegExp(pattern.source, pattern.flags).test(sentence)) { handoff = true; break; }
+        }
+        if (handoff && !sentenceIsSoft(sentence)) { askIsSoft = false; break; }
+      }
+    }
     // Names a silence the chip path already chose. It does not add a
     // return. quietHint is used only where classify already returned
     // type null with no type of its own.
