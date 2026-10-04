@@ -1,6 +1,7 @@
 // The Chrome side of the hybrid execution path with a fake chrome: the runtime's capability and refusal logic, the worker's consent and
 // message routing, and the whole path (content-script client -> worker -> offscreen -> router) with a fake model and a fake server.
 // Run: node test/hybrid-path-corpus.cjs
+global.FlowCapability = require('../core/capability.js').FlowCapability;
 const { FlowHybridRuntime: R } = require('../src/hybrid-runtime.js');
 const { FlowHybridSW: SW } = require('../src/hybrid-sw.js');
 const { FlowJsonEnforce: J } = require('../core/json-enforce.js');
@@ -26,7 +27,7 @@ const gpu = (o) => ({ requestAdapter: async () => (o === null ? null : { feature
   check('a capable machine is accepted', okCaps.ok === true && okCaps.maxBufferSize === 4 * GiB);
   check('an unknown storage estimate does not block', (await R.capabilities({ navigator: { gpu: gpu({}) }, storage: { estimate: async () => { throw new Error('x'); } } }, 2.2e9)).ok === true);
   check('the small model is the default', R.pick('phi-3-mini', okCaps, { deviceMemory: 8 }) === 'phi-3-mini' && R.pick(undefined, okCaps, { deviceMemory: 8 }) === 'phi-3-mini');
-  check('the 8B model only when the machine reports room for it', R.pick('llama-3-8b', okCaps, { deviceMemory: 8 }) === 'llama-3-8b' && R.pick('llama-3-8b', okCaps, { deviceMemory: 4 }) === 'phi-3-mini' && R.pick('llama-3-8b', { maxBufferSize: 2 * GiB }, { deviceMemory: 8 }) === 'phi-3-mini');
+  check('the 8B model is never picked while its library is not in the package (the +12 MB budget)', R.pick('llama-3-8b', okCaps, { deviceMemory: 8 }) === 'phi-3-mini');
   check('WebLLM\'s own published memory needs are recorded', R.CATALOG['phi-3-mini'].vramMB > 3600 && R.CATALOG['llama-3-8b'].vramMB > 4900);
 
   console.log('\n--- the runtime: starting the engine ---\n');
@@ -52,108 +53,193 @@ const gpu = (o) => ({ requestAdapter: async () => (o === null ? null : { feature
   check('an engine that reports no logprobs gives no probability (the router then counts it as 1 and says so)', (await R.infer({ chat: { completions: { create: async () => ({ choices: [{ message: { content: '{}' } }] }) } } }, 'x')).tokenProb === undefined);
   check('an empty reply is an empty string, not a crash', (await R.infer({ chat: { completions: { create: async () => ({}) } } }, 'x')).text === '');
 
-  console.log('\n--- the worker: consent and routing, with a fake chrome ---\n');
+  console.log('\n--- the worker: with a fake chrome ---\n');
   function fakeChrome() {
-    const store = {}, alarms = {}, log = { offscreenCreated: 0, toOffscreen: [], cleared: [] };
+    const store = {}, alarms = {}, listeners = { alarm: [], startup: [], installed: [] }, log = { offscreenCreated: 0, offscreenClosed: 0, toOffscreen: [], cleared: [] };
     let offscreenOpen = false;
     const chrome = {
-      runtime: { id: 'me', getContexts: async () => (offscreenOpen ? [{}] : []), sendMessage: async (m) => { log.toOffscreen.push(m); return (chrome._offscreen || (() => ({ ok: true })))(m); }, onStartup: { addListener() {} } },
-      offscreen: { createDocument: async () => { if (offscreenOpen) throw new Error('Only a single offscreen document may be created.'); offscreenOpen = true; log.offscreenCreated++; } },
+      runtime: { id: 'me', getContexts: async () => (offscreenOpen ? [{}] : []), sendMessage: async (m) => { log.toOffscreen.push(m); return (chrome._offscreen || (() => ({ ok: true })))(m); },
+        onStartup: { addListener: (f) => listeners.startup.push(f) }, onInstalled: { addListener: (f) => listeners.installed.push(f) } },
+      offscreen: { createDocument: async () => { if (offscreenOpen) throw new Error('Only a single offscreen document may be created.'); offscreenOpen = true; log.offscreenCreated++; },
+        closeDocument: async () => { offscreenOpen = false; log.offscreenClosed++; } },
       storage: { local: { get: async (k) => (typeof k === 'string' ? { [k]: store[k] } : {}), set: async (o) => { Object.assign(store, o); }, remove: async (k) => { delete store[k]; } } },
-      alarms: { create: (n, o) => { alarms[n] = o; }, clear: async (n) => { delete alarms[n]; log.cleared.push(n); }, onAlarm: { addListener() {} } }
+      alarms: { create: (n, o) => { alarms[n] = o; }, clear: async (n) => { delete alarms[n]; log.cleared.push(n); }, onAlarm: { addListener: (f) => listeners.alarm.push(f) } }
     };
-    return { chrome, store, alarms, log, setOffscreen: (v) => { offscreenOpen = v; } };
+    return { chrome, store, alarms, log, listeners, isOpen: () => offscreenOpen };
   }
-  const popup = { id: 'me' }, tab = { id: 'me', tab: { id: 7 } };
-  let f = fakeChrome();
+  const popup = { id: 'me' }, tab = { id: 'me', tab: { id: 7 } }, page = { id: 'me' };
+  const ON = { enabled: true, autoDownload: false, serverFallback: false };
+  const starts = (f) => f.log.toOffscreen.filter((m) => m.type === 'hybrid:start').length;
+  const eligible = () => ({ ok: true, eligible: true, model: 'phi-3-mini', downloadBytes: 2152379174 });
+  const incapable = (reason) => ({ ok: true, eligible: false, reason, permanent: true });
   let assistCalls = [];
-  let sw = SW.create(f.chrome, { callAssist: async (b) => { assistCalls.push(b); return { ok: true, text: JSON.stringify({ action: 'none', reason: 'x' }) }; } });
+  const mk = (f, config) => SW.create(f.chrome, { config, callAssist: async (b) => { assistCalls.push(b); return { ok: true, text: JSON.stringify({ action: 'none', reason: 'x' }) }; } });
+
+  console.log('--- disabled (this build): nothing happens ---');
+  let f = fakeChrome();
+  let sw = mk(f, { enabled: false, autoDownload: true, serverFallback: true });
+  check('status says the path is not enabled', (await sw.handle({ type: 'flow:hybrid-status' }, tab)).enabled === false);
+  check('consent is refused: not enabled', (await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup)).reason === 'not-enabled');
+  check('the server call is refused even with serverFallback in the config', (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, tab)).reason === 'needs-consent' && assistCalls.length === 0);
+  await sw.boot(); sw.install();
+  check('boot and install do nothing: no offscreen page, no probe, no listeners, no messages', f.log.offscreenCreated === 0 && f.log.toOffscreen.length === 0 && f.listeners.alarm.length + f.listeners.startup.length + f.listeners.installed.length === 0);
+  check('the isModelLoaded the router sees is false', (await sw.status()).isModelLoaded === false);
+
+  console.log('--- consent and routing ---');
+  f = fakeChrome(); assistCalls = [];
+  sw = mk(f, ON);
   let st = await sw.handle({ type: 'flow:hybrid-status' }, tab);
-  check('by default: no model, no server consent', st.isModelLoaded === false && st.serverConsent === false && st.localModelConsent === false);
-  check('a content script cannot give consent', (await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, tab)).reason === 'popup-only' && Object.keys(f.store).length === 0);
-  check('a foreign extension or page is refused', (await sw.handle({ type: 'flow:hybrid-status' }, { id: 'someone-else' })).reason === 'foreign-sender');
+  check('enabled, by the config defaults: no model, no server', st.enabled === true && st.isModelLoaded === false && st.serverConsent === false && st.consent.localModel === false);
+  check('the config defaults can turn the server fallback on', (await mk(f, { enabled: true, autoDownload: false, serverFallback: true }).status()).serverConsent === true);
+  check('a content script cannot give consent or retry', (await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, tab)).reason === 'popup-only' && (await sw.handle({ type: 'flow:hybrid-retry' }, tab)).reason === 'popup-only' && f.store[SW.KEY_CONSENT] === undefined);
+  check('a foreign extension is refused', (await sw.handle({ type: 'flow:hybrid-status' }, { id: 'someone-else' })).reason === 'foreign-sender');
   check('unknown messages are left to the worker\'s other handlers', sw.handle({ type: 'flow:draft-reply' }, tab) === undefined && sw.handle(null, tab) === undefined);
-  check('the server is refused without server consent, and the assist endpoint is not called', (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, tab)).reason === 'needs-consent' && assistCalls.length === 0);
+  check('the server is refused without server consent', (await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, tab)).reason === 'needs-consent' && assistCalls.length === 0);
   await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, popup);
-  const ex = await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'Pay [CLIENT_NAME_1]', lang: 'en', instructions: 'ignored by the server' } }, tab);
-  check('with consent the masked prompt goes through the licence-checked call', ex.ok && JSON.parse(ex.text).action === 'none' && assistCalls.length === 1 && assistCalls[0].action === 'execute' && assistCalls[0].maskedPrompt === 'Pay [CLIENT_NAME_1]', assistCalls);
-  const failing = SW.create(f.chrome, { callAssist: async () => { const e = new Error('This feature is part of Glance Pro.'); e.status = 402; throw e; } });
+  const ex = await sw.handle({ type: 'flow:execute', payload: { maskedPrompt: 'Pay [CLIENT_NAME_1]', lang: 'en' } }, tab);
+  check('with consent the masked prompt goes through the licence-checked call', ex.ok && assistCalls.length === 1 && assistCalls[0].action === 'execute' && assistCalls[0].maskedPrompt === 'Pay [CLIENT_NAME_1]');
+  const failing = SW.create(f.chrome, { config: ON, callAssist: async () => { const e = new Error('This feature is part of Glance Pro.'); e.status = 402; throw e; } });
   check('a free user (no licence) gets the reason, not a crash', (await failing.handle({ type: 'flow:execute', payload: { maskedPrompt: 'x' } }, tab)).status === 402);
   check('asking the local model before it is loaded is a clear refusal', (await sw.handle({ type: 'flow:hybrid-infer', prompt: 'x' }, tab)).reason === 'not-loaded');
 
-  console.log('\n--- the worker: the model lifecycle ---\n');
-  f = fakeChrome();
-  sw = SW.create(f.chrome, { callAssist: async () => ({}) });
+  console.log('--- the silent capability probe comes BEFORE any download ---');
+  f = fakeChrome(); sw = mk(f, ON);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
   await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
-  await new Promise((r) => setTimeout(r, 5));                                     // the start message is sent without being awaited
-  check('consent starts it: one offscreen page, the resume alarm, a start message', f.log.offscreenCreated === 1 && f.alarms[SW.ALARM] && f.log.toOffscreen.some((m) => m.type === 'hybrid:start') && f.log.toOffscreen.some((m) => m.type === 'hybrid:consent' && m.given === true), f.log);
-  await sw.ensureOffscreen(); await sw.ensureOffscreen();
-  check('the offscreen page is created once, however many callers', f.log.offscreenCreated === 1);
+  await new Promise((r) => setTimeout(r, 5));
+  const order = f.log.toOffscreen.map((m) => m.type);
+  check('capable machine: consent, then the probe, then the start (never the start first)', order.indexOf('hybrid:probe') > order.indexOf('hybrid:consent') && order.indexOf('hybrid:start') > order.indexOf('hybrid:probe'), order);
+  f = fakeChrome(); sw = mk(f, ON);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? incapable('no-webgpu') : { ok: true });
+  await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
+  await new Promise((r) => setTimeout(r, 5));
+  let fl = (await sw.status()).flags;
+  check('an incapable machine: NO download is ever started', starts(f) === 0);
+  check('...one permanent flag is set with the reason', fl.disabled && fl.disabled.kind === 'incapable' && fl.disabled.reason === 'no-webgpu', fl);
+  check('...the offscreen page is closed and every alarm cleared', f.log.offscreenClosed === 1 && !f.isOpen() && !f.alarms[SW.ALARM_TICK] && !f.alarms[SW.ALARM_RETRY]);
+  const created = f.log.offscreenCreated;
+  f.log.toOffscreen.length = 0;
+  await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
+  await sw.boot(); await sw.tick(SW.ALARM_TICK); await sw.tick(SW.ALARM_RETRY);
+  check('once disabled, nothing wakes it: no page, no message, no start, however it is asked', f.log.offscreenCreated === created && f.log.toOffscreen.length === 0 && starts(f) === 0);
+  check('the flag survives a worker restart (a new worker on the same storage)', (await mk(f, ON).status()).flags.disabled.kind === 'incapable' && (await mk(f, ON).status()).isModelLoaded === false);
+  f = fakeChrome(); sw = mk(f, Object.assign({}, ON, { autoDownload: true }));
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? { ok: true, eligible: false, reason: 'low-storage', permanent: false } : { ok: true });
+  await sw.boot();
+  check('low disk is NOT permanent: no download, no flag, nothing to retry on a timer', starts(f) === 0 && (await sw.status()).flags.disabled === null);
+  f = fakeChrome(); sw = mk(f, Object.assign({}, ON, { autoDownload: true }));
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
+  await sw.boot(); await new Promise((r) => setTimeout(r, 5));
+  check('install on a capable machine with autoDownload: probe, then start', starts(f) === 1);
+  f = fakeChrome(); sw = mk(f, ON);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
+  await sw.boot(); await new Promise((r) => setTimeout(r, 5));
+  check('without autoDownload or consent nothing is downloaded', starts(f) === 0);
+
+  console.log('--- a failing download backs off, then gives up after three attempts ---');
+  f = fakeChrome(); sw = mk(f, ON);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
+  await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
+  const failed = (err) => sw.handle({ type: 'hybrid:state', state: { status: 'failed', lastError: err, isModelLoaded: false } }, page);
+  await failed('hash-mismatch:shard-1');
+  check('failure 1 (a wrong hash): a retry in 15 minutes, not 30 forever', f.alarms[SW.ALARM_RETRY] && f.alarms[SW.ALARM_RETRY].delayInMinutes === 15 && (await sw.status()).flags.attempts === 1 && (await sw.status()).flags.disabled === null, f.alarms);
+  await failed('network:shard-3');
+  check('failure 2: a retry in 60 minutes (exponential)', f.alarms[SW.ALARM_RETRY].delayInMinutes === 60 && (await sw.status()).flags.attempts === 2);
+  check('the retry alarm is one shot: no period', f.alarms[SW.ALARM_RETRY].periodInMinutes === undefined);
+  await failed('manifest-unpinned');
+  fl = (await sw.status()).flags;
+  check('failure 3: it gives up for good, with the reason', fl.disabled && fl.disabled.kind === 'gave-up' && /manifest-unpinned/.test(fl.disabled.reason) && fl.attempts === 3, fl);
+  check('...alarms cleared, offscreen page closed', !f.alarms[SW.ALARM_RETRY] && !f.alarms[SW.ALARM_TICK] && !f.isOpen());
+  f.log.toOffscreen.length = 0;
+  await sw.tick(SW.ALARM_RETRY); await sw.boot();
+  check('...and it never retries again on its own', starts(f) === 0 && f.log.toOffscreen.length === 0);
+  f = fakeChrome(); sw = mk(f, ON);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
+  await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
+  await sw.handle({ type: 'hybrid:state', state: { status: 'failed', lastError: 'network:x' } }, page);
+  await new Promise((r) => setTimeout(r, 5));                                       // the consent's own start message is sent without being awaited
+  f.log.toOffscreen.length = 0;
+  await sw.tick(SW.ALARM_RETRY);
+  check('a due retry restarts the download', starts(f) === 1);
+  await sw.handle({ type: 'hybrid:state', state: { status: 'ready', downloaded: true, isModelLoaded: true } }, page);
+  fl = (await sw.status()).flags;
+  check('success resets the attempt count and clears the retry alarm', fl.attempts === 0 && !f.alarms[SW.ALARM_RETRY] && (await sw.status()).isModelLoaded === true);
+  await sw.handle({ type: 'hybrid:state', state: { status: 'unsupported', unsupportedReason: 'engine-failed:out of memory', isModelLoaded: false } }, page);
+  check('an engine that cannot start on this machine (after the files verified) is permanent too', (await sw.status()).flags.disabled.kind === 'incapable' && /engine-failed/.test((await sw.status()).flags.disabled.reason));
+  f.log.toOffscreen.length = 0;
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
+  const rr = await sw.handle({ type: 'flow:hybrid-retry' }, popup);
+  await new Promise((r) => setTimeout(r, 5));
+  check('only the person\'s own "try again" in the popup clears the permanent flag, and it probes before it starts', rr.ok !== false && (await sw.status()).flags.disabled === null && f.log.toOffscreen.map((m) => m.type).indexOf('hybrid:probe') >= 0, f.log.toOffscreen.map((m) => m.type));
+
+  console.log('--- paused is not failed ---');
+  f = fakeChrome(); sw = mk(f, ON);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
+  await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
+  await sw.handle({ type: 'hybrid:state', state: { status: 'paused', pausedReason: 'metered' } }, page);
+  check('a paused download (metered, offline) wakes every 30 minutes, and does not count as an attempt', f.alarms[SW.ALARM_TICK] && f.alarms[SW.ALARM_TICK].periodInMinutes === 30 && (await sw.status()).flags.attempts === 0);
+  await new Promise((r) => setTimeout(r, 5));
+  f.log.toOffscreen.length = 0;
+  await sw.tick(SW.ALARM_TICK);
+  check('its tick resumes it', starts(f) === 1);
+  await sw.handle({ type: 'hybrid:state', state: { status: 'downloading' } }, page);
+  f.log.toOffscreen.length = 0;
+  await sw.tick(SW.ALARM_TICK);
+  check('a tick for a download that is no longer paused stops the periodic wake-up', starts(f) === 0 && !f.alarms[SW.ALARM_TICK]);
+
+  console.log('--- the model lifecycle ---');
+  f = fakeChrome(); sw = mk(f, ON);
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : m.type === 'hybrid:infer' ? { ok: true, text: '{"action":"none","reason":"y"}', tokenProb: 0.95 } : { ok: true });
+  await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
   check('a content script cannot overwrite the mirrored state', (await sw.handle({ type: 'hybrid:state', state: { isModelLoaded: true } }, tab)).reason === 'offscreen-only');
-  await sw.handle({ type: 'hybrid:state', state: { status: 'downloading', bytesDone: 5, isModelLoaded: false } }, { id: 'me' });
-  check('the offscreen page\'s state is mirrored for the popup and the router', (await sw.status()).state.status === 'downloading' && (await sw.status()).isModelLoaded === false);
-  f.log.toOffscreen.length = 0;
-  await sw.tick();
-  check('the alarm resumes a download that is not finished', f.log.toOffscreen.some((m) => m.type === 'hybrid:start'));
-  await sw.handle({ type: 'hybrid:state', state: { status: 'ready', downloaded: true, isModelLoaded: true } }, { id: 'me' });
-  f.log.toOffscreen.length = 0;
-  check('once loaded, the alarm does nothing', (await sw.tick()).skipped === 'ready' && f.log.toOffscreen.length === 0);
+  await sw.handle({ type: 'hybrid:state', state: { status: 'ready', downloaded: true, isModelLoaded: true } }, page);
   check('isModelLoaded is true only with consent AND a loaded model', (await sw.status()).isModelLoaded === true);
-  f.chrome._offscreen = (m) => (m.type === 'hybrid:infer' ? { ok: true, text: '{"action":"none","reason":"y"}', tokenProb: 0.95 } : { ok: true });
   const inf = await sw.handle({ type: 'flow:hybrid-infer', prompt: 'hi', opts: { maxTokens: 50 } }, tab);
   check('inference is forwarded to the offscreen page', inf.ok && inf.tokenProb === 0.95);
-  await sw.handle({ type: 'hybrid:state', state: { status: 'unsupported', isModelLoaded: false } }, { id: 'me' });
-  f.log.toOffscreen.length = 0;
-  check('an unsupported machine is left alone', (await sw.tick()).skipped === 'unsupported' && f.log.toOffscreen.length === 0);
-  f.log.toOffscreen.length = 0;
-  await sw.handle({ type: 'hybrid:state', state: { status: 'failed', lastError: 'hash-mismatch:shard-1', isModelLoaded: false } }, { id: 'me' });
-  check('a failure retrying cannot fix (a wrong hash) does not wake the download every 30 minutes', (await sw.tick()).skipped === 'fatal' && f.log.toOffscreen.length === 0 && !f.alarms[SW.ALARM]);
-  f.alarms[SW.ALARM] = { periodInMinutes: 30 };
-  await sw.handle({ type: 'hybrid:state', state: { status: 'failed', lastError: 'network:shard-3', isModelLoaded: false } }, { id: 'me' });
-  check('a network failure IS retried', (await sw.tick()).ok !== false && f.log.toOffscreen.some((m) => m.type === 'hybrid:start'));
-  await sw.handle({ type: 'hybrid:state', state: { status: 'unsupported', isModelLoaded: false } }, { id: 'me' });
-  f.alarms[SW.ALARM] = { periodInMinutes: 30 };
-  check('an unsupported machine stops the alarm instead of waking up forever', (await sw.tick()).skipped === 'unsupported' && !f.alarms[SW.ALARM]);
-  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? { ok: true, eligible: true, model: 'phi-3-mini', downloadBytes: 2152379174 } : { ok: true });
-  const pr = await sw.handle({ type: 'flow:hybrid-probe' }, popup);
-  check('the popup can ask "can this machine run it, and how big is it" before turning anything on', pr.ok && pr.eligible === true && pr.downloadBytes > 2e9 && !f.log.toOffscreen.some((m) => m.type === 'hybrid:start' && f.log.toOffscreen.indexOf(m) > f.log.toOffscreen.length - 2));
   await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: false } }, popup);
-  check('turning it off removes the model, clears the alarm and forgets the state', f.log.toOffscreen.some((m) => m.type === 'hybrid:remove') && !f.alarms[SW.ALARM] && f.store[SW.KEY_STATE] === undefined && (await sw.status()).isModelLoaded === false);
-  check('with consent withdrawn a stray alarm cancels itself', (await sw.tick()).skipped === 'no-consent');
+  check('turning it off removes the model, clears the alarms and forgets the state', f.log.toOffscreen.some((m) => m.type === 'hybrid:remove') && !f.alarms[SW.ALARM_TICK] && f.store[SW.KEY_STATE] === undefined && (await sw.status()).isModelLoaded === false);
   const noOff = fakeChrome(); delete noOff.chrome.offscreen;
-  check('a browser without the offscreen API: a refusal, not a crash', (await SW.create(noOff.chrome, {}).handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup)).ok === true);
+  check('a browser without the offscreen API: a refusal, not a crash', (await mk(noOff, ON).handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup)).ok === true);
 
-  console.log('\n--- the whole path: client -> worker -> offscreen -> router ---\n');
+  console.log('\n--- the whole path: executeTask -> worker -> offscreen -> router ---\n');
   f = fakeChrome();
   const serverAnswers = [];
-  sw = SW.create(f.chrome, { callAssist: async (b) => { serverAnswers.push(b); return { text: JSON.stringify({ action: 'create_task', title: 'Wire the money', dueText: '[DATE_1]' }) }; } });
+  sw = SW.create(f.chrome, { config: ON, callAssist: async (b) => { serverAnswers.push(b); return { text: JSON.stringify({ action: 'create_task', title: 'Wire the money', dueText: '[DATE_1]' }) }; } });
+  f.chrome._offscreen = (m) => (m.type === 'hybrid:probe' ? eligible() : { ok: true });
   global.chrome = { runtime: { lastError: null, sendMessage: (msg, cb) => { Promise.resolve(sw.handle(msg, tab)).then((r) => cb(r)); } } };
   global.FlowJsonEnforce = J; global.FlowMaskIds = M; global.FlowPrivacyShield = Shield; global.FlowExecRouter = Router;
-  const { FlowHybrid: H } = require('../src/hybrid-client.js');
+  const { FlowHybrid: H, executeTask } = require('../src/hybrid-client.js');
   const PROMPT = 'Dana Levi writes: please wire $3,850 for account 99887766 by 2026-10-09.';
-  let res = await H.run({ prompt: PROMPT });
-  check('nothing consented: a reason, and nothing left the device', res.ok === false && res.reason === 'needs-consent' && serverAnswers.length === 0, res);
+  let res = await executeTask({ prompt: PROMPT });
+  check('executeTask with nothing consented: a reason, and nothing left the device', res.ok === false && res.reason === 'needs-consent' && serverAnswers.length === 0, res);
   await sw.handle({ type: 'flow:hybrid-consent', patch: { server: true } }, popup);
-  res = await H.run({ prompt: PROMPT, lang: 'en' });
-  check('server consent only: Tier 1 answers, as a proposal', res.ok && res.tier === 'server' && res.action.action === 'create_task', res);
+  res = await executeTask({ prompt: PROMPT, lang: 'en' });
+  check('server fallback on: the server answers (Tier 1), as a proposal', res.ok && res.tier === 'server' && res.action.action === 'create_task', res);
   check('what the worker sent to the licence-checked call is masked', serverAnswers.length === 1 && !/Dana|3,850|99887766|2026-10-09/.test(JSON.stringify(serverAnswers[0])), serverAnswers[0]);
+  res = await executeTask({ prompt: PROMPT, tiers: { server: false } });
+  check('a caller can forbid the server tier for one task', res.ok === false && serverAnswers.length === 1, res);
   await sw.handle({ type: 'flow:hybrid-consent', patch: { localModel: true } }, popup);
-  await sw.handle({ type: 'hybrid:state', state: { status: 'ready', downloaded: true, isModelLoaded: true } }, { id: 'me' });
+  await sw.handle({ type: 'hybrid:state', state: { status: 'ready', downloaded: true, isModelLoaded: true } }, page);
   const same = JSON.stringify({ action: 'create_task', title: 'Wire the money', dueText: 'by Friday' });
   f.chrome._offscreen = (m) => (m.type === 'hybrid:infer' ? { ok: true, text: same, tokenProb: 0.97 } : { ok: true });
   serverAnswers.length = 0;
-  res = await H.run({ prompt: PROMPT });
+  res = await executeTask({ prompt: PROMPT });
   check('a loaded model that is sure: the answer stays on the device, the server is not called', res.ok && res.tier === 'local' && serverAnswers.length === 0, res);
   let n = 0;
   f.chrome._offscreen = (m) => (m.type === 'hybrid:infer' ? { ok: true, text: JSON.stringify({ action: 'create_task', title: 't' + (++n), dueText: null }), tokenProb: 0.97 } : { ok: true });
-  res = await H.run({ prompt: PROMPT });
+  res = await executeTask({ prompt: PROMPT });
   check('a loaded model that is unsure: the masked prompt goes to the server (Tier 3)', res.ok && res.tier === 'server-fallback' && serverAnswers.length === 1, res);
   f.chrome._offscreen = () => ({ ok: false, reason: 'device lost' });
-  res = await H.run({ prompt: PROMPT });
+  res = await executeTask({ prompt: PROMPT });
   check('a model error on the device falls back too', res.ok && res.tier === 'server-fallback', res);
+  await sw.disable('incapable', 'no-webgpu');
+  serverAnswers.length = 0;
+  res = await executeTask({ prompt: PROMPT });
+  check('on a disabled machine executeTask goes straight to the server and never asks the device', res.ok && res.tier === 'server' && res.trace.indexOf('local-not-loaded') >= 0, res);
   global.chrome.runtime.sendMessage = (msg, cb) => cb(undefined);
-  res = await H.run({ prompt: PROMPT });
+  res = await executeTask({ prompt: PROMPT });
   check('a worker that does not answer is a refusal, not a hang or a throw', res.ok === false, res);
+  check('executeTask never throws on garbage', (await Promise.all([null, undefined, {}, { prompt: 5 }].map((p) => executeTask(p)))).every((r) => r.ok === false));
 
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);

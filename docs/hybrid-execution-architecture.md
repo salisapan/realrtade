@@ -1,8 +1,8 @@
 # Hybrid execution: the device first, the server when it is needed. Plan, what is built, what needs the owner
 
-> Written 2026-10-04 from the owner's specification, before the code. **Status: built and tested, DORMANT.** Nothing in `manifest.json`,
-> `background.js` or the content scripts references any of it, so no user is affected and no promise on the privacy page changes yet. The
-> activation checklist (§11) is the list of things that must be decided or done first. Companion to `docs/when-recognition-fails.md`,
+> Written 2026-10-04 from the owner's specification, before the code. **Status (second pass, same day): WIRED INTO THE EXTENSION, SWITCHED OFF.** The manifest, `background.js`, the content scripts,
+> the popup and the install package now contain all of it (runtime, model library, worker, client, status row), and `config/hybrid.public.js` has `enabled: false`, so no user sees or runs anything yet and the
+> privacy page is unchanged and true. §0b says why the switch is off and how to turn it on. Companion to `docs/when-recognition-fails.md`,
 > `docs/local-model-server.md`, `docs/lm-fallback-evaluation-plan.md` (the measured result on small models), `docs/local-first-principle.md`.
 
 ## 0. Owner decisions after the first draft (2026-10-04)
@@ -15,6 +15,27 @@
 | 5 | Llama-3-70B, Mistral-Large, DeepSeek and Claude were named for the server and not wired | **Connect them.** | §9: Mistral Large and DeepSeek are connected to the server router for the `execute` action; Claude is connected already (Sonnet). Llama-3-70B needs a hosted endpoint nobody has chosen, so it is the one name not connected. |
 
 Points 4, 6 and 7 of the first draft (the evidence for the device tier, the bundled WASM, `fill_field`) were not answered and stand as written.
+
+## 0b. The second pass: the owner's execution brief (2026-10-04) and what was done
+
+| Brief | Done | Where it differs, and why |
+|---|---|---|
+| Silent WebGPU check before any download; an incapable machine gets a permanent flag, the worker is disabled, no retry loops | `core/capability.js` (the checker), `src/hybrid-sw.js` (`disable`, `boot`, `probe`), `src/offscreen.js` (`hybrid:probe`) | Permanent for hardware and browser reasons (no WebGPU, no adapter, no shader-f16, GPU buffer under 1 GiB, under 4 GB of device memory) and for an engine that cannot start. **Low disk is not permanent** (the person can free space). Only the person's own "Check again" in the popup clears the flag. |
+| Exponential back-off; give up after 3 attempts; then server-side only | `hybrid-sw.js` `onState`: failure 1 retries in 15 min, failure 2 in 60 min, failure 3 sets the permanent `gave-up` flag, clears every alarm and closes the offscreen page | The old 30-minute loop now exists only for a download that is merely PAUSED (offline, metered, data saver), which is not a failure and downloads nothing. A hash mismatch or manifest failure counts as a failure like any other. |
+| Default model: 2.15 GB SLM (Gemma-2-2B or Phi-3-mini) through Transformers.js and WebGPU | Phi-3-mini 4-bit (2.15 GB, pinned and hash-verified) through **WebLLM** | Not Transformers.js. The 2.15 GB figure and every hash belong to the MLC build of Phi-3-mini that WebLLM runs; Transformers.js would need a different format and a new pinned manifest. Gemma-2-2B has no pinned manifest yet (the CI job that builds one takes minutes if wanted). |
+| Package budget +12 MB | **+11.3 MB**: `vendor/web-llm.js` 6.03 MB (tree-shaken, minified) + the Phi-3-mini WASM 5.31 MB, produced by `scripts/hybrid/vendor-runtime.cjs`, which verifies the npm tarball's integrity hash and the WASM's SHA-256 against the pinned manifest | The 8B library is not bundled (it would break the budget). The install zip is 3.87 MB, which the download function returns as base64: **5.16 MB against a 6.29 MB limit on a synchronous Netlify function response, 18% headroom.** Any further growth needs a different delivery for the zip. |
+| Server order Mistral Large, Claude Sonnet, Grok-strong, DeepSeek (backup); skip a provider with no key | Done (§9) | Llama-3-70B was added right after Mistral Large as the "alternate route" (one constant, `EXECUTE_ORDER`, to move it). |
+| Model ids | `mistral-large-latest`; DeepSeek `deepseek-v4-pro` (the retired `deepseek-chat` is nowhere in the router, and a test pins that); Llama `meta-llama/Meta-Llama-3-70B-Instruct` on Together AI | **None of these ids could be checked from this environment**; the owner's spec is followed. `LLAMA_API_URL` and `LLAMA_MODEL` switch the host (Groq, or any compatible host) without a code change; the URL must be https and not local. |
+| Capability checker script | `core/capability.js`, 13 checks | |
+| `async function executeTask(payload)` | `src/hybrid-client.js`: the dual-tier wrapper (device first, masked server fallback, JSON only, a proposal), also a top-level function in the Gmail content scripts | **No feature calls it yet.** |
+| Scrubbing before low-confidence text goes to the server | `core/exec-router.js` with `core/mask-ids.js` over `core/privacyShield.js`: names, companies, amounts, dates, e-mail, phone, labelled identifiers and IBANs; the router refuses to send if a contact detail or amount survives or a masked value is found in the payload | The masking is pattern-based and can miss (§6). |
+| State manager for the popup ("Ready for local processing", "Server-backed mode") | `core/hybrid-status.js` (pure) and a popup row (`renderHybridRow`), 13 + 7 checks | The row is hidden while the switch is off. |
+
+**Why the switch is off.** `executeTask` has no caller: nothing in Glance asks for a proposed action yet (Do It is judged and planned by deterministic code, and Draft It's free text cannot be accepted by the exact-agreement confidence rule). Switching it on now would
+download 2.15 GB on every capable computer, and show a status row, for a tier no feature uses. To turn it on: set `enabled: true` in `config/hybrid.public.js`, in the same commit put the §13 text on the privacy page (`test/hybrid-copy-corpus.cjs` fails otherwise), and make a feature call `executeTask`.
+The one-line change is deliberately the owner's.
+
+The repository's default branch is `main`, not `master`; this work was pushed only to its feature branch and is not merged.
 
 ## 1. What was asked
 
@@ -90,6 +111,10 @@ Data layers stay separate: **masking** (`core/mask-ids.js` over `core/privacyShi
 | `core/json-enforce.js` | core | The closed action schema, the instruction both tiers get, `parse()` that never throws, a JSON Schema export for constrained decoding |
 | `core/mask-ids.js` | core | Labelled identifiers and IBANs → `[ID_n]`; `maskAll` = shield then identifiers |
 | `core/exec-router.js` | core | Tier order, consent gates, the mask-as-hard-gate, confidence, fallback, the unknown-placeholder check |
+| `core/capability.js` | core | The silent environment check, with permanent versus transient reasons |
+| `core/hybrid-status.js` | core | The popup's state manager: raw worker status to one plain line |
+| `config/hybrid.public.js` | config | The switch (`enabled: false`) |
+| `vendor/` | data | `web-llm.js`, the Phi-3-mini WASM, the runtime's licence and `VENDOR.json` (hashes and sources), produced by `scripts/hybrid/vendor-runtime.cjs` |
 | `core/model-store.js` | core | Manifest trust check, consented, polite, resumable, verified download, state machine, `networkConditions` |
 | `core/model-manifests/*.json` | data | Pinned file lists with size and SHA-256 at an exact commit, written by CI (`scripts/hybrid/build-model-manifest.cjs`, `.github/workflows/model-manifest.yml`) |
 | `src/hybrid-runtime.js` | src | Capability check, which model, engine start (refuses a remote WASM), one constrained inference with logprobs |
@@ -156,11 +181,11 @@ contact details in the answer, unmasked input, and an attempt to override the in
 
 ## 10. What the tests pin
 
-`json-enforce-corpus` (28 checks), `mask-ids-corpus` (19), `exec-router-corpus` (39), `model-store-corpus` (35), `hybrid-path-corpus` (48, with a fake chrome and a fake model and server), and the `execute` cases in
+`json-enforce-corpus` (28 checks), `mask-ids-corpus` (19), `exec-router-corpus` (39), `model-store-corpus` (35), `capability-corpus` (13), `hybrid-status-corpus` (13), `hybrid-copy-corpus` (promise versus reality), `hybrid-path-corpus` (72, with a fake chrome and a fake model and server), and the `execute` cases in
 `glance-assist/model-router.test.cjs`. Mutation checks were run: removing the consent gate, sending unmasked text, accepting unknown placeholders, ignoring the confidence bar, skipping the hash check, letting a
 content script set consent, and allowing a remote WASM each make tests fail.
 
-## 11. Before this can be switched on (in order)
+## 11. Before this can be switched on (in order). Items 3, 4 and 5 were done in the second pass (§0b)
 
 1. **Owner decisions still open:** where and how the first-run notice appears (§8a); the free-tier quota and daily spend cap (row 29); whether the package grows by about 12 MB; Phi-3-mini only, or Llama-3-8B as well;
    whether DeepSeek's key is set at all (§9); which host serves Llama-3-70B, if it is wanted. (Closed: the boundary wording and the device-only claim, §0.)
@@ -177,7 +202,7 @@ content script set consent, and allowing a remote WASM each make tests fail.
 
 ## 12. Not built
 
-Page automation (`fill_field`); a quota or free tier; cheapest-first routing; Llama-3-70B (no host chosen); a self-hosted model of any size; a popup UI; the vendored runtime; any manifest or `background.js` change; any privacy-page change.
+Page automation (`fill_field`); a quota or free tier; cheapest-first routing; a self-hosted model of any size; a feature that calls `executeTask`; the 8B model; Gemma-2-2B; any change to the live privacy page (it is true while the switch is off); a trial on a real GPU (never run here).
 
 ## 13. The copy that goes live with activation (drafted now, not published)
 

@@ -36,6 +36,8 @@
 // had.
 
 import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
+import { HYBRID } from '../config/hybrid.public.js';
+import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -2890,6 +2892,10 @@ async function connectorStatus() {
   };
 }
 
+// The hybrid execution path (device model first, masked server fallback). Inert while HYBRID.enabled is false (config/hybrid.public.js).
+const hybrid = globalThis.FlowHybridSW.create(chrome, { config: HYBRID, callAssist: (body) => callGlanceAssist(body) });
+hybrid.install();
+
 function reply(sendResponse, promise) {
   promise
     .then((r) => sendResponse(r))
@@ -2899,6 +2905,9 @@ function reply(sendResponse, promise) {
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+
+  const hybridAnswer = hybrid.handle(msg, sender);
+  if (hybridAnswer) return reply(sendResponse, hybridAnswer);
 
   if (msg.type === 'flow:connector-status') return reply(sendResponse, connectorStatus());
 

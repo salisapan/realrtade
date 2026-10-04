@@ -5,7 +5,11 @@
 // Messages out: hybrid:state { state }   (after every step the service worker mirrors it for the popup and the router)
 (() => {
   const KV_KEY = 'glance.hybrid.model.state';
-  const MANIFESTS = { 'phi-3-mini': '../core/model-manifests/Phi-3-mini-4k-instruct-q4f16_1-MLC.json', 'llama-3-8b': '../core/model-manifests/Llama-3-8B-Instruct-q4f16_1-MLC.json' };
+  // Literal paths on purpose: scripts/package_trial_extension.py finds the files an install needs by reading the string arguments of chrome.runtime.getURL calls.
+  // Only Phi-3-mini is bundled (the 8B library would take the package over the +12 MB budget).
+  const MANIFEST_URL = { 'phi-3-mini': chrome.runtime.getURL('core/model-manifests/Phi-3-mini-4k-instruct-q4f16_1-MLC.json') };
+  const LIB_URL = { 'phi-3-mini': chrome.runtime.getURL('vendor/Phi-3-mini-4k-instruct-q4f16_1-MLC-webgpu.wasm') };
+  const RUNTIME_URL = chrome.runtime.getURL('vendor/web-llm.js');
   const R = FlowHybridRuntime, S = FlowModelStore, J = FlowJsonEnforce;
   let store = null, engine = null, modelKey = null, starting = null;
 
@@ -25,7 +29,8 @@
   async function publish(state) { try { await chrome.runtime.sendMessage({ type: 'hybrid:state', state }); } catch (e) { /* the worker is asleep; it re-reads on wake */ } }
 
   async function manifestFor(key) {
-    const res = await fetch(chrome.runtime.getURL(MANIFESTS[key].replace('../', '')));
+    if (!MANIFEST_URL[key]) throw new Error('model-not-bundled');
+    const res = await fetch(MANIFEST_URL[key]);
     if (!res.ok) throw new Error('manifest-missing');
     return res.json();
   }
@@ -40,7 +45,8 @@
 
   async function start(preferred) {
     const caps = await R.capabilities({ navigator, storage: navigator.storage }, 2.2e9);
-    if (!caps.ok) { const s0 = await (await ensureStore('phi-3-mini')).markUnsupported(caps.reason); await publish(s0); return s0; }
+    if (!caps.ok && caps.permanent) { const s0 = await (await ensureStore('phi-3-mini')).markUnsupported(caps.reason); await publish(s0); return s0; }
+    if (!caps.ok) { const s1 = Object.assign({}, await (await ensureStore('phi-3-mini')).getState(), { status: 'paused', pausedReason: caps.reason }); await publish(s1); return s1; }   // not enough disk: waits, the person can free space
     const key = R.pick(preferred, caps, navigator);
     const st = await ensureStore(key);
     let s = await st.run();
@@ -48,7 +54,7 @@
     if (s.status !== 'ready' && !s.downloaded) return s;
     if (!engine) {
       const manifest = await manifestFor(key);
-      const r = await R.start({ modelKey: key, manifest, libUrl: chrome.runtime.getURL('vendor/' + R.CATALOG[key].id + '-webgpu.wasm'), importer: () => import('./vendor/web-llm.js'),
+      const r = await R.start({ modelKey: key, manifest, libUrl: LIB_URL[key], importer: () => import(RUNTIME_URL),
         onProgress: () => {} });
       if (!r.ok) { s = await st.markUnsupported(r.reason); await publish(s); return s; }
       engine = r.engine;
@@ -65,7 +71,7 @@
         if (msg.type === 'hybrid:probe') {
           // Capability and size only: nothing is downloaded and nothing is stored.
           const caps = await R.capabilities({ navigator, storage: navigator.storage }, 2.2e9);
-          if (!caps.ok) { reply({ ok: true, eligible: false, reason: caps.reason }); return; }
+          if (!caps.ok) { reply({ ok: true, eligible: false, reason: caps.reason, permanent: caps.permanent === true }); return; }
           const key = R.pick(msg.modelKey, caps, navigator);
           const m = await manifestFor(key);
           reply({ ok: true, eligible: true, model: key, label: R.CATALOG[key].label, downloadBytes: m.files.reduce((n, f) => n + f.bytes, 0), network: S.networkConditions(navigator) });

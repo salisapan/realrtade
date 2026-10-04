@@ -108,6 +108,8 @@ function load(stored, opts) {
           return;
         }
         if (msg && msg.type === 'flow:search-drive') { if (cb) cb({ ok: true, files: opts.driveFiles || [] }); return; }
+        if (msg && msg.type === 'flow:hybrid-status') { if (cb) cb(opts.hybridStatus || { ok: true }); return; }
+        if (msg && msg.type === 'flow:hybrid-consent') { (opts.hybridConsents = opts.hybridConsents || []).push(msg.patch); if (cb) cb({ ok: true }); return; }
         if (msg && msg.type === 'flow:follow-draft') { (opts.drafts = opts.drafts || []).push(msg.payload); if (cb) cb({ ok: true }); return; }
         if (cb) cb(msg && msg.type === 'flow:connector-status' ? {} : { ok: true });
       }
@@ -144,7 +146,7 @@ function load(stored, opts) {
     [CORE, 'actions.js'], [CORE, 'execution-memory.js'],
     [SRC, 'chrome-storage-adapter.js'],
     [SRC, 'receipt-copy.js'],
-    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'local-lm.js'], [CORE, 'local-lm-audit.js'], [CORE, 'local-lm-server.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
+    [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'local-lm.js'], [CORE, 'local-lm-audit.js'], [CORE, 'local-lm-server.js'], [CORE, 'hybrid-status.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
     [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
   ];
   for (const [dir, f] of loadOrder) {
@@ -675,6 +677,31 @@ async function run() {
     const buttons = find(host, 'ghost').map((b) => b.textContent);
     check('and offers Turn on once a client id is set', buttons.includes('Turn on'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
+  }
+
+  console.log('\n--- popup.js: the on-device processing row (hybrid path) ---\n');
+  const hybridRow = async (hybridStatus) => {
+    const { sandbox, document } = load({}, { hybridStatus });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 20; i++) await new Promise((r) => setTimeout(r, 0));
+    const host = document.getElementById('surface-list');
+    return { whos: find(host, 'wait-who').map((n) => n.textContent), states: find(host, 'wait-state').map((n) => n.textContent), notes: find(host, 'wait-note').map((n) => n.textContent), buttons: find(host, 'ghost').map((b) => b.textContent) };
+  };
+  {
+    const r = await hybridRow(undefined);
+    check('not enabled in this build: no row at all', !r.whos.includes('On-device processing'));
+    const on = { ok: true, enabled: true, consent: { localModel: true, server: true }, flags: { disabled: null, attempts: 0 }, state: { status: 'downloading', bytesDone: 1.07e9, bytesTotal: 2.15e9 }, isModelLoaded: false, serverConsent: true };
+    let x = await hybridRow(on);
+    check('downloading: "Preparing", the progress, and that the server is used meanwhile', x.whos.includes('On-device processing') && x.states.includes('Preparing the on-device model') && x.notes.some((t) => /^50%/.test(t)) && x.notes.some((t) => /uses our server/.test(t)), x);
+    check('downloading: one way out, "Turn off and free the disk"', x.buttons.includes('Turn off and free the disk'));
+    x = await hybridRow(Object.assign({}, on, { isModelLoaded: true, state: { status: 'ready', isModelLoaded: true } }));
+    check('loaded: "Ready for local processing"', x.states.includes('Ready for local processing'), x);
+    x = await hybridRow(Object.assign({}, on, { consent: { localModel: false, server: true }, state: null }));
+    check('off, server on: "Server-backed mode" and an offer to turn the model on', x.states.includes('Server-backed mode') && x.buttons.includes('Turn on the on-device model'), x);
+    x = await hybridRow(Object.assign({}, on, { flags: { disabled: { kind: 'incapable', reason: 'no-webgpu' }, attempts: 0 }, state: null }));
+    check('this computer cannot run it: "Server-backed mode", the plain reason, and a way to check again', x.states.includes('Server-backed mode') && x.notes.some((t) => /does not offer WebGPU/.test(t)) && x.buttons.includes('Check again') && !x.buttons.includes('Turn on the on-device model'), x);
+    x = await hybridRow(Object.assign({}, on, { flags: { disabled: { kind: 'gave-up', reason: 'after 3 failed attempts' }, attempts: 3 }, state: null }));
+    check('gave up after three tries: says so, and offers to check again', x.notes.some((t) => /after 3 tries/.test(t)) && x.buttons.includes('Check again'), x);
   }
 
   console.log('\n--- popup.js: a model on this computer is off until it passes the test ---\n');

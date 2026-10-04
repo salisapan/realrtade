@@ -811,6 +811,40 @@
 
   function fmtLm(r) { return r && r.ok ? 'on (precision ' + (r.precision == null ? '?' : r.precision) + ', recall ' + (r.recall == null ? '?' : r.recall) + ')' : r && r.precision != null ? 'off (precision ' + r.precision + ', needs ' + FlowLocalLM.TEST_MIN_PRECISION + ')' : 'off'; }
 
+  // The on-device model and the server fallback (core/hybrid-status.js turns the worker's status into this line). Hidden while the hybrid path is not
+  // enabled in this build (config/hybrid.public.js): a row for something that is not there would be a promise with nothing behind it.
+  async function renderHybridRow(host) {
+    if (typeof FlowHybridStatus === 'undefined') return;
+    const raw = await send({ type: 'flow:hybrid-status' });
+    const v = FlowHybridStatus.describe(raw);
+    if (!v.visible) return;
+    const row = el('div', 'wait-item');
+    row.id = 'hybridRow';
+    const top = el('div', 'wait-top');
+    top.appendChild(el('span', 'wait-who', 'On-device processing'));
+    top.appendChild(el('span', 'wait-state' + (v.mode === 'local-ready' ? ' ok' : ''), v.label));
+    row.appendChild(top);
+    if (v.progress !== null) {
+      const bar = el('div', 'wait-note', Math.round(v.progress * 100) + '%');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-valuenow', String(Math.round(v.progress * 100)));
+      row.appendChild(bar);
+    }
+    row.appendChild(el('div', 'wait-note', v.detail));
+    const acts = el('div', 'wait-acts');
+    const act = (label, msg) => {
+      const b = el('button', 'ghost sm', label);
+      b.type = 'button';
+      b.addEventListener('click', async () => { b.disabled = true; await send(msg); await renderSurfaces(); });
+      acts.appendChild(b);
+    };
+    if (v.canEnable) act('Turn on the on-device model', { type: 'flow:hybrid-consent', patch: { localModel: true } });
+    if (v.canRetry) act('Check again', { type: 'flow:hybrid-retry' });
+    if (v.canRemove) act('Turn off and free the disk', { type: 'flow:hybrid-consent', patch: { localModel: false } });
+    if (acts.children.length) row.appendChild(acts);
+    host.appendChild(row);
+  }
+
   async function renderLocalModelRow(host) {
     if (typeof FlowLocalLMServer === 'undefined' || typeof FlowLocalLM === 'undefined' || typeof FlowStorage.getLocalLmServer !== 'function') return;
     const cfg = await FlowStorage.getLocalLmServer();
@@ -1015,6 +1049,7 @@
     }
     await renderOutlookRow(host);
     await renderLocalModelRow(host);
+    await renderHybridRow(host);
   }
 
   // Two entries that might be one person (the same full name in two apps): asked once, never merged on a guess.

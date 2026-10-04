@@ -16,7 +16,7 @@ const vm = require('vm');
 function load() {
   const calls = [];
   let onMessageListener = null;
-  let onInstalledListener = null;
+  const onInstalledListeners = [];                 // Chrome calls every registered onInstalled listener; so does this stub
   // A real backing store (not the always-empty stub the other tests in this
   // file use) — needed to prove getInstallId() actually persists across
   // calls, not just that it returns a string once.
@@ -35,7 +35,7 @@ function load() {
       runtime: {
         getManifest: () => ({ oauth2: { client_id: 'real.apps.googleusercontent.com' } }),
         onMessage: { addListener(fn) { onMessageListener = fn; } },
-        onInstalled: { addListener(fn) { onInstalledListener = fn; } },
+        onInstalled: { addListener(fn) { onInstalledListeners.push(fn); } },
         onStartup: { addListener() {} },
         lastError: null, getURL: (s) => s, id: 'ext'
       },
@@ -63,7 +63,7 @@ function load() {
 
   return {
     calls,
-    install: (details) => onInstalledListener(details),
+    install: (details) => { onInstalledListeners.forEach((fn) => fn(details)); },
     // Fire-and-forget messages (flow:pending-count) never call sendResponse,
     // so this variant is fine for them and for anything synchronous.
     message: (msg) => onMessageListener(msg, {}, () => {}),

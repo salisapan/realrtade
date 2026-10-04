@@ -46,7 +46,7 @@ global.FlowCloseFamilies = FlowCloseFamilies;
 const { FlowIntent } = require('../../../../flow-trial-extension/core/intent.js');
 const { FlowPrivacyShield } = require('../../../../flow-trial-extension/core/privacyShield.js');
 
-const ENV_KEYS = ['ANTHROPIC_API_KEY', 'XAI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY'];
+const ENV_KEYS = ['ANTHROPIC_API_KEY', 'XAI_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY', 'MISTRAL_API_KEY', 'DEEPSEEK_API_KEY', 'LLAMA_API_KEY'];
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -54,6 +54,9 @@ const XAI_URL = 'https://api.x.ai/v1/chat/completions';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const MISTRAL_URL = 'https://api.mistral.ai/v1/chat/completions';
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
+// Llama-3-70B through a serverless OpenAI-compatible endpoint. Together AI by default; Groq (or any compatible host) by setting LLAMA_API_URL and
+// LLAMA_MODEL. The key is LLAMA_API_KEY, so the route simply does not exist until someone sets it.
+const LLAMA_DEFAULT_URL = 'https://api.together.xyz/v1/chat/completions';
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
 const OPEN_MS = 60 * 1000;
@@ -73,8 +76,13 @@ const MODELS = {
   // and both are asked for JSON mode. The ids are the providers' documented aliases and are UNVERIFIED from this environment: check them in
   // each provider's console before setting the key. A provider with no key configured is never called.
   mistralLarge: { id: 'mistral-large-latest', slot: 'D', provider: 'mistral', env: 'MISTRAL_API_KEY', preference: 0 },
-  deepseek: { id: 'deepseek-chat', slot: 'D', provider: 'deepseek', env: 'DEEPSEEK_API_KEY', preference: 1 }
+  llama70b: { id: 'meta-llama/Meta-Llama-3-70B-Instruct', slot: 'D', provider: 'llama', env: 'LLAMA_API_KEY', preference: 1 },
+  // 'deepseek-chat' is the retired alias and answers 400; the current id is deepseek-v4-pro (owner's 2026 spec, not verifiable from here).
+  deepseek: { id: 'deepseek-v4-pro', slot: 'D', provider: 'deepseek', env: 'DEEPSEEK_API_KEY', preference: 2 }
 };
+
+// The strict order for 'execute', in one place. A provider with no key, or an open circuit, is skipped; the rest keep this order.
+const EXECUTE_ORDER = ['mistralLarge', 'llama70b', 'sonnet', 'grokStrong', 'deepseek'];
 
 const EMAIL_LEAK = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 const PHONE_LEAK = /\+\d{1,3}[-.\s]?\(?\d{1,4}\)?(?:[-.\s]?\d{2,4}){1,4}|(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}/;
@@ -98,7 +106,7 @@ function envGet(name) {
 
 function readEnv(overrides) {
   const out = {};
-  for (const name of ENV_KEYS) {
+  for (const name of ENV_KEYS.concat(['LLAMA_API_URL', 'LLAMA_MODEL'])) {
     let value = '';
     if (overrides && Object.prototype.hasOwnProperty.call(overrides, name)) value = overrides[name];
     else value = envGet(name);
@@ -196,9 +204,8 @@ function planRoute(action, opts) {
   } else if (action === 'classify') {
     models = [MODELS.sonnet, MODELS.grokStrong].filter((model) => available(model, env, state, now));
   } else if (action === 'execute') {
-    // The owner's order for the strict-JSON proposal: Mistral Large first, then the strong pair already connected (Sonnet, Grok-strong), DeepSeek last as
-    // the backup. Each is skipped when it has no key or its circuit is open. Cheapest-first routing is a separate owner decision (open-tasks row 29).
-    models = [MODELS.mistralLarge, MODELS.sonnet, MODELS.grokStrong, MODELS.deepseek].filter((model) => available(model, env, state, now));
+    // The owner's order for the strict-JSON proposal (EXECUTE_ORDER): Mistral Large, Llama-3-70B (serverless), Sonnet, Grok-strong, DeepSeek as the backup. Each is skipped when it has no key or its circuit is open. Cheapest-first routing is a separate owner decision (open-tasks row 29).
+    models = EXECUTE_ORDER.map((key) => MODELS[key]).filter((model) => available(model, env, state, now));
   }
   // Classify and draft never keep slot C, including when it is the only
   // configured provider. Summarize is the only action allowed to use it.
@@ -344,12 +351,14 @@ function requestFor(model, env, system, userText, maxTokens) {
       }
     };
   }
-  const url = model.provider === 'openai' ? OPENAI_URL : model.provider === 'mistral' ? MISTRAL_URL : model.provider === 'deepseek' ? DEEPSEEK_URL : XAI_URL;
+  const llamaUrl = String(env.LLAMA_API_URL || '').trim() || LLAMA_DEFAULT_URL;
+  const url = model.provider === 'openai' ? OPENAI_URL : model.provider === 'mistral' ? MISTRAL_URL : model.provider === 'deepseek' ? DEEPSEEK_URL : model.provider === 'llama' ? llamaUrl : XAI_URL;
   const key = env[model.env];
   const body = {
     model: model.id,
     messages: [{ role: 'system', content: system }, { role: 'user', content: userText }]
   };
+  if (model.provider === 'llama' && String(env.LLAMA_MODEL || '').trim()) body.model = String(env.LLAMA_MODEL).trim();
   if (model.provider === 'openai') body.max_completion_tokens = maxTokens;
   else body.max_tokens = maxTokens;
   if (model.slot === 'D') { body.response_format = { type: 'json_object' }; body.temperature = 0; }
@@ -360,8 +369,13 @@ function requestFor(model, env, system, userText, maxTokens) {
   };
 }
 
+function hostedHttps(url) {
+  try { const u = new URL(url); return u.protocol === 'https:' && !/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(u.hostname); } catch (e) { return false; }
+}
+
 async function invoke(model, env, system, userText, maxTokens, fetchImpl) {
   const req = requestFor(model, env, system, userText, maxTokens);
+  if (!hostedHttps(req.url)) throw httpError(400);                 // a mistyped LLAMA_API_URL must never send text to a local or plain-http address
   const res = await fetchImpl(req.url, {
     method: 'POST',
     headers: req.headers,

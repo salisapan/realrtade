@@ -7,35 +7,22 @@
 // the capability logic, the refusal to run a remotely hosted WASM, the configuration, and the reading of logprobs with a fake engine.
 const FlowHybridRuntime = (() => {
   // The two models the owner named for the browser. ids are WebLLM's prebuilt ids; vramMB is WebLLM's own published requirement.
+  // `bundled` says whether this model's WASM library is a file of the package. Only Phi-3-mini ships: the 8B library would take the package over
+  // the +12 MB budget the owner set (2026-10-04). The 8B entry stays so its manifest is not lost, and pick() never returns it while it is not bundled.
   const CATALOG = {
-    'phi-3-mini': { id: 'Phi-3-mini-4k-instruct-q4f16_1-MLC', vramMB: 3672, label: 'Phi-3 mini 4k Instruct (4-bit)' },
-    'llama-3-8b': { id: 'Llama-3-8B-Instruct-q4f16_1-MLC', vramMB: 5001, label: 'Llama 3 8B Instruct (4-bit)' }
+    'phi-3-mini': { id: 'Phi-3-mini-4k-instruct-q4f16_1-MLC', vramMB: 3672, label: 'Phi-3 mini 4k Instruct (4-bit)', bundled: true },
+    'llama-3-8b': { id: 'Llama-3-8B-Instruct-q4f16_1-MLC', vramMB: 5001, label: 'Llama 3 8B Instruct (4-bit)', bundled: false }
   };
   const GiB = 1024 * 1024 * 1024;
 
-  // env: { navigator, storage } (injected). Returns { ok, reason? , maxBufferSize, storageFreeBytes }.
-  async function capabilities(env, needBytes) {
-    const nav = env && env.navigator;
-    if (!nav || !nav.gpu) return { ok: false, reason: 'no-webgpu' };
-    let adapter = null;
-    try { adapter = await nav.gpu.requestAdapter(); } catch (e) { adapter = null; }
-    if (!adapter) return { ok: false, reason: 'no-gpu-adapter' };
-    const f16 = Boolean(adapter.features && adapter.features.has && adapter.features.has('shader-f16'));
-    if (!f16) return { ok: false, reason: 'no-shader-f16' };           // the q4f16 builds need it; the larger q4f32 builds are not offered
-    let free = null;
-    try {
-      const st = env.storage && env.storage.estimate ? await env.storage.estimate() : null;
-      if (st && typeof st.quota === 'number') free = st.quota - (st.usage || 0);
-    } catch (e) { free = null; }
-    if (free !== null && needBytes && free < needBytes * 1.2) return { ok: false, reason: 'low-storage', storageFreeBytes: free };
-    return { ok: true, maxBufferSize: adapter.limits && adapter.limits.maxBufferSize || 0, storageFreeBytes: free };
-  }
+  // The silent check lives in core/capability.js (FlowCapability); this is the same call under the runtime's name.
+  const capabilities = (env, need) => FlowCapability.check(env, need);
 
   // Which model this machine may run. The larger one needs a buffer limit and device memory that most business laptops do not report; the
   // default is the smaller one. The adapter does not expose VRAM, so maxBufferSize and navigator.deviceMemory are proxies, and they say so.
   function pick(preferred, caps, nav) {
     const mem = nav && typeof nav.deviceMemory === 'number' ? nav.deviceMemory : 0;
-    if (preferred === 'llama-3-8b' && caps && caps.maxBufferSize >= 4 * GiB - 1 && mem >= 8) return 'llama-3-8b';
+    if (preferred === 'llama-3-8b' && CATALOG['llama-3-8b'].bundled && caps && caps.maxBufferSize >= 4 * GiB - 1 && mem >= 8) return 'llama-3-8b';
     return 'phi-3-mini';
   }
 

@@ -437,13 +437,14 @@ async function run() {
       check('an empty request is a 400', empty.status === 400, empty);
     }
     {
-      const ALL = Object.assign({}, KEYS, { MISTRAL_API_KEY: 'test-mistral', DEEPSEEK_API_KEY: 'test-deepseek' });
+      const ALL = Object.assign({}, KEYS, { MISTRAL_API_KEY: 'test-mistral', DEEPSEEK_API_KEY: 'test-deepseek', LLAMA_API_KEY: 'test-llama' });
       const ids = (action) => planRoute(action, { env: ALL, state: createState(), now: CLOCK }).map((m) => m.id);
-      check('execute order with every key: Mistral Large, Sonnet, Grok-strong, DeepSeek', ids('execute').join() === ['mistral-large-latest', MODELS.sonnet.id, MODELS.grokStrong.id, 'deepseek-chat'].join(), ids('execute'));
-      check('the new providers are used for execute only: never draft, summary or classify', ['draft-reply', 'summarize-attachment', 'classify'].every((a) => ids(a).every((id) => id !== 'mistral-large-latest' && id !== 'deepseek-chat')), ['draft-reply', 'summarize-attachment', 'classify'].map(ids));
+      check('execute order with every key: Mistral Large, Llama-3-70B, Sonnet, Grok-strong, DeepSeek', ids('execute').join() === ['mistral-large-latest', 'meta-llama/Meta-Llama-3-70B-Instruct', MODELS.sonnet.id, MODELS.grokStrong.id, 'deepseek-v4-pro'].join(), ids('execute'));
+      check('the retired DeepSeek id is nowhere in the router', ids('execute').indexOf('deepseek-chat') < 0 && require('fs').readFileSync(require('path').join(__dirname, 'model-router.js'), 'utf8').replace(/\/\/[^\n]*/g, '').indexOf('deepseek-chat') < 0);
+      check('the new providers are used for execute only: never draft, summary or classify', ['draft-reply', 'summarize-attachment', 'classify'].every((a) => ids(a).every((id) => id !== 'mistral-large-latest' && id !== 'deepseek-v4-pro' && id.indexOf('Llama-3-70B') < 0)), ['draft-reply', 'summarize-attachment', 'classify'].map(ids));
       check('a provider with no key is never planned', planRoute('execute', { env: Object.assign({}, ALL, { MISTRAL_API_KEY: '' }), state: createState(), now: CLOCK }).every((m) => m.id !== 'mistral-large-latest'));
-      check('with only a DeepSeek key, execute still has a route', planRoute('execute', { env: { ANTHROPIC_API_KEY: '', XAI_API_KEY: '', GEMINI_API_KEY: '', OPENAI_API_KEY: '', MISTRAL_API_KEY: '', DEEPSEEK_API_KEY: 'k' }, state: createState(), now: CLOCK }).map((m) => m.id).join() === 'deepseek-chat');
-      Object.assign(process.env, { MISTRAL_API_KEY: 'test-mistral', DEEPSEEK_API_KEY: 'test-deepseek' });
+      check('with only a DeepSeek key, execute still has a route', planRoute('execute', { env: { ANTHROPIC_API_KEY: '', XAI_API_KEY: '', GEMINI_API_KEY: '', OPENAI_API_KEY: '', MISTRAL_API_KEY: '', LLAMA_API_KEY: '', DEEPSEEK_API_KEY: 'k' }, state: createState(), now: CLOCK }).map((m) => m.id).join() === 'deepseek-v4-pro');
+      Object.assign(process.env, { MISTRAL_API_KEY: 'test-mistral', DEEPSEEK_API_KEY: 'test-deepseek', LLAMA_API_KEY: 'test-llama' });
       resetState();
       const ACTION = JSON.stringify({ action: 'create_task', title: 'Wire the money to [CLIENT_NAME_1]', dueText: null });
       let script = scriptedFetch([chat(ACTION)]);
@@ -452,21 +453,39 @@ async function run() {
       check('execute goes to Mistral Large first, with its key, in JSON mode, temperature 0', res.status === 200 && script.calls.length === 1 && /api\.mistral\.ai/.test(script.calls[0].url) && script.calls[0].headers.Authorization === 'Bearer test-mistral' && JSON.parse(script.calls[0].body).response_format.type === 'json_object' && JSON.parse(script.calls[0].body).temperature === 0, script.calls);
       check('the Mistral request carries only masked text', !/Dana|jane/.test(script.calls[0].body) && /\[CLIENT_NAME_1\]/.test(script.calls[0].body));
       resetState();
-      script = scriptedFetch([{ status: 500, raw: '' }, anthropic(ACTION)]);
+      script = scriptedFetch([{ status: 500, raw: '' }, { status: 500, raw: '' }, anthropic(ACTION)]);
       global.fetch = script.fetchImpl;
       res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
-      check('Mistral down: Sonnet answers', res.status === 200 && script.calls.length === 2 && modelOf(script.calls[1]) === MODELS.sonnet.id, script.calls.map((c) => c.url));
+      check('Mistral and Llama down: Sonnet answers', res.status === 200 && script.calls.length === 3 && modelOf(script.calls[2]) === MODELS.sonnet.id, script.calls.map((c) => c.url));
       resetState();
-      script = scriptedFetch([{ status: 500, raw: '' }, { status: 500, raw: '' }, { status: 500, raw: '' }, chat(ACTION)]);
+      script = scriptedFetch([{ status: 500, raw: '' }, { status: 500, raw: '' }, { status: 500, raw: '' }, { status: 500, raw: '' }, chat(ACTION)]);
       global.fetch = script.fetchImpl;
       res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
-      check('the first three down: DeepSeek is the backup and answers', res.status === 200 && script.calls.length === 4 && /api\.deepseek\.com/.test(script.calls[3].url) && script.calls[3].headers.Authorization === 'Bearer test-deepseek', script.calls.map((c) => c.url));
+      check('the first four down: DeepSeek is the backup, with the current model id, and answers', res.status === 200 && script.calls.length === 5 && /api\.deepseek\.com/.test(script.calls[4].url) && script.calls[4].headers.Authorization === 'Bearer test-deepseek' && modelOf(script.calls[4]) === 'deepseek-v4-pro', script.calls.map((c) => c.url));
       resetState();
-      script = scriptedFetch([chat('I will do that.'), anthropic('{"action":"wire_funds"}'), chat('nope'), chat('still not json')]);
+      script = scriptedFetch([chat('I will do that.'), chat('no'), anthropic('{"action":"wire_funds"}'), chat('nope'), chat('still not json')]);
       global.fetch = script.fetchImpl;
       res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1].' });
       check('every provider answering off-schema is a 502, never an invented action', res.status === 502 && !res.json.text, res);
-      delete process.env.MISTRAL_API_KEY; delete process.env.DEEPSEEK_API_KEY;
+      resetState();
+      script = scriptedFetch([{ status: 500, raw: '' }, chat(ACTION)]);
+      global.fetch = script.fetchImpl;
+      res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
+      check('Mistral down: the serverless Llama-3-70B route answers next, with the owner\'s model id, on Together by default', res.status === 200 && /api\.together\.xyz/.test(script.calls[1].url) && modelOf(script.calls[1]) === 'meta-llama/Meta-Llama-3-70B-Instruct' && script.calls[1].headers.Authorization === 'Bearer test-llama', script.calls.map((c) => c.url));
+      process.env.LLAMA_API_URL = 'https://api.groq.com/openai/v1/chat/completions'; process.env.LLAMA_MODEL = 'llama3-70b-8192';
+      resetState();
+      script = scriptedFetch([{ status: 500, raw: '' }, chat(ACTION)]);
+      global.fetch = script.fetchImpl;
+      res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
+      check('LLAMA_API_URL and LLAMA_MODEL switch the host (Groq) without a code change', res.status === 200 && /api\.groq\.com/.test(script.calls[1].url) && modelOf(script.calls[1]) === 'llama3-70b-8192', script.calls.map((c) => c.url));
+      process.env.LLAMA_API_URL = 'http://127.0.0.1:9999/x';
+      resetState();
+      script = scriptedFetch([{ status: 500, raw: '' }, anthropic(ACTION)]);
+      global.fetch = script.fetchImpl;
+      res = await post({ action: 'execute', lang: 'en', maskedPrompt: 'Please wire [CURRENCY_VAL_1] to [CLIENT_NAME_1].' });
+      check('a Llama URL that is local or plain http is never called: text cannot be sent there', script.calls.every((c) => !/127\.0\.0\.1/.test(c.url)) && res.status === 200, script.calls.map((c) => c.url));
+      delete process.env.LLAMA_API_URL; delete process.env.LLAMA_MODEL;
+      delete process.env.MISTRAL_API_KEY; delete process.env.DEEPSEEK_API_KEY; delete process.env.LLAMA_API_KEY;
     }
     {
       resetState();

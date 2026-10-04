@@ -30,6 +30,8 @@ ZIP_PATH = (
 IMPORT_RE = re.compile(r"""(?:import|export)\s+(?:[^'"\n]+?\s+from\s+)?['"](\.[^'"]+)['"]""")
 HTML_REF_RE = re.compile(r"""(?:src|href)\s*=\s*['"]([^'"]+)['"]""", re.I)
 GETURL_RE = re.compile(r"""chrome\.runtime\.getURL\(\s*['"]([^'"]+)['"]\s*\)""")
+# The hybrid path opens an offscreen page by a constant, not by getURL(): src/hybrid-sw.js  const OFFSCREEN_URL = 'src/offscreen.html'.
+OFFSCREEN_RE = re.compile(r"""OFFSCREEN_URL\s*=\s*['"]([^'"]+)['"]""")
 HARDCODED_CLIENT_ID_RE = re.compile(
     r"""(?:HUBSPOT|SALESFORCE|SLACK|MONDAY)_CLIENT_ID\s*=\s*['"]YOUR_"""
 )
@@ -97,7 +99,8 @@ def module_imports(js_path: Path) -> list[Path]:
     # paths are relative to the extension root.
     imported = [resolve_relative(js_path, spec) for spec in IMPORT_RE.findall(text)]
     opened = [resolve_relative(EXTENSION_ROOT / "manifest.json", spec) for spec in GETURL_RE.findall(text)]
-    return imported + opened
+    offscreen = [resolve_relative(EXTENSION_ROOT / "manifest.json", spec) for spec in OFFSCREEN_RE.findall(text)]
+    return imported + opened + offscreen
 
 
 def manifest_pages(manifest: dict) -> list[str]:
@@ -181,6 +184,13 @@ def collect() -> dict[str, Path]:
             pending.extend(html_local_refs(resolved))
         if resolved.suffix.lower() == ".js":
             pending.extend(module_imports(resolved))
+
+    # Vendored third-party code travels with its licence text and the record of what it is (scripts/hybrid/vendor-runtime.cjs).
+    vendor = EXTENSION_ROOT / "vendor"
+    if vendor.is_dir():
+        for extra in sorted(vendor.glob("*.LICENSE")) + [vendor / "VENDOR.json"]:
+            if extra.is_file():
+                add_file(files, extra)
 
     oauth = EXTENSION_ROOT / "config" / "oauth.public.js"
     if posix(oauth.relative_to(EXTENSION_ROOT)) not in files:

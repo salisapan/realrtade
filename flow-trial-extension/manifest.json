@@ -73,6 +73,10 @@
         "src/chrome-storage-adapter.js",
         "src/storage.js",
         "core/privacyShield.js",
+        "core/json-enforce.js",
+        "core/mask-ids.js",
+        "core/exec-router.js",
+        "src/hybrid-client.js",
         "core/learning-ledger.js",
         "core/active-question.js",
         "core/style-profile.js",
@@ -105,7 +109,8 @@
     "alarms",
     "notifications",
     "scripting",
-    "contextMenus"
+    "contextMenus",
+    "offscreen"
   ],
   "host_permissions": [
     "https://mail.google.com/*",
@@ -127,7 +132,7 @@
     ]
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
   "optional_host_permissions": [
     "https://web.whatsapp.com/*",
