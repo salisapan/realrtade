@@ -121,3 +121,8 @@ Community (cross-user) learning is built but DORMANT and its on-device wiring is
 Requests that take more than one step (starting with "send me the receipt"): `docs/resolution-paths.md` — define "done", find an existing artifact, verify the precondition (the payment), prepare or ask the one who issues it, and close ONLY when a message the person sent carries a real attachment. Glance never sends, issues or generates a receipt; that needs a billing connector that does not exist yet. Read it before adding a new multi-step class or letting any step close a loop.
 
 What Glance calls when it cannot recognise an intent (no external model by default; the server router; the owner's open decision): `docs/when-recognition-fails.md`. A model on the person's own computer (Ollama, LM Studio) as tier 2, loopback-only and gated by the same precision self-test: `docs/local-model-server.md` — never let a non-loopback address through, and never let it close or write anything.
+
+## Hybrid execution (device model, masked server fallback, strict JSON) — dormant, read before touching
+
+`docs/hybrid-execution-architecture.md`: the owner's three-tier plan for Do It / Draft It, what is built and tested, what is deliberately not claimed (no compliance or regulated-industry wording: `docs/product-architecture.md`), and the ordered activation checklist. Nothing in it is wired into the manifest, `background.js` or the content scripts yet; the server is never used without a one-time consent and only with masked text; a model's answer is a proposal and never closes or writes anything.
+
