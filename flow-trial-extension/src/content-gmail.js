@@ -1976,13 +1976,23 @@
         }).catch((e) => console.error('[Glance] failed to remember a personal close — the write itself already succeeded', e))
       );
     }
-    // success: every step the chip proposed actually wrote. Partials stay
-    // out. This count does not follow the receipt string ("Handled." vs
-    // "Partly handled."). Local only; not a flow:track event.
-    if (typeof FlowCloseQuality !== 'undefined' && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length)) {
+    // Close-quality success and trusted closes/week: every step the chip
+    // proposed actually wrote, and the receipt said Handled. Partials stay
+    // out. Local only; not a flow:track event. The quiet fold drops this
+    // unless the steps are the Free Gmail→Google writers.
+    if (typeof FlowCloseQuality !== 'undefined' && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length) && copy.full) {
       bookkeeping.push(
-        FlowStorage.recordCloseQuality({ kind: 'success', messageId: ctx.messageId })
-          .catch((e) => console.error('[Glance] failed to record a full-close success', e))
+        FlowStorage.recordCloseQuality({
+          kind: 'success',
+          messageId: ctx.messageId,
+          app: SOURCE_APP,
+          product: 'free',
+          proposed: ctx.process.steps.length,
+          succeeded: succeeded.length,
+          receiptFull: true,
+          receiptStatus: copy.status,
+          kinds: succeeded.map((r) => r && r.action && r.action.kind)
+        }).catch((e) => console.error('[Glance] failed to record a full-close success', e))
       );
     }
     await Promise.all(bookkeeping);
