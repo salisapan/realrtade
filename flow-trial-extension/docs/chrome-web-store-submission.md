@@ -185,7 +185,7 @@ Use these verbatim — each is traceable to the exact code that uses it.
 | `host_permissions: https://www.googleapis.com/drive/*` | Read calls (`drive.readonly`) when the user clicks Do It on a message that clearly asks for one file: search that account's Drive and attach only a single high-confidence match to an unsent Gmail draft (`searchDriveFiles` in `src/background.js`, ranked in `core/file-attach.js`). The same read confirms there is exactly one file before a calendar, task, or template create. If more than one file could be the one, Glance stays silent. The optional Drive picker remains a secondary control, not the close. |
 | `host_permissions: https://www.googleapis.com/upload/drive/*` | `drive.file` only. When a clear ask has no safe match and exactly one company template for that object exists, Do It uploads a new file made from that template and attaches it to the unsent draft. The same upload creates a Doc, Sheet, or saved file for a create-and-share close. Undo deletes that new file. Glance does not edit the template or any other Drive file. No full `drive`, `documents`, or `spreadsheets` scope. |
 | `host_permissions: https://gmail.googleapis.com/*` | Direct API calls to create/undo a Gmail draft reply after the user clicks Do It. |
-| `host_permissions: https://theflow-ai.com/*` | Calls Glance's own Netlify Functions for the two opt-in AI features (Draft-It, attachment summary), which only ever receive masked placeholder text, and for the anonymous, aggregate-only usage-count pings described below. |
+| `host_permissions: https://theflow-ai.com/*` | Calls Glance's own Netlify Functions for the opt-in AI features (Draft-It, attachment summary, and, once the person turns it on, the "second reading" of one sentence), which only ever receive masked placeholder text, and for the anonymous, aggregate-only usage-count pings described below. |
 
 Notion, HubSpot, Salesforce, Slack, and Monday.com have real, working
 connector code in `src/background.js`, but no live path to reach them from
@@ -201,7 +201,7 @@ based on what the code actually does:
 
 | Category | Collected? | Notes |
 |---|---|---|
-| Personally identifiable information | **Yes** | Only the fields the user explicitly approves via Do It (sender name/email, extracted amount/date, one quoted sentence) — sent directly to the destination *they* connected, not to Glance. Draft-It / attachment summary send masked placeholder tokens only, never real PII. |
+| Personally identifiable information | **Yes** | Only the fields the user explicitly approves via Do It (sender name/email, extracted amount/date, one quoted sentence) — sent directly to the destination *they* connected, not to Glance. Draft-It / attachment summary / the opt-in second reading send masked placeholder tokens only, never real PII. |
 | Health information | No | — |
 | Financial and payment information | **Yes** (narrow) | A monetary amount extracted from the open email, only when the user clicks Do It, sent only to their chosen connector. Masked before reaching Draft-It/attachment summary. |
 | Authentication information | **Yes** | OAuth tokens for connected destinations, stored only in `chrome.storage.local` on the user's device; never transmitted to or stored by Glance. |

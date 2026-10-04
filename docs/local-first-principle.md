@@ -16,7 +16,9 @@ that looks at a message, and never the thing a feature depends on to work.**
    decision 2026-10-04, `docs/ai-ladder.md`), and only when the code's own
    answer is "unsure". It may suggest; it never closes a loop, writes a record
    or spends money on its own. A feature must still work, more quietly, with
-   the model off (`REMOTE_CLASSIFY = false` is the default and stays so).
+   the model off (`REMOTE_CLASSIFY = false`, whole-message classification, is the
+   default and stays so; the opt-in second reading of one sentence is the only
+   external step, `docs/ai-ladder.md`).
 3. **Unsure means silent.** When local code is not confident it shows nothing.
    Silence is cheaper than a wrong card and a wrong close.
 4. **Every new case ships with its tests.** A recognised type needs positive
@@ -25,7 +27,8 @@ that looks at a message, and never the thing a feature depends on to work.**
 5. **Portable.** Recognition lives in `core/` with no `chrome.*` or DOM, so it
    can serve the future Flow runtime unchanged.
 
-Why: privacy (nothing leaves the device to decide), speed and cost (no per-
+Why: privacy (nothing leaves the device to decide, unless the person turned on
+the second reading and then only one masked sentence), speed and cost (no per-
 message model bill), trust (the same input always gives the same answer), and
 the decision filter (`decision-filter.md`): reliability beats cleverness.
 

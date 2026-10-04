@@ -17,6 +17,7 @@
 | What a reply did to a loop | `classifyReply` (regex) | yes |
 | Draft-It, attachment summary | `glance-assist` (masked, Pro) | remote, optional, never closes or writes alone |
 | Remote classifier hook | `REMOTE_CLASSIFY = false` | off |
+| Second reading of one unplaced sentence (`docs/ai-ladder.md`, added 2026-10-04) | `core/ai-ladder.js` through `glance-assist` | remote, opt-in, masked, allowance-limited; off at the server until measured; a proposal only |
 
 Remote is not in the spine today. The risk the brief names is real in a
 different form: the local base is *narrow* in three places (below), and a thin

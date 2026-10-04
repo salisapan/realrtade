@@ -10,7 +10,7 @@ Flow is an independent company. It is not affiliated with Google Flow, flow-ai.c
 
 ## Products
 - Flow: for organizations with sensitive data. Scoped per engagement. Pricing: https://theflow-ai.com/pricing.html
-- Glance: a free Chrome extension for individuals that closes one email into one real record (calendar event, task or drafted reply) in Google. A separate product from Flow. https://theflow-ai.com/trial.html
+- Glance: a Chrome extension for individuals, free to start, that stays on what you asked for or promised until it is really closed, and turns an email into one calendar event, task or drafted reply in one click (it never sends). For general business use, not for regulated or sensitive data. A separate product from Flow. https://theflow-ai.com/trial.html
 
 ## Key pages
 - About and founders: https://theflow-ai.com/about.html

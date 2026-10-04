@@ -216,6 +216,8 @@
   // attachment summaries are different — you ask for them, and you know the
   // masked text goes out. If this ever returns it must be opt-in, in the
   // popup, and the privacy copy must change in the same commit.
+  // (The opt-in "second reading" of ONE masked sentence is a different, narrower
+  // path: src/follow.js ladderAsk, docs/ai-ladder.md. It never reaches this chip.)
   const REMOTE_CLASSIFY = false;
 
   async function ensureRemoteClassification(rawText) {

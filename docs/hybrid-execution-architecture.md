@@ -2,7 +2,8 @@
 
 > Written 2026-10-04 from the owner's specification, before the code. **Status (second pass, same day): WIRED INTO THE EXTENSION, SWITCHED OFF.** The manifest, `background.js`, the content scripts,
 > the popup and the install package now contain all of it (runtime, model library, worker, client, status row), and `config/hybrid.public.js` has `enabled: false`, so no user sees or runs anything yet and the
-> privacy page is unchanged and true. §0b says why the switch is off and how to turn it on. Companion to `docs/when-recognition-fails.md`,
+> privacy page does not describe this path (a test fails if it does while the switch is off) and is true. §0b says why the switch is off and how to turn it on.
+> **Relation to the second reading (2026-10-04, `docs/ai-ladder.md`):** a separate, narrower, opt-in step that IS on in the extension (its server is off until measured). It reads ONE masked sentence for recognition; this path proposes a Do It action with a device model. They share the masking function (`maskForServer` in `core/exec-router.js`) and the server router, and have separate switches; neither depends on the other. Companion to `docs/when-recognition-fails.md`,
 > `docs/local-model-server.md`, `docs/lm-fallback-evaluation-plan.md` (the measured result on small models), `docs/local-first-principle.md`.
 
 ## 0. Owner decisions after the first draft (2026-10-04)
@@ -26,7 +27,7 @@ Points 4, 6 and 7 of the first draft (the evidence for the device tier, the bund
 | Package budget +12 MB | **+11.3 MB**: `vendor/web-llm.js` 6.03 MB (tree-shaken, minified) + the Phi-3-mini WASM 5.31 MB, produced by `scripts/hybrid/vendor-runtime.cjs`, which verifies the npm tarball's integrity hash and the WASM's SHA-256 against the pinned manifest | The 8B library is not bundled (it would break the budget). The install zip is 3.87 MB, which the download function returns as base64: **5.16 MB against a 6.29 MB limit on a synchronous Netlify function response, 18% headroom.** Any further growth needs a different delivery for the zip. |
 | Server order Mistral Large, Claude Sonnet, Grok-strong, DeepSeek (backup); skip a provider with no key | Done (§9) | Llama-3-70B was added right after Mistral Large as the "alternate route" (one constant, `EXECUTE_ORDER`, to move it). |
 | Model ids | `mistral-large-latest`; DeepSeek `deepseek-v4-pro` (the retired `deepseek-chat` is nowhere in the router, and a test pins that); Llama `meta-llama/Meta-Llama-3-70B-Instruct` on Together AI | **None of these ids could be checked from this environment**; the owner's spec is followed. `LLAMA_API_URL` and `LLAMA_MODEL` switch the host (Groq, or any compatible host) without a code change; the URL must be https and not local. |
-| Capability checker script | `core/capability.js`, 13 checks | |
+| Capability checker script | `core/capability.js` (counted in `test/capability-corpus.cjs`) | |
 | `async function executeTask(payload)` | `src/hybrid-client.js`: the dual-tier wrapper (device first, masked server fallback, JSON only, a proposal), also a top-level function in the Gmail content scripts | **No feature calls it yet.** |
 | Scrubbing before low-confidence text goes to the server | `core/exec-router.js` with `core/mask-ids.js` over `core/privacyShield.js`: names, companies, amounts, dates, e-mail, phone, labelled identifiers and IBANs; the router refuses to send if a contact detail or amount survives or a masked value is found in the payload | The masking is pattern-based and can miss (§6). |
 | State manager for the popup ("Ready for local processing", "Server-backed mode") | `core/hybrid-status.js` (pure) and a popup row (`renderHybridRow`), 13 + 7 checks | The row is hidden while the switch is off. |

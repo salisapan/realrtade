@@ -3,7 +3,7 @@
 > Written 2026-10-03. Companion to `docs/file-backed-closure-plan.md` (single-file closure), `docs/open-loops.md`,
 > `docs/decision-filter.md` (§5.8 of `docs/product-architecture.md`), `docs/local-first-principle.md`.
 > Code: `flow-trial-extension/core/resolution.js` (pure), `src/follow.js` (the card and the loop),
-> tests: `test/resolution-corpus.cjs` (114 checks), `test/follow-gmail-harness.cjs` section 32.
+> tests: `test/resolution-corpus.cjs`, `test/follow-gmail-harness.cjs` sections 32 and 32j (documents).
 
 ## 1. The problem, in one example
 
@@ -64,9 +64,8 @@ Built: the pure planner and delivery judge; payments-seen and issuer storage; th
 the path advances after each tap); the loop with its status line; popup row; Do It chip steps aside for receipts and transfer proofs
 so nothing says "Handled." over an unsent draft; the issuer's file arriving in another thread advances the same loop; privacy page and store copy; 114 core checks and 38 browser checks.
 
-Wired to receipts and transfer proofs only. The planner already speaks invoice, tax invoice and statement (tested), but
-those keep the existing Do It chip until the receipt path has been used on real mail. Contracts and other documents are
-untouched.
+Wired to receipts and transfer proofs first, and since 2026-10-04 also to **the documents the person sends: contract, quote, proposal, signed copy** (`CLASSES` in `core/resolution.js`; no payment step; `docs/true-close.md` §4).
+The planner also speaks invoice, tax invoice and statement (tested), but those keep the existing Do It chip until these paths have been used on real mail. Other documents (reports, decks, forms) are untouched.
 
 ## 5. What needs future connectors (not faked here)
 

@@ -1,0 +1,70 @@
+# docs/ — the map (read this first, human or agent)
+
+> Maintained as part of every change: `test/docs-consistency-corpus.cjs` fails when a doc listed here is missing, when a `core/` module is missing from `flow-trial-extension/core/README.md`,
+> and when the public numbers (allowances, prices, switches) in the docs disagree with the code. Last reviewed: 2026-10-04.
+
+## 0. Who reads what
+
+- **Any agent (Claude Code, a Grok bot, another)**: `CLAUDE.md` (standing rules, they override defaults) -> this file -> `open-tasks.md` (what is open, blocked, decided) -> the one document that owns the topic you touch (table below).
+  `.claude/ecc-agents/INDEX.md` is the role library `CLAUDE.md` routes to. `docs/ai-assistant-context-parity.md` says what a fresh clone does and does not give an assistant.
+- **A public AI reader of the site** (`flow-landing/llms.txt`): describes only what is live. It is kept short on purpose and never describes a switch that is off.
+- **David / the owner**: `revenue-routines.md` (Hebrew) and `open-tasks.md`.
+
+## 1. Topic -> the document that owns it -> the code -> the test
+
+| Topic | Owner document | Code | Tests |
+|---|---|---|---|
+| Two products (Glance Free/Pro vs Flow), what each may claim | `product-architecture.md`, `product-identity.md` | `flow-landing/pricing.html`, `trial.html` | `test/identity-copy-corpus.cjs` |
+| Standing review rules | `design-principles.md`, `decision-filter.md`, `local-first-principle.md`, `magic-moment.md` | - | - |
+| What is sold, the Free/Pro table, money | `monetization.md`, `revenue-routines.md` (Hebrew) | `core/entitlements.js`, `glance-assist` licence check | `test/pro-corpus.cjs` |
+| **The recognition order and the one external step** | `ai-ladder.md` (owns it), `when-recognition-fails.md`, `intent-model.md` | `core/ai-ladder.js`, `glance-assist/ladder.js`, `src/background.js`, `src/follow.js` | `test/ai-ladder-*-corpus.cjs`, `glance-assist/ladder.test.cjs`, `scripts/ai-ladder/eval.cjs` |
+| The on-device engine and how it learns | `intent-model.md`, `ai-engine-upgrade.md`, `reply-model.md`, `human-eval.md` | `core/request-types.js`, `intent-model.js`, `intent-pipeline.js`, `reply-model.js` | `intent-model-corpus`, `reply-model-corpus`, `request-types-corpus` |
+| **True close: when a loop is closed** | `true-close.md`, `open-loops.md`, `reply-model.md` | `core/follow-up.js` (`classifyReplyText`), `core/reply-meaning.js` | `test/true-close-corpus.cjs`, `reply-closure-corpus` |
+| Multi-step resolution (receipts, contract, quote, proposal, signed copy) | `resolution-paths.md`, `true-close.md` §4, `file-backed-closure-plan.md` | `core/resolution.js`, `src/follow.js` | `test/resolution-corpus.cjs`, harness section 32 and 32j |
+| A model on the person's own computer | `local-model-server.md` | `core/local-lm.js`, `local-lm-server.js` | `local-lm-corpus`, `local-lm-server-corpus` |
+| Hybrid on-device model + server for Do It proposals (**dormant**) | `hybrid-execution-architecture.md`, `lm-fallback-evaluation-plan.md` | `config/hybrid.public.js`, `src/hybrid-sw.js`, `core/exec-router.js`, `core/capability.js` | `hybrid-*-corpus`, `exec-router-corpus`, `capability-corpus` |
+| Masking before anything leaves the device | `ai-ladder.md` §2, `hybrid-execution-architecture.md` §6 | `core/privacyShield.js`, `mask-ids.js`, `exec-router.js` (`maskForServer`) | `privacy-shield-corpus`, `mask-ids-corpus`, `glance-assist/scrub-e2e.test.cjs` |
+| Other apps (WhatsApp Web, Outlook, capture) | `multi-platform.md` | `src/content-whatsapp.js`, `core/graph-mail.js`, `outlook-*.js` | `whatsapp-harness`, `outlook-*-corpus` |
+| Community (cross-user) learning (**dormant**) | `community-learning.md` | `core/community.js` | `community-corpus` |
+| Packaging, the Chrome Web Store, setup | `flow-trial-extension/docs/SETUP.md`, `chrome-web-store-submission.md`, `hybrid-execution-architecture.md` §0c | `scripts/package_trial_extension.py` (lite/full), `scripts/verify_trial_install.py` | `verify_trial_install.py` |
+| Open work, blockers, decisions | `open-tasks.md` | - | - |
+
+## 2. When X changes, update these in the SAME commit
+
+| Change | Update |
+|---|---|
+| An allowance, a price, a Free/Pro line | `core/ai-ladder.js` `PLANS` or `core/entitlements.js` -> `ai-ladder.md` §3-§4, `monetization.md` table, `revenue-routines.md` §3, `flow-landing/privacy.html` and `trial.html` (numbers), `flow-trial-extension/README.md` |
+| What leaves the device | `flow-landing/privacy.html`, `trial.html`, `popup/popup.html` footer, `chrome-web-store-submission.md` (data usage), `local-first-principle.md`, `ai-ladder.md`/`hybrid-execution-architecture.md`, `llms.txt` if public |
+| A switch (`config/*.public.js`, a Netlify env var such as `GLANCE_AI_LADDER`) | the config comment, `ai-ladder.md` §7 or the hybrid §13, `flow-trial-extension/README.md` (env list), `open-tasks.md`, and the copy corpus for that switch |
+| A new `core/` module | `core/README.md` (a test enforces it), this table if it is a new topic, and the extension manifest + `popup.html` script lists |
+| A rule on when a loop closes | `true-close.md`, `reply-model.md`, a case in `test/true-close-corpus.cjs` |
+| A new multi-step document class | `core/resolution.js` `CLASSES`, `resolution-paths.md`, `true-close.md` §4, corpus + harness |
+| A new surface (an app) | `multi-platform.md`, the privacy page, the store text, in the same commit |
+| Anything decided, blocked or finished | `open-tasks.md` (and its "Last updated") |
+| Anything David or the owner should do about money | `revenue-routines.md` |
+
+## 3. Every document, one line
+
+`ai-assistant-context-parity.md` what an assistant gets from a fresh clone · `ai-engine-upgrade.md` teacher data, a model of each person, outcome labels · **`ai-ladder.md` the second reading: order, allowance, cost, contract, how to switch on, real-Gmail test** ·
+`closure-plan.md` unfinished intentions to completion · `community-learning.md` cross-user learning, dormant · `decision-filter.md` the five-question filter · `design-principles.md` twelve review criteria ·
+`encoder-evaluation-plan.md` encoder experiment (not met) · `engineering-audit.md`, `system-audit-2026-09.md` audits · `file-backed-closure-plan.md` single-file closure · `human-eval.md` first numbers on real mail ·
+`hybrid-execution-architecture.md` device model + server for Do It proposals, dormant, packaging profiles, GPU diagnostics · `intent-model.md` the local engine and its tiers · `lm-fallback-evaluation-plan.md` small on-device model experiment (not met) ·
+`local-detection-plan.md` outcome identity and local closure · `local-first-principle.md` our code recognises first · `local-model-server.md` Ollama / LM Studio · `magic-moment.md` the first real close ·
+`monetization.md` how Glance earns · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
+`product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
+**`true-close.md` when a loop is closed, what was found and fixed** · `when-recognition-fails.md` the steps when a sentence is not recognised.
+Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the numbers cited in the documents come from them.
+
+## 4. Run everything (what "the tests pass" means)
+
+```sh
+cd flow-trial-extension
+for t in test/*-corpus.cjs; do node $t || echo "FAILED $t"; done          # 66 corpora, no network
+node test/follow-gmail-harness.cjs && node test/whatsapp-harness.cjs      # real content scripts in Chromium (takes ~10 minutes; SKIPPED without Playwright)
+cd ../flow-landing/netlify/functions/glance-assist
+for t in ladder model-router scrub-e2e style-hints; do node $t.test.cjs; done
+cd ../../../.. && python3 scripts/verify_trial_install.py                  # both packaging profiles, size guard, download handler
+node scripts/ai-ladder/eval.cjs                                           # SKIPPED without provider keys; with keys it is the gate for GLANCE_AI_LADDER
+```
+
+Nothing here can drive a real Gmail, a real provider, Stripe or Supabase: those checks are the owner's (`open-tasks.md` rows 34 and 35).

@@ -250,6 +250,11 @@ be redirected to offering #3, not sold Pro with an asterisk.
 > promised anywhere on the site. Pro still carries no security or compliance
 > claim (§2.3 stands). Awaiting the owner's sign-off, which this section's
 > header requires for any change to the boundary.
+>
+> **Update 2026-10-04 (see `docs/ai-ladder.md`, `docs/monetization.md`).** Pro now also has
+> a larger allowance of the opt-in "second reading" (1,500 a month against Free's 120) and a
+> strong model for the torn cases. Free has the second reading too: the paid line is the
+> allowance and the stronger reading, not whether it exists. Nothing in this changes §2.3.
 
 Not yet built. `pricing.html`'s `Notify Me` button is a real double
 opt-in waitlist form (Supabase + `send-confirmation`), not a checkout —

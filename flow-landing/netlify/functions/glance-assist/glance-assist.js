@@ -1,7 +1,10 @@
 // Masked-LLM backend for the Glance Chrome extension: Draft-It (Feature 2),
-// Attachment X-ray (Feature 3), and — since this file's 'classify' action
-// was added — a remote fallback for the passive "Do It" chip's own local
-// classifier when it finds nothing.
+// Attachment X-ray (Feature 3), a remote fallback for the passive "Do It" chip's
+// own local classifier when it finds nothing ('classify', switched off in the
+// extension), the strict-JSON Do It proposal ('execute', dormant), and the
+// "second reading" of one masked sentence ('ladder-read' / 'ladder-status': the one
+// action that is NOT Pro-only, with its own identity and counters, ladder.js,
+// docs/ai-ladder.md).
 //
 // The extension's core/privacyShield.js masks names, companies, monetary
 // amounts, and dates BEFORE any text reaches this function — this function

@@ -292,6 +292,13 @@ Real-Gmail steps:
 49. **Not twice.** Open the same thread again: the count stays 1.
 50. **No false lesson.** Send an ask that gets a card, then *"Any update?"*: `missedAsk` stays 0.
 
+### 9a-v. True close, third pass (built 2026-10-04, `docs/true-close.md`)
+
+A short reply with no answer in it ("Perfect", "Seen", "ראיתי") no longer closes a loop by default: it is held open, silently, with the reason in the Activity list. "Waiting for…", "it is with…"
+and Hebrew promises with no day (אעדכן, אבדוק) are interims that move the chase, never closes. Measured on a fresh list: 21 of 71 non-answers closed a loop before, 0 after, 0 of 29 real answers lost.
+A Hebrew bug where "כן" matched inside other words was fixed. Contracts, quotes, proposals and signed copies now take the receipt's path to a real delivery (`docs/resolution-paths.md`).
+The opt-in second reading of one masked sentence (`docs/ai-ladder.md`) can also open a loop, as a proposal the person taps.
+
 ## 9b. Still not built
 
 - Reading the Calendar itself to find meetings Glance did not create.

@@ -53,5 +53,6 @@ so it can be added to the data. Never lower the 0.9 threshold to catch more.
 ## 5. What was refused
 
 - Letting the model close loops: a confident "answered" is not used, because the cost asymmetry is the whole point.
-- A remote model for this: the question is short, frequent and private; it runs on the device (`docs/local-first-principle.md`).
+- A remote model for this: the question is short, frequent and private; it runs on the device (`docs/local-first-principle.md`). Still true: the second reading (`docs/ai-ladder.md`) is about recognising an ask or a promise in your own sentence, never about judging a reply.
+- A short reply nothing could place used to close a loop by default; since 2026-10-04 a reply of three words or fewer with no answer in it is held open instead (`docs/true-close.md`). The model is unchanged.
 - A bigger or fancier model: the data, not the architecture, was the limit (see how accuracy moved with the second and third data banks).

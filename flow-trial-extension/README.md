@@ -21,7 +21,8 @@ weighted, named signals — a currency figure, a commitment verb, a dated
 obligation, a direct request, a stated loss — against negative ones like an
 automated sender or mailing-list boilerplate. It speaks only above a threshold
 that moves as you click and dismiss. No email text is sent anywhere to reach
-this decision.
+this decision. (The one optional exception is not part of judging a message:
+the "second reading" of a single masked sentence, below.)
 
 **Facts are extracted, not just detected.** `core/extract.js` pulls the amount
 (with currency, `k`/`m` suffixes, and a refusal to treat a bare number or a
@@ -79,6 +80,23 @@ per item. The in-thread Do It chip is unchanged.
 
 Every path is additive only: it creates one new record and never edits or
 deletes anything that was already there.
+
+## Built since this page was first written (one line each, with the document that owns it)
+
+| What | Where it is described |
+|---|---|
+| **Waiting on / what you promised**: loops that close on the outcome of a reply, with the Free cap of 3 | `docs/open-loops.md`, `docs/monetization.md` |
+| The on-device engine: word lists, a learned model, a reply reader, one story across threads | `docs/intent-model.md`, `docs/reply-model.md`, `docs/ai-engine-upgrade.md` |
+| A model on your own computer (Ollama, LM Studio), loopback only | `docs/local-model-server.md` |
+| **Second reading**: one masked sentence to our server for what the code could not place; opt-in; Free 120 and Pro 1,500 a month | `docs/ai-ladder.md` |
+| **True close**: a short reply with no answer in it never closes a loop; a draft is not a delivery | `docs/true-close.md`, `docs/resolution-paths.md` |
+| Receipts and documents (contract, quote, proposal, signed copy) as a path to a real delivery | `docs/resolution-paths.md`, `docs/true-close.md` §4 |
+| Other apps (WhatsApp Web, Outlook through Graph, right-click capture), opt-in and read-only | `docs/multi-platform.md` |
+| Hybrid on-device model + masked server for Do It proposals (**dormant**, `config/hybrid.public.js`) | `docs/hybrid-execution-architecture.md` |
+| Pro (Stripe, licence key, server-enforced paid features) | `docs/monetization.md`, `docs/revenue-routines.md` |
+| What is open, blocked or decided | `docs/open-tasks.md` |
+
+The full reading order for a human or an agent is `docs/README.md`.
 
 ## Local Privacy Shield, and where masked text is allowed to go
 
@@ -473,7 +491,10 @@ The download after email confirmation is a zip of this folder, built by
 `scripts/package_trial_extension.py` and served by
 `flow-landing/netlify/functions/download-trial-zip`. It is not checked in.
 How Netlify produces it, and which OAuth values the owner still has to
-paste, is `docs/SETUP.md`.
+paste, is `docs/SETUP.md`. The packager has two profiles: **lite** (what the
+site serves while `config/hybrid.public.js` is off: no on-device runtime,
+0.9 MB) and **full** (with the 11.3 MB runtime: the Chrome Web Store upload);
+`--profile auto|lite|full`, `docs/hybrid-execution-architecture.md` §0c.
 
 ## Load it locally
 
@@ -497,6 +518,18 @@ sees them):
 4. `OPENAI_API_KEY` — optional. Used only to summarize an attachment when
    Gemini's key is missing or Gemini's circuit is open. Never used for
    drafts or classification.
+
+Also read by the same function (all optional; a provider with no key is
+skipped, never called):
+
+5. `SUPABASE_SERVICE_ROLE_KEY` — licence checks (every Pro-only action) and the
+   second reading's counter (`supabase/migrations/20261004000000_glance_ai_usage.sql`).
+6. `GLANCE_AI_LADDER` — the languages that passed `scripts/ai-ladder/eval.cjs`
+   (`en`, `he` or `en,he`). Empty = the second reading is off for everyone.
+   `GLANCE_AI_DAILY_UNITS` (default 3000) and `GLANCE_AI_IP_DAILY_UNITS`
+   (default 300) are the cost caps. `docs/ai-ladder.md` §7.
+7. `MISTRAL_API_KEY`, `LLAMA_API_KEY` (+ `LLAMA_API_URL`, `LLAMA_MODEL`),
+   `DEEPSEEK_API_KEY` — only for the dormant Do It proposal (`execute`).
 
 No extension-side configuration, no OAuth, no new `host_permissions` (the
 function lives on `theflow-ai.com`, already covered by the extension's
@@ -531,6 +564,11 @@ core/execution-memory.js  local event log of what a user keeps/strips/undoes per
 core/privacyShield.js   Local Privacy Shield — masks names/companies/money/dates/emails/phones before anything leaves the device
 core/docwriter.js       generates a real .docx locally, no library (Feature 4 Path B)
 core/docreader.js       reads a .docx locally, no library (Feature 3's attachment text extraction)
+core/ (the other ~60 modules)  one line each in `core/README.md`; a test keeps that list complete
+core/ai-ladder.js       the second reading's policy: who may be asked about what, the Free/Pro allowance, the checks an answer passes
+core/resolution.js      multi-step resolution: receipts and the documents the person sends; closes only on a real delivery
+core/follow-up.js       Waiting on, promises, what a reply did to a loop, the true-close rules
+config/                 public switches: oauth.public.js, hybrid.public.js (off), ladder.public.js (on; the server decides)
 
 src/storage.js          chrome.storage wrapper; log, calibration, weekly/badge counters — Glance's own persistence choices, not core logic
 src/chrome-storage-adapter.js  wires core/execution-memory.js's storage seam to chrome.storage.local
@@ -545,7 +583,9 @@ src/content-gmail.js    Gmail watcher, the chip, the sidebar wiring, and the rec
 src/background.js       credentials, the five write paths, undo, the glance-assist relay, and the extension-icon badge
 
 popup/                  the only configuration surface, plus the Open tab (Unified Open Items Surface)
-netlify/functions/glance-assist/  masked-only backend proxy to a real LLM, for Draft-It + attachment X-ray
+../flow-landing/netlify/functions/glance-assist/  masked-only backend proxy to a real LLM: Draft-It + attachment X-ray (Pro), the second reading (ladder.js, Free and Pro), the dormant Do It proposal
+../supabase/migrations/  licences and the second reading's counter (the project is paused; the owner restores it)
+../scripts/             packager (lite/full), verify, vendor-runtime, ai-ladder/eval.cjs (the measurement gate)
 ```
 
 ## Future: anonymous team-level pattern sharing (foundation only, not built)

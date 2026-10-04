@@ -1,3 +1,8 @@
+## Start here — the map of every document
+
+`docs/README.md` is the reading order and the update map: which document owns which topic, the code and tests behind it, and which files to update in the same commit when something changes
+(an allowance, a price, what leaves the device, a switch, a new `core/` module, a rule on closing a loop). `test/docs-consistency-corpus.cjs` fails when the map and the code disagree.
+
 ## Open tasks file — keep it current
 
 `docs/open-tasks.md` is the running list of open tasks, blockers, decisions and

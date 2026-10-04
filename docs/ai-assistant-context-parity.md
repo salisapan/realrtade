@@ -1,5 +1,8 @@
 # Claude/Grok context parity — what a fresh clone does and doesn't give you
 
+> **Update 2026-10-04.** The shared, in-repo reading order for any assistant is now `docs/README.md` (topic -> owning document -> code -> test, and "when X changes update Y").
+> `CLAUDE.md` points to it first. The section lists below are a dated snapshot of 2026-09-27 and are not kept current; `docs/README.md` and `docs/open-tasks.md` are.
+
 ## Why this document exists
 
 The `realrtade` product (Flow + Glance) is being worked on from two AI

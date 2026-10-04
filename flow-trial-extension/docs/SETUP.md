@@ -33,13 +33,26 @@ generated zip is what gets deployed next to the handler.
 handler also checks `process.cwd()` for the same filename, which is the
 layout `netlify dev` uses when the base directory is `flow-landing`.
 
+### Two profiles (lite and full)
+
+The packager builds one of two zips (`--profile auto|lite|full`, `--out <path>`):
+
+| Profile | Contains | Size | Used for |
+|---|---|---|---|
+| **lite** | everything except the on-device model runtime (`vendor/`, `src/offscreen.*`) | about 0.9 MB (1.2 MB as the base64 body the function returns) | the download function **while `config/hybrid.public.js` has `enabled: false`** (what `auto` picks) |
+| **full** | lite plus the 11.3 MB runtime, hash-checked against `vendor/VENDOR.json` | about 3.9 MB (5.2 MB base64) | the Chrome Web Store upload (`--profile full --out ...`), and the function once the hybrid path is on |
+
+The download function returns the zip as base64 and Netlify caps a synchronous response at 6 MiB, so the build **fails** if the zip would exceed 90% of that cap; `lite` is refused while the hybrid switch is on.
+Details and the reasons the runtime is not fetched from a CDN: `docs/hybrid-execution-architecture.md` §0c. Public switches the zip carries: `config/hybrid.public.js` (off),
+`config/ladder.public.js` (on in the extension; the server's `GLANCE_AI_LADDER` decides, `docs/ai-ladder.md` §7).
+
 Check it locally from the repo root:
 
 ```
 python3 scripts/verify_trial_install.py
 ```
 
-That rebuilds the zip, refuses to package a build that still assigns
+That builds both profiles and checks their contents, size and the refusals, rebuilds the zip, refuses to package a build that still assigns
 `YOUR_*` client IDs in `background.js`, and calls the download function
 with a signed token and with a bad token.
 

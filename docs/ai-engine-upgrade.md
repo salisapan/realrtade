@@ -6,7 +6,7 @@
 > parts real, and says where the numbers stop being trustworthy.
 > Companion docs: `docs/intent-model.md`, `docs/local-first-principle.md`, `docs/product-identity.md`.
 
-No external model is called by any of this at run time. The teacher is used at BUILD time.
+No external model is called by any of this at run time. The teacher is used at BUILD time. (The one run-time external step added later, an opt-in masked second reading of single sentences with an allowance, is separate: `docs/ai-ladder.md`.)
 
 ## 1. Teacher data (large model -> small on-device model)
 

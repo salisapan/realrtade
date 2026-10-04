@@ -129,4 +129,4 @@ What this says, and what it does not:
 
 **Decision: no open model is added to the extension.** The on-device slot stays as built (`core/local-lm.js`: Chrome's built-in model or the person's own Ollama / LM Studio,
 each switched on per language only after the same test). Where more recall can come from is a different list: the structural shape gate (15 English and 6 Hebrew misses
-sit behind it on these sets) and an external model with consent and a quota (open-tasks row 29), both of which need the owner's decision and their own measurement.
+sit behind it on these sets) and an external model with consent and a quota (open-tasks rows 25 and 29: DECIDED by the owner 2026-10-04 and built as the second reading, `docs/ai-ladder.md`; its measurement on real answers, row 34, is still to run).

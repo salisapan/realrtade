@@ -24,8 +24,11 @@ cleverness.
 - Free builds trust by closing things locally; Pro protects the expensive open
   loops (every loop, the money owed, firmer nudges). Draft-It and summaries are
   "also".
-- An external model, if one is ever used, assists hard cases and never becomes the
-  identity or the spine (`docs/local-first-principle.md`).
+- An external model assists hard cases and never becomes the identity or the
+  spine (`docs/local-first-principle.md`). Today that is one opt-in step, the
+  "second reading" of a single masked sentence (`docs/ai-ladder.md`). Its words
+  in the popup are about sentences and loops ("Second reading", "used up", "starts
+  again on Nov 1"), never about cleverness; `test/ai-ladder-corpus.cjs` enforces it.
 - Being honest about the engine is fine and expected where someone asks (the FAQ
   answers "Is there AI in this?"): *yes, as the engine and not the product, mostly
   on your device.* We do not hide it; we do not lead with it.

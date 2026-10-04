@@ -11,6 +11,9 @@
 //     healthy, then the other, then a hard failure.
 //   classify: Sonnet, then Grok-strong, then silence { type: null }.
 //     Slot C is never a candidate, even when it is the only configured key.
+//   execute: Mistral Large, Llama-3-70B, Sonnet, Grok-strong, DeepSeek (EXECUTE_ORDER; the only action that uses slot D). Dormant.
+//   ladder (the second reading, docs/ai-ladder.md): tier 'fast' = Haiku and Grok-fast; tier 'strong' = Sonnet and Grok-strong,
+//     asked for only by ladder.js and only for Pro. The caller asks twice; cheapest-first is the order of the two calls.
 //
 // Slot A is Anthropic. Slot B is xAI. Slot C is Gemini Flash, and OpenAI's
 // mini model only when Gemini's key is missing or Gemini's circuit is

@@ -9,9 +9,12 @@
 // recheck never reaches the server.
 //
 // What Pro is for: the two features that call a paid model through the masked
-// backend (Draft-It reply drafts, attachment summaries). Everything else —
-// judging emails, the Do It chip, writing to Google, Undo — stays free and
-// stays on the device. The server enforces the same rule independently
+// backend (Draft-It reply drafts, attachment summaries), a larger allowance of
+// the "second reading" (1,500 a month against Free's 120) with a strong model for
+// the torn cases (core/ai-ladder.js, docs/ai-ladder.md), every open loop, the money
+// totals and the firmer nudges. Everything else — judging emails, the Do It chip,
+// writing to Google, Undo, and the second reading itself at its Free size — stays
+// free; judging stays on the device. The server enforces the same rule independently
 // (glance-assist checks the licence), so editing this file cannot unlock them.
 const FlowEntitlements = (() => {
   const OFFLINE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;

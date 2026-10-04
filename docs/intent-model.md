@@ -10,7 +10,8 @@
 |---|---|---|
 | 0 | `core/request-types.js` | Structure and vocabulary: a sentence is FRAME (how it is asked) + ACTION (what is wanted) + OBJECT (of what), English and Hebrew. Exact, fast, very precise, narrow. |
 | 1 | `core/intent-model.js` + `core/lang-normalize.js` | A small statistical model that runs on the device. It generalises to phrasings no list contains. |
-| 2 | (external model) | **Not used.** Never asked first, never required, never allowed to close or write anything. `REMOTE_CLASSIFY` stays `false`. The pipeline's `unsure` answer is the only hook a future, optional, masked, Pro-only last resort would use. |
+| 2 | a model on this computer (browser's own, Ollama, LM Studio) | Optional, loopback only, gated by a precision self-test per language (`docs/local-model-server.md`). |
+| 3 | **the deeper read** (`docs/ai-ladder.md`) | One masked sentence to our server, only after the person's one-time yes, only for what the pipeline calls `unsure` and the learned model leaned to an ask or promise on (its "residual", about 6% of the gold sets). Free has an allowance of 120 a month, Pro 1,500 and a strong model for the torn cases. Never asked first, never required, never allowed to close or write anything; the answer is a proposal. Off at the server until the owner has measured it on real answers (`scripts/ai-ladder/eval.cjs`). `REMOTE_CLASSIFY` (whole-message classification for the Do It chip) stays `false`. |
 
 `core/intent-pipeline.js` combines tiers 0 and 1, and each checks the other:
 the model can veto the lexicon when it is nearly certain a sentence is only a

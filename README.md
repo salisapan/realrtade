@@ -5,6 +5,8 @@ a moment, recognize it, act on it, always reversibly — and the site that
 sells both of them. See `docs/product-architecture.md` for the full split
 and `CLAUDE.md` for standing rules on pricing/positioning copy.
 
+The reading order for a person or an agent, and which document owns which topic, is `docs/README.md`; what is open or decided is `docs/open-tasks.md`.
+
 ## Layout
 
 ```
@@ -25,6 +27,12 @@ docs/                    Cross-cutting product and design decisions that
                              not claim.
                            - design-principles.md — standing UI/UX review
                              criteria for any change to the site or extension.
+                           - README.md — the map: every document, what owns
+                             what, and what to update when something changes.
+                           - ai-ladder.md, true-close.md, monetization.md,
+                             open-tasks.md — the recognition order and its
+                             allowance, when a loop is closed, how Glance
+                             earns, and what is open.
 
 action-graph-video/      A Remotion project — the source for the Action
                          Graph promo video embedded on the homepage. Not

@@ -66,6 +66,8 @@ So Glance now does two jobs:
 | Meeting debrief, expiry reminders, "By person" view, aging | yes (count toward the 3 loops) | yes |
 | Nudge drafts | friendly first nudge only (never sent) | friendly, firmer and last (never sent) |
 | Draft-It (AI reply) and attachment summaries | no | yes (server-enforced) |
+| **Second reading** of one masked sentence Glance could not place (opt-in, `docs/ai-ladder.md`) | yes, **120 a month**, fast model | yes, **1,500 a month**, plus a strong model when the fast one is torn and a wider door for hard sentences (server-counted) |
+| Contract, quote, proposal, signed copy: a path to a real delivery, not a "Handled." chip (`docs/true-close.md`) | yes | same |
 
 **Why the limit is 3.** The limit sits on the thing that grows with the value
 Glance delivers. Anyone using Waiting on for a week has more than three open
@@ -78,7 +80,10 @@ payment is being chased, that Pro shows the total owed to them.
 own copy of the extension can remove it. That is acceptable for a limit on a
 convenience at this stage. What cannot be bypassed is everything that calls a
 paid model: Draft-It and attachment summaries are checked by the server on every
-call, and the server fails closed.
+call, and the server fails closed. The second reading's allowance is counted
+on the server too (a hash of the install id or key, per month; per network
+address and everyone-together per day), so editing the extension does not
+raise it.
 
 **What the money argument is, and what it is not.** One $1,000 invoice paid a
 week earlier, or one signature that does not slip a deadline, is worth many
@@ -86,8 +91,11 @@ months of $14. That is the claim to test with users, not a measured result.
 Do not put it on the site as a number.
 
 **Free stays private.** Waiting on reads only your own newest message in the
-thread, on the device. Nothing is sent to us. The automatic "remote
-classification" fallback stays off for everyone (`REMOTE_CLASSIFY = false`).
+thread, on the device. Nothing is sent to us, with one exception the person
+switches on themselves: the "second reading", one masked sentence at a time for
+what Glance's own code could not place (`docs/ai-ladder.md`, owner decision
+2026-10-04: Free gets it too, with a monthly allowance). The automatic "remote
+classification" of whole messages stays off for everyone (`REMOTE_CLASSIFY = false`).
 
 > Product-architecture note: `docs/product-architecture.md` §2 describes Pro as
 > a small-team plan. This document redefines Pro as the individual
@@ -195,8 +203,13 @@ classification" fallback stays off for everyone (`REMOTE_CLASSIFY = false`).
 
 - Do not cap the free tier. Nobody is paying yet, and the free closes are the
   product's proof.
-- Do not turn automatic classification back on to "improve free". It breaks the
-  one sentence the product page rests on.
+- Do not turn whole-message automatic classification (`REMOTE_CLASSIFY`) on to
+  "improve free". The only external step is the opt-in second reading of one
+  sentence (`docs/ai-ladder.md`); widening it needs its own measurement and a
+  privacy-page change in the same commit.
+- Do not describe the second reading as live, or give it an accuracy figure,
+  before the server switch is on and `scripts/ai-ladder/eval.cjs` has run on
+  real answers.
 - Do not announce Pro anywhere before step 6 passes in real Gmail.
 - Do not describe Pro as secure or compliant. It carries the same
   non-sensitive-data boundary as Free.
@@ -204,7 +217,10 @@ classification" fallback stays off for everyone (`REMOTE_CLASSIFY = false`).
 ## 8. What to watch
 
 Weekly, in this order: new company-domain clusters, installs, Do It closes per
-active user, Pro trial starts, trial-to-paid rate, cancellations. The funnel
+active user, Pro trial starts, trial-to-paid rate, cancellations, and (once the
+second reading is on) units used against the daily cap, how many Free people
+reached the allowance and how many of them upgraded, and the share of second
+readings the person kept. The funnel
 events are `pro_start_clicked`, `pro_activated` (extension, anonymous) and
 `pricing_pro_checkout_click`, `pro_checkout_complete` (site, GA4). Revenue
 itself is in Stripe.
