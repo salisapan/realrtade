@@ -860,6 +860,18 @@
     row.appendChild(el('div', 'wait-note', OUTLOOK_COPY));
     if (!st.configured) row.appendChild(el('div', 'wait-note', 'It needs a Microsoft app registration first. Redirect address for it: ' + st.redirectUri));
     if (st.connected) {
+      // If OWA host permission is already granted (e.g. after reconnect), ensure the content script is registered.
+      try {
+        const origins = (typeof FlowOutlook !== 'undefined' && FlowOutlook.OWA_ORIGINS) || [
+          'https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'
+        ];
+        const granted = await chrome.permissions.contains({ origins: origins });
+        if (granted) {
+          const surf = await send({ type: 'flow:surface-status' });
+          const on = surf && surf.surfaces && surf.surfaces.outlook && surf.surfaces.outlook.enabled;
+          if (!on) await send({ type: 'flow:surface-enable', id: 'outlook' });
+        }
+      } catch (e) { /* ignore */ }
       const who = st.primary || (st.account && st.account.address) || '';
       const idN = (typeof st.ownAddressCount === 'number' ? st.ownAddressCount : ((st.ownAddresses && st.ownAddresses.length) || (who ? 1 : 0)));
       const checked = st.lastAt
@@ -927,6 +939,29 @@
       off.type = 'button';
       off.addEventListener('click', async () => { off.disabled = true; await o.disconnect(); await renderSurfaces(); await renderOutlookCards(); });
       acts.appendChild(chk); acts.appendChild(off);
+      // Upgrade from 0.9.6: Graph may be on without OWA host permission for the in-page card.
+      (async () => {
+        try {
+          const origins = (typeof FlowOutlook !== 'undefined' && FlowOutlook.OWA_ORIGINS) || [
+            'https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'
+          ];
+          if (await chrome.permissions.contains({ origins: origins })) return;
+          const btn = el('button', 'ghost sm', 'Show Do It in Outlook on the web');
+          btn.type = 'button';
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            let ok = false;
+            try { ok = await chrome.permissions.request({ origins: origins }); } catch (e) { ok = false; }
+            if (!ok) { btn.disabled = false; note.hidden = false; note.textContent = 'The browser did not grant access to Outlook on the web.'; return; }
+            const r = await send({ type: 'flow:surface-enable', id: 'outlook' });
+            if (!r || !r.ok) { btn.disabled = false; note.hidden = false; note.textContent = 'Could not turn on the Outlook page card.'; return; }
+            btn.remove();
+            note.hidden = false;
+            note.textContent = 'Do It will appear on open messages at outlook.live.com / outlook.office.com.';
+          });
+          acts.appendChild(btn);
+        } catch (e) { /* ignore */ }
+      })();
     }
     row.appendChild(acts);
     row.appendChild(note);
