@@ -4,7 +4,8 @@
 // that runs entirely in this tab; there is no network call and no model here.
 //
 // This is deliberately separate from FlowExtract (core/extract.js): that file
-// finds the single best money/date value for on-device judgment scoring.
+// finds the single best money/date value for judgment scoring (on the device
+// in the Chrome extension; in Google Apps Script in the Gmail add-on).
 // This file finds and replaces EVERY matching span, because a masking pass
 // that misses one occurrence of a name defeats the point of masking it.
 //

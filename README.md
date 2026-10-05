@@ -9,10 +9,17 @@ and `CLAUDE.md` for standing rules on pricing/positioning copy.
 
 ```
 flow-trial-extension/   Glance — the Chrome extension (Flow Trial's Free/Pro tier).
-                         Local, on-device judgment engine + real write paths
-                         (Google Calendar/Tasks/Gmail, Notion, HubSpot,
-                         Salesforce, Slack, Monday.com). See its own README
-                         for setup, architecture, and how to load it locally.
+                         Judgment runs on the device in this extension, plus
+                         real write paths (Google Calendar/Tasks/Gmail,
+                         Notion, HubSpot, Salesforce, Slack, Monday.com).
+                         See its own README for setup, architecture, and how
+                         to load it locally.
+
+glance-gmail-addon/     Glance for Gmail on the web and in the Gmail iOS and
+                         Android apps. Same judgment, executed in Google
+                         Apps Script — not on the device. One Do It writes a
+                         Calendar event, a Task, or a Gmail draft, and never
+                         sends. See glance-gmail-addon/DEPLOY.md.
 
 flow-landing/            The marketing site (theflow-ai.com) — homepage,
                          pricing, solutions pages, blog, and the Netlify
