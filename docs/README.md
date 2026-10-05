@@ -7,7 +7,7 @@
 Any description of Glance starts from the sentence above, and any report keeps the *product definition (vision-locked)* apart from the *current implementation status (code reality)*; both rules and the anti-drift list are in `product-identity.md`.
 
 > Maintained as part of every change: `test/docs-consistency-corpus.cjs` fails when a doc listed here is missing, when a `core/` module is missing from `flow-trial-extension/core/README.md`,
-> and when the public numbers (allowances, prices, switches) in the docs disagree with the code. Last reviewed: 2026-10-04.
+> and when the public numbers (allowances, prices, switches) in the docs disagree with the code. Last reviewed: 2026-10-05.
 
 ## 0. Who reads what
 
@@ -35,6 +35,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Other apps (WhatsApp Web, Outlook, capture) | `multi-platform.md` | `src/content-whatsapp.js`, `core/graph-mail.js`, `outlook-*.js` | `whatsapp-harness`, `outlook-*-corpus` |
 | Community (cross-user) learning (**dormant**) | `community-learning.md` | `core/community.js` | `community-corpus` |
 | Packaging, the Chrome Web Store, setup | `flow-trial-extension/docs/SETUP.md`, `chrome-web-store-submission.md`, `hybrid-execution-architecture.md` §0c | `scripts/package_trial_extension.py` (lite/full), `scripts/verify_trial_install.py` | `verify_trial_install.py` |
+| **The living icon** (one gel body: breathes, changes shape while Glance works, ring + tick on a real close) | `living-icon.md` | `core/living-icon.js`, `src/living-toolbar.js`, `design/living-icon/index.html`, `scripts/living-icon/` | `test/living-icon-corpus.cjs` |
 | Open work, blockers, decisions | `open-tasks.md` | - | - |
 
 ## 2. When X changes, update these in the SAME commit
@@ -58,7 +59,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 `closure-plan.md` unfinished intentions to completion · `community-learning.md` cross-user learning, dormant · `decision-filter.md` the five-question filter · `design-principles.md` twelve review criteria ·
 `encoder-evaluation-plan.md` encoder experiment (not met) · `engineering-audit.md`, `system-audit-2026-09.md` audits · `file-backed-closure-plan.md` single-file closure · `human-eval.md` first numbers on real mail ·
 `hybrid-execution-architecture.md` device model + server for Do It proposals, dormant, packaging profiles, GPU diagnostics · `intent-model.md` the local engine and its tiers · `lm-fallback-evaluation-plan.md` small on-device model experiment (not met) ·
-`local-detection-plan.md` outcome identity and local closure · `local-first-principle.md` our code recognises first · `local-model-server.md` Ollama / LM Studio · `magic-moment.md` the first real close ·
+**`living-icon.md` the living icon: one body, shape morph, a tick only on a real close** · `local-detection-plan.md` outcome identity and local closure · `local-first-principle.md` our code recognises first · `local-model-server.md` Ollama / LM Studio · `magic-moment.md` the first real close ·
 `monetization.md` how Glance earns · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
 `product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
 **`true-close.md` when a loop is closed, what was found and fixed** · `when-recognition-fails.md` the steps when a sentence is not recognised.
@@ -68,7 +69,7 @@ Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the 
 
 ```sh
 cd flow-trial-extension
-for t in test/*-corpus.cjs; do node $t || echo "FAILED $t"; done          # 66 corpora, no network
+for t in test/*-corpus.cjs; do node $t || echo "FAILED $t"; done          # 67 corpora, no network
 node test/follow-gmail-harness.cjs && node test/whatsapp-harness.cjs      # real content scripts in Chromium (takes ~10 minutes; SKIPPED without Playwright)
 cd ../flow-landing/netlify/functions/glance-assist
 for t in ladder model-router scrub-e2e style-hints; do node $t.test.cjs; done

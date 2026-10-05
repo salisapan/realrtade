@@ -82,6 +82,7 @@ it, not touching the module.
 | `json-enforce.js` | Strict JSON for model output, shared by every tier that asks a model for a structured answer (the on-device model, the company server). |
 | `lang-normalize.js` | Language normalisation for local intent recognition — portable, no chrome.*, no DOM, no network, no model. |
 | `learning-ledger.js` | "What Glance learned from you": a short, plain list of every time the engine moved because of something this person did. |
+| `living-icon.js` | **The living icon** (`docs/living-icon.md`): one gel body computed from one distance field, shapes blended inside the field (not images), spring-driven, with a breath and a domain warp; `render(params, size)` gives RGBA for the demo and for the toolbar's live `setIcon`. Portable; the toolbar driver is `src/living-toolbar.js`. |
 | `local-lm-audit.js` | The fixed sentences an on-device language model must pass on THIS device before core/local-lm.js lets it propose anything. |
 | `local-lm-server.js` | A language model the person runs ON THEIR OWN COMPUTER (Ollama, LM Studio, or anything that speaks the same two HTTP dialects), as another source for the session core/local-lm.js already knows how to use. |
 | `local-lm.js` | A language model that runs on THIS device, as the third recognition tier. |

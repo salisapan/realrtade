@@ -39,6 +39,8 @@ import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import { LADDER } from '../config/ladder.public.js';
+import '../core/living-icon.js';  // classic script: sets globalThis.FlowLivingIcon
+import './living-toolbar.js';     // classic script: sets globalThis.FlowLivingToolbar
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -2992,8 +2994,18 @@ function reply(sendResponse, promise) {
   return true;
 }
 
+// The living toolbar icon (src/living-toolbar.js): it changes shape while Glance does something and draws its tick only on a real close.
+const livingToolbar = globalThis.FlowLivingToolbar.create(chrome, globalThis.FlowLivingIcon);
+function watchLiving(msg, sendResponse) {
+  const closes = globalThis.FlowLivingToolbar.WATCH[msg.type];
+  if (!closes) return sendResponse;
+  const end = livingToolbar.begin();
+  return (r) => { end(closes(r)); sendResponse(r); };
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || !msg.type) return;
+  sendResponse = watchLiving(msg, sendResponse);
 
   const hybridAnswer = hybrid.handle(msg, sender);
   if (hybridAnswer) return reply(sendResponse, hybridAnswer);
