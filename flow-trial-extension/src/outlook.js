@@ -530,16 +530,20 @@ const FlowOutlook = (() => {
     // the loop; sent draft closes it for real.
     function receiptsFromState(st) {
       const log = (st && st.log) || [];
-      const undone = new Set();
+      const undoTsByMsg = Object.create(null);
       log.forEach((e) => {
-        if (e && e.kind === 'undone' && e.messageId) undone.add(e.messageId);
+        if (!e || e.kind !== 'undone' || !e.messageId) return;
+        const ts = e.ts || 0;
+        if (undoTsByMsg[e.messageId] == null || ts >= undoTsByMsg[e.messageId]) undoTsByMsg[e.messageId] = ts;
       });
       const out = [];
       const seen = new Set();
       log.forEach((e) => {
         if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) return;
         if (e.undone || e.outlookSent || e.outlookReceipt === false) return;
-        if (undone.has(e.messageId) || seen.has(e.messageId)) return;
+        const wts = e.ts || 0;
+        if (undoTsByMsg[e.messageId] != null && undoTsByMsg[e.messageId] >= wts) return;
+        if (seen.has(e.messageId)) return;
         seen.add(e.messageId);
         out.push(e);
       });
@@ -566,14 +570,14 @@ const FlowOutlook = (() => {
         if (!e || e.kind !== 'written' || e.messageId !== messageId) continue;
         if (e.connectorId && e.connectorId !== 'outlookDraft') continue;
         log[i] = Object.assign({}, e, {
-          kind: 'undone', label: (e.label || 'Reply draft ready in Outlook Drafts. Not sent.') + ' (undone)',
+          kind: 'undone', label: 'Reply draft removed. Not sent.',
           undone: true, outlookReopen: true, url: null, ref: null, connectorId: 'outlookDraft', app: 'outlook'
         });
         hit = true;
         break;
       }
       if (!hit) {
-        log.unshift({ ts: deps.now(), kind: 'undone', label: 'Outlook draft undone', messageId, app: 'outlook', connectorId: 'outlookDraft', outlookReopen: true });
+        log.unshift({ ts: deps.now(), kind: 'undone', label: 'Reply draft removed. Not sent.', messageId, app: 'outlook', connectorId: 'outlookDraft', outlookReopen: true });
       }
       const resolved = (st.resolvedMessageIds || []).filter((id) => id !== messageId);
       await deps.storage.set({ log: log, resolvedMessageIds: resolved });

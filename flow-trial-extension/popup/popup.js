@@ -527,6 +527,9 @@
         outlookReceipt: true
       });
       if (entry.messageId) {
+        if (typeof FlowStorage.clearStillOpenUndoForMessage === 'function') {
+          await FlowStorage.clearStillOpenUndoForMessage(entry.messageId);
+        }
         await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: entry.messageId });
         await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: entry.messageId });
       }

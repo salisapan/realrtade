@@ -6,7 +6,7 @@
 // the pair into one Undone row and recomputes stats under the draftOnly rule
 // (prepared draft undo is not a false close).
 const FlowOutlookStateMigrate = (() => {
-  const MIGRATE_VERSION = 2;
+  const MIGRATE_VERSION = 3;
 
   function isOutlookDraftRow(e) {
     if (!e) return false;
@@ -54,7 +54,7 @@ const FlowOutlookStateMigrate = (() => {
         emittedUndone[e.messageId] = true;
         out.push(Object.assign({}, e, {
           kind: 'undone',
-          label: (e.label || 'Reply draft ready in Outlook Drafts. Not sent.') + ' (undone)',
+          label: 'Reply draft removed. Not sent.',
           undone: true,
           outlookReopen: true,
           url: null,
@@ -109,14 +109,8 @@ const FlowOutlookStateMigrate = (() => {
         so.recent = (so.recent || []).filter((r) => !(r && r.kind === 'falseClose' && draftUndoIds.has(r.id)));
         changed = true;
       }
-      so.undoIds = (so.undoIds || []).slice();
-      draftUndoIds.forEach((id) => {
-        if (so.undoIds.indexOf(id) === -1) {
-          so.undoIds = [id].concat(so.undoIds).slice(0, 300);
-          so.undo = (so.undo || 0) + 1;
-          changed = true;
-        }
-      });
+      // Do not seed undo counts here — that made a later live Undo look like a
+      // no-op (deduped by messageId). Live Undo records draftOnly undo itself.
     }
 
     return { closeQuality: cq, stillOpenMetrics: so, changed };
@@ -143,6 +137,19 @@ const FlowOutlookStateMigrate = (() => {
     });
     if (scrub.closeQuality) next.closeQuality = scrub.closeQuality;
     if (scrub.stillOpenMetrics) next.stillOpenMetrics = scrub.stillOpenMetrics;
+    // Drop undoIds seeded by migrate v1/v2 for draft-only undos so the next
+    // live Undo can increment the Still Open undo counter.
+    if (next.stillOpenMetrics && draftIds.size) {
+      const so = Object.assign({}, next.stillOpenMetrics);
+      const before = (so.undoIds || []).slice();
+      so.undoIds = before.filter((id) => !draftIds.has(id));
+      const removed = before.length - so.undoIds.length;
+      if (removed > 0) {
+        so.undo = Math.max(0, (so.undo || 0) - removed);
+        so.recent = (so.recent || []).filter((r) => !(r && r.kind === 'undo' && draftIds.has(r.id)));
+        next.stillOpenMetrics = so;
+      }
+    }
 
     return {
       state: next,

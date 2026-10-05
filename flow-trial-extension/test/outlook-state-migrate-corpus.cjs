@@ -36,7 +36,7 @@ console.log('\n--- scrub false-close for draft undos ---\n');
   const r = M.migrate(state);
   check('migrated once', r.migrated === true && r.state.outlookMigrateVersion === M.MIGRATE_VERSION);
   check('falseDoIt cleared for draft undo', r.state.closeQuality.falseDoIt === 0 && r.state.closeQuality.falseDoItIds.length === 0, r.state.closeQuality);
-  check('stillOpen falseClose cleared; undo recorded', r.state.stillOpenMetrics.falseClose === 0 && r.state.stillOpenMetrics.undo >= 1 && r.state.stillOpenMetrics.undoIds.indexOf('m1') !== -1, r.state.stillOpenMetrics);
+  check('stillOpen falseClose cleared; undo NOT seeded by migrate', r.state.stillOpenMetrics.falseClose === 0 && r.state.stillOpenMetrics.undoIds.indexOf('m1') === -1, r.state.stillOpenMetrics);
   check('messageId removed from resolved so loop can reopen', r.state.resolvedMessageIds.indexOf('m1') === -1, r.state.resolvedMessageIds);
   const again = M.migrate(r.state);
   check('second migrate is no-op', again.migrated === false && again.changed === false);

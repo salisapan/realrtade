@@ -1239,20 +1239,24 @@ const FlowStorage = (() => {
   // receipt and can reopen the ask after a draft-only undo.
   function getActiveOutlookReceiptsFrom(state) {
     const log = (state && state.log) || [];
-    const undone = new Set();
+    // An older undone (e.g. migrated 0.9.3) must not hide a NEWER draft receipt
+    // for the same messageId after a fresh Do It.
+    const undoTsByMsg = Object.create(null);
+    const undoByRef = Object.create(null);
     for (const e of log) {
-      // Any undone for this messageId suppresses the receipt (0.9.3 undos had no app tag).
-      if (e && e.kind === 'undone' && e.messageId) {
-        undone.add(e.messageId + '|' + (e.ref || ''));
-        undone.add(e.messageId);
-      }
+      if (!e || e.kind !== 'undone' || !e.messageId) continue;
+      const ts = e.ts || 0;
+      if (undoTsByMsg[e.messageId] == null || ts >= undoTsByMsg[e.messageId]) undoTsByMsg[e.messageId] = ts;
+      if (e.ref) undoByRef[e.messageId + '|' + e.ref] = ts;
     }
     const out = [];
     const seen = new Set();
     for (const e of log) {
       if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) continue;
       if (e.undone || e.outlookSent || e.outlookReceipt === false) continue;
-      if (undone.has(e.messageId) || undone.has(e.messageId + '|' + (e.ref || ''))) continue;
+      const wts = e.ts || 0;
+      if (e.ref && undoByRef[e.messageId + '|' + e.ref] != null && undoByRef[e.messageId + '|' + e.ref] >= wts) continue;
+      if (undoTsByMsg[e.messageId] != null && undoTsByMsg[e.messageId] >= wts) continue;
       if (seen.has(e.messageId)) continue;
       seen.add(e.messageId);
       out.push(e);
@@ -1266,6 +1270,26 @@ const FlowStorage = (() => {
 
   // Convert the matching written Outlook draft row into undone in place (no duplicate HANDLED row).
   // Removes messageId from resolvedMessageIds so Check now can surface the ask again.
+
+  // After a fresh Do It on a message that was previously undone, allow the next
+  // Undo to increment Still Open undo again (migration may have seeded undoIds).
+  const clearStillOpenUndoForMessage = serialize(async function clearStillOpenUndoForMessage(messageId) {
+    if (!messageId || typeof FlowStillOpen === 'undefined') return { ok: false };
+    const state = await get();
+    const so = state.stillOpenMetrics || FlowStillOpen.emptyMetrics();
+    const ids = (so.undoIds || []).slice();
+    const i = ids.indexOf(messageId);
+    if (i === -1) return { ok: true, changed: false };
+    ids.splice(i, 1);
+    const next = Object.assign({}, so, {
+      undoIds: ids,
+      undo: Math.max(0, (so.undo || 0) - 1),
+      recent: (so.recent || []).filter((r) => !(r && r.kind === 'undo' && r.id === messageId))
+    });
+    await set({ stillOpenMetrics: next });
+    return { ok: true, changed: true };
+  });
+
   const markOutlookDraftUndone = serialize(async function markOutlookDraftUndone(messageId, ref) {
     if (!messageId) return { ok: false };
     const state = await get();
@@ -1278,7 +1302,7 @@ const FlowStorage = (() => {
       if (ref && e.ref && e.ref !== ref) continue;
       log[i] = Object.assign({}, e, {
         kind: 'undone',
-        label: (e.label || 'Reply draft ready in Outlook Drafts. Not sent.') + ' (undone)',
+        label: 'Reply draft removed. Not sent.',
         undone: true,
         outlookReopen: true,
         url: null,
@@ -1288,7 +1312,7 @@ const FlowStorage = (() => {
       break;
     }
     if (!hit) {
-      log.unshift({ ts: Date.now(), kind: 'undone', label: 'Outlook draft undone', messageId, ref: ref || null, app: 'outlook', connectorId: 'outlookDraft', outlookReopen: true });
+      log.unshift({ ts: Date.now(), kind: 'undone', label: 'Reply draft removed. Not sent.', messageId, ref: ref || null, app: 'outlook', connectorId: 'outlookDraft', outlookReopen: true });
     }
     const resolved = (state.resolvedMessageIds || []).filter((id) => id !== messageId);
     await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
@@ -1386,7 +1410,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };
