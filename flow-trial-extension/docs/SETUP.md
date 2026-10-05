@@ -40,8 +40,14 @@ python3 scripts/verify_trial_install.py
 ```
 
 That rebuilds the zip, refuses to package a build that still assigns
-`YOUR_*` client IDs in `background.js`, and calls the download function
-with a signed token and with a bad token.
+`YOUR_*` client IDs in `background.js`, refuses `picker/`, and calls the
+download function with a signed token and with a bad token. The download
+zip keeps the repo manifest (unpacked `key` and unpacked Google client).
+
+The Chrome Web Store upload is a different file. From the repo root,
+`bash flow-trial-extension/scripts/build-cws.sh` writes
+`flow-trial-extension/dist/glance-cws.zip` with `key` removed and the
+store OAuth client applied. Do not upload the signup zip to the store.
 
 Load unpacked still uses the `flow-trial-extension/` folder directly.
 The zip is only what a confirmed signup receives.
