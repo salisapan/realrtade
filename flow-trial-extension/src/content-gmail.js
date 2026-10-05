@@ -5,10 +5,13 @@
 //
 // Honesty about fragility: Gmail's DOM has no public contract and changes
 // without notice. The selectors below read the current structure (role="main"
-// reading pane, div[role="listitem"] messages, the `email` attribute on the
-// sender span, h2.hP for the subject). If Gmail changes, this degrades to "the
-// chip stops appearing" — never to a crash and never to a wrong write, because
-// judgment only ever reads text and the write path only ever adds a record.
+// reading pane, div[role="listitem"] messages, div.a3s for the message body,
+// the `email` attribute on the sender span, h2.hP for the subject). Judgment
+// reads the body (.a3s), not the whole listitem — the listitem also carries
+// the received-time row, invite chips, and smart replies. If Gmail changes,
+// this degrades to "the chip stops appearing" — never to a crash and never to
+// a wrong write, because judgment only ever reads text and the write path
+// only ever adds a record.
 
 (function flowGmailWatcher() {
   // Every FlowStorage.appendLog() call this file makes is tagged with this
@@ -401,29 +404,74 @@
   // wrapper — a non-Gmail sender, or a plain-text forward.
   const QUOTE_CONTAINER_SELECTOR = '.gmail_quote';
 
+  // Gmail's message body. Prefer this over the whole listitem: the
+  // listitem also carries the sender row (a received clock like "12:05"),
+  // detected-event invite chips, and smart-reply suggestions. Those are
+  // UI chrome, not the sender's words. A received "12:05" next to a
+  // meeting "10:00" looks like Family H two-slot ambiguity and stays
+  // quiet forever. .a3s is the long-standing body class. If it is missing
+  // we fall back to the listitem and strip known chrome there only.
+  const BODY_SELECTOR = 'div.a3s';
+
+  // Drop Gmail reading-pane chrome that is not part of the sender's
+  // message. Listitem fallback only. Never run this on .a3s text — a
+  // clock the sender wrote in the body must stay.
+  function stripGmailReadingChrome(text) {
+    let t = String(text || '');
+    // Leading header: optional name/email lines, then HH:MM (optionally
+    // "(N minutes ago)"), then "to me".
+    t = t.replace(
+      /^(?:[^\n]{1,120}\n){0,4}?\d{1,2}:\d{2}(?:\s*\([^)\n]{0,40}\))?\s*\n(?:to\s+me\b[^\n]*\n)?/i,
+      ''
+    );
+    // Detected-event invite chip under the body.
+    t = t.replace(
+      /(?:^|\n)(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*,\s+[A-Za-z]+\s+\d{1,2},\s+\d{1,2}:\d{2}\s*(?:AM|PM)\s*[–—-]\s*\d{1,2}:\d{2}\s*(?:AM|PM)(?:\s*\([A-Z]{2,5}\))?\s*(?=\n|$)/gi,
+      '\n'
+    );
+    // Bare invite range without a weekday prefix.
+    t = t.replace(
+      /(?:^|\n)\d{1,2}:\d{2}\s*(?:AM|PM)\s*[–—-]\s*\d{1,2}:\d{2}\s*(?:AM|PM)(?:\s*\([A-Z]{2,5}\))?\s*(?=\n|$)/gi,
+      '\n'
+    );
+    // Smart-reply chips Gmail appends under the message.
+    t = t.replace(
+      /(?:^|\n)(?:Yes, that works for me\.?|Yes, see you then!?|No, I can'?t make it\.?)\s*(?=\n|$)/gi,
+      '\n'
+    );
+    return t.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
   // Returns only the text that renders before the first quote container —
-  // never the quoted history sitting after it. Matches messageNode's own
-  // innerText computation (rather than a DOM Range) specifically so the
-  // whitespace/line-break shape of what's returned is identical to what
-  // every other caller of .innerText in this file already expects; a
-  // second, differently-shaped text-extraction method here would risk
-  // corrupting the word-boundary-sensitive regexes downstream.
+  // never the quoted history sitting after it. Prefers the .a3s body node
+  // (see BODY_SELECTOR). Falls back to the listitem only when that node
+  // is missing, and only then strips reading-pane chrome. Matches the
+  // chosen node's own innerText computation (rather than a DOM Range)
+  // specifically so the whitespace/line-break shape of what's returned is
+  // identical to what every other caller of .innerText in this file
+  // already expects.
   function ownMessageText(messageNode) {
-    const full = (messageNode?.innerText || '').trim();
-    if (!messageNode) return full;
-    const quoteBlock = messageNode.querySelector(QUOTE_CONTAINER_SELECTOR);
-    if (!quoteBlock) return full;
-    const quoted = (quoteBlock.innerText || '').trim();
-    if (!quoted) return full;
-    const idx = full.lastIndexOf(quoted);
-    // Not found at all (a rendering mismatch between the isolated block's
-    // own innerText and its innerText as read within the full message) —
-    // fall back to the unfiltered text rather than guess where to cut.
-    if (idx < 0) return full;
-    // idx === 0 (the quote is the entire visible message, nothing new was
-    // written) correctly yields an empty string here, same treatment as
-    // judgment.js's own newContent() gives that case.
-    return full.slice(0, idx).trim();
+    if (!messageNode) return '';
+    const body = messageNode.querySelector(BODY_SELECTOR);
+    const root = body || messageNode;
+    const full = (root.innerText || '').trim();
+    let cut = full;
+    const quoteBlock = root.querySelector(QUOTE_CONTAINER_SELECTOR);
+    if (quoteBlock) {
+      const quoted = (quoteBlock.innerText || '').trim();
+      if (quoted) {
+        const idx = full.lastIndexOf(quoted);
+        // Not found at all (a rendering mismatch between the isolated
+        // block's own innerText and its innerText as read within the
+        // full message) — keep the unfiltered text rather than guess
+        // where to cut. idx === 0 (the quote is the entire visible
+        // message) correctly yields an empty string, same treatment as
+        // judgment.js's own newContent() gives that case.
+        if (idx >= 0) cut = full.slice(0, idx).trim();
+      }
+    }
+    if (body) return cut;
+    return stripGmailReadingChrome(cut);
   }
 
   // Gmail renders any recipient who is the signed-in account as the literal
@@ -704,6 +752,17 @@
     const subject = currentSubject();
     const threadId = threadIdFrom(message);
 
+    // Opt-in local trace. chrome.storage.local.glanceDebug === true, unset
+    // by default. One read per scan. Never sent off-device. A storage miss
+    // leaves the trace off and does not stop the scan.
+    let debug = false;
+    try {
+      const debugBag = await chrome.storage.local.get('glanceDebug');
+      debug = !!(debugBag && debugBag.glanceDebug === true);
+    } catch {
+      debug = false;
+    }
+
     // Classification (intent.js) -> Decision (actions.js) -> Execution
     // (background.js's writer functions, dispatched by step.kind). This
     // file only ever sits at the two ends of that chain: it hands intent.js
@@ -721,7 +780,9 @@
       subject: subject,
       calibration: state.calibration,
       calibrationByType: state.calibrationByType,
-      attachmentCount: attachments.length
+      attachmentCount: attachments.length,
+      messageId: messageId,
+      debug: debug
     });
     // Reply-with-facts. Only when Google is already connected, so the chip
     // appears after one Sheet cell or Doc paragraph actually matched.
@@ -774,7 +835,11 @@
       // counter above — it is not given a reason it did not earn.
       const reason = (typeof FlowQuietMetrics !== 'undefined' && FlowQuietMetrics.reasonFor(intent))
         || (factOwns && !intent.type ? 'fact' : null);
-      recordSilence(messageId, reason);
+      recordSilence(messageId, reason, {
+        family: intent.closeFamily || intent.quiet,
+        clocks: (String(text).match(/\b\d{1,2}:\d{2}\b|\b\d{1,2}\s*(?:am|pm)\b/gi) || []).join(' ').slice(0, 80),
+        debug: debug
+      });
       return;
     }
 
@@ -1549,10 +1614,19 @@
   }
 
   // A reason code and a message id. recordSilence drops anything else.
-  function recordSilence(messageId, reason) {
+  // detail is local only. A family trace logs clock tokens, never the body.
+  function recordSilence(messageId, reason, detail) {
     if (!messageId || !reason || typeof FlowStorage.recordSilence !== 'function') return;
     FlowStorage.recordSilence({ messageId: messageId, reason: reason })
       .catch((e) => console.error('[Glance] failed to record a silence decision', e));
+    if (!detail || detail.debug !== true || reason !== 'family') return;
+    const clocks = String(detail.clocks || '').slice(0, 80);
+    console.log('[Glance debug]', {
+      messageId: messageId,
+      reason: reason,
+      family: detail.family || null,
+      clocks: clocks || null
+    });
   }
 
   function sendExecuteAction(payload) {
