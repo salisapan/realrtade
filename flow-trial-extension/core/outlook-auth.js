@@ -78,7 +78,11 @@ const FlowOutlookAuth = (() => {
   }
 
   async function post(deps, url, body) {
-    const res = await deps.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
+    let res;
+    // A dropped connection is a failed attempt (retried later), never a sign-out.
+    try { res = await deps.fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }); }
+    catch (e) { return { ok: false, error: 'network', description: null, aadsts: null }; }
+    if (!res) return { ok: false, error: 'network', description: null, aadsts: null };
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
     if (!res.ok || !data || data.error) {
@@ -121,17 +125,23 @@ const FlowOutlookAuth = (() => {
       authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: cfg.SCOPES,
       challenge: pk.challenge, state: pk.state, prompt: 'none', loginHint: loginHint || null
     });
+    // launchSilent resolves the redirect address, null, or { error } (Chrome's own message, e.g. "User interaction required.").
     let back;
-    try { back = await deps.launchSilent(url); } catch (e) { return { ok: false, error: 'silent-failed', needsInteraction: true }; }
-    if (!back) return { ok: false, error: 'silent-failed', needsInteraction: true };
+    try { back = await deps.launchSilent(url); } catch (e) { return { ok: false, error: 'silent-failed', needsInteraction: false }; }
+    if (back && typeof back === 'object' && back.error) {
+      const interaction = /interaction|sign.?in|login/i.test(String(back.error));
+      return { ok: false, error: interaction ? 'login_required' : 'silent-failed', description: String(back.error).slice(0, 120), needsInteraction: interaction };
+    }
+    if (!back) return { ok: false, error: 'silent-failed', needsInteraction: false };
     const r = parseRedirect(back, pk.state);
     if (r.error) {
-      const needs = Boolean(INTERACTION_ERRORS[r.error] || r.error === 'login_required');
-      return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null, needsInteraction: needs || true };
+      // Only Microsoft's own "a person has to act" answers mean interaction. A state mismatch or a bad redirect is a
+      // failed attempt, retried later, never a reason to drop the connection.
+      return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null, needsInteraction: Boolean(INTERACTION_ERRORS[r.error]) };
     }
     const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: cfg.SCOPES }));
     if (!t.ok) {
-      return { ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null, needsInteraction: Boolean(INTERACTION_ERRORS[t.error]) || true };
+      return { ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null, needsInteraction: Boolean(INTERACTION_ERRORS[t.error]) };
     }
     const tok = normalizeToken(t.data, deps.now(), null, true);
     return tok ? { ok: true, token: tok } : { ok: false, error: 'no-token', needsInteraction: true };
@@ -169,10 +179,92 @@ const FlowOutlookAuth = (() => {
     return first.slice(0, 120) + (upper ? ' (' + upper + ')' : (error && error !== first ? ' (' + String(error).slice(0, 40) + ')' : ''));
   }
 
+  // ---- the durable session ----------------------------------------------------------------------------------
+  // Microsoft gives a single-page-application client a refresh token that lives 24 hours from the sign-in and does not
+  // slide when it is used. A refresh_token grant inside that window gives a new access token (and a new refresh token
+  // with the SAME end); only a new authorization code (interactive, or silent with prompt=none) starts a new 24 hours.
+  // So the session stays alive by renewing silently well before hour 24, retrying on every later check, and treating a
+  // failed attempt as "try again later", never as "signed out", unless Microsoft itself says a person must act.
+  const RT_LIFETIME_MS = 24 * 60 * 60 * 1000;
+  const SILENT_AFTER_MS = 16 * 60 * 60 * 1000;     // first silent renewal at hour 16: eight hours of retries before hour 24
+  const ACCESS_MARGIN_MS = 5 * 60 * 1000;           // refresh an access token in its last five minutes
+  const SILENT_RETRY_MS = 30 * 60 * 1000;           // after a failed silent renewal, wait before asking again
+
+  function rtAgeOf(token, now) { return token && token.rtIssuedAt ? Math.max(0, now - token.rtIssuedAt) : 0; }
+  function refreshTokenAlive(token, now) { return Boolean(token && token.refreshToken) && rtAgeOf(token, now) < RT_LIFETIME_MS - 60 * 1000; }
+  function isTransient(error) { return !INTERACTION_ERRORS[error] && error !== 'not-connected' && error !== 'not-configured'; }
+
+  // One answer to "give me a usable access token", used by the panel, the Outlook page and the background worker alike.
+  // deps: { fetch, now, random, sha256, launchSilent? }. auth: the stored outlookAuth record ({ token, account, ... }).
+  // opts: { redirectUri, loginHint, force (the token was refused: refresh even if it looks fresh), lastSilentAt, allowSilent }.
+  // -> { ok, token, changed, how } or { ok:false, error, description, aadsts, needsSignIn, transient, silentTried }.
+  async function session(deps, cfg, auth, opts) {
+    const o = opts || {};
+    const token = auth && auth.token;
+    if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured', needsSignIn: false, transient: false };
+    if (!token || !token.accessToken) return { ok: false, error: 'not-connected', needsSignIn: true, transient: false };
+    const now = deps.now();
+    const allowSilent = o.allowSilent !== false && typeof deps.launchSilent === 'function' && Boolean(o.redirectUri);
+    const silentDue = !o.lastSilentAt || now - o.lastSilentAt >= SILENT_RETRY_MS;
+    let silentTried = false;
+    let silentFail = null;
+
+    async function silent() {
+      silentTried = true;
+      const r = await silentReauth(deps, cfg, o.redirectUri, o.loginHint || null);
+      if (r.ok) return r.token;
+      silentFail = r;
+      return null;
+    }
+
+    // 1. Proactive: the 24 hours are running out (or the age is unknown and the token is old): start a new window now.
+    if (allowSilent && silentDue && rtAgeOf(token, now) >= SILENT_AFTER_MS) {
+      const t = await silent();
+      if (t) return { ok: true, token: t, changed: true, how: 'silent', silentTried };
+    }
+
+    // 2. The access token is still good.
+    if (!o.force && token.expiresAt - ACCESS_MARGIN_MS > now) return { ok: true, token, changed: false, how: 'fresh', silentTried, silentFail };
+
+    // 3. Refresh inside the 24 hours.
+    let refreshFail = null;
+    if (refreshTokenAlive(token, now)) {
+      const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: cfg.SCOPES }));
+      if (t.ok) {
+        const next = normalizeToken(t.data, now, token, false);
+        if (next) return { ok: true, token: next, changed: true, how: 'refresh', silentTried };
+      }
+      refreshFail = t.ok ? { error: 'no-token' } : t;
+      // A network hiccup or a 5xx while the access token still works: keep using it, try again next time.
+      if (isTransient(refreshFail.error) && !o.force && token.expiresAt > now) return { ok: true, token, changed: false, how: 'stale-ok', silentTried };
+    }
+
+    // 4. The refresh token is spent (or refused): a new code without a window.
+    if (allowSilent && !silentTried && (silentDue || o.force)) {
+      const t = await silent();
+      if (t) return { ok: true, token: t, changed: true, how: 'silent', silentTried };
+    }
+
+    const rtDead = !refreshTokenAlive(token, now) || Boolean(refreshFail && INTERACTION_ERRORS[refreshFail.error]);
+    const silentSaysAct = Boolean(silentFail && silentFail.needsInteraction);
+    const fail = refreshFail || silentFail || { error: 'expired' };
+    // Signed out only when the refresh token can no longer work AND (silent renewal said a person must act, or there is no
+    // silent path at all). Anything else is transient: the session is kept and the next check tries again.
+    const needsSignIn = rtDead && (silentSaysAct || !allowSilent);
+    return {
+      ok: false, error: (silentSaysAct && silentFail.error) || fail.error || 'expired',
+      description: fail.description || (silentFail && silentFail.description) || null,
+      aadsts: fail.aadsts || (silentFail && silentFail.aadsts) || null,
+      needsSignIn, transient: !needsSignIn, silentTried
+    };
+  }
+
   return {
     b64url, newPkce, authorizeUrl, parseRedirect, codeBody, refreshBody, normalizeToken,
-    explainError, errorSentence, signIn, ensureFresh, silentReauth
+    explainError, errorSentence, signIn, ensureFresh, silentReauth,
+    session, rtAgeOf, refreshTokenAlive, RT_LIFETIME_MS, SILENT_AFTER_MS, ACCESS_MARGIN_MS, SILENT_RETRY_MS
   };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookAuth };
+else if (typeof globalThis !== 'undefined') globalThis.FlowOutlookAuth = FlowOutlookAuth;

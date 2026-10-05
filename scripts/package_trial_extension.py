@@ -185,6 +185,25 @@ def manifest_pages(manifest: dict) -> list[str]:
     return pages
 
 
+SURFACE_TABLE_RE = re.compile(r"const SURFACES = \{(.*?)\n\};", re.S)
+SURFACE_FILE_RE = re.compile(r"['\"]((?:src|core)/[A-Za-z0-9_./-]+\.(?:js|css))['\"]")
+
+
+def registered_surface_files(worker: Path) -> list[Path]:
+    """Files named in background.js's SURFACES table (scripts registered at runtime for opt-in sites)."""
+    text = worker.read_text(encoding="utf-8")
+    table = SURFACE_TABLE_RE.search(text)
+    if not table:
+        return []
+    out: list[Path] = []
+    for name in SURFACE_FILE_RE.findall(table.group(1)):
+        path = EXTENSION_ROOT / name
+        if not path.is_file():
+            die(f"background.js SURFACES names {name}, which does not exist")
+        out.append(path)
+    return out
+
+
 def collect(profile: str = "full") -> dict[str, Path]:
     manifest_path = EXTENSION_ROOT / "manifest.json"
     if not manifest_path.is_file():
@@ -217,6 +236,10 @@ def collect(profile: str = "full") -> dict[str, Path]:
     if not worker:
         die("manifest.json has no background.service_worker")
     referenced.append(EXTENSION_ROOT / worker)
+    # Content scripts the worker registers at runtime (chrome.scripting.registerContentScripts: WhatsApp Web, Outlook on
+    # the web) are named only in background.js's SURFACES table, not in the manifest. Without this they were missing from
+    # the install zip, so turning a surface on registered files the install did not contain.
+    referenced.extend(registered_surface_files(EXTENSION_ROOT / worker))
     for content in manifest.get("content_scripts") or []:
         for name in (content.get("js") or []) + (content.get("css") or []):
             referenced.append(EXTENSION_ROOT / name)

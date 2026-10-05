@@ -25,3 +25,4 @@ const FlowOutlookConfig = {
 };
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookConfig };
+else if (typeof globalThis !== 'undefined') globalThis.FlowOutlookConfig = FlowOutlookConfig;

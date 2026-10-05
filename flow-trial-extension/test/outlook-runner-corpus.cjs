@@ -357,7 +357,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     const s2 = await o2.sync({ force: true });
     const pend2 = w2.store.outlookPending || {};
     check('upgrade wipe: stale self-offer gone after stateVersion bump', !(pend2.offers || []).some((x) => x.key === 'stale' || (x.base && x.base.counterpart && x.base.counterpart.email === OUT)), pend2);
-    check('upgrade wipe: stateVersion written to 2', w2.store.outlookSync && w2.store.outlookSync.stateVersion === 2, w2.store.outlookSync);
+    check('upgrade wipe: stateVersion written to the current version', w2.store.outlookSync && w2.store.outlookSync.stateVersion === O.create(w2.deps()).STATE_VERSION, w2.store.outlookSync);
     check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), pend2);
     check('upgrade sync ok', s2.ok, s2);
   }

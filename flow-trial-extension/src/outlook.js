@@ -2,7 +2,10 @@
 // core/outlook-sync.js: sign in, fetch the last couple of weeks of one mailbox, hand them to the planner, apply what it decides.
 //
 // What this is, and is not (docs/multi-platform.md):
-//   - It runs while Glance's panel is open (on open, every ten minutes, and on "Check now"). There is no background polling.
+//   - It runs while Glance's panel is open (on open, every ten minutes, and on "Check now") and while an Outlook on the web
+//     tab is open (the in-page Do It card; its network calls go through the service worker). The service worker keeps
+//     the Microsoft session alive on its own (core/outlook-auth.js session(), alarm 'glance-outlook-keepalive') but never
+//     reads mail by itself.
 //   - It reads the last 14 days of the inbox and the sent folder, on this device, with the person's own Microsoft sign-in.
 //     Nothing is sent to Glance's servers.
 //   - On Do It for an incoming ask, it writes a reply DRAFT into the person's Outlook Drafts (Graph createReply) with
@@ -18,11 +21,12 @@ const FlowOutlook = (() => {
   const STATE_KEY = 'outlookSync';
   const PENDING_KEY = 'outlookPending';
   const MIN_INTERVAL_MS = 10 * 60 * 1000;
-  const SILENT_REAUTH_AFTER_MS = 20 * 60 * 60 * 1000; // 20h into the 24h SPA window
-  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,webLink';
+  const SILENT_REAUTH_AFTER_MS = 16 * 60 * 60 * 1000; // first silent renewal at hour 16 of the 24h SPA window (outlook-auth SILENT_AFTER_MS)
+  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,webLink,hasAttachments,internetMessageId';
   const OWN_LEARNED_CAP = 20;
-  // Bump to wipe stale outlookPending/offers from older builds (0.9.0 silence bug).
-  const STATE_VERSION = 2;
+  // Bump to wipe stale outlookPending/offers from older builds (0.9.0 silence bug; 0.9.14: own addresses learned from
+  // other people's To lines and asks swallowed by a loop in another app).
+  const STATE_VERSION = 3;
 
   // Non-GET Graph paths Glance is allowed to call. Anything else throws.
   const WRITE_ALLOW = [
@@ -135,8 +139,16 @@ const FlowOutlook = (() => {
     }
 
     // ---- Graph ------------------------------------------------------------------------------------------------
+    // token: an access-token string, or a holder { accessToken, renew() } whose renew() forces a refresh (or a silent
+    // renewal) and returns the new access token. A 401 is answered once with a renewed token before it counts as signed out.
     async function graphGet(token, url) {
-      const res = await deps.fetch(url, { headers: { Authorization: 'Bearer ' + token, Prefer: 'outlook.body-content-type="text"' } });
+      const holder = typeof token === 'string' ? null : token;
+      const call = (t) => deps.fetch(url, { headers: { Authorization: 'Bearer ' + t, Prefer: 'outlook.body-content-type="text"' } });
+      let res = await call(holder ? holder.accessToken : token);
+      if (res.status === 401 && holder && typeof holder.renew === 'function') {
+        const next = await holder.renew();
+        if (next) res = await call(next);
+      }
       if (res.status === 401) { const e = new Error('auth'); e.code = 'auth'; throw e; }
       if (!res.ok) { const e = new Error('http-' + res.status); e.code = 'http'; e.status = res.status; throw e; }
       return res.json();
@@ -156,8 +168,13 @@ const FlowOutlook = (() => {
 
     async function graphWrite(token, method, url, body) {
       assertAllowedWrite(url, method);
-      const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
-      const res = await deps.fetch(url, { method, headers, body: body != null ? JSON.stringify(body) : undefined });
+      const holder = typeof token === 'string' ? null : token;
+      const call = (t) => deps.fetch(url, { method, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: body != null ? JSON.stringify(body) : undefined });
+      let res = await call(holder ? holder.accessToken : token);
+      if (res.status === 401 && holder && typeof holder.renew === 'function') {
+        const next = await holder.renew();
+        if (next) res = await call(next);
+      }
       if (res.status === 401) { const e = new Error('auth'); e.code = 'auth'; throw e; }
       if (res.status === 403) { const e = new Error('forbidden'); e.code = 'forbidden'; throw e; }
       if (!res.ok && res.status !== 204) { const e = new Error('http-' + res.status); e.code = 'http'; e.status = res.status; throw e; }
@@ -202,11 +219,8 @@ const FlowOutlook = (() => {
     }
 
     function buildOwnAddresses(profile, learned) {
-      if (deps.graphMail && deps.graphMail.ownAddressesFrom) {
-        return Array.from(deps.graphMail.ownAddressesFrom(profile, learned));
-      }
-      const { FlowGraphMail } = (typeof require !== 'undefined' ? (() => { try { return require('../core/graph-mail.js'); } catch (e) { return {}; } })() : {});
-      if (FlowGraphMail && FlowGraphMail.ownAddressesFrom) return Array.from(FlowGraphMail.ownAddressesFrom(profile, learned));
+      const g = gm();
+      if (g && g.ownAddressesFrom) return Array.from(g.ownAddressesFrom(profile, learned));
       const s = new Set();
       const add = (a) => { if (a) s.add(String(a).toLowerCase()); };
       if (profile) { add(profile.mail); add(profile.userPrincipalName); (profile.otherMails || []).forEach(add); }
@@ -249,19 +263,65 @@ const FlowOutlook = (() => {
       return { ok: true };
     }
 
-    async function trySilent(auth, st) {
-      const hint = primaryAddress(auth);
-      if (!hint || typeof deps.launchSilent !== 'function') return { ok: false, needsInteraction: true, error: 'no-silent' };
-      const r = await deps.auth.silentReauth(authDeps(), cfg, deps.redirectUri(), hint);
+    // ---- the durable session (core/outlook-auth.js session) -----------------------------------------------------
+    // Every Graph call in this file gets its token here: fresh, refreshed, or renewed silently. The result is written back
+    // at once (chrome.storage.local), so a service-worker restart, a closed panel or a second tab never loses it.
+    async function ensureSession(opts) {
+      const o = opts || {};
+      const auth = await read(AUTH_KEY, null);
+      const st = await read(STATE_KEY, {});
+      if (!auth || !auth.token) return { ok: false, error: 'not-connected', needsSignIn: false };
+      if (typeof deps.auth.session !== 'function') {
+        const f = await deps.auth.ensureFresh({ fetch: deps.fetch, now: deps.now }, cfg, auth.token);
+        if (f.ok && f.refreshed) await write(AUTH_KEY, Object.assign({}, auth, { token: f.token }));
+        return f.ok ? { ok: true, token: f.token, auth: Object.assign({}, auth, { token: f.token }) } : { ok: false, error: f.error, needsSignIn: Boolean(f.reauth), aadsts: f.aadsts || null, description: f.description || null };
+      }
+      const r = await deps.auth.session(authDeps(), cfg, auth, {
+        redirectUri: deps.redirectUri(), loginHint: primaryAddress(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null
+      });
+      const now = deps.now();
+      let nextAuth = auth;
+      if (r.ok && r.changed) {
+        // Read again right before writing: another surface may have stored a newer token meanwhile; keep the newest window.
+        const cur = (await read(AUTH_KEY, null)) || auth;
+        nextAuth = Object.assign({}, cur, { token: r.token });
+        await write(AUTH_KEY, nextAuth);
+      }
+      const patch = {};
+      if (r.silentTried) patch.lastSilentAt = now;
       if (r.ok) {
-        await write(AUTH_KEY, Object.assign({}, auth, { token: r.token }));
-        return { ok: true, token: r.token };
+        if (st.needsSignIn || st.error) Object.assign(patch, { needsSignIn: false, error: null, aadsts: null, errorDetail: null });
+        if (r.how === 'silent') patch.lastRenewedAt = now;
+      } else {
+        Object.assign(patch, { error: r.error || 'expired', needsSignIn: Boolean(r.needsSignIn), aadsts: r.aadsts || null, errorDetail: r.description || null });
+        if (r.error === 'consent_required') patch.draftConsentNeeded = true;
       }
-      if (r.error === 'consent_required') {
-        await write(STATE_KEY, Object.assign({}, st, { draftConsentNeeded: true, error: r.error, aadsts: r.aadsts || null, errorDetail: r.description || null }));
-        return { ok: false, needsInteraction: true, error: r.error, draftConsentNeeded: true };
-      }
-      return r;
+      if (Object.keys(patch).length) await write(STATE_KEY, Object.assign({}, await read(STATE_KEY, {}), patch));
+      return r.ok ? { ok: true, token: r.token, auth: nextAuth, how: r.how } : r;
+    }
+
+    // A token holder for graphGet/graphWrite: on a 401 it forces one refresh / silent renewal and retries.
+    function holderFor(token) {
+      const h = {
+        accessToken: token.accessToken,
+        renewedOk: false,
+        renew: async () => {
+          const r = await ensureSession({ force: true });
+          if (!r.ok) return null;
+          h.renewedOk = true;
+          h.accessToken = r.token.accessToken;
+          return h.accessToken;
+        }
+      };
+      return h;
+    }
+
+    // Keep the session alive without reading mail (the service worker's alarm, the Outlook page on load).
+    async function keepAlive() {
+      const auth = await read(AUTH_KEY, null);
+      if (!cfg.CLIENT_ID || !auth || !auth.token) return { ok: false, error: 'not-connected' };
+      const r = await ensureSession({});
+      return r.ok ? { ok: true, how: r.how } : { ok: false, error: r.error, needsSignIn: Boolean(r.needsSignIn) };
     }
 
     // ---- one check --------------------------------------------------------------------------------------------
@@ -272,44 +332,24 @@ const FlowOutlook = (() => {
       await ensureStateVersion();
       let st = await read(STATE_KEY, {});
       const now = deps.now();
-      if (!o.force && st.lastAt && now - st.lastAt < MIN_INTERVAL_MS) return { ok: true, skipped: true };
+      const minInterval = typeof o.minIntervalMs === 'number' ? Math.max(30 * 1000, o.minIntervalMs) : MIN_INTERVAL_MS;
+      if (!o.force && st.lastAt && now - st.lastAt < minInterval) return { ok: true, skipped: true };
 
-      // Silent renewal before the 24h SPA window ends, or when refresh fails with invalid_grant.
-      const rtAge = auth.token.rtIssuedAt ? (now - auth.token.rtIssuedAt) : 0;
-      if (rtAge > SILENT_REAUTH_AFTER_MS) {
-        const silent = await trySilent(auth, st);
-        if (silent.ok) { auth = await read(AUTH_KEY, null); st = await read(STATE_KEY, {}); }
-        else if (silent.needsInteraction) {
-          await write(STATE_KEY, Object.assign({}, st, { error: silent.error || 'expired', needsSignIn: true, aadsts: silent.aadsts || null, errorDetail: silent.description || null }));
-          return { ok: false, error: silent.error, needsSignIn: true };
-        }
+      // A usable token: fresh, refreshed, or silently renewed before / after the 24h SPA window (ensureSession).
+      const sess = await ensureSession({});
+      if (!sess.ok) {
+        return { ok: false, error: sess.error, needsSignIn: Boolean(sess.needsSignIn), transient: Boolean(sess.transient), aadsts: sess.aadsts || null };
       }
-
-      let fresh = await deps.auth.ensureFresh({ fetch: deps.fetch, now: deps.now }, cfg, auth.token);
-      if (!fresh.ok && fresh.reauth) {
-        const silent = await trySilent(auth, st);
-        if (silent.ok) {
-          auth = await read(AUTH_KEY, null);
-          fresh = { ok: true, token: auth.token, refreshed: true };
-        } else {
-          await write(STATE_KEY, Object.assign({}, st, {
-            error: fresh.error, needsSignIn: true,
-            aadsts: fresh.aadsts || silent.aadsts || null,
-            errorDetail: fresh.description || silent.description || null
-          }));
-          return { ok: false, error: fresh.error, needsSignIn: true, aadsts: fresh.aadsts || null };
-        }
-      } else if (!fresh.ok) {
-        await write(STATE_KEY, Object.assign({}, st, { error: fresh.error, needsSignIn: Boolean(fresh.reauth), aadsts: fresh.aadsts || null, errorDetail: fresh.description || null }));
-        return { ok: false, error: fresh.error, needsSignIn: Boolean(fresh.reauth) };
-      }
-      if (fresh.refreshed) await write(AUTH_KEY, Object.assign({}, auth, { token: fresh.token }));
+      auth = sess.auth || (await read(AUTH_KEY, null));
+      st = await read(STATE_KEY, {});
+      const fresh = { ok: true, token: sess.token };
+      const tok = holderFor(sess.token);
 
       let messages;
       try {
         const since = new Date(now - cfg.LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
-        const inbox = await folder(fresh.token.accessToken, 'inbox', since);
-        const sent = await folder(fresh.token.accessToken, 'sentitems', since);
+        const inbox = await folder(tok, 'inbox', since);
+        const sent = await folder(tok, 'sentitems', since);
         // Learn own addresses: profile + sentitems from + inbox toRecipients that are not the sender.
         const g = gm();
         const learnedMsg = (g && g.learnOwnFromMessages)
@@ -323,31 +363,40 @@ const FlowOutlook = (() => {
             if (a && a !== from) inboxLearned.push(a);
           });
         });
+        // Own addresses are recomputed on every check from what can only be yours: the profile, the senders of your sent
+        // folder (kept across checks in sentLearned), and To lines that pass graph-mail's strict rule. Never sticky inbox
+        // guesses: one CC'd message used to make its To person "you" for good, and every ask from them went silent.
         const prevOwn = auth.ownAddresses || [];
+        const sentLearned = Array.from(new Set((auth.sentLearned || []).concat(sent.map((m) => normAddr(m && m.from && m.from.emailAddress && m.from.emailAddress.address)).filter(Boolean)))).slice(0, OWN_LEARNED_CAP);
         const profile = auth.profile || { mail: auth.account && auth.account.mail, userPrincipalName: auth.account && auth.account.userPrincipalName };
-        const ownAddresses = buildOwnAddresses(profile, prevOwn.concat(learnedMsg)).slice(0, OWN_LEARNED_CAP);
+        let ownAddresses = buildOwnAddresses(profile, sentLearned.concat(learnedMsg)).slice(0, OWN_LEARNED_CAP);
+        if (g && g.notOwn) ownAddresses = g.notOwn(ownAddresses, inbox, profile, sentLearned);
         const primary = (g && g.pickPrimary)
-          ? (g.pickPrimary(ownAddresses, profile, inboxLearned) || ownAddresses[0] || (auth.account && auth.account.address))
-          : (inboxLearned[0] || learnedMsg[0] || ownAddresses[0] || (auth.account && auth.account.address));
-        if (ownAddresses.join('|') !== (prevOwn || []).join('|') || (auth.account && auth.account.address) !== primary) {
-          await write(AUTH_KEY, Object.assign({}, auth, {
-            ownAddresses,
-            account: Object.assign({}, auth.account, { address: primary }),
-            token: fresh.token
+          ? (g.pickPrimary(ownAddresses, profile, inboxLearned.filter((a) => ownAddresses.indexOf(a) !== -1)) || ownAddresses[0] || (auth.account && auth.account.address))
+          : (ownAddresses[0] || (auth.account && auth.account.address));
+        if (ownAddresses.join('|') !== (prevOwn || []).join('|') || (auth.account && auth.account.address) !== primary || (auth.sentLearned || []).join('|') !== sentLearned.join('|')) {
+          const cur = (await read(AUTH_KEY, null)) || auth;
+          await write(AUTH_KEY, Object.assign({}, cur, {
+            ownAddresses, sentLearned,
+            account: Object.assign({}, cur.account, { address: primary })
           }));
           auth = await read(AUTH_KEY, null);
         }
         messages = inbox.concat(sent);
       } catch (e) {
-        const reauth = e.code === 'auth';
-        await write(STATE_KEY, Object.assign({}, st, { error: e.code === 'auth' ? 'auth' : (e.message || 'error'), needsSignIn: reauth }));
-        return { ok: false, error: e.message, needsSignIn: reauth };
+        // A 401 that survived one forced renewal: the session state was already written by ensureSession.
+        const cur = await read(STATE_KEY, {});
+        // Still refused with a token Microsoft has just renewed: the grant itself is gone (revoked, consent withdrawn).
+        const reauth = e.code === 'auth' && (Boolean(cur.needsSignIn) || tok.renewedOk || typeof deps.auth.session !== 'function');
+        await write(STATE_KEY, Object.assign({}, cur, { error: e.code === 'auth' ? 'auth' : (e.message || 'error'), needsSignIn: reauth }));
+        return { ok: false, error: e.message, needsSignIn: reauth, transient: !reauth };
       }
 
       const meSet = auth.ownAddresses && auth.ownAddresses.length ? auth.ownAddresses : (auth.account && auth.account.address);
       const watches = await deps.storage.getWatches();
       const graph = await deps.storage.getIdentityGraph();
-      const p = deps.plan({ messages, me: meSet, watches, graph, state: st, now, deps: deps.planDeps });
+      const planDeps = Object.assign({}, deps.planDeps, { actions: (deps.planDeps && deps.planDeps.actions) || deps.actions || null });
+      const p = deps.plan({ messages, me: meSet, watches, graph, state: st, now, deps: planDeps });
 
       for (const party of p.parties) { try { await deps.storage.observeIdentity(party); } catch (e) { /* optional */ } }
 
@@ -392,12 +441,9 @@ const FlowOutlook = (() => {
       const incomingCards = [];
       for (const inc of (p.incoming || [])) {
         const intent = inc.intent;
-        const actions = deps.actions || (typeof FlowActions !== 'undefined' ? FlowActions : null);
-        if (!actions || !intent) continue;
-        const process = actions.planFor(intent, { threadUrl: inc.base.threadUrl, hasThreadAttachment: false });
-        if (!process) continue;
-        const steps = (process.steps || []).map((s) => s.kind === 'gmailDraft' ? Object.assign({}, s, { kind: 'outlookDraft', id: (s.id || 'draft').replace(/^gmail/, 'outlook') }) : s);
-        const outlookProcess = Object.assign({}, process, { steps });
+        // The planner already ran Gmail's chain (core/incoming-judge.js) and mapped the draft step to Outlook.
+        const outlookProcess = inc.process;
+        if (!intent || !outlookProcess) continue;
         const text = (inc.base.subject ? inc.base.subject + '\n' : '') + (inc.base.text || '');
         const entry = {
           messageId: inc.messageId,
@@ -412,6 +458,8 @@ const FlowOutlook = (() => {
           text: text,
           outlookIncomingId: inc.messageId,
           outlookConversationId: inc.conversationId,
+          internetMessageId: inc.internetMessageId || null,
+          receivedDateTime: inc.receivedDateTime || null,
           key: inc.key,
           label: (intent && intent.label) || 'Reply requested'
         };
@@ -449,7 +497,8 @@ const FlowOutlook = (() => {
         lastAt: now, lastCount: p.stats.conversations, lastIncoming: (p.incoming || []).length, lastOffers: offers.length,
         error: null, needsSignIn: false, draftConsentNeeded: Boolean(st.draftConsentNeeded),
         offered, declined: st.declined || {}, incomingDeclined: st.incomingDeclined || {},
-        stateVersion: STATE_VERSION, diagnostics
+        stateVersion: STATE_VERSION, diagnostics,
+        lastSilentAt: st.lastSilentAt || null, lastRenewedAt: st.lastRenewedAt || null
       });
       let reconcile = null;
       try { reconcile = await reconcileReceipts(); } catch (e) { reconcile = { ok: false, error: String(e && e.message || e) }; }
@@ -487,9 +536,9 @@ const FlowOutlook = (() => {
       if (!scoped.ok) {
         return { ok: false, error: scoped.error || 'consent', fallback: true };
       }
-      const fresh = await deps.auth.ensureFresh({ fetch: deps.fetch, now: deps.now }, cfg, scoped.auth.token);
-      if (!fresh.ok) return { ok: false, error: fresh.error, needsSignIn: Boolean(fresh.reauth) };
-      const token = fresh.token.accessToken;
+      const sess = await ensureSession({});
+      if (!sess.ok) return { ok: false, error: sess.error, needsSignIn: Boolean(sess.needsSignIn) };
+      const token = holderFor(sess.token);
       const url = cfg.GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
       let draft;
       try {
@@ -565,9 +614,9 @@ const FlowOutlook = (() => {
       if (!draftId) return { ok: false, error: 'no-ref' };
       const auth = await read(AUTH_KEY, null);
       if (!auth || !auth.token) return { ok: false, error: 'not-connected' };
-      const fresh = await deps.auth.ensureFresh({ fetch: deps.fetch, now: deps.now }, cfg, auth.token);
-      if (!fresh.ok) return { ok: false, error: fresh.error };
-      const token = fresh.token.accessToken;
+      const sess = await ensureSession({});
+      if (!sess.ok) return { ok: false, error: sess.error };
+      const token = holderFor(sess.token);
       const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '?$select=id,isDraft';
       let msg;
       try { msg = await graphGet(token, getUrl); }
@@ -664,12 +713,10 @@ const FlowOutlook = (() => {
     async function reconcileReceipts() {
       const auth = await read(AUTH_KEY, null);
       if (!cfg.CLIENT_ID || !auth || !auth.token) return { ok: true, skipped: true, checked: 0 };
-      let fresh;
-      try {
-        fresh = await deps.auth.ensureFresh({ fetch: deps.fetch, now: deps.now }, cfg, auth.token);
-      } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
-      if (!fresh.ok) return { ok: false, error: fresh.error, needsSignIn: Boolean(fresh.reauth) };
-      const token = fresh.token.accessToken;
+      let sess;
+      try { sess = await ensureSession({}); } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+      if (!sess.ok) return { ok: false, error: sess.error, needsSignIn: Boolean(sess.needsSignIn) };
+      const token = holderFor(sess.token);
       const receipts = await listActiveReceipts();
       let dropped = 0, sent = 0, kept = 0;
       for (const r of receipts) {
@@ -768,7 +815,7 @@ const FlowOutlook = (() => {
     }
 
     return {
-      ORIGINS, OWA_ORIGINS, status, connect, disconnect, sync, acceptOffer, declineOffer, declineIncoming, answerAsk,
+      ORIGINS, OWA_ORIGINS, status, connect, disconnect, sync, keepAlive, ensureSession, acceptOffer, declineOffer, declineIncoming, answerAsk,
       createReplyDraft, undoReplyDraft, reconcileReceipts, assertAllowedWrite, hasScope, primaryAddress, clearOutlookJudgmentState, dismissIncoming, STATE_VERSION
     };
   }

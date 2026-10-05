@@ -1,7 +1,12 @@
-// Outlook on the web (outlook.live.com / outlook.office.com): same Glance Do It
-// card and the same engine as Gmail (FlowIntent + FlowActions). Only I/O differs:
-// read the open message from the OWA DOM (matched to Graph/sync state); write a
-// reply DRAFT via Graph (never send).
+// Outlook on the web (outlook.live.com / outlook.office.com): the same Glance Do It
+// card, floating in the open message, and the same engine as Gmail
+// (core/incoming-judge.js: FlowIntent -> FlowActions -> FlowDraftReply). Only I/O differs:
+// the mail is read through Microsoft Graph by the same planner the panel runs
+// (src/outlook.js + core/outlook-sync.js, network through the service worker), the
+// open message is matched to it, and Do It writes a reply DRAFT via Graph (never sends).
+//
+// The page does not wait for Glance's panel: on load, and whenever an open message has
+// no judged entry yet, it runs one check itself (at most once a minute).
 //
 // Honesty: OWA markup is not a public interface. Selectors live in core/owa-parse.js
 // and are re-checked every pass; if the pane cannot be read, stay silent.
@@ -10,8 +15,11 @@
   if (typeof FlowStorage === 'undefined') return;
 
   const DEBOUNCE_MS = 800;
+  const PAGE_SYNC_MIN_MS = 60 * 1000;
   let timer = null;
   let lastKey = '';
+  let lastPageSyncAt = 0;
+  let syncing = null;
 
   function send(msg) {
     return new Promise((resolve) => {
@@ -24,6 +32,67 @@
         resolve({ ok: false, reason: String(e && e.message || e) });
       }
     });
+  }
+
+  // ---- the same planner as the panel, run from this page ----------------------------------------------------------
+  // Graph reads go through the service worker (flow:outlook-fetch); the session (refresh / silent renewal) is the worker's
+  // (flow:outlook-session), so two places never renew at once and the token request carries the extension's own origin.
+  function proxyFetch(url, init) {
+    return send({ type: 'flow:outlook-fetch', url: String(url), init: { method: (init && init.method) || 'GET', headers: (init && init.headers) || {} } })
+      .then((r) => {
+        const body = (r && typeof r.body === 'string') ? r.body : '';
+        return {
+          ok: Boolean(r && r.ok), status: (r && r.status) || 0,
+          json: async () => JSON.parse(body || 'null'),
+          text: async () => body
+        };
+      });
+  }
+
+  function runner() {
+    if (runner.inst) return runner.inst;
+    if (typeof FlowOutlook === 'undefined' || typeof FlowOutlookSync === 'undefined' || typeof FlowOutlookConfig === 'undefined' || typeof FlowOutlookAuth === 'undefined') return null;
+    const auth = Object.assign({}, FlowOutlookAuth, {
+      session: async (_deps, _cfg, _auth, opts) => {
+        const r = await send({ type: 'flow:outlook-session', force: Boolean(opts && opts.force) });
+        return r && r.ok ? r : Object.assign({ ok: false, error: 'failed' }, r || {});
+      }
+    });
+    runner.inst = FlowOutlook.create({
+      storage: FlowStorage, cfg: FlowOutlookConfig, auth: auth, plan: FlowOutlookSync.plan,
+      fetch: proxyFetch,
+      redirectUri: () => 'https://' + chrome.runtime.id + '.chromiumapp.org/',
+      launch: () => Promise.reject(new Error('panel-only')),
+      permissions: { request: async () => false, contains: async () => true, remove: async () => false },
+      send: send,
+      random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b), now: () => Date.now(),
+      planDeps: {
+        extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null,
+        types: typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null,
+        pipeline: typeof FlowIntentPipeline !== 'undefined' ? FlowIntentPipeline : null,
+        intent: typeof FlowIntent !== 'undefined' ? FlowIntent : null,
+        factReply: typeof FlowFactReply !== 'undefined' ? FlowFactReply : null,
+        actions: typeof FlowActions !== 'undefined' ? FlowActions : null
+      },
+      actions: typeof FlowActions !== 'undefined' ? FlowActions : null,
+      identity: typeof FlowIdentity !== 'undefined' ? FlowIdentity : null,
+      followUp: typeof FlowFollowUp !== 'undefined' ? FlowFollowUp : null
+    });
+    return runner.inst;
+  }
+
+  // One check from this page, at most once a minute (the runner also refuses more often than that).
+  async function pageSync(reason) {
+    if (syncing) return syncing;
+    const now = Date.now();
+    if (now - lastPageSyncAt < PAGE_SYNC_MIN_MS) return { ok: true, skipped: true };
+    const o = runner();
+    if (!o) return { ok: false, error: 'no-runner' };
+    lastPageSyncAt = now;
+    syncing = o.sync({ minIntervalMs: PAGE_SYNC_MIN_MS, reason: reason || 'page' })
+      .catch((e) => ({ ok: false, error: String(e && e.message || e) }))
+      .finally(() => { syncing = null; });
+    return syncing;
   }
 
   // Candidates Glance already judged for Outlook (sync / Still Open).
@@ -50,24 +119,18 @@
     return out;
   }
 
-  // Same engine as Gmail: classify + planFor. Used when DOM text is available
-  // and no stored candidate matched (or to verify the stored intent).
-  function decideFromText(text, senderEmail, senderName) {
-    if (typeof FlowIntent === 'undefined' || typeof FlowActions === 'undefined') return null;
-    const intent = FlowIntent.classify(text, {
-      senderEmail: senderEmail,
-      senderName: senderName,
-      now: new Date()
+  // Same engine as Gmail (core/incoming-judge.js), on the open message's text. Used only when the planner has not judged
+  // this message yet; the planner's own entry (Graph ids, Graph text) always wins.
+  function decideFromText(pane) {
+    if (typeof FlowIncomingJudge === 'undefined') return null;
+    // The message's own words, as Gmail judges them: quoted history ("From: … Sent: …", "On … wrote:") cut off.
+    const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
+    const r = FlowIncomingJudge.judge({
+      text: own, subject: pane.subject || '',
+      sender: { name: pane.senderName, email: pane.senderEmail },
+      now: new Date(), threadUrl: location.href, hasThreadAttachment: false, surface: 'outlook'
     });
-    if (!intent || !FlowIntent.shouldShowChip(intent)) return null;
-    if (typeof FlowFactReply !== 'undefined' && FlowFactReply.blocksInbox && FlowFactReply.blocksInbox(intent, text)) return null;
-    const process = FlowActions.planFor(intent, { threadUrl: location.href, hasThreadAttachment: false });
-    if (!process) return null;
-    const steps = (process.steps || []).map((s) => {
-      if (s.kind !== 'gmailDraft') return s;
-      return Object.assign({}, s, { kind: 'outlookDraft', id: (s.id || 'draft').replace(/^gmail/, 'outlook') });
-    });
-    return { intent: intent, process: Object.assign({}, process, { steps: steps }) };
+    return r && r.show ? { intent: r.intent, process: r.process } : null;
   }
 
   function buildCtx(entry, pane, decided) {
@@ -128,36 +191,24 @@
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     const askText = ctx.bodyText || ctx.text || '';
     const subject = ctx.subject || '';
-    const body = (typeof FlowDraftReply !== 'undefined')
-      ? FlowDraftReply.bodyFromIntent(
-          ctx.intent,
-          ctx.sender && ctx.sender.name,
-          ctx.sender && ctx.sender.email,
-          { text: askText, subject: subject }
-        )
-      : '';
-    const draftStep = (ctx.process.steps || []).find((s) => s.kind === 'outlookDraft') || { kind: 'outlookDraft', params: {} };
-    const params = Object.assign({}, draftStep.params || {}, {
-      askText: askText || (draftStep.params && draftStep.params.askText) || null
-    });
     let fromAddress = null;
     try {
       const st = await FlowStorage.get();
       fromAddress = preferHumanFrom(st && st.outlookAuth);
     } catch (e) { /* From resolved again in background */ }
-    const payload = {
+    // Exactly the payload Gmail's Do It sends for its draft step (core/incoming-judge.js draftPayload); background.js
+    // writes it with the same composer (FlowDraftReply.draftBodyText). Only the connector differs.
+    const base = (typeof FlowIncomingJudge !== 'undefined')
+      ? FlowIncomingJudge.draftPayload(ctx.process, { sender: ctx.sender, subject: subject })
+      : { params: {}, senderName: ctx.sender && ctx.sender.name, senderEmail: ctx.sender && ctx.sender.email, subject: subject };
+    const payload = Object.assign(base, {
       outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
       messageId: ctx.messageId,
-      body: body,
-      senderName: ctx.sender && ctx.sender.name,
-      senderEmail: ctx.sender && ctx.sender.email,
       intent: ctx.intent,
-      params: params,
       label: ctx.intent && ctx.intent.label,
       text: askText,
-      subject: subject,
       fromAddress: fromAddress
-    };
+    });
     payload.connectorId = 'outlookDraft';
     const r = await send({ type: 'flow:execute-action', payload: payload });
     if (!r || !r.ok) {
@@ -224,21 +275,29 @@
     const st = await FlowStorage.get();
     if (!st || !st.outlookAuth || !st.outlookAuth.token) return;
 
-    const pane = FlowOwaParse.readPane(document, location.href);
+    const own = (st.outlookAuth.ownAddresses || []).concat(st.outlookAuth.account && st.outlookAuth.account.address ? [st.outlookAuth.account.address] : []);
+    const pane = FlowOwaParse.readPane(document, location.href, { own: own });
     if (!pane) return;
 
-    const candidates = await outlookCandidates();
+    let candidates = await outlookCandidates();
     let entry = FlowOwaParse.matchEntry(pane, candidates);
+    // Not judged yet (new mail, or the panel has not been opened): run one check from here, then look again.
+    if (!entry && !(st.outlookSync && st.outlookSync.needsSignIn)) {
+      const r = await pageSync('pane');
+      if (r && r.ok && !r.skipped) {
+        candidates = await outlookCandidates();
+        entry = FlowOwaParse.matchEntry(pane, candidates);
+      }
+    }
 
-    // Same silence bar as Gmail: if no stored candidate, try classify on the open text.
+    // Same silence bar as Gmail: if no stored candidate, judge the open text with the same chain.
     let decided = null;
-    const text = (pane.subject ? pane.subject + '\n' : '') + (pane.text || '');
     if (!entry || !entry.process) {
-      decided = decideFromText(text, pane.senderEmail, pane.senderName);
+      decided = decideFromText(pane);
       if (!decided) return;
       if (!entry) {
-        // No Graph id → cannot createReply; stay silent rather than a dead Do It.
-        if (!pane.itemId && !(entry && entry.messageId)) return;
+        // No Graph id -> cannot createReply; stay silent rather than a dead Do It.
+        if (!pane.itemId) return;
         entry = {
           messageId: pane.itemId,
           outlookIncomingId: pane.itemId,
@@ -337,5 +396,16 @@
   obs.observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('hashchange', schedule);
   window.addEventListener('popstate', schedule);
+  // A check from the panel (or another Outlook tab) lands here at once.
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && (changes.outlookPending || changes.outlookAuth)) schedule();
+    });
+  } catch (e) { /* storage events unavailable */ }
+  // Keep the Microsoft session alive while Outlook is open, and judge the inbox once on arrival.
+  send({ type: 'flow:outlook-keepalive' }).catch(() => {});
+  FlowStorage.get().then((st) => {
+    if (st && st.outlookAuth && st.outlookAuth.token) pageSync('load').then(schedule).catch(() => {});
+  }).catch(() => {});
   schedule();
 })();

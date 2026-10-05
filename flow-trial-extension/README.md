@@ -616,7 +616,8 @@ foundation, not the feature.
   stricter than Gmail until measured: WhatsApp Web (read-only, one-to-one chats,
   `src/content-whatsapp.js`), a right-click "stay on this" on any page
   (`core/capture.js`), and Outlook through Microsoft's own mail API and the same Do It card inside Outlook on the web (read + reply drafts on Do It, never send; last 14
-  days, while the panel is open: `src/outlook.js`, needs a Microsoft app registration
+  days, while the panel or an Outlook-on-the-web tab is open; one decision shared with Gmail in `core/incoming-judge.js`;
+  the session kept alive by the worker: `src/outlook.js`, needs a Microsoft app registration
   and its client id in `core/outlook-config.js`). See `docs/multi-platform.md`.
 - **The passive judgment engine is not a language model, and sends nothing
   anywhere.** `core/judgment.js`'s scorer is a transparent, explainable

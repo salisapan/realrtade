@@ -4,7 +4,7 @@
 //
 //   patches   changes to loops that already exist
 //   offers    conversations where YOUR newest message asks/promises and no loop exists yet
-//   incoming  someone else asked YOU something (same silence bar as Gmail: FlowIntent.shouldShowChip); Do It creates a reply draft
+//   incoming  someone else asked YOU something: core/incoming-judge.js, the very chain Gmail's chip runs; Do It creates a reply draft
 //   asks      a question to put to the person instead of acting
 //   parties   the people met, for core/identity-graph.js
 //
@@ -20,6 +20,7 @@ const FlowOutlookSync = (() => {
   const identity = sibling(typeof FlowIdentity !== 'undefined' ? FlowIdentity : null, './identity-graph.js', 'FlowIdentity');
   const graphMail = sibling(typeof FlowGraphMail !== 'undefined' ? FlowGraphMail : null, './graph-mail.js', 'FlowGraphMail');
   const channel = sibling(typeof FlowChannel !== 'undefined' ? FlowChannel : null, './channel.js', 'FlowChannel');
+  const judge = sibling(typeof FlowIncomingJudge !== 'undefined' ? FlowIncomingJudge : null, './incoming-judge.js', 'FlowIncomingJudge');
 
   const MAX_OFFERS = 5;
   const MAX_ASKS = 5;
@@ -139,105 +140,92 @@ const FlowOutlookSync = (() => {
       // Never classify a message whose sender is in ownAddresses.
       if (meSet && graphMail.isOwn && graphMail.isOwn(party.email, meSet)) { note('own-sender', { counterpart: party.email || null }); return; }
 
-      let target = w && w.status === 'waiting' && !followUp.isMine(w) && !followUp.isClock(w) ? w : null;
-      let via = null;
-      let crossHandled = false;
-      if (!target && !w) {
-        if (story && followUp.isActive) {
-          const hit = story.match(watches, { email: party.email, subject: lastRaw.subject, text: last.text }, { extract: deps.extract, samePerson: identity ? (c) => identity.same(o.graph, c, party) : null });
-          if (hit) { target = hit.watch; via = (target.channel || 'gmail') !== 'outlook' ? 'outlook' : null; }
-        }
-        if (!target && crossChannel && identity) {
-          const d = crossChannel.judge(watches, o.graph, party, last.text, { channel: 'outlook', thread: id }, { now, extract: deps.extract });
-          if (d) {
-            crossHandled = true;
-            const cw = watches.find((x) => x.id === d.watchId);
-            if (cw && cw.lastReplyMessageId !== last.id) {
-              if (d.action === 'ask') {
-                if (out.asks.length < MAX_ASKS) {
-                  const yes = crossChannel.patchFor(cw, Object.assign({}, d, { action: 'close' }), 'outlook', now);
-                  if (yes) out.asks.push({ key: 'x|' + cw.id + '|' + last.id, watchId: cw.id, title: first(party) + ' wrote in Outlook.', detail: 'Does this settle “' + String(cw.what || '').slice(0, 80) + '”? I kept the loop open.', yes: Object.assign({ lastReplyMessageId: last.id }, yes) });
-                  out.patches.push({ id: cw.id, patch: { crossAskedAt: now } });
-                }
-              } else {
-                const patch = crossChannel.patchFor(cw, d, 'outlook', now);
-                if (patch) {
-                  out.patches.push({ id: cw.id, patch: Object.assign({ lastReplyMessageId: last.id }, patch) });
-                  out.stats[d.action === 'close' ? 'closed' : 'moved']++;
-                  out.lines.push(lineFor(d.reply, cw, party, { patch }) + ' (from Outlook)');
+      // The incoming-ask judgment comes first and is Gmail's own (core/incoming-judge.js): the message's own text, the
+      // subject as context, the same silence bar, the same process. Gmail shows its chip on a new ask whatever loops exist
+      // with that person elsewhere, so Outlook does too.
+      const ikey = conv + '|' + last.id;
+      const subject = String(lastRaw.subject || '');
+      const judged = judge ? judge.judge({
+        text: last.text, subject, sender: { name: party.name, email: party.email },
+        attachmentCount: lastRaw.hasAttachments ? 1 : 0,
+        calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
+        now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: Boolean(lastRaw.hasAttachments), surface: 'outlook'
+      }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' };
+      // Someone asking YOU for something: Gmail shows its Do It on that message whatever loops exist, so Outlook does too.
+      // Their own promise or answer stays with the loop it belongs to (one item, not two).
+      const isAsk = Boolean(judged.show && judged.intent && judged.intent.type === 'request');
+
+      // Loops this message may answer: the conversation's own loop, the same matter in another app, a person-only guess.
+      let loopNoted = false;
+      function handleLoops() {
+        loopNoted = false;
+        let target = w && w.status === 'waiting' && !followUp.isMine(w) && !followUp.isClock(w) ? w : null;
+        let via = null;
+        if (!target && !w) {
+          if (story && followUp.isActive) {
+            const hit = story.match(watches, { email: party.email, subject: lastRaw.subject, text: last.text }, { extract: deps.extract, samePerson: identity ? (c) => identity.same(o.graph, c, party) : null });
+            if (hit) { target = hit.watch; via = (target.channel || 'gmail') !== 'outlook' ? 'outlook' : null; }
+          }
+          if (!target && crossChannel && identity) {
+            const d = crossChannel.judge(watches, o.graph, party, last.text, { channel: 'outlook', thread: id }, { now, extract: deps.extract });
+            // A new ask is not an answer: with no topical link to the loop, a message Gmail would show as a Do It does not
+            // also become "does this settle it?" for some other loop with the same person.
+            if (d && !(isAsk && d.link === 'person')) {
+              const cw = watches.find((x) => x.id === d.watchId);
+              if (cw && cw.lastReplyMessageId !== last.id) {
+                if (d.action === 'ask') {
+                  if (out.asks.length < MAX_ASKS) {
+                    const yes = crossChannel.patchFor(cw, Object.assign({}, d, { action: 'close' }), 'outlook', now);
+                    if (yes) out.asks.push({ key: 'x|' + cw.id + '|' + last.id, watchId: cw.id, title: first(party) + ' wrote in Outlook.', detail: 'Does this settle “' + String(cw.what || '').slice(0, 80) + '”? I kept the loop open.', yes: Object.assign({ lastReplyMessageId: last.id }, yes) });
+                    out.patches.push({ id: cw.id, patch: { crossAskedAt: now } });
+                  }
+                } else {
+                  const patch = crossChannel.patchFor(cw, d, 'outlook', now);
+                  if (patch) {
+                    out.patches.push({ id: cw.id, patch: Object.assign({ lastReplyMessageId: last.id }, patch) });
+                    out.stats[d.action === 'close' ? 'closed' : 'moved']++;
+                    out.lines.push(lineFor(d.reply, cw, party, { patch }) + ' (from Outlook)');
+                  }
                 }
               }
+              if (!isAsk) note('cross-channel');
+              loopNoted = true;
+              return;
             }
           }
         }
-      }
-      if (target && target.lastReplyMessageId !== last.id) {
-        const reply = followUp.classifyReply(last.text, target, { now, email: party.email, extract: deps.extract });
-        const res = followUp.applyReply(target, reply, last.ts || now);
-        if (res && !res.none) {
-          if (res.confirm) {
-            if (out.asks.length < MAX_ASKS) out.asks.push({ key: 'p|' + target.id + '|' + last.id, watchId: target.id, title: first(party) + ' replied. Is it paid?', detail: 'Nothing in the message says the payment was sent, so I kept the loop open.', yes: { status: 'resolved', resolvedAt: now, resolvedBy: 'manual', closedAs: 'paid', lastReplyMessageId: last.id } });
-            out.patches.push({ id: target.id, patch: Object.assign({}, res.patch, { lastReplyMessageId: last.id }) });
+        if (target && target.lastReplyMessageId !== last.id) {
+          const reply = followUp.classifyReply(last.text, target, { now, email: party.email, extract: deps.extract });
+          const res = followUp.applyReply(target, reply, last.ts || now);
+          if (res && !res.none) {
+            if (res.confirm) {
+              if (out.asks.length < MAX_ASKS) out.asks.push({ key: 'p|' + target.id + '|' + last.id, watchId: target.id, title: first(party) + ' replied. Is it paid?', detail: 'Nothing in the message says the payment was sent, so I kept the loop open.', yes: { status: 'resolved', resolvedAt: now, resolvedBy: 'manual', closedAs: 'paid', lastReplyMessageId: last.id } });
+              out.patches.push({ id: target.id, patch: Object.assign({}, res.patch, { lastReplyMessageId: last.id }) });
+              loopNoted = true;
+              return;
+            }
+            const patch = Object.assign({}, res.patch, { lastReplyMessageId: last.id }, via ? { viaChannel: via } : {});
+            out.patches.push({ id: target.id, patch });
+            if (res.close) out.stats.closed++; else if (res.rescheduled) out.stats.moved++;
+            if (res.close || res.rescheduled || res.yours) out.lines.push(lineFor(reply, target, party, res));
+            loopNoted = true;
             return;
           }
-          const patch = Object.assign({}, res.patch, { lastReplyMessageId: last.id }, via ? { viaChannel: via } : {});
-          out.patches.push({ id: target.id, patch });
-          if (res.close) out.stats.closed++; else if (res.rescheduled) out.stats.moved++;
-          if (res.close || res.rescheduled || res.yours) out.lines.push(lineFor(reply, target, party, res));
-          return;
         }
+        if (w && !isAsk) { if (!judged.show) note(w.status === 'waiting' ? 'has-open-loop' : 'has-loop'); loopNoted = true; }
       }
-      if (crossHandled) { note('cross-channel'); return; }
-      // An incoming ask in a conversation that already has a loop: handled above as a reply, not as a second item.
-      if (w) { note(w.status === 'waiting' ? 'has-open-loop' : 'has-loop'); return; }
 
-      // ---- incoming ask: someone else asked you something (same judge Gmail uses) ------------------------
-      // Fall through instead of returning silently when no loop / story / crossChannel hit.
-      const intentApi = deps.intent || (typeof FlowIntent !== 'undefined' ? FlowIntent : null);
-      if (!intentApi || typeof intentApi.classify !== 'function') { note('no-intent-api'); return; }
-      if (out.incoming.length >= MAX_INCOMING) { note('incoming-capped'); return; }
-      const ikey = conv + '|' + last.id;
+      handleLoops();
+
+      if (judged.show && loopNoted && !isAsk) return;
+      if (!judged.show) {
+        if (!loopNoted) note(judged.reason || 'intent-null', { counterpart: party.email || null, intentType: judged.intent && judged.intent.type || undefined });
+        return;
+      }
       if (incomingDeclined[ikey] || declined[ikey]) { note('incoming-declined'); return; }
-      const subject = String(lastRaw.subject || '');
-      const text = (subject ? subject + '\n' : '') + last.text;
-      const intent = intentApi.classify(text, {
-        senderEmail: party.email, senderName: party.name,
-        calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
-        now: new Date(now)
-      });
-      if (!intent || !intent.type) {
-        note(intent && intent.quiet ? ('quiet:' + intent.quiet) : 'intent-null', { counterpart: party.email || null });
-        return;
-      }
-      if (!intentApi.shouldShowChip(intent)) {
-        note('chip-low-confidence', { counterpart: party.email || null, intentType: intent.type });
-        return;
-      }
-      if (deps.factReply && typeof deps.factReply.blocksInbox === 'function' && deps.factReply.blocksInbox(intent, text)) {
-        note('fact-reply-block', { counterpart: party.email || null });
-        return;
-      }
-      // Same process planner as Gmail; map gmailDraft → outlookDraft (Graph write adapter).
-      const actionsApi = deps.actions || (typeof FlowActions !== 'undefined' ? FlowActions : null);
-      let process = null;
-      if (actionsApi && typeof actionsApi.planFor === 'function') {
-        const planned = actionsApi.planFor(intent, {
-          threadUrl: lastRaw.webLink || null,
-          hasThreadAttachment: Boolean(lastRaw.hasAttachments)
-        });
-        if (planned && planned.steps && planned.steps.length) {
-          process = Object.assign({}, planned, {
-            steps: planned.steps.map((s) => {
-              if (s.kind !== 'gmailDraft') return s;
-              return Object.assign({}, s, {
-                kind: 'outlookDraft',
-                id: String(s.id || 'draft').replace(/^gmail/i, 'outlook')
-              });
-            })
-          });
-        }
-      }
-      if (!process) { note('no-process', { counterpart: party.email || null, intentType: intent.type }); return; }
+      if (out.incoming.length >= MAX_INCOMING) { note('incoming-capped'); return; }
+      const process = judged.process;
+      const intent = judged.intent;
       out.incoming.push({
         key: ikey, conversationId: conv, messageId: last.id, intent, process,
         subject: subject.slice(0, 160),
@@ -246,6 +234,8 @@ const FlowOutlookSync = (() => {
         app: 'outlook',
         outlookIncomingId: last.id,
         outlookConversationId: conv,
+        internetMessageId: lastRaw.internetMessageId || null,
+        receivedDateTime: lastRaw.receivedDateTime || null,
         threadId: id,
         threadUrl: lastRaw.webLink || null,
         base: {
@@ -258,6 +248,7 @@ const FlowOutlookSync = (() => {
       });
       out.stats.incoming++;
       note('shown-incoming', { counterpart: party.email || null, intentType: intent.type });
+
     });
     if (out.diagnostics.length > 40) out.diagnostics = out.diagnostics.slice(0, 40);
     return out;

@@ -94,16 +94,17 @@ const FlowOwaParse = (() => {
     return best;
   }
 
-  // Reading-pane root candidates (newest first). Used by the content script;
-  // fixtures pass a fake document.
+  // Reading-pane message-body candidates (newest first). Used by the content script; fixtures pass a fake document.
+  // Only message-body containers: the whole [role="main"] region also holds the message list, and judging that text would
+  // be judging the inbox, not the open message.
   function readingPaneRoots(doc) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
     if (!d || !d.querySelectorAll) return [];
     const sels = [
+      '[role="main"] [aria-label="Message body"]',
       '[role="main"] [aria-label*="Message body"]',
       '[role="main"] [data-app-section="MessageBody"]',
       '[role="main"] .ReadingPaneContents',
-      '[role="main"] [class*="ReadingPane"]',
       'div[aria-label="Message body"]',
       '[data-testid="message-body"]'
     ];
@@ -114,41 +115,87 @@ const FlowOwaParse = (() => {
     return out;
   }
 
-  function readPane(doc, href) {
+  const EMAIL_RE = /[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i;
+
+  function before(a, b) {
+    if (!a || !b || a === b || typeof a.compareDocumentPosition !== 'function') return true;
+    // 4 = DOCUMENT_POSITION_FOLLOWING: b comes after a.
+    return Boolean(a.compareDocumentPosition(b) & 4);
+  }
+
+  // The part of the page that belongs to the open message: the nearest ancestor of the body that also holds a heading.
+  function containerOf(bodyRoot, d) {
+    let n = bodyRoot;
+    for (let i = 0; n && i < 14; i++) {
+      if (n.querySelector && n !== bodyRoot && n.querySelector('[role="heading"], h1, h2')) return n;
+      n = n.parentElement;
+    }
+    return (d && d.querySelector && d.querySelector('[role="main"]')) || null;
+  }
+
+  // Sender of the open message: a mailto link, an element whose title/aria-label carries an address, or "Name <address>"
+  // text in the message header, above the body, that is not one of the person's own addresses.
+  function senderOf(container, bodyRoot, own) {
+    const mine = new Set((own || []).map((a) => String(a || '').toLowerCase()));
+    const ok = (e) => e && !mine.has(e);
+    if (!container || !container.querySelectorAll) return { email: '', name: '' };
+    const nodes = container.querySelectorAll('a[href^="mailto:"], [title*="@"], [aria-label*="@"], span, button');
+    for (const n of nodes) {
+      if (bodyRoot && (n === bodyRoot || (bodyRoot.contains && bodyRoot.contains(n)) || !before(n, bodyRoot))) continue;
+      let email = '';
+      let name = '';
+      const href = n.getAttribute && n.getAttribute('href');
+      if (href && /^mailto:/i.test(href)) { email = href.replace(/^mailto:/i, '').split('?')[0]; name = textOf(n); }
+      if (!email) {
+        const t = (n.getAttribute && (n.getAttribute('title') || n.getAttribute('aria-label'))) || '';
+        const m = t.match(EMAIL_RE);
+        if (m) {
+          email = m[0];
+          name = t.replace(m[0], '').replace(/[<>()"]/g, '').replace(/^(from|מאת)\s*:?\s*/i, '').trim();
+          // OWA puts the address in the title and the display name in the text: <span title="dana@acme.com">Dana Cohen</span>.
+          if (!name) { const shown = textOf(n); if (shown && !EMAIL_RE.test(shown) && shown.length <= 80) name = shown; }
+        }
+      }
+      if (!email && n.children && n.children.length === 0) {
+        const t = textOf(n);
+        const m = t.match(/^(.{0,80}?)\s*<\s*([^<>\s]+@[^<>\s]+)\s*>$/);
+        if (m) { email = m[2]; name = m[1].trim(); }
+      }
+      email = normEmail(email);
+      if (EMAIL_RE.test(email) && ok(email)) return { email, name: name.slice(0, 80) };
+    }
+    return { email: '', name: '' };
+  }
+
+  // opts: { own: [addresses] } so the person's own address in the header is never taken for the sender.
+  function readPane(doc, href, opts) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
     if (!d) return null;
     const roots = readingPaneRoots(d);
-    const root = roots[0] || d.querySelector('[role="main"]');
-    if (!root) return null;
-    // Subject: heading near the reading pane
-    const subjectEl =
-      d.querySelector('[role="main"] [role="heading"]') ||
-      d.querySelector('[role="main"] h1, [role="main"] h2') ||
-      root.querySelector('[role="heading"]');
-    const subject = textOf(subjectEl);
-    // Sender: mailto link or aria person button
-    let senderEmail = '';
-    let senderName = '';
-    const mail = d.querySelector('[role="main"] a[href^="mailto:"]');
-    if (mail) {
-      senderEmail = (mail.getAttribute('href') || '').replace(/^mailto:/i, '').split('?')[0];
-      senderName = textOf(mail);
+    const bodyRoot = roots[0] || null;
+    if (!bodyRoot) return null; // no message body on screen: stay silent rather than read the message list
+    const container = containerOf(bodyRoot, d);
+    let subjectEl = null;
+    if (container) {
+      const heads = Array.prototype.slice.call(container.querySelectorAll('[role="heading"], h1, h2'));
+      subjectEl = heads.find((h) => textOf(h) && before(h, bodyRoot) && !(bodyRoot.contains && bodyRoot.contains(h))) || heads.find((h) => textOf(h)) || null;
     }
-    const body =
-      textOf(root.querySelector('.AllowTextSelection, [aria-label*="Message body"], [class*="UniqueMessageBody"]')) ||
-      textOf(root);
+    if (!subjectEl) subjectEl = d.querySelector('[role="main"] [role="heading"]') || d.querySelector('[role="main"] h1, [role="main"] h2');
+    const subject = textOf(subjectEl).split('\n')[0].trim();
+    const who = senderOf(container, bodyRoot, opts && opts.own);
+    const body = textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
     if (!subject && !body) return null;
     return {
       itemId: itemIdFromUrl(href || (typeof location !== 'undefined' ? location.href : '')),
       subject: subject,
-      senderEmail: senderEmail,
-      senderName: senderName,
+      senderEmail: who.email,
+      senderName: who.name,
       text: body,
       conversationId: null
     };
   }
 
-  return { itemIdFromUrl, matchEntry, readingPaneRoots, readPane, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, matchEntry, readingPaneRoots, readPane, senderOf, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

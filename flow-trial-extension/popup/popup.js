@@ -483,10 +483,13 @@
       const who = (entry.sender && entry.sender.name) || '';
       const email = (entry.sender && entry.sender.email) || '';
       const bodyText = entry.text || '';
-      // Same composer as Gmail Do It (FlowDraftReply), not a forked Outlook body.
-      const replyText = (typeof FlowDraftReply !== 'undefined')
-        ? FlowDraftReply.bodyFromIntent(entry.intent || {}, who, email, { text: bodyText, subject: entry.subject || null })
-        : ('Hi,\n\nFollowing up on your message below.\n\n[Write your reply here]');
+      // Same draft as Gmail's Do It: the draft step's params from the same process, through the same composer
+      // (core/incoming-judge.js draftText -> FlowDraftReply.draftBodyText), not a forked Outlook body.
+      const replyText = (typeof FlowIncomingJudge !== 'undefined' && entry.process)
+        ? FlowIncomingJudge.draftText(entry.process, { sender: entry.sender || { name: who, email }, subject: entry.subject || null }, typeof FlowDraftReply !== 'undefined' ? FlowDraftReply : null)
+        : ((typeof FlowDraftReply !== 'undefined')
+          ? FlowDraftReply.bodyFromIntent(entry.intent || {}, who, email, { text: bodyText, subject: entry.subject || null })
+          : ('Hi,\n\nFollowing up on your message below.\n\n[Write your reply here]'));
       // Delivered-to alias when known (identity primary), else account primary.
       const st0 = await o.status();
       const fromAddress = st0.primary || null;
@@ -844,7 +847,7 @@
     return outlook.inst || (outlook.inst = FlowOutlook.create(outlookDeps()));
   }
 
-  const OUTLOOK_COPY = 'Reads asks made of you and answers to yours, on this device, while this panel is open. On Do It (popup or inside Outlook on the web), writes a reply draft into your Outlook Drafts — same judgment and draft as Gmail. Never sends. Uses your own Microsoft sign-in; nothing goes to Glance\'s servers.';
+  const OUTLOOK_COPY = 'Reads the last 14 days of your Outlook mail on this device, while this panel or Outlook on the web is open: asks made of you and answers to yours. On Do It (here or inside Outlook on the web), writes a reply draft into your Outlook Drafts, with the same judgment and draft as Gmail. Never sends. Uses your own Microsoft sign-in, kept alive in this browser; nothing is sent to Glance\'s servers.';
   const OUTLOOK_ERRORS = { permission: 'The browser did not grant access, so it stays off.', cancelled: 'The sign-in window was closed.', profile: 'Signed in, but Microsoft did not say whose mailbox this is. Try again.', 'not-configured': 'Not set up yet.' };
 
   async function renderOutlookRow(host) {
@@ -1180,7 +1183,9 @@
     const o = outlook();
     if (!o) return;
     const st = await o.status();
-    if (!st.connected || st.needsSignIn) return;
+    // "Sign in again" is not the end: sync() first tries a silent renewal (at most every 30 minutes), so the row heals itself
+    // whenever Microsoft still has the person signed in.
+    if (!st.connected) return;
     const r = await o.sync();
     if (r.ok && !r.skipped) { await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen(); }
     if (!outlookAutoSync.timer) outlookAutoSync.timer = setInterval(() => { outlookAutoSync().catch(() => {}); }, 10 * 60 * 1000 + 5000);

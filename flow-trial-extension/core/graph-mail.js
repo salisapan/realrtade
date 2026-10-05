@@ -105,9 +105,10 @@ const FlowGraphMail = (() => {
   }
 
   // Learn mailbox aliases from fetched mail when /me lacks them (common on personal MSA).
-  // - sentitems from-address
-  // - inbox toRecipient that is not the sender (safe heuristic: an address that receives
-  //   inbox mail and is not the sender counts as me)
+  // - every sentitems from-address (only you send from your sent folder)
+  // - an inbox To address ONLY when it is the sole To of mail from at least two different senders and is itself never the
+  //   sender of an inbox message. The old rule (any sole To) made the real recipient of a message you were CC'd or BCC'd on
+  //   "you", and from then on every ask from that person was read as your own mail: silence, no card.
   function learnOwnFromMessages(inbox, sent) {
     const out = [];
     const seen = new Set();
@@ -121,18 +122,36 @@ const FlowGraphMail = (() => {
       const a = m && m.from && m.from.emailAddress && m.from.emailAddress.address;
       if (a) add(a);
     });
-    // Inbox: prefer sole toRecipient (≠ sender). Multi-recipient rows only count
-    // toward a frequency vote so we do not treat every CC/To coworker as me.
-    const freq = Object.create(null);
+    const senders = new Set();
+    (inbox || []).forEach((m) => {
+      const f = channel.normalizeEmail(m && m.from && m.from.emailAddress && m.from.emailAddress.address);
+      if (f) senders.add(f);
+    });
+    const soleFrom = Object.create(null);
     (inbox || []).forEach((m) => {
       if (!m) return;
       const from = channel.normalizeEmail(m.from && m.from.emailAddress && m.from.emailAddress.address);
       const tos = (m.toRecipients || []).map((r) => channel.normalizeEmail(r && r.emailAddress && r.emailAddress.address)).filter((e) => e && e !== from);
-      if (tos.length === 1) add(tos[0]);
-      tos.forEach((e) => { freq[e] = (freq[e] || 0) + 1; });
+      if (tos.length !== 1 || !from) return;
+      (soleFrom[tos[0]] = soleFrom[tos[0]] || new Set()).add(from);
     });
-    Object.keys(freq).forEach((e) => { if (freq[e] >= 2) add(e); });
+    Object.keys(soleFrom).forEach((e) => { if (soleFrom[e].size >= 2 && !senders.has(e)) add(e); });
     return out;
+  }
+
+  // Drop from an own-address list anyone who sends you mail, unless the profile or your sent folder says the address is
+  // yours (mail you send to yourself lands in the inbox too). Someone who writes to you is not you.
+  function notOwn(list, inbox, profile, sentLearned) {
+    const sure = ownAddressesFrom(profile, sentLearned || []);
+    const senders = new Set();
+    (inbox || []).forEach((m) => {
+      const f = channel.normalizeEmail(m && m.from && m.from.emailAddress && m.from.emailAddress.address);
+      if (f) senders.add(f);
+    });
+    return (list || []).filter((a) => {
+      const e = channel.normalizeEmail(a);
+      return e && (sure.has(e) || !senders.has(e));
+    });
   }
 
   // Personal MSA often exposes an opaque CID mailbox (outlook_HEX@outlook.com) as
@@ -165,7 +184,7 @@ const FlowGraphMail = (() => {
     return list[0] || channel.normalizeEmail(p.userPrincipalName) || null;
   }
 
-  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, pickPrimary, isOpaqueMailbox, isHumanMailbox };
+  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, notOwn, pickPrimary, isOpaqueMailbox, isHumanMailbox };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGraphMail };

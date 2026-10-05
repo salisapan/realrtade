@@ -673,7 +673,9 @@ async function run() {
     const states = find(host, 'wait-state').map((n) => n.textContent);
     const notes = find(host, 'wait-note').map((n) => n.textContent);
     check('the Outlook row is there and is off until turned on', states.includes('Off') && !states.includes('Not set up yet'), states);
-    check('it says what it does, read-only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Read-only/.test(t) && /nothing is sent to Glance/.test(t)), notes);
+    // Since Mail.ReadWrite (2026-10-05) Outlook writes reply drafts on Do It, so "read-only" is no longer true: the row
+    // says what it reads, that it never sends, and that nothing goes to Glance.
+    check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Never sends/.test(t) && /reply draft/.test(t) && /nothing is sent to Glance/.test(t)), notes);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
     check('and offers Turn on once a client id is set', buttons.includes('Turn on'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);

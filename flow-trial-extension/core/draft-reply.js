@@ -16,8 +16,10 @@ const FlowDraftReply = (() => {
     const first = name.split(/\s+/)[0];
     if (!first) return null;
     const fl = first.toLowerCase();
-    // Skip when the display name is just a local-part segment (e.g. "flow" for ai.local.flow@…).
-    if (localParts.some((p) => p === fl) || fl === localFull) return null;
+    // Skip when the display name is only an address fragment the mail app made up (one lower-case word equal to a
+    // local-part segment, e.g. "flow" for ai.local.flow@…). A real name such as "Dana Cohen" <dana@…> keeps "Hi Dana,".
+    const oneWord = name.split(/\s+/).length === 1;
+    if (oneWord && first === first.toLowerCase() && (localParts.some((p) => p === fl) || fl === localFull)) return null;
     if (first.length <= 2 && first === first.toLowerCase()) return null;
     return first;
   }

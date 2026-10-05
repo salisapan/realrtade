@@ -148,7 +148,10 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
     watches: [{ id: 'ol:convA', threadId: 'ol:convA', channel: 'outlook', messageId: 'old', subject: 'pilot', counterpart: { name: 'AI Local Flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'review', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW2 - 86400000, chaseIso: '2026-10-07', lang: 'en', amount: null, deadlineIso: null }],
     graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
   });
-  check('incoming ask in a conversation that already has a loop: handled as reply, not a second incoming', withLoop.incoming.length === 0, withLoop);
+  // Gmail parity (0.9.14): Gmail shows its Do It on a new ask in a thread that has a loop, and the loop moves to "yours".
+  // Outlook does both too, instead of swallowing the ask into the loop (one of the live "no card" causes).
+  check('incoming ask in a conversation that already has a loop: the loop moves to "yours"', withLoop.patches.some((x) => x.id === 'ol:convA' && x.patch.stage === 'yours'), withLoop);
+  check('incoming ask in a conversation that already has a loop: and the ask still gets its Do It (Gmail parity)', withLoop.incoming.length === 1 && withLoop.incoming[0].messageId === 'a1', withLoop);
 
   const replyClose = S.plan({
     messages: [

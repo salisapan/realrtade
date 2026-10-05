@@ -39,6 +39,8 @@ import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
+import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
+import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -186,7 +188,8 @@ const SURFACES = {
   outlook: {
     label: 'Outlook on the web',
     origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
-    extra: ['core/owa-parse.js', 'core/draft-reply.js', 'src/chip-host.js', 'src/content-outlook.js'],
+    extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
+      'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
     css: ['src/chip.css']
   }
 };
@@ -2902,14 +2905,159 @@ function lmServerPrompt(text, schema) {
 // Outlook reply drafts (Mail.ReadWrite): createReply / DELETE of Glance's own draft only. Never send.
 const OUTLOOK_GRAPH = 'https://graph.microsoft.com/v1.0';
 const OUTLOOK_AUTH_KEY = 'outlookAuth';
-async function outlookAccessToken() {
-  const st = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
-  const auth = st && st[OUTLOOK_AUTH_KEY];
-  if (!auth || !auth.token || !auth.token.accessToken) return null;
-  if (auth.token.expiresAt && auth.token.expiresAt > Date.now()) return auth.token.accessToken;
-  // Soft path: popup's ensureFresh usually runs first. If expired here, refuse rather than refresh without PKCE deps.
-  return auth.token.accessToken;
+const OUTLOOK_STATE_KEY = 'outlookSync';
+const OUTLOOK_KEEPALIVE_ALARM = 'glance-outlook-keepalive';
+const OUTLOOK_KEEPALIVE_MINUTES = 30;
+
+// ---- the durable Outlook session (core/outlook-auth.js session) -----------------------------------------------
+// The service worker keeps the Microsoft session alive on its own: an alarm every 30 minutes (alarms survive the worker
+// being stopped and restarted), on browser start-up and on install/update. Each run refreshes an access token in its last
+// minutes and, from hour 16 of the 24-hour single-page-application window, renews silently (prompt=none, no window) so a
+// new 24 hours starts before the old one ends. Every token lives in chrome.storage.local, so nothing depends on this worker
+// staying awake. One run at a time (outlookSessionBusy), so two surfaces never renew at once.
+function outlookLaunchSilent(url) {
+  return new Promise((resolve) => {
+    try {
+      chrome.identity.launchWebAuthFlow({ url, interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 30000 }, (r) => {
+        const err = chrome.runtime.lastError;
+        if (err || !r) resolve(err ? { error: String(err.message || 'failed') } : null);
+        else resolve(r);
+      });
+    } catch (e) { resolve({ error: String(e && e.message || e) }); }
+  });
 }
+
+function outlookPrimaryHint(auth) {
+  if (!auth) return null;
+  const opaque = /^outlook_[0-9a-f]+@outlook\.com$/i;
+  const list = [auth.account && auth.account.address, auth.account && auth.account.mail].concat(auth.ownAddresses || []).filter(Boolean).map((a) => String(a).toLowerCase());
+  return list.find((a) => !opaque.test(a)) || list[0] || null;
+}
+
+let outlookSessionBusy = null;
+async function outlookSession(opts) {
+  const o = opts || {};
+  if (outlookSessionBusy && !o.force) return outlookSessionBusy;
+  const run = (async () => {
+    const A = globalThis.FlowOutlookAuth, cfg = globalThis.FlowOutlookConfig;
+    if (!A || !cfg) return { ok: false, error: 'not-configured' };
+    const bag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
+    const auth = bag[OUTLOOK_AUTH_KEY];
+    const st = bag[OUTLOOK_STATE_KEY] || {};
+    if (!auth || !auth.token) return { ok: false, error: 'not-connected' };
+    const r = await A.session({
+      fetch: (u, i) => fetch(u, i), now: () => Date.now(),
+      random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b),
+      launchSilent: outlookLaunchSilent
+    }, cfg, auth, { redirectUri: chrome.identity.getRedirectURL(), loginHint: outlookPrimaryHint(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null });
+    const now = Date.now();
+    if (r.ok && r.changed) {
+      const cur = (await chrome.storage.local.get(OUTLOOK_AUTH_KEY))[OUTLOOK_AUTH_KEY] || auth;
+      await chrome.storage.local.set({ [OUTLOOK_AUTH_KEY]: Object.assign({}, cur, { token: r.token }) });
+    }
+    const patch = {};
+    if (r.silentTried) patch.lastSilentAt = now;
+    if (r.ok) {
+      if (st.needsSignIn || st.error) Object.assign(patch, { needsSignIn: false, error: null, aadsts: null, errorDetail: null });
+      if (r.how === 'silent') patch.lastRenewedAt = now;
+    } else if (r.error !== 'not-connected') {
+      Object.assign(patch, { error: r.error || 'expired', needsSignIn: Boolean(r.needsSignIn), aadsts: r.aadsts || null, errorDetail: r.description || null });
+    }
+    if (Object.keys(patch).length) {
+      const cur = (await chrome.storage.local.get(OUTLOOK_STATE_KEY))[OUTLOOK_STATE_KEY] || {};
+      await chrome.storage.local.set({ [OUTLOOK_STATE_KEY]: Object.assign({}, cur, patch) });
+    }
+    return r;
+  })();
+  outlookSessionBusy = run;
+  try { return await run; } finally { if (outlookSessionBusy === run) outlookSessionBusy = null; }
+}
+
+async function outlookKeepAlive() {
+  try { return await outlookSession({}); } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+
+function scheduleOutlookKeepAlive() {
+  if (!chrome.alarms || !chrome.alarms.create) return;
+  try { chrome.alarms.create(OUTLOOK_KEEPALIVE_ALARM, { delayInMinutes: 1, periodInMinutes: OUTLOOK_KEEPALIVE_MINUTES }); } catch (e) { /* alarms unavailable */ }
+}
+
+try {
+  if (chrome.alarms && chrome.alarms.onAlarm) {
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (!alarm || alarm.name !== OUTLOOK_KEEPALIVE_ALARM) return;
+      outlookKeepAlive();
+    });
+  }
+  if (chrome.alarms && chrome.alarms.get) {
+    chrome.alarms.get(OUTLOOK_KEEPALIVE_ALARM, (a) => { if (!a) scheduleOutlookKeepAlive(); });
+  } else scheduleOutlookKeepAlive();
+  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { scheduleOutlookKeepAlive(); outlookKeepAlive(); });
+  chrome.runtime.onInstalled.addListener(() => { scheduleOutlookKeepAlive(); outlookKeepAlive(); ensureOutlookSurface(); });
+} catch (e) { console.error('[Glance] Outlook keep-alive unavailable', e); }
+
+// Connected to Outlook and the Outlook-on-the-web permission granted, but the page script not registered (an older build
+// connected Graph only, or the browser dropped it): register it, so Do It floats on the page without a visit to the panel.
+async function ensureOutlookSurface() {
+  try {
+    const bag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, 'surfaces']);
+    if (!bag[OUTLOOK_AUTH_KEY] || !bag[OUTLOOK_AUTH_KEY].token) return;
+    const on = bag.surfaces && bag.surfaces.outlook && bag.surfaces.outlook.enabled;
+    if (on) return;
+    if (!(await chrome.permissions.contains({ origins: SURFACES.outlook.origins }))) return;
+    await enableSurface('outlook');
+  } catch (e) { /* the panel's Outlook row offers the button */ }
+}
+ensureOutlookSurface();
+
+async function outlookAccessToken(opts) {
+  const r = await outlookSession(opts || {});
+  return r && r.ok && r.token ? r.token.accessToken : null;
+}
+
+// A Graph call with the session's token; a 401 is answered once with a forced refresh (or silent renewal) and a retry.
+async function outlookFetch(url, init) {
+  let token = await outlookAccessToken();
+  if (!token) return { status: 0, ok: false, notConnected: true };
+  const call = (t) => fetch(url, Object.assign({}, init || {}, { headers: Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t }) }));
+  let res = await call(token);
+  if (res.status === 401) {
+    token = await outlookAccessToken({ force: true });
+    if (token) res = await call(token);
+  }
+  return res;
+}
+
+// The Outlook-on-the-web page runs the same planner as the panel (src/outlook.js). Its session comes from here
+// (flow:outlook-session: one renewal at a time, from this worker, with this extension's origin on the token request), and
+// its Graph reads go through here (flow:outlook-fetch) so the page never makes a cross-origin call of its own. Reads only:
+// Graph GETs under /me. Every write stays in flow:execute-action (outlookDraftWrite), which refuses anything that sends.
+const OUTLOOK_PROXY_GET = /^https:\/\/graph\.microsoft\.com\/v1\.0\/me([?\/(]|$)/;
+async function outlookProxyFetch(msg, sender) {
+  if (!sender || sender.id !== chrome.runtime.id) return { ok: false, status: 0, error: 'foreign-sender' };
+  const url = String(msg.url || '');
+  const method = String((msg.init && msg.init.method) || 'GET').toUpperCase();
+  if (method !== 'GET' || !OUTLOOK_PROXY_GET.test(url)) return { ok: false, status: 0, error: 'refused' };
+  const headers = {};
+  const h = (msg.init && msg.init.headers) || {};
+  if (h.Authorization) headers.Authorization = String(h.Authorization);
+  if (h.Prefer) headers.Prefer = String(h.Prefer);
+  try {
+    const res = await fetch(url, { method: 'GET', headers });
+    return { ok: res.ok, status: res.status, body: await res.text() };
+  } catch (e) {
+    return { ok: false, status: 0, error: 'network' };
+  }
+}
+
+async function outlookSessionForPage(msg, sender) {
+  if (!sender || sender.id !== chrome.runtime.id) return { ok: false, error: 'foreign-sender' };
+  const r = await outlookSession({ force: Boolean(msg && msg.force) });
+  if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'failed', needsSignIn: Boolean(r && r.needsSignIn), transient: Boolean(r && r.transient), aadsts: (r && r.aadsts) || null };
+  // Already stored by outlookSession: the caller must not store it again.
+  return { ok: true, token: r.token, changed: false, how: r.how || null };
+}
+
 function outlookAssertNotSend(url) {
   if (/\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(String(url || ''))) {
     const e = new Error('graph-send-refused'); e.code = 'refused'; throw e;
@@ -2947,52 +3095,45 @@ async function outlookPreferredFrom(explicit) {
   return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
 }
 async function outlookDraftWrite(p) {
-  const token = await outlookAccessToken();
-  if (!token) return { ok: false, reason: 'not-connected' };
   const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   if (!incomingId) return { ok: false, reason: 'no-message' };
-  // Same composer as Gmail: draftBodyText / FlowDraftReply.
-  let comment = (p && p.body) || (p && p.comment) || '';
-  if (!comment && p && (p.params || p.intent)) {
-    comment = globalThis.FlowDraftReply.bodyFromIntent(
-      p.intent || { entities: (p.params || {}), label: p.label },
-      p.senderName,
-      p.senderEmail,
-      { text: p.text || p.bodyText || null, subject: p.subject || null, askText: p.askText || null }
-    );
-  }
-  if (!comment && p && p.params) {
-    comment = globalThis.FlowDraftReply.draftBodyText({ senderName: p.senderName, senderEmail: p.senderEmail, params: p.params });
+  // Same draft as Gmail: the payload Gmail's buildActionPayload sends ({ params, senderName, senderEmail, subject }) through the
+  // same composer gmailDraftWrite uses (FlowDraftReply.draftBodyText). A ready-made body is only a fallback for older callers.
+  let comment = '';
+  if (p && p.params && Object.keys(p.params).length) comment = draftBodyText(p, null, null, null);
+  if (!comment) comment = (p && (p.body || p.comment)) || '';
+  if (!comment && p && p.intent) {
+    comment = globalThis.FlowDraftReply.bodyFromIntent(p.intent, p.senderName, p.senderEmail, { text: p.text || p.bodyText || null, subject: p.subject || null });
   }
   const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
   outlookAssertNotSend(url);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ comment: comment })
-  });
+  const res = await outlookFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: comment }) });
+  if (res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
   if (!res.ok) return { ok: false, reason: 'http-' + res.status };
   const draft = await res.json();
   if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };
   // Prefer connected human From alias over opaque outlook_HEX@outlook.com CID.
   // Graph createReply often defaults From to the CID on personal MSA; PATCH from+sender.
   const wantFrom = await outlookPreferredFrom(p && p.fromAddress);
+  const patchUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id);
+  outlookAssertNotSend(patchUrl);
+  const patchBody = { body: { contentType: 'Text', content: comment } };
   let fromSet = false;
   if (wantFrom && draft.isDraft !== false && !outlookIsOpaqueMailbox(wantFrom)) {
+    patchBody.from = { emailAddress: { address: wantFrom } };
+    patchBody.sender = { emailAddress: { address: wantFrom } };
+  }
+  if (draft.isDraft !== false) {
     try {
-      const patchUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id);
-      outlookAssertNotSend(patchUrl);
-      await fetch(patchUrl, {
-        method: 'PATCH',
-        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          from: { emailAddress: { address: wantFrom } },
-          sender: { emailAddress: { address: wantFrom } },
-          body: { contentType: 'Text', content: comment }
-        })
-      });
-      fromSet = true;
-    } catch (e) { /* alias may be refused on MSA */ }
+      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) });
+      fromSet = Boolean(pr && pr.ok && patchBody.from);
+      if (pr && !pr.ok && patchBody.from) {
+        // The alias was refused (common on personal accounts): keep the body, leave From as Outlook set it.
+        await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: patchBody.body }) });
+      }
+    } catch (e) { /* createReply's comment already holds the body */ }
   }
   return {
     ok: true,
@@ -3006,18 +3147,17 @@ async function outlookDraftWrite(p) {
 }
 async function outlookDraftUndo(ref) {
   if (!ref) return { ok: false };
-  const token = await outlookAccessToken();
-  if (!token) return { ok: false, reason: 'not-connected' };
   const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
   outlookAssertNotSend(getUrl);
-  const got = await fetch(getUrl, { headers: { Authorization: 'Bearer ' + token } });
+  const got = await outlookFetch(getUrl, {});
+  if (got.notConnected) return { ok: false, reason: 'not-connected' };
   if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
   if (!got.ok) return { ok: false, reason: 'http-' + got.status };
   const msg = await got.json();
   if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
   const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
   outlookAssertNotSend(delUrl);
-  const del = await fetch(delUrl, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+  const del = await outlookFetch(delUrl, { method: 'DELETE' });
   if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
   return { ok: true, written: 'Draft removed from Outlook Drafts.' };
 }
@@ -3166,6 +3306,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:classify-remote') {
     return reply(sendResponse, classifyViaBackend(msg.payload || {}));
+  }
+
+  // Outlook: the durable session and the page's read-only network (see outlookProxyFetch).
+  if (msg.type === 'flow:outlook-fetch') return reply(sendResponse, outlookProxyFetch(msg, sender));
+  if (msg.type === 'flow:outlook-session') return reply(sendResponse, outlookSessionForPage(msg, sender));
+  if (msg.type === 'flow:outlook-keepalive') {
+    if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
+    return reply(sendResponse, (async () => { scheduleOutlookKeepAlive(); const r = await outlookKeepAlive(); return { ok: Boolean(r && r.ok), error: (r && r.error) || null, how: (r && r.how) || null, needsSignIn: Boolean(r && r.needsSignIn) }; })());
   }
 
   if (msg.type === 'flow:surface-status') return reply(sendResponse, surfaceStatus());
