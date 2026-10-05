@@ -25,6 +25,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Standing review rules | `design-principles.md`, `decision-filter.md`, `local-first-principle.md`, `magic-moment.md` | - | - |
 | What is sold, the Free/Pro table, money | `monetization.md`, `revenue-routines.md` (Hebrew) | `core/entitlements.js`, `glance-assist` licence check | `test/pro-corpus.cjs` |
 | **The recognition order and the one external step** | `ai-ladder.md` (owns it), `when-recognition-fails.md`, `intent-model.md` | `core/ai-ladder.js`, `glance-assist/ladder.js`, `src/background.js`, `src/follow.js` | `test/ai-ladder-*-corpus.cjs`, `glance-assist/ladder.test.cjs`, `scripts/ai-ladder/eval.cjs` |
+| **A review of every model and AI layer: what runs where, what is on or off, what was tested and failed, the numbers and their limits** (for David and any agent) | `ai-models-overview.md` (Hebrew) | see the table in that file | - |
 | The on-device engine and how it learns | `intent-model.md`, `ai-engine-upgrade.md`, `reply-model.md`, `human-eval.md` | `core/request-types.js`, `intent-model.js`, `intent-pipeline.js`, `reply-model.js` | `intent-model-corpus`, `reply-model-corpus`, `request-types-corpus` |
 | **True close: when a loop is closed** | `true-close.md`, `open-loops.md`, `reply-model.md` | `core/follow-up.js` (`classifyReplyText`), `core/reply-meaning.js` | `test/true-close-corpus.cjs`, `reply-closure-corpus` |
 | Multi-step resolution (receipts, contract, quote, proposal, signed copy) | `resolution-paths.md`, `true-close.md` §4, `file-backed-closure-plan.md` | `core/resolution.js`, `src/follow.js` | `test/resolution-corpus.cjs`, harness section 32 and 32j |
@@ -53,7 +54,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 
 ## 3. Every document, one line
 
-`ai-assistant-context-parity.md` what an assistant gets from a fresh clone · `ai-engine-upgrade.md` teacher data, a model of each person, outcome labels · **`ai-ladder.md` the second reading: order, allowance, cost, contract, how to switch on, real-Gmail test** ·
+`ai-assistant-context-parity.md` what an assistant gets from a fresh clone · **`ai-models-overview.md` every model and AI layer in one page, in Hebrew** · `ai-engine-upgrade.md` teacher data, a model of each person, outcome labels · **`ai-ladder.md` the second reading: order, allowance, cost, contract, how to switch on, real-Gmail test** ·
 `closure-plan.md` unfinished intentions to completion · `community-learning.md` cross-user learning, dormant · `decision-filter.md` the five-question filter · `design-principles.md` twelve review criteria ·
 `encoder-evaluation-plan.md` encoder experiment (not met) · `engineering-audit.md`, `system-audit-2026-09.md` audits · `file-backed-closure-plan.md` single-file closure · `human-eval.md` first numbers on real mail ·
 `hybrid-execution-architecture.md` device model + server for Do It proposals, dormant, packaging profiles, GPU diagnostics · `intent-model.md` the local engine and its tiers · `lm-fallback-evaluation-plan.md` small on-device model experiment (not met) ·
