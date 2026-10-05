@@ -11,10 +11,13 @@
 // "don't let this personal commitment slip." Re-promote them once Google
 // Tasks + Notion have proven the core loop, not before.
 //
-//   Google Tasks authenticates via chrome.identity.getAuthToken — Chrome's own
-//   Google account chooser, driven by an OAuth Client ID registered for this
-//   extension. No server-side exchange, no Client Secret, because Chrome
-//   itself is the OAuth client.
+//   Google authenticates first via chrome.identity.getAuthToken — Chrome's
+//   own Google account chooser, driven by the Chrome-extension OAuth client
+//   in manifest.json. When that fails because browser sign-in is off (or
+//   the identity API is otherwise unavailable, and the user did not cancel),
+//   the same grant is obtained with chrome.identity.launchWebAuthFlow and
+//   the Web application client in config/oauth.public.js (WEB_OAUTH_CLIENT_ID).
+//   No server-side exchange and no Client Secret either way.
 //
 //   Notion authenticates with an internal integration token the user creates
 //   themselves, so there is no app registration, no review queue and no
@@ -35,7 +38,8 @@
 // to undo it. Nothing here ever edits or deletes something the user already
 // had.
 
-import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
+import { OAUTH_PUBLIC, publicClientId, WEB_OAUTH_CLIENT_ID } from '../config/oauth.public.js';
+import { GOOGLE_WEB_AUTH_STORAGE_KEY, googleConnectErrorMessage, googleImplicitAuthUrl, googleOAuthScopesFrom, googleRedirectUriForExtension, parseGoogleImplicitRedirect, shouldFallbackFromGetAuthToken, webTokenUsable } from './google-web-auth.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -83,10 +87,11 @@ const NOTE_TO_CONTACT_ASSOCIATION_TYPE_ID = 202;
 const GOOGLE_TASKS_CLIENT_ID_PLACEHOLDER = 'YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com';
 const GOOGLE_TASKS_API = 'https://tasks.googleapis.com/tasks/v1';
 const GLANCE_TASK_LIST_TITLE = 'Glance';
-// Calendar and Gmail share the exact same OAuth grant as Tasks — one
-// chrome.identity token, requested with every scope in
-// manifest.json's oauth2.scopes at once — so there is one "connect Google"
-// step for the whole execution layer.
+// Calendar, Gmail, and Drive share the exact same OAuth grant as Tasks —
+// one access token, requested with every scope in manifest.json's
+// oauth2.scopes at once — so there is one "connect Google" step for the
+// whole execution layer. The token comes from getAuthToken when Chrome can
+// provide one, and from the stored web-flow token otherwise.
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const GOOGLE_DRIVE_API = 'https://www.googleapis.com/drive/v3';
@@ -816,12 +821,17 @@ async function mondayUndo(ref) {
 
 /* ------------------------------------------------------------ Google Tasks */
 //
-// The MVP write path: no token to paste, no vendor app to authorize —
-// chrome.identity.getAuthToken drives Chrome's own Google account chooser
-// against the OAuth Client ID registered in manifest.json's oauth2 key. The
-// only thing this needs from the account owner is that one Client ID, not a
-// server-side exchange or a Client Secret at all, because Chrome itself is
-// the OAuth client here rather than a page Flow has to build.
+// The MVP write path: no token to paste. chrome.identity.getAuthToken is
+// primary — Chrome's own Google account chooser against the Chrome-extension
+// client in manifest.json's oauth2 key. When that call fails because browser
+// sign-in is off, or Chrome's identity API is unavailable and the user did
+// not cancel, launchWebAuthFlow runs the implicit grant against
+// WEB_OAUTH_CLIENT_ID (one Web client, both extension IDs). No client secret
+// and no token endpoint: Google web clients need a secret to redeem an
+// authorization code, and this service worker does not have one.
+
+const GOOGLE_WEB_CLIENT_ID = publicClientId(WEB_OAUTH_CLIENT_ID);
+let googleWebAuthInteractiveFlight = null;
 
 function googleTasksConfigured() {
   const oauth2 = chrome.runtime.getManifest().oauth2;
@@ -846,24 +856,168 @@ function removeCachedGoogleAuthToken(token) {
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 
-// Base-URL-parameterized so Calendar and Gmail can reuse the exact same
-// token-fetch-and-401-retry logic instead of each writer function
-// duplicating it — this is what Google Tasks' own authed fetch became once
-// two more Google APIs needed the identical dance.
+function launchGoogleWebAuthFlow(details) {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.identity.launchWebAuthFlow(details, (responseUrl) => {
+        const err = chrome.runtime.lastError;
+        if (err || !responseUrl) {
+          reject(new Error((err && err.message) || 'Google sign-in was closed or denied.'));
+          return;
+        }
+        resolve(responseUrl);
+      });
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+    }
+  });
+}
+
+function googleManifestScopes() {
+  const oauth2 = chrome.runtime.getManifest().oauth2;
+  return googleOAuthScopesFrom(oauth2 && oauth2.scopes);
+}
+
+async function readGoogleWebAuth() {
+  const stored = await chrome.storage.local.get(GOOGLE_WEB_AUTH_STORAGE_KEY);
+  return stored[GOOGLE_WEB_AUTH_STORAGE_KEY] || null;
+}
+
+async function clearGoogleWebAuth() {
+  await chrome.storage.local.remove(GOOGLE_WEB_AUTH_STORAGE_KEY);
+}
+
+async function runGoogleWebAuth(interactive) {
+  if (!GOOGLE_WEB_CLIENT_ID) {
+    throw new Error('Glance’s backup Google sign-in isn’t configured on this build yet.');
+  }
+  const redirectUri = googleRedirectUriForExtension(chrome.runtime && chrome.runtime.id);
+  if (!redirectUri) throw new Error('Glance could not determine this extension’s redirect address.');
+  const state = randomOAuthState();
+  const url = googleImplicitAuthUrl({
+    clientId: GOOGLE_WEB_CLIENT_ID,
+    redirectUri,
+    scopes: googleManifestScopes(),
+    state,
+    prompt: interactive ? 'select_account' : 'none'
+  });
+  const resultUrl = await launchGoogleWebAuthFlow({ url, interactive: Boolean(interactive) });
+  const parsed = parseGoogleImplicitRedirect(resultUrl, state);
+  const record = { accessToken: parsed.accessToken };
+  if (parsed.expiresIn) record.expiresAt = Date.now() + parsed.expiresIn * 1000;
+  await chrome.storage.local.set({ [GOOGLE_WEB_AUTH_STORAGE_KEY]: record });
+  return record;
+}
+
+// Stored web-flow token when it is still inside its expiry. A previously
+// issued token that has lapsed tries a silent prompt=none grant before an
+// interactive window. The first connect (nothing stored) goes straight to
+// the interactive window.
+async function getGoogleWebAccessToken(interactive) {
+  const existing = await readGoogleWebAuth();
+  if (webTokenUsable(existing)) return { token: existing.accessToken, source: 'web' };
+  const hadToken = Boolean(existing && existing.accessToken);
+  if (hadToken) await clearGoogleWebAuth();
+  if (hadToken) {
+    try {
+      const silent = await runGoogleWebAuth(false);
+      return { token: silent.accessToken, source: 'web' };
+    } catch (silentErr) {
+      if (!interactive) throw silentErr;
+    }
+  }
+  if (!interactive) throw new Error('Google sign-in needs you to connect again.');
+  if (!googleWebAuthInteractiveFlight) {
+    googleWebAuthInteractiveFlight = runGoogleWebAuth(true).finally(() => {
+      googleWebAuthInteractiveFlight = null;
+    });
+  }
+  const saved = await googleWebAuthInteractiveFlight;
+  return { token: saved.accessToken, source: 'web' };
+}
+
+// getAuthToken first. The web flow runs only after a non-cancel failure.
+async function getGoogleAccessToken(interactive) {
+  const wantUi = Boolean(interactive);
+  try {
+    const token = await getGoogleAuthToken(wantUi);
+    return { token, source: 'chrome' };
+  } catch (err) {
+    const message = err && err.message;
+    if (!shouldFallbackFromGetAuthToken(message, { interactive: wantUi })) throw err;
+    try {
+      return await getGoogleWebAccessToken(wantUi);
+    } catch (fallbackErr) {
+      if (wantUi) throw new Error(googleConnectErrorMessage(message, fallbackErr && fallbackErr.message));
+      throw fallbackErr;
+    }
+  }
+}
+
+async function invalidateGoogleCredential(cred) {
+  if (!cred) return;
+  if (cred.source === 'web') {
+    const stored = await readGoogleWebAuth();
+    if (stored && stored.accessToken === cred.token) await clearGoogleWebAuth();
+    return;
+  }
+  if (cred.token) await removeCachedGoogleAuthToken(cred.token);
+}
+
+// Evicts Chrome's getAuthToken cache only. Does not open the web flow —
+// Disconnect must not pop a consent window when browser sign-in is off.
+async function clearCachedChromeGoogleTokens() {
+  try {
+    const token = await getGoogleAuthToken(false);
+    if (token) await removeCachedGoogleAuthToken(token);
+  } catch (e) {
+    // Browser sign-in off, or no cached token. The web-flow token is cleared
+    // by the caller along with googleTasksAuth.
+  }
+  const identity = chrome.identity;
+  if (identity && typeof identity.clearAllCachedAuthTokens === 'function') {
+    try {
+      await new Promise((resolve) => identity.clearAllCachedAuthTokens(resolve));
+    } catch (e) { /* already empty, or the API rejected the call */ }
+  }
+}
+
+async function disconnectConnector(connectorId) {
+  const STORAGE_KEYS = {
+    hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',
+    googleTasks: 'googleTasksAuth'
+  };
+  const key = STORAGE_KEYS[connectorId] || null;
+  if (!key) return { ok: false };
+  // Google also evicts Chrome's cached getAuthToken AND the stored web-flow
+  // token. Otherwise "Disconnect" then "Connect" silently reuses the same
+  // grant instead of letting the user pick a different Google account.
+  if (connectorId === 'googleTasks') {
+    await clearCachedChromeGoogleTokens();
+    await chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY]);
+    return { ok: true };
+  }
+  await chrome.storage.local.remove(key);
+  return { ok: true };
+}
+
+// Base-URL-parameterized so Calendar, Gmail, and Drive reuse the same
+// token-fetch-and-401-retry logic. The bearer is a getAuthToken result when
+// Chrome can mint one, and the stored web-flow token otherwise.
 async function googleAuthedFetch(baseUrl, path, options) {
-  const token = await getGoogleAuthToken(true);
+  let cred = await getGoogleAccessToken(true);
   const doFetch = (t) => fetch(baseUrl + path, Object.assign({}, options, {
     headers: Object.assign({ Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, (options && options.headers) || {})
   }));
-  const res = await doFetch(token);
+  const res = await doFetch(cred.token);
   if (res.status !== 401) return res;
   // A cached token can go stale (revoked access from the Google Account
   // permissions page, expired) without Chrome knowing yet — evict it and
   // request a fresh one once before surfacing the failure, the same
   // "refresh once, then fail loudly" shape every OAuth connector above uses.
-  await removeCachedGoogleAuthToken(token);
-  const freshToken = await getGoogleAuthToken(true);
-  return doFetch(freshToken);
+  await invalidateGoogleCredential(cred);
+  cred = await getGoogleAccessToken(true);
+  return doFetch(cred.token);
 }
 
 function googleTasksAuthedFetch(path, options) {
@@ -911,9 +1065,10 @@ async function connectGoogleTasks() {
     throw new Error('Google isn’t configured on this build yet — manifest.json’s oauth2.client_id still needs a real Google OAuth Client ID (see the README’s “Set up Google” section).');
   }
   // interactive:true is the one moment Chrome may show the account chooser
-  // or consent screen; every later call in this file passes interactive:true
-  // too, but resolves instantly from Chrome's own cache once granted.
-  await getGoogleAuthToken(true);
+  // or, if browser sign-in is off, the web-flow consent window. Later API
+  // calls use the same getGoogleAccessToken path and resolve from Chrome's
+  // cache or the stored web-flow token once granted.
+  await getGoogleAccessToken(true);
   const taskListId = await findOrCreateGlanceTaskList();
   await chrome.storage.local.set({ googleTasksAuth: { taskListId } });
   return true;
@@ -2383,20 +2538,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   if (msg.type === 'flow:disconnect') {
-    const STORAGE_KEYS = {
-      hubspot: 'hubspotAuth', notion: 'notionAuth', salesforce: 'salesforceAuth', slack: 'slackAuth', monday: 'mondayAuth',
-      googleTasks: 'googleTasksAuth'
-    };
-    const key = STORAGE_KEYS[msg.connectorId] || null;
-    if (!key) return reply(sendResponse, Promise.resolve({ ok: false }));
-    // Google Tasks also evicts Chrome's own cached token, not just Flow's
-    // local record of which list to write to — otherwise "Disconnect" then
-    // "Connect" again silently reuses the same grant instead of giving the
-    // user a real chance to pick a different Google account.
-    const extra = msg.connectorId === 'googleTasks'
-      ? getGoogleAuthToken(false).then(removeCachedGoogleAuthToken).catch(() => {})
-      : Promise.resolve();
-    return reply(sendResponse, extra.then(() => chrome.storage.local.remove(key)).then(() => ({ ok: true })));
+    return reply(sendResponse, disconnectConnector(msg.connectorId));
   }
 
   if (msg.type === 'flow:fact-sources') {

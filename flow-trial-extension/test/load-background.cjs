@@ -1,24 +1,27 @@
 // background.js is the extension service worker (manifest "type": "module"),
-// so it imports config/oauth.public.js. These corpora evaluate it as a
-// classic script inside vm, which cannot take that import. Load the public
-// config in the same script and drop the one import line. The service
-// worker itself stays a module.
+// so it imports config/oauth.public.js and src/google-web-auth.js. These
+// corpora evaluate it as a classic script inside vm, which cannot take
+// those imports. Load both modules in the same script and drop the import
+// lines. The service worker itself stays a module.
 
 const fs = require('fs');
 const path = require('path');
 
-const IMPORT_LINE = /^import \{ OAUTH_PUBLIC, publicClientId \} from '\.\.\/config\/oauth\.public\.js';\r?\n/m;
+function stripModuleSyntax(source) {
+  return source
+    .replace(/^export const /gm, 'const ')
+    .replace(/^export function /gm, 'function ');
+}
 
 function backgroundScript() {
   const root = path.join(__dirname, '..');
-  const oauth = fs.readFileSync(path.join(root, 'config', 'oauth.public.js'), 'utf8')
-    .replace(/^export const /m, 'const ')
-    .replace(/^export function /m, 'function ');
-  const bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(IMPORT_LINE, '');
+  const oauth = stripModuleSyntax(fs.readFileSync(path.join(root, 'config', 'oauth.public.js'), 'utf8'));
+  const webAuth = stripModuleSyntax(fs.readFileSync(path.join(root, 'src', 'google-web-auth.js'), 'utf8'));
+  const bg = fs.readFileSync(path.join(root, 'src', 'background.js'), 'utf8').replace(/^import .*;\r?\n/gm, '');
   if (/^\s*import\s/m.test(bg)) {
     throw new Error('background.js has an import the corpus harness does not load');
   }
-  return oauth + '\n' + bg;
+  return oauth + '\n' + webAuth + '\n' + bg;
 }
 
 module.exports = { backgroundScript };

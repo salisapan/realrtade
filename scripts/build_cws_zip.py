@@ -21,6 +21,11 @@ UNPACKED_EXTENSION_ID = "dnjhplgmnkabbjogfpbhofjedlkehkai"
 UNPACKED_CLIENT_ID = "93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com"
 STORE_EXTENSION_ID = "lbihckfmoffgjjlnneoeaehbhoonfenh"
 STORE_CLIENT_ID = "93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com"
+# Web application client for launchWebAuthFlow. Same string in the unpacked
+# zip and this store zip (config/oauth.public.js). This script does not
+# rewrite it. The swap below is only manifest oauth2.client_id, which
+# getAuthToken reads.
+WEB_OAUTH_CLIENT_ID = "93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleusercontent.com"
 STORE_DESCRIPTION = (
     "Glance closes open loops in Gmail: what you asked, what you promised, "
     "what others asked of you. One click to close."
@@ -47,8 +52,8 @@ def store_manifest(raw: bytes) -> bytes:
     manifest.pop("key", None)
     manifest["description"] = STORE_DESCRIPTION
     manifest["oauth2"]["client_id"] = STORE_CLIENT_ID
-    if manifest.get("version") != "0.7.1":
-        die(f"refusing to package version {manifest.get('version')}; this store build is 0.7.1")
+    if manifest.get("version") != "0.7.2":
+        die(f"refusing to package version {manifest.get('version')}; this store build is 0.7.2")
     encoded = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     packed = json.loads(encoded)
     if "key" in packed:
