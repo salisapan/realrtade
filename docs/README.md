@@ -1,5 +1,11 @@
 # docs/ — the map (read this first, human or agent)
 
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+Any description of Glance starts from the sentence above, and any report keeps the *product definition (vision-locked)* apart from the *current implementation status (code reality)*; both rules and the anti-drift list are in `product-identity.md`.
+
 > Maintained as part of every change: `test/docs-consistency-corpus.cjs` fails when a doc listed here is missing, when a `core/` module is missing from `flow-trial-extension/core/README.md`,
 > and when the public numbers (allowances, prices, switches) in the docs disagree with the code. Last reviewed: 2026-10-04.
 
@@ -14,6 +20,7 @@
 
 | Topic | Owner document | Code | Tests |
 |---|---|---|---|
+| **What Glance IS (locked identity: closes open loops, starts in Gmail), the wording rules and the anti-drift list** | `product-identity.md` (owns the verbatim block) | every file that quotes the block, `flow-landing/llms.txt`, the store listing | `test/docs-consistency-corpus.cjs`, `test/identity-copy-corpus.cjs` |
 | Two products (Glance Free/Pro vs Flow), what each may claim | `product-architecture.md`, `product-identity.md` | `flow-landing/pricing.html`, `trial.html` | `test/identity-copy-corpus.cjs` |
 | Standing review rules | `design-principles.md`, `decision-filter.md`, `local-first-principle.md`, `magic-moment.md` | - | - |
 | What is sold, the Free/Pro table, money | `monetization.md`, `revenue-routines.md` (Hebrew) | `core/entitlements.js`, `glance-assist` licence check | `test/pro-corpus.cjs` |
@@ -37,6 +44,7 @@
 | What leaves the device | `flow-landing/privacy.html`, `trial.html`, `popup/popup.html` footer, `chrome-web-store-submission.md` (data usage), `local-first-principle.md`, `ai-ladder.md`/`hybrid-execution-architecture.md`, `llms.txt` if public |
 | A switch (`config/*.public.js`, a Netlify env var such as `GLANCE_AI_LADDER`) | the config comment, `ai-ladder.md` §7 or the hybrid §13, `flow-trial-extension/README.md` (env list), `open-tasks.md`, and the copy corpus for that switch |
 | A new `core/` module | `core/README.md` (a test enforces it), this table if it is a new topic, and the extension manifest + `popup.html` script lists |
+| How Glance is described anywhere (a blurb, a listing, a report, a commit message) | start from the locked block in `product-identity.md`; change the block only there and in every file the consistency test names, in one commit, with the owner's say-so. Reports keep *product definition* and *implementation status* apart |
 | A rule on when a loop closes | `true-close.md`, `reply-model.md`, a case in `test/true-close-corpus.cjs` |
 | A new multi-step document class | `core/resolution.js` `CLASSES`, `resolution-paths.md`, `true-close.md` §4, corpus + harness |
 | A new surface (an app) | `multi-platform.md`, the privacy page, the store text, in the same commit |

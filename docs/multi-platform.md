@@ -5,6 +5,12 @@
 
 ## 1. The idea
 
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+**Multi-platform means** execution and observation across the surfaces where a loop really opens, advances and closes, in service of closure. **It does not mean** a connector marketplace, inbox-zero, or integrations for their own sake. The surfaces built or planned below are means; the close is the product.
+
 The unit of Glance is the **loop**, not the email: something someone owes you, or you owe them, that stays open until reality
 closes it. Email is where Glance first saw loops open and close. Reality also closes them in other places: an answer on WhatsApp,
 a payment, a calendar entry, a shared file. So "multi-platform" is not "more inboxes". It is three things:

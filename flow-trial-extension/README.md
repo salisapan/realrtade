@@ -1,12 +1,13 @@
 # Glance
 
-Glance turns decisions made in your inbox into records in the systems you
-already use — automatically, with no data entry, no rules, no chat. Today
-it ships as a Chrome extension that watches Gmail passively and, when an
-email actually decides something, puts one `Do It` button next to it that
-writes the record for you. The judgment engine itself knows nothing about
-Gmail — it scores plain text — so Gmail is the first surface, not the
-architecture's ceiling (see "What is still deliberately narrow" below).
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+**Implementation status (code reality, this commit; not the product definition).** The entry surface is a Chrome extension that watches Gmail passively. It stays on what you are waiting on until the
+other side really answers, and when an email decides something it puts one `Do It` button next to it that writes the record for you (a Google Calendar event, a Google Task, a Gmail draft; Drive for
+files). Execution today goes through those Google surfaces; WhatsApp Web, Outlook and right-click capture are opt-in and experimental. The judgment engine itself knows nothing about Gmail: it scores plain
+text, so Gmail is the first surface, not the architecture's ceiling (see "What is still deliberately narrow" below).
 
 Glance is a separate product from Flow (theflow-ai.com's enterprise workflow
 engine for organizations with sensitive or regulated data) — not a stripped
@@ -547,7 +548,7 @@ it references `chrome.*`, `document`, or `window`; every module is loaded as a
 plain script here and also runs unmodified under Node (see `test/*.cjs`). This
 is the part a future Flow enterprise runtime would reuse without a rewrite —
 see `core/README.md` for the boundary contract. `src/` is everything that
-makes Glance specifically a Chrome extension talking to Gmail: persistence,
+makes Glance's current entry surface a Chrome extension talking to Gmail (implementation status, not the product definition): persistence,
 the injected UI, the service worker, and the one file (`chrome-storage-
 adapter.js`) that wires core/'s storage seam to `chrome.storage.local`.
 
@@ -620,7 +621,9 @@ foundation, not the feature.
 - **The passive judgment engine is not a language model, and sends nothing
   anywhere.** `core/judgment.js`'s scorer is a transparent, explainable
   weighting, which is why the popup can show why Glance spoke — this has not
-  changed. A miss, and only a miss, may use the masked classify fallback.
+  changed. The whole-message classify fallback is switched off
+  (`REMOTE_CLASSIFY = false`); the one external step on recognition is the
+  opt-in "second reading" of a single masked sentence (`docs/ai-ladder.md`).
   Draft-It and the attachment X-ray are separate tools that call a routed
   model with masked-only text; see "Local Privacy Shield, and where masked
   text is allowed to go" above for exactly where the line is.

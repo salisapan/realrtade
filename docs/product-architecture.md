@@ -7,6 +7,16 @@
 > Flow's security/compliance guarantees, or make Flow look like a
 > self-serve download — stop and ask before shipping it.
 
+## 0b. Locked identity of Glance (2026-10-05)
+
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+This block is the product definition. §0a below is the current implementation status and wins over the rest of this document for what ships today. Standing constraints and wording rules: `docs/product-identity.md`.
+
+---
+
 ## 0a. Current shipping scope (read this before trusting anything below)
 
 > Added after an audit found this document describing a product the code no
@@ -51,6 +61,8 @@ surface it exposes — never the core mechanic.
 | Security posture | Local scoring; no security review offered or needed | Same as Free | SSO, audit log, DPA, compliance review |
 | Price | $0 | ~$14/user/mo ($11 annual) | $80/user/mo + scoped setup fee |
 | Sold via | Self-serve download | Self-serve checkout (not yet built) | Quote request → proposal |
+
+> **Pro column superseded (2026-10-05, locked identity §0b and §2.4's update):** Pro is Glance's *personal depth layer* for one person ($14 a month or $132 a year), not a 2-10 person team plan. The team column above is the old plan and is not on the roadmap.
 
 ---
 
@@ -195,8 +207,11 @@ offering #3 exists to close.
   is the product, not a missing feature.
 - **Not a notifier** — going quiet for days is the system working
   correctly.
-- **Not a mailbox scanner** — it only ever reads the one email open in
-  front of you.
+- **Not a mailbox scanner** — in Gmail it only ever reads the one email open in
+  front of you (the opt-in Outlook connection reads the last 14 days while the
+  panel is open, `docs/multi-platform.md`).
+- **Not "a Gmail add-on" or an inbox-zero tool** — Gmail is where loops start
+  today; the product is closing them (`docs/product-identity.md`).
 
 ---
 

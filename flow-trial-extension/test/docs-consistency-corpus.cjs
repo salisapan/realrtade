@@ -69,5 +69,23 @@ const decisionSyn = read('CLAUDE.md');
 check('CLAUDE.md points to the map, the second reading and true close', /docs\/README\.md/.test(decisionSyn) && /docs\/ai-ladder\.md/.test(decisionSyn) && /docs\/true-close\.md/.test(decisionSyn));
 check('llms.txt describes Glance as loops, free to start, not for regulated data, and does not mention a switch that is off', /stays on what you asked for or promised/.test(read('flow-landing/llms.txt')) && /not for regulated/.test(read('flow-landing/llms.txt')) && !/second reading|Phi-3|on-device model/i.test(read('flow-landing/llms.txt')));
 check('the open tasks the documents point at exist (rows 25, 29, 34, 35, 36, 37)', [25, 29, 34, 35, 36, 37].every((n) => new RegExp('^\\| ' + n + ' \\|', 'm').test(read('docs/open-tasks.md'))));
+
+console.log('--- the locked identity is one definition, quoted verbatim ---');
+const START = '<!-- LOCKED-IDENTITY:START -->', END = '<!-- LOCKED-IDENTITY:END -->';
+const blockOf = (t) => { const a = t.indexOf(START), b = t.indexOf(END); return a >= 0 && b > a ? t.slice(a + START.length, b).trim() : null; };
+const SOURCE = blockOf(read('docs/product-identity.md'));
+check('the source block exists and starts with the sentence every description must start from', SOURCE && SOURCE.indexOf('**Glance closes open loops. Gmail is where it starts today.**') === 0, SOURCE);
+check('it carries the loop, the entry surface, the execution surfaces, silence, preparation and true close, and the Flow split', ['detect → carry → execute → true close', 'current primary entry surface', 'Google Tasks, Gmail drafts and Drive', 'silent when it is uncertain', 'preparation as not completion', 'real completion or a deliberate release', 'Flow, the enterprise product, is separate'].every((x) => SOURCE.indexOf(x) >= 0));
+const QUOTERS = ['CLAUDE.md', 'README.md', 'docs/README.md', 'docs/product-architecture.md', 'docs/monetization.md', 'docs/open-loops.md', 'docs/multi-platform.md', 'flow-trial-extension/README.md'];
+const drift = QUOTERS.filter((f) => blockOf(read(f)) !== SOURCE);
+check('every source-of-truth file quotes it character for character: ' + QUOTERS.length + ' files', drift.length === 0, drift);
+const pi = read('docs/product-identity.md'), cl = read('CLAUDE.md');
+check('the anti-drift list and the two-part report rule are in product-identity.md and summarised in CLAUDE.md', ['Glance is not only a Gmail add-on', 'Glance is not an AI email product', 'Pro is the personal depth layer', 'Waiting or tracking alone is not success', 'Free must stay genuinely useful', 'Zero-Prompt is sacred', 'Multi-platform means'].every((x) => pi.indexOf(x) >= 0) && /Product definition \(vision-locked\)/.test(pi) && /Current implementation status \(code reality\)/.test(pi) && /Product definition \(vision-locked\)/.test(cl) && /Current implementation status \(code reality\)/.test(cl) && /Zero-Prompt is sacred/.test(cl));
+check('the public short forms start from the same sentence', /Glance closes open loops\. Gmail is where it starts today\./.test(read('flow-landing/llms.txt')) && /Glance closes open loops\. Gmail is where it starts today\./.test(read('flow-trial-extension/docs/chrome-web-store-submission.md')));
+check('the Hebrew revenue document states the locked definition and the implementation status apart', /הגדרת המוצר \(נעולה/.test(read('docs/revenue-routines.md')) && /מצב המימוש היום/.test(read('docs/revenue-routines.md')));
+const FORBIDDEN_DEF = /\bGlance is (?:a|an|just a|only a) (?:free |personal |small )?(?:chrome |browser )?(?:extension|add-?on)(?: for| to| in) gmail\b|\bGlance is (?:a|an) (?:free |personal )?(?:ai|smart) (?:email|inbox)/i;
+const defHits = Array.from(new Set(agentFiles.concat(['docs/product-identity.md']))).filter((f) => exists(f) && FORBIDDEN_DEF.test(read(f).replace(/"[^"\n]*"/g, '"…"').replace(/“[^”\n]*”/g, '“…”')));
+check('no agent-readable file defines Glance as an extension for Gmail or as an AI email product (quoting it as the forbidden example is allowed)', defHits.length === 0, defHits);
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

@@ -40,7 +40,7 @@ Glance stays on what you are waiting on until it is closed, and closes what is a
 ### Detailed description
 
 ```
-Glance watches the Gmail message you already have open. It doesn't scan
+Glance closes open loops. Gmail is where it starts today. It watches the Gmail message you already have open. It doesn't scan
 your whole mailbox, doesn't need rules or triggers, and doesn't chat. When
 a message actually decides something — a meeting is proposed, a deadline
 is set, a request is made, a commitment is agreed — one Do It button
@@ -150,16 +150,18 @@ write to, say what kind of work you do, and open an email.
 ### Single purpose description (required field, plain text, no formatting)
 
 ```
-Glance's single purpose is to detect, on the user's device, when the
-currently open Gmail message reflects a real decision (a commitment, a
-scheduled event, a request, a deadline) and, only when the user clicks an
-on-screen button, close it by writing the appropriate record(s) — a Google
-Calendar event, a Google Tasks reminder, a Gmail draft reply, or a
-combination of these — to the user's own, already-signed-in Google
-account. It does not do anything else: it does not scan the mailbox in
-bulk, does not act automatically, and does not serve any purpose unrelated
-to turning one open, user-selected email into one user-approved,
-one-click-undoable record.
+Glance's single purpose is to help the user close their open loops: what
+they asked someone for, what they promised, and what was asked of them. It
+starts in Gmail. On the user's device it detects when the currently open
+Gmail message reflects a real decision or request, and only when the user
+clicks an on-screen button does it close it by writing the appropriate
+record(s) — a Google Calendar event, a Google Tasks reminder, a Gmail draft
+reply, or a combination of these — to the user's own, already-signed-in
+Google account; and, only when the user says yes, it stays on something the
+user is waiting on until the other side really answers. It never sends
+anything for the user, does not scan the mailbox in bulk, does not act
+automatically, and does not serve any purpose unrelated to closing the
+user's own open loops.
 ```
 
 ## Permission justifications (Privacy practices tab)

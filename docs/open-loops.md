@@ -7,6 +7,10 @@
 
 ## 1. The identity shift
 
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
 Glance used to describe itself as an email intention detector. It still does
 that, and still does it quietly. But the thing a person will pay to keep is
 different:

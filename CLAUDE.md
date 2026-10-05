@@ -1,3 +1,17 @@
+## Product identity — LOCKED. Read before describing Glance anywhere (a report, a blurb, a commit, a reply)
+
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+**Standing constraints.** Glance is not only a Gmail add-on (Gmail is the entry surface). Glance is not an AI email product (AI is under the hood; outcomes are what we sell). Pro is the personal depth
+layer, not team or enterprise (that is Flow). Waiting or tracking alone is not success; true close is. Free must stay genuinely useful, never a dead demo. Zero-Prompt is sacred. Multi-platform means
+execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Do not describe Glance as "a Chrome
+extension for Gmail", "an AI email assistant" or "a smart inbox", and never describe tracking or a prepared draft as completion. Full rules, required framing and before/after examples: `docs/product-identity.md`.
+
+**Every report keeps two parts apart.** *Product definition (vision-locked)*: the block above, unchanged by what the code does today. *Current implementation status (code reality)*: what ships in this
+commit, stated as status. "It is a Chrome extension on Gmail" belongs in the second part only. Any description of Glance starts: "Glance closes open loops. Gmail is where it starts today."
+
 ## Start here — the map of every document
 
 `docs/README.md` is the reading order and the update map: which document owns which topic, the code and tests behind it, and which files to update in the same commit when something changes
@@ -27,8 +41,8 @@ boundary, not a folder preference: `core/` is portable business logic
 calibration, document read/write) with zero `chrome.*`/`document`/`window`
 reference, meant to outlive Glance's Chrome-extension packaging and one day
 serve a separate enterprise Flow runtime unchanged. `src/` is everything that
-makes Glance specifically a Chrome extension talking to Gmail (persistence,
-injected UI, the service worker). Full contract, the adapter pattern for
+makes Glance's current entry surface a Chrome extension talking to Gmail (persistence,
+injected UI, the service worker): implementation status, not the product definition above. Full contract, the adapter pattern for
 giving a core module storage without coupling it to `chrome.storage.local`,
 and a decision guide for where new code belongs are in
 `flow-trial-extension/core/README.md` — read it before adding any new module
@@ -77,7 +91,7 @@ last resort (Free with an allowance, Pro with more: `docs/ai-ladder.md`) that ne
 
 ## Product identity — AI is the engine, closure is the product
 
-Glance is not sold or worded as "an AI email product". Copy on any Glance
+Glance is not sold or worded as "an AI email product" or as "a Gmail extension". Copy on any Glance
 surface talks about loops that are open, chased, yours or closed, and money at
 risk, never about cleverness. `docs/product-identity.md` has the rule and the
 list of phrases a Glance surface may not use (enforced by

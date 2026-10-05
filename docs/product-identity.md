@@ -4,6 +4,50 @@
 > recognise) and `docs/open-loops.md` (what Glance does). This file is about how
 > Glance presents itself.
 
+## The locked identity (source of truth: every other file quotes this block verbatim)
+
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+`test/docs-consistency-corpus.cjs` fails if any file that quotes this block differs from it by a character, so there is one definition. To change it, change it HERE and in every file the test names, in one commit, with the owner's say-so.
+
+### Two things that are never the same sentence
+
+When anyone (a person, Claude, a Grok bot, David) describes Glance, the description starts from the block above, and any status report keeps two parts apart:
+
+1. **Product definition (vision-locked).** What Glance is: the block above. It does not change because the code is behind it.
+2. **Current implementation status (code reality).** What ships today: for example "the entry surface is a Chrome extension on Gmail; execution goes through Google Tasks, Gmail drafts and Drive; WhatsApp Web, Outlook and right-click capture are opt-in experimental; the second reading is built and off at the server". It is true of this commit only, and it lives in `docs/open-tasks.md`, `docs/product-architecture.md` §0a and the owner documents named in `docs/README.md`.
+
+"Glance is a Chrome extension for Gmail" is a sentence of the second kind presented as the first. It describes today's entry surface, not the product.
+
+### Required framing, forbidden framing
+
+Required, in any description of Glance: a system that closes open loops / unfinished intentions; starts today in Gmail; executes through Tasks, Draft and Drive when that is what completion needs; a multi-surface path toward true close; silence when uncertain; preparation is not completion; true close only on real completion or a deliberate release.
+
+Forbidden as the full product definition: "Chrome extension for Gmail", "Gmail add-on", "AI email assistant", "smart inbox", and tracking, a reminder or a prepared draft described as completion. A sentence about the form (it installs in Chrome, it reads the open Gmail thread) is fine when it is plainly a statement of how it works today, not of what it is.
+
+### Standing constraints (the anti-drift list)
+
+1. Glance is not only a Gmail add-on. Gmail is the entry surface.
+2. Glance is not an AI email product. AI is under the hood; outcomes are what we sell.
+3. Pro is the personal depth layer: more loops, the money owed, firmer nudges, Draft-It and summaries, and, once the server switch is on, a larger allowance and a stronger second reading. It is not a team or enterprise tier and carries no compliance claim. That is Flow, and it is separate.
+4. Waiting or tracking alone is not success. True close is: the original intention completed in fact, or released on purpose by the person.
+5. Free must stay genuinely useful: Do It without limit, loops that close on the outcome, and, once the server switch is on, the second reading within its allowance. Never a dead demo.
+6. Zero-Prompt is sacred: no chat, no rules screen, no setup questions beyond signing in, one card only when something real is decided; silence when unsure.
+7. Multi-platform means execution and observation across the surfaces where a loop really opens, advances and closes, in service of closure. It does not mean a connector marketplace, inbox-zero, or integrations for their own sake. A new surface is opt-in, read-only, stricter than Gmail, and changes the privacy page and the store text in the same commit (`docs/multi-platform.md`).
+
+### Before and after
+
+| Before (drifted) | After (locked) |
+|---|---|
+| "Glance is a Chrome extension for Gmail." | "Glance closes open loops. Gmail is where it starts today." |
+| "A free Gmail extension that turns an email into a calendar event." | "Glance stays on what you asked for or promised until it is truly closed, and turns what is asked of you into a calendar event, a task or a draft. It starts in Gmail." |
+| "Glance reminds you to follow up." | "Glance stays on it until the answer arrives; the reminder is a means, the close is the product." |
+| "Draft ready: handled." | "Draft ready, nothing sent. It closes when you send it with the file." (preparation is not completion) |
+| "An AI email assistant that understands your inbox." | "It stays quiet unless something real is open, and says what is still open." |
+| "Glance is a connector to Calendar, Tasks and Drive." | "Glance executes through Calendar, Tasks, Drafts and Drive when that is what completion needs." |
+
 ## The rule
 
 Glance is built with AI techniques and must not be sold, worded or felt as "an AI

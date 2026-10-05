@@ -1,5 +1,11 @@
 # Glance — how it earns money
 
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+What is sold is the personal depth layer of that: more loops held until they close, the money owed, a stronger second reading, firmer nudges. Not a team plan, not Flow.
+
 > Written 2026-10-01. Everything marked **built** exists in the repository and
 > is tested. Everything marked **owner** needs an account, a key or a decision
 > that only the owner can supply. Nothing on the public site claims Pro is

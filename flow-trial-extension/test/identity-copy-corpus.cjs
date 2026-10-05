@@ -21,8 +21,11 @@ const FILES = [
   'flow-trial-extension/popup/popup.js',
   'flow-trial-extension/src/content-gmail.js',
   'flow-trial-extension/src/follow.js',
-  'flow-trial-extension/docs/chrome-web-store-submission.md'
+  'flow-trial-extension/docs/chrome-web-store-submission.md',
+  'flow-landing/llms.txt'
 ];
+// Pages that legitimately discuss AI (security, legal) are scanned only for the locked-identity patterns (FORM, below).
+const FORM_ONLY_FILES = ['flow-landing/solutions/browser-ai-agent-extension-hijack.html', 'flow-landing/terms.html', 'flow-landing/privacy.html', 'README.md', 'flow-trial-extension/README.md', 'docs/README.md', 'docs/monetization.md', 'docs/open-loops.md', 'docs/multi-platform.md'];
 // Pricing mixes Flow and Glance; only its Glance block is scanned.
 function pricingGlance() {
   const s = fs.readFileSync(path.join(ROOT, 'flow-landing/pricing.html'), 'utf8');
@@ -36,17 +39,22 @@ const BANNED = [
   [/\b(?:smart|intelligent) (?:inbox|email|mail|assistant|repl(?:y|ies)|compose)\b/i, 'smart inbox / smart email'],
   [/\bunderstands? your (?:inbox|email|mail|messages)\b/i, 'understands your inbox'],
   [/\b(?:your )?(?:ai|email) (?:assistant|copilot)\b/i, 'assistant / copilot'],
-  [/\bchat ?bot\b/i, 'chatbot']
+  [/\bchat ?bot\b/i, 'chatbot'],
+  // Locked identity (docs/product-identity.md): Glance is not defined by its entry surface.
+  [/\b(?:(?:free|personal|chrome|browser) )*(?:extension|add-?on|plug-?in) (?:for|to|in) gmail\b/i, 'defines Glance as an extension for Gmail'],
+  [/\bgmail (?:extension|add-?on|plug-?in)\b/i, 'defines Glance as a Gmail extension / add-on'],
+  [/\bglance is (?:a|an|just a|only a) (?:free |personal |small )?(?:chrome |browser )?(?:extension|add-?on)\b(?!,? (?:so|that installs|which installs))/i, 'defines Glance by its form (an extension)']
 ];
+const FORM = BANNED.slice(BANNED.length - 3);
 // Honest mentions that are NOT marketing: privacy disclosures name "AI" features
 // because a store reviewer must know. Those lines are allowed to say "AI feature(s)".
 const ALLOWED_LINE = /AI[- ]assisted feature|opt-in AI features?|train any AI model|AI model/i;
 
-function scan(label, text) {
+function scan(label, text, patterns) {
   const hits = [];
   text.split('\n').forEach((line, i) => {
-    if (ALLOWED_LINE.test(line)) return;
-    BANNED.forEach(([re, what]) => { if (re.test(line)) hits.push({ line: i + 1, what, text: line.trim().slice(0, 120) }); });
+    if (!patterns && ALLOWED_LINE.test(line)) return;
+    (patterns || BANNED).forEach(([re, what]) => { if (re.test(line)) hits.push({ line: i + 1, what, text: line.trim().slice(0, 120) }); });
   });
   check(label + ': no "AI product" wording', hits.length === 0, hits);
 }
@@ -56,7 +64,15 @@ FILES.forEach((f) => {
   if (!fs.existsSync(p)) { check(f + ' exists', false); return; }
   scan(f, fs.readFileSync(p, 'utf8'));
 });
+FORM_ONLY_FILES.forEach((f) => { if (fs.existsSync(path.join(ROOT, f))) scan(f + ' (identity)', fs.readFileSync(path.join(ROOT, f), 'utf8'), FORM); });
 scan('flow-landing/pricing.html (Glance block)', pricingGlance());
+
+// index.html mixes Flow and Glance (Flow may describe AI plainly), so only the Glance call-to-action is scanned.
+(function () {
+  const t = fs.readFileSync(path.join(ROOT, 'flow-landing/index.html'), 'utf8').split('\n').filter((l) => /Get Glance|wl\.solo/.test(l)).join('\n');
+  scan('flow-landing/index.html (Glance call-to-action)', t);
+  check('index.html says what Glance does, not what it installs as', /closes open loops, starting in Gmail/.test(t) && !/free Gmail extension/i.test(t));
+})();
 
 console.log('\n--- positive: the closure language is actually there ---');
 const trial = fs.readFileSync(path.join(ROOT, 'flow-landing/trial.html'), 'utf8');

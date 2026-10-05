@@ -1,5 +1,13 @@
 # Flow / Glance
 
+**Glance**
+
+<!-- LOCKED-IDENTITY:START -->
+**Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+<!-- LOCKED-IDENTITY:END -->
+
+**Flow** is the separate enterprise product for organizations with sensitive data.
+
 This repository holds two related products built on one shared idea — watch
 a moment, recognize it, act on it, always reversibly — and the site that
 sells both of them. See `docs/product-architecture.md` for the full split
@@ -10,11 +18,13 @@ The reading order for a person or an agent, and which document owns which topic,
 ## Layout
 
 ```
-flow-trial-extension/   Glance — the Chrome extension (Flow Trial's Free/Pro tier).
-                         Local, on-device judgment engine + real write paths
-                         (Google Calendar/Tasks/Gmail, Notion, HubSpot,
-                         Salesforce, Slack, Monday.com). See its own README
-                         for setup, architecture, and how to load it locally.
+flow-trial-extension/   Glance's current implementation (Flow Trial's Free/Pro
+                         tier): a Chrome extension whose first surface is Gmail.
+                         Local, on-device judgment engine + execution through
+                         Google Calendar/Tasks/Gmail drafts/Drive today (Notion,
+                         HubSpot, Salesforce, Slack, Monday.com are dormant code).
+                         See its own README for setup, architecture, and how to
+                         load it locally.
 
 flow-landing/            The marketing site (theflow-ai.com) — homepage,
                          pricing, solutions pages, blog, and the Netlify
