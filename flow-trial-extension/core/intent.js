@@ -716,7 +716,22 @@ const FlowIntent = (() => {
     // A family veto (cancel with no new slot, two file targets, a retraction,
     // a doc comment we cannot write) is silence. A reschedule that names
     // one new slot is that slot, not the old time the event gate would file.
-    if (familyBox.hit && familyBox.hit.suppress) return stayQuiet('family');
+    if (familyBox.hit && familyBox.hit.suppress) {
+      if (ctx.debug) {
+        let matched = familyBox.hit.matched || null;
+        if (Array.isArray(matched)) matched = matched.join(', ').slice(0, 80);
+        else if (matched != null) matched = String(matched).slice(0, 80);
+        console.log('[Glance debug]', {
+          messageId: ctx.messageId || null,
+          family: familyBox.hit.family,
+          rule: familyBox.hit.rule || null,
+          reason: 'family',
+          suppress: true,
+          matched: matched
+        });
+      }
+      return stayQuiet('family');
+    }
     if (familyBox.hit && familyBox.hit.family === 'G') {
       const viaMove = fromFamily(familyBox.hit);
       if (viaMove) return viaMove;

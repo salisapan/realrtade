@@ -778,9 +778,10 @@ const FlowCloseFamilies = (() => {
       if (distinct.indexOf(key) === -1) distinct.push(key);
     }
     if (distinct.length < 2) return false;
-    return MEET_EN.test(text) || MEET_HE.test(text) ||
+    const meeting = MEET_EN.test(text) || MEET_HE.test(text) ||
       /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text) ||
       /יום/.test(text);
+    return meeting ? distinct : false;
   }
 
   function assess(text, facts, ctx) {
@@ -791,8 +792,9 @@ const FlowCloseFamilies = (() => {
     if (!text.trim()) return null;
     if (ctx.blocked) return null;
     if (NOISE_EN.test(text) || NOISE_HE.test(text)) return null;
-    if (ambiguousFiles(text)) return hit({ suppress: true, family: 'H' });
-    if (ambiguousClocks(text)) return hit({ suppress: true, family: 'H' });
+    if (ambiguousFiles(text)) return hit({ suppress: true, family: 'H', rule: 'ambiguousFiles', matched: distinctFiles(text) });
+    const clockStarts = ambiguousClocks(text);
+    if (clockStarts) return hit({ suppress: true, family: 'H', rule: 'ambiguousClocks', matched: clockStarts });
     const now = ctx.now;
     if (!facts && typeof FlowExtract !== 'undefined') {
       facts = FlowExtract.extract(text, { now: now, senderEmail: ctx.senderEmail });
