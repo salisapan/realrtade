@@ -7,6 +7,17 @@ const { FlowRequestTypes } = require('../core/request-types.js');
 const { FlowIntentPipeline } = require('../core/intent-pipeline.js');
 const { FlowIntentModel } = require('../core/intent-model.js');
 FlowIntentModel.load(require('../core/intent-model-weights.js').FlowIntentWeights);
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const sandbox = { module: undefined, console, require };
+vm.createContext(sandbox);
+for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js']) {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+}
+const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+const FlowActions = vm.runInContext('FlowActions', sandbox);
+
 let failures = 0;
 function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
@@ -15,7 +26,7 @@ function check(name, cond, detail) {
 const DAY = 24 * 3600 * 1000;
 const NOW = new Date(2026, 9, 3, 12).getTime();
 const ME = 'me@contoso.com';
-const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline };
+const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
 let n = 0;
 const iso = (d) => new Date(NOW - d * DAY).toISOString();
 const mine = (conv, text, ago, subject) => ({ id: 'm' + (++n), conversationId: conv, subject: subject || 'Lease', isDraft: false, from: { emailAddress: { name: 'Me', address: ME } }, toRecipients: [{ emailAddress: { name: 'Dana Cole', address: 'dana@acme.com' } }], sentDateTime: iso(ago), webLink: 'https://outlook.office.com/mail/id/' + n, body: { contentType: 'text', content: text } });
@@ -96,6 +107,7 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
   }
   const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+  const FlowActions = vm.runInContext('FlowActions', sandbox);
   const NOW2 = Date.parse('2026-10-05T10:00:00Z');
   const OUT = 'glance.salisapan@outlook.com';
   const GMAIL_ME = 'salisapan1@gmail.com';
@@ -109,7 +121,7 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
     toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
     receivedDateTime: '2026-10-05T08:00:00Z',
     body: { contentType: 'text', content: 'Can you send me the signed contract by Thursday?' } };
-  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
   const planLive = (me) => S.plan({ messages: [ask, prev], me, watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
 
   const both = planLive([OUT, GMAIL_ME]);
@@ -173,6 +185,7 @@ console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
     vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
   }
   const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+  const FlowActions = vm.runInContext('FlowActions', sandbox);
   const NOW2 = Date.parse('2026-10-05T14:06:00+03:00');
   const OUT = 'glance.salisapan@outlook.com';
   const LIVE_BODY = 'Hi Sali,\n\nCould you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.\n\nThanks,\nFlow team';
@@ -181,9 +194,10 @@ console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
     toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
     receivedDateTime: '2026-10-05T10:21:00Z', webLink: 'https://outlook.office.com/mail/id/a1',
     body: { contentType: 'text', content: LIVE_BODY } };
-  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
   const r = S.plan({ messages: [ask], me: [OUT, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
   check('live Flow-team body: one incoming (not quiet:hedge)', r.incoming.length === 1 && r.incoming[0].base.counterpart.email === 'ai.local.flow@gmail.com', { incoming: r.incoming, diagnostics: r.diagnostics });
+  check('live Flow-team body: process has outlookDraft', r.incoming[0] && r.incoming[0].process && (r.incoming[0].process.steps || []).some((s) => s.kind === 'outlookDraft'), r.incoming[0] && r.incoming[0].process);
   check('live Flow-team body: Why not shown omits shown-incoming', !(r.diagnostics || []).some((d) => String(d.reason || '').indexOf('shown-') === 0), r.diagnostics);
   const bare = FlowIntent.classify(LIVE_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', now: new Date(NOW2) });
   check('classify alone: request chip for confirm-by-Wednesday-whether', bare.type === 'request' && FlowIntent.shouldShowChip(bare), { type: bare.type, quiet: bare.quiet, label: bare.label });

@@ -38,6 +38,7 @@
 import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
+import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -180,7 +181,14 @@ chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
 // site's permission (an OPTIONAL host permission: the install itself asks for nothing new) and then registers the content scripts for
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
 const SURFACES = {
-  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] }
+  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
+  // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
+  outlook: {
+    label: 'Outlook on the web',
+    origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
+    extra: ['core/owa-parse.js', 'core/draft-reply.js', 'src/chip-host.js', 'src/content-outlook.js'],
+    css: ['src/chip.css']
+  }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
 const GMAIL_ONLY_SCRIPTS = ['src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
@@ -195,7 +203,8 @@ async function registerSurface(id) {
   if (!def || !chrome.scripting || !chrome.scripting.registerContentScripts) return { ok: false, reason: 'unsupported' };
   const granted = await chrome.permissions.contains({ origins: def.origins });
   if (!granted) return { ok: false, reason: 'no-permission' };
-  const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: ['src/follow.css'], runAt: 'document_idle', persistAcrossSessions: true };
+  const css = (def.css && def.css.length) ? def.css : ['src/follow.css'];
+  const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: css, runAt: 'document_idle', persistAcrossSessions: true };
   try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered yet */ }
   await chrome.scripting.registerContentScripts([script]);
   return { ok: true };
@@ -1746,58 +1755,14 @@ function draftSubject(p) {
   return /^re:/i.test(base) ? base : 'Re: ' + base;
 }
 
-function draftGreeting(senderName) {
-  const name = (senderName || '').trim();
-  // Correspondence in this product's actual use (Hebrew and English SMB
-  // email) is almost always first-name-only — the full display name Gmail
-  // hands back can carry a title or a company suffix that would read oddly
-  // as a greeting.
-  const first = name ? name.split(/\s+/)[0] : '';
-  return first ? 'Hi ' + first + ',' : 'Hi,';
+function draftGreeting(senderName, senderEmail) {
+  return globalThis.FlowDraftReply.draftGreeting(senderName, senderEmail);
 }
 
-// attachment/attachmentSource are optional — every existing caller that
-// passes just `p` still gets the exact same body it always did.
-// attachmentSource === 'found' or 'template' is the one case worth a line
-// in the draft itself: 'thread'/'picked' are things the user already saw
-// before Do It was ever clicked, but an auto-found file is Glance's own
-// guess, and a guess that lands in a real, sendable draft with no visible
-// flag is exactly the kind of silent overreach this product's
-// precision-first posture exists to avoid.
-// A share-link draft is the file sentence plus the link. A reply-with-facts
-// draft is the greeting plus that one fact. Neither one is a rewrite, and
-// the user still sends.
 function draftBodyText(p, attachment, attachmentSource, shareUrl) {
-  const params = p.params || {};
-  if (params.replyFact && !params.shareLink) {
-    const factLine = String(params.factLine || '').replace(/[\r\n]+/g, ' ').trim();
-    return [draftGreeting(p.senderName), '', factLine].join('\n');
-  }
-  const lines = [draftGreeting(p.senderName), ''];
-  if (shareUrl) {
-    lines.push(params.what || 'The file is ready.');
-    lines.push(shareUrl);
-    return lines.join('\n');
-  }
-  if (params.what && params.when) lines.push('Following up on: ' + params.what + ' (' + params.when + ')');
-  else if (params.what) lines.push('Following up on: ' + params.what);
-  else lines.push('Following up on your message below.');
-  if (attachment && (attachmentSource === 'found' || attachmentSource === 'template')) {
-    lines.push('', 'Attached: ' + attachment.filename);
-    if (attachmentSource === 'template') {
-      const fields = params.fields || [];
-      for (const field of fields) {
-        if (field && field.label && String(field.value || '').trim()) {
-          lines.push(String(field.label) + ': ' + String(field.value).replace(/[\r\n]+/g, ' ').trim());
-        }
-      }
-    }
-  }
-  lines.push('', '[Write your reply here]');
-  return lines.join('\n');
+  return globalThis.FlowDraftReply.draftBodyText(p, attachment, attachmentSource, shareUrl);
 }
 
-// opts: { to, subject, body, attachment: {filename, mimeType, base64} | null }
 function buildMimeMessage(opts) {
   const headers = [
     mimeHeader('To', opts.to),
@@ -2955,7 +2920,14 @@ async function outlookDraftWrite(p) {
   if (!token) return { ok: false, reason: 'not-connected' };
   const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
   if (!incomingId) return { ok: false, reason: 'no-message' };
-  const comment = (p && p.body) || (p && p.comment) || '';
+  // Same composer as Gmail: draftBodyText / FlowDraftReply.
+  let comment = (p && p.body) || (p && p.comment) || '';
+  if (!comment && p && (p.params || p.intent)) {
+    comment = globalThis.FlowDraftReply.bodyFromIntent(p.intent || { entities: (p.params || {}), label: p.label }, p.senderName, p.senderEmail);
+  }
+  if (!comment && p && p.params) {
+    comment = globalThis.FlowDraftReply.draftBodyText({ senderName: p.senderName, senderEmail: p.senderEmail, params: p.params });
+  }
   const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
   outlookAssertNotSend(url);
   const res = await fetch(url, {
@@ -2966,7 +2938,18 @@ async function outlookDraftWrite(p) {
   if (!res.ok) return { ok: false, reason: 'http-' + res.status };
   const draft = await res.json();
   if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };
-  return { ok: true, ref: draft.id, where: draft.webLink || null, written: 'Reply draft ready in Outlook Drafts. Not sent.' };
+  // Prefer preferred From alias when provided (same as popup createReplyDraft).
+  const wantFrom = p && p.fromAddress;
+  if (wantFrom && draft.isDraft !== false) {
+    try {
+      await fetch(OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id), {
+        method: 'PATCH',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: { emailAddress: { address: wantFrom } }, body: { contentType: 'Text', content: comment } })
+      });
+    } catch (e) { /* alias may be refused on MSA */ }
+  }
+  return { ok: true, ref: draft.id, where: draft.webLink || null, url: draft.webLink || null, written: 'Reply draft ready in Outlook Drafts. Not sent.' };
 }
 async function outlookDraftUndo(ref) {
   if (!ref) return { ok: false };
@@ -2975,7 +2958,7 @@ async function outlookDraftUndo(ref) {
   const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
   outlookAssertNotSend(getUrl);
   const got = await fetch(getUrl, { headers: { Authorization: 'Bearer ' + token } });
-  if (got.status === 404) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+  if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
   if (!got.ok) return { ok: false, reason: 'http-' + got.status };
   const msg = await got.json();
   if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };

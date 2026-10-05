@@ -53,7 +53,8 @@ const FlowOutlookSync = (() => {
     return e ? new Set([e]) : null;
   }
 
-  // opts: { messages, me, watches, graph, state:{offered,declined,incomingDeclined}, now, deps:{ extract, types, pipeline, intent, factReply } }
+  // opts: { messages, me, watches, graph, state:{offered,declined,incomingDeclined}, now, deps:{ extract, types, pipeline, intent, factReply, actions } }
+  // Incoming uses the SAME FlowIntent.classify + FlowActions.planFor as Gmail; only the draft step kind is mapped to outlookDraft.
   function plan(opts) {
     const o = opts || {};
     const out = { patches: [], offers: [], incoming: [], asks: [], parties: [], lines: [], diagnostics: [], stats: { conversations: 0, closed: 0, moved: 0, offers: 0, incoming: 0 } };
@@ -216,8 +217,37 @@ const FlowOutlookSync = (() => {
         note('fact-reply-block', { counterpart: party.email || null });
         return;
       }
+      // Same process planner as Gmail; map gmailDraft → outlookDraft (Graph write adapter).
+      const actionsApi = deps.actions || (typeof FlowActions !== 'undefined' ? FlowActions : null);
+      let process = null;
+      if (actionsApi && typeof actionsApi.planFor === 'function') {
+        const planned = actionsApi.planFor(intent, {
+          threadUrl: lastRaw.webLink || null,
+          hasThreadAttachment: Boolean(lastRaw.hasAttachments)
+        });
+        if (planned && planned.steps && planned.steps.length) {
+          process = Object.assign({}, planned, {
+            steps: planned.steps.map((s) => {
+              if (s.kind !== 'gmailDraft') return s;
+              return Object.assign({}, s, {
+                kind: 'outlookDraft',
+                id: String(s.id || 'draft').replace(/^gmail/i, 'outlook')
+              });
+            })
+          });
+        }
+      }
+      if (!process) { note('no-process', { counterpart: party.email || null, intentType: intent.type }); return; }
       out.incoming.push({
-        key: ikey, conversationId: conv, messageId: last.id, intent,
+        key: ikey, conversationId: conv, messageId: last.id, intent, process,
+        subject: subject.slice(0, 160),
+        text: last.text,
+        sender: { name: party.name, email: party.email },
+        app: 'outlook',
+        outlookIncomingId: last.id,
+        outlookConversationId: conv,
+        threadId: id,
+        threadUrl: lastRaw.webLink || null,
         base: {
           threadId: id, messageId: last.id, subject: subject.slice(0, 160),
           counterpart: { name: party.name, email: party.email, phone: null },

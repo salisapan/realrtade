@@ -12,6 +12,8 @@
 //     only ever offered, and created when the person taps. Incoming asks appear in Still Open with Do It.
 const FlowOutlook = (() => {
   const ORIGINS = ['https://graph.microsoft.com/*', 'https://login.microsoftonline.com/*'];
+  // Outlook on the web: floating Do It card (same engine as Gmail). Requested with Graph on connect.
+  const OWA_ORIGINS = ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'];
   const AUTH_KEY = 'outlookAuth';
   const STATE_KEY = 'outlookSync';
   const PENDING_KEY = 'outlookPending';
@@ -190,7 +192,7 @@ const FlowOutlook = (() => {
 
     async function connect(opts) {
       if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured' };
-      const granted = await deps.permissions.request({ origins: ORIGINS });
+      const granted = await deps.permissions.request({ origins: ORIGINS.concat(OWA_ORIGINS) });
       if (!granted) return { ok: false, error: 'permission' };
       const o = opts || {};
       const r = await deps.auth.signIn(authDeps(), cfg, deps.redirectUri(), { prompt: o.prompt, loginHint: o.loginHint });
@@ -204,6 +206,10 @@ const FlowOutlook = (() => {
       await write(AUTH_KEY, { token: r.token, account, ownAddresses, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
+      // Register the OWA content script (same chip as Gmail) while Outlook is on.
+      if (typeof deps.send === 'function') {
+        try { await deps.send({ type: 'flow:surface-enable', id: 'outlook' }); } catch (e) { /* permission already granted above */ }
+      }
       const s = await sync({ force: true });
       return Object.assign({ ok: true, account }, { sync: s });
     }
@@ -212,7 +218,10 @@ const FlowOutlook = (() => {
       await write(AUTH_KEY, null);
       await write(STATE_KEY, {});
       await write(PENDING_KEY, { offers: [], asks: [] });
-      try { await deps.permissions.remove({ origins: ORIGINS }); } catch (e) { /* tokens are gone either way */ }
+      try { await deps.permissions.remove({ origins: ORIGINS.concat(OWA_ORIGINS) }); } catch (e) { /* tokens are gone either way */ }
+      if (typeof deps.send === 'function') {
+        try { await deps.send({ type: 'flow:surface-disable', id: 'outlook' }); } catch (e) { /* ignore */ }
+      }
       return { ok: true };
     }
 
@@ -710,12 +719,12 @@ const FlowOutlook = (() => {
     }
 
     return {
-      ORIGINS, status, connect, disconnect, sync, acceptOffer, declineOffer, declineIncoming, answerAsk,
+      ORIGINS, OWA_ORIGINS, status, connect, disconnect, sync, acceptOffer, declineOffer, declineIncoming, answerAsk,
       createReplyDraft, undoReplyDraft, reconcileReceipts, assertAllowedWrite, hasScope, primaryAddress, clearOutlookJudgmentState, dismissIncoming, STATE_VERSION
     };
   }
 
-  return { ORIGINS, MIN_INTERVAL_MS, SILENT_REAUTH_AFTER_MS, create };
+  return { ORIGINS, OWA_ORIGINS, MIN_INTERVAL_MS, SILENT_REAUTH_AFTER_MS, create };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlook };
