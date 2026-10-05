@@ -92,6 +92,7 @@ it, not touching the module.
 | `outlook-auth.js` | Sign in to Microsoft (OAuth 2.0 authorization code with PKCE) and keep the tokens fresh. |
 | `outlook-config.js` | The application (client) ID of the registered "Glance Outlook" Microsoft Entra app. Public; a placeholder until the owner registers it (open-tasks). |
 | `outlook-sync.js` | What to do with the last couple of weeks of an Outlook mailbox. |
+| `outlook-reply.js` | On-device Outlook reply draft body (never sent): greeting without a local-part display name, no em dash, acknowledge the asks with a fill-in placeholder. |
 | `outside-signals.js` | Loops that close without the other person replying |
 | `person-model.js` | A model of HOW LONG each person takes — portable, no chrome.*, no DOM, no network, no model service. |
 | `pmf-metrics.js` | Turns the durable local counters storage.js already keeps (shownStats, writeStats, undoneStats, activeDays, closeStats) into the three product- market-fit signals this product actually needs to know whether it's working |

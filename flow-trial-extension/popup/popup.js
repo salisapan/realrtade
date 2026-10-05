@@ -480,16 +480,28 @@
       if (!o) return;
       const incomingId = entry.outlookIncomingId || entry.messageId;
       const label = (entry.intent && entry.intent.label) || (entry.process && entry.process.name) || 'Reply';
-      // Same voice rules as Gmail's on-device draft: short reply acknowledging the ask. Never claim a file we cannot attach.
       const who = (entry.sender && entry.sender.name) || '';
-      const replyText = 'Hi' + (who ? ' ' + String(who).split(' ')[0] : '') + ',\n\nThanks — I will confirm shortly.\n';
-      const draft = await o.createReplyDraft(incomingId, replyText);
+      const email = (entry.sender && entry.sender.email) || '';
+      const bodyText = entry.text || '';
+      const replyText = (typeof FlowOutlookReply !== 'undefined' && FlowOutlookReply.buildBody)
+        ? FlowOutlookReply.buildBody({
+            intent: entry.intent || {},
+            text: bodyText,
+            subject: entry.subject || '',
+            senderName: who,
+            senderEmail: email
+          })
+        : ('Hi,\n\nThanks for your note. I will follow up shortly.\n');
+      // Delivered-to alias when known (identity primary), else account primary.
+      const st0 = await o.status();
+      const fromAddress = st0.primary || null;
+      const draft = await o.createReplyDraft(incomingId, replyText, { fromAddress: fromAddress });
       if (draft && draft.fallback) {
-        // Consent refused: task + Open in Outlook, one line.
         const due = entry.intent && entry.intent.facts && entry.intent.facts.date && entry.intent.facts.date.iso;
         await send({ type: 'flow:follow-task', payload: { title: label, dueIso: due || null, what: label, counterpart: who, threadUrl: entry.threadUrl } });
-        await FlowStorage.appendLog({ kind: 'written', label: label + ' — task ready; open in Outlook to reply (draft permission not granted).', messageId: entry.messageId, app: 'outlook' });
+        await FlowStorage.appendLog({ kind: 'written', label: label + ' - task ready; open in Outlook to reply (draft permission not granted).', messageId: entry.messageId, app: 'outlook' });
         await renderOpen();
+        await renderOutlookCards();
         return;
       }
       if (!draft || !draft.ok) {
@@ -498,10 +510,34 @@
         return;
       }
       await FlowStorage.appendLog({
-        kind: 'written', label: draft.written, messageId: entry.messageId, app: 'outlook',
-        connectorId: 'outlookDraft', ref: draft.ref, where: draft.where, url: draft.where
+        kind: 'written',
+        label: draft.written,
+        messageId: entry.messageId,
+        app: 'outlook',
+        connectorId: 'outlookDraft',
+        ref: draft.ref,
+        where: draft.where,
+        url: draft.where,
+        sender: entry.sender || null,
+        subject: entry.subject || null,
+        intent: entry.intent || null,
+        process: entry.process || null,
+        text: bodyText,
+        outlookIncomingId: incomingId,
+        outlookReceipt: true
       });
-      // Google Task due on the detected date, when Google is connected.
+      if (entry.messageId) {
+        await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: entry.messageId });
+        await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: entry.messageId });
+      }
+      // Drop duplicate From Outlook card; Still Open will show the receipt instead.
+      if (typeof o.dismissIncoming === 'function') {
+        await o.dismissIncoming(entry.key || entry.messageId);
+      }
+      if (typeof depsForget === 'function') { /* noop */ }
+      if (typeof FlowStorage.forgetStillOpenScan === 'function' && entry.messageId) {
+        try { await FlowStorage.forgetStillOpenScan(entry.messageId); } catch (e) {}
+      }
       const due = entry.intent && entry.intent.facts && entry.intent.facts.date && entry.intent.facts.date.iso;
       try {
         const task = await send({ type: 'flow:follow-task', payload: { title: label, dueIso: due || null, what: label, counterpart: who, threadUrl: entry.threadUrl } });
@@ -509,8 +545,8 @@
           await FlowStorage.appendLog({ kind: 'written', label: 'Task due ' + (due || 'soon'), messageId: entry.messageId, connectorId: 'googleTask', ref: task.ref, app: 'outlook' });
         }
       } catch (e) { /* Google may not be connected; draft still stands */ }
-      // A prepared draft is not a close — item stays open until they send from Outlook.
       await renderOpen();
+      await renderOutlookCards();
       return;
     }
     let tabs = [];
@@ -543,6 +579,7 @@
     // ever existed, rather than showing a blank tag.
     top.appendChild(el('span', 'log-kind', (entry.app || 'gmail').toUpperCase()));
     item.appendChild(top);
+    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', 'From Outlook'));
 
     const subtitle = pendingRowSubtitle(entry);
     if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
@@ -571,9 +608,9 @@
       await closeStillOpenFromPopup(entry);
     });
     acts.appendChild(doIt);
-    if (entry.threadUrl) {
-      const view = el('a', 'ghost sm', 'View');
-      view.href = entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
+    if (entry.threadUrl || entry.url) {
+      const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? 'Open draft' : 'View');
+      view.href = entry.url || entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
       acts.appendChild(view);
     }
     const dismiss = el('button', 'ghost sm', 'Dismiss');
@@ -850,6 +887,7 @@
         details.appendChild(list);
         row.appendChild(details);
       }
+      if (st.fromAliasHint) row.appendChild(el('div', 'wait-note', st.fromAliasHint));
     }
     if (st.error) {
       const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
@@ -1070,33 +1108,11 @@
     const pend = (await FlowStorage.get()).outlookPending || { offers: [], asks: [], incoming: [] };
     const host = document.getElementById('outlook-card');
     host.replaceChildren();
-    const offers = pend.offers || [], asks = pend.asks || [], incoming = pend.incoming || [];
-    block.hidden = offers.length + asks.length + incoming.length === 0;
+    // Incoming asks render once in the unified Loops list (Still Open + receipts).
+    // From Outlook keeps only follow-up offers and yes/no asks.
+    const offers = pend.offers || [], asks = pend.asks || [];
+    block.hidden = offers.length + asks.length === 0;
     const mk = (label, fn) => { const b = el('button', 'ghost sm', label); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; await fn(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === 'function') await renderOpen(); }); return b; };
-    for (const x of incoming) {
-      const item = el('div', 'wait-item');
-      const top = el('div', 'wait-top');
-      const who = (x.sender && (x.sender.name || x.sender.email)) || 'Outlook';
-      top.appendChild(el('span', 'wait-who', who));
-      top.appendChild(el('span', 'wait-state', x.label || (x.intent && x.intent.label) || 'Reply requested'));
-      item.appendChild(top);
-      const what = (x.subject || '') || (x.text || '').split('\n')[0] || '';
-      if (what) item.appendChild(el('div', 'wait-what', '\u201c' + String(what).slice(0, 160) + '\u201d'));
-      const acts = el('div', 'wait-acts');
-      const doIt = el('button', 'primary sm', 'Do It');
-      doIt.type = 'button';
-      doIt.addEventListener('click', async () => {
-        doIt.disabled = true;
-        await closeStillOpenFromPopup(x);
-        if (typeof o.dismissIncoming === 'function') await o.dismissIncoming(x.key || x.messageId);
-        await renderOutlookCards();
-        if (typeof renderOpen === 'function') await renderOpen();
-      });
-      acts.appendChild(doIt);
-      acts.appendChild(mk('Not now', () => o.declineIncoming(x.key || x.messageId)));
-      item.appendChild(acts);
-      host.appendChild(item);
-    }
     for (const x of offers) {
       const item = el('div', 'wait-item');
       const top = el('div', 'wait-top');
@@ -1734,12 +1750,58 @@
     }
   }
 
+  function outlookReceiptRow(entry) {
+    const item = el('div', 'log-item');
+    const top = el('div', 'log-top');
+    top.appendChild(el('span', 'log-label', entry.label || 'Reply draft ready in Outlook Drafts. Not sent.'));
+    top.appendChild(el('span', 'log-kind written', 'Draft'));
+    item.appendChild(top);
+    item.appendChild(el('span', 'log-where', 'From Outlook'));
+    if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
+    const acts = el('div', 'log-acts');
+    if (entry.url || entry.where) {
+      const a = el('a', 'ghost sm', 'Open draft');
+      a.href = entry.url || entry.where; a.target = '_blank'; a.rel = 'noopener';
+      acts.appendChild(a);
+    }
+    const u = el('button', 'ghost sm', 'Undo');
+    u.type = 'button';
+    u.addEventListener('click', async () => {
+      u.disabled = true; u.textContent = 'Undoing…';
+      const o = outlook();
+      const r = o ? await o.undoReplyDraft(entry.ref) : { ok: false };
+      if (r && r.ok) {
+        if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+          await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
+        } else {
+          await FlowStorage.appendLog({ kind: 'undone', label: entry.label, messageId: entry.messageId, app: 'outlook', connectorId: 'outlookDraft', ref: entry.ref });
+        }
+        // Draft undo is not a false close (prepared reply, not a trusted close).
+        await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: entry.messageId, draftOnly: true });
+        if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(entry.messageId);
+        await renderOpen();
+        await renderOutlookCards();
+        await renderLog();
+      } else {
+        u.disabled = false; u.textContent = 'Undo';
+      }
+    });
+    acts.appendChild(u);
+    item.appendChild(acts);
+    return item;
+  }
+
   async function renderOpen() {
     const pending = await FlowStorage.getStillOpen();
-    // The badge is the Still Open count, the same number the morning brief
-    // posts. A restart can open this panel before any Gmail tab has run.
-    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: pending.length });
-    for (const item of pending) {
+    const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
+      ? await FlowStorage.getActiveOutlookReceipts()
+      : [];
+    // Dedup: if a receipt exists for a messageId, skip the still-open card.
+    const receiptIds = new Set(receipts.map((r) => r.messageId).filter(Boolean));
+    const openOnly = pending.filter((e) => !receiptIds.has(e.messageId));
+    const total = openOnly.length + receipts.length;
+    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: total });
+    for (const item of openOnly) {
       FlowStorage.recordStillOpenMetric({ kind: 'shown', messageId: item.messageId })
         .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
     }
@@ -1747,8 +1809,9 @@
     const host = document.getElementById('open-list');
     const empty = document.getElementById('open-empty');
     host.replaceChildren();
-    empty.hidden = pending.length > 0;
-    pending.forEach((entry) => host.appendChild(openRow(entry)));
+    empty.hidden = total > 0;
+    receipts.forEach((entry) => host.appendChild(outlookReceiptRow(entry)));
+    openOnly.forEach((entry) => host.appendChild(openRow(entry)));
   }
 
   function when(ts) {
@@ -2056,8 +2119,8 @@
   function logRow(e) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    top.appendChild(el('span', 'log-label', e.label || '—'));
-    // The stored kind stays 'written' — counters and CSS key off it. The
+    top.appendChild(el('span', 'log-label', e.label || '-'));
+    // The stored kind stays 'written' - counters and CSS key off it. The
     // badge a person reads should say what the chip just said.
     const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
     top.appendChild(el('span', 'log-kind ' + e.kind, KIND_LABEL[e.kind] || e.kind));
@@ -2070,7 +2133,7 @@
       const acts = el('div', 'log-acts');
       let undoNote = null;
       if (e.url) {
-        const a = el('a', 'ghost sm', 'View');
+        const a = el('a', 'ghost sm', e.connectorId === 'outlookDraft' ? 'Open draft' : 'View');
         a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
         acts.appendChild(a);
       }
@@ -2086,15 +2149,25 @@
           u.disabled = true;
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
           if (r && r.ok) {
-            await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId });
+            const isOutlookDraft = e.connectorId === 'outlookDraft' || e.app === 'outlook';
+            if (isOutlookDraft && typeof FlowStorage.markOutlookDraftUndone === 'function') {
+              await FlowStorage.markOutlookDraftUndone(e.messageId, e.ref);
+            } else {
+              await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId, connectorId: e.connectorId, ref: e.ref, app: e.app });
+            }
             if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(e.messageId);
             if (e.messageId) {
-              await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+              if (isOutlookDraft) {
+                // Prepared draft undo is not a false close.
+                await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId, draftOnly: true });
+              } else {
+                await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+                await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId });
+              }
             }
             await renderLog();
+            if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            // Same contract as the chip: the button stays Undo, and the
-            // line under it says the record is still there.
             const line = FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = 'Undo';
             u.disabled = false;

@@ -416,7 +416,10 @@ const FlowStillOpen = (() => {
         pushRecent(next, recorded);
         changed = true;
       }
-      if (id && next.falseCloseIds.indexOf(id) === -1) {
+      // A prepared Outlook reply draft is not a trusted close. Undoing it
+      // counts as undo, not as false-close (docs/close-quality-metrics.md:
+      // false-Do-It is reject of a chip / undo of a write that closed).
+      if (!event.draftOnly && id && next.falseCloseIds.indexOf(id) === -1) {
         next.falseClose += 1;
         next.falseCloseIds = remember(next.falseCloseIds, id);
         recorded = { kind: 'falseClose', id: id, ts: ts, reason: 'undo' };

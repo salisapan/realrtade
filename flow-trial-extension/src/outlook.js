@@ -103,6 +103,7 @@ const FlowOutlook = (() => {
         offers: (pending.offers || []).length, asks: (pending.asks || []).length,
         incoming: (pending.incoming || []).length,
         diagnostics: Array.isArray(st.diagnostics) ? st.diagnostics.slice(0, 40) : [],
+        fromAliasHint: st.fromAliasHint || null,
         origins: ORIGINS
       };
     }
@@ -439,14 +440,16 @@ const FlowOutlook = (() => {
       return { ok: true, auth: next };
     }
 
-    // replyText comes from the same on-device draft writer Gmail uses when available.
-    async function createReplyDraft(incomingId, replyText) {
+    // replyText from FlowOutlookReply / Gmail-style on-device draft. fromAddress:
+    // prefer the alias the original was delivered to (Graph may allow PATCH from
+    // when it is a verified mailbox alias; personal MSA often keeps the primary).
+    async function createReplyDraft(incomingId, replyText, opts) {
+      const o = opts || {};
       const auth = await read(AUTH_KEY, null);
       const st = await read(STATE_KEY, {});
       if (!auth || !auth.token) return { ok: false, error: 'not-connected' };
       const scoped = await ensureDraftScope(auth, st);
       if (!scoped.ok) {
-        // Fallback: task + Open in Outlook.
         return { ok: false, error: scoped.error || 'consent', fallback: true };
       }
       const fresh = await deps.auth.ensureFresh({ fetch: deps.fetch, now: deps.now }, cfg, scoped.auth.token);
@@ -461,19 +464,40 @@ const FlowOutlook = (() => {
         throw e;
       }
       if (!draft || !draft.id) return { ok: false, error: 'no-draft' };
-      // Optional PATCH only if body must be set after creation and isDraft is true.
-      if (replyText && draft.isDraft !== false && (!draft.body || !draft.body.content)) {
+      const draftUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draft.id);
+      if (replyText && draft.isDraft !== false) {
         try {
-          await graphWrite(token, 'PATCH', cfg.GRAPH + '/me/messages/' + encodeURIComponent(draft.id), {
-            body: { contentType: 'Text', content: replyText }
-          });
-        } catch (e) { /* draft still exists from createReply */ }
+          await graphWrite(token, 'PATCH', draftUrl, { body: { contentType: 'Text', content: replyText } });
+        } catch (e) { /* createReply comment may already hold the body */ }
+      }
+      const wantFrom = normAddr(o.fromAddress || primaryAddress(auth));
+      let fromSet = false;
+      let fromHint = null;
+      if (wantFrom && draft.isDraft !== false) {
+        try {
+          const patched = await graphWrite(token, 'PATCH', draftUrl, { from: { emailAddress: { address: wantFrom } } });
+          const got = patched && patched.from && patched.from.emailAddress && patched.from.emailAddress.address;
+          fromSet = Boolean(wantFrom && normAddr(got) === wantFrom);
+          if (!fromSet) {
+            fromHint = 'Outlook may keep its primary mailbox address on From. Set your preferred alias as primary in the Microsoft account if drafts should show that address.';
+          }
+        } catch (e) {
+          fromHint = 'Outlook kept its primary From address (Graph did not accept the alias on this draft). Set your preferred address as primary in the Microsoft account, or leave as-is.';
+        }
+      }
+      if (fromHint) {
+        await write(STATE_KEY, Object.assign({}, await read(STATE_KEY, {}), { fromAliasHint: fromHint }));
+      } else if (fromSet) {
+        await write(STATE_KEY, Object.assign({}, await read(STATE_KEY, {}), { fromAliasHint: null }));
       }
       return {
         ok: true,
         ref: draft.id,
         where: draft.webLink || null,
-        written: 'Reply draft ready in Outlook Drafts. Not sent.'
+        written: 'Reply draft ready in Outlook Drafts. Not sent.',
+        fromAddress: wantFrom || null,
+        fromSet: fromSet,
+        fromHint: fromHint
       };
     }
 

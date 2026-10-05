@@ -184,7 +184,7 @@ console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
   const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent };
   const r = S.plan({ messages: [ask], me: [OUT, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
   check('live Flow-team body: one incoming (not quiet:hedge)', r.incoming.length === 1 && r.incoming[0].base.counterpart.email === 'ai.local.flow@gmail.com', { incoming: r.incoming, diagnostics: r.diagnostics });
-  check('live Flow-team body: diagnostic shows shown-incoming', (r.diagnostics || []).some((d) => d.reason === 'shown-incoming'), r.diagnostics);
+  check('live Flow-team body: Why not shown omits shown-incoming', !(r.diagnostics || []).some((d) => String(d.reason || '').indexOf('shown-') === 0), r.diagnostics);
   const bare = FlowIntent.classify(LIVE_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', now: new Date(NOW2) });
   check('classify alone: request chip for confirm-by-Wednesday-whether', bare.type === 'request' && FlowIntent.shouldShowChip(bare), { type: bare.type, quiet: bare.quiet, label: bare.label });
   const hedgeStill = FlowIntent.classify('Can you confirm whether the proposal at $3,900 still works?', { senderEmail: 'x@y.com', senderName: 'X', now: new Date(NOW2) });

@@ -532,7 +532,12 @@ const FlowStorage = (() => {
     // did not. Non-terminal rows are now simply passed over.
     for (const entry of state.log) {
       if (!entry.messageId || resolved.has(entry.messageId)) continue;
-      if (TERMINAL_KINDS.has(entry.kind)) { resolved.add(entry.messageId); continue; }
+      // A prepared Outlook draft that was undone is not a trusted close: the ask
+      // may reappear in Loops (outlookReopen). Do not treat that undone as terminal.
+      if (TERMINAL_KINDS.has(entry.kind)) {
+        if (entry.kind === 'undone' && entry.outlookReopen) continue;
+        resolved.add(entry.messageId); continue;
+      }
       if (entry.kind !== 'shown' || !entry.process) continue;
       if (listed.has(entry.messageId)) continue;
       listed.add(entry.messageId);
@@ -1227,7 +1232,68 @@ const FlowStorage = (() => {
     return id;
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+
+  // Outlook Loops receipts: a prepared draft is shown in place until Undo or dismiss.
+  // Written rows are terminal for getPending; these helpers surface the active draft
+  // receipt and can reopen the ask after a draft-only undo.
+  function getActiveOutlookReceiptsFrom(state) {
+    const log = (state && state.log) || [];
+    const undone = new Set();
+    for (const e of log) {
+      if (e && e.kind === 'undone' && e.messageId && (e.connectorId === 'outlookDraft' || e.app === 'outlook')) {
+        undone.add(e.messageId + '|' + (e.ref || ''));
+        undone.add(e.messageId);
+      }
+    }
+    const out = [];
+    const seen = new Set();
+    for (const e of log) {
+      if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) continue;
+      if (e.undone) continue;
+      if (undone.has(e.messageId) || undone.has(e.messageId + '|' + (e.ref || ''))) continue;
+      if (seen.has(e.messageId)) continue;
+      seen.add(e.messageId);
+      out.push(e);
+    }
+    return out;
+  }
+
+  async function getActiveOutlookReceipts() {
+    return getActiveOutlookReceiptsFrom(await get());
+  }
+
+  // Convert the matching written Outlook draft row into undone in place (no duplicate HANDLED row).
+  // Removes messageId from resolvedMessageIds so Check now can surface the ask again.
+  const markOutlookDraftUndone = serialize(async function markOutlookDraftUndone(messageId, ref) {
+    if (!messageId) return { ok: false };
+    const state = await get();
+    const log = (state.log || []).slice();
+    let hit = false;
+    for (let i = 0; i < log.length; i++) {
+      const e = log[i];
+      if (!e || e.kind !== 'written' || e.messageId !== messageId) continue;
+      if (e.connectorId && e.connectorId !== 'outlookDraft') continue;
+      if (ref && e.ref && e.ref !== ref) continue;
+      log[i] = Object.assign({}, e, {
+        kind: 'undone',
+        label: (e.label || 'Reply draft ready in Outlook Drafts. Not sent.') + ' (undone)',
+        undone: true,
+        outlookReopen: true,
+        url: null,
+        ref: null
+      });
+      hit = true;
+      break;
+    }
+    if (!hit) {
+      log.unshift({ ts: Date.now(), kind: 'undone', label: 'Outlook draft undone', messageId, ref: ref || null, app: 'outlook', connectorId: 'outlookDraft', outlookReopen: true });
+    }
+    const resolved = (state.resolvedMessageIds || []).filter((id) => id !== messageId);
+    await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
+    return { ok: true };
+  });
+
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

@@ -85,6 +85,8 @@ const FlowOutlookSync = (() => {
       const lastRaw0 = byId[last.id] || {};
       const subject0 = String(lastRaw0.subject || '').slice(0, 120);
       function note(reason, extra) {
+        // Why not shown: only drops / silence. Successful shows stay out of the list.
+        if (String(reason || '').indexOf('shown-') === 0) return;
         const row = { conversationId: conv, subject: subject0, reason: reason, direction: last.direction };
         if (extra) Object.assign(row, extra);
         out.diagnostics.push(row);
