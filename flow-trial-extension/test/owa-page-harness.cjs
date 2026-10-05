@@ -43,7 +43,8 @@ async function runPage(opts) {
   const dom = new JSDOM(html, { url, runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   // innerText needs layout in a real browser; here block elements become lines.
-  Object.defineProperty(w.HTMLElement.prototype, 'innerText', { get() { return this.innerHTML.replace(/<br\s*\/?>/g, '\n').replace(/<\/div>/g, '\n').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim(); } });
+  // Quoted attributes may contain ">" (the persona title is flow &lt;addr&gt;). A [^>]+ strip would end the tag there and leak the attribute into the text.
+  Object.defineProperty(w.HTMLElement.prototype, 'innerText', { get() { return this.innerHTML.replace(/<br\s*\/?>/gi, '\n').replace(/<\/div>/gi, '\n').replace(/<(?:[^>"']|"[^"]*"|'[^']*')*>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim(); } });
   w.TextEncoder = TextEncoder; w.TextDecoder = TextDecoder;
   if (!w.crypto || !w.crypto.subtle) Object.defineProperty(w, 'crypto', { value: require('crypto').webcrypto });
   const logs = [];
@@ -99,6 +100,8 @@ async function runPage(opts) {
   while (Date.now() < deadline && !w.document.querySelector('.flow-chip-host')) await new Promise((r) => setTimeout(r, 100));
   await new Promise((r) => setTimeout(r, 300));
   const logsAtCard = logs.length;
+  // A live re-parse: the open message's header changes under the card (the address leaves the persona).
+  if (typeof o.mutate === 'function') o.mutate(w.document);
   // Keep the page churning with the card up, to see whether the open message is judged again on every tick.
   if (o.afterMs) await new Promise((r) => setTimeout(r, o.afterMs));
   clearInterval(ad);
@@ -191,6 +194,60 @@ async function runPage(opts) {
     const r = await runPage({});
     const p = r.parsed || {};
     check('fixture with the address on the page: subject "Pilot proposal", sender ai.local.flow@gmail.com', p.subject === 'Pilot proposal' && p.senderEmail === 'ai.local.flow@gmail.com', p);
+  }
+
+  console.log('\n--- a date row next to the sender (0.9.17 live miss) ---\n');
+  {
+    // Real Hebrew OWA: the first read of the open message is correct (subject, address, display name "flow").
+    // A later read of the same message no longer has the address, and the date/time row beside the sender
+    // ("ג 06/10/2026" + an RTL mark + "01:16") was taken as the sender name. That changed the scan signature
+    // and matched/judged the same message again.
+    const DATE = '\u05d2 06/10/2026 \u200f01:16';
+    const dateRow = (h) => h.replace(
+      '<div class="date">\u05d2 06/10/2026 01:16</div>',
+      '<div role="heading" aria-level="3" class="dateRow">' + DATE + '</div>'
+    );
+    // The name lives only in the persona, not in a heading. The date row is the heading nearest the body.
+    const nameOnly = (h) => dateRow(h).replace(
+      /<div class="persona">[\s\S]*?<\/div>/,
+      '<div class="persona"><span class="senderName">flow</span></div>'
+    );
+    const r = await runPage({ htmlPatch: nameOnly, store: { glanceDebug: true } });
+    const p = r.parsed || {};
+    check('date row adjacent to the persona is not the sender name', p.subject === 'Pilot proposal' && p.senderName === 'flow' && p.senderEmail !== ME, p);
+
+    // No persona element: the sender heading, then the date heading. The date must not win by being nearer the body.
+    const headingOnly = (h) => dateRow(h).replace(
+      /<div class="persona">[\s\S]*?<\/div>/,
+      '<div role="heading" aria-level="3" class="senderHeading"><span>flow</span></div>'
+    );
+    const h = await runPage({ htmlPatch: headingOnly, store: { glanceDebug: true } });
+    check('a date heading after the sender heading is rejected', (h.parsed || {}).senderName === 'flow', h.parsed);
+    const wed = await runPage({ htmlPatch: (html) => headingOnly(html).replace(DATE, 'Wed 06/10/2026 01:16'), store: { glanceDebug: true } });
+    check('an English weekday date row is not the sender name', (wed.parsed || {}).senderName === 'flow', wed.parsed);
+    const dot = await runPage({ htmlPatch: (html) => headingOnly(html).replace(DATE, '06.10.2026 01:16'), store: { glanceDebug: true } });
+    check('a dotted date row is not the sender name', (dot.parsed || {}).senderName === 'flow', dot.parsed);
+
+    // First read has the address. Then the address leaves the header and the page reads the message again.
+    const again = await runPage({
+      htmlPatch: dateRow,
+      store: { glanceDebug: true },
+      afterMs: 3000,
+      mutate(doc) {
+        const span = doc.querySelector('.persona span');
+        if (span) { span.removeAttribute('title'); span.removeAttribute('aria-label'); }
+        if (doc.defaultView && doc.defaultView.__glanceOutlookPage) doc.defaultView.__glanceOutlookPage.rescan();
+      }
+    });
+    const parsedLines = again.logs.filter((l) => /^Glance: parsed/.test(l));
+    const first = parsedLines[0] || '';
+    const last = parsedLines[parsedLines.length - 1] || '';
+    check('the first parse keeps the address and the name "flow"', parsedLines.length >= 1 && /"sender":"ai\.local\.flow@gmail\.com"/.test(first) && /"senderName":"flow"/.test(first), parsedLines);
+    check('a re-parse of the same conversation keeps the last good sender, not the date row',
+      parsedLines.length === 2 && /"sender":"ai\.local\.flow@gmail\.com"/.test(last) && /"senderName":"flow"/.test(last) && !/2026/.test(last),
+      parsedLines);
+    const judged = again.logs.filter((l) => /^Glance: judged/.test(l));
+    check('the date row does not judge the same message on every tick', judged.length === 2, judged.map((l) => l.slice(0, 160)));
   }
 
   console.log('\nTOTAL FAILURES:', failures);

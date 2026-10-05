@@ -44,6 +44,9 @@
   // card still on the page (or its reason already recorded): nothing to do, nothing to log.
   let lastSig = '';
   let lastOutcome = '';
+  // Last address and display name that parsed cleanly, per conversation. A later read of the same open message
+  // sometimes loses the address (it lives in a hover card) and would otherwise keep a worse sender.
+  const senderMemory = Object.create(null);
   let debug = false;
   try { debug = window.localStorage && window.localStorage.getItem('glance-debug') === '1'; } catch (e) { /* storage blocked */ }
   try { chrome.storage.local.get({ glanceDebug: false }, (r) => { if (r && r.glanceDebug) debug = true; dbg('injected', { version: VERSION, href: location.href }); }); } catch (e) { /* no storage */ }
@@ -355,12 +358,32 @@
     await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: ctx.messageId, reason: 'dismiss' });
   }
 
+  function badSenderName(n) {
+    return !n || (FlowOwaParse.looksLikeDateTime && FlowOwaParse.looksLikeDateTime(n));
+  }
+
+  // Empty sender on a conversation we already read well: keep that sender. A date/time row is never a name.
+  function keepSender(pane) {
+    if (!pane) return pane;
+    const key = String(pane.conversationId || pane.itemId || '');
+    if (!key) return pane;
+    const prev = senderMemory[key];
+    if (!pane.senderEmail && prev && prev.email) {
+      pane.senderEmail = prev.email;
+      if (badSenderName(pane.senderName) && prev.name) pane.senderName = prev.name;
+    } else if (badSenderName(pane.senderName)) {
+      pane.senderName = (prev && prev.email === pane.senderEmail && prev.name) || '';
+    }
+    if (pane.senderEmail) senderMemory[key] = { email: pane.senderEmail, name: pane.senderName || '' };
+    return pane;
+  }
+
   async function scan() {
     const st = await FlowStorage.get();
     const own = ((st && st.outlookAuth && st.outlookAuth.ownAddresses) || [])
       .concat(st && st.outlookAuth && st.outlookAuth.account && st.outlookAuth.account.address ? [st.outlookAuth.account.address] : [])
       .map((a) => String(a || '').toLowerCase());
-    const pane = FlowOwaParse.readPane(document, location.href, { own: own });
+    const pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own }));
     const ids = FlowOwaParse.urlIds(location.href);
     const sig = pane
       ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text)].join('|')

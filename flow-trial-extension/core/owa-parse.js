@@ -220,24 +220,59 @@ const FlowOwaParse = (() => {
         if (m) { email = m[2]; name = m[1].trim(); }
       }
       email = normEmail(email);
-      if (EMAIL_RE.test(email) && ok(email)) return { email, name: name.slice(0, 80) };
+      if (EMAIL_RE.test(email) && ok(email)) return { email, name: looksLikeDateTime(name) ? '' : name.slice(0, 80) };
     }
     return { email: '', name: '' };
   }
 
   const HEADINGS = '[role="heading"], h1, h2, h3';
   const LISTS = '[role="listbox"], [role="list"], [role="grid"], [role="tree"], [role="navigation"]';
-  const DATEISH = /^\s*([א-ת]|[a-z]{2,3}\.?)?\s*\d{1,2}[./]\d{1,2}([./]\d{2,4})?\s+\d{1,2}:\d{2}\s*$/i;
+  // Bidi / RTL marks OWA drops into the date row (U+200F before the clock). They are not whitespace, so a
+  // date pattern that only allows \s between the date and the time misses "ג 06/10/2026 ‏01:16".
+  const BIDI_RE = /[\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c\ufeff\u200b\u200c\u200d]/g;
+  const DATE_RE = (() => {
+    const wk = '(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)';
+    const he = "[\\u05d0-\\u05ea]['׳\u05f3]?";
+    const day = '(?:(?:' + wk + ')\\.?|' + he + '|יום\\s+' + he + ')';
+    const clock = '\\d{1,2}:\\d{2}(?::\\d{2})?(?:\\s*[ap]\\.?m\\.?)?';
+    const date = '\\d{1,4}[./]\\d{1,2}(?:[./]\\d{2,4})?';
+    return new RegExp('^(?:' + day + '\\s+)?(?:' + date + '(?:[,\\s]+' + clock + ')?|' + clock + ')$', 'i');
+  })();
+  function looksLikeDateTime(s) {
+    const t = String(s || '').replace(BIDI_RE, '').replace(/\s+/g, ' ').trim();
+    return Boolean(t) && DATE_RE.test(t);
+  }
   function inList(n) { return Boolean(n && n.closest && n.closest(LISTS)); }
   function signature(n) { return (n.getAttribute && n.getAttribute('aria-level') || '') + '|' + (n.tagName || '') + '|' + (n.className && typeof n.className === 'string' ? n.className : ''); }
   function headingText(h) { return textOf(h).split('\n')[0].trim(); }
-  function usable(h) { const t = headingText(h); return t && !EMAIL_RE.test(t) && !DATEISH.test(t); }
+  function usable(h) { const t = headingText(h); return t && !EMAIL_RE.test(t) && !looksLikeDateTime(t); }
+  // The display name. OWA's persona is not always a heading; the date row beside it sometimes is.
+  function personaName(container, bodyRoot) {
+    if (!container || !container.querySelectorAll) return '';
+    const nodes = container.querySelectorAll('.senderName, .persona');
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (bodyRoot && ((bodyRoot.contains && bodyRoot.contains(n)) || !before(n, bodyRoot))) continue;
+      const lines = textOf(n).split('\n');
+      for (let j = 0; j < lines.length; j++) {
+        const line = lines[j].trim();
+        if (!line || line.length > 80 || EMAIL_RE.test(line) || looksLikeDateTime(line)) continue;
+        return line;
+      }
+    }
+    return '';
+  }
+  function pickSender(heads) {
+    const named = heads.filter((h) => h.closest && (h.closest('.persona') || (h.classList && (h.classList.contains('senderName') || h.classList.contains('persona')))));
+    const pool = named.length ? named : heads;
+    return pool[pool.length - 1];
+  }
 
   // Subject and sender name from the reading pane, language-neutral. Real OWA (2026-10, checked live): the subject sits in
   // the reading-pane header ABOVE the message, and inside the message the first heading is the sender's display name
-  // ("flow"), with the address usually only in a hover card. So: the heading nearest the body is the sender name when
-  // there is a header above the message; the subject is the first heading above the message item that is not the sender
-  // and is not shaped like another message's sender row.
+  // ("flow"), with the address usually only in a hover card. A date/time row beside that name is sometimes a heading
+  // too (and may carry an RTL mark); it is not a sender. The persona/name element is preferred. The subject is the
+  // first heading above the message item that is not the sender.
   function headerOf(bodyRoot, d) {
     const container = containerOf(bodyRoot, d);
     const near = container ? Array.prototype.slice.call(container.querySelectorAll(HEADINGS))
@@ -252,7 +287,7 @@ const FlowOwaParse = (() => {
     }
     let senderHead = null, subjectHead = null;
     if (far.length && near.length) {
-      senderHead = near[near.length - 1];
+      senderHead = pickSender(near);
       const sig = signature(senderHead), name = headingText(senderHead);
       subjectHead = far.find((h) => headingText(h) !== name && signature(h) !== sig) || far.find((h) => headingText(h) !== name) || null;
     } else if (near.length) {
@@ -278,7 +313,10 @@ const FlowOwaParse = (() => {
       subject = fallback && !inList(fallback) ? headingText(fallback) : '';
     }
     const who = senderOf(container, bodyRoot, opts && opts.own);
-    const senderName = who.name || head.senderName || '';
+    const fromWho = who.name && !looksLikeDateTime(who.name) ? who.name : '';
+    const fromHead = head.senderName && !looksLikeDateTime(head.senderName) ? head.senderName : '';
+    // The persona/name element wins over a heading nearer the body (that nearer heading is often the date row).
+    const senderName = personaName(container, bodyRoot) || fromWho || fromHead || '';
     const body = textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
     if (!subject && !body) return null;
     const ids = urlIds(href || (typeof location !== 'undefined' ? location.href : ''));
@@ -293,7 +331,7 @@ const FlowOwaParse = (() => {
     };
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, readingPaneRoots, rootsReport, readPane, senderOf, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

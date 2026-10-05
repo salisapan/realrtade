@@ -140,6 +140,13 @@ takes the heading nearest the body as the sender name and the header above the m
 subject fallback needs the display name to agree when there is no address. The scan remembers the open message (id,
 subject, sender name, a hash of the text) and does nothing while it is unchanged and its card or reason is already in place.
 
+What 0.9.17 changed after a live re-read of the same Hebrew message: the first parse was the subject, the address and
+the display name, and a later parse of that same open message had an empty address and the date/time row
+(`ג 06/10/2026`, an RTL mark, then the clock) as the sender name. That changed the scan signature and matched and judged
+the message again. A sender-name candidate that is a date or a time (digits with `/` `.` `:` , a Hebrew or English
+weekday prefix, RTL marks stripped first) is rejected, the persona/name element is preferred, and a re-parse that loses
+the address keeps the last good sender for that conversation.
+
 **A session that lasts (0.9.14).** A single-page-application refresh token lives 24 hours from the sign-in and does not slide. The worker keeps
 the session alive on its own: an alarm every 30 minutes (and on browser start-up), refresh in the access token's last 5 minutes, silent renewal
 (`launchWebAuthFlow({interactive:false})`, `prompt=none`, no window) from hour 16, a forced refresh and one retry on a Graph 401, and every
