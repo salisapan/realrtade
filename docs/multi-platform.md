@@ -47,7 +47,7 @@ stricter than Gmail, and silent when it cannot read its page**. The first measur
 | One heading per person across apps in "By person", with the apps named; rows from another app say which | `core/follow-up.js` groupByPerson, popup | Built; corpus-tested. |
 | Opt-in plumbing: optional host permission, scripts registered on request, re-registered after an update, removed on "off" | `src/background.js`, popup "Where Glance watches" | Built; the popup call to the browser's permission prompt is not exercised in an automated test (it needs a real browser profile). |
 | "Stay on this" on any page (right-click menu, popup question, loop opens) | `core/capture.js`, `src/background.js`, popup | Built; core and popup logic tested. The right-click item and side-panel opening are not exercised in an automated test. |
-| Outlook through Microsoft Graph: sign-in (PKCE), a bounded read of the last 14 days of inbox and sent, planning with the same rules as Gmail, offers and questions in the popup | `core/outlook-config.js`, `outlook-auth.js`, `graph-mail.js`, `outlook-sync.js`, `src/outlook.js`, popup | Built and tested against a **fake Microsoft** (75 checks: PKCE vector, read-only, bounded, honest failure, never creates a loop without a tap). **Dormant until the owner registers the Microsoft app and pastes its client id** (section 5). Never run against the real Microsoft. |
+| Outlook through Microsoft Graph: sign-in (PKCE), a bounded read of the last 14 days of inbox and sent, planning with the same rules as Gmail, offers and questions in the popup | `core/outlook-config.js`, `outlook-auth.js`, `graph-mail.js`, `outlook-sync.js`, `src/outlook.js`, popup | Built and tested against a **fake Microsoft** (PKCE, own-identity set, incoming asks, draft allow-list, silent renewal, honest failure, never creates a loop without a tap). Client id is set. SPA registration verified live 2026-10-05. Incoming asks + Do It (reply draft) live-verified 2026-10-05; unified Loops + receipt reconcile + draft-undo migration 0.9.5. |
 
 ## 4. The hard rules
 
@@ -87,13 +87,66 @@ Reading Outlook's page would repeat WhatsApp's fragility, so the path is Microso
 
 What it does: sign in with the person's own Microsoft account (OAuth code flow with PKCE, `chrome.identity.launchWebAuthFlow`), read the
 last 14 days of the inbox and the sent folder (50 per page, two pages, text bodies), hand them to `core/outlook-sync.js`, and apply what it
-decides: a reply closes or moves a loop exactly as in Gmail, your chase moves the day, and a new ask or promise of yours is only OFFERED in
-the popup ("Waiting on a reply? Stay on it"). A reply that cannot be linked to a loop for sure only asks ("Does this settle it?"). An answer
-that arrives in Outlook can settle a Gmail or WhatsApp loop for the same person, and the other way round.
+decides: a reply closes or moves a loop exactly as in Gmail, your chase moves the day, a new ask or promise of yours is only OFFERED in
+the popup ("Waiting on a reply? Stay on it"), and an incoming ask from someone else is shown **once** in the unified Loops list (source line
+"From Outlook"; same silence bar as Gmail). On Do It, Glance creates a reply DRAFT in Outlook Drafts via Graph `createReply` (Mail.ReadWrite)
+with an on-device body from `core/draft-reply.js (shared with Gmail)` (acknowledge the asks, fill-in placeholder, no em dash; never sends). The Loops card turns
+into the receipt in place ("Reply draft ready in Outlook Drafts. Not sent." + Open draft + Undo). Undo deletes only that draft while it is
+still a draft, converts the Activity row to Undone (no second HANDLED row), and does **not** count as a false close (a prepared draft is not
+a trusted close). A reply that cannot be linked to a loop for sure only asks ("Does this settle it?"). An answer that arrives in Outlook can
+settle a Gmail or WhatsApp loop for the same person, and the other way round. Own identity is a set (mail, UPN, otherMails, proxyAddresses
+smtp:, plus learned sentitems senders, and a sole inbox toRecipient only when two or more different people wrote to it and it never wrote in).
 
-What it does not do: it never writes to the mailbox (only read permissions are requested, and the tests assert that the only non-GET call is
-the token exchange); it does not run while the panel is closed (on open, every ten minutes, and "Check now"; the runner refuses to check
-more often than every ten minutes); nothing is sent to Glance's servers.
+**From address (verified vs inferred):** Graph allows PATCH `from` on a draft when the address belongs to the mailbox. Personal MSA accounts
+often keep the account's primary alias on From even after PATCH; if the preferred alias does not stick, Setup shows a one-line hint to set it
+as primary in the Microsoft account. Verified in code path; live MSA rewrite behaviour is account-dependent (inferred from Graph docs + live
+0.9.3 observation of an `outlook_…@outlook.com` primary; 0.9.9 skips opaque CID when a human alias is known and PATCHes from+sender).
+
+What it does not do: it never sends (never `Mail.Send`, never `/send`, `/reply`, `/replyAll`, `/forward`, `/sendMail`). Allowed non-GET
+Graph calls are exactly: the token exchange, `createReply`, PATCH of a Glance-created draft (body and attempted `from`), DELETE of a
+Glance-created draft. Mail is read while the panel is open (on open, every ten minutes, and "Check now") and while an Outlook-on-the-web tab
+is open (at most once a minute, so the card there needs no panel); nothing is sent to Glance's servers. WhatsApp stays read-only.
+
+**Same engine as Gmail (0.9.14).** Outlook has no judgment of its own. `core/incoming-judge.js` is Gmail's chain as one pure function (the
+message's own text with quoted history cut, `FlowIntent.classify` with sender and subject, the same silence bar, the file gate, `planFor`), and
+both the Graph planner (`core/outlook-sync.js`) and the in-page card (`src/content-outlook.js`) call it. Do It sends the exact payload Gmail's
+`buildActionPayload` sends, and `background.js` composes both drafts with `FlowDraftReply.draftBodyText`. `test/gmail-outlook-parity-corpus.cjs`
+runs the same emails through both adapters and both real writers and requires the same decision and the same draft, word for word. Two
+connector gaps stay silent on Outlook rather than weaker: a request for a file (Gmail searches Drive first; the Outlook draft cannot attach)
+and a close with no reply in it (a calendar event or a Task; Gmail writes those with the Google writers). A new ask is shown even when the
+same person has an open loop elsewhere (as in Gmail), and "me" is learned only from strong evidence (a CC'd mail no longer makes its To
+person "me").
+
+**The Do It card inside Outlook on the web.** With Outlook on and the Outlook-on-the-web permission granted, `background.js` registers the same
+Glance card (`src/chip-host.js`) on outlook.live.com / outlook.office.com / outlook.office365.com. The page runs the same planner as the panel
+(its Graph reads go through the worker, GET under `/me` only), matches the open message by Graph id, internet message id, or subject and
+sender, and Do It writes the reply draft through the worker.
+
+What 0.9.15 changed after the first live test showed no card: the page scan is a throttle (OWA changes the page all the
+time, and a debounce that restarts on every change never fired); the message body is found by language-neutral anchors
+(`div[role="document"]` in the reading pane, `allowTextSelection` / `UniqueMessageBody` classes; the English aria-label
+"Message body" is only a last resort, because OWA localizes it); the address `/mail/0/inbox/id/<id>` usually carries the
+CONVERSATION id (AQQk… / AAQk…), matched against the synced conversation, with ids compared in one spelling whatever base64
+alphabet they use; the open message ends in a card or in a reason under "Why not shown" (`outlookPageDiag`, e.g.
+`page:pane-unreadable` with the anchors seen); tabs already open when the scripts are registered get them injected; and a
+debug mode logs each stage with a `Glance:` prefix (`chrome.storage.local.set({ glanceDebug: true })` from the worker
+console, or `localStorage.setItem('glance-debug', '1')` on the Outlook page). `test/owa-page-harness.cjs` loads the exact
+registered file list on a Hebrew reading pane whose ads keep changing and requires the card (needs jsdom; skipped without). The surface stays opt-in (optional host permission, registered at runtime), not a
+static `content_scripts` entry, so installing Glance never asks for Outlook.
+
+What 0.9.16 changed after 0.9.15 passed live: on the real page the subject sits in the reading-pane header above the
+message and the message itself only shows the sender's display name (the address is in a hover card), so the parser now
+takes the heading nearest the body as the sender name and the header above the message as the subject, and the
+subject fallback needs the display name to agree when there is no address. The scan remembers the open message (id,
+subject, sender name, a hash of the text) and does nothing while it is unchanged and its card or reason is already in place.
+
+**A session that lasts (0.9.14).** A single-page-application refresh token lives 24 hours from the sign-in and does not slide. The worker keeps
+the session alive on its own: an alarm every 30 minutes (and on browser start-up), refresh in the access token's last 5 minutes, silent renewal
+(`launchWebAuthFlow({interactive:false})`, `prompt=none`, no window) from hour 16, a forced refresh and one retry on a Graph 401, and every
+token in `chrome.storage.local` so a worker restart loses nothing. A network error, a 5xx or a failed silent attempt is transient (tried
+again within 30 minutes); the row says "Sign in again" only when the refresh token is spent AND Microsoft says a person must act.
+`test/outlook-session-corpus.cjs` walks 72 hours on a fake clock. Silent renewal depends on the Microsoft sign-in cookie in Chrome's web-auth
+session ("Stay signed in"); if Microsoft or the account's policy refuses prompt=none, one interactive sign-in a day is the honest floor.
 
 This is a bigger change than anything before it to "Glance reads only the message you open". It is opt-in, disclosed on the privacy
 page in the same commit (a dedicated bullet), and the store justification rows for the two optional Microsoft hosts are written.
@@ -101,16 +154,17 @@ page in the same commit (a dedicated bullet), and the store justification rows f
 **What the owner has to do (the only manual step):**
 1. Microsoft Entra admin center, App registrations, New registration. Supported account types: "Accounts in any organizational directory and
    personal Microsoft accounts".
-2. Authentication, Add a platform, **Mobile and desktop applications**, custom redirect URI = the address the Outlook row in the popup shows
-   (`https://<extension id>.chromiumapp.org/`), and "Allow public client flows: Yes".
-3. API permissions, Microsoft Graph, Delegated: `Mail.Read`, `User.Read`, `offline_access`. Nothing else, ever.
+2. Authentication, Add a platform, **Single-page application**, redirect URI = the address the Outlook row in the popup shows
+   (`https://<extension id>.chromiumapp.org/`). Verified live 2026-10-05: "Mobile and desktop" fails with `invalid_request` (likely AADSTS9002326)
+   because the token POST from the extension carries `Origin: chrome-extension://...`. SPA refresh tokens last 24h; silent renewal renews them.
+3. API permissions, Microsoft Graph, Delegated: `Mail.Read`, `Mail.ReadWrite` (drafts only, by code), `User.Read`, `offline_access`. Never `Mail.Send`.
 4. Paste the Application (client) ID into `CLIENT_ID` in `flow-trial-extension/core/outlook-config.js` (it is not a secret) and rebuild the package.
 5. Turn Outlook on in the popup, sign in, and watch "Last checked". Tell me what the row says if it fails.
 
-**Honest limits:** never run against the real Microsoft. The platform type matters (a "Single-page application" registration rejects a
-token request that does not come from a web origin, so use "Mobile and desktop"); if Microsoft behaves differently from the documentation the
-sign-in is where it will show. Personal and work accounts may need different consent, and some organisations block user consent for apps
-(their administrator then has to approve it).
+**Honest limits (verified live 2026-10-05):** SPA registration works; "Mobile and desktop" fails with `invalid_request` (likely AADSTS9002326).
+SPA refresh tokens last 24h and do not slide; silent `launchWebAuthFlow({interactive:false})` with `prompt=none` is the renewal path, now run
+by the worker's keep-alive from hour 16 (acceptance test 7; the 24h live check is still owed). Personal and work accounts may need different consent, and some organisations block user consent for apps (their administrator then has
+to approve it).
 
 ### Slack, Teams and others
 

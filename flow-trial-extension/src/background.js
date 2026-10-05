@@ -38,6 +38,9 @@
 import { OAUTH_PUBLIC, publicClientId } from '../config/oauth.public.js';
 import { HYBRID } from '../config/hybrid.public.js';
 import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
+import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
+import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
+import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -180,7 +183,15 @@ chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
 // site's permission (an OPTIONAL host permission: the install itself asks for nothing new) and then registers the content scripts for
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
 const SURFACES = {
-  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] }
+  whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
+  // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
+  outlook: {
+    label: 'Outlook on the web',
+    origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
+    extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
+      'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
+    css: ['src/chip.css']
+  }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
 const GMAIL_ONLY_SCRIPTS = ['src/content-gmail.js', 'src/sidebar.js', 'src/brief.js', 'src/weekly.js'];
@@ -190,15 +201,69 @@ function surfaceScripts(id) {
   return base.concat(SURFACES[id].extra);
 }
 
-async function registerSurface(id) {
+// Registered content scripts survive a browser restart (persistAcrossSessions) but an update can leave the previous
+// version's list behind, and Chrome injects them only into pages loaded AFTER registration. So: one registration at a
+// time per site, replaced only when the file list differs, and then the open tabs of that site get the scripts too.
+const surfaceBusy = {};
+function registerSurface(id) {
+  if (surfaceBusy[id]) return surfaceBusy[id];
+  surfaceBusy[id] = registerSurfaceNow(id).finally(() => { delete surfaceBusy[id]; });
+  return surfaceBusy[id];
+}
+
+async function registerSurfaceNow(id) {
   const def = SURFACES[id];
   if (!def || !chrome.scripting || !chrome.scripting.registerContentScripts) return { ok: false, reason: 'unsupported' };
   const granted = await chrome.permissions.contains({ origins: def.origins });
   if (!granted) return { ok: false, reason: 'no-permission' };
-  const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: ['src/follow.css'], runAt: 'document_idle', persistAcrossSessions: true };
-  try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered yet */ }
-  await chrome.scripting.registerContentScripts([script]);
-  return { ok: true };
+  const css = (def.css && def.css.length) ? def.css : ['src/follow.css'];
+  const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: css, runAt: 'document_idle', persistAcrossSessions: true };
+  let current = null;
+  try { current = ((await chrome.scripting.getRegisteredContentScripts({ ids: [script.id] })) || [])[0] || null; } catch (e) { current = null; }
+  const same = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
+    && JSON.stringify((current.matches || []).slice().sort()) === JSON.stringify(script.matches.slice().sort());
+  if (!same) {
+    if (current) { try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered */ } }
+    await chrome.scripting.registerContentScripts([script]);
+    console.info('Glance: ' + id + ' surface registered', chrome.runtime.getManifest().version, script.js.length + ' files');
+  }
+  const injected = await injectSurfaceIntoOpenTabs(id, script);
+  return { ok: true, registered: !same, injected };
+}
+
+// Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
+async function injectSurfaceIntoOpenTabs(id, script) {
+  if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: script.matches }); } catch (e) { return 0; }
+  let n = 0;
+  for (const tab of tabs || []) {
+    if (!tab || typeof tab.id !== 'number') continue;
+    try {
+      const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
+        let alive = false;
+        try { alive = Boolean(chrome.runtime && chrome.runtime.id); } catch (e) { alive = false; }
+        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive };
+      } });
+      const seen = (probe && probe[0] && probe[0].result) || {};
+      if (seen.globals && !seen.alive) {
+        // A copy from before an update, cut off from the extension: its declarations block a second copy. Only a reload
+        // of that tab clears it.
+        console.warn('Glance: an open ' + id + ' tab runs an old copy; reload that tab once');
+        continue;
+      }
+      if (seen.globals) {
+        // A copy from this or an earlier load is there: ask it to look again rather than declaring everything twice.
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } } });
+        continue;
+      }
+      if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
+      n++;
+    } catch (e) { console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e); }
+  }
+  if (n) console.info('Glance: ' + id + ' injected into ' + n + ' open tab(s)');
+  return n;
 }
 
 async function readSurfaces() {
@@ -1746,58 +1811,14 @@ function draftSubject(p) {
   return /^re:/i.test(base) ? base : 'Re: ' + base;
 }
 
-function draftGreeting(senderName) {
-  const name = (senderName || '').trim();
-  // Correspondence in this product's actual use (Hebrew and English SMB
-  // email) is almost always first-name-only — the full display name Gmail
-  // hands back can carry a title or a company suffix that would read oddly
-  // as a greeting.
-  const first = name ? name.split(/\s+/)[0] : '';
-  return first ? 'Hi ' + first + ',' : 'Hi,';
+function draftGreeting(senderName, senderEmail) {
+  return globalThis.FlowDraftReply.draftGreeting(senderName, senderEmail);
 }
 
-// attachment/attachmentSource are optional — every existing caller that
-// passes just `p` still gets the exact same body it always did.
-// attachmentSource === 'found' or 'template' is the one case worth a line
-// in the draft itself: 'thread'/'picked' are things the user already saw
-// before Do It was ever clicked, but an auto-found file is Glance's own
-// guess, and a guess that lands in a real, sendable draft with no visible
-// flag is exactly the kind of silent overreach this product's
-// precision-first posture exists to avoid.
-// A share-link draft is the file sentence plus the link. A reply-with-facts
-// draft is the greeting plus that one fact. Neither one is a rewrite, and
-// the user still sends.
 function draftBodyText(p, attachment, attachmentSource, shareUrl) {
-  const params = p.params || {};
-  if (params.replyFact && !params.shareLink) {
-    const factLine = String(params.factLine || '').replace(/[\r\n]+/g, ' ').trim();
-    return [draftGreeting(p.senderName), '', factLine].join('\n');
-  }
-  const lines = [draftGreeting(p.senderName), ''];
-  if (shareUrl) {
-    lines.push(params.what || 'The file is ready.');
-    lines.push(shareUrl);
-    return lines.join('\n');
-  }
-  if (params.what && params.when) lines.push('Following up on: ' + params.what + ' (' + params.when + ')');
-  else if (params.what) lines.push('Following up on: ' + params.what);
-  else lines.push('Following up on your message below.');
-  if (attachment && (attachmentSource === 'found' || attachmentSource === 'template')) {
-    lines.push('', 'Attached: ' + attachment.filename);
-    if (attachmentSource === 'template') {
-      const fields = params.fields || [];
-      for (const field of fields) {
-        if (field && field.label && String(field.value || '').trim()) {
-          lines.push(String(field.label) + ': ' + String(field.value).replace(/[\r\n]+/g, ' ').trim());
-        }
-      }
-    }
-  }
-  lines.push('', '[Write your reply here]');
-  return lines.join('\n');
+  return globalThis.FlowDraftReply.draftBodyText(p, attachment, attachmentSource, shareUrl);
 }
 
-// opts: { to, subject, body, attachment: {filename, mimeType, base64} | null }
 function buildMimeMessage(opts) {
   const headers = [
     mimeHeader('To', opts.to),
@@ -2933,17 +2954,280 @@ function lmServerPrompt(text, schema) {
 // flow:execute-action/flow:connect keep working for whatever still calls
 // them directly (the popup's own connect/disconnect flow, direct testing) —
 // not because the multi-action engine still writes to them.
+
+// Outlook reply drafts (Mail.ReadWrite): createReply / DELETE of Glance's own draft only. Never send.
+const OUTLOOK_GRAPH = 'https://graph.microsoft.com/v1.0';
+const OUTLOOK_AUTH_KEY = 'outlookAuth';
+const OUTLOOK_STATE_KEY = 'outlookSync';
+const OUTLOOK_KEEPALIVE_ALARM = 'glance-outlook-keepalive';
+const OUTLOOK_KEEPALIVE_MINUTES = 30;
+
+// ---- the durable Outlook session (core/outlook-auth.js session) -----------------------------------------------
+// The service worker keeps the Microsoft session alive on its own: an alarm every 30 minutes (alarms survive the worker
+// being stopped and restarted), on browser start-up and on install/update. Each run refreshes an access token in its last
+// minutes and, from hour 16 of the 24-hour single-page-application window, renews silently (prompt=none, no window) so a
+// new 24 hours starts before the old one ends. Every token lives in chrome.storage.local, so nothing depends on this worker
+// staying awake. One run at a time (outlookSessionBusy), so two surfaces never renew at once.
+function outlookLaunchSilent(url) {
+  return new Promise((resolve) => {
+    try {
+      chrome.identity.launchWebAuthFlow({ url, interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 30000 }, (r) => {
+        const err = chrome.runtime.lastError;
+        if (err || !r) resolve(err ? { error: String(err.message || 'failed') } : null);
+        else resolve(r);
+      });
+    } catch (e) { resolve({ error: String(e && e.message || e) }); }
+  });
+}
+
+function outlookPrimaryHint(auth) {
+  if (!auth) return null;
+  const opaque = /^outlook_[0-9a-f]+@outlook\.com$/i;
+  const list = [auth.account && auth.account.address, auth.account && auth.account.mail].concat(auth.ownAddresses || []).filter(Boolean).map((a) => String(a).toLowerCase());
+  return list.find((a) => !opaque.test(a)) || list[0] || null;
+}
+
+let outlookSessionBusy = null;
+async function outlookSession(opts) {
+  const o = opts || {};
+  if (outlookSessionBusy && !o.force) return outlookSessionBusy;
+  const run = (async () => {
+    const A = globalThis.FlowOutlookAuth, cfg = globalThis.FlowOutlookConfig;
+    if (!A || !cfg) return { ok: false, error: 'not-configured' };
+    const bag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, OUTLOOK_STATE_KEY]);
+    const auth = bag[OUTLOOK_AUTH_KEY];
+    const st = bag[OUTLOOK_STATE_KEY] || {};
+    if (!auth || !auth.token) return { ok: false, error: 'not-connected' };
+    const r = await A.session({
+      fetch: (u, i) => fetch(u, i), now: () => Date.now(),
+      random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b),
+      launchSilent: outlookLaunchSilent
+    }, cfg, auth, { redirectUri: chrome.identity.getRedirectURL(), loginHint: outlookPrimaryHint(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null });
+    const now = Date.now();
+    if (r.ok && r.changed) {
+      const cur = (await chrome.storage.local.get(OUTLOOK_AUTH_KEY))[OUTLOOK_AUTH_KEY] || auth;
+      await chrome.storage.local.set({ [OUTLOOK_AUTH_KEY]: Object.assign({}, cur, { token: r.token }) });
+    }
+    const patch = {};
+    if (r.silentTried) patch.lastSilentAt = now;
+    if (r.ok) {
+      if (st.needsSignIn || st.error) Object.assign(patch, { needsSignIn: false, error: null, aadsts: null, errorDetail: null });
+      if (r.how === 'silent') patch.lastRenewedAt = now;
+    } else if (r.error !== 'not-connected') {
+      Object.assign(patch, { error: r.error || 'expired', needsSignIn: Boolean(r.needsSignIn), aadsts: r.aadsts || null, errorDetail: r.description || null });
+    }
+    if (Object.keys(patch).length) {
+      const cur = (await chrome.storage.local.get(OUTLOOK_STATE_KEY))[OUTLOOK_STATE_KEY] || {};
+      await chrome.storage.local.set({ [OUTLOOK_STATE_KEY]: Object.assign({}, cur, patch) });
+    }
+    return r;
+  })();
+  outlookSessionBusy = run;
+  try { return await run; } finally { if (outlookSessionBusy === run) outlookSessionBusy = null; }
+}
+
+async function outlookKeepAlive() {
+  try { return await outlookSession({}); } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+
+function scheduleOutlookKeepAlive() {
+  if (!chrome.alarms || !chrome.alarms.create) return;
+  try { chrome.alarms.create(OUTLOOK_KEEPALIVE_ALARM, { delayInMinutes: 1, periodInMinutes: OUTLOOK_KEEPALIVE_MINUTES }); } catch (e) { /* alarms unavailable */ }
+}
+
+try {
+  if (chrome.alarms && chrome.alarms.onAlarm) {
+    chrome.alarms.onAlarm.addListener((alarm) => {
+      if (!alarm || alarm.name !== OUTLOOK_KEEPALIVE_ALARM) return;
+      outlookKeepAlive();
+    });
+  }
+  if (chrome.alarms && chrome.alarms.get) {
+    chrome.alarms.get(OUTLOOK_KEEPALIVE_ALARM, (a) => { if (!a) scheduleOutlookKeepAlive(); });
+  } else scheduleOutlookKeepAlive();
+  if (chrome.runtime.onStartup) chrome.runtime.onStartup.addListener(() => { scheduleOutlookKeepAlive(); outlookKeepAlive(); });
+  chrome.runtime.onInstalled.addListener(() => { scheduleOutlookKeepAlive(); outlookKeepAlive(); ensureOutlookSurface(); });
+} catch (e) { console.error('[Glance] Outlook keep-alive unavailable', e); }
+
+// Connected to Outlook and the Outlook-on-the-web permission granted, but the page script not registered (an older build
+// connected Graph only, or the browser dropped it): register it, so Do It floats on the page without a visit to the panel.
+async function ensureOutlookSurface() {
+  try {
+    const bag = await chrome.storage.local.get([OUTLOOK_AUTH_KEY, 'surfaces']);
+    if (!bag[OUTLOOK_AUTH_KEY] || !bag[OUTLOOK_AUTH_KEY].token) return;
+    const on = bag.surfaces && bag.surfaces.outlook && bag.surfaces.outlook.enabled;
+    if (on) return;
+    if (!(await chrome.permissions.contains({ origins: SURFACES.outlook.origins }))) return;
+    await enableSurface('outlook');
+  } catch (e) { /* the panel's Outlook row offers the button */ }
+}
+ensureOutlookSurface();
+
+async function outlookAccessToken(opts) {
+  const r = await outlookSession(opts || {});
+  return r && r.ok && r.token ? r.token.accessToken : null;
+}
+
+// A Graph call with the session's token; a 401 is answered once with a forced refresh (or silent renewal) and a retry.
+async function outlookFetch(url, init) {
+  let token = await outlookAccessToken();
+  if (!token) return { status: 0, ok: false, notConnected: true };
+  const call = (t) => fetch(url, Object.assign({}, init || {}, { headers: Object.assign({}, (init && init.headers) || {}, { Authorization: 'Bearer ' + t }) }));
+  let res = await call(token);
+  if (res.status === 401) {
+    token = await outlookAccessToken({ force: true });
+    if (token) res = await call(token);
+  }
+  return res;
+}
+
+// The Outlook-on-the-web page runs the same planner as the panel (src/outlook.js). Its session comes from here
+// (flow:outlook-session: one renewal at a time, from this worker, with this extension's origin on the token request), and
+// its Graph reads go through here (flow:outlook-fetch) so the page never makes a cross-origin call of its own. Reads only:
+// Graph GETs under /me. Every write stays in flow:execute-action (outlookDraftWrite), which refuses anything that sends.
+const OUTLOOK_PROXY_GET = /^https:\/\/graph\.microsoft\.com\/v1\.0\/me([?\/(]|$)/;
+async function outlookProxyFetch(msg, sender) {
+  if (!sender || sender.id !== chrome.runtime.id) return { ok: false, status: 0, error: 'foreign-sender' };
+  const url = String(msg.url || '');
+  const method = String((msg.init && msg.init.method) || 'GET').toUpperCase();
+  if (method !== 'GET' || !OUTLOOK_PROXY_GET.test(url)) return { ok: false, status: 0, error: 'refused' };
+  const headers = {};
+  const h = (msg.init && msg.init.headers) || {};
+  if (h.Authorization) headers.Authorization = String(h.Authorization);
+  if (h.Prefer) headers.Prefer = String(h.Prefer);
+  try {
+    const res = await fetch(url, { method: 'GET', headers });
+    return { ok: res.ok, status: res.status, body: await res.text() };
+  } catch (e) {
+    return { ok: false, status: 0, error: 'network' };
+  }
+}
+
+async function outlookSessionForPage(msg, sender) {
+  if (!sender || sender.id !== chrome.runtime.id) return { ok: false, error: 'foreign-sender' };
+  const r = await outlookSession({ force: Boolean(msg && msg.force) });
+  if (!r || !r.ok) return { ok: false, error: (r && r.error) || 'failed', needsSignIn: Boolean(r && r.needsSignIn), transient: Boolean(r && r.transient), aadsts: (r && r.aadsts) || null };
+  // Already stored by outlookSession: the caller must not store it again.
+  return { ok: true, token: r.token, changed: false, how: r.how || null };
+}
+
+function outlookAssertNotSend(url) {
+  if (/\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(String(url || ''))) {
+    const e = new Error('graph-send-refused'); e.code = 'refused'; throw e;
+  }
+}
+function outlookIsOpaqueMailbox(addr) {
+  return /^outlook_[0-9a-f]+@outlook\.com$/i.test(String(addr || '').trim());
+}
+async function outlookPreferredFrom(explicit) {
+  const want = String(explicit || '').trim().toLowerCase();
+  if (want && !outlookIsOpaqueMailbox(want)) return want;
+  const st = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = st && st[OUTLOOK_AUTH_KEY];
+  if (!auth) return want || null;
+  const candidates = [];
+  if (want) candidates.push(want);
+  if (auth.account && auth.account.address) candidates.push(auth.account.address);
+  if (auth.account && auth.account.mail) candidates.push(auth.account.mail);
+  (auth.ownAddresses || []).forEach((a) => candidates.push(a));
+  if (auth.profile) {
+    if (auth.profile.mail) candidates.push(auth.profile.mail);
+    (auth.profile.otherMails || []).forEach((a) => candidates.push(a));
+    (auth.profile.proxyAddresses || []).forEach((p) => {
+      const m = String(p || '').match(/^smtp:(.+)$/i);
+      if (m) candidates.push(m[1]);
+    });
+  }
+  const seen = new Set();
+  for (const raw of candidates) {
+    const e = String(raw || '').trim().toLowerCase();
+    if (!e || seen.has(e)) continue;
+    seen.add(e);
+    if (!outlookIsOpaqueMailbox(e)) return e;
+  }
+  return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
+}
+async function outlookDraftWrite(p) {
+  const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
+  if (!incomingId) return { ok: false, reason: 'no-message' };
+  // Same draft as Gmail: the payload Gmail's buildActionPayload sends ({ params, senderName, senderEmail, subject }) through the
+  // same composer gmailDraftWrite uses (FlowDraftReply.draftBodyText). A ready-made body is only a fallback for older callers.
+  let comment = '';
+  if (p && p.params && Object.keys(p.params).length) comment = draftBodyText(p, null, null, null);
+  if (!comment) comment = (p && (p.body || p.comment)) || '';
+  if (!comment && p && p.intent) {
+    comment = globalThis.FlowDraftReply.bodyFromIntent(p.intent, p.senderName, p.senderEmail, { text: p.text || p.bodyText || null, subject: p.subject || null });
+  }
+  const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
+  outlookAssertNotSend(url);
+  const res = await outlookFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: comment }) });
+  if (res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
+  if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+  const draft = await res.json();
+  if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };
+  // Prefer connected human From alias over opaque outlook_HEX@outlook.com CID.
+  // Graph createReply often defaults From to the CID on personal MSA; PATCH from+sender.
+  const wantFrom = await outlookPreferredFrom(p && p.fromAddress);
+  const patchUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id);
+  outlookAssertNotSend(patchUrl);
+  const patchBody = { body: { contentType: 'Text', content: comment } };
+  let fromSet = false;
+  if (wantFrom && draft.isDraft !== false && !outlookIsOpaqueMailbox(wantFrom)) {
+    patchBody.from = { emailAddress: { address: wantFrom } };
+    patchBody.sender = { emailAddress: { address: wantFrom } };
+  }
+  if (draft.isDraft !== false) {
+    try {
+      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) });
+      fromSet = Boolean(pr && pr.ok && patchBody.from);
+      if (pr && !pr.ok && patchBody.from) {
+        // The alias was refused (common on personal accounts): keep the body, leave From as Outlook set it.
+        await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: patchBody.body }) });
+      }
+    } catch (e) { /* createReply's comment already holds the body */ }
+  }
+  return {
+    ok: true,
+    ref: draft.id,
+    where: draft.webLink || null,
+    url: draft.webLink || null,
+    written: 'Reply draft ready in Outlook Drafts. Not sent.',
+    fromAddress: wantFrom || null,
+    fromSet: fromSet
+  };
+}
+async function outlookDraftUndo(ref) {
+  if (!ref) return { ok: false };
+  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
+  outlookAssertNotSend(getUrl);
+  const got = await outlookFetch(getUrl, {});
+  if (got.notConnected) return { ok: false, reason: 'not-connected' };
+  if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+  if (!got.ok) return { ok: false, reason: 'http-' + got.status };
+  const msg = await got.json();
+  if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
+  outlookAssertNotSend(delUrl);
+  const del = await outlookFetch(delUrl, { method: 'DELETE' });
+  if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
+  return { ok: true, written: 'Draft removed from Outlook Drafts.' };
+}
+
 const WRITERS = {
   hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
-  driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile
+  driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
+  outlookDraft: outlookDraftWrite
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
-  driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash
+  driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
+  outlookDraft: outlookDraftUndo
 };
 
 async function connectorStatus() {
@@ -3075,6 +3359,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:classify-remote') {
     return reply(sendResponse, classifyViaBackend(msg.payload || {}));
+  }
+
+  // Outlook: the durable session and the page's read-only network (see outlookProxyFetch).
+  if (msg.type === 'flow:outlook-fetch') return reply(sendResponse, outlookProxyFetch(msg, sender));
+  if (msg.type === 'flow:outlook-session') return reply(sendResponse, outlookSessionForPage(msg, sender));
+  if (msg.type === 'flow:outlook-keepalive') {
+    if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
+    return reply(sendResponse, (async () => { scheduleOutlookKeepAlive(); const r = await outlookKeepAlive(); return { ok: Boolean(r && r.ok), error: (r && r.error) || null, how: (r && r.how) || null, needsSignIn: Boolean(r && r.needsSignIn) }; })());
   }
 
   if (msg.type === 'flow:surface-status') return reply(sendResponse, surfaceStatus());

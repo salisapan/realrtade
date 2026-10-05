@@ -474,6 +474,82 @@
   }
 
   async function closeStillOpenFromPopup(entry) {
+    // Outlook incoming ask: Do It creates a reply draft in Outlook Drafts (never sends), plus a Google Task when connected.
+    if (entry && (entry.app === 'outlook' || (entry.process && entry.process.steps && entry.process.steps.some((s) => s.kind === 'outlookDraft')))) {
+      const o = outlook();
+      if (!o) return;
+      const incomingId = entry.outlookIncomingId || entry.messageId;
+      const label = (entry.intent && entry.intent.label) || (entry.process && entry.process.name) || 'Reply';
+      const who = (entry.sender && entry.sender.name) || '';
+      const email = (entry.sender && entry.sender.email) || '';
+      const bodyText = entry.text || '';
+      // Same draft as Gmail's Do It: the draft step's params from the same process, through the same composer
+      // (core/incoming-judge.js draftText -> FlowDraftReply.draftBodyText), not a forked Outlook body.
+      const replyText = (typeof FlowIncomingJudge !== 'undefined' && entry.process)
+        ? FlowIncomingJudge.draftText(entry.process, { sender: entry.sender || { name: who, email }, subject: entry.subject || null }, typeof FlowDraftReply !== 'undefined' ? FlowDraftReply : null)
+        : ((typeof FlowDraftReply !== 'undefined')
+          ? FlowDraftReply.bodyFromIntent(entry.intent || {}, who, email, { text: bodyText, subject: entry.subject || null })
+          : ('Hi,\n\nFollowing up on your message below.\n\n[Write your reply here]'));
+      // Delivered-to alias when known (identity primary), else account primary.
+      const st0 = await o.status();
+      const fromAddress = st0.primary || null;
+      const draft = await o.createReplyDraft(incomingId, replyText, { fromAddress: fromAddress });
+      if (draft && draft.fallback) {
+        const due = entry.intent && entry.intent.facts && entry.intent.facts.date && entry.intent.facts.date.iso;
+        await send({ type: 'flow:follow-task', payload: { title: label, dueIso: due || null, what: label, counterpart: who, threadUrl: entry.threadUrl } });
+        await FlowStorage.appendLog({ kind: 'written', label: label + ' - task ready; open in Outlook to reply (draft permission not granted).', messageId: entry.messageId, app: 'outlook' });
+        await renderOpen();
+        await renderOutlookCards();
+        return;
+      }
+      if (!draft || !draft.ok) {
+        await FlowStorage.appendLog({ kind: 'written', label: 'Could not create Outlook draft' + (draft && draft.error ? ' (' + draft.error + ')' : ''), messageId: entry.messageId, app: 'outlook' });
+        await renderOpen();
+        return;
+      }
+      await FlowStorage.appendLog({
+        kind: 'written',
+        label: draft.written,
+        messageId: entry.messageId,
+        app: 'outlook',
+        connectorId: 'outlookDraft',
+        ref: draft.ref,
+        where: draft.where,
+        url: draft.where,
+        sender: entry.sender || null,
+        subject: entry.subject || null,
+        intent: entry.intent || null,
+        process: entry.process || null,
+        text: bodyText,
+        outlookIncomingId: incomingId,
+        outlookReceipt: true
+      });
+      if (entry.messageId) {
+        if (typeof FlowStorage.clearStillOpenUndoForMessage === 'function') {
+          await FlowStorage.clearStillOpenUndoForMessage(entry.messageId);
+        }
+        await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: entry.messageId });
+        await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: entry.messageId });
+      }
+      // Drop duplicate From Outlook card; Still Open will show the receipt instead.
+      if (typeof o.dismissIncoming === 'function') {
+        await o.dismissIncoming(entry.key || entry.messageId);
+      }
+      if (typeof depsForget === 'function') { /* noop */ }
+      if (typeof FlowStorage.forgetStillOpenScan === 'function' && entry.messageId) {
+        try { await FlowStorage.forgetStillOpenScan(entry.messageId); } catch (e) {}
+      }
+      const due = entry.intent && entry.intent.facts && entry.intent.facts.date && entry.intent.facts.date.iso;
+      try {
+        const task = await send({ type: 'flow:follow-task', payload: { title: label, dueIso: due || null, what: label, counterpart: who, threadUrl: entry.threadUrl } });
+        if (task && task.ok && task.ref) {
+          await FlowStorage.appendLog({ kind: 'written', label: 'Task due ' + (due || 'soon'), messageId: entry.messageId, connectorId: 'googleTask', ref: task.ref, app: 'outlook' });
+        }
+      } catch (e) { /* Google may not be connected; draft still stands */ }
+      await renderOpen();
+      await renderOutlookCards();
+      return;
+    }
     let tabs = [];
     if (chrome.tabs && chrome.tabs.query) {
       try { tabs = await chrome.tabs.query({ url: 'https://mail.google.com/*' }); }
@@ -504,6 +580,7 @@
     // ever existed, rather than showing a blank tag.
     top.appendChild(el('span', 'log-kind', (entry.app || 'gmail').toUpperCase()));
     item.appendChild(top);
+    if (entry.app === 'outlook') item.appendChild(el('span', 'log-where', 'From Outlook'));
 
     const subtitle = pendingRowSubtitle(entry);
     if (subtitle) item.appendChild(el('span', 'log-where', subtitle));
@@ -532,9 +609,9 @@
       await closeStillOpenFromPopup(entry);
     });
     acts.appendChild(doIt);
-    if (entry.threadUrl) {
-      const view = el('a', 'ghost sm', 'View');
-      view.href = entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
+    if (entry.threadUrl || entry.url) {
+      const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? 'Open draft' : 'View');
+      view.href = entry.url || entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
       acts.appendChild(view);
     }
     const dismiss = el('button', 'ghost sm', 'Dismiss');
@@ -743,9 +820,26 @@
       storage: FlowStorage, cfg: FlowOutlookConfig, auth: FlowOutlookAuth, plan: FlowOutlookSync.plan,
       fetch: (u, i) => fetch(u, i), redirectUri: () => chrome.identity.getRedirectURL(),
       launch: (url) => new Promise((resolve, reject) => { chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => { if (chrome.runtime.lastError || !r) reject(new Error('cancelled')); else resolve(r); }); }),
+      // Silent renewal: never opens a visible window. Resolves null on chrome.runtime.lastError.
+      launchSilent: (url) => new Promise((resolve) => {
+        try {
+          chrome.identity.launchWebAuthFlow({ url, interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 15000 }, (r) => {
+            if (chrome.runtime.lastError || !r) resolve(null); else resolve(r);
+          });
+        } catch (e) { resolve(null); }
+      }),
       permissions: { request: (o) => chrome.permissions.request(o), contains: (o) => chrome.permissions.contains(o), remove: (o) => chrome.permissions.remove(o) },
       send, random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b), now: () => Date.now(),
-      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline }, identity: FlowIdentity, followUp: FlowFollowUp
+      planDeps: {
+        extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null,
+        types: typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null,
+        pipeline: typeof FlowIntentPipeline !== 'undefined' ? FlowIntentPipeline : null,
+        intent: typeof FlowIntent !== 'undefined' ? FlowIntent : null,
+        factReply: typeof FlowFactReply !== 'undefined' ? FlowFactReply : null,
+        actions: typeof FlowActions !== 'undefined' ? FlowActions : null
+      },
+      actions: typeof FlowActions !== 'undefined' ? FlowActions : null,
+      identity: FlowIdentity, followUp: FlowFollowUp
     };
   }
   function outlook() {
@@ -753,7 +847,7 @@
     return outlook.inst || (outlook.inst = FlowOutlook.create(outlookDeps()));
   }
 
-  const OUTLOOK_COPY = 'Reads the last 14 days of your inbox and sent mail, only while this panel is open, to see whether something you asked was answered. Read-only: Glance never changes your mailbox. It uses your own Microsoft sign-in, and nothing is sent to Glance.';
+  const OUTLOOK_COPY = 'Reads the last 14 days of your Outlook mail on this device, while this panel or Outlook on the web is open: asks made of you and answers to yours. On Do It (here or inside Outlook on the web), writes a reply draft into your Outlook Drafts, with the same judgment and draft as Gmail. Never sends. Uses your own Microsoft sign-in, kept alive in this browser; nothing is sent to Glance\'s servers.';
   const OUTLOOK_ERRORS = { permission: 'The browser did not grant access, so it stays off.', cancelled: 'The sign-in window was closed.', profile: 'Signed in, but Microsoft did not say whose mailbox this is. Try again.', 'not-configured': 'Not set up yet.' };
 
   async function renderOutlookRow(host) {
@@ -768,8 +862,55 @@
     row.appendChild(top);
     row.appendChild(el('div', 'wait-note', OUTLOOK_COPY));
     if (!st.configured) row.appendChild(el('div', 'wait-note', 'It needs a Microsoft app registration first. Redirect address for it: ' + st.redirectUri));
-    if (st.connected) row.appendChild(el('div', 'wait-note', (st.account && st.account.address ? 'Signed in as ' + st.account.address + '. ' : '') + (st.lastAt ? 'Last checked ' + new Date(st.lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + st.lastCount + ' conversations.' : 'Not checked yet.')));
-    if (st.error) row.appendChild(el('div', 'wait-note', 'Last check: ' + (OUTLOOK_ERRORS[st.error] || st.error)));
+    if (st.connected) {
+      // If OWA host permission is already granted (e.g. after reconnect), ensure the content script is registered.
+      try {
+        const origins = (typeof FlowOutlook !== 'undefined' && FlowOutlook.OWA_ORIGINS) || [
+          'https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'
+        ];
+        const granted = await chrome.permissions.contains({ origins: origins });
+        if (granted) {
+          const surf = await send({ type: 'flow:surface-status' });
+          const on = surf && surf.surfaces && surf.surfaces.outlook && surf.surfaces.outlook.enabled;
+          if (!on) await send({ type: 'flow:surface-enable', id: 'outlook' });
+        }
+      } catch (e) { /* ignore */ }
+      const who = st.primary || (st.account && st.account.address) || '';
+      const idN = (typeof st.ownAddressCount === 'number' ? st.ownAddressCount : ((st.ownAddresses && st.ownAddresses.length) || (who ? 1 : 0)));
+      const checked = st.lastAt
+        ? ('Last checked ' + new Date(st.lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          + ', ' + st.lastCount + ' conversations'
+          + (typeof st.lastIncoming === 'number' ? (', ' + st.lastIncoming + ' incoming') : '')
+          + '.')
+        : 'Not checked yet.';
+      row.appendChild(el('div', 'wait-note', (who ? ('Signed in as ' + who + '. ') : '') + idN + ' identities. ' + checked));
+      // The mailbox check's reasons, then the Outlook-on-the-web card's own (newest first): every incoming message ends
+      // in a card or in a line here.
+      const diags = (Array.isArray(st.pageDiagnostics) ? st.pageDiagnostics : []).concat(Array.isArray(st.diagnostics) ? st.diagnostics : []);
+      if (diags.length) {
+        const details = document.createElement('details');
+        details.className = 'wait-note';
+        const sum = document.createElement('summary');
+        sum.textContent = 'Why not shown (' + diags.length + ')';
+        details.appendChild(sum);
+        const list = el('div', 'wait-note');
+        // Safe local-only readout: subject + reason code, no body text.
+        diags.slice(0, 20).forEach((d) => {
+          const sub = (d.subject || '(no subject)').slice(0, 80);
+          const who2 = d.counterpart ? (' · ' + d.counterpart) : '';
+          list.appendChild(el('div', 'wait-note', d.reason + ' — “' + sub + '”' + who2));
+        });
+        details.appendChild(list);
+        row.appendChild(details);
+      }
+      if (st.fromAliasHint) row.appendChild(el('div', 'wait-note', st.fromAliasHint));
+    }
+    if (st.error) {
+      const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
+        ? FlowOutlookAuth.errorSentence(st.error, st.errorDetail, st.aadsts)
+        : (OUTLOOK_ERRORS[st.error] || st.error);
+      row.appendChild(el('div', 'wait-note', 'Last check: ' + sentence));
+    }
     const note = el('p', 'wait-note');
     note.hidden = true;
     const acts = el('div', 'wait-acts');
@@ -779,8 +920,15 @@
       c.addEventListener('click', async () => {
         c.disabled = true;
         const r = await o.connect();
-        if (!r.ok) { c.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || 'Could not turn it on (' + r.error + ').'; return; }
-        await renderSurfaces(); await renderOutlookCards(); await renderWaiting();
+        if (!r.ok) {
+          c.disabled = false; note.hidden = false;
+          const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
+            ? FlowOutlookAuth.errorSentence(r.error, r.description, r.aadsts)
+            : (OUTLOOK_ERRORS[r.error] || 'Could not turn it on (' + r.error + ').');
+          note.textContent = sentence;
+          return;
+        }
+        await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
       acts.appendChild(c);
     } else if (st.connected) {
@@ -790,12 +938,35 @@
         chk.disabled = true;
         const r = st.needsSignIn ? await o.connect() : await o.sync({ force: true });
         if (!r.ok) { chk.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
-        await renderSurfaces(); await renderOutlookCards(); await renderWaiting();
+        await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
       const off = el('button', 'ghost sm', 'Turn off');
       off.type = 'button';
       off.addEventListener('click', async () => { off.disabled = true; await o.disconnect(); await renderSurfaces(); await renderOutlookCards(); });
       acts.appendChild(chk); acts.appendChild(off);
+      // Upgrade from 0.9.6: Graph may be on without OWA host permission for the in-page card.
+      (async () => {
+        try {
+          const origins = (typeof FlowOutlook !== 'undefined' && FlowOutlook.OWA_ORIGINS) || [
+            'https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'
+          ];
+          if (await chrome.permissions.contains({ origins: origins })) return;
+          const btn = el('button', 'ghost sm', 'Show Do It in Outlook on the web');
+          btn.type = 'button';
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            let ok = false;
+            try { ok = await chrome.permissions.request({ origins: origins }); } catch (e) { ok = false; }
+            if (!ok) { btn.disabled = false; note.hidden = false; note.textContent = 'The browser did not grant access to Outlook on the web.'; return; }
+            const r = await send({ type: 'flow:surface-enable', id: 'outlook' });
+            if (!r || !r.ok) { btn.disabled = false; note.hidden = false; note.textContent = 'Could not turn on the Outlook page card.'; return; }
+            btn.remove();
+            note.hidden = false;
+            note.textContent = 'Do It will appear on open messages at outlook.live.com / outlook.office.com.';
+          });
+          acts.appendChild(btn);
+        } catch (e) { /* ignore */ }
+      })();
     }
     row.appendChild(acts);
     row.appendChild(note);
@@ -973,12 +1144,14 @@
     const block = document.getElementById('outlookBlock');
     const o = outlook();
     if (!block || !o) return;
-    const pend = (await FlowStorage.get()).outlookPending || { offers: [], asks: [] };
+    const pend = (await FlowStorage.get()).outlookPending || { offers: [], asks: [], incoming: [] };
     const host = document.getElementById('outlook-card');
     host.replaceChildren();
+    // Incoming asks render once in the unified Loops list (Still Open + receipts).
+    // From Outlook keeps only follow-up offers and yes/no asks.
     const offers = pend.offers || [], asks = pend.asks || [];
     block.hidden = offers.length + asks.length === 0;
-    const mk = (label, fn) => { const b = el('button', 'ghost sm', label); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; await fn(); await renderOutlookCards(); await renderWaiting(); }); return b; };
+    const mk = (label, fn) => { const b = el('button', 'ghost sm', label); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; await fn(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === 'function') await renderOpen(); }); return b; };
     for (const x of offers) {
       const item = el('div', 'wait-item');
       const top = el('div', 'wait-top');
@@ -1012,9 +1185,11 @@
     const o = outlook();
     if (!o) return;
     const st = await o.status();
-    if (!st.connected || st.needsSignIn) return;
+    // "Sign in again" is not the end: sync() first tries a silent renewal (at most every 30 minutes), so the row heals itself
+    // whenever Microsoft still has the person signed in.
+    if (!st.connected) return;
     const r = await o.sync();
-    if (r.ok && !r.skipped) { await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); }
+    if (r.ok && !r.skipped) { await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen(); }
     if (!outlookAutoSync.timer) outlookAutoSync.timer = setInterval(() => { outlookAutoSync().catch(() => {}); }, 10 * 60 * 1000 + 5000);
   }
 
@@ -1052,6 +1227,7 @@
     host.replaceChildren();
     if (!st || !st.ok) return;
     for (const id of Object.keys(st.surfaces || {})) {
+      if (id === 'outlook') continue; // managed by the Outlook row (connect registers the OWA chip)
       const s = st.surfaces[id];
       const row = el('div', 'wait-item');
       const top = el('div', 'wait-top');
@@ -1616,12 +1792,95 @@
     }
   }
 
+  function outlookReceiptRow(entry) {
+    const item = el('div', 'log-item');
+    const top = el('div', 'log-top');
+    top.appendChild(el('span', 'log-label', entry.label || 'Reply draft ready in Outlook Drafts. Not sent.'));
+    top.appendChild(el('span', 'log-kind written', 'Draft'));
+    item.appendChild(top);
+    item.appendChild(el('span', 'log-where', 'From Outlook'));
+    if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
+    const acts = el('div', 'log-acts');
+    if (entry.url || entry.where) {
+      const a = el('a', 'ghost sm', 'Open draft');
+      a.href = entry.url || entry.where; a.target = '_blank'; a.rel = 'noopener';
+      acts.appendChild(a);
+    }
+    const u = el('button', 'ghost sm', 'Undo');
+    u.type = 'button';
+    const note = el('span', 'log-undo-note', '');
+    note.hidden = true;
+    u.addEventListener('click', async () => {
+      u.disabled = true; u.textContent = 'Undoing…';
+      note.hidden = true;
+      let r = { ok: false };
+      try {
+        const o = outlook();
+        if (o && entry.ref) r = await o.undoReplyDraft(entry.ref);
+        else if (!entry.ref) r = { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+        else r = { ok: false, error: 'not-connected' };
+      } catch (err) {
+        r = { ok: false, error: String(err && err.message || err) };
+      }
+      // Always drop the local receipt — stale cards after Graph delete are the bug.
+      if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+        await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
+      } else {
+        await FlowStorage.appendLog({
+          kind: 'undone', label: entry.label, messageId: entry.messageId,
+          app: 'outlook', connectorId: 'outlookDraft', ref: entry.ref, outlookReopen: true
+        });
+      }
+      if (entry.messageId) {
+        await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: entry.messageId, draftOnly: true });
+        if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(entry.messageId);
+      }
+      note.textContent = (r && r.written)
+        ? r.written
+        : (r && r.ok
+          ? 'Draft removed from Outlook Drafts.'
+          : ('Could not reach Outlook' + (r && r.error ? ' (' + r.error + ')' : '') + '; receipt cleared here.'));
+      note.hidden = false;
+      await renderOpen();
+      await renderOutlookCards();
+      await renderLog();
+    });
+    acts.appendChild(u);
+    item.appendChild(acts);
+    item.appendChild(note);
+    return item;
+  }
+
+  async function ensureOutlookMigrated() {
+    if (ensureOutlookMigrated.done) return ensureOutlookMigrated.result;
+    ensureOutlookMigrated.done = true;
+    if (typeof FlowStorage.migrateOutlookDraftState === 'function') {
+      try { ensureOutlookMigrated.result = await FlowStorage.migrateOutlookDraftState(); }
+      catch (e) { ensureOutlookMigrated.result = { ok: false, error: String(e && e.message || e) }; }
+    } else ensureOutlookMigrated.result = { skipped: true };
+    return ensureOutlookMigrated.result;
+  }
+
+  async function reconcileOutlookReceiptsSafe() {
+    const o = outlook();
+    if (!o || typeof o.reconcileReceipts !== 'function') return null;
+    try { return await o.reconcileReceipts(); }
+    catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+
   async function renderOpen() {
+    await ensureOutlookMigrated();
+    await reconcileOutlookReceiptsSafe();
     const pending = await FlowStorage.getStillOpen();
-    // The badge is the Still Open count, the same number the morning brief
-    // posts. A restart can open this panel before any Gmail tab has run.
-    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: pending.length });
-    for (const item of pending) {
+    const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
+      ? await FlowStorage.getActiveOutlookReceipts()
+      : [];
+    // Dedup: if a receipt exists for a messageId, skip the still-open card.
+    const receiptIds = new Set(receipts.map((r) => r.messageId).filter(Boolean));
+    const openOnly = pending.filter((e) => !receiptIds.has(e.messageId));
+    const total = openOnly.length + receipts.length;
+    chrome.runtime.sendMessage({ type: 'flow:pending-count', count: total });
+    for (const item of openOnly) {
       FlowStorage.recordStillOpenMetric({ kind: 'shown', messageId: item.messageId })
         .catch((e) => console.error('[Glance] failed to record a Still Open card as shown', e));
     }
@@ -1629,8 +1888,9 @@
     const host = document.getElementById('open-list');
     const empty = document.getElementById('open-empty');
     host.replaceChildren();
-    empty.hidden = pending.length > 0;
-    pending.forEach((entry) => host.appendChild(openRow(entry)));
+    empty.hidden = total > 0;
+    receipts.forEach((entry) => host.appendChild(outlookReceiptRow(entry)));
+    openOnly.forEach((entry) => host.appendChild(openRow(entry)));
   }
 
   function when(ts) {
@@ -1874,13 +2134,20 @@
 
   function wireClearCloseMemory() {
     const btn = document.getElementById('clearCloseMemory');
-    if (!btn || typeof FlowCloseMemory === 'undefined') return;
+    if (!btn) return;
     btn.addEventListener('click', async () => {
+      const ok = window.confirm('Clear personal close memory and Outlook loop cards on this device? Draft receipts and From Outlook offers will be removed. This cannot be undone.');
+      if (!ok) return;
       btn.disabled = true;
-      await FlowCloseMemory.clear();
+      if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.clear();
+      if (typeof FlowStorage.clearOutlookLoopsState === 'function') await FlowStorage.clearOutlookLoopsState();
+      ensureOutlookMigrated.done = false;
       const original = btn.textContent;
       btn.textContent = 'Cleared';
-      setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1600);
+      await renderOpen();
+      await renderOutlookCards();
+      await renderLog();
+      setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 2000);
     });
   }
 
@@ -1915,6 +2182,7 @@
   }
 
   async function renderLog() {
+    await ensureOutlookMigrated();
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderCloseQuality(s);
@@ -1938,8 +2206,8 @@
   function logRow(e) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    top.appendChild(el('span', 'log-label', e.label || '—'));
-    // The stored kind stays 'written' — counters and CSS key off it. The
+    top.appendChild(el('span', 'log-label', e.label || '-'));
+    // The stored kind stays 'written' - counters and CSS key off it. The
     // badge a person reads should say what the chip just said.
     const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
     top.appendChild(el('span', 'log-kind ' + e.kind, KIND_LABEL[e.kind] || e.kind));
@@ -1952,7 +2220,7 @@
       const acts = el('div', 'log-acts');
       let undoNote = null;
       if (e.url) {
-        const a = el('a', 'ghost sm', 'View');
+        const a = el('a', 'ghost sm', e.connectorId === 'outlookDraft' ? 'Open draft' : 'View');
         a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
         acts.appendChild(a);
       }
@@ -1968,15 +2236,25 @@
           u.disabled = true;
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
           if (r && r.ok) {
-            await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId });
+            const isOutlookDraft = e.connectorId === 'outlookDraft' || e.app === 'outlook';
+            if (isOutlookDraft && typeof FlowStorage.markOutlookDraftUndone === 'function') {
+              await FlowStorage.markOutlookDraftUndone(e.messageId, e.ref);
+            } else {
+              await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId, connectorId: e.connectorId, ref: e.ref, app: e.app });
+            }
             if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(e.messageId);
             if (e.messageId) {
-              await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+              if (isOutlookDraft) {
+                // Prepared draft undo is not a false close.
+                await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId, draftOnly: true });
+              } else {
+                await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+                await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId });
+              }
             }
             await renderLog();
+            if (typeof renderOpen === 'function') await renderOpen();
           } else {
-            // Same contract as the chip: the button stays Undo, and the
-            // line under it says the record is still there.
             const line = FlowReceipt.reverseNote({ reversed: 0, remaining: 1, keptWhere: e.where });
             u.textContent = 'Undo';
             u.disabled = false;

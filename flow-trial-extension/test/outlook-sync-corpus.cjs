@@ -7,6 +7,17 @@ const { FlowRequestTypes } = require('../core/request-types.js');
 const { FlowIntentPipeline } = require('../core/intent-pipeline.js');
 const { FlowIntentModel } = require('../core/intent-model.js');
 FlowIntentModel.load(require('../core/intent-model-weights.js').FlowIntentWeights);
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const sandbox = { module: undefined, console, require };
+vm.createContext(sandbox);
+for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js']) {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+}
+const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+const FlowActions = vm.runInContext('FlowActions', sandbox);
+
 let failures = 0;
 function check(name, cond, detail) {
   if (cond) console.log('PASS:', name);
@@ -15,7 +26,7 @@ function check(name, cond, detail) {
 const DAY = 24 * 3600 * 1000;
 const NOW = new Date(2026, 9, 3, 12).getTime();
 const ME = 'me@contoso.com';
-const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline };
+const deps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
 let n = 0;
 const iso = (d) => new Date(NOW - d * DAY).toISOString();
 const mine = (conv, text, ago, subject) => ({ id: 'm' + (++n), conversationId: conv, subject: subject || 'Lease', isDraft: false, from: { emailAddress: { name: 'Me', address: ME } }, toRecipients: [{ emailAddress: { name: 'Dana Cole', address: 'dana@acme.com' } }], sentDateTime: iso(ago), webLink: 'https://outlook.office.com/mail/id/' + n, body: { contentType: 'text', content: text } });
@@ -84,6 +95,165 @@ console.log('\n--- people and drafts ---\n');
   check('a draft is never read', plan([Object.assign(mine('c1', ASK, 1), { isDraft: true })]).offers.length === 0);
   check('an empty mailbox plans nothing and never throws', JSON.stringify(plan([]).patches) === '[]' && plan(null).offers.length === 0);
   check('only the text you wrote this time counts, not the quoted history', plan([mine('c5', 'Thanks!\n\nOn Mon, Oct 1, 2026 at 9:00 AM Dana Cole <dana@acme.com> wrote:\n> Could you please send me the signed lease by Friday?', 1)]).offers.length === 0);
+}
+
+console.log('\n--- incoming asks (someone else asked you) ---\n');
+{
+  // Load FlowIntent the way the popup does (globals).
+  const fs = require('fs'); const path = require('path'); const vm = require('vm');
+  const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+  vm.createContext(sandbox);
+  for (const f of ['domains.js','extract.js','judgment.js','google-closes.js','close-families.js','fact-reply.js','intent.js','actions.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+  }
+  const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+  const FlowActions = vm.runInContext('FlowActions', sandbox);
+  const NOW2 = Date.parse('2026-10-05T10:00:00Z');
+  const OUT = 'glance.salisapan@outlook.com';
+  const GMAIL_ME = 'salisapan1@gmail.com';
+  const ask = { id: 'a1', conversationId: 'convA', subject: 'Could you review the pilot proposal and confirm by Wednesday?', isDraft: false,
+    from: { emailAddress: { name: 'AI Local Flow', address: 'ai.local.flow@gmail.com' } },
+    toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+    receivedDateTime: '2026-10-05T09:00:00Z', webLink: 'https://outlook.office.com/mail/id/a1',
+    body: { contentType: 'text', content: 'Hi Sali,\nCould you review the pilot proposal and confirm by Wednesday? Also, please send me the name of the onboarding owner.\nThanks' } };
+  const prev = { id: 'p1', conversationId: 'convB', subject: 'Signed contract', isDraft: false,
+    from: { emailAddress: { name: 'Sali Sapan', address: GMAIL_ME } },
+    toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+    receivedDateTime: '2026-10-05T08:00:00Z',
+    body: { contentType: 'text', content: 'Can you send me the signed contract by Thursday?' } };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+  const planLive = (me) => S.plan({ messages: [ask, prev], me, watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
+
+  const both = planLive([OUT, GMAIL_ME]);
+  check('live messages with both own addresses: one incoming from ai.local.flow', both.incoming.length === 1 && both.incoming[0].base.counterpart.email === 'ai.local.flow@gmail.com', both.incoming);
+  check('incoming label mentions the request and Wed Oct 7', /Reply requested/i.test(both.incoming[0].intent.label) && /Oct 7/.test(both.incoming[0].intent.label), both.incoming[0].intent.label);
+  check('self mail produces no offer whose counterpart is an own address', !both.offers.some((o) => o.base.counterpart.email === OUT || o.base.counterpart.email === GMAIL_ME), both.offers);
+
+  const oldMe = planLive(GMAIL_ME);
+  check('old behaviour input (me = gmail only): incoming ask still yields one incoming item', oldMe.incoming.length === 1, oldMe.incoming);
+
+  const courtesy = S.plan({
+    messages: [{ id: 'c1', conversationId: 'cC', subject: 'Thanks', isDraft: false,
+      from: { emailAddress: { name: 'Dana', address: 'dana@acme.com' } },
+      toRecipients: [{ emailAddress: { name: 'Me', address: OUT } }],
+      receivedDateTime: '2026-10-05T09:00:00Z',
+      body: { contentType: 'text', content: 'Thanks for today, talk soon' } }],
+    me: OUT, watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('courtesy mail from someone else: silence bar holds', courtesy.incoming.length === 0 && courtesy.offers.length === 0, courtesy);
+
+  const withLoop = S.plan({
+    messages: [ask],
+    me: [OUT, GMAIL_ME],
+    watches: [{ id: 'ol:convA', threadId: 'ol:convA', channel: 'outlook', messageId: 'old', subject: 'pilot', counterpart: { name: 'AI Local Flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'review', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW2 - 86400000, chaseIso: '2026-10-07', lang: 'en', amount: null, deadlineIso: null }],
+    graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  // Gmail parity (0.9.14): Gmail shows its Do It on a new ask in a thread that has a loop, and the loop moves to "yours".
+  // Outlook does both too, instead of swallowing the ask into the loop (one of the live "no card" causes).
+  check('incoming ask in a conversation that already has a loop: the loop moves to "yours"', withLoop.patches.some((x) => x.id === 'ol:convA' && x.patch.stage === 'yours'), withLoop);
+  check('incoming ask in a conversation that already has a loop: and the ask still gets its Do It (Gmail parity)', withLoop.incoming.length === 1 && withLoop.incoming[0].messageId === 'a1', withLoop);
+
+  const replyClose = S.plan({
+    messages: [
+      ask,
+      { id: 's1', conversationId: 'convA', subject: 'RE: Could you review the pilot proposal and confirm by Wednesday?', isDraft: false, _folder: 'sentitems',
+        from: { emailAddress: { name: 'Glance', address: OUT } },
+        toRecipients: [{ emailAddress: { name: 'AI Local Flow', address: 'ai.local.flow@gmail.com' } }],
+        sentDateTime: '2026-10-05T11:00:00Z',
+        body: { contentType: 'text', content: 'Confirmed, and the onboarding owner is Dana.' } }
+    ],
+    me: [OUT, GMAIL_ME],
+    watches: [{ id: 'ol:convA', threadId: 'ol:convA', channel: 'outlook', messageId: 'a1', fromIncoming: true, subject: 'pilot', counterpart: { name: 'AI Local Flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'review', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW2 - 86400000, chaseIso: '2026-10-07', lang: 'en', amount: null, deadlineIso: null }],
+    graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('user later reply in sentitems closes the incoming item', replyClose.patches.some((p) => p.id === 'ol:convA' && p.patch.status === 'resolved'), replyClose.patches);
+
+  const draftOnly = S.plan({
+    messages: [ask, Object.assign({}, ask, { id: 'd1', isDraft: true, subject: 'RE: pilot' })],
+    me: [OUT, GMAIL_ME],
+    watches: [{ id: 'ol:convA', threadId: 'ol:convA', channel: 'outlook', messageId: 'a1', fromIncoming: true, subject: 'pilot', counterpart: { name: 'AI Local Flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'review', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW2 - 86400000, chaseIso: '2026-10-07', lang: 'en', amount: null, deadlineIso: null }],
+    graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('a draft alone does NOT close the incoming item', !draftOnly.patches.some((p) => p.patch && p.patch.status === 'resolved'), draftOnly.patches);
+}
+
+
+
+console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
+{
+  const fs = require('fs'); const path = require('path'); const vm = require('vm');
+  const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+  vm.createContext(sandbox);
+  for (const f of ['domains.js','extract.js','judgment.js','google-closes.js','close-families.js','fact-reply.js','intent.js','actions.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+  }
+  const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+  const FlowActions = vm.runInContext('FlowActions', sandbox);
+  const NOW2 = Date.parse('2026-10-05T14:06:00+03:00');
+  const OUT = 'glance.salisapan@outlook.com';
+  const LIVE_BODY = 'Hi Sali,\n\nCould you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.\n\nThanks,\nFlow team';
+  const ask = { id: 'a1', conversationId: 'convA', subject: 'Could you review the pilot proposal and confirm by Wednesday?', isDraft: false,
+    from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } },
+    toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+    receivedDateTime: '2026-10-05T10:21:00Z', webLink: 'https://outlook.office.com/mail/id/a1',
+    body: { contentType: 'text', content: LIVE_BODY } };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+  const r = S.plan({ messages: [ask], me: [OUT, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
+  check('live Flow-team body: one incoming (not quiet:hedge)', r.incoming.length === 1 && r.incoming[0].base.counterpart.email === 'ai.local.flow@gmail.com', { incoming: r.incoming, diagnostics: r.diagnostics });
+  check('live Flow-team body: process has outlookDraft', r.incoming[0] && r.incoming[0].process && (r.incoming[0].process.steps || []).some((s) => s.kind === 'outlookDraft'), r.incoming[0] && r.incoming[0].process);
+  check('live Flow-team body: Why not shown omits shown-incoming', !(r.diagnostics || []).some((d) => String(d.reason || '').indexOf('shown-') === 0), r.diagnostics);
+  const bare = FlowIntent.classify(LIVE_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', now: new Date(NOW2) });
+  check('classify alone: request chip for confirm-by-Wednesday-whether', bare.type === 'request' && FlowIntent.shouldShowChip(bare), { type: bare.type, quiet: bare.quiet, label: bare.label });
+  const hedgeStill = FlowIntent.classify('Can you confirm whether the proposal at $3,900 still works?', { senderEmail: 'x@y.com', senderName: 'X', now: new Date(NOW2) });
+  check('bare confirm-whether (no "confirm by") still quiet hedge', !hedgeStill.type && hedgeStill.quiet === 'hedge', hedgeStill);
+}
+
+console.log('\n--- learn own addresses from inbox recipients ---\n');
+{
+  const { FlowGraphMail: G } = require('../core/graph-mail.js');
+  const OUT = 'glance.salisapan@outlook.com';
+  const GMAIL_ME = 'salisapan1@gmail.com';
+  const ask = { from: { emailAddress: { address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { address: OUT } }] };
+  const selfIn = { from: { emailAddress: { address: GMAIL_ME } }, toRecipients: [{ emailAddress: { address: OUT } }] };
+  const multi = { from: { emailAddress: { address: 'boss@acme.com' } }, toRecipients: [
+    { emailAddress: { address: 'a@acme.com' } }, { emailAddress: { address: 'b@acme.com' } }
+  ] };
+  const learned = G.learnOwnFromMessages([ask, selfIn, multi], []);
+  check('learnOwnFromMessages picks sole inbox toRecipient', learned.indexOf(OUT) !== -1, learned);
+  check('learnOwnFromMessages does not add multi-recipient coworkers from one message', learned.indexOf('a@acme.com') === -1 && learned.indexOf('b@acme.com') === -1, learned);
+  const primary = G.pickPrimary([GMAIL_ME, OUT], { mail: '', userPrincipalName: GMAIL_ME }, [OUT, OUT]);
+  check('pickPrimary prefers outlook alias over gmail UPN when inbox-received', primary === OUT, primary);
+  const CID = 'outlook_de6b4487c57f9cb0@outlook.com';
+  check('isOpaqueMailbox detects CID form', G.isOpaqueMailbox(CID) === true && G.isOpaqueMailbox(OUT) === false);
+  const primaryCid = G.pickPrimary([CID, OUT], { mail: CID, userPrincipalName: CID }, [OUT]);
+  check('pickPrimary skips opaque outlook_HEX@outlook.com when human alias exists', primaryCid === OUT, primaryCid);
+  const onlyCid = G.pickPrimary([CID], { mail: CID, userPrincipalName: CID }, []);
+  check('pickPrimary falls back to CID only when nothing human learned', onlyCid === CID, onlyCid);
+}
+
+console.log('\n--- every incoming message ends in a card or a reason (never neither) ---\n');
+{
+  const T = (conv, from, text, ago, extra) => Object.assign({ id: 'z' + (++n), conversationId: conv, subject: 'S ' + conv, isDraft: false, from: { emailAddress: { name: from.split('@')[0], address: from } }, toRecipients: [{ emailAddress: { name: 'Me', address: ME } }], receivedDateTime: iso(ago), webLink: 'https://outlook.office.com/mail/id/z' + n, body: { contentType: 'text', content: text } }, extra || {});
+  const msgs = [
+    T('k1', 'dana@acme.com', ASK, 0.1),
+    T('k2', 'dana@acme.com', 'Thanks so much, all good on my side. Have a great weekend!', 0.2),
+    T('k3', 'avi@partner.io', '', 0.3),                                                      // empty body
+    T('k4', ME, 'Note to self: call the bank.', 0.4, { toRecipients: [{ emailAddress: { name: 'Me', address: ME } }] }),
+    T('k5', 'noa@vendor.co', 'Could you send me the signed contract by Friday?', 0.5),       // a file ask Outlook cannot attach
+    T('k6', 'yael@client.org', 'Confirmed, the figure is 4,200. Booking now.', 0.6),         // answers a waiting loop
+    T('k7', 'tom@corp.com', 'Please confirm by Monday that the new pricing works for you.', 0.7),
+    T('k8', 'liz@corp.com', 'Can we meet on Thursday at 3pm to go over the rollout plan?', 0.8),
+    T('k9', 'ops@corp.com', 'This week we shipped the new dashboard. No action needed.', 0.9)
+  ];
+  const watches = [loop('k6', { counterpart: { name: 'Yael', email: 'yael@client.org', phone: null } })];
+  const r = plan(msgs, watches, { me: ME, state: { incomingDeclined: { ['k7|' + msgs[6].id]: NOW } } });
+  const inbound = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9'];
+  const unexplained = inbound.filter((c) => !r.incoming.some((x) => x.conversationId === c) && !r.diagnostics.some((d) => d.conversationId === c));
+  check('each of nine different inbound messages is either an incoming card or a Why-not-shown line', unexplained.length === 0, { unexplained, diagnostics: r.diagnostics.map((d) => d.conversationId + ':' + d.reason), incoming: r.incoming.map((x) => x.conversationId) });
+  const why = (c) => (r.diagnostics.find((d) => d.conversationId === c) || {}).reason;
+  check('an empty body says no-text', why('k3') === 'no-text', why('k3'));
+  check('an answer that settled a waiting loop says so', /answered-loop|has-open-loop|has-loop/.test(why('k6') || ''), why('k6'));
+  check('a declined ask says incoming-declined', why('k7') === 'incoming-declined', why('k7'));
 }
 
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));

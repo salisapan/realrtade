@@ -89,9 +89,13 @@ it, not touching the module.
 | `meeting-debrief.js` | After a meeting: what came out of it — portable, no chrome.*, no DOM, no network, no model. |
 | `model-store.js` | Fetches, verifies and keeps an on-device model's files, quietly and politely. |
 | `outcome-labels.js` | Labels the product earns for free from what happens next — portable, no chrome.*, no DOM, no network. |
-| `outlook-auth.js` | Sign in to Microsoft (OAuth 2.0 authorization code with PKCE) and keep the tokens fresh. |
+| `outlook-auth.js` | Sign in to Microsoft (OAuth 2.0 authorization code with PKCE) and keep the session alive: `session()` refreshes inside the 24-hour single-page-application window, renews silently (prompt=none) from hour 16, and treats a failed attempt as transient unless Microsoft says a person must sign in. |
+| `incoming-judge.js` | The one decision for "someone asked you something", shared by every mail surface: Gmail's chain (own text, classify with sender and subject, silence bar, file gate, planFor) as a pure function, plus the Gmail-shaped draft payload. Outlook (Graph planner and the Outlook-on-the-web card) uses it, so only the connector differs. |
 | `outlook-config.js` | The application (client) ID of the registered "Glance Outlook" Microsoft Entra app. Public; a placeholder until the owner registers it (open-tasks). |
 | `outlook-sync.js` | What to do with the last couple of weeks of an Outlook mailbox. |
+| `outlook-state-migrate.js` | One-shot upgrade: merge leftover HANDLED+UNDONE Outlook draft rows and scrub false-close counts for prepared-draft undos. |
+| `draft-reply.js` | Shared reply-draft body for Gmail and Outlook (never sent): rich ack of concrete asks (facts when known; placeholders only when needed), same shape on both surfaces. |
+| `owa-parse.js` | Outlook on the web reading-pane helpers (URL item id, subject/sender/body, match to sync entries). Selectors are best-effort against OWA markup. |
 | `outside-signals.js` | Loops that close without the other person replying |
 | `person-model.js` | A model of HOW LONG each person takes — portable, no chrome.*, no DOM, no network, no model service. |
 | `pmf-metrics.js` | Turns the durable local counters storage.js already keeps (shownStats, writeStats, undoneStats, activeDays, closeStats) into the three product- market-fit signals this product actually needs to know whether it's working |

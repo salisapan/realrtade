@@ -92,7 +92,7 @@ deletes anything that was already there.
 | **Second reading**: one masked sentence to our server for what the code could not place; opt-in; Free 120 and Pro 1,500 a month | `docs/ai-ladder.md` |
 | **True close**: a short reply with no answer in it never closes a loop; a draft is not a delivery | `docs/true-close.md`, `docs/resolution-paths.md` |
 | Receipts and documents (contract, quote, proposal, signed copy) as a path to a real delivery | `docs/resolution-paths.md`, `docs/true-close.md` §4 |
-| Other apps (WhatsApp Web, Outlook through Graph, right-click capture), opt-in and read-only | `docs/multi-platform.md` |
+| Other apps (WhatsApp Web, Outlook through Graph + Outlook on the web Do It card, right-click capture), opt-in; Outlook drafts on Do It (never send) | Store listing + `src/content-outlook.js` |
 | Hybrid on-device model + masked server for Do It proposals (**dormant**, `config/hybrid.public.js`) | `docs/hybrid-execution-architecture.md` |
 | Pro (Stripe, licence key, server-enforced paid features) | `docs/monetization.md`, `docs/revenue-routines.md` |
 | What is open, blocked or decided | `docs/open-tasks.md` |
@@ -615,8 +615,9 @@ foundation, not the feature.
   contract (`core/channel.js`), are off until the person turns them on, and are
   stricter than Gmail until measured: WhatsApp Web (read-only, one-to-one chats,
   `src/content-whatsapp.js`), a right-click "stay on this" on any page
-  (`core/capture.js`), and Outlook through Microsoft's own mail API (read-only, last 14
-  days, while the panel is open: `src/outlook.js`, needs a Microsoft app registration
+  (`core/capture.js`), and Outlook through Microsoft's own mail API and the same Do It card inside Outlook on the web (read + reply drafts on Do It, never send; last 14
+  days, while the panel or an Outlook-on-the-web tab is open; one decision shared with Gmail in `core/incoming-judge.js`;
+  the session kept alive by the worker: `src/outlook.js`, needs a Microsoft app registration
   and its client id in `core/outlook-config.js`). See `docs/multi-platform.md`.
 - **The passive judgment engine is not a language model, and sends nothing
   anywhere.** `core/judgment.js`'s scorer is a transparent, explainable
