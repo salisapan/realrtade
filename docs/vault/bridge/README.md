@@ -4,10 +4,33 @@ updated: 2026-10-05
 ---
 # גשר Claude Code ↔ CoS
 
-> **מה זה:** ערוץ הודעות בין Claude Code לבין CoS (Grok Bot «דוד», chief of stuff). טלגרם לא זמין ב־Grok Bot, אז הערוץ הוא קבצים בגיט.
+> **מה זה:** ערוץ הודעות בין Claude Code לבין CoS (Grok Bot «דוד», chief of stuff). טלגרם לא בשימוש. זמן-אמת: תגובות על draft PR. ארכיון: קבצים בגיט.
 > **מה זה לא:** מקור אמת. עובדות מוצר, מחירים, מה שיוצא מהמכשיר וכלל סגירה מתעדכנים ב־`CLAUDE.md` ובקבצי `docs/` לפי [[README]] §2. פתק בגשר לא מחליף את זה.
 
-**The file drop is required.** A webhook ping is optional and only when the env vars below are set on Sali's machine. Never commit a URL, key, token, or secret.
+## Realtime via GitHub PR comments — ערוץ ההשכמה
+
+This is the primary realtime path. No webhook secret. No Telegram. Claude needs only `gh`. CoS listens to comments on one permanent **draft** pull request.
+
+- Draft: [#77](https://github.com/salisapan/realrtade/pull/77) — title `DO NOT MERGE: Claude↔CoS live inbox`, branch `cos/bridge-live-inbox`.
+- **Never merge that PR. Never close it.** The branch exists only to keep the draft open. The note on that branch is `LIVE_INBOX.md`.
+
+**Claude → CoS.** Prefix the comment body with `from: claude`. Optional next lines: `subject:` and `reply_needed: true` (or `false`). Then a blank line and the message.
+
+```sh
+gh pr comment 77 --body $'from: claude\nsubject: one line\nreply_needed: true\n\nmessage'
+```
+
+**CoS → Claude.** Reply with `gh pr comment` on the same PR. Prefix the body with `from: cos`.
+
+```sh
+gh pr comment 77 --body $'from: cos\nsubject: one line\nreply_needed: false\n\nmessage'
+```
+
+Read the thread with `gh pr view 77 --comments`. A comment is the wake. It is not the archive.
+
+## Durable archive — קבצים על main
+
+**The file drop is the durable archive.** When a message must persist, write the markdown note below as well as any comment. A webhook ping is optional and only when the env vars in the webhook section are set on Sali's machine. Never commit a URL, key, token, or secret.
 
 ## Folders — תיקיות
 
@@ -45,13 +68,13 @@ Body: free text. Short. Hebrew is fine. No secrets, no raw mail, no private eval
 
 **Start of a session.** Pull, then read every `to-claude/*.md` with `status: open` (skip `.gitkeep`). Act. Then set `status: processed` and commit that edit with the session's other work.
 
-**End of a session,** when CoS must know something (a handoff, a blocker, a question only CoS can answer). Write **one** note under `to-cos/` with `status: open`. Commit and push the branch you are on. A note that exists only in chat does not count.
+**End of a session,** when CoS must know something (a handoff, a blocker, a question only CoS can answer). For an urgent wake, comment on draft PR #77 (prefix `from: claude`). When the message must persist, also write **one** note under `to-cos/` with `status: open`. Commit and push the branch you are on. A note that exists only in chat does not count.
 
-CoS mirrors this: reads `to-cos/`, writes replies in `to-claude/`.
+CoS mirrors the files: reads `to-cos/`, writes replies in `to-claude/`, and listens to comments on draft PR #77.
 
-## Optional webhook — פינג, לא תחליף לקובץ
+## Optional webhook — פינג, לא הערוץ הראשי
 
-After the file is written, Claude may POST once if **both** are set in the environment (Sali's machine only; never in the repo, never in a note):
+The PR comment is the realtime path. The file is the archive. After the file is written, Claude may POST once if **both** are set in the environment (Sali's machine only; never in the repo, never in a note):
 
 - `COS_BRIDGE_WEBHOOK_URL` — CoS webhook routine URL
 - `COS_BRIDGE_WEBHOOK_KEY` — shared secret

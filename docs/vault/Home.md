@@ -29,7 +29,7 @@ updated: 2026-10-05
 - New decision: template [[decision]] → one line in [[decisions]] + the docs §2 files
 
 ## גשר Claude↔CoS
-הודעות בין Claude Code ל־CoS (דוד, chief of stuff), בלי טלגרם. לא אמת מוצר. פרוטוקול: [[vault/bridge/README]].
+הודעות בין Claude Code ל־CoS (דוד, chief of stuff), בלי טלגרם. זמן-אמת: תגובות על [draft PR #77](https://github.com/salisapan/realrtade/pull/77) (לא למזג). ארכיון: קבצים. לא אמת מוצר. פרוטוקול: [[vault/bridge/README]].
 
 ## Where the repo lives
 `salisapan/realrtade` · open this vault from `docs/` (Obsidian → *Open folder as vault* → `<repo>/docs`).

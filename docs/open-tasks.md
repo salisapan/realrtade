@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-05 (Claude Code ↔ CoS file bridge, row 41; Obsidian vault row 40; 0.9.13 toolbar morph icon).
+Last updated: 2026-10-05 (Claude ↔ CoS live inbox is draft PR #77, row 41; file bridge and Obsidian vault unchanged as archive).
 
 ## Open
 
@@ -54,7 +54,7 @@ Last updated: 2026-10-05 (Claude Code ↔ CoS file bridge, row 41; Obsidian vaul
 | 38 | Documentation symmetry (owner 2026-10-04): every document an agent or person reads agrees with the code. DONE: `docs/README.md` is the map and the "when X changes, update Y" table; `test/docs-consistency-corpus.cjs` fails on an unlisted document, an undescribed `core/` module, a public number (allowance, caps) that differs from the code, an undocumented server environment variable, or a sentence that is no longer true | done | Claude | - | Keep it true: every change that touches an allowance, a price, a switch, what leaves the device or a rule for closing a loop updates the rows listed in `docs/README.md` §2 in the same commit. |
 | 39 | Product identity correction (owner 2026-10-05, wording only, no feature scope): Glance closes open loops, Gmail is where it starts today; the locked block, the anti-drift list and the product-definition vs implementation-status report rule are in `docs/product-identity.md`, quoted verbatim by 8 files and enforced by `test/docs-consistency-corpus.cjs` and `test/identity-copy-corpus.cjs` | done | Claude | - | Remaining in the site copy, by owner decision: the SEO page title "Close from Gmail without a prompt" and trial.html's install steps still say Gmail/Chrome because they describe today's entry surface. |
 | 40 | Obsidian vault as the context cache across chats (owner 2026-10-05: "embed it in the development process"): `docs/` is the vault, notes in `docs/vault/` (Home, decisions, stream notes, session logs, templates), process in `docs/README.md` §5 and `docs/vault/when-to-write-to-vault.md` | done | Cos | - | Owner: install Obsidian, *Open folder as vault* -> `<repo>/docs`. Living toolbar icon brief handed to Claude Code (`docs/vault/living-icon-handoff.md`). |
-| 41 | Claude Code ↔ CoS (דוד, chief of stuff) messaging bridge, file drop because Telegram Channels are unavailable in Grok Bot | done | Claude | - | `docs/vault/bridge/` (`to-cos/`, `to-claude/`). Protocol in `docs/vault/bridge/README.md`, pointer in `CLAUDE.md`. File drop is required; webhook POST only if `COS_BRIDGE_WEBHOOK_URL` and `COS_BRIDGE_WEBHOOK_KEY` are set locally. No secrets in git. Messaging only — product truth stays in `CLAUDE.md` + `docs/` §2. |
+| 41 | Claude Code ↔ CoS (דוד, chief of stuff) messaging bridge, file drop because Telegram Channels are unavailable in Grok Bot | done | Claude | - | Realtime wake: comments on draft PR #77 (`DO NOT MERGE: Claude↔CoS live inbox`, https://github.com/salisapan/realrtade/pull/77, branch `cos/bridge-live-inbox`); do not merge or close it. Durable archive remains `docs/vault/bridge/to-cos/` and `to-claude/` on main. Protocol in `docs/vault/bridge/README.md`, pointer in `CLAUDE.md`. Webhook POST only if `COS_BRIDGE_WEBHOOK_URL` and `COS_BRIDGE_WEBHOOK_KEY` are set locally. No secrets in git. Messaging only — product truth stays in `CLAUDE.md` + `docs/` §2. |
 
 ## Decisions waiting for an answer
 
