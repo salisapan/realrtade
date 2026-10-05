@@ -21,6 +21,27 @@ const FlowOwaParse = (() => {
     return null;
   }
 
+  // The ids an OWA address carries. outlook.live.com/mail/0/inbox/id/<id>: with conversation view on (the default) <id> is
+  // the CONVERSATION id (AQQk… personal, AAQk… work), otherwise a message id (AQMk… / AAMk…). Same strings Graph returns
+  // in conversationId / id, up to the base64 alphabet (REST ids use - and _, EWS ids + and /) and URL encoding.
+  function urlIds(href) {
+    const raw = String(href || '');
+    let id = null;
+    const m = raw.match(/\/id\/([^/?#&]+)/i) || raw.match(/[?&#]ItemID=([^&#]+)/i) || raw.match(/[?&#]id=([^&#]+)/i) || raw.match(/restid=([^&#]+)/i);
+    if (m && m[1]) { try { id = decodeURIComponent(m[1]); } catch (e) { id = m[1]; } }
+    if (!id) return { itemId: null, conversationId: null, kind: null };
+    const conv = /^A[AQ]Qk/.test(id);
+    return { itemId: conv ? null : id, conversationId: conv ? id : null, kind: conv ? 'conversation' : 'message', raw: id };
+  }
+
+  // One spelling for an Exchange id, whatever alphabet and padding it arrived in.
+  function canonId(id) {
+    if (!id) return '';
+    let s = String(id);
+    try { s = decodeURIComponent(s); } catch (e) { /* already decoded */ }
+    return s.replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim();
+  }
+
   function textOf(el) {
     if (!el) return '';
     return String(el.innerText || el.textContent || '').replace(/\s+\n/g, '\n').trim();
@@ -49,49 +70,56 @@ const FlowOwaParse = (() => {
     return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
   }
 
-  // Match an open-pane snapshot to a sync incoming/still-open entry.
-  // Prefer Graph message id / internetMessageId / conversation id; else subject+sender (+ optional day).
-  // OWA URL ItemID often differs from Graph id — subject fallback must still work.
-  function matchEntry(pane, entries) {
-    const list = entries || [];
+  // Match an open-pane snapshot to a sync incoming/still-open entry: { entry, how } or null.
+  // 1. the message id in the URL, 2. the internet message id, 3. the conversation id in the URL (OWA's default address),
+  // 4. subject + sender (+ received day). Ids are compared in one canonical spelling (canonId).
+  function matchEntryHow(pane, entries) {
+    const list = (entries || []).filter(Boolean);
     if (!pane || !list.length) return null;
-    const paneId = pane.itemId || pane.messageId || null;
-    const paneInternet = pane.internetMessageId || null;
-    const paneConv = pane.conversationId || null;
+    const ids = (e) => [e.messageId, e.outlookIncomingId, e.id].map(canonId).filter(Boolean);
+    const convs = (e) => [e.outlookConversationId, e.conversationId, e.threadId, e.base && e.base.threadId].map(canonId).filter(Boolean);
+    const paneId = canonId(pane.itemId || pane.messageId);
     if (paneId) {
-      const byId = list.find((e) => e && (
-        e.messageId === paneId || e.outlookIncomingId === paneId || e.id === paneId ||
-        e.internetMessageId === paneId
-      ));
-      if (byId) return byId;
+      const hit = list.find((e) => ids(e).indexOf(paneId) >= 0 || canonId(e.internetMessageId) === paneId);
+      if (hit) return { entry: hit, how: 'message id' };
     }
+    const paneInternet = canonId(pane.internetMessageId);
     if (paneInternet) {
-      const byInternet = list.find((e) => e && (
-        e.internetMessageId === paneInternet || e.messageId === paneInternet || e.outlookIncomingId === paneInternet
-      ));
-      if (byInternet) return byInternet;
+      const hit = list.find((e) => canonId(e.internetMessageId) === paneInternet);
+      if (hit) return { entry: hit, how: 'internet message id' };
     }
+    const paneConv = canonId(pane.conversationId);
     if (paneConv) {
-      const byConv = list.find((e) => e && (e.outlookConversationId === paneConv || e.conversationId === paneConv || e.threadId === 'ol:' + paneConv));
-      if (byConv) return byConv;
+      // Several entries of one conversation: the newest ask in it.
+      const hits = list.filter((e) => convs(e).indexOf(paneConv) >= 0);
+      if (hits.length) {
+        hits.sort((a, b) => (Date.parse(b.receivedDateTime || 0) || 0) - (Date.parse(a.receivedDateTime || 0) || 0));
+        return { entry: hits.find((e) => e.process && !e.outlookReceipt) || hits[0], how: 'conversation id' };
+      }
     }
-    const sub = norm(pane.subject);
-    const from = normEmail(pane.senderEmail || pane.from);
+    const sub = norm(stripPrefix(pane.subject));
+    const from = pane.senderEmail || pane.from ? normEmail(pane.senderEmail || pane.from) : '';
     const paneDay = dayKey(pane.receivedDateTime || pane.date || pane.ts);
-    if (!sub && !from) return null;
-    let best = null;
+    if (!sub) return null; // a sender alone is not enough: the same person may have several asks open
     for (const e of list) {
-      if (!e) continue;
-      const esub = norm(e.subject);
+      const esub = norm(stripPrefix(e.subject));
       const efrom = normEmail((e.sender && e.sender.email) || (e.base && e.base.counterpart && e.base.counterpart.email) || e.from);
-      if (sub && esub && sub !== esub && esub.indexOf(sub) < 0 && sub.indexOf(esub) < 0) continue;
+      if (!esub || (sub !== esub && esub.indexOf(sub) < 0 && sub.indexOf(esub) < 0)) continue;
       if (from && efrom && from !== efrom) continue;
       const eDay = dayKey(e.receivedDateTime || e.date || e.ts);
       if (paneDay && eDay && paneDay !== eDay) continue;
-      best = e;
-      break;
+      return { entry: e, how: from ? 'subject and sender' : 'subject' };
     }
-    return best;
+    return null;
+  }
+
+  function matchEntry(pane, entries) {
+    const r = matchEntryHow(pane, entries);
+    return r ? r.entry : null;
+  }
+
+  function stripPrefix(s) {
+    return String(s || '').replace(/^\s*((re|fw|fwd|השב|העבר|תשובה)\s*:\s*)+/i, '');
   }
 
   // Reading-pane message-body candidates (newest first). Used by the content script; fixtures pass a fake document.
@@ -100,19 +128,46 @@ const FlowOwaParse = (() => {
   function readingPaneRoots(doc) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
     if (!d || !d.querySelectorAll) return [];
+    // Language-neutral anchors first: OWA localizes aria-label ("Message body" is "גוף ההודעה" in Hebrew), so a label
+    // can only ever be a last resort. The body is div[role="document"] inside the reading pane; class names carrying
+    // allowTextSelection / UniqueMessageBody are older and newer OWA builds.
     const sels = [
+      '#ReadingPaneContainerId div[role="document"]',
+      '[role="main"] div[role="document"]',
+      'div[role="document"].allowTextSelection',
+      '[role="main"] [class*="allowTextSelection"]',
+      '[role="main"] [id^="UniqueMessageBody"]',
+      '[role="main"] [class*="UniqueMessageBody"]',
+      '[role="main"] [data-app-section="MessageBody"]',
       '[role="main"] [aria-label="Message body"]',
       '[role="main"] [aria-label*="Message body"]',
-      '[role="main"] [data-app-section="MessageBody"]',
       '[role="main"] .ReadingPaneContents',
       'div[aria-label="Message body"]',
       '[data-testid="message-body"]'
     ];
     const out = [];
     sels.forEach((sel) => {
-      d.querySelectorAll(sel).forEach((n) => { if (out.indexOf(n) < 0) out.push(n); });
+      let found = [];
+      try { found = d.querySelectorAll(sel); } catch (e) { found = []; }
+      found.forEach((n) => {
+        if (out.indexOf(n) >= 0) return;
+        // Never the message list, and never a reply being written.
+        if (n.closest && (n.closest('[role="listbox"], [role="list"], [role="grid"], [role="tree"]') || n.closest('[contenteditable="true"]'))) return;
+        if (n.getAttribute && n.getAttribute('contenteditable') === 'true') return;
+        // A body wrapper that contains another candidate: keep the inner one only.
+        for (let i = out.length - 1; i >= 0; i--) { if (n.contains && n.contains(out[i])) return; if (out[i].contains && out[i].contains(n)) out.splice(i, 1); }
+        out.push(n);
+      });
     });
     return out;
+  }
+
+  // Which anchor found the body, for the debug log.
+  function rootsReport(doc) {
+    const d = doc || (typeof document !== 'undefined' ? document : null);
+    if (!d || !d.querySelectorAll) return {};
+    const q = (sel) => { try { return d.querySelectorAll(sel).length; } catch (e) { return -1; } };
+    return { main: q('[role="main"]'), document: q('div[role="document"]'), readingPane: q('#ReadingPaneContainerId'), allowTextSelection: q('[class*="allowTextSelection"]'), headings: q('[role="heading"]') };
   }
 
   const EMAIL_RE = /[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/i;
@@ -185,17 +240,19 @@ const FlowOwaParse = (() => {
     const who = senderOf(container, bodyRoot, opts && opts.own);
     const body = textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
     if (!subject && !body) return null;
+    const ids = urlIds(href || (typeof location !== 'undefined' ? location.href : ''));
     return {
-      itemId: itemIdFromUrl(href || (typeof location !== 'undefined' ? location.href : '')),
+      itemId: ids.itemId,
+      conversationId: ids.conversationId,
+      idKind: ids.kind,
       subject: subject,
       senderEmail: who.email,
       senderName: who.name,
-      text: body,
-      conversationId: null
+      text: body
     };
   }
 
-  return { itemIdFromUrl, matchEntry, readingPaneRoots, readPane, senderOf, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, readingPaneRoots, rootsReport, readPane, senderOf, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

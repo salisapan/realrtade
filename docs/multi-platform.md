@@ -120,7 +120,18 @@ person "me").
 **The Do It card inside Outlook on the web.** With Outlook on and the Outlook-on-the-web permission granted, `background.js` registers the same
 Glance card (`src/chip-host.js`) on outlook.live.com / outlook.office.com / outlook.office365.com. The page runs the same planner as the panel
 (its Graph reads go through the worker, GET under `/me` only), matches the open message by Graph id, internet message id, or subject and
-sender, and Do It writes the reply draft through the worker. The surface stays opt-in (optional host permission, registered at runtime), not a
+sender, and Do It writes the reply draft through the worker.
+
+What 0.9.15 changed after the first live test showed no card: the page scan is a throttle (OWA changes the page all the
+time, and a debounce that restarts on every change never fired); the message body is found by language-neutral anchors
+(`div[role="document"]` in the reading pane, `allowTextSelection` / `UniqueMessageBody` classes; the English aria-label
+"Message body" is only a last resort, because OWA localizes it); the address `/mail/0/inbox/id/<id>` usually carries the
+CONVERSATION id (AQQk… / AAQk…), matched against the synced conversation, with ids compared in one spelling whatever base64
+alphabet they use; the open message ends in a card or in a reason under "Why not shown" (`outlookPageDiag`, e.g.
+`page:pane-unreadable` with the anchors seen); tabs already open when the scripts are registered get them injected; and a
+debug mode logs each stage with a `Glance:` prefix (`chrome.storage.local.set({ glanceDebug: true })` from the worker
+console, or `localStorage.setItem('glance-debug', '1')` on the Outlook page). `test/owa-page-harness.cjs` loads the exact
+registered file list on a Hebrew reading pane whose ads keep changing and requires the card (needs jsdom; skipped without). The surface stays opt-in (optional host permission, registered at runtime), not a
 static `content_scripts` entry, so installing Glance never asks for Outlook.
 
 **A session that lasts (0.9.14).** A single-page-application refresh token lives 24 hours from the sign-in and does not slide. The worker keeps

@@ -10,16 +10,72 @@
 //
 // Honesty: OWA markup is not a public interface. Selectors live in core/owa-parse.js
 // and are re-checked every pass; if the pane cannot be read, stay silent.
+//
+// Debug: chrome.storage.local.glanceDebug = true (or localStorage 'glance-debug' = '1' on the Outlook page) logs every
+// stage with a "Glance:" prefix: start, injected, parsed, matched, judged, decision, rendered (or the reason it did not).
+// Without it the page logs one line ("Glance: outlook content start") and any error.
 (() => {
-  if (typeof FlowChipHost === 'undefined' || typeof FlowOwaParse === 'undefined') return;
-  if (typeof FlowStorage === 'undefined') return;
+  const VERSION = (() => { try { return chrome.runtime.getManifest().version; } catch (e) { return '?'; } })();
+  try { console.info('Glance: outlook content start', VERSION, location.host); } catch (e) { /* no console */ }
+  // Classic scripts share this isolated world; a file that failed to load leaves its global undefined (no eval: MV3 CSP).
+  const missing = [];
+  if (typeof FlowChipHost === 'undefined') missing.push('FlowChipHost');
+  if (typeof FlowOwaParse === 'undefined') missing.push('FlowOwaParse');
+  if (typeof FlowStorage === 'undefined') missing.push('FlowStorage');
+  if (typeof FlowIncomingJudge === 'undefined') missing.push('FlowIncomingJudge');
+  if (missing.indexOf('FlowChipHost') >= 0 || missing.indexOf('FlowOwaParse') >= 0 || missing.indexOf('FlowStorage') >= 0) {
+    console.error('Glance: outlook page cannot start, missing ' + missing.join(', ') + ' (a file before content-outlook.js failed to load)');
+    return;
+  }
+  if (globalThis.__glanceOutlookPage) { try { globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* old copy */ } return; }
 
-  const DEBOUNCE_MS = 800;
+  const SCAN_EVERY_MS = 800;        // at most one scan per 0.8 s, and at least one 0.8 s after any change
   const PAGE_SYNC_MIN_MS = 60 * 1000;
+  const PAGE_DIAG_KEY = 'outlookPageDiag';
   let timer = null;
+  let scanning = false;
+  let again = false;
   let lastKey = '';
   let lastPageSyncAt = 0;
   let syncing = null;
+  let lastReasonKey = '';
+  let lastHref = location.href;
+  let debug = false;
+  try { debug = window.localStorage && window.localStorage.getItem('glance-debug') === '1'; } catch (e) { /* storage blocked */ }
+  try { chrome.storage.local.get({ glanceDebug: false }, (r) => { if (r && r.glanceDebug) debug = true; dbg('injected', { version: VERSION, href: location.href }); }); } catch (e) { /* no storage */ }
+
+  function dbg(stage, data) {
+    if (!debug) return;
+    try { console.info('Glance: ' + stage, data === undefined ? '' : (typeof data === 'string' ? data : JSON.stringify(data))); } catch (e) { /* console gone */ }
+  }
+
+  // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
+  async function pageReason(reason, pane, extra) {
+    dbg('decision', { shown: false, reason, subject: pane && pane.subject });
+    const key = reason + '|' + ((pane && (pane.conversationId || pane.itemId || pane.subject)) || location.pathname);
+    if (key === lastReasonKey) return;
+    lastReasonKey = key;
+    try {
+      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
+      const list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => d && d.key !== key);
+      list.unshift(Object.assign({
+        key, reason, at: Date.now(), source: 'page',
+        subject: String((pane && pane.subject) || '').slice(0, 120),
+        counterpart: (pane && pane.senderEmail) || null
+      }, extra || {}));
+      await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 20) }, resolve));
+    } catch (e) { /* the extension was reloaded under this page */ }
+  }
+
+  async function clearReason(pane) {
+    lastReasonKey = '';
+    try {
+      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
+      const id = pane && (pane.conversationId || pane.itemId || pane.subject);
+      const list = (bag[PAGE_DIAG_KEY] || []).filter((d) => d && !(id && String(d.key || '').endsWith('|' + id)));
+      if (list.length !== (bag[PAGE_DIAG_KEY] || []).length) await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list }, resolve));
+    } catch (e) { /* ignore */ }
+  }
 
   function send(msg) {
     return new Promise((resolve) => {
@@ -130,7 +186,23 @@
       sender: { name: pane.senderName, email: pane.senderEmail },
       now: new Date(), threadUrl: location.href, hasThreadAttachment: false, surface: 'outlook'
     });
-    return r && r.show ? { intent: r.intent, process: r.process } : null;
+    dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
+    return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
+  }
+
+  // The open message's Graph id when the address only carries its conversation: the newest message in it from someone else.
+  async function messageIdForConversation(convId, own) {
+    try {
+      const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + String(convId).replace(/'/g, "''") + "'") + '&$select=id,receivedDateTime,from,subject,internetMessageId&$top=25';
+      const r = await send({ type: 'flow:outlook-fetch', url: 'https://graph.microsoft.com/v1.0' + q, init: { method: 'GET', headers: {} } });
+      if (!r || !r.ok) return null;
+      const list = (JSON.parse(r.body || '{}').value || []).filter((m) => {
+        const a = String((m.from && m.from.emailAddress && m.from.emailAddress.address) || '').toLowerCase();
+        return a && own.indexOf(a) < 0;
+      });
+      list.sort((a, b) => (Date.parse(b.receivedDateTime) || 0) - (Date.parse(a.receivedDateTime) || 0));
+      return list[0] || null;
+    } catch (e) { return null; }
   }
 
   function buildCtx(entry, pane, decided) {
@@ -271,36 +343,64 @@
   }
 
   async function scan() {
-    // Outlook must be connected (token present); otherwise silence.
     const st = await FlowStorage.get();
-    if (!st || !st.outlookAuth || !st.outlookAuth.token) return;
-
-    const own = (st.outlookAuth.ownAddresses || []).concat(st.outlookAuth.account && st.outlookAuth.account.address ? [st.outlookAuth.account.address] : []);
+    const own = ((st && st.outlookAuth && st.outlookAuth.ownAddresses) || [])
+      .concat(st && st.outlookAuth && st.outlookAuth.account && st.outlookAuth.account.address ? [st.outlookAuth.account.address] : [])
+      .map((a) => String(a || '').toLowerCase());
     const pane = FlowOwaParse.readPane(document, location.href, { own: own });
-    if (!pane) return;
+    const ids = FlowOwaParse.urlIds(location.href);
+    if (!pane) {
+      // A message is open (its id is in the address) but its body could not be found: say so, with what was on the page.
+      if (ids.kind) {
+        const report = FlowOwaParse.rootsReport ? FlowOwaParse.rootsReport(document) : {};
+        dbg('parsed', { ok: false, ids, anchors: report });
+        await pageReason('page:pane-unreadable', null, { anchors: report });
+      }
+      return;
+    }
+    dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, itemId: pane.itemId, conversationId: pane.conversationId, chars: (pane.text || '').length });
+    // Outlook must be connected (token present); otherwise no card, and the reason says why.
+    if (!st || !st.outlookAuth || !st.outlookAuth.token) { await pageReason('page:not-connected', pane); return; }
 
     let candidates = await outlookCandidates();
-    let entry = FlowOwaParse.matchEntry(pane, candidates);
+    let m = FlowOwaParse.matchEntryHow(pane, candidates);
     // Not judged yet (new mail, or the panel has not been opened): run one check from here, then look again.
-    if (!entry && !(st.outlookSync && st.outlookSync.needsSignIn)) {
+    if (!m && !(st.outlookSync && st.outlookSync.needsSignIn)) {
       const r = await pageSync('pane');
+      dbg('synced', { ok: r && r.ok, skipped: r && r.skipped, incoming: r && r.incoming, error: r && r.error });
       if (r && r.ok && !r.skipped) {
         candidates = await outlookCandidates();
-        entry = FlowOwaParse.matchEntry(pane, candidates);
+        m = FlowOwaParse.matchEntryHow(pane, candidates);
       }
     }
+    let entry = m ? m.entry : null;
+    dbg('matched', m ? { how: m.how, messageId: entry.messageId, label: entry.intent && entry.intent.label, candidates: candidates.length } : { how: 'none', candidates: candidates.length });
 
     // Same silence bar as Gmail: if no stored candidate, judge the open text with the same chain.
     let decided = null;
-    if (!entry || !entry.process) {
+    if (!entry || (!entry.process && !(entry.outlookReceipt && entry.ref))) {
       decided = decideFromText(pane);
-      if (!decided) return;
+      if (!decided || decided.none) {
+        // The planner's own reason for this conversation, when it has one, says more than "the open text was quiet".
+        const diags = (st.outlookSync && st.outlookSync.diagnostics) || [];
+        const conv = FlowOwaParse.canonId(pane.conversationId);
+        const planned = conv ? diags.find((d) => FlowOwaParse.canonId(d.conversationId) === conv) : null;
+        await pageReason(planned ? planned.reason : ('page:' + ((decided && decided.reason) || 'intent-null')), pane);
+        return;
+      }
       if (!entry) {
-        // No Graph id -> cannot createReply; stay silent rather than a dead Do It.
-        if (!pane.itemId) return;
+        // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.
+        let msgId = pane.itemId || null;
+        if (!msgId && pane.conversationId) {
+          const found = await messageIdForConversation(pane.conversationId, own);
+          msgId = found ? found.id : null;
+          dbg('resolved', { conversationId: pane.conversationId, messageId: msgId });
+        }
+        if (!msgId) { await pageReason('page:no-message-id', pane); return; }
         entry = {
-          messageId: pane.itemId,
-          outlookIncomingId: pane.itemId,
+          messageId: msgId,
+          outlookIncomingId: msgId,
+          outlookConversationId: pane.conversationId || null,
           subject: pane.subject,
           text: pane.text,
           sender: { name: pane.senderName, email: pane.senderEmail },
@@ -310,18 +410,22 @@
       } else {
         entry = Object.assign({}, entry, { intent: decided.intent, process: decided.process });
       }
+    } else {
+      dbg('judged', { show: true, type: entry.intent && entry.intent.type, label: entry.intent && entry.intent.label, from: 'mailbox check' });
     }
 
     // Receipt-only entry: show settled receipt if draft still active.
     if (entry.outlookReceipt && entry.ref && !entry.process) {
-      const mount = FlowOwaParse.readingPaneRoots(document)[0] || document.querySelector('[role="main"]');
-      if (!mount || mount.querySelector('.flow-chip-host')) return;
+      const mount = mountPoint();
+      if (!mount) { await pageReason('page:no-mount', pane); return; }
+      if (mount.querySelector('.flow-chip-host')) return;
       const host = FlowChipHost.inject(mount, {
         process: { name: 'Reply', steps: [{ kind: 'outlookDraft' }] },
         intent: { label: entry.label || 'Reply draft ready' },
         messageId: entry.messageId
       }, { onDoIt: () => {}, onDismiss: (h) => h.remove() });
       if (host) {
+        dbg('rendered', { receipt: true, messageId: entry.messageId });
         FlowChipHost.showDraftReceipt(host, {
           written: entry.label || 'Reply draft ready in Outlook Drafts. Not sent.',
           url: entry.url || entry.where,
@@ -342,17 +446,17 @@
     }
 
     const ctx = buildCtx(entry, pane, decided);
-    if (!ctx || !ctx.messageId) return;
+    if (!ctx || !ctx.messageId) { await pageReason('page:no-process', pane); return; }
     const receipts = typeof FlowStorage.getActiveOutlookReceipts === 'function'
       ? await FlowStorage.getActiveOutlookReceipts() : [];
     const hasReceipt = receipts.some((r) => r.messageId === ctx.messageId);
     // Same still-open rule as the popup: draft-only undo (outlookReopen) is NOT
     // terminal, so Do It must be eligible again after Undo.
-    if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) return;
+    if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) { await pageReason('page:already-handled', pane); return; }
 
     const key = ctx.messageId + '|' + (ctx.intent && ctx.intent.label);
-    const mount = FlowOwaParse.readingPaneRoots(document)[0] || document.querySelector('[role="main"]');
-    if (!mount) return;
+    const mount = mountPoint();
+    if (!mount) { await pageReason('page:no-mount', pane); return; }
     const existing = mount.querySelector('.flow-chip-host');
     // Settled receipt with no active draft (e.g. Undo from the popup while this
     // pane is open): tear down so Do It can return.
@@ -365,10 +469,14 @@
     if (old) old.remove();
     lastKey = key;
 
-    FlowChipHost.inject(mount, ctx, {
-      onDoIt: (host, chip, c) => { onDoIt(host, chip, c); },
-      onDismiss: (host, c) => { onDismiss(host, c); }
+    const host = FlowChipHost.inject(mount, ctx, {
+      onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+      onDismiss: (h, c) => { onDismiss(h, c); }
     });
+    if (!host) { await pageReason('page:inject-failed', pane); return; }
+    dbg('decision', { shown: true, label: ctx.intent && ctx.intent.label });
+    dbg('rendered', { messageId: ctx.messageId, label: ctx.intent && ctx.intent.label });
+    await clearReason(pane);
 
     await FlowStorage.appendLog({
       kind: 'shown',
@@ -387,18 +495,43 @@
     }).catch(() => {});
   }
 
+  // The open message's body, or the reading pane around it: never the message list.
+  function mountPoint() {
+    const root = FlowOwaParse.readingPaneRoots(document)[0];
+    if (root) return root.parentElement || root;
+    return document.querySelector('#ReadingPaneContainerId') || null;
+  }
+
+  // OWA never stops changing the page (ads, presence, "x min ago"). A debounce that restarts on every change never fires
+  // there, which is how 0.9.14 stayed silent: so this is a throttle. One scan at a time; a change during a scan runs one more.
   function schedule() {
-    clearTimeout(timer);
-    timer = setTimeout(() => { scan().catch(() => {}); }, DEBOUNCE_MS);
+    if (timer) return;
+    timer = setTimeout(runScan, SCAN_EVERY_MS);
+  }
+
+  async function runScan() {
+    timer = null;
+    if (scanning) { again = true; return; }
+    scanning = true;
+    try { await scan(); }
+    catch (e) { try { console.error('Glance: outlook scan error', e && e.message ? e.message : e); } catch (x) { /* console gone */ } }
+    finally {
+      scanning = false;
+      if (again) { again = false; schedule(); }
+    }
   }
 
   const obs = new MutationObserver(schedule);
   obs.observe(document.documentElement, { childList: true, subtree: true });
   window.addEventListener('hashchange', schedule);
   window.addEventListener('popstate', schedule);
+  // OWA moves between messages with pushState (no event): notice the address changing.
+  setInterval(() => { if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; schedule(); } }, 1000);
+  globalThis.__glanceOutlookPage = { rescan: () => { lastKey = ''; schedule(); } };
   // A check from the panel (or another Outlook tab) lands here at once.
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.glanceDebug) debug = Boolean(changes.glanceDebug.newValue);
       if (area === 'local' && (changes.outlookPending || changes.outlookAuth)) schedule();
     });
   } catch (e) { /* storage events unavailable */ }

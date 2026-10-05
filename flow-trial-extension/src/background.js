@@ -201,16 +201,69 @@ function surfaceScripts(id) {
   return base.concat(SURFACES[id].extra);
 }
 
-async function registerSurface(id) {
+// Registered content scripts survive a browser restart (persistAcrossSessions) but an update can leave the previous
+// version's list behind, and Chrome injects them only into pages loaded AFTER registration. So: one registration at a
+// time per site, replaced only when the file list differs, and then the open tabs of that site get the scripts too.
+const surfaceBusy = {};
+function registerSurface(id) {
+  if (surfaceBusy[id]) return surfaceBusy[id];
+  surfaceBusy[id] = registerSurfaceNow(id).finally(() => { delete surfaceBusy[id]; });
+  return surfaceBusy[id];
+}
+
+async function registerSurfaceNow(id) {
   const def = SURFACES[id];
   if (!def || !chrome.scripting || !chrome.scripting.registerContentScripts) return { ok: false, reason: 'unsupported' };
   const granted = await chrome.permissions.contains({ origins: def.origins });
   if (!granted) return { ok: false, reason: 'no-permission' };
   const css = (def.css && def.css.length) ? def.css : ['src/follow.css'];
   const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: css, runAt: 'document_idle', persistAcrossSessions: true };
-  try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered yet */ }
-  await chrome.scripting.registerContentScripts([script]);
-  return { ok: true };
+  let current = null;
+  try { current = ((await chrome.scripting.getRegisteredContentScripts({ ids: [script.id] })) || [])[0] || null; } catch (e) { current = null; }
+  const same = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
+    && JSON.stringify((current.matches || []).slice().sort()) === JSON.stringify(script.matches.slice().sort());
+  if (!same) {
+    if (current) { try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered */ } }
+    await chrome.scripting.registerContentScripts([script]);
+    console.info('Glance: ' + id + ' surface registered', chrome.runtime.getManifest().version, script.js.length + ' files');
+  }
+  const injected = await injectSurfaceIntoOpenTabs(id, script);
+  return { ok: true, registered: !same, injected };
+}
+
+// Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
+async function injectSurfaceIntoOpenTabs(id, script) {
+  if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({ url: script.matches }); } catch (e) { return 0; }
+  let n = 0;
+  for (const tab of tabs || []) {
+    if (!tab || typeof tab.id !== 'number') continue;
+    try {
+      const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
+        let alive = false;
+        try { alive = Boolean(chrome.runtime && chrome.runtime.id); } catch (e) { alive = false; }
+        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive };
+      } });
+      const seen = (probe && probe[0] && probe[0].result) || {};
+      if (seen.globals && !seen.alive) {
+        // A copy from before an update, cut off from the extension: its declarations block a second copy. Only a reload
+        // of that tab clears it.
+        console.warn('Glance: an open ' + id + ' tab runs an old copy; reload that tab once');
+        continue;
+      }
+      if (seen.globals) {
+        // A copy from this or an earlier load is there: ask it to look again rather than declaring everything twice.
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } } });
+        continue;
+      }
+      if (script.css && script.css.length) await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: script.css });
+      await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: script.js });
+      n++;
+    } catch (e) { console.warn('Glance: could not inject ' + id + ' into an open tab', e && e.message ? e.message : e); }
+  }
+  if (n) console.info('Glance: ' + id + ' injected into ' + n + ' open tab(s)');
+  return n;
 }
 
 async function readSurfaces() {

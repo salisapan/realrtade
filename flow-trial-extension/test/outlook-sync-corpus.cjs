@@ -231,6 +231,31 @@ console.log('\n--- learn own addresses from inbox recipients ---\n');
   check('pickPrimary falls back to CID only when nothing human learned', onlyCid === CID, onlyCid);
 }
 
+console.log('\n--- every incoming message ends in a card or a reason (never neither) ---\n');
+{
+  const T = (conv, from, text, ago, extra) => Object.assign({ id: 'z' + (++n), conversationId: conv, subject: 'S ' + conv, isDraft: false, from: { emailAddress: { name: from.split('@')[0], address: from } }, toRecipients: [{ emailAddress: { name: 'Me', address: ME } }], receivedDateTime: iso(ago), webLink: 'https://outlook.office.com/mail/id/z' + n, body: { contentType: 'text', content: text } }, extra || {});
+  const msgs = [
+    T('k1', 'dana@acme.com', ASK, 0.1),
+    T('k2', 'dana@acme.com', 'Thanks so much, all good on my side. Have a great weekend!', 0.2),
+    T('k3', 'avi@partner.io', '', 0.3),                                                      // empty body
+    T('k4', ME, 'Note to self: call the bank.', 0.4, { toRecipients: [{ emailAddress: { name: 'Me', address: ME } }] }),
+    T('k5', 'noa@vendor.co', 'Could you send me the signed contract by Friday?', 0.5),       // a file ask Outlook cannot attach
+    T('k6', 'yael@client.org', 'Confirmed, the figure is 4,200. Booking now.', 0.6),         // answers a waiting loop
+    T('k7', 'tom@corp.com', 'Please confirm by Monday that the new pricing works for you.', 0.7),
+    T('k8', 'liz@corp.com', 'Can we meet on Thursday at 3pm to go over the rollout plan?', 0.8),
+    T('k9', 'ops@corp.com', 'This week we shipped the new dashboard. No action needed.', 0.9)
+  ];
+  const watches = [loop('k6', { counterpart: { name: 'Yael', email: 'yael@client.org', phone: null } })];
+  const r = plan(msgs, watches, { me: ME, state: { incomingDeclined: { ['k7|' + msgs[6].id]: NOW } } });
+  const inbound = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8', 'k9'];
+  const unexplained = inbound.filter((c) => !r.incoming.some((x) => x.conversationId === c) && !r.diagnostics.some((d) => d.conversationId === c));
+  check('each of nine different inbound messages is either an incoming card or a Why-not-shown line', unexplained.length === 0, { unexplained, diagnostics: r.diagnostics.map((d) => d.conversationId + ':' + d.reason), incoming: r.incoming.map((x) => x.conversationId) });
+  const why = (c) => (r.diagnostics.find((d) => d.conversationId === c) || {}).reason;
+  check('an empty body says no-text', why('k3') === 'no-text', why('k3'));
+  check('an answer that settled a waiting loop says so', /answered-loop|has-open-loop|has-loop/.test(why('k6') || ''), why('k6'));
+  check('a declined ask says incoming-declined', why('k7') === 'incoming-declined', why('k7'));
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

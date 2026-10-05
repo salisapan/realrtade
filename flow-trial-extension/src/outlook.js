@@ -133,6 +133,8 @@ const FlowOutlook = (() => {
         offers: (pending.offers || []).length, asks: (pending.asks || []).length,
         incoming: (pending.incoming || []).length,
         diagnostics: Array.isArray(st.diagnostics) ? st.diagnostics.slice(0, 40) : [],
+        // What the Outlook-on-the-web card could not show, and why (src/content-outlook.js pageReason).
+        pageDiagnostics: (await read('outlookPageDiag', [])).slice(0, 20),
         fromAliasHint: st.fromAliasHint || null,
         origins: ORIGINS
       };

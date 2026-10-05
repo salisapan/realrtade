@@ -73,11 +73,19 @@ const FlowOutlookSync = (() => {
     (o.messages || []).forEach((m) => { if (m && m.id) byId[m.id] = m; });
 
     const threads = {};
+    const unreadable = {};
     Object.keys(byId).forEach((id) => {
       const u = graphMail.toUtterance(byId[id], me);
-      if (!u || !u.thread || !u.text.trim()) return;
+      if (!u || !u.thread || !u.text.trim()) {
+        // A message with no readable text (an empty body, an attachment only): it still gets a line in Why not shown.
+        const raw = byId[id];
+        const conv = raw && raw.conversationId;
+        if (conv) unreadable[conv] = unreadable[conv] || { conversationId: conv, subject: String(raw.subject || '').slice(0, 120), reason: 'no-text', direction: u ? u.direction : null };
+        return;
+      }
       (threads[u.thread] = threads[u.thread] || []).push(u);
     });
+    Object.keys(unreadable).forEach((conv) => { if (!threads[conv]) out.diagnostics.push(unreadable[conv]); });
 
     const seenParty = {};
     Object.keys(threads).forEach((conv) => {
@@ -201,6 +209,7 @@ const FlowOutlookSync = (() => {
             if (res.confirm) {
               if (out.asks.length < MAX_ASKS) out.asks.push({ key: 'p|' + target.id + '|' + last.id, watchId: target.id, title: first(party) + ' replied. Is it paid?', detail: 'Nothing in the message says the payment was sent, so I kept the loop open.', yes: { status: 'resolved', resolvedAt: now, resolvedBy: 'manual', closedAs: 'paid', lastReplyMessageId: last.id } });
               out.patches.push({ id: target.id, patch: Object.assign({}, res.patch, { lastReplyMessageId: last.id }) });
+              if (!isAsk) note('asked-is-it-paid', { counterpart: party.email || null });
               loopNoted = true;
               return;
             }
@@ -208,11 +217,13 @@ const FlowOutlookSync = (() => {
             out.patches.push({ id: target.id, patch });
             if (res.close) out.stats.closed++; else if (res.rescheduled) out.stats.moved++;
             if (res.close || res.rescheduled || res.yours) out.lines.push(lineFor(reply, target, party, res));
+            if (!isAsk) note('answered-loop', { counterpart: party.email || null });
             loopNoted = true;
             return;
           }
         }
-        if (w && !isAsk) { if (!judged.show) note(w.status === 'waiting' ? 'has-open-loop' : 'has-loop'); loopNoted = true; }
+        if (w && !isAsk) { note(w.status === 'waiting' ? 'has-open-loop' : 'has-loop'); loopNoted = true; }
+        else if (target && !isAsk && target.lastReplyMessageId === last.id) { note('loop-already-updated'); loopNoted = true; }
       }
 
       handleLoops();
