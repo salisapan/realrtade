@@ -32,10 +32,10 @@ this listing. Client secrets stay in Netlify. Do not invent IDs.
 ### Short description (max 132 characters)
 
 ```
-When an email actually decides something, Glance closes it for you — one click, straight into Google, judgment on your device.
+Glance closes open loops in Gmail: what you asked, what you promised, what others asked of you. One click to close.
 ```
 
-126 characters.
+115 characters. This is also the `description` written into the store zip's manifest by `bash flow-trial-extension/scripts/build-cws.sh`. The repo manifest keeps the longer unpacked description.
 
 ### Detailed description
 
@@ -235,17 +235,22 @@ background/framing), not something to upload as-is.
 
 ## Manifest notes
 
-- **The store build must not include `key`.** The `"key"` field in the
-  repo's `manifest.json` exists only so Load unpacked stays on extension ID
-  `dnjhplgmnkabbjogfpbhofjedlkehkai`. That ID is what the Google OAuth
-  Client ID (`README.md`, "Set up Google", step 4's Item ID) and the four
-  non-Google connectors' redirect URLs are registered against. Leave `key`
-  in git. Delete it from the `manifest.json` inside the zip you upload to
-  the Chrome Web Store. The dashboard rejects a package whose `key` does
-  not match the item the store already holds, and shipping `key` is not
-  how the listing's ID is pinned — the store holds that key itself. Do not
-  regenerate the repo key; that changes the unpacked ID and breaks the
-  registered OAuth client.
+Two extension IDs, two OAuth clients. Do not collapse them.
+
+| | Load unpacked and the signup download zip | Chrome Web Store item |
+|---|---|---|
+| Extension ID | `dnjhplgmnkabbjogfpbhofjedlkehkai` | `lbihckfmoffgjjlnneoeaehbhoonfenh` |
+| Google OAuth client | `93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com` | `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com` |
+
+The store client is the Chrome-extension client in GCP project **Flow Extension** (`oceanic-spider-509610-c1`). It is registered against the store item ID. The unpacked client stays in the repo manifest with `key`, which pins the unpacked ID the non-Google redirect URLs use.
+
+- **The store build must not include `key`, and must use the store client.** Leave both the unpacked `key` and the unpacked `oauth2.client_id` in git. From the repo root:
+
+  ```
+  bash flow-trial-extension/scripts/build-cws.sh
+  ```
+
+  That writes `flow-trial-extension/dist/glance-cws.zip`. The script removes `key`, sets `oauth2.client_id` to the store client above, and sets `description` to the short description in this doc. Upload that zip. Do not upload the signup zip at `flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip` — that copy keeps the unpacked manifest. The dashboard rejects a package whose `key` does not match the item the store already holds. Do not regenerate the repo key; that changes the unpacked ID and breaks the unpacked OAuth client.
 - **No remote code.** `picker/` is not in the package. That page loaded
   `https://apis.google.com/js/api.js` (Google Picker) and its API key was
   a placeholder. Drive attach is the one-match search above. The manifest

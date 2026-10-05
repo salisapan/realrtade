@@ -74,6 +74,8 @@ def add_file(files: dict[str, Path], path: Path) -> None:
     rel = path.relative_to(EXTENSION_ROOT)
     if any(part.startswith(".") for part in rel.parts):
         die(f"refusing to package dotfile {rel}")
+    if rel.parts and rel.parts[0] == "picker":
+        die(f"refusing to package {posix(rel)}; the Drive Picker is not part of Glance")
     key = posix(rel)
     files[key] = path
 
@@ -195,13 +197,21 @@ def collect() -> dict[str, Path]:
         text = path.read_text(encoding="utf-8", errors="replace")
         if SECRET_ASSIGNMENT_RE.search(text):
             die(f"{rel} looks like it contains a secret assignment; refusing to package it")
+        if path.suffix.lower() in {".js", ".html"} and "apis.google.com" in text:
+            die(f"{rel} loads a remote Google script; the package must stay self-contained")
 
     return files
 
 
-def write_zip(files: dict[str, Path]) -> None:
-    ZIP_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp = ZIP_PATH.with_suffix(".zip.partial")
+def write_zip(
+    files: dict[str, Path],
+    dest: Path | None = None,
+    replacements: dict[str, bytes] | None = None,
+) -> None:
+    dest = ZIP_PATH if dest is None else dest
+    replacements = replacements or {}
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_suffix(".zip.partial")
     if tmp.exists():
         tmp.unlink()
     # Fixed timestamps keep two builds of the same tree byte-identical.
@@ -211,8 +221,8 @@ def write_zip(files: dict[str, Path]) -> None:
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, files[rel].read_bytes())
-    os.replace(tmp, ZIP_PATH)
+            archive.writestr(info, replacements.get(rel, files[rel].read_bytes()))
+    os.replace(tmp, dest)
 
 
 def main() -> None:

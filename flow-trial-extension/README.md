@@ -163,9 +163,26 @@ native Google account chooser, not `launchWebAuthFlow` like the four
 connectors below). That means **no redirect URL, no client secret, and no
 Netlify environment variable** — the entire flow is client-side. Drive
 find-and-attach uses that same OAuth token (`drive.readonly` /
-`drive.file`). There is no Google Picker and no separate API key: the
-Picker widget loaded remote code (`https://apis.google.com/js/api.js`) and
-is not part of the package.
+`drive.file`). There is no Google Picker and no separate API key. The
+Picker widget loaded a hosted Google script and is not part of either zip.
+
+### Unpacked and Chrome Web Store are two extension IDs
+
+| | Load unpacked and the signup download zip | Chrome Web Store item |
+|---|---|---|
+| Extension ID | `dnjhplgmnkabbjogfpbhofjedlkehkai` | `lbihckfmoffgjjlnneoeaehbhoonfenh` |
+| Google OAuth client | `93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com` | `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com` |
+| Where it lives | `manifest.json` in git (`key` + `oauth2.client_id`) | Only inside the store zip |
+
+The store client is the Chrome-extension client in GCP project **Flow Extension** (`oceanic-spider-509610-c1`), registered against the store item ID. The unpacked client stays registered against the unpacked ID. Do not paste the store client into the repo manifest, and do not delete `key` there. Load unpacked and the signup download both use that file as-is.
+
+Build the store zip from the repo root:
+
+```
+bash flow-trial-extension/scripts/build-cws.sh
+```
+
+That writes `flow-trial-extension/dist/glance-cws.zip`. The script drops `key`, sets `oauth2.client_id` to the store client, and sets the manifest description to the store line (132 characters or fewer). It does not contain `picker/`. Upload that zip. Do not upload `flow-landing/netlify/functions/download-trial-zip/flow-trial-extension.zip` — that is the signup download, and it keeps the unpacked manifest.
 
 ### 1. Create or pick a Google Cloud project
 
@@ -204,7 +221,7 @@ which is the single most common way this gets half-configured:
 1. Application type: **Chrome extension** (not "Web application" — that's
    the type the other four connectors below effectively use via their
    redirect-URL flow; Google's flow is a different, extension-native type).
-2. **Item ID / Application ID**: paste the extension's own ID —
+2. **Item ID / Application ID**: the unpacked ID —
    ```
    dnjhplgmnkabbjogfpbhofjedlkehkai
    ```
@@ -212,13 +229,16 @@ which is the single most common way this gets half-configured:
    URLs for HubSpot/Salesforce/Slack/Monday.com below, derived from the
    `key` pinned in `manifest.json`. It stays stable across reloads — don't
    regenerate that key without updating it everywhere it's registered,
-   here included.
-3. Create it, then copy the generated **Client ID**
-   (`....apps.googleusercontent.com`). There is no client secret for this
-   application type — Chrome itself is the OAuth client, so there's nothing
-   to keep server-side.
-4. Paste that Client ID into `manifest.json`'s `oauth2.client_id`, replacing
-   the `YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com` placeholder.
+   here included. The store item is a different ID
+   (`lbihckfmoffgjjlnneoeaehbhoonfenh`); its client is already created
+   and is applied only by `build-cws.sh`.
+3. Both clients already exist (see the table above). There is no client
+   secret for this application type — Chrome itself is the OAuth client.
+4. Leave `manifest.json`'s `oauth2.client_id` on the unpacked client
+   `93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com`.
+   The store client
+   `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com`
+   belongs only in the store zip.
 
 ### 5. Confirm the scopes match
 
