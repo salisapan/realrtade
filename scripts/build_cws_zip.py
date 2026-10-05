@@ -52,8 +52,8 @@ def store_manifest(raw: bytes) -> bytes:
     manifest.pop("key", None)
     manifest["description"] = STORE_DESCRIPTION
     manifest["oauth2"]["client_id"] = STORE_CLIENT_ID
-    if manifest.get("version") != "0.7.2":
-        die(f"refusing to package version {manifest.get('version')}; this store build is 0.7.2")
+    if manifest.get("version") != "0.7.3":
+        die(f"refusing to package version {manifest.get('version')}; this store build is 0.7.3")
     encoded = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     packed = json.loads(encoded)
     if "key" in packed:
