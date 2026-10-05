@@ -36,16 +36,40 @@ const FlowOwaParse = (() => {
     return m ? m[0] : norm(s);
   }
 
+  function dayKey(v) {
+    if (v == null || v === '') return '';
+    if (typeof v === 'number' && isFinite(v)) {
+      const d = new Date(v);
+      if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    const s = String(v);
+    const m = s.match(/(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+    const d = new Date(s);
+    return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  }
+
   // Match an open-pane snapshot to a sync incoming/still-open entry.
-  // Prefer Graph message id / conversation id; else subject+sender (+ optional day).
+  // Prefer Graph message id / internetMessageId / conversation id; else subject+sender (+ optional day).
+  // OWA URL ItemID often differs from Graph id — subject fallback must still work.
   function matchEntry(pane, entries) {
     const list = entries || [];
     if (!pane || !list.length) return null;
     const paneId = pane.itemId || pane.messageId || null;
+    const paneInternet = pane.internetMessageId || null;
     const paneConv = pane.conversationId || null;
     if (paneId) {
-      const byId = list.find((e) => e && (e.messageId === paneId || e.outlookIncomingId === paneId || e.id === paneId));
+      const byId = list.find((e) => e && (
+        e.messageId === paneId || e.outlookIncomingId === paneId || e.id === paneId ||
+        e.internetMessageId === paneId
+      ));
       if (byId) return byId;
+    }
+    if (paneInternet) {
+      const byInternet = list.find((e) => e && (
+        e.internetMessageId === paneInternet || e.messageId === paneInternet || e.outlookIncomingId === paneInternet
+      ));
+      if (byInternet) return byInternet;
     }
     if (paneConv) {
       const byConv = list.find((e) => e && (e.outlookConversationId === paneConv || e.conversationId === paneConv || e.threadId === 'ol:' + paneConv));
@@ -53,6 +77,7 @@ const FlowOwaParse = (() => {
     }
     const sub = norm(pane.subject);
     const from = normEmail(pane.senderEmail || pane.from);
+    const paneDay = dayKey(pane.receivedDateTime || pane.date || pane.ts);
     if (!sub && !from) return null;
     let best = null;
     for (const e of list) {
@@ -61,6 +86,8 @@ const FlowOwaParse = (() => {
       const efrom = normEmail((e.sender && e.sender.email) || (e.base && e.base.counterpart && e.base.counterpart.email) || e.from);
       if (sub && esub && sub !== esub && esub.indexOf(sub) < 0 && sub.indexOf(esub) < 0) continue;
       if (from && efrom && from !== efrom) continue;
+      const eDay = dayKey(e.receivedDateTime || e.date || e.ts);
+      if (paneDay && eDay && paneDay !== eDay) continue;
       best = e;
       break;
     }
@@ -121,7 +148,7 @@ const FlowOwaParse = (() => {
     };
   }
 
-  return { itemIdFromUrl, matchEntry, readingPaneRoots, readPane, norm, normEmail, textOf };
+  return { itemIdFromUrl, matchEntry, readingPaneRoots, readPane, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

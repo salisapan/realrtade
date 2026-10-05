@@ -151,18 +151,18 @@
       url: r.url || r.where,
       onUndo: async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
-        if (u && u.ok) {
-          if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
-            await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
-          }
-          await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: ctx.messageId, draftOnly: true });
-          return { ok: true, written: u.written || 'Reply draft removed. Not sent.' };
-        }
-        // Clear local receipt even if Graph already deleted the draft.
         if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
         }
-        return { ok: true, written: 'Reply draft removed. Not sent.' };
+        if (u && u.ok) {
+          await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: ctx.messageId, draftOnly: true });
+        }
+        // Undo reopens the owed ask: drop the settled receipt and let scan
+        // re-inject Do It (same eligibility as the popup Still Open list).
+        lastKey = '';
+        try { host.remove(); } catch (e) { /* already gone */ }
+        schedule();
+        return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
       }
     });
   }
@@ -233,7 +233,10 @@
               await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
             }
             await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: entry.messageId, draftOnly: true });
-            return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.' };
+            lastKey = '';
+            try { host.remove(); } catch (e) { /* already gone */ }
+            schedule();
+            return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
           }
         });
       }
@@ -242,16 +245,23 @@
 
     const ctx = buildCtx(entry, pane, decided);
     if (!ctx || !ctx.messageId) return;
-    if (await FlowStorage.hasTerminalOutcome(ctx.messageId)) {
-      // Unless it's an active outlook draft receipt
-      const receipts = typeof FlowStorage.getActiveOutlookReceipts === 'function'
-        ? await FlowStorage.getActiveOutlookReceipts() : [];
-      if (!receipts.some((r) => r.messageId === ctx.messageId)) return;
-    }
+    const receipts = typeof FlowStorage.getActiveOutlookReceipts === 'function'
+      ? await FlowStorage.getActiveOutlookReceipts() : [];
+    const hasReceipt = receipts.some((r) => r.messageId === ctx.messageId);
+    // Same still-open rule as the popup: draft-only undo (outlookReopen) is NOT
+    // terminal, so Do It must be eligible again after Undo.
+    if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) return;
 
     const key = ctx.messageId + '|' + (ctx.intent && ctx.intent.label);
     const mount = FlowOwaParse.readingPaneRoots(document)[0] || document.querySelector('[role="main"]');
     if (!mount) return;
+    const existing = mount.querySelector('.flow-chip-host');
+    // Settled receipt with no active draft (e.g. Undo from the popup while this
+    // pane is open): tear down so Do It can return.
+    if (existing && existing.classList.contains('flow-chip-settled') && !hasReceipt) {
+      existing.remove();
+      lastKey = '';
+    }
     if (mount.querySelector('.flow-chip-host') && key === lastKey) return;
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();

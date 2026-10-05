@@ -105,6 +105,8 @@ const FlowChipHost = (() => {
         undo.disabled = true; undo.textContent = 'Undoing…';
         Promise.resolve(o.onUndo()).then((r) => {
           if (r && r.ok) {
+            // Caller may remove the host to re-inject Do It (outlookReopen).
+            if (r.reopen || !host.isConnected) return;
             done.replaceChildren(el('span', 'flow-chip-label', r.written || 'Reply draft removed. Not sent.'));
           } else {
             undo.disabled = false; undo.textContent = 'Undo';

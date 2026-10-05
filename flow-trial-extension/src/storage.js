@@ -324,7 +324,15 @@ const FlowStorage = (() => {
     const patch = {};
 
     const resolved = new Set(state.resolvedMessageIds || []);
-    if (row.messageId && TERMINAL_KINDS.has(row.kind) && !resolved.has(row.messageId)) {
+    // A draft-only Outlook undo (outlookReopen) is not a trusted close: the ask
+    // must be eligible again for the popup Still Open list AND the in-page card.
+    // Clear any durable resolve from the prior write; do not count a close.
+    const reopenUndone = row.kind === 'undone' && row.outlookReopen;
+    if (reopenUndone && row.messageId) {
+      if (resolved.has(row.messageId)) {
+        patch.resolvedMessageIds = (state.resolvedMessageIds || []).filter((id) => id !== row.messageId);
+      }
+    } else if (row.messageId && TERMINAL_KINDS.has(row.kind) && !resolved.has(row.messageId)) {
       resolved.add(row.messageId);
       patch.resolvedMessageIds = [row.messageId, ...(state.resolvedMessageIds || [])].slice(0, RESOLVED_CAP);
       // The one moment a process's fate is settled for good, whichever of
@@ -439,14 +447,32 @@ const FlowStorage = (() => {
   // 'undone' are terminal. A message that only ever logged 'shown' has no
   // recorded user decision, so it's safe — and correct — to judge and show
   // again after Gmail rebuilds its node.
+  // Draft-only Outlook undo: the loop is still owed. Same rule getPendingFrom
+  // uses for Still Open / popup Do It — the in-page card must agree.
+  function isReopenUndone(entry) {
+    return !!(entry && entry.kind === 'undone' && entry.outlookReopen);
+  }
+
+  // Pure over a fetched state so corpora and content scripts share one definition
+  // with getPendingFrom (popup still-open) and hasTerminalOutcome (page card).
+  function hasTerminalOutcomeFrom(state, messageId) {
+    if (!messageId) return false;
+    const log = (state && state.log) || [];
+    // Newest first. A reopen undone means the ask may show again even if an
+    // older written row is still in the log (appendLog fallback) or a stale
+    // id lingered in resolvedMessageIds.
+    for (const entry of log) {
+      if (!entry || entry.messageId !== messageId) continue;
+      if (isReopenUndone(entry)) return false;
+      if (TERMINAL_KINDS.has(entry.kind)) return true;
+      // shown / clicked / etc. — not a final decision
+      return false;
+    }
+    return ((state && state.resolvedMessageIds) || []).includes(messageId);
+  }
+
   async function hasTerminalOutcome(messageId) {
-    const state = await get();
-    // The durable set first — it outlives log eviction, which is the whole
-    // point of it. The log scan behind it is the migration path for installs
-    // that recorded decisions before resolvedMessageIds existed.
-    if ((state.resolvedMessageIds || []).includes(messageId)) return true;
-    const entry = state.log.find((e) => e.messageId === messageId);
-    return !!entry && TERMINAL_KINDS.has(entry.kind);
+    return hasTerminalOutcomeFrom(await get(), messageId);
   }
 
   // Recent behaviour should count for more than something from three months ago,
@@ -531,12 +557,19 @@ const FlowStorage = (() => {
     // nothing had been written and hasTerminalOutcome still said it was open.
     // The two functions claimed to share one definition of "still open" and
     // did not. Non-terminal rows are now simply passed over.
+    // messageIds whose newest terminal-ish row was a draft-only undo. An older
+    // written twin must not close them (appendLog fallback leaves written in place).
+    const reopened = new Set();
     for (const entry of state.log) {
       if (!entry.messageId || resolved.has(entry.messageId)) continue;
       // A prepared Outlook draft that was undone is not a trusted close: the ask
       // may reappear in Loops (outlookReopen). Do not treat that undone as terminal.
       if (TERMINAL_KINDS.has(entry.kind)) {
-        if (entry.kind === 'undone' && entry.outlookReopen) continue;
+        if (isReopenUndone(entry)) {
+          reopened.add(entry.messageId);
+          continue;
+        }
+        if (reopened.has(entry.messageId) && entry.kind === 'written') continue;
         resolved.add(entry.messageId); continue;
       }
       if (entry.kind !== 'shown' || !entry.process) continue;
@@ -1410,7 +1443,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };
