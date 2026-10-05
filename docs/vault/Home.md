@@ -28,6 +28,9 @@ updated: 2026-10-05
 - New session log: Daily note → `vault/sessions/YYYY-MM-DD.md` (template [[session]])
 - New decision: template [[decision]] → one line in [[decisions]] + the docs §2 files
 
+## גשר Claude↔CoS
+הודעות בין Claude Code ל־CoS (דוד, chief of stuff), בלי טלגרם. לא אמת מוצר. פרוטוקול: [[vault/bridge/README]].
+
 ## Where the repo lives
 `salisapan/realrtade` · open this vault from `docs/` (Obsidian → *Open folder as vault* → `<repo>/docs`).
 Never Netlify-deploy and never merge to `main` without Sali.

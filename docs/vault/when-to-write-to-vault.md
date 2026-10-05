@@ -19,6 +19,8 @@ Before starting any stream: skim [[Home]], the top of [[decisions]], and the str
 | A new stream starts | new note in `vault/`, linked from [[Home]] | owner doc row in [[README]] §1 if it is a new topic |
 | A product fact changed (allowance, price, switch, what leaves the device, close rule, surface) | link from the stream note | **all** files in [[README]] §2 — the vault never replaces that |
 
+- Bridge notes (`vault/bridge/to-cos/`, `vault/bridge/to-claude/`) are messages between Claude Code and CoS, not product truth. Product facts still update `CLAUDE.md` and the `docs/` §2 files. Protocol: [[vault/bridge/README]].
+
 ## Never write to the vault
 - Secrets, tokens, keys, client secrets, personal mail text, the private eval sentences (gitignored for a reason).
 - A new definition or marketing line for Glance (only [[glance-definition]], verbatim).
