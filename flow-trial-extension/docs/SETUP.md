@@ -66,10 +66,26 @@ prefix, as unset.
 | `slackClientId` | Slack app → Basic Information → Client ID |
 | `mondayClientId` | Monday.com app → OAuth → Client ID |
 
-No Google OAuth client ID is used. `manifest.json`'s `key` is the
-extension's public pinning key (already set) so the redirect URL stays
-`https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/`. Register that
-exact URL on each of the four apps. Do not regenerate the key.
+The four vendor IDs above are the ones that stay `REPLACE_WITH_*` until
+an app exists. Google is separate. `manifest.json`'s `oauth2.client_id` is
+the unpacked Chrome-extension client (`getAuthToken`). The store build
+swaps only that field. `WEB_OAUTH_CLIENT_ID` in this same file is the Web
+application client for `launchWebAuthFlow`, and it is the same value in
+the unpacked zip and the store zip:
+
+`93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleusercontent.com`
+
+Redirect URIs on that client:
+
+```
+https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
+https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/
+```
+
+`manifest.json`'s `key` pins the unpacked id, so the unpacked redirect
+stays `https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/`. Register
+that exact URL on each of the four non-Google apps as well. Do not
+regenerate the key. Do not put the Web client into `oauth2.client_id`.
 
 Per-connector click paths (scopes, test accounts) stay in `README.md`.
 

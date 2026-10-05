@@ -158,11 +158,15 @@ genuinely completed once, never speculatively.
 ## Set up Google (Tasks, Calendar, Gmail Drafts, Drive) (needs the site owner)
 
 Google is the default connector — Calendar, Gmail Drafts, Google Tasks, and
-Drive all share one OAuth grant via `chrome.identity.getAuthToken` (Chrome's own
-native Google account chooser, not `launchWebAuthFlow` like the four
-connectors below). That means **no redirect URL, no client secret, and no
-Netlify environment variable** — the entire flow is client-side. Drive
-find-and-attach uses that same OAuth token (`drive.readonly` /
+Drive all share one OAuth grant. The primary path is
+`chrome.identity.getAuthToken` (Chrome's own account chooser, the
+Chrome-extension client in `manifest.json`). When that call fails because
+browser sign-in is off, or the identity API is unavailable and the user did
+not cancel, Glance uses `chrome.identity.launchWebAuthFlow` with the Web
+application client `WEB_OAUTH_CLIENT_ID` in `config/oauth.public.js`
+(implicit `response_type=token` to `https://<extension-id>.chromiumapp.org/`).
+There is still **no client secret and no Netlify exchange**. Drive
+find-and-attach uses whichever token that path returned (`drive.readonly` /
 `drive.file`). There is no Google Picker and no separate API key. The
 Picker widget loaded a hosted Google script and is not part of either zip.
 
@@ -240,6 +244,27 @@ which is the single most common way this gets half-configured:
    `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com`
    belongs only in the store zip.
 
+### Web application client (launchWebAuthFlow fallback)
+
+One Web application client in the same GCP project serves both extension
+IDs. It lives in `config/oauth.public.js` as `WEB_OAUTH_CLIENT_ID`:
+
+```
+93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleusercontent.com
+```
+
+Authorized redirect URIs on that client:
+
+```
+https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
+https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/
+```
+
+`build-cws.sh` does not swap this id. It only swaps `manifest.json`'s
+`oauth2.client_id`, which is the Chrome-extension client `getAuthToken`
+uses. Unpacked and store builds both call `launchWebAuthFlow` with this
+same Web client.
+
 ### 5. Confirm the scopes match
 
 `manifest.json`'s `oauth2.scopes` should already list all five (this ships
@@ -304,8 +329,10 @@ completed verification" blocking screen, not a partial failure.
   Drive after a successful sign-in almost always means step 2 was skipped
   for that specific API, not a scopes or Client ID problem.
 - **Wrong OAuth client type.** "Web application" and "Chrome extension" are
-  different Client ID formats; `chrome.identity.getAuthToken` only works
-  with the Chrome extension type from step 4.
+  different Client ID formats. `chrome.identity.getAuthToken` only works
+  with the Chrome extension client from step 4. The sign-in fallback uses
+  the Web application client above, and only that client. Do not paste the
+  Web client into `oauth2.client_id`.
 - **Forgetting the test user.** The single most common "it just won't sign
   in" report while in Testing status — the fix is step 6, not the Client ID.
 - **Regenerating `manifest.json`'s `key`.** This changes the unpacked

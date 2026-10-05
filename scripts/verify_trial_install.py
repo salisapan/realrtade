@@ -20,6 +20,7 @@ REQUIRED = [
     "config/oauth.public.js",
     "docs/SETUP.md",
     "src/background.js",
+    "src/google-web-auth.js",
     "popup/popup.html",
     "popup/popup.js",
     "popup/popup.css",
@@ -69,6 +70,15 @@ def check_zip() -> None:
                 die(f"oauth.public.js is missing {field}")
         if "REPLACE_WITH_" not in oauth and "publicClientId" not in oauth:
             die("oauth.public.js has neither placeholders nor the unset-id helper")
+        if cws.WEB_OAUTH_CLIENT_ID not in oauth:
+            die("download zip oauth.public.js is missing the Web OAuth client")
+        if "WEB_OAUTH_CLIENT_ID" not in background or "launchWebAuthFlow" not in background:
+            die("download zip background.js does not wire the web auth fallback")
+        web_auth = archive.read("src/google-web-auth.js").decode("utf-8")
+        if "response_type" not in web_auth or "access_token" not in web_auth:
+            die("google-web-auth.js is missing the implicit token grant")
+        if "chrome.identity.launchWebAuthFlow(" in web_auth or "chrome.identity.getAuthToken(" in web_auth:
+            die("google-web-auth.js must not call chrome.identity")
         manifest = archive.read("manifest.json")
         if b'"manifest_version": 3' not in manifest and b'"manifest_version":3' not in manifest:
             die("packaged manifest is not version 3")
@@ -107,15 +117,23 @@ def check_cws_zip() -> None:
             if name.endswith((".js", ".html")) and b"apis.google.com" in archive.read(name):
                 die(f"store zip entry {name} loads a remote Google script")
         manifest = json.loads(archive.read("manifest.json"))
+        store_oauth = archive.read("config/oauth.public.js").decode("utf-8")
+        store_background = archive.read("src/background.js").decode("utf-8")
+        if cws.WEB_OAUTH_CLIENT_ID not in store_oauth:
+            die("store zip oauth.public.js is missing the Web OAuth client")
+        if "WEB_OAUTH_CLIENT_ID" not in store_background or "launchWebAuthFlow" not in store_background:
+            die("store zip background.js does not wire the web auth fallback")
     if "key" in manifest:
         die("store zip manifest still has key")
     if manifest.get("oauth2", {}).get("client_id") != cws.STORE_CLIENT_ID:
         die("store zip oauth2.client_id is not the store client")
+    if manifest.get("oauth2", {}).get("client_id") == cws.WEB_OAUTH_CLIENT_ID:
+        die("store zip oauth2.client_id must stay the Chrome-extension client, not the Web client")
     if manifest.get("description") != cws.STORE_DESCRIPTION or len(cws.STORE_DESCRIPTION) > 132:
         die("store zip description is not the store line")
     source = json.loads((package.EXTENSION_ROOT / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("version") != "0.7.1" or source.get("version") != "0.7.1":
-        die("extension version must stay 0.7.1")
+    if manifest.get("version") != "0.7.2" or source.get("version") != "0.7.2":
+        die("extension version must stay 0.7.2")
     if source.get("oauth2", {}).get("client_id") != cws.UNPACKED_CLIENT_ID or "key" not in source:
         die("repo manifest must keep the unpacked key and unpacked Google client")
 
@@ -130,7 +148,7 @@ def main() -> None:
 
 
 NODE_PUBLIC_CLIENT_ID_CHECK = r"""
-import { publicClientId, OAUTH_PUBLIC } from './flow-trial-extension/config/oauth.public.js';
+import { publicClientId, OAUTH_PUBLIC, WEB_OAUTH_CLIENT_ID } from './flow-trial-extension/config/oauth.public.js';
 const assert = (cond, message) => { if (!cond) { console.error(message); process.exit(1); } };
 assert(publicClientId('') === '', 'empty');
 assert(publicClientId('   ') === '', 'blank');
@@ -140,6 +158,9 @@ assert(publicClientId('  real-client ') === 'real-client', 'trim real id');
 for (const [key, value] of Object.entries(OAUTH_PUBLIC)) {
   assert(publicClientId(value) === '', key + ' is still a placeholder and must count as unset');
 }
+assert(WEB_OAUTH_CLIENT_ID === '93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleusercontent.com', 'web client id');
+assert(publicClientId(WEB_OAUTH_CLIENT_ID) === WEB_OAUTH_CLIENT_ID, 'web client is configured');
+assert(!Object.values(OAUTH_PUBLIC).includes(WEB_OAUTH_CLIENT_ID), 'web client stays outside the vendor placeholder map');
 console.log('publicClientId ok');
 """
 

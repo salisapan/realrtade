@@ -149,7 +149,7 @@ Use these verbatim — each is traceable to the exact code that uses it.
 | Permission | Justification |
 |---|---|
 | `storage` | Stores the user's chosen connector, line-of-work profile, sensitivity calibration, the local activity log, and the local Execution Memory log (which steps of a process this account tends to keep or remove) — entirely in `chrome.storage.local` on the user's own device (`src/storage.js`, `core/execution-memory.js`). Never synced to a Glance-owned server. |
-| `identity` | Used only for `chrome.identity.getAuthToken()` — Chrome's own native Google account chooser — so Glance can write to Google Calendar, Google Tasks, and Gmail drafts using an OAuth grant to the Google account the user is already signed into (`src/background.js`). No redirect page, no third-party auth screen. |
+| `identity` | Used for `chrome.identity.getAuthToken()` — Chrome's Google account chooser — and, when that fails because browser sign-in is off or the identity API is unavailable, for `chrome.identity.launchWebAuthFlow()` against the same Google scopes. Glance then writes to Calendar, Tasks, Gmail drafts, and Drive (`src/background.js`). The web-flow redirect is this extension's own `chromiumapp.org` address. |
 | `host_permissions: https://mail.google.com/*` | The content script (`src/content-gmail.js`) runs only on Gmail to read the open message's visible text, subject, and sender, and to inject the Do It button / Morning Brief UI. |
 | `host_permissions: https://tasks.googleapis.com/*` | Direct API calls to create/undo a Google Tasks reminder after the user clicks Do It. |
 | `host_permissions: https://www.googleapis.com/calendar/*` | Direct API calls to create/undo a Google Calendar event after the user clicks Do It. |
@@ -243,6 +243,8 @@ Two extension IDs, two OAuth clients. Do not collapse them.
 | Google OAuth client | `93977330357-hsd2u2bjg480q135juftdpkvo5hcsn7j.apps.googleusercontent.com` | `93977330357-aup7do27a71h8sfhq4h35pogslt92iid.apps.googleusercontent.com` |
 
 The store client is the Chrome-extension client in GCP project **Flow Extension** (`oceanic-spider-509610-c1`). It is registered against the store item ID. The unpacked client stays in the repo manifest with `key`, which pins the unpacked ID the non-Google redirect URLs use.
+
+`getAuthToken` uses those Chrome-extension clients. When browser sign-in is off, `launchWebAuthFlow` uses one Web application client for both extension IDs: `93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleusercontent.com` (`WEB_OAUTH_CLIENT_ID` in `config/oauth.public.js`). Its redirect URIs are `https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/` and `https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/`. The store build does not swap that Web client. It only swaps `oauth2.client_id`.
 
 - **The store build must not include `key`, and must use the store client.** Leave both the unpacked `key` and the unpacked `oauth2.client_id` in git. From the repo root:
 
