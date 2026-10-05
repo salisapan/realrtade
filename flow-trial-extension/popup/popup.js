@@ -1791,7 +1791,26 @@
     return item;
   }
 
+  async function ensureOutlookMigrated() {
+    if (ensureOutlookMigrated.done) return ensureOutlookMigrated.result;
+    ensureOutlookMigrated.done = true;
+    if (typeof FlowStorage.migrateOutlookDraftState === 'function') {
+      try { ensureOutlookMigrated.result = await FlowStorage.migrateOutlookDraftState(); }
+      catch (e) { ensureOutlookMigrated.result = { ok: false, error: String(e && e.message || e) }; }
+    } else ensureOutlookMigrated.result = { skipped: true };
+    return ensureOutlookMigrated.result;
+  }
+
+  async function reconcileOutlookReceiptsSafe() {
+    const o = outlook();
+    if (!o || typeof o.reconcileReceipts !== 'function') return null;
+    try { return await o.reconcileReceipts(); }
+    catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+  }
+
   async function renderOpen() {
+    await ensureOutlookMigrated();
+    await reconcileOutlookReceiptsSafe();
     const pending = await FlowStorage.getStillOpen();
     const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
       ? await FlowStorage.getActiveOutlookReceipts()
@@ -2096,6 +2115,7 @@
   }
 
   async function renderLog() {
+    await ensureOutlookMigrated();
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderCloseQuality(s);

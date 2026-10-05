@@ -223,6 +223,7 @@ const FlowStorage = (() => {
     outlookAuth: null,
     outlookSync: {},
     outlookPending: { offers: [], asks: [], incoming: [] },
+    outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.
     activeQuestion: { pending: null, asked: [], skips: 0, pausedUntil: null, answered: 0 },
     // core/recognition-stats.js: how many decisions our own code made versus left
@@ -1249,7 +1250,7 @@ const FlowStorage = (() => {
     const seen = new Set();
     for (const e of log) {
       if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) continue;
-      if (e.undone) continue;
+      if (e.undone || e.outlookSent || e.outlookReceipt === false) continue;
       if (undone.has(e.messageId) || undone.has(e.messageId + '|' + (e.ref || ''))) continue;
       if (seen.has(e.messageId)) continue;
       seen.add(e.messageId);
@@ -1293,7 +1294,59 @@ const FlowStorage = (() => {
     return { ok: true };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+
+  function migrateMod() {
+    if (typeof FlowOutlookStateMigrate !== 'undefined') return FlowOutlookStateMigrate;
+    try { return typeof require !== 'undefined' ? require('../core/outlook-state-migrate.js').FlowOutlookStateMigrate : null; }
+    catch (e) { return null; }
+  }
+
+  // One-shot upgrade from 0.9.3/0.9.4 leftovers: merge HANDLED+UNDONE, scrub false-close.
+  const migrateOutlookDraftState = serialize(async function migrateOutlookDraftState() {
+    const M = migrateMod();
+    if (!M) return { ok: false, skipped: true };
+    const state = await get();
+    const r = M.migrate(state);
+    if (!r.migrated) return { ok: true, skipped: true };
+    await set({
+      log: r.state.log,
+      resolvedMessageIds: r.state.resolvedMessageIds,
+      closeQuality: r.state.closeQuality,
+      stillOpenMetrics: r.state.stillOpenMetrics,
+      outlookMigrateVersion: r.state.outlookMigrateVersion
+    });
+    return { ok: true, migrated: true, draftUndoIds: r.draftUndoIds || [] };
+  });
+
+  // Draft was sent (no longer a draft): keep closed, drop receipt surface.
+  const markOutlookDraftSent = serialize(async function markOutlookDraftSent(messageId, ref) {
+    if (!messageId) return { ok: false };
+    const state = await get();
+    const log = (state.log || []).slice();
+    let hit = false;
+    for (let i = 0; i < log.length; i++) {
+      const e = log[i];
+      if (!e || e.kind !== 'written' || e.messageId !== messageId) continue;
+      if (e.connectorId && e.connectorId !== 'outlookDraft') continue;
+      if (ref && e.ref && e.ref !== ref) continue;
+      log[i] = Object.assign({}, e, {
+        label: 'Reply sent from Outlook.',
+        outlookReceipt: false,
+        outlookSent: true,
+        url: e.url || null
+      });
+      hit = true;
+      break;
+    }
+    const resolved = state.resolvedMessageIds || [];
+    const nextResolved = resolved.indexOf(messageId) === -1
+      ? [messageId].concat(resolved).slice(0, RESOLVED_CAP)
+      : resolved;
+    await set({ log: trimLog(log, new Set(nextResolved)), resolvedMessageIds: nextResolved });
+    return { ok: true, hit: hit };
+  });
+
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, migrateOutlookDraftState, markOutlookDraftSent, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

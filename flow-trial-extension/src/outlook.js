@@ -418,11 +418,13 @@ const FlowOutlook = (() => {
         offered, declined: st.declined || {}, incomingDeclined: st.incomingDeclined || {},
         stateVersion: STATE_VERSION, diagnostics
       });
+      let reconcile = null;
+      try { reconcile = await reconcileReceipts(); } catch (e) { reconcile = { ok: false, error: String(e && e.message || e) }; }
       return {
         ok: true, conversations: p.stats.conversations, closed: p.stats.closed, moved: p.stats.moved,
         offers: offers.length, asks: p.asks.length, incoming: (p.incoming || []).length,
         ownAddressCount: ownList.length, primary: primaryAddress(auth), lines: p.lines,
-        diagnostics
+        diagnostics, reconcile
       };
     }
     // ---- Do It: create a reply draft in Outlook Drafts (never send) --------------------------------------
@@ -512,13 +514,132 @@ const FlowOutlook = (() => {
       let msg;
       try { msg = await graphGet(token, getUrl); }
       catch (e) {
-        if (e.status === 404 || e.message === 'http-404') return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+        // Already deleted (prior Undo in an older build, or user deleted it): success, clear line.
+        if (e.status === 404 || e.message === 'http-404') {
+          return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+        }
         throw e;
       }
-      if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+      if (!msg) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+      if (msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
       await graphWrite(token, 'DELETE', cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId), null);
       return { ok: true, written: 'Draft removed from Outlook Drafts.' };
     }
+
+    // Verify each Outlook draft receipt against Graph. Missing draft (not sent) reopens
+    // the loop; sent draft closes it for real.
+    function receiptsFromState(st) {
+      const log = (st && st.log) || [];
+      const undone = new Set();
+      log.forEach((e) => {
+        if (e && e.kind === 'undone' && e.messageId && (e.connectorId === 'outlookDraft' || e.app === 'outlook')) {
+          undone.add(e.messageId);
+        }
+      });
+      const out = [];
+      const seen = new Set();
+      log.forEach((e) => {
+        if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) return;
+        if (e.undone || e.outlookSent || e.outlookReceipt === false) return;
+        if (undone.has(e.messageId) || seen.has(e.messageId)) return;
+        seen.add(e.messageId);
+        out.push(e);
+      });
+      return out;
+    }
+
+    async function listActiveReceipts() {
+      if (typeof deps.storage.getActiveOutlookReceipts === 'function') {
+        return deps.storage.getActiveOutlookReceipts();
+      }
+      const st = await deps.storage.get();
+      return receiptsFromState(st);
+    }
+
+    async function dropReceiptAsUndone(messageId, ref) {
+      if (typeof deps.storage.markOutlookDraftUndone === 'function') {
+        return deps.storage.markOutlookDraftUndone(messageId, ref);
+      }
+      const st = await deps.storage.get();
+      const log = (st.log || []).slice();
+      let hit = false;
+      for (let i = 0; i < log.length; i++) {
+        const e = log[i];
+        if (!e || e.kind !== 'written' || e.messageId !== messageId) continue;
+        if (e.connectorId && e.connectorId !== 'outlookDraft') continue;
+        log[i] = Object.assign({}, e, {
+          kind: 'undone', label: (e.label || 'Reply draft ready in Outlook Drafts. Not sent.') + ' (undone)',
+          undone: true, outlookReopen: true, url: null, ref: null, connectorId: 'outlookDraft', app: 'outlook'
+        });
+        hit = true;
+        break;
+      }
+      if (!hit) {
+        log.unshift({ ts: deps.now(), kind: 'undone', label: 'Outlook draft undone', messageId, app: 'outlook', connectorId: 'outlookDraft', outlookReopen: true });
+      }
+      const resolved = (st.resolvedMessageIds || []).filter((id) => id !== messageId);
+      await deps.storage.set({ log: log, resolvedMessageIds: resolved });
+      return { ok: true };
+    }
+
+    async function closeReceiptAsSent(messageId, ref) {
+      if (typeof deps.storage.markOutlookDraftSent === 'function') {
+        return deps.storage.markOutlookDraftSent(messageId, ref);
+      }
+      const st = await deps.storage.get();
+      const log = (st.log || []).slice();
+      for (let i = 0; i < log.length; i++) {
+        const e = log[i];
+        if (!e || e.kind !== 'written' || e.messageId !== messageId) continue;
+        if (e.connectorId && e.connectorId !== 'outlookDraft') continue;
+        log[i] = Object.assign({}, e, { label: 'Reply sent from Outlook.', outlookReceipt: false, outlookSent: true });
+        break;
+      }
+      const resolved = st.resolvedMessageIds || [];
+      const next = resolved.indexOf(messageId) === -1 ? [messageId].concat(resolved) : resolved;
+      await deps.storage.set({ log: log, resolvedMessageIds: next });
+      return { ok: true };
+    }
+
+    async function reconcileReceipts() {
+      const auth = await read(AUTH_KEY, null);
+      if (!cfg.CLIENT_ID || !auth || !auth.token) return { ok: true, skipped: true, checked: 0 };
+      let fresh;
+      try {
+        fresh = await deps.auth.ensureFresh({ fetch: deps.fetch, now: deps.now }, cfg, auth.token);
+      } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+      if (!fresh.ok) return { ok: false, error: fresh.error, needsSignIn: Boolean(fresh.reauth) };
+      const token = fresh.token.accessToken;
+      const receipts = await listActiveReceipts();
+      let dropped = 0, sent = 0, kept = 0;
+      for (const r of receipts) {
+        if (!r || !r.ref) continue;
+        const getUrl = cfg.GRAPH + '/me/messages/' + encodeURIComponent(r.ref) + '?$select=id,isDraft';
+        let msg = null;
+        let gone = false;
+        try { msg = await graphGet(token, getUrl); }
+        catch (e) {
+          if (e.status === 404 || e.message === 'http-404') gone = true;
+          else continue;
+        }
+        if (gone || !msg) {
+          await dropReceiptAsUndone(r.messageId, r.ref);
+          dropped++;
+          continue;
+        }
+        if (msg.isDraft === false) {
+          await closeReceiptAsSent(r.messageId, r.ref);
+          if (r.messageId && typeof deps.storage.recordCloseQuality === 'function') {
+            try { await deps.storage.recordCloseQuality({ kind: 'success', messageId: r.messageId }); } catch (e) {}
+          }
+          sent++;
+          continue;
+        }
+        kept++;
+      }
+      return { ok: true, checked: receipts.length, dropped: dropped, sent: sent, kept: kept };
+    }
+
 
     // ---- what the person answers ------------------------------------------------------------------------------
     async function acceptOffer(key) {
@@ -588,7 +709,7 @@ const FlowOutlook = (() => {
 
     return {
       ORIGINS, status, connect, disconnect, sync, acceptOffer, declineOffer, declineIncoming, answerAsk,
-      createReplyDraft, undoReplyDraft, assertAllowedWrite, hasScope, primaryAddress, clearOutlookJudgmentState, dismissIncoming, STATE_VERSION
+      createReplyDraft, undoReplyDraft, reconcileReceipts, assertAllowedWrite, hasScope, primaryAddress, clearOutlookJudgmentState, dismissIncoming, STATE_VERSION
     };
   }
 

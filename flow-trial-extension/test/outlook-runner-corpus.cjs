@@ -363,6 +363,32 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
   }
 
 
+
+  console.log('\n--- reconcile gone draft + alreadyGone undo ---\n');
+  {
+    const w = world({ inbox: [], sent: [] });
+    const o = O.create(w.deps());
+    await o.connect();
+    // Simulate a leftover receipt pointing at a draft Graph no longer has.
+    w.store.log = [{
+      ts: NOW, kind: 'written', messageId: 'gone1', connectorId: 'outlookDraft',
+      ref: 'missing-draft', label: 'Reply draft ready in Outlook Drafts. Not sent.',
+      url: 'https://outlook/missing', app: 'outlook', outlookReceipt: true
+    }];
+    w.store.resolvedMessageIds = ['gone1'];
+    const rec = await o.reconcileReceipts();
+    check('reconcile drops gone draft receipt', rec.ok && rec.dropped === 1, rec);
+    const receipts = (w.store.log || []).filter((e) => e.kind === 'written' && e.connectorId === 'outlookDraft' && !e.undone && e.outlookReceipt !== false);
+    // After markOutlookDraftUndone the written becomes undone
+    const undone = (w.store.log || []).filter((e) => e.kind === 'undone' && e.messageId === 'gone1');
+    check('gone draft becomes undone with reopen', undone.length >= 1 && undone[0].outlookReopen, undone);
+    check('gone draft no longer resolved', (w.store.resolvedMessageIds || []).indexOf('gone1') === -1, w.store.resolvedMessageIds);
+
+    const gone = await o.undoReplyDraft('still-missing');
+    check('Undo when draft already missing is success alreadyGone', gone.ok && gone.alreadyGone && /already gone/i.test(gone.written), gone);
+  }
+
+
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
   console.log('TOTAL FAILURES: ' + failures);
   process.exit(failures ? 1 : 0);
