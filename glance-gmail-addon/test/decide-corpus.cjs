@@ -72,7 +72,9 @@ function judge(text) {
 
 const meeting = 'Let’s do a call Friday, September 18 at 3pm to review the contract.';
 const confirm = meeting + ' Could you please confirm you can make it?';
-const approved = 'Approved, go ahead.';
+// "Approved, go ahead." is 19 characters. The Chrome chip does not judge
+// under 20 (content-gmail.js), so the add-on stays quiet on that line too.
+const approved = 'Approved — go ahead on the contract.';
 const sendFile = 'Could you please send the signed contract?';
 const fact = 'What is the balance in the Acme sheet?';
 const noise = 'Hope you are well. Just wanted to say hello and see how things are going.';
@@ -108,6 +110,7 @@ check('file ask stays quiet', judge(sendFile).speak === false && judge(sendFile)
 check('sheet fact stays quiet', judge(fact).speak === false && judge(fact).reason === 'fact', judge(fact));
 check('small talk stays quiet', judge(noise).speak === false, judge(noise));
 check('empty stays quiet', api.decide('', { now: NOW }).speak === false && api.decide('', { now: NOW }).quiet === 'Nothing to close.', api.decide('', { now: NOW }));
+check('a 19-character approval stays under the Chrome floor', api.decide('Approved, go ahead.', { now: NOW }).speak === false, api.decide('Approved, go ahead.', { now: NOW }));
 
 {
   const he = api.decide('שלום, מה נשמע היום בלי שום בקשה ובלי תאריך.', { now: NOW });
