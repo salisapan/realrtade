@@ -2,8 +2,7 @@
 //
 // This is the stable way into Outlook: an official API with a documented message shape, rather than reading Outlook's page, whose
 // markup is not a public interface. This file only turns a Graph message into core/channel.js's utterance and strips the quoted
-// history, so that every rule that works on an email (core/follow-up.js) works on it. It is NOT yet wired to anything: reading a
-// mailbox needs a Microsoft app registration and the person's consent (docs/multi-platform.md, "Outlook"), which are the owner's to set up.
+// history, so that every rule that works on an email (core/follow-up.js) works on it.
 const FlowGraphMail = (() => {
   function sibling(globalValue, file, name) {
     if (globalValue) return globalValue;
@@ -24,8 +23,7 @@ const FlowGraphMail = (() => {
       .replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
-  // Only what the sender wrote THIS time: cut at the first line that starts the quoted history (Outlook's "From: … Sent: …" block, a
-  // reply header such as "On … wrote:", a Hebrew "מאת:" header, a separator line, or a ">" quote).
+  // Only what the sender wrote THIS time: cut at the first line that starts the quoted history.
   const CUT = [
     /^\s*(?:from|מאת)\s*[:：]\s*.+/i,
     /^\s*on .{5,120} wrote:\s*$/i,
@@ -41,31 +39,72 @@ const FlowGraphMail = (() => {
     return out.join('\n').trim();
   }
 
-  // msg: a Graph message resource. me: the mailbox owner's address. Returns an utterance, or null for a draft or something unusable.
+  // me may be a string (one address, backward compatible) or a Set/array of normalized addresses.
+  function meSetOf(me) {
+    if (!me) return null;
+    if (me instanceof Set) return me;
+    if (Array.isArray(me)) {
+      const s = new Set();
+      me.forEach((a) => { const e = channel.normalizeEmail(a); if (e) s.add(e); });
+      return s.size ? s : null;
+    }
+    const e = channel.normalizeEmail(me);
+    return e ? new Set([e]) : null;
+  }
+
+  function isOwn(email, meSet) {
+    if (!meSet || !email) return false;
+    return meSet.has(channel.normalizeEmail(email));
+  }
+
+  // msg: a Graph message resource (may carry _folder from the runner). me: string | Set | array.
+  // direction 'out' if the message came from sentitems OR its from-address is in meSet; otherwise 'in'.
   function toUtterance(msg, me) {
     if (!msg || msg.isDraft) return null;
     const fa = msg.from && msg.from.emailAddress;
     const from = channel.party({ channel: 'outlook', name: fa && fa.name, email: fa && fa.address });
     if (!from.email) return null;
-    const own = Boolean(me) && from.email === channel.normalizeEmail(me);
+    const meSet = meSetOf(me);
+    const fromSent = msg._folder === 'sentitems';
+    const own = fromSent || isOwn(from.email, meSet);
     const raw = msg.body && msg.body.content != null ? (String(msg.body.contentType).toLowerCase() === 'html' ? htmlToText(msg.body.content) : String(msg.body.content)) : String(msg.bodyPreview || '');
     const ts = Date.parse(msg.sentDateTime || msg.receivedDateTime || '');
     return channel.utterance({ channel: 'outlook', thread: msg.conversationId, id: msg.id, ts: Number.isFinite(ts) ? ts : null, direction: own ? 'out' : 'in', from: own ? Object.assign({}, from, { name: from.name }) : from, text: ownText(raw) });
   }
 
-  // The other person of a conversation, from the messages in it (everyone but the mailbox owner, the most recent first).
+  // The other person of a conversation: everyone but addresses in meSet. A conversation whose parties are all in meSet (note to self) yields null.
   function counterpartOf(msgs, me) {
-    const meE = channel.normalizeEmail(me);
+    const meSet = meSetOf(me) || new Set();
     for (let i = (msgs || []).length - 1; i >= 0; i--) {
       const m = msgs[i];
       const recips = [(m.from && m.from.emailAddress)].concat((m.toRecipients || []).map((r) => r.emailAddress)).filter(Boolean);
-      const other = recips.find((r) => channel.normalizeEmail(r.address) && channel.normalizeEmail(r.address) !== meE);
+      const other = recips.find((r) => channel.normalizeEmail(r.address) && !isOwn(r.address, meSet));
       if (other) return channel.party({ channel: 'outlook', name: other.name, email: other.address });
     }
     return null;
   }
 
-  return { htmlToText, ownText, toUtterance, counterpartOf };
+  // Build the own-address set from profile fields + optional learned sentitems senders.
+  // Ignores empty / refused fields. proxyAddresses entries starting with smtp: (case-insensitive) are included.
+  function ownAddressesFrom(profile, learned) {
+    const s = new Set();
+    function add(a) {
+      const e = channel.normalizeEmail(a);
+      if (e) s.add(e);
+    }
+    const p = profile || {};
+    add(p.mail);
+    add(p.userPrincipalName);
+    (p.otherMails || []).forEach(add);
+    (p.proxyAddresses || []).forEach((raw) => {
+      const m = String(raw || '').match(/^smtp:(.+)$/i);
+      if (m) add(m[1]);
+    });
+    (learned || []).forEach(add);
+    return s;
+  }
+
+  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGraphMail };

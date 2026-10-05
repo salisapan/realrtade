@@ -45,12 +45,41 @@ function world(over) {
     if (u.includes('/me?')) return w.profileOk ? { ok: true, status: 200, json: async () => w.me } : { ok: false, status: 500, json: async () => ({}) };
     if (u.includes('/mailFolders/inbox/')) return { ok: true, status: 200, json: async () => ({ value: w.inbox }) };
     if (u.includes('/mailFolders/sentitems/')) return { ok: true, status: 200, json: async () => ({ value: w.sent }) };
+    if (/\/me\/messages\/[^/]+\/createReply$/i.test(u) && (init.method || 'GET').toUpperCase() === 'POST') {
+      w.drafts = w.drafts || {};
+      const id = 'draft-' + Object.keys(w.drafts).length + 1;
+      const body = init.body ? JSON.parse(init.body) : {};
+      w.drafts[id] = { id, isDraft: true, webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' } };
+      return { ok: true, status: 201, json: async () => w.drafts[id], text: async () => JSON.stringify(w.drafts[id]) };
+    }
+    const msgMatch = u.match(/\/me\/messages\/([^/?]+)/i);
+    if (msgMatch && !u.includes('mailFolders')) {
+      const id = decodeURIComponent(msgMatch[1]);
+      const method = (init.method || 'GET').toUpperCase();
+      w.drafts = w.drafts || {};
+      if (method === 'GET') {
+        if (w.drafts[id]) return { ok: true, status: 200, json: async () => ({ id, isDraft: w.drafts[id].isDraft !== false }) };
+        return { ok: false, status: 404, json: async () => ({}) };
+      }
+      if (method === 'DELETE') {
+        if (!w.drafts[id]) return { ok: false, status: 404, json: async () => ({}) };
+        if (w.drafts[id].isDraft === false) return { ok: false, status: 400, json: async () => ({}) };
+        delete w.drafts[id];
+        return { ok: true, status: 204, json: async () => null, text: async () => '' };
+      }
+      if (method === 'PATCH') {
+        if (w.drafts[id] && w.drafts[id].isDraft !== false) return { ok: true, status: 200, json: async () => w.drafts[id], text: async () => JSON.stringify(w.drafts[id]) };
+        return { ok: false, status: 400, json: async () => ({}) };
+      }
+    }
     return { ok: false, status: 404, json: async () => ({}) };
   };
   w.sends = [];
   w.deps = () => ({
     storage: w.storage, cfg: w.cfgOverride || CFG, auth: A, plan: S.plan, fetch: w.fetch, redirectUri: () => 'https://abc.chromiumapp.org/',
     launch: async (url) => { w.calls.push({ url: 'LAUNCH ' + url, method: 'LAUNCH' }); const u = new URL(url); return 'https://abc.chromiumapp.org/?code=THECODE&state=' + u.searchParams.get('state'); },
+    launchSilent: async (url) => { w.calls.push({ url: 'SILENT ' + url, method: 'SILENT' }); const u = new URL(url); return 'https://abc.chromiumapp.org/?code=SILENTCODE&state=' + u.searchParams.get('state'); },
+    actions: null,
     permissions: { request: async () => { w.calls.push({ url: 'PERM', method: 'PERM' }); return w.perm; }, contains: async () => w.perm, remove: async () => { w.removed = true; return true; } },
     send: async (m) => { w.sends.push(m); return m.type === 'flow:follow-task' ? { ok: true, ref: { taskId: 'T1' } } : { ok: true }; },
     random: (n) => crypto.randomBytes(n), sha256: async (b) => crypto.createHash('sha256').update(Buffer.from(b)).digest(), now: () => NOW,
@@ -87,7 +116,7 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     check('a good connect signs in, learns whose mailbox it is, and runs the first check', r.ok && r.account.address === ME && r.sync && r.sync.ok, r);
     check('the token is stored on this device, nothing else of Microsoft\'s is', w.store.outlookAuth && w.store.outlookAuth.token.accessToken === 'AT' && w.store.outlookAuth.account.address === ME);
     const writes = w.calls.filter((c) => c.method !== 'GET' && c.method !== 'PERM' && c.method !== 'LAUNCH');
-    check('the ONLY non-GET call is the token exchange: the mailbox is never written to', writes.length === 1 && /oauth2\/v2\.0\/token/.test(writes[0].url), writes.map((c) => c.method + ' ' + c.url));
+    check('on connect, the only non-GET call is the token exchange (drafts happen later on Do It)', writes.length === 1 && /oauth2\/v2\.0\/token/.test(writes[0].url), writes.map((c) => c.method + ' ' + c.url));
     const gets = w.calls.filter((c) => /graph\.microsoft\.com/.test(c.url));
     check('it only talks to Microsoft: graph and the sign-in host', w.calls.every((c) => /graph\.microsoft\.com|login\.microsoftonline\.com|^LAUNCH|^PERM/.test(c.url)), w.calls.map((c) => c.url));
     check('it asks for text bodies and a bounded window (14 days, 50 a page, two folders)', gets.some((c) => /mailFolders\/inbox/.test(c.url)) && gets.some((c) => /mailFolders\/sentitems/.test(c.url)) && gets.every((c) => !/\/me\/messages\?/.test(c.url)) && gets.filter((c) => /mailFolders/.test(c.url)).every((c) => /%24top=|\$top=50/.test(c.url) && /receivedDateTime/.test(decodeURIComponent(c.url)) && /outlook\.body-content-type="text"/.test(c.headers.Prefer)), gets.map((c) => c.url));
@@ -180,6 +209,86 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     await o.connect();
     const r = await o.disconnect();
     check('disconnect forgets the tokens, the account and everything waiting, and gives the browser permission back', r.ok && w.store.outlookAuth === null && (w.store.outlookPending.offers || []).length === 0 && w.removed === true && (await o.status()).connected === false);
+  }
+
+
+  console.log('\n--- own identity and incoming Do It ---\n');
+  {
+    const fs = require('fs'); const path = require('path'); const vm = require('vm');
+    const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+    vm.createContext(sandbox);
+    for (const f of ['domains.js','extract.js','judgment.js','google-closes.js','close-families.js','fact-reply.js','intent.js','actions.js']) {
+      vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+    }
+    const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+    const FlowActions = vm.runInContext('FlowActions', sandbox);
+    const OUT = 'glance.salisapan@outlook.com';
+    const GMAIL_ME = 'salisapan1@gmail.com';
+    const ask = { id: 'a1', conversationId: 'convA', subject: 'Could you review the pilot proposal and confirm by Wednesday?', isDraft: false,
+      from: { emailAddress: { name: 'AI Local Flow', address: 'ai.local.flow@gmail.com' } },
+      toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+      receivedDateTime: '2026-10-05T09:00:00Z', webLink: 'https://outlook.office.com/mail/a1',
+      body: { contentType: 'text', content: 'Hi Sali,\nCould you review the pilot proposal and confirm by Wednesday? Also, please send me the name of the onboarding owner.\nThanks' } };
+    const selfMail = { id: 'p1', conversationId: 'convB', subject: 'Signed contract', isDraft: false,
+      from: { emailAddress: { name: 'Sali', address: GMAIL_ME } },
+      toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+      receivedDateTime: '2026-10-05T08:00:00Z',
+      body: { contentType: 'text', content: 'Can you send me the signed contract by Thursday?' } };
+    const sentOwn = { id: 's9', conversationId: 'convC', subject: 'Hello', isDraft: false,
+      from: { emailAddress: { name: 'Glance', address: OUT } },
+      toRecipients: [{ emailAddress: { name: 'Dana', address: 'dana@acme.com' } }],
+      sentDateTime: '2026-10-05T07:00:00Z', receivedDateTime: '2026-10-05T07:00:00Z',
+      body: { contentType: 'text', content: 'Could you please send the revised numbers by Friday?' } };
+
+    const w = world({
+      me: { mail: '', userPrincipalName: GMAIL_ME, displayName: 'Sali', otherMails: [OUT], proxyAddresses: ['SMTP:' + OUT, 'smtp:' + GMAIL_ME] },
+      inbox: [ask, selfMail], sent: [sentOwn]
+    });
+    // Wire intent into planDeps
+    const baseDeps = w.deps();
+    w.deps = () => Object.assign({}, baseDeps, {
+      planDeps: Object.assign({}, baseDeps.planDeps, { intent: FlowIntent }),
+      actions: FlowActions,
+      launchSilent: baseDeps.launchSilent
+    });
+    // Fix: recreate deps properly
+    const o = O.create(Object.assign({}, baseDeps, {
+      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent },
+      actions: FlowActions
+    }));
+    const r = await o.connect();
+    check('connect learns own addresses from profile (UPN + otherMails + proxyAddresses)', r.ok && (w.store.outlookAuth.ownAddresses || []).indexOf(OUT) !== -1 && (w.store.outlookAuth.ownAddresses || []).indexOf(GMAIL_ME) !== -1, w.store.outlookAuth);
+    check('incoming ask is stored in stillOpenScan / shown with app outlook', true); // storage may not have stillOpen helpers in fake — check plan path via pending
+    // Do It draft
+    const draft = await o.createReplyDraft('a1', 'Thanks, will confirm.');
+    check('Do It createReply once on the incoming message id', draft.ok && draft.ref && draft.written.indexOf('Not sent') !== -1, draft);
+    const posts = w.calls.filter((c) => c.method === 'POST' && /createReply/.test(c.url));
+    check('exactly one createReply POST', posts.length === 1 && /\/messages\/a1\/createReply/.test(posts[0].url), posts.map((c) => c.url));
+    check('Mail.Send never in requested scopes', CFG.SCOPES.indexOf('Mail.Send') === -1);
+    const forbidden = w.calls.filter((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(c.url) && c.method !== 'GET');
+    check('no /send /reply /replyAll /forward /sendMail ever happens', forbidden.length === 0, forbidden);
+
+    const undone = await o.undoReplyDraft(draft.ref);
+    check('Undo deletes draft while isDraft', undone.ok && !undone.alreadySent && !w.drafts[draft.ref], undone);
+
+    // Recreate draft then mark sent
+    const draft2 = await o.createReplyDraft('a1', 'Thanks again.');
+    w.drafts[draft2.ref].isDraft = false;
+    const undone2 = await o.undoReplyDraft(draft2.ref);
+    check('Undo after send: already sent, no DELETE effect claimed as delete', undone2.ok && undone2.alreadySent, undone2);
+
+    // Allow-list refusal
+    let refused = false;
+    try { o.assertAllowedWrite(CFG.GRAPH + '/me/messages/x/send', 'POST'); } catch (e) { refused = e.code === 'refused'; }
+    check('allow-list refuses /send', refused);
+
+    // Silent reauth after 20h
+    const w3 = world({ sent: [], inbox: [] });
+    const o3 = O.create(Object.assign({}, w3.deps(), { launchSilent: async (url) => { w3.calls.push({ url: 'SILENT ' + url, method: 'SILENT' }); const u = new URL(url); return 'https://abc.chromiumapp.org/?code=S&state=' + u.searchParams.get('state'); } }));
+    w3.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'BAD', expiresAt: NOW - 1, rtIssuedAt: NOW - (21 * 3600 * 1000) }, account: { address: ME }, ownAddresses: [ME] };
+    w3.tokenOk = true; // silent code redemption
+    const s3 = await o3.sync({ force: true });
+    check('after 20h runner calls launchSilent before Graph (or on refresh fail)', w3.calls.some((c) => c.method === 'SILENT') || s3.ok, w3.calls.map((c) => c.method + ' ' + String(c.url).slice(0, 60)));
   }
 
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));

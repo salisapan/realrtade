@@ -474,6 +474,45 @@
   }
 
   async function closeStillOpenFromPopup(entry) {
+    // Outlook incoming ask: Do It creates a reply draft in Outlook Drafts (never sends), plus a Google Task when connected.
+    if (entry && (entry.app === 'outlook' || (entry.process && entry.process.steps && entry.process.steps.some((s) => s.kind === 'outlookDraft')))) {
+      const o = outlook();
+      if (!o) return;
+      const incomingId = entry.outlookIncomingId || entry.messageId;
+      const label = (entry.intent && entry.intent.label) || (entry.process && entry.process.name) || 'Reply';
+      // Same voice rules as Gmail's on-device draft: short reply acknowledging the ask. Never claim a file we cannot attach.
+      const who = (entry.sender && entry.sender.name) || '';
+      const replyText = 'Hi' + (who ? ' ' + String(who).split(' ')[0] : '') + ',\n\nThanks — I will confirm shortly.\n';
+      const draft = await o.createReplyDraft(incomingId, replyText);
+      if (draft && draft.fallback) {
+        // Consent refused: task + Open in Outlook, one line.
+        const due = entry.intent && entry.intent.facts && entry.intent.facts.date && entry.intent.facts.date.iso;
+        await send({ type: 'flow:follow-task', payload: { title: label, dueIso: due || null, what: label, counterpart: who, threadUrl: entry.threadUrl } });
+        await FlowStorage.appendLog({ kind: 'written', label: label + ' — task ready; open in Outlook to reply (draft permission not granted).', messageId: entry.messageId, app: 'outlook' });
+        await renderOpen();
+        return;
+      }
+      if (!draft || !draft.ok) {
+        await FlowStorage.appendLog({ kind: 'written', label: 'Could not create Outlook draft' + (draft && draft.error ? ' (' + draft.error + ')' : ''), messageId: entry.messageId, app: 'outlook' });
+        await renderOpen();
+        return;
+      }
+      await FlowStorage.appendLog({
+        kind: 'written', label: draft.written, messageId: entry.messageId, app: 'outlook',
+        connectorId: 'outlookDraft', ref: draft.ref, where: draft.where, url: draft.where
+      });
+      // Google Task due on the detected date, when Google is connected.
+      const due = entry.intent && entry.intent.facts && entry.intent.facts.date && entry.intent.facts.date.iso;
+      try {
+        const task = await send({ type: 'flow:follow-task', payload: { title: label, dueIso: due || null, what: label, counterpart: who, threadUrl: entry.threadUrl } });
+        if (task && task.ok && task.ref) {
+          await FlowStorage.appendLog({ kind: 'written', label: 'Task due ' + (due || 'soon'), messageId: entry.messageId, connectorId: 'googleTask', ref: task.ref, app: 'outlook' });
+        }
+      } catch (e) { /* Google may not be connected; draft still stands */ }
+      // A prepared draft is not a close — item stays open until they send from Outlook.
+      await renderOpen();
+      return;
+    }
     let tabs = [];
     if (chrome.tabs && chrome.tabs.query) {
       try { tabs = await chrome.tabs.query({ url: 'https://mail.google.com/*' }); }
@@ -743,9 +782,25 @@
       storage: FlowStorage, cfg: FlowOutlookConfig, auth: FlowOutlookAuth, plan: FlowOutlookSync.plan,
       fetch: (u, i) => fetch(u, i), redirectUri: () => chrome.identity.getRedirectURL(),
       launch: (url) => new Promise((resolve, reject) => { chrome.identity.launchWebAuthFlow({ url, interactive: true }, (r) => { if (chrome.runtime.lastError || !r) reject(new Error('cancelled')); else resolve(r); }); }),
+      // Silent renewal: never opens a visible window. Resolves null on chrome.runtime.lastError.
+      launchSilent: (url) => new Promise((resolve) => {
+        try {
+          chrome.identity.launchWebAuthFlow({ url, interactive: false, abortOnLoadForNonInteractive: false, timeoutMsForNonInteractive: 15000 }, (r) => {
+            if (chrome.runtime.lastError || !r) resolve(null); else resolve(r);
+          });
+        } catch (e) { resolve(null); }
+      }),
       permissions: { request: (o) => chrome.permissions.request(o), contains: (o) => chrome.permissions.contains(o), remove: (o) => chrome.permissions.remove(o) },
       send, random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b), now: () => Date.now(),
-      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline }, identity: FlowIdentity, followUp: FlowFollowUp
+      planDeps: {
+        extract: typeof FlowExtract !== 'undefined' ? FlowExtract : null,
+        types: typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null,
+        pipeline: typeof FlowIntentPipeline !== 'undefined' ? FlowIntentPipeline : null,
+        intent: typeof FlowIntent !== 'undefined' ? FlowIntent : null,
+        factReply: typeof FlowFactReply !== 'undefined' ? FlowFactReply : null
+      },
+      actions: typeof FlowActions !== 'undefined' ? FlowActions : null,
+      identity: FlowIdentity, followUp: FlowFollowUp
     };
   }
   function outlook() {
@@ -753,7 +808,7 @@
     return outlook.inst || (outlook.inst = FlowOutlook.create(outlookDeps()));
   }
 
-  const OUTLOOK_COPY = 'Reads the last 14 days of your inbox and sent mail, only while this panel is open, to see whether something you asked was answered. Read-only: Glance never changes your mailbox. It uses your own Microsoft sign-in, and nothing is sent to Glance.';
+  const OUTLOOK_COPY = 'Reads asks made of you and answers to yours, on this device, while this panel is open. On Do It, writes a reply draft into your Outlook Drafts. Never sends. Uses your own Microsoft sign-in; nothing goes to Glance\'s servers.';
   const OUTLOOK_ERRORS = { permission: 'The browser did not grant access, so it stays off.', cancelled: 'The sign-in window was closed.', profile: 'Signed in, but Microsoft did not say whose mailbox this is. Try again.', 'not-configured': 'Not set up yet.' };
 
   async function renderOutlookRow(host) {
@@ -768,8 +823,13 @@
     row.appendChild(top);
     row.appendChild(el('div', 'wait-note', OUTLOOK_COPY));
     if (!st.configured) row.appendChild(el('div', 'wait-note', 'It needs a Microsoft app registration first. Redirect address for it: ' + st.redirectUri));
-    if (st.connected) row.appendChild(el('div', 'wait-note', (st.account && st.account.address ? 'Signed in as ' + st.account.address + '. ' : '') + (st.lastAt ? 'Last checked ' + new Date(st.lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + st.lastCount + ' conversations.' : 'Not checked yet.')));
-    if (st.error) row.appendChild(el('div', 'wait-note', 'Last check: ' + (OUTLOOK_ERRORS[st.error] || st.error)));
+    if (st.connected) row.appendChild(el('div', 'wait-note', ((st.primary || (st.account && st.account.address)) ? 'Signed in as ' + (st.primary || st.account.address) + '. ' : '') + (st.lastAt ? 'Last checked ' + new Date(st.lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + st.lastCount + ' conversations.' : 'Not checked yet.')));
+    if (st.error) {
+      const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
+        ? FlowOutlookAuth.errorSentence(st.error, st.errorDetail, st.aadsts)
+        : (OUTLOOK_ERRORS[st.error] || st.error);
+      row.appendChild(el('div', 'wait-note', 'Last check: ' + sentence));
+    }
     const note = el('p', 'wait-note');
     note.hidden = true;
     const acts = el('div', 'wait-acts');
@@ -779,8 +839,15 @@
       c.addEventListener('click', async () => {
         c.disabled = true;
         const r = await o.connect();
-        if (!r.ok) { c.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || 'Could not turn it on (' + r.error + ').'; return; }
-        await renderSurfaces(); await renderOutlookCards(); await renderWaiting();
+        if (!r.ok) {
+          c.disabled = false; note.hidden = false;
+          const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
+            ? FlowOutlookAuth.errorSentence(r.error, r.description, r.aadsts)
+            : (OUTLOOK_ERRORS[r.error] || 'Could not turn it on (' + r.error + ').');
+          note.textContent = sentence;
+          return;
+        }
+        await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
       acts.appendChild(c);
     } else if (st.connected) {
@@ -790,7 +857,7 @@
         chk.disabled = true;
         const r = st.needsSignIn ? await o.connect() : await o.sync({ force: true });
         if (!r.ok) { chk.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
-        await renderSurfaces(); await renderOutlookCards(); await renderWaiting();
+        await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
       const off = el('button', 'ghost sm', 'Turn off');
       off.type = 'button';
@@ -1014,7 +1081,7 @@
     const st = await o.status();
     if (!st.connected || st.needsSignIn) return;
     const r = await o.sync();
-    if (r.ok && !r.skipped) { await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); }
+    if (r.ok && !r.skipped) { await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen(); }
     if (!outlookAutoSync.timer) outlookAutoSync.timer = setInterval(() => { outlookAutoSync().catch(() => {}); }, 10 * 60 * 1000 + 5000);
   }
 

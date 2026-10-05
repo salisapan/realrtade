@@ -86,6 +86,82 @@ console.log('\n--- people and drafts ---\n');
   check('only the text you wrote this time counts, not the quoted history', plan([mine('c5', 'Thanks!\n\nOn Mon, Oct 1, 2026 at 9:00 AM Dana Cole <dana@acme.com> wrote:\n> Could you please send me the signed lease by Friday?', 1)]).offers.length === 0);
 }
 
+console.log('\n--- incoming asks (someone else asked you) ---\n');
+{
+  // Load FlowIntent the way the popup does (globals).
+  const fs = require('fs'); const path = require('path'); const vm = require('vm');
+  const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+  vm.createContext(sandbox);
+  for (const f of ['domains.js','extract.js','judgment.js','google-closes.js','close-families.js','fact-reply.js','intent.js','actions.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+  }
+  const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+  const NOW2 = Date.parse('2026-10-05T10:00:00Z');
+  const OUT = 'glance.salisapan@outlook.com';
+  const GMAIL_ME = 'salisapan1@gmail.com';
+  const ask = { id: 'a1', conversationId: 'convA', subject: 'Could you review the pilot proposal and confirm by Wednesday?', isDraft: false,
+    from: { emailAddress: { name: 'AI Local Flow', address: 'ai.local.flow@gmail.com' } },
+    toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+    receivedDateTime: '2026-10-05T09:00:00Z', webLink: 'https://outlook.office.com/mail/id/a1',
+    body: { contentType: 'text', content: 'Hi Sali,\nCould you review the pilot proposal and confirm by Wednesday? Also, please send me the name of the onboarding owner.\nThanks' } };
+  const prev = { id: 'p1', conversationId: 'convB', subject: 'Signed contract', isDraft: false,
+    from: { emailAddress: { name: 'Sali Sapan', address: GMAIL_ME } },
+    toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+    receivedDateTime: '2026-10-05T08:00:00Z',
+    body: { contentType: 'text', content: 'Can you send me the signed contract by Thursday?' } };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent };
+  const planLive = (me) => S.plan({ messages: [ask, prev], me, watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
+
+  const both = planLive([OUT, GMAIL_ME]);
+  check('live messages with both own addresses: one incoming from ai.local.flow', both.incoming.length === 1 && both.incoming[0].base.counterpart.email === 'ai.local.flow@gmail.com', both.incoming);
+  check('incoming label mentions the request and Wed Oct 7', /Reply requested/i.test(both.incoming[0].intent.label) && /Oct 7/.test(both.incoming[0].intent.label), both.incoming[0].intent.label);
+  check('self mail produces no offer whose counterpart is an own address', !both.offers.some((o) => o.base.counterpart.email === OUT || o.base.counterpart.email === GMAIL_ME), both.offers);
+
+  const oldMe = planLive(GMAIL_ME);
+  check('old behaviour input (me = gmail only): incoming ask still yields one incoming item', oldMe.incoming.length === 1, oldMe.incoming);
+
+  const courtesy = S.plan({
+    messages: [{ id: 'c1', conversationId: 'cC', subject: 'Thanks', isDraft: false,
+      from: { emailAddress: { name: 'Dana', address: 'dana@acme.com' } },
+      toRecipients: [{ emailAddress: { name: 'Me', address: OUT } }],
+      receivedDateTime: '2026-10-05T09:00:00Z',
+      body: { contentType: 'text', content: 'Thanks for today, talk soon' } }],
+    me: OUT, watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('courtesy mail from someone else: silence bar holds', courtesy.incoming.length === 0 && courtesy.offers.length === 0, courtesy);
+
+  const withLoop = S.plan({
+    messages: [ask],
+    me: [OUT, GMAIL_ME],
+    watches: [{ id: 'ol:convA', threadId: 'ol:convA', channel: 'outlook', messageId: 'old', subject: 'pilot', counterpart: { name: 'AI Local Flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'review', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW2 - 86400000, chaseIso: '2026-10-07', lang: 'en', amount: null, deadlineIso: null }],
+    graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('incoming ask in a conversation that already has a loop: handled as reply, not a second incoming', withLoop.incoming.length === 0, withLoop);
+
+  const replyClose = S.plan({
+    messages: [
+      ask,
+      { id: 's1', conversationId: 'convA', subject: 'RE: Could you review the pilot proposal and confirm by Wednesday?', isDraft: false, _folder: 'sentitems',
+        from: { emailAddress: { name: 'Glance', address: OUT } },
+        toRecipients: [{ emailAddress: { name: 'AI Local Flow', address: 'ai.local.flow@gmail.com' } }],
+        sentDateTime: '2026-10-05T11:00:00Z',
+        body: { contentType: 'text', content: 'Confirmed, and the onboarding owner is Dana.' } }
+    ],
+    me: [OUT, GMAIL_ME],
+    watches: [{ id: 'ol:convA', threadId: 'ol:convA', channel: 'outlook', messageId: 'a1', fromIncoming: true, subject: 'pilot', counterpart: { name: 'AI Local Flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'review', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW2 - 86400000, chaseIso: '2026-10-07', lang: 'en', amount: null, deadlineIso: null }],
+    graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('user later reply in sentitems closes the incoming item', replyClose.patches.some((p) => p.id === 'ol:convA' && p.patch.status === 'resolved'), replyClose.patches);
+
+  const draftOnly = S.plan({
+    messages: [ask, Object.assign({}, ask, { id: 'd1', isDraft: true, subject: 'RE: pilot' })],
+    me: [OUT, GMAIL_ME],
+    watches: [{ id: 'ol:convA', threadId: 'ol:convA', channel: 'outlook', messageId: 'a1', fromIncoming: true, subject: 'pilot', counterpart: { name: 'AI Local Flow', email: 'ai.local.flow@gmail.com', phone: null }, kind: 'reply', what: 'review', status: 'waiting', direction: 'theirs', stage: 'waiting', nudges: 0, createdAt: NOW2 - 86400000, chaseIso: '2026-10-07', lang: 'en', amount: null, deadlineIso: null }],
+    graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('a draft alone does NOT close the incoming item', !draftOnly.patches.some((p) => p.patch && p.patch.status === 'resolved'), draftOnly.patches);
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

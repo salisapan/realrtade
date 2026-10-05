@@ -47,7 +47,7 @@ stricter than Gmail, and silent when it cannot read its page**. The first measur
 | One heading per person across apps in "By person", with the apps named; rows from another app say which | `core/follow-up.js` groupByPerson, popup | Built; corpus-tested. |
 | Opt-in plumbing: optional host permission, scripts registered on request, re-registered after an update, removed on "off" | `src/background.js`, popup "Where Glance watches" | Built; the popup call to the browser's permission prompt is not exercised in an automated test (it needs a real browser profile). |
 | "Stay on this" on any page (right-click menu, popup question, loop opens) | `core/capture.js`, `src/background.js`, popup | Built; core and popup logic tested. The right-click item and side-panel opening are not exercised in an automated test. |
-| Outlook through Microsoft Graph: sign-in (PKCE), a bounded read of the last 14 days of inbox and sent, planning with the same rules as Gmail, offers and questions in the popup | `core/outlook-config.js`, `outlook-auth.js`, `graph-mail.js`, `outlook-sync.js`, `src/outlook.js`, popup | Built and tested against a **fake Microsoft** (75 checks: PKCE vector, read-only, bounded, honest failure, never creates a loop without a tap). **Dormant until the owner registers the Microsoft app and pastes its client id** (section 5). Never run against the real Microsoft. |
+| Outlook through Microsoft Graph: sign-in (PKCE), a bounded read of the last 14 days of inbox and sent, planning with the same rules as Gmail, offers and questions in the popup | `core/outlook-config.js`, `outlook-auth.js`, `graph-mail.js`, `outlook-sync.js`, `src/outlook.js`, popup | Built and tested against a **fake Microsoft** (PKCE, own-identity set, incoming asks, draft allow-list, silent renewal, honest failure, never creates a loop without a tap). Client id is set. SPA registration verified live 2026-10-05. Incoming asks + Do It (reply draft) per owner decision 2026-10-05. |
 
 ## 4. The hard rules
 
@@ -87,13 +87,16 @@ Reading Outlook's page would repeat WhatsApp's fragility, so the path is Microso
 
 What it does: sign in with the person's own Microsoft account (OAuth code flow with PKCE, `chrome.identity.launchWebAuthFlow`), read the
 last 14 days of the inbox and the sent folder (50 per page, two pages, text bodies), hand them to `core/outlook-sync.js`, and apply what it
-decides: a reply closes or moves a loop exactly as in Gmail, your chase moves the day, and a new ask or promise of yours is only OFFERED in
-the popup ("Waiting on a reply? Stay on it"). A reply that cannot be linked to a loop for sure only asks ("Does this settle it?"). An answer
-that arrives in Outlook can settle a Gmail or WhatsApp loop for the same person, and the other way round.
+decides: a reply closes or moves a loop exactly as in Gmail, your chase moves the day, a new ask or promise of yours is only OFFERED in
+the popup ("Waiting on a reply? Stay on it"), and an incoming ask from someone else is shown in the main open list with Do It (same silence
+bar as Gmail). On Do It, Glance creates a reply DRAFT in Outlook Drafts via Graph `createReply` (Mail.ReadWrite); it never sends. Undo
+deletes only that draft while it is still a draft. A reply that cannot be linked to a loop for sure only asks ("Does this settle it?"). An
+answer that arrives in Outlook can settle a Gmail or WhatsApp loop for the same person, and the other way round. Own identity is a set
+(mail, UPN, otherMails, proxyAddresses smtp:, plus learned sentitems senders).
 
-What it does not do: it never writes to the mailbox (only read permissions are requested, and the tests assert that the only non-GET call is
-the token exchange); it does not run while the panel is closed (on open, every ten minutes, and "Check now"; the runner refuses to check
-more often than every ten minutes); nothing is sent to Glance's servers.
+What it does not do: it never sends (never `Mail.Send`, never `/send`, `/reply`, `/replyAll`, `/forward`, `/sendMail`). Allowed non-GET
+Graph calls are exactly: the token exchange, `createReply`, PATCH of a Glance-created draft, DELETE of a Glance-created draft. It does not
+run while the panel is closed (on open, every ten minutes, and "Check now"); nothing is sent to Glance's servers. WhatsApp stays read-only.
 
 This is a bigger change than anything before it to "Glance reads only the message you open". It is opt-in, disclosed on the privacy
 page in the same commit (a dedicated bullet), and the store justification rows for the two optional Microsoft hosts are written.
@@ -101,16 +104,17 @@ page in the same commit (a dedicated bullet), and the store justification rows f
 **What the owner has to do (the only manual step):**
 1. Microsoft Entra admin center, App registrations, New registration. Supported account types: "Accounts in any organizational directory and
    personal Microsoft accounts".
-2. Authentication, Add a platform, **Mobile and desktop applications**, custom redirect URI = the address the Outlook row in the popup shows
-   (`https://<extension id>.chromiumapp.org/`), and "Allow public client flows: Yes".
-3. API permissions, Microsoft Graph, Delegated: `Mail.Read`, `User.Read`, `offline_access`. Nothing else, ever.
+2. Authentication, Add a platform, **Single-page application**, redirect URI = the address the Outlook row in the popup shows
+   (`https://<extension id>.chromiumapp.org/`). Verified live 2026-10-05: "Mobile and desktop" fails with `invalid_request` (likely AADSTS9002326)
+   because the token POST from the extension carries `Origin: chrome-extension://...`. SPA refresh tokens last 24h; silent renewal renews them.
+3. API permissions, Microsoft Graph, Delegated: `Mail.Read`, `Mail.ReadWrite` (drafts only, by code), `User.Read`, `offline_access`. Never `Mail.Send`.
 4. Paste the Application (client) ID into `CLIENT_ID` in `flow-trial-extension/core/outlook-config.js` (it is not a secret) and rebuild the package.
 5. Turn Outlook on in the popup, sign in, and watch "Last checked". Tell me what the row says if it fails.
 
-**Honest limits:** never run against the real Microsoft. The platform type matters (a "Single-page application" registration rejects a
-token request that does not come from a web origin, so use "Mobile and desktop"); if Microsoft behaves differently from the documentation the
-sign-in is where it will show. Personal and work accounts may need different consent, and some organisations block user consent for apps
-(their administrator then has to approve it).
+**Honest limits (verified live 2026-10-05):** SPA registration works; "Mobile and desktop" fails with `invalid_request` (likely AADSTS9002326).
+SPA refresh tokens last 24h and do not slide; silent `launchWebAuthFlow({interactive:false})` with `prompt=none` is the renewal path (acceptance
+test 7). Personal and work accounts may need different consent, and some organisations block user consent for apps (their administrator then has
+to approve it).
 
 ### Slack, Teams and others
 

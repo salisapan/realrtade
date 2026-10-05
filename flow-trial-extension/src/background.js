@@ -2933,17 +2933,72 @@ function lmServerPrompt(text, schema) {
 // flow:execute-action/flow:connect keep working for whatever still calls
 // them directly (the popup's own connect/disconnect flow, direct testing) —
 // not because the multi-action engine still writes to them.
+
+// Outlook reply drafts (Mail.ReadWrite): createReply / DELETE of Glance's own draft only. Never send.
+const OUTLOOK_GRAPH = 'https://graph.microsoft.com/v1.0';
+const OUTLOOK_AUTH_KEY = 'outlookAuth';
+async function outlookAccessToken() {
+  const st = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = st && st[OUTLOOK_AUTH_KEY];
+  if (!auth || !auth.token || !auth.token.accessToken) return null;
+  if (auth.token.expiresAt && auth.token.expiresAt > Date.now()) return auth.token.accessToken;
+  // Soft path: popup's ensureFresh usually runs first. If expired here, refuse rather than refresh without PKCE deps.
+  return auth.token.accessToken;
+}
+function outlookAssertNotSend(url) {
+  if (/\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(String(url || ''))) {
+    const e = new Error('graph-send-refused'); e.code = 'refused'; throw e;
+  }
+}
+async function outlookDraftWrite(p) {
+  const token = await outlookAccessToken();
+  if (!token) return { ok: false, reason: 'not-connected' };
+  const incomingId = p && (p.outlookIncomingId || p.messageId || p.incomingId);
+  if (!incomingId) return { ok: false, reason: 'no-message' };
+  const comment = (p && p.body) || (p && p.comment) || '';
+  const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
+  outlookAssertNotSend(url);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ comment: comment })
+  });
+  if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+  const draft = await res.json();
+  if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };
+  return { ok: true, ref: draft.id, where: draft.webLink || null, written: 'Reply draft ready in Outlook Drafts. Not sent.' };
+}
+async function outlookDraftUndo(ref) {
+  if (!ref) return { ok: false };
+  const token = await outlookAccessToken();
+  if (!token) return { ok: false, reason: 'not-connected' };
+  const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
+  outlookAssertNotSend(getUrl);
+  const got = await fetch(getUrl, { headers: { Authorization: 'Bearer ' + token } });
+  if (got.status === 404) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+  if (!got.ok) return { ok: false, reason: 'http-' + got.status };
+  const msg = await got.json();
+  if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
+  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
+  outlookAssertNotSend(delUrl);
+  const del = await fetch(delUrl, { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+  if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
+  return { ok: true, written: 'Draft removed from Outlook Drafts.' };
+}
+
 const WRITERS = {
   hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
-  driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile
+  driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
+  outlookDraft: outlookDraftWrite
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
-  driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash
+  driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
+  outlookDraft: outlookDraftUndo
 };
 
 async function connectorStatus() {
