@@ -135,22 +135,37 @@ const FlowGraphMail = (() => {
     return out;
   }
 
+  // Personal MSA often exposes an opaque CID mailbox (outlook_HEX@outlook.com) as
+  // mail/UPN. Prefer a human alias the person actually uses (inbox To / otherMails).
+  function isOpaqueMailbox(addr) {
+    return /^outlook_[0-9a-f]+@outlook\.com$/i.test(String(addr || '').trim());
+  }
+
+  function isHumanMailbox(addr) {
+    const e = channel.normalizeEmail(addr);
+    return Boolean(e && !isOpaqueMailbox(e));
+  }
+
   // Prefer a non-UPN mailbox alias as primary when we have one (outlook.com etc.),
   // else the most common inbox-received address, else first learned, else profile mail/UPN.
+  // Never prefer an opaque outlook_HEX@outlook.com address when a human alias exists.
   function pickPrimary(ownList, profile, inboxLearned) {
     const list = (ownList || []).map((a) => channel.normalizeEmail(a)).filter(Boolean);
-    const inboxSet = new Set((inboxLearned || []).map((a) => channel.normalizeEmail(a)).filter(Boolean));
-    const alias = list.find((e) => inboxSet.has(e) && !/@gmail\.com$/i.test(e));
+    const humans = list.filter(isHumanMailbox);
+    const inboxHuman = (inboxLearned || []).map((a) => channel.normalizeEmail(a)).filter(isHumanMailbox);
+    const inboxSet = new Set(inboxHuman);
+    const alias = humans.find((e) => inboxSet.has(e) && !/@gmail\.com$/i.test(e));
     if (alias) return alias;
-    const inboxFirst = (inboxLearned || []).map((a) => channel.normalizeEmail(a)).filter(Boolean)[0];
-    if (inboxFirst) return inboxFirst;
+    if (inboxHuman[0]) return inboxHuman[0];
     const p = profile || {};
     const mail = channel.normalizeEmail(p.mail);
-    if (mail) return mail;
+    if (mail && isHumanMailbox(mail)) return mail;
+    if (humans[0]) return humans[0];
+    // Last resort only: opaque CID / UPN when nothing human was learned yet.
     return list[0] || channel.normalizeEmail(p.userPrincipalName) || null;
   }
 
-  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, pickPrimary };
+  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, pickPrimary, isOpaqueMailbox, isHumanMailbox };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGraphMail };

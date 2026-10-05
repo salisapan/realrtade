@@ -103,12 +103,48 @@
     };
   }
 
+  function preferHumanFrom(auth) {
+    if (!auth) return null;
+    const opaque = /^outlook_[0-9a-f]+@outlook\.com$/i;
+    const candidates = [];
+    if (auth.account && auth.account.address) candidates.push(auth.account.address);
+    if (auth.account && auth.account.mail) candidates.push(auth.account.mail);
+    (auth.ownAddresses || []).forEach((a) => candidates.push(a));
+    if (auth.profile) {
+      if (auth.profile.mail) candidates.push(auth.profile.mail);
+      (auth.profile.otherMails || []).forEach((a) => candidates.push(a));
+    }
+    const seen = new Set();
+    for (const raw of candidates) {
+      const e = String(raw || '').trim().toLowerCase();
+      if (!e || seen.has(e)) continue;
+      seen.add(e);
+      if (!opaque.test(e)) return e;
+    }
+    return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
+  }
+
   async function onDoIt(host, chip, ctx) {
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+    const askText = ctx.bodyText || ctx.text || '';
+    const subject = ctx.subject || '';
     const body = (typeof FlowDraftReply !== 'undefined')
-      ? FlowDraftReply.bodyFromIntent(ctx.intent, ctx.sender && ctx.sender.name, ctx.sender && ctx.sender.email)
+      ? FlowDraftReply.bodyFromIntent(
+          ctx.intent,
+          ctx.sender && ctx.sender.name,
+          ctx.sender && ctx.sender.email,
+          { text: askText, subject: subject }
+        )
       : '';
     const draftStep = (ctx.process.steps || []).find((s) => s.kind === 'outlookDraft') || { kind: 'outlookDraft', params: {} };
+    const params = Object.assign({}, draftStep.params || {}, {
+      askText: askText || (draftStep.params && draftStep.params.askText) || null
+    });
+    let fromAddress = null;
+    try {
+      const st = await FlowStorage.get();
+      fromAddress = preferHumanFrom(st && st.outlookAuth);
+    } catch (e) { /* From resolved again in background */ }
     const payload = {
       outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
       messageId: ctx.messageId,
@@ -116,8 +152,11 @@
       senderName: ctx.sender && ctx.sender.name,
       senderEmail: ctx.sender && ctx.sender.email,
       intent: ctx.intent,
-      params: draftStep.params || {},
-      label: ctx.intent && ctx.intent.label
+      params: params,
+      label: ctx.intent && ctx.intent.label,
+      text: askText,
+      subject: subject,
+      fromAddress: fromAddress
     };
     payload.connectorId = 'outlookDraft';
     const r = await send({ type: 'flow:execute-action', payload: payload });

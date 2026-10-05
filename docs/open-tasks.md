@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-05 (0.9.8: Undo reopen for Outlook in-page Do It card; page eligibility matches popup Still Open).
+Last updated: 2026-10-05 (0.9.9: shared rich draft body + human From alias for Outlook drafts).
 
 ## Open
 
@@ -33,7 +33,7 @@ Last updated: 2026-10-05 (0.9.8: Undo reopen for Outlook in-page Do It card; pag
 | 18 | Try WhatsApp Web for real: turn it on in the popup (Where Glance watches), ask something in a 1:1 chat, answer it, check a group stays untouched; tell me if the popup says the page is not recognised | open | owner + Claude | - | Built and browser-tested only against a mock that imitates the page's structure. |
 | 19 | Outlook: register the Microsoft Entra app and paste its Application (client) ID into `flow-trial-extension/core/outlook-config.js`, then rebuild the package and try it | done | owner | - | Client id set. SPA registration verified live 2026-10-05 (Mobile and desktop failed with invalid_request). |
 | 20 | In a real Chrome profile: turn an app on and off in the popup (the permission prompt), and right-click a selection on any page ("Glance: stay on this" opens the side panel card) | open | owner + Claude | - | Neither the browser permission prompt nor the context menu can be driven by the automated tests. |
-| 21 | Outlook end-to-end: incoming asks + Do It draft + silent renewal + own-identity set | in progress | owner + Cos | - | 0.9.8 on `cos/outlook-fix-on-claude`: after Undo, `outlookReopen` clears terminal state so the in-page OWA card and popup Still Open both show Do It again (`test/outlook-undo-reopen-corpus.cjs`). Owner acceptance tests 2, 2b, 5-8 still need real Microsoft. |
+| 21 | Outlook end-to-end: incoming asks + Do It draft + silent renewal + own-identity set | in progress | owner + Cos | - | 0.9.9 on `cos/outlook-fix-on-claude`: shared `FlowDraftReply` rich ack (pilot/review/confirm/owner) for Gmail+Outlook; Graph drafts PATCH from+sender to connected human alias (skip opaque `outlook_HEX@outlook.com`). Owner acceptance tests 2, 2b, 5-8 still need real Microsoft. |
 | 21b | Mail.ReadWrite for Outlook reply drafts: DECIDED by the owner 2026-10-05 (yes; drafts only, never send, Undo deletes the draft) | decided / building | owner | - | Entra app 22682454-808b-41e5-80fe-6abadc1d5595 has Mail.ReadWrite. Code allow-list: createReply, PATCH/DELETE of Glance drafts only. |
 | 22 | Validate the reply model on real threads: ask something, get "looking into it" or "thanks for letting me know", check the loop stays in Waiting on with no card and the Activity list says why; report any real answer it held open (with the sentence) | open | owner + Claude | first week of use | `docs/reply-model.md` §4. Trained and measured only on model-written sentences. |
 | 23 | Multi-step resolution, first slice: "send me the receipt" (`docs/resolution-paths.md`). Try it on real mail: ask yourself for a receipt in Gmail with and without a file in Drive; check the card says what it did, nothing is sent, and the loop closes only after YOU send a message with the receipt attached. Report any wrong file offered, any close that happened without an attachment, and any "was it paid?" asked when it should not have been | open | owner + Claude | first week of use | Built and tested against a Gmail-shaped page, not real Gmail. Wired to receipts and transfer proofs only; invoices keep the Do It chip. |

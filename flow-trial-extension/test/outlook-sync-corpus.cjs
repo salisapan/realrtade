@@ -220,6 +220,12 @@ console.log('\n--- learn own addresses from inbox recipients ---\n');
   check('learnOwnFromMessages does not add multi-recipient coworkers from one message', learned.indexOf('a@acme.com') === -1 && learned.indexOf('b@acme.com') === -1, learned);
   const primary = G.pickPrimary([GMAIL_ME, OUT], { mail: '', userPrincipalName: GMAIL_ME }, [OUT, OUT]);
   check('pickPrimary prefers outlook alias over gmail UPN when inbox-received', primary === OUT, primary);
+  const CID = 'outlook_de6b4487c57f9cb0@outlook.com';
+  check('isOpaqueMailbox detects CID form', G.isOpaqueMailbox(CID) === true && G.isOpaqueMailbox(OUT) === false);
+  const primaryCid = G.pickPrimary([CID, OUT], { mail: CID, userPrincipalName: CID }, [OUT]);
+  check('pickPrimary skips opaque outlook_HEX@outlook.com when human alias exists', primaryCid === OUT, primaryCid);
+  const onlyCid = G.pickPrimary([CID], { mail: CID, userPrincipalName: CID }, []);
+  check('pickPrimary falls back to CID only when nothing human learned', onlyCid === CID, onlyCid);
 }
 
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));

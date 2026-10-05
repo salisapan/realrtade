@@ -44,13 +44,11 @@ function pathFor(surface, text) {
   }
   const draftKind = surface === 'gmail' ? 'gmailDraft' : 'outlookDraft';
   const draftStep = steps.find((s) => s.kind === draftKind);
-  const body = draftStep
-    ? FlowDraftReply.draftBodyText({
-        senderName: CTX.senderName,
-        senderEmail: CTX.senderEmail,
-        params: draftStep.params || {}
-      })
-    : (intent ? FlowDraftReply.bodyFromIntent(intent, CTX.senderName, CTX.senderEmail) : null);
+  // Same rich body for both surfaces: pass the ask text so review/confirm/owner land.
+  const body = intent
+    ? FlowDraftReply.bodyFromIntent(intent, CTX.senderName, CTX.senderEmail, { text: text, subject: 'Pilot proposal' })
+    : null;
+  void draftStep;
   return {
     type: intent && intent.type,
     label: intent && intent.label,
@@ -70,6 +68,9 @@ assert.strictEqual(g.show, o.show, 'same show decision');
 assert.strictEqual(g.body, o.body, 'same draft body\nG:\n' + g.body + '\nO:\n' + o.body);
 assert.ok(g.stepKinds.indexOf('gmailDraft') >= 0, 'gmail draft step: ' + g.stepKinds);
 assert.ok(o.stepKinds.indexOf('outlookDraft') >= 0, 'outlook draft step: ' + o.stepKinds);
+assert.ok(/pilot proposal/i.test(g.body || '') && /review/i.test(g.body || ''), 'rich pilot ack: ' + g.body);
+assert.ok(/onboarding owner[\s\S]*\[name\]/i.test(g.body || ''), 'owner placeholder: ' + g.body);
+assert.ok((g.body || '').indexOf('Following up on:') < 0, 'not weak template: ' + g.body);
 assert.ok((g.body || '').indexOf('\u2014') < 0, 'no em dash');
 
 // OWA match helpers

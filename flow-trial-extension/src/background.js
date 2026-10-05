@@ -2915,6 +2915,37 @@ function outlookAssertNotSend(url) {
     const e = new Error('graph-send-refused'); e.code = 'refused'; throw e;
   }
 }
+function outlookIsOpaqueMailbox(addr) {
+  return /^outlook_[0-9a-f]+@outlook\.com$/i.test(String(addr || '').trim());
+}
+async function outlookPreferredFrom(explicit) {
+  const want = String(explicit || '').trim().toLowerCase();
+  if (want && !outlookIsOpaqueMailbox(want)) return want;
+  const st = await chrome.storage.local.get(OUTLOOK_AUTH_KEY);
+  const auth = st && st[OUTLOOK_AUTH_KEY];
+  if (!auth) return want || null;
+  const candidates = [];
+  if (want) candidates.push(want);
+  if (auth.account && auth.account.address) candidates.push(auth.account.address);
+  if (auth.account && auth.account.mail) candidates.push(auth.account.mail);
+  (auth.ownAddresses || []).forEach((a) => candidates.push(a));
+  if (auth.profile) {
+    if (auth.profile.mail) candidates.push(auth.profile.mail);
+    (auth.profile.otherMails || []).forEach((a) => candidates.push(a));
+    (auth.profile.proxyAddresses || []).forEach((p) => {
+      const m = String(p || '').match(/^smtp:(.+)$/i);
+      if (m) candidates.push(m[1]);
+    });
+  }
+  const seen = new Set();
+  for (const raw of candidates) {
+    const e = String(raw || '').trim().toLowerCase();
+    if (!e || seen.has(e)) continue;
+    seen.add(e);
+    if (!outlookIsOpaqueMailbox(e)) return e;
+  }
+  return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
+}
 async function outlookDraftWrite(p) {
   const token = await outlookAccessToken();
   if (!token) return { ok: false, reason: 'not-connected' };
@@ -2923,7 +2954,12 @@ async function outlookDraftWrite(p) {
   // Same composer as Gmail: draftBodyText / FlowDraftReply.
   let comment = (p && p.body) || (p && p.comment) || '';
   if (!comment && p && (p.params || p.intent)) {
-    comment = globalThis.FlowDraftReply.bodyFromIntent(p.intent || { entities: (p.params || {}), label: p.label }, p.senderName, p.senderEmail);
+    comment = globalThis.FlowDraftReply.bodyFromIntent(
+      p.intent || { entities: (p.params || {}), label: p.label },
+      p.senderName,
+      p.senderEmail,
+      { text: p.text || p.bodyText || null, subject: p.subject || null, askText: p.askText || null }
+    );
   }
   if (!comment && p && p.params) {
     comment = globalThis.FlowDraftReply.draftBodyText({ senderName: p.senderName, senderEmail: p.senderEmail, params: p.params });
@@ -2938,18 +2974,35 @@ async function outlookDraftWrite(p) {
   if (!res.ok) return { ok: false, reason: 'http-' + res.status };
   const draft = await res.json();
   if (!draft || !draft.id) return { ok: false, reason: 'no-draft' };
-  // Prefer preferred From alias when provided (same as popup createReplyDraft).
-  const wantFrom = p && p.fromAddress;
-  if (wantFrom && draft.isDraft !== false) {
+  // Prefer connected human From alias over opaque outlook_HEX@outlook.com CID.
+  // Graph createReply often defaults From to the CID on personal MSA; PATCH from+sender.
+  const wantFrom = await outlookPreferredFrom(p && p.fromAddress);
+  let fromSet = false;
+  if (wantFrom && draft.isDraft !== false && !outlookIsOpaqueMailbox(wantFrom)) {
     try {
-      await fetch(OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id), {
+      const patchUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id);
+      outlookAssertNotSend(patchUrl);
+      await fetch(patchUrl, {
         method: 'PATCH',
         headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: { emailAddress: { address: wantFrom } }, body: { contentType: 'Text', content: comment } })
+        body: JSON.stringify({
+          from: { emailAddress: { address: wantFrom } },
+          sender: { emailAddress: { address: wantFrom } },
+          body: { contentType: 'Text', content: comment }
+        })
       });
+      fromSet = true;
     } catch (e) { /* alias may be refused on MSA */ }
   }
-  return { ok: true, ref: draft.id, where: draft.webLink || null, url: draft.webLink || null, written: 'Reply draft ready in Outlook Drafts. Not sent.' };
+  return {
+    ok: true,
+    ref: draft.id,
+    where: draft.webLink || null,
+    url: draft.webLink || null,
+    written: 'Reply draft ready in Outlook Drafts. Not sent.',
+    fromAddress: wantFrom || null,
+    fromSet: fromSet
+  };
 }
 async function outlookDraftUndo(ref) {
   if (!ref) return { ok: false };

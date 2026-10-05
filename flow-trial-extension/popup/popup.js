@@ -485,7 +485,7 @@
       const bodyText = entry.text || '';
       // Same composer as Gmail Do It (FlowDraftReply), not a forked Outlook body.
       const replyText = (typeof FlowDraftReply !== 'undefined')
-        ? FlowDraftReply.bodyFromIntent(entry.intent || {}, who, email)
+        ? FlowDraftReply.bodyFromIntent(entry.intent || {}, who, email, { text: bodyText, subject: entry.subject || null })
         : ('Hi,\n\nFollowing up on your message below.\n\n[Write your reply here]');
       // Delivered-to alias when known (identity primary), else account primary.
       const st0 = await o.status();

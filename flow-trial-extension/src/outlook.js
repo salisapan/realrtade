@@ -80,12 +80,36 @@ const FlowOutlook = (() => {
       return true;
     }
 
+    function isOpaqueMailbox(addr) {
+      const g = gm();
+      if (g && g.isOpaqueMailbox) return g.isOpaqueMailbox(addr);
+      return /^outlook_[0-9a-f]+@outlook\.com$/i.test(String(addr || '').trim());
+    }
+
+    // Human From for drafts: prefer pickPrimary / account.address, skip opaque CID.
     function primaryAddress(auth) {
       if (!auth) return null;
-      // account.address is set by pickPrimary (inbox alias preferred over UPN).
-      if (auth.account && auth.account.address) return auth.account.address;
-      const learned = (auth.ownAddresses || []).filter(Boolean);
-      return learned[0] || null;
+      const candidates = [];
+      if (auth.account && auth.account.address) candidates.push(auth.account.address);
+      if (auth.account && auth.account.mail) candidates.push(auth.account.mail);
+      (auth.ownAddresses || []).forEach((a) => candidates.push(a));
+      if (auth.profile) {
+        if (auth.profile.mail) candidates.push(auth.profile.mail);
+        (auth.profile.otherMails || []).forEach((a) => candidates.push(a));
+        (auth.profile.proxyAddresses || []).forEach((p) => {
+          const m = String(p || '').match(/^smtp:(.+)$/i);
+          if (m) candidates.push(m[1]);
+        });
+      }
+      const seen = new Set();
+      for (const raw of candidates) {
+        const e = normAddr(raw);
+        if (!e || seen.has(e)) continue;
+        seen.add(e);
+        if (!isOpaqueMailbox(e)) return e;
+      }
+      // Last resort: opaque CID only when no human alias was learned.
+      return candidates.map(normAddr).find(Boolean) || null;
     }
 
     async function status() {
@@ -481,15 +505,40 @@ const FlowOutlook = (() => {
           await graphWrite(token, 'PATCH', draftUrl, { body: { contentType: 'Text', content: replyText } });
         } catch (e) { /* createReply comment may already hold the body */ }
       }
+      // Prefer a human connected alias (never the opaque outlook_HEX@outlook.com CID
+      // when a real address is known). Graph createReply often defaults From to the CID
+      // on personal MSA; PATCH from+sender to the alias when Graph allows.
       const wantFrom = normAddr(o.fromAddress || primaryAddress(auth));
       let fromSet = false;
       let fromHint = null;
-      if (wantFrom && draft.isDraft !== false) {
+      if (wantFrom && draft.isDraft !== false && !isOpaqueMailbox(wantFrom)) {
         try {
-          const patched = await graphWrite(token, 'PATCH', draftUrl, { from: { emailAddress: { address: wantFrom } } });
-          const got = patched && patched.from && patched.from.emailAddress && patched.from.emailAddress.address;
-          fromSet = Boolean(wantFrom && normAddr(got) === wantFrom);
+          const patched = await graphWrite(token, 'PATCH', draftUrl, {
+            from: { emailAddress: { address: wantFrom } },
+            sender: { emailAddress: { address: wantFrom } }
+          });
+          const gotFrom = patched && patched.from && patched.from.emailAddress && patched.from.emailAddress.address;
+          const gotSender = patched && patched.sender && patched.sender.emailAddress && patched.sender.emailAddress.address;
+          fromSet = Boolean(
+            (gotFrom && normAddr(gotFrom) === wantFrom) ||
+            (gotSender && normAddr(gotSender) === wantFrom)
+          );
+          // Some Graph responses omit from/sender on PATCH; re-GET to verify.
           if (!fromSet) {
+            try {
+              const check = await graphGet(token, draftUrl + '?$select=id,from,sender');
+              const cFrom = check && check.from && check.from.emailAddress && check.from.emailAddress.address;
+              const cSender = check && check.sender && check.sender.emailAddress && check.sender.emailAddress.address;
+              fromSet = Boolean(
+                (cFrom && normAddr(cFrom) === wantFrom) ||
+                (cSender && normAddr(cSender) === wantFrom)
+              );
+              if (!fromSet && ((cFrom && isOpaqueMailbox(cFrom)) || (cSender && isOpaqueMailbox(cSender)))) {
+                fromHint = 'Outlook may keep its primary mailbox address on From. Set your preferred alias as primary in the Microsoft account if drafts should show that address.';
+              }
+            } catch (e2) { /* verification optional */ }
+          }
+          if (!fromSet && !fromHint) {
             fromHint = 'Outlook may keep its primary mailbox address on From. Set your preferred alias as primary in the Microsoft account if drafts should show that address.';
           }
         } catch (e) {

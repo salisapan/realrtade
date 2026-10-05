@@ -93,7 +93,7 @@ it, not touching the module.
 | `outlook-config.js` | The application (client) ID of the registered "Glance Outlook" Microsoft Entra app. Public; a placeholder until the owner registers it (open-tasks). |
 | `outlook-sync.js` | What to do with the last couple of weeks of an Outlook mailbox. |
 | `outlook-state-migrate.js` | One-shot upgrade: merge leftover HANDLED+UNDONE Outlook draft rows and scrub false-close counts for prepared-draft undos. |
-| `draft-reply.js` | Shared reply-draft body for Gmail and Outlook (never sent): same greeting + follow-up shape as the Gmail Do It path. |
+| `draft-reply.js` | Shared reply-draft body for Gmail and Outlook (never sent): rich ack of concrete asks (facts when known; placeholders only when needed), same shape on both surfaces. |
 | `owa-parse.js` | Outlook on the web reading-pane helpers (URL item id, subject/sender/body, match to sync entries). Selectors are best-effort against OWA markup. |
 | `outside-signals.js` | Loops that close without the other person replying |
 | `person-model.js` | A model of HOW LONG each person takes — portable, no chrome.*, no DOM, no network, no model service. |

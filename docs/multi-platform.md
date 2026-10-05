@@ -90,7 +90,7 @@ last 14 days of the inbox and the sent folder (50 per page, two pages, text bodi
 decides: a reply closes or moves a loop exactly as in Gmail, your chase moves the day, a new ask or promise of yours is only OFFERED in
 the popup ("Waiting on a reply? Stay on it"), and an incoming ask from someone else is shown **once** in the unified Loops list (source line
 "From Outlook"; same silence bar as Gmail). On Do It, Glance creates a reply DRAFT in Outlook Drafts via Graph `createReply` (Mail.ReadWrite)
-with an on-device body from `core/outlook-reply.js` (acknowledge the asks, fill-in placeholder, no em dash; never sends). The Loops card turns
+with an on-device body from `core/draft-reply.js (shared with Gmail)` (acknowledge the asks, fill-in placeholder, no em dash; never sends). The Loops card turns
 into the receipt in place ("Reply draft ready in Outlook Drafts. Not sent." + Open draft + Undo). Undo deletes only that draft while it is
 still a draft, converts the Activity row to Undone (no second HANDLED row), and does **not** count as a false close (a prepared draft is not
 a trusted close). A reply that cannot be linked to a loop for sure only asks ("Does this settle it?"). An answer that arrives in Outlook can
@@ -100,7 +100,7 @@ smtp:, plus learned sentitems senders and sole inbox toRecipients).
 **From address (verified vs inferred):** Graph allows PATCH `from` on a draft when the address belongs to the mailbox. Personal MSA accounts
 often keep the account's primary alias on From even after PATCH; if the preferred alias does not stick, Setup shows a one-line hint to set it
 as primary in the Microsoft account. Verified in code path; live MSA rewrite behaviour is account-dependent (inferred from Graph docs + live
-0.9.3 observation of an `outlook_…@outlook.com` primary).
+0.9.3 observation of an `outlook_…@outlook.com` primary; 0.9.9 skips opaque CID when a human alias is known and PATCHes from+sender).
 
 What it does not do: it never sends (never `Mail.Send`, never `/send`, `/reply`, `/replyAll`, `/forward`, `/sendMail`). Allowed non-GET
 Graph calls are exactly: the token exchange, `createReply`, PATCH of a Glance-created draft (body and attempted `from`), DELETE of a
