@@ -324,11 +324,14 @@ const FlowIntent = (() => {
   // decision the reader has not made. "Could you confirm the payment by
   // Friday" stays a request: it names the work, not a yes to the deal.
   // "confirm whether" asks which way it went; it does not record one.
+  // Exception: "confirm by <deadline> whether ..." is still a dated ask
+  // (reply by that day). Silencing it hid real inbox asks (Outlook live
+  // 0.9.2: "confirm by Wednesday whether we can start next week").
   function readerDecisionAsk(text) {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
     if (/\b(?:please|kindly|do you)\s+(?:agree|accept)\b/i.test(raw)) return true;
-    if (/\bconfirm\b/i.test(raw) && /\bwhether\b/i.test(raw)) return true;
+    if (/\bconfirm\b/i.test(raw) && /\bwhether\b/i.test(raw) && !/\bconfirm\s+by\b/i.test(raw)) return true;
     if (/\b(?:please|kindly)\s+confirm\b/i.test(raw) && /\bagree[ds]?\b/i.test(raw)) return true;
     if (/(?:^|\s)האם\s/.test(raw) && /מסכימ/.test(raw)) return true;
     if (/(?:^|\s)אתה\s+מסכים/.test(raw) || /(?:^|\s)אתם\s+מסכימים/.test(raw)) return true;

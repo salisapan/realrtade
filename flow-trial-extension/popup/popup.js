@@ -833,6 +833,23 @@
           + '.')
         : 'Not checked yet.';
       row.appendChild(el('div', 'wait-note', (who ? ('Signed in as ' + who + '. ') : '') + idN + ' identities. ' + checked));
+      const diags = Array.isArray(st.diagnostics) ? st.diagnostics : [];
+      if (diags.length) {
+        const details = document.createElement('details');
+        details.className = 'wait-note';
+        const sum = document.createElement('summary');
+        sum.textContent = 'Why not shown (' + diags.length + ')';
+        details.appendChild(sum);
+        const list = el('div', 'wait-note');
+        // Safe local-only readout: subject + reason code, no body text.
+        diags.slice(0, 20).forEach((d) => {
+          const sub = (d.subject || '(no subject)').slice(0, 80);
+          const who2 = d.counterpart ? (' · ' + d.counterpart) : '';
+          list.appendChild(el('div', 'wait-note', d.reason + ' — “' + sub + '”' + who2));
+        });
+        details.appendChild(list);
+        row.appendChild(details);
+      }
     }
     if (st.error) {
       const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)

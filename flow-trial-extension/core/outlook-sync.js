@@ -56,7 +56,7 @@ const FlowOutlookSync = (() => {
   // opts: { messages, me, watches, graph, state:{offered,declined,incomingDeclined}, now, deps:{ extract, types, pipeline, intent, factReply } }
   function plan(opts) {
     const o = opts || {};
-    const out = { patches: [], offers: [], incoming: [], asks: [], parties: [], lines: [], stats: { conversations: 0, closed: 0, moved: 0, offers: 0, incoming: 0 } };
+    const out = { patches: [], offers: [], incoming: [], asks: [], parties: [], lines: [], diagnostics: [], stats: { conversations: 0, closed: 0, moved: 0, offers: 0, incoming: 0 } };
     if (!followUp || !graphMail || !channel) return out;
     const now = typeof o.now === 'number' ? o.now : Date.now();
     const me = o.me;
@@ -82,14 +82,21 @@ const FlowOutlookSync = (() => {
       const utts = threads[conv].sort(sortByTime);
       const last = utts[utts.length - 1];
       const raws = utts.map((u) => byId[u.id]);
+      const lastRaw0 = byId[last.id] || {};
+      const subject0 = String(lastRaw0.subject || '').slice(0, 120);
+      function note(reason, extra) {
+        const row = { conversationId: conv, subject: subject0, reason: reason, direction: last.direction };
+        if (extra) Object.assign(row, extra);
+        out.diagnostics.push(row);
+      }
       const cp = graphMail.counterpartOf(raws, me);
       // Note to self (every party is me): produce nothing.
-      if (!cp) { out.stats.conversations++; return; }
+      if (!cp) { out.stats.conversations++; note('note-to-self'); return; }
       if (cp.email && !seenParty[cp.email]) { seenParty[cp.email] = true; out.parties.push(cp); }
       out.stats.conversations++;
       const id = watchId(conv);
       const w = watches.find((x) => x && x.id === id) || null;
-      const lastRaw = byId[last.id] || {};
+      const lastRaw = lastRaw0;
 
       // ---- your message is the newest ------------------------------------------------------------------
       if (last.direction === 'out') {
@@ -112,21 +119,22 @@ const FlowOutlookSync = (() => {
         }
         if (w) return;
         const key = conv + '|' + last.id;
-        if (offered[key] || declined[key] || out.offers.length >= MAX_OFFERS) return;
+        if (offered[key] || declined[key] || out.offers.length >= MAX_OFFERS) { note(declined[key] ? 'offer-declined' : (offered[key] ? 'offer-already' : 'offers-capped')); return; }
         const ask = followUp.classifyOutgoing(last.text, cls) || followUp.classifyCommitment(last.text, cls);
-        if (!ask || !cp) return;
+        if (!ask || !cp) { note(!ask ? 'out-no-ask' : 'out-no-counterpart'); return; }
         out.offers.push({
           key, conversationId: conv, messageId: last.id, ask,
           base: { threadId: id, messageId: last.id, subject: String(lastRaw.subject || '').slice(0, 160), counterpart: { name: cp.name, email: cp.email, phone: null }, channel: 'outlook', threadUrl: lastRaw.webLink || null }
         });
         out.stats.offers++;
+        note('shown-offer', { counterpart: cp.email || null });
         return;
       }
 
       // ---- their message is the newest -------------------------------------------------------------------
       const party = last.from;
       // Never classify a message whose sender is in ownAddresses.
-      if (meSet && graphMail.isOwn && graphMail.isOwn(party.email, meSet)) return;
+      if (meSet && graphMail.isOwn && graphMail.isOwn(party.email, meSet)) { note('own-sender', { counterpart: party.email || null }); return; }
 
       let target = w && w.status === 'waiting' && !followUp.isMine(w) && !followUp.isClock(w) ? w : null;
       let via = null;
@@ -176,17 +184,17 @@ const FlowOutlookSync = (() => {
           return;
         }
       }
-      if (crossHandled) return;
+      if (crossHandled) { note('cross-channel'); return; }
       // An incoming ask in a conversation that already has a loop: handled above as a reply, not as a second item.
-      if (w) return;
+      if (w) { note(w.status === 'waiting' ? 'has-open-loop' : 'has-loop'); return; }
 
       // ---- incoming ask: someone else asked you something (same judge Gmail uses) ------------------------
       // Fall through instead of returning silently when no loop / story / crossChannel hit.
       const intentApi = deps.intent || (typeof FlowIntent !== 'undefined' ? FlowIntent : null);
-      if (!intentApi || typeof intentApi.classify !== 'function') return;
-      if (out.incoming.length >= MAX_INCOMING) return;
+      if (!intentApi || typeof intentApi.classify !== 'function') { note('no-intent-api'); return; }
+      if (out.incoming.length >= MAX_INCOMING) { note('incoming-capped'); return; }
       const ikey = conv + '|' + last.id;
-      if (incomingDeclined[ikey] || declined[ikey]) return;
+      if (incomingDeclined[ikey] || declined[ikey]) { note('incoming-declined'); return; }
       const subject = String(lastRaw.subject || '');
       const text = (subject ? subject + '\n' : '') + last.text;
       const intent = intentApi.classify(text, {
@@ -194,8 +202,18 @@ const FlowOutlookSync = (() => {
         calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
         now: new Date(now)
       });
-      if (!intent || !intentApi.shouldShowChip(intent)) return;
-      if (deps.factReply && typeof deps.factReply.blocksInbox === 'function' && deps.factReply.blocksInbox(intent, text)) return;
+      if (!intent || !intent.type) {
+        note(intent && intent.quiet ? ('quiet:' + intent.quiet) : 'intent-null', { counterpart: party.email || null });
+        return;
+      }
+      if (!intentApi.shouldShowChip(intent)) {
+        note('chip-low-confidence', { counterpart: party.email || null, intentType: intent.type });
+        return;
+      }
+      if (deps.factReply && typeof deps.factReply.blocksInbox === 'function' && deps.factReply.blocksInbox(intent, text)) {
+        note('fact-reply-block', { counterpart: party.email || null });
+        return;
+      }
       out.incoming.push({
         key: ikey, conversationId: conv, messageId: last.id, intent,
         base: {
@@ -207,7 +225,9 @@ const FlowOutlookSync = (() => {
         }
       });
       out.stats.incoming++;
+      note('shown-incoming', { counterpart: party.email || null, intentType: intent.type });
     });
+    if (out.diagnostics.length > 40) out.diagnostics = out.diagnostics.slice(0, 40);
     return out;
   }
 

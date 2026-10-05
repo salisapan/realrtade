@@ -163,6 +163,34 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
 }
 
 
+
+console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
+{
+  const fs = require('fs'); const path = require('path'); const vm = require('vm');
+  const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+  vm.createContext(sandbox);
+  for (const f of ['domains.js','extract.js','judgment.js','google-closes.js','close-families.js','fact-reply.js','intent.js','actions.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+  }
+  const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+  const NOW2 = Date.parse('2026-10-05T14:06:00+03:00');
+  const OUT = 'glance.salisapan@outlook.com';
+  const LIVE_BODY = 'Hi Sali,\n\nCould you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.\n\nThanks,\nFlow team';
+  const ask = { id: 'a1', conversationId: 'convA', subject: 'Could you review the pilot proposal and confirm by Wednesday?', isDraft: false,
+    from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } },
+    toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+    receivedDateTime: '2026-10-05T10:21:00Z', webLink: 'https://outlook.office.com/mail/id/a1',
+    body: { contentType: 'text', content: LIVE_BODY } };
+  const intentDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent };
+  const r = S.plan({ messages: [ask], me: [OUT, 'salisapan1@gmail.com'], watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps });
+  check('live Flow-team body: one incoming (not quiet:hedge)', r.incoming.length === 1 && r.incoming[0].base.counterpart.email === 'ai.local.flow@gmail.com', { incoming: r.incoming, diagnostics: r.diagnostics });
+  check('live Flow-team body: diagnostic shows shown-incoming', (r.diagnostics || []).some((d) => d.reason === 'shown-incoming'), r.diagnostics);
+  const bare = FlowIntent.classify(LIVE_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', now: new Date(NOW2) });
+  check('classify alone: request chip for confirm-by-Wednesday-whether', bare.type === 'request' && FlowIntent.shouldShowChip(bare), { type: bare.type, quiet: bare.quiet, label: bare.label });
+  const hedgeStill = FlowIntent.classify('Can you confirm whether the proposal at $3,900 still works?', { senderEmail: 'x@y.com', senderName: 'X', now: new Date(NOW2) });
+  check('bare confirm-whether (no "confirm by") still quiet hedge', !hedgeStill.type && hedgeStill.quiet === 'hedge', hedgeStill);
+}
+
 console.log('\n--- learn own addresses from inbox recipients ---\n');
 {
   const { FlowGraphMail: G } = require('../core/graph-mail.js');

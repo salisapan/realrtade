@@ -66,7 +66,7 @@ const FlowOutlook = (() => {
       await write(STATE_KEY, Object.assign({}, st, {
         offered: {}, declined: {}, incomingDeclined: {},
         lastAt: null, lastCount: 0, lastIncoming: 0, lastOffers: 0,
-        error: null, stateVersion: STATE_VERSION
+        error: null, stateVersion: STATE_VERSION, diagnostics: []
       }));
     }
 
@@ -101,7 +101,9 @@ const FlowOutlook = (() => {
         error: st.error || null, errorDetail: st.errorDetail || null, aadsts: st.aadsts || null,
         redirectUri: deps.redirectUri(),
         offers: (pending.offers || []).length, asks: (pending.asks || []).length,
-        incoming: (pending.incoming || []).length, origins: ORIGINS
+        incoming: (pending.incoming || []).length,
+        diagnostics: Array.isArray(st.diagnostics) ? st.diagnostics.slice(0, 40) : [],
+        origins: ORIGINS
       };
     }
 
@@ -408,16 +410,18 @@ const FlowOutlook = (() => {
 
       const offeredKeys = Object.keys(offered);
       if (offeredKeys.length > 200) offeredKeys.slice(0, offeredKeys.length - 200).forEach((k) => { delete offered[k]; });
+      const diagnostics = (p.diagnostics || []).slice(0, 40);
       await write(STATE_KEY, {
         lastAt: now, lastCount: p.stats.conversations, lastIncoming: (p.incoming || []).length, lastOffers: offers.length,
         error: null, needsSignIn: false, draftConsentNeeded: Boolean(st.draftConsentNeeded),
         offered, declined: st.declined || {}, incomingDeclined: st.incomingDeclined || {},
-        stateVersion: STATE_VERSION
+        stateVersion: STATE_VERSION, diagnostics
       });
       return {
         ok: true, conversations: p.stats.conversations, closed: p.stats.closed, moved: p.stats.moved,
         offers: offers.length, asks: p.asks.length, incoming: (p.incoming || []).length,
-        ownAddressCount: ownList.length, primary: primaryAddress(auth), lines: p.lines
+        ownAddressCount: ownList.length, primary: primaryAddress(auth), lines: p.lines,
+        diagnostics
       };
     }
     // ---- Do It: create a reply draft in Outlook Drafts (never send) --------------------------------------
