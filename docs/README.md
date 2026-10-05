@@ -88,6 +88,7 @@ it opens on the **Home** bookmark (`docs/vault/Home.md`). Every document in this
 
 - **What it is:** a context cache so a new chat (CoS, a Grok bot, Claude Code, the owner) does not start from zero: `vault/decisions.md` (one line per decision, newest first), one note per stream
   (`vault/outlook-status.md`, `vault/living-icon-handoff.md`), the owner's own words on taste and rejections, and dated session logs in `vault/sessions/`.
+- **Claude ↔ CoS bridge:** `vault/bridge/` is a message drop between Claude Code and CoS (`to-cos/`, `to-claude/`). Messaging only; it does not change product truth. Protocol: `vault/bridge/README.md`.
 - **What it is not:** a source of truth. Code and product truth stay in `CLAUDE.md` and the documents above. When the vault and a document disagree, the document wins and the vault is fixed.
   `vault/glance-definition.md` quotes the locked block verbatim and `test/docs-consistency-corpus.cjs` fails if it drifts.
 - **Before a stream:** skim `vault/Home.md`, the top of `vault/decisions.md` and the stream note, then the reading order in §0.

@@ -5,6 +5,7 @@ tags: [decisions]
 
 One line per decision: `date · decision · who · where it is written in docs/`. Full status stays in [[open-tasks]]; this is the fast index for a new chat.
 
+- 2026-10-05 · Claude Code ↔ CoS bridge is a file drop under `vault/bridge/` (webhook optional, no secrets in git); messaging only · Sali · [[vault/bridge/README]], [[open-tasks]] row 41
 - 2026-10-05 · Obsidian vault = `docs/` (context notes in `docs/vault/`); context cache, docs stay the truth · Sali · [[README]] §5
 - 2026-10-05 · Living toolbar icon handed to Claude Code (one living body, not a flipbook) · Sali · [[living-icon-handoff]]
 - 2026-10-05 · Outlook Mail.ReadWrite yes, drafts only, never send, Undo deletes the draft · Sali · [[open-tasks]] row 21b, [[multi-platform]]

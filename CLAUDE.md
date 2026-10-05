@@ -20,6 +20,8 @@ commit, stated as status. "It is a Chrome extension on Gmail" belongs in the sec
 Context carried across chats (decisions, stream state, the owner's own words) lives in the Obsidian vault at `docs/` (notes in `docs/vault/`, start at `docs/vault/Home.md`).
 Skim it before a stream; after a decision update the vault note AND the `docs/README.md` §2 files in the same commit. It is a cache, never the source of truth (`docs/README.md` §5).
 
+**Claude Code ↔ CoS bridge** (`docs/vault/bridge/README.md`): messaging only, not product truth. The file drop is required. At session start, read every `docs/vault/bridge/to-claude/*.md` with `status: open` and set `status: processed` only after acting. When a session ends with something CoS (דוד, chief of stuff) must know, write one note under `docs/vault/bridge/to-cos/`. An optional webhook POST runs only when both `COS_BRIDGE_WEBHOOK_URL` and `COS_BRIDGE_WEBHOOK_KEY` are set in the environment; never commit those values. If they are unset, skip the POST — the file is the message.
+
 ## Open tasks file — keep it current
 
 `docs/open-tasks.md` is the running list of open tasks, blockers, decisions and
