@@ -90,10 +90,6 @@ const GLANCE_TASK_LIST_TITLE = 'Glance';
 const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 const GOOGLE_GMAIL_API = 'https://gmail.googleapis.com/gmail/v1';
 const GOOGLE_DRIVE_API = 'https://www.googleapis.com/drive/v3';
-// The Picker API key itself (a second, separate Google Cloud credential
-// from the OAuth Client ID above) lives only in picker/picker.js — that
-// page is what calls setDeveloperKey(), and there's nothing for this file
-// to do with the key itself, only with the OAuth-authed file access above.
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -2050,60 +2046,6 @@ async function gmailDraftUndo(ref) {
   return { ok: true };
 }
 
-/* ------------------------------------------------------ Google Drive picker */
-
-// content-gmail.js can't open chrome.windows itself (that API isn't exposed
-// to content scripts), and the picker has to live in its own extension page
-// rather than be loaded into the Gmail tab — Gmail's own CSP would be the
-// one deciding whether https://apis.google.com's gapi loader is even
-// allowed to run there, and there is no reason to depend on that. So the
-// content script asks this worker to open the window, and this worker
-// remembers which Gmail tab asked, keyed by the requestId the content
-// script minted — multiple Gmail tabs can each have a picker open at once
-// without their results crossing.
-const pendingDrivePickers = new Map(); // requestId -> { tabId, windowId }
-
-async function openDrivePicker(payload, sender) {
-  const requestId = payload && payload.requestId;
-  const tabId = sender && sender.tab && sender.tab.id;
-  if (!requestId || !tabId) return { ok: false, error: 'Missing request context.' };
-
-  const win = await chrome.windows.create({
-    url: chrome.runtime.getURL('picker/picker.html') + '?requestId=' + encodeURIComponent(requestId),
-    type: 'popup',
-    width: 640,
-    height: 620
-  });
-  if (!win) return { ok: false, error: 'Could not open the Drive picker window.' };
-  pendingDrivePickers.set(requestId, { tabId, windowId: win.id });
-  return { ok: true };
-}
-
-// picker.js posts this once, then closes its own window — this only ever
-// routes the result back to the one Gmail tab that asked for it (via
-// chrome.tabs.sendMessage), never a broadcast, so a second open Gmail tab
-// never sees a file meant for the first.
-function deliverDrivePickerResult(payload) {
-  const { requestId, file, cancelled } = payload || {};
-  const info = pendingDrivePickers.get(requestId);
-  if (!info) return { ok: true }; // already delivered, or the requesting tab is gone
-  pendingDrivePickers.delete(requestId);
-  chrome.tabs.sendMessage(info.tabId, { type: 'flow:drive-file-result', requestId, file, cancelled }).catch(() => {});
-  return { ok: true };
-}
-
-// The user closing the picker window (Escape, the × button, alt-F4) is a
-// cancellation that never posts flow:drive-file-picked at all — without
-// this, the content script's awaiting promise would simply hang forever.
-chrome.windows.onRemoved.addListener((windowId) => {
-  for (const [requestId, info] of pendingDrivePickers) {
-    if (info.windowId === windowId) {
-      pendingDrivePickers.delete(requestId);
-      chrome.tabs.sendMessage(info.tabId, { type: 'flow:drive-file-result', requestId, cancelled: true }).catch(() => {});
-    }
-  }
-});
-
 /* ------------------------------------------------------------------ Notion */
 
 async function getNotionAuth() {
@@ -2496,14 +2438,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'flow:drive-find-one') {
     return reply(sendResponse, driveFindOneByName(msg.term));
-  }
-
-  if (msg.type === 'flow:open-drive-picker') {
-    return reply(sendResponse, openDrivePicker(msg.payload || {}, sender));
-  }
-
-  if (msg.type === 'flow:drive-file-picked') {
-    return reply(sendResponse, Promise.resolve(deliverDrivePickerResult(msg.payload || {})));
   }
 
   // Fire-and-forget, same as flow:track below — the caller already computed

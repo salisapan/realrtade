@@ -1004,56 +1004,6 @@
     return svg;
   }
 
-  // content-gmail.js can't open a chrome.windows popup itself — that API
-  // isn't exposed to content scripts — so opening the Drive picker means
-  // asking background.js to do it, then waiting for the result to come back
-  // as its own message (the picker is a separate window the user interacts
-  // with for as long as they like, not something a single request/response
-  // round-trip can represent). resolves null on cancel, on a background.js
-  // failure (e.g. the picker API key isn't configured yet), or if the
-  // picker window is closed without picking anything.
-  //
-  // The one gap that pattern doesn't cover on its own: background.js's
-  // pendingDrivePickers map (the record of which requestId belongs to which
-  // Gmail tab) lives only in the service worker's memory. MV3 kills an idle
-  // service worker after a short window with no activity — entirely
-  // plausible while the user is just browsing folders in the picker with no
-  // messages passing through background.js — and a restart silently empties
-  // that map. picker.js still posts its result and still closes itself
-  // either way, so the window closing looks like nothing went wrong; but
-  // deliverDrivePickerResult() then finds no matching entry and treats it as
-  // "already delivered, or the tab is gone" (its own comment's other two
-  // cases), so flow:drive-file-result never arrives here. Without a bound,
-  // this promise — and the "Opening Drive…" chip that awaits it, disabled
-  // the whole time — would hang forever, exactly the "user gets stuck" this
-  // product treats as unacceptable everywhere else. DRIVE_PICKER_TIMEOUT_MS
-  // is generous enough to never fire on a real pick (minutes, not seconds)
-  // and simply resolves null — the same outcome an explicit cancel already
-  // produces — rather than inventing a new, scarier failure state for what
-  // is, from the user's side, indistinguishable from having closed the
-  // window themselves.
-  const DRIVE_PICKER_TIMEOUT_MS = 10 * 60 * 1000;
-  let drivePickerSeq = 0;
-  const pendingDrivePickerResolvers = new Map(); // requestId -> resolve(file|null)
-
-  function openDrivePicker() {
-    const requestId = 'dp_' + Date.now() + '_' + (++drivePickerSeq);
-    return new Promise((resolve) => {
-      const settle = (result) => {
-        if (!pendingDrivePickerResolvers.has(requestId)) return; // already settled via the other path
-        pendingDrivePickerResolvers.delete(requestId);
-        clearTimeout(timer);
-        resolve(result);
-      };
-      const timer = setTimeout(() => settle(null), DRIVE_PICKER_TIMEOUT_MS);
-      pendingDrivePickerResolvers.set(requestId, settle);
-      chrome.runtime.sendMessage({ type: 'flow:open-drive-picker', payload: { requestId } }, (response) => {
-        if (response && response.ok) return; // the real result arrives later via flow:drive-file-result
-        settle(null);
-      });
-    });
-  }
-
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg && msg.type === 'flow:still-open-do-it' && msg.messageId) {
       runStillOpenDoIt(msg.messageId);
@@ -1064,26 +1014,20 @@
       FlowStorage.getStillOpen()
         .then((open) => { if (open.length) openBriefPanel(open); })
         .catch((e) => console.error('[Glance] failed to open Still Open from the notification', e));
-      return;
     }
-    if (!msg || msg.type !== 'flow:drive-file-result') return;
-    // settle() itself guards against a requestId that's already gone (the
-    // open-ack failure path, or DRIVE_PICKER_TIMEOUT_MS already firing) and
-    // does its own map cleanup — no separate get/delete needed here.
-    const settle = pendingDrivePickerResolvers.get(msg.requestId);
-    if (settle) settle(msg.cancelled ? null : (msg.file || null));
   });
 
   // The attachment-choice row under the gmailDraft pill: one chip per real
-  // thread attachment (so the user can pick which one when there's more
-  // than one — this is the disambiguation surface, not a blocking prompt),
-  // plus a chip that opens the Drive picker as an alternative source.
-  // Mutates action.params directly — buildActionPayload() below reads
-  // whatever was last selected, defaulting to the thread's first attachment
-  // when the user never opens this row at all (the ordinary, one-attachment
-  // Zero-Prompt path this pill already handled before Drive existed).
+  // thread attachment, so the user can pick which one when there's more
+  // than one. This is the disambiguation surface, not a blocking prompt
+  // and not a Drive browser. A single high-confidence Drive match is
+  // already on the step (driveFileId from the one-match search) and this
+  // row is not shown in that case. Mutates action.params directly —
+  // buildActionPayload() below reads whatever was last selected, defaulting
+  // to the thread's first attachment when the user never opens this row.
   function buildAttachChooser(action, ctx) {
     const attachments = ctx.attachments && ctx.attachments.length ? ctx.attachments : (ctx.attachment ? [ctx.attachment] : []);
+    if (!attachments.length) return null;
 
     const row = el('div', 'flow-chip-attach-row');
     row.setAttribute('dir', 'ltr');
@@ -1106,27 +1050,6 @@
       });
       row.appendChild(chip);
     });
-
-    const driveChip = el('button', 'flow-chip-attach-chip flow-chip-attach-drive', attachments.length ? 'Choose from Drive instead' : 'Attach from Drive');
-    driveChip.type = 'button';
-    driveChip.setAttribute('aria-pressed', 'false');
-    chips.push(driveChip);
-    driveChip.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const prevLabel = driveChip.textContent;
-      driveChip.textContent = 'Opening Drive…';
-      driveChip.disabled = true;
-      const picked = await openDrivePicker();
-      driveChip.disabled = false;
-      if (!picked) { driveChip.textContent = prevLabel; return; }
-      action.params.selectedAttachment = null;
-      action.params.driveFileId = picked.id;
-      action.params.driveFileName = picked.name;
-      action.params.driveMimeType = picked.mimeType;
-      driveChip.textContent = 'Drive: ' + picked.name;
-      selectChip(driveChip);
-    });
-    row.appendChild(driveChip);
 
     return row;
   }
@@ -1389,12 +1312,12 @@
         pillRow.appendChild(pill);
 
         // Only the gmailDraft pill ever has a document to choose — and only
-        // when it actually wants one. Google-ecosystem-only, same as every
-        // other write path here: the choice is between this thread's own
-        // attachment(s) and a single file picked from Drive, nothing else.
+        // when it actually wants one that the one-match Drive search did
+        // not already resolve. The choice is among this thread's own
+        // attachments. There is no Drive browser.
         if (step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId) {
           attachChooser = buildAttachChooser(step, ctx);
-          pillRow.appendChild(attachChooser);
+          if (attachChooser) pillRow.appendChild(attachChooser);
         }
       }
     }
@@ -1563,10 +1486,10 @@
     }
 
     if (action.kind === 'gmailDraft') {
-      // selectedAttachment/driveFileId are only ever set by the attach
-      // chooser (buildAttachChooser, above) — if the user never opened it,
-      // both stay undefined and this falls back to exactly the old
-      // single-attachment behaviour: the thread's first real attachment.
+      // selectedAttachment is set only by the thread-attachment chooser.
+      // driveFileId comes from the one-match Drive search in actions.js,
+      // before this chip is built. If the user never opens the chooser,
+      // this falls back to the thread's first real attachment.
       const { selectedAttachment, driveFileId, driveFileName, driveMimeType, ...cleanParams } = action.params;
       if (cleanParams.shareLink) {
         if (!priorUrl) return null;

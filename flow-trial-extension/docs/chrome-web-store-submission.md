@@ -153,7 +153,7 @@ Use these verbatim — each is traceable to the exact code that uses it.
 | `host_permissions: https://mail.google.com/*` | The content script (`src/content-gmail.js`) runs only on Gmail to read the open message's visible text, subject, and sender, and to inject the Do It button / Morning Brief UI. |
 | `host_permissions: https://tasks.googleapis.com/*` | Direct API calls to create/undo a Google Tasks reminder after the user clicks Do It. |
 | `host_permissions: https://www.googleapis.com/calendar/*` | Direct API calls to create/undo a Google Calendar event after the user clicks Do It. |
-| `host_permissions: https://www.googleapis.com/drive/*` | Read calls (`drive.readonly`) when the user clicks Do It on a message that clearly asks for one file: search that account's Drive and attach only a single high-confidence match to an unsent Gmail draft (`searchDriveFiles` in `src/background.js`, ranked in `core/file-attach.js`). The same read confirms there is exactly one file before a calendar, task, or template create. If more than one file could be the one, Glance stays silent. The optional Drive picker remains a secondary control, not the close. |
+| `host_permissions: https://www.googleapis.com/drive/*` | Read calls (`drive.readonly`) when the user clicks Do It on a message that clearly asks for one file: search that account's Drive and attach only a single high-confidence match to an unsent Gmail draft (`searchDriveFiles` in `src/background.js`, ranked in `core/file-attach.js`). The same read confirms there is exactly one file before a calendar, task, or template create. If more than one file could be the one, Glance stays silent. There is no Drive file browser and no Google Picker. |
 | `host_permissions: https://www.googleapis.com/upload/drive/*` | `drive.file` only. When a clear ask has no safe match and exactly one company template for that object exists, Do It uploads a new file made from that template and attaches it to the unsent draft. The same upload creates a Doc, Sheet, or saved file for a create-and-share close. Undo deletes that new file. Glance does not edit the template or any other Drive file. No full `drive`, `documents`, or `spreadsheets` scope. |
 | `host_permissions: https://gmail.googleapis.com/*` | Direct API calls to create/undo a Gmail draft reply after the user clicks Do It. |
 | `host_permissions: https://theflow-ai.com/*` | Calls Glance's own Netlify Functions for the two opt-in AI features (Draft-It, attachment summary), which only ever receive masked placeholder text, and for the anonymous, aggregate-only usage-count pings described below. |
@@ -233,18 +233,26 @@ Store screenshots must be exactly 1280×800 or 640×400, so this is source
 material to composite onto a listing-sized canvas (centered, with your own
 background/framing), not something to upload as-is.
 
-## Manifest notes confirmed correct (no action needed)
+## Manifest notes
 
-- **`manifest.json`'s pinned `key` field is intentional and correct** — it
-  keeps the extension ID (`dnjhplgmnkabbjogfpbhofjedlkehkai`) stable across
-  reloads and across the eventual Store listing. That exact ID is what
-  Google's own OAuth Client ID (the live connector — see `README.md`'s "Set
-  up Google" section, step 4's "Item ID") is registered against, and it's
-  also baked into the four non-Google connectors' OAuth redirect URLs even
-  though they're out of scope for this listing today. **Do not remove this
-  key before submitting** — removing it would let Chrome Web Store assign a
-  different ID and break Google sign-in along with every other connector's
-  redirect.
+- **The store build must not include `key`.** The `"key"` field in the
+  repo's `manifest.json` exists only so Load unpacked stays on extension ID
+  `dnjhplgmnkabbjogfpbhofjedlkehkai`. That ID is what the Google OAuth
+  Client ID (`README.md`, "Set up Google", step 4's Item ID) and the four
+  non-Google connectors' redirect URLs are registered against. Leave `key`
+  in git. Delete it from the `manifest.json` inside the zip you upload to
+  the Chrome Web Store. The dashboard rejects a package whose `key` does
+  not match the item the store already holds, and shipping `key` is not
+  how the listing's ID is pinned — the store holds that key itself. Do not
+  regenerate the repo key; that changes the unpacked ID and breaks the
+  registered OAuth client.
+- **No remote code.** `picker/` is not in the package. That page loaded
+  `https://apis.google.com/js/api.js` (Google Picker) and its API key was
+  a placeholder. Drive attach is the one-match search above. The manifest
+  has no `web_accessible_resources` entry, no CSP exception for
+  `apis.google.com`, and no host permission that exists only to load that
+  script. `content_security_policy.extension_pages` stays
+  `script-src 'self'; object-src 'self'`.
 - `chrome.tabs.create()` in `background.js` does not require the `"tabs"`
   permission (only reading cross-tab data would) — no permission gap there.
 - Icons (16/48/128) are present and correctly sized.
