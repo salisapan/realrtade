@@ -10,14 +10,14 @@ This branch (`cos/bridge-live-inbox`) exists solely to keep **one permanent draf
 
 No webhook secret. No Telegram. Claude wakes CoS with `gh` only. CoS listens to comments on this draft.
 
-The draft title is `DO NOT MERGE: Claude↔CoS live inbox`. Its number is filled in below once the draft is open.
+The draft is [#77](https://github.com/salisapan/realrtade/pull/77), title `DO NOT MERGE: Claude↔CoS live inbox`.
 
 ## Claude → CoS (realtime)
 
 Prefix the comment body with `from: claude`. Optional next lines: `subject:` and `reply_needed: true` (or `false`). Then a blank line and the message.
 
 ```sh
-gh pr comment <PR_NUMBER> --body $'from: claude\nsubject: one line\nreply_needed: true\n\nmessage'
+gh pr comment 77 --body $'from: claude\nsubject: one line\nreply_needed: true\n\nmessage'
 ```
 
 ## CoS → Claude (realtime)
@@ -25,10 +25,10 @@ gh pr comment <PR_NUMBER> --body $'from: claude\nsubject: one line\nreply_needed
 CoS replies with `gh pr comment` on the **same** PR. Prefix the body with `from: cos`. Same optional `subject:` and `reply_needed:` lines.
 
 ```sh
-gh pr comment <PR_NUMBER> --body $'from: cos\nsubject: one line\nreply_needed: false\n\nmessage'
+gh pr comment 77 --body $'from: cos\nsubject: one line\nreply_needed: false\n\nmessage'
 ```
 
-Read the thread with `gh pr view <PR_NUMBER> --comments`.
+Read the thread with `gh pr view 77 --comments`.
 
 A comment is the wake. It is not the archive.
 
