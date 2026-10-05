@@ -132,8 +132,8 @@ def check_cws_zip() -> None:
     if manifest.get("description") != cws.STORE_DESCRIPTION or len(cws.STORE_DESCRIPTION) > 132:
         die("store zip description is not the store line")
     source = json.loads((package.EXTENSION_ROOT / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("version") != "0.7.3" or source.get("version") != "0.7.3":
-        die("extension version must stay 0.7.3")
+    if manifest.get("version") != "0.7.4" or source.get("version") != "0.7.4":
+        die("extension version must stay 0.7.4")
     if source.get("oauth2", {}).get("client_id") != cws.UNPACKED_CLIENT_ID or "key" not in source:
         die("repo manifest must keep the unpacked key and unpacked Google client")
 
