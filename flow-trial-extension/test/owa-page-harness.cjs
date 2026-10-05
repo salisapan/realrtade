@@ -39,7 +39,8 @@ async function runPage(opts) {
   const files = registeredFiles();
   let html = fs.readFileSync(path.join(__dirname, 'fixtures/owa-reading-pane-he.html'), 'utf8');
   if (o.htmlPatch) html = o.htmlPatch(html);
-  const dom = new JSDOM(html, { url: 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(o.urlId || CONV), runScripts: 'outside-only', pretendToBeVisual: true });
+  const url = o.url || ('https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(o.urlId || CONV));
+  const dom = new JSDOM(html, { url, runScripts: 'outside-only', pretendToBeVisual: true });
   const w = dom.window;
   // innerText needs layout in a real browser; here block elements become lines.
   Object.defineProperty(w.HTMLElement.prototype, 'innerText', { get() { return this.innerHTML.replace(/<br\s*\/?>/g, '\n').replace(/<\/div>/g, '\n').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/\n{3,}/g, '\n\n').trim(); } });
@@ -97,8 +98,13 @@ async function runPage(opts) {
   const deadline = Date.now() + (o.waitMs || 6000);
   while (Date.now() < deadline && !w.document.querySelector('.flow-chip-host')) await new Promise((r) => setTimeout(r, 100));
   await new Promise((r) => setTimeout(r, 300));
+  const logsAtCard = logs.length;
+  // Keep the page churning with the card up, to see whether the open message is judged again on every tick.
+  if (o.afterMs) await new Promise((r) => setTimeout(r, o.afterMs));
   clearInterval(ad);
-  const res = { files, throws, logs, store, sent, chip: w.document.querySelector('.flow-chip-host'), doc: w.document };
+  let parsed = null;
+  try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
+  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), doc: w.document };
   w.close();
   return res;
 }
@@ -153,6 +159,38 @@ async function runPage(opts) {
     // The conversation is in the mailbox but the address carries a message id Graph spells with the other alphabet.
     const r = await runPage({ urlId: MSG.replace(/_/g, '/').replace(/-/g, '+'), store: { glanceDebug: true } });
     check('a message id in EWS spelling (+ and /) still matches the Graph id (- and _)', Boolean(r.chip) && r.logs.some((l) => /^Glance: matched/.test(l) && /message id/.test(l)), r.logs.filter((l) => /^Glance: matched/.test(l)));
+  }
+
+  console.log('\n--- live shape (0.9.15 live pass): the sender name is the heading inside the message, no address on the page ---\n');
+  {
+    // Real Hebrew OWA: subject "Pilot proposal" in the reading-pane header above the message; inside the message a heading
+    // with only the display name "flow" (the address lives in a hover card) and the "אל: <me>" row. 0.9.15 read "flow" as
+    // the subject and an empty sender, so the subject+sender fallback could never work.
+    const live = (h) => h.replace(/<div class="persona">[\s\S]*?<\/div>/, '<div class="persona"><div role="heading" aria-level="3" class="senderName"><span>flow</span></div></div>');
+    const r = await runPage({ htmlPatch: live, store: { glanceDebug: true }, afterMs: 2500 });
+    const p = r.parsed || {};
+    check('live shape: subject is the reading-pane header "Pilot proposal", not the sender name', p.subject === 'Pilot proposal', p);
+    check('live shape: sender name is "flow", and the own address in the "אל:" row is never the sender', p.senderName === 'flow' && p.senderEmail !== ME, p);
+    check('live shape: the card still mounts (matched by conversation id)', Boolean(r.chip), r.logs.filter((l) => /^Glance:/.test(l)));
+    const after = r.logs.slice(r.logsAtCard).filter((l) => /^Glance: (parsed|matched|judged|decision|rendered)/.test(l));
+    check('same open message, same text, card up: not parsed/matched/judged again on every tick (2.5 s of page churn)', after.length === 0, after);
+    const parsedLines = r.logs.filter((l) => /^Glance: parsed/.test(l));
+    check('the parsed line is logged once, with subject and sender name', parsedLines.length === 1 && /Pilot proposal/.test(parsedLines[0]) && /"senderName":"flow"/.test(parsedLines[0]), parsedLines);
+
+    // Same page, but the address carries no id at all: only the subject + sender-name fallback can find the message.
+    const n = await runPage({ htmlPatch: live, url: 'https://outlook.live.com/mail/0/inbox', store: { glanceDebug: true } });
+    check('no id in the address: the card mounts, matched by subject and sender name', Boolean(n.chip) && n.logs.some((l) => /^Glance: matched/.test(l) && /subject and sender name/.test(l)), n.logs.filter((l) => /^Glance: (parsed|matched|decision)/.test(l)));
+
+    // A different sender with the same subject must not be taken for this message when there is no id to go on.
+    const other = (h) => live(h).replace('<span>flow</span></div></div>', '<span>Someone Else</span></div></div>');
+    const o = await runPage({ htmlPatch: other, url: 'https://outlook.live.com/mail/0/inbox', store: { glanceDebug: true }, waitMs: 2500 });
+    check('no id, same subject, different sender name: no card from the wrong message', !o.chip && !o.logs.some((l) => /^Glance: matched/.test(l) && /subject and sender name/.test(l)), o.logs.filter((l) => /^Glance: (matched|decision)/.test(l)));
+  }
+  {
+    // The original fixture (address in the persona title) keeps working: subject from the header, address as the sender.
+    const r = await runPage({});
+    const p = r.parsed || {};
+    check('fixture with the address on the page: subject "Pilot proposal", sender ai.local.flow@gmail.com', p.subject === 'Pilot proposal' && p.senderEmail === 'ai.local.flow@gmail.com', p);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

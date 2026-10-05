@@ -134,6 +134,12 @@ console, or `localStorage.setItem('glance-debug', '1')` on the Outlook page). `t
 registered file list on a Hebrew reading pane whose ads keep changing and requires the card (needs jsdom; skipped without). The surface stays opt-in (optional host permission, registered at runtime), not a
 static `content_scripts` entry, so installing Glance never asks for Outlook.
 
+What 0.9.16 changed after 0.9.15 passed live: on the real page the subject sits in the reading-pane header above the
+message and the message itself only shows the sender's display name (the address is in a hover card), so the parser now
+takes the heading nearest the body as the sender name and the header above the message as the subject, and the
+subject fallback needs the display name to agree when there is no address. The scan remembers the open message (id,
+subject, sender name, a hash of the text) and does nothing while it is unchanged and its card or reason is already in place.
+
 **A session that lasts (0.9.14).** A single-page-application refresh token lives 24 hours from the sign-in and does not slide. The worker keeps
 the session alive on its own: an alarm every 30 minutes (and on browser start-up), refresh in the access token's last 5 minutes, silent renewal
 (`launchWebAuthFlow({interactive:false})`, `prompt=none`, no window) from hour 16, a forced refresh and one retry on a Graph 401, and every

@@ -40,9 +40,20 @@
   let syncing = null;
   let lastReasonKey = '';
   let lastHref = location.href;
+  // What the last finished scan looked at, and how it ended ('card' or 'reason'). Same open message, same text, and the
+  // card still on the page (or its reason already recorded): nothing to do, nothing to log.
+  let lastSig = '';
+  let lastOutcome = '';
   let debug = false;
   try { debug = window.localStorage && window.localStorage.getItem('glance-debug') === '1'; } catch (e) { /* storage blocked */ }
   try { chrome.storage.local.get({ glanceDebug: false }, (r) => { if (r && r.glanceDebug) debug = true; dbg('injected', { version: VERSION, href: location.href }); }); } catch (e) { /* no storage */ }
+
+  function hashText(t) {
+    let h = 0;
+    const str = String(t || '');
+    for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    return str.length + ':' + h;
+  }
 
   function dbg(stage, data) {
     if (!debug) return;
@@ -51,6 +62,7 @@
 
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
   async function pageReason(reason, pane, extra) {
+    lastOutcome = 'reason';
     dbg('decision', { shown: false, reason, subject: pane && pane.subject });
     const key = reason + '|' + ((pane && (pane.conversationId || pane.itemId || pane.subject)) || location.pathname);
     if (key === lastReasonKey) return;
@@ -322,6 +334,7 @@
         // Undo reopens the owed ask: drop the settled receipt and let scan
         // re-inject Do It (same eligibility as the popup Still Open list).
         lastKey = '';
+        lastSig = '';
         try { host.remove(); } catch (e) { /* already gone */ }
         schedule();
         return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
@@ -349,6 +362,12 @@
       .map((a) => String(a || '').toLowerCase());
     const pane = FlowOwaParse.readPane(document, location.href, { own: own });
     const ids = FlowOwaParse.urlIds(location.href);
+    const sig = pane
+      ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text)].join('|')
+      : 'none|' + location.pathname;
+    if (sig === lastSig && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) return;
+    lastSig = sig;
+    lastOutcome = '';
     if (!pane) {
       // A message is open (its id is in the address) but its body could not be found: say so, with what was on the page.
       if (ids.kind) {
@@ -358,7 +377,7 @@
       }
       return;
     }
-    dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, itemId: pane.itemId, conversationId: pane.conversationId, chars: (pane.text || '').length });
+    dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, chars: (pane.text || '').length });
     // Outlook must be connected (token present); otherwise no card, and the reason says why.
     if (!st || !st.outlookAuth || !st.outlookAuth.token) { await pageReason('page:not-connected', pane); return; }
 
@@ -418,13 +437,14 @@
     if (entry.outlookReceipt && entry.ref && !entry.process) {
       const mount = mountPoint();
       if (!mount) { await pageReason('page:no-mount', pane); return; }
-      if (mount.querySelector('.flow-chip-host')) return;
+      if (mount.querySelector('.flow-chip-host')) { lastOutcome = 'card'; return; }
       const host = FlowChipHost.inject(mount, {
         process: { name: 'Reply', steps: [{ kind: 'outlookDraft' }] },
         intent: { label: entry.label || 'Reply draft ready' },
         messageId: entry.messageId
       }, { onDoIt: () => {}, onDismiss: (h) => h.remove() });
       if (host) {
+        lastOutcome = 'card';
         dbg('rendered', { receipt: true, messageId: entry.messageId });
         FlowChipHost.showDraftReceipt(host, {
           written: entry.label || 'Reply draft ready in Outlook Drafts. Not sent.',
@@ -464,7 +484,7 @@
       existing.remove();
       lastKey = '';
     }
-    if (mount.querySelector('.flow-chip-host') && key === lastKey) return;
+    if (mount.querySelector('.flow-chip-host') && key === lastKey) { lastOutcome = 'card'; return; }
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
     lastKey = key;
@@ -474,6 +494,7 @@
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
     if (!host) { await pageReason('page:inject-failed', pane); return; }
+    lastOutcome = 'card';
     dbg('decision', { shown: true, label: ctx.intent && ctx.intent.label });
     dbg('rendered', { messageId: ctx.messageId, label: ctx.intent && ctx.intent.label });
     await clearReason(pane);
@@ -526,13 +547,16 @@
   window.addEventListener('hashchange', schedule);
   window.addEventListener('popstate', schedule);
   // OWA moves between messages with pushState (no event): notice the address changing.
-  setInterval(() => { if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; schedule(); } }, 1000);
-  globalThis.__glanceOutlookPage = { rescan: () => { lastKey = ''; schedule(); } };
+  setInterval(() => { if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; lastSig = ''; schedule(); } }, 1000);
+  globalThis.__glanceOutlookPage = { rescan: () => { lastKey = ''; lastSig = ''; schedule(); } };
   // A check from the panel (or another Outlook tab) lands here at once.
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.glanceDebug) debug = Boolean(changes.glanceDebug.newValue);
-      if (area === 'local' && (changes.outlookPending || changes.outlookAuth)) schedule();
+      // A Do It / Undo from the panel changes what this card should say; this page's own "shown" row does not.
+      const logChanged = area === 'local' && changes.log && Array.isArray(changes.log.newValue)
+        && (changes.log.newValue[0] || {}).kind !== 'shown'; // the log is newest first
+      if (area === 'local' && (changes.outlookPending || changes.outlookAuth || logChanged)) { lastSig = ''; schedule(); }
     });
   } catch (e) { /* storage events unavailable */ }
   // Keep the Microsoft session alive while Outlook is open, and judge the inbox once on arrival.

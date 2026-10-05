@@ -106,9 +106,12 @@ const FlowOwaParse = (() => {
       const efrom = normEmail((e.sender && e.sender.email) || (e.base && e.base.counterpart && e.base.counterpart.email) || e.from);
       if (!esub || (sub !== esub && esub.indexOf(sub) < 0 && sub.indexOf(esub) < 0)) continue;
       if (from && efrom && from !== efrom) continue;
+      // No address on the page (OWA keeps it in a hover card): the display name has to agree instead.
+      const pname = norm(pane.senderName), ename = norm((e.sender && e.sender.name) || (e.base && e.base.counterpart && e.base.counterpart.name));
+      if (!from && pname && ename && pname !== ename) continue;
       const eDay = dayKey(e.receivedDateTime || e.date || e.ts);
       if (paneDay && eDay && paneDay !== eDay) continue;
-      return { entry: e, how: from ? 'subject and sender' : 'subject' };
+      return { entry: e, how: from ? 'subject and sender' : (pname && ename ? 'subject and sender name' : 'subject') };
     }
     return null;
   }
@@ -222,6 +225,44 @@ const FlowOwaParse = (() => {
     return { email: '', name: '' };
   }
 
+  const HEADINGS = '[role="heading"], h1, h2, h3';
+  const LISTS = '[role="listbox"], [role="list"], [role="grid"], [role="tree"], [role="navigation"]';
+  const DATEISH = /^\s*([א-ת]|[a-z]{2,3}\.?)?\s*\d{1,2}[./]\d{1,2}([./]\d{2,4})?\s+\d{1,2}:\d{2}\s*$/i;
+  function inList(n) { return Boolean(n && n.closest && n.closest(LISTS)); }
+  function signature(n) { return (n.getAttribute && n.getAttribute('aria-level') || '') + '|' + (n.tagName || '') + '|' + (n.className && typeof n.className === 'string' ? n.className : ''); }
+  function headingText(h) { return textOf(h).split('\n')[0].trim(); }
+  function usable(h) { const t = headingText(h); return t && !EMAIL_RE.test(t) && !DATEISH.test(t); }
+
+  // Subject and sender name from the reading pane, language-neutral. Real OWA (2026-10, checked live): the subject sits in
+  // the reading-pane header ABOVE the message, and inside the message the first heading is the sender's display name
+  // ("flow"), with the address usually only in a hover card. So: the heading nearest the body is the sender name when
+  // there is a header above the message; the subject is the first heading above the message item that is not the sender
+  // and is not shaped like another message's sender row.
+  function headerOf(bodyRoot, d) {
+    const container = containerOf(bodyRoot, d);
+    const near = container ? Array.prototype.slice.call(container.querySelectorAll(HEADINGS))
+      .filter((h) => before(h, bodyRoot) && !(bodyRoot.contains && bodyRoot.contains(h)) && !inList(h) && usable(h)) : [];
+    let far = [];
+    let n = container && container.parentElement;
+    for (let i = 0; n && i < 10 && !far.length; i++) {
+      far = Array.prototype.slice.call(n.querySelectorAll(HEADINGS))
+        .filter((h) => !(container.contains && container.contains(h)) && before(h, container) && !inList(h) && usable(h));
+      if (n.getAttribute && (n.getAttribute('role') === 'main' || n.id === 'ReadingPaneContainerId')) break;
+      n = n.parentElement;
+    }
+    let senderHead = null, subjectHead = null;
+    if (far.length && near.length) {
+      senderHead = near[near.length - 1];
+      const sig = signature(senderHead), name = headingText(senderHead);
+      subjectHead = far.find((h) => headingText(h) !== name && signature(h) !== sig) || far.find((h) => headingText(h) !== name) || null;
+    } else if (near.length) {
+      subjectHead = near[0];
+    } else if (far.length) {
+      subjectHead = far[0];
+    }
+    return { container, subject: subjectHead ? headingText(subjectHead) : '', senderName: senderHead ? headingText(senderHead) : '' };
+  }
+
   // opts: { own: [addresses] } so the person's own address in the header is never taken for the sender.
   function readPane(doc, href, opts) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
@@ -229,15 +270,15 @@ const FlowOwaParse = (() => {
     const roots = readingPaneRoots(d);
     const bodyRoot = roots[0] || null;
     if (!bodyRoot) return null; // no message body on screen: stay silent rather than read the message list
-    const container = containerOf(bodyRoot, d);
-    let subjectEl = null;
-    if (container) {
-      const heads = Array.prototype.slice.call(container.querySelectorAll('[role="heading"], h1, h2'));
-      subjectEl = heads.find((h) => textOf(h) && before(h, bodyRoot) && !(bodyRoot.contains && bodyRoot.contains(h))) || heads.find((h) => textOf(h)) || null;
+    const head = headerOf(bodyRoot, d);
+    const container = head.container;
+    let subject = head.subject;
+    if (!subject) {
+      const fallback = d.querySelector('[role="main"] [role="heading"]') || d.querySelector('[role="main"] h1, [role="main"] h2');
+      subject = fallback && !inList(fallback) ? headingText(fallback) : '';
     }
-    if (!subjectEl) subjectEl = d.querySelector('[role="main"] [role="heading"]') || d.querySelector('[role="main"] h1, [role="main"] h2');
-    const subject = textOf(subjectEl).split('\n')[0].trim();
     const who = senderOf(container, bodyRoot, opts && opts.own);
+    const senderName = who.name || head.senderName || '';
     const body = textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
     if (!subject && !body) return null;
     const ids = urlIds(href || (typeof location !== 'undefined' ? location.href : ''));
@@ -245,9 +286,9 @@ const FlowOwaParse = (() => {
       itemId: ids.itemId,
       conversationId: ids.conversationId,
       idKind: ids.kind,
-      subject: subject,
+      subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
-      senderName: who.name,
+      senderName: senderName.slice(0, 80),
       text: body
     };
   }
