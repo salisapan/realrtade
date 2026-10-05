@@ -45,8 +45,10 @@ function load(opts) {
   opts = opts || {};
   const calls = [];
   const tokens = [];
+  const pendingWebFlows = [];
   const stored = JSON.parse(JSON.stringify(opts.stored || {}));
   let tokenSeq = 0;
+  let onMessageListener = null;
   const runtime = {
     getManifest: () => ({
       oauth2: {
@@ -54,7 +56,7 @@ function load(opts) {
         scopes: opts.scopes || SCOPES.slice()
       }
     }),
-    onMessage: { addListener() {} },
+    onMessage: { addListener(fn) { onMessageListener = fn; } },
     onInstalled: { addListener() {} },
     onStartup: { addListener() {} },
     lastError: null,
@@ -102,26 +104,37 @@ function load(opts) {
           calls.push('CLEAR_ALL');
           if (cb) cb();
         },
+        getRedirectURL: opts.omitGetRedirectURL ? undefined : () => {
+          calls.push('REDIRECT_URL');
+          return 'https://' + runtime.id + '.chromiumapp.org/';
+        },
         launchWebAuthFlow: (details, cb) => {
           const authUrl = new URL(details.url);
           calls.push('WEB prompt=' + authUrl.searchParams.get('prompt') + ' interactive=' + Boolean(details.interactive));
           calls.push('WEB_URL ' + details.url);
-          if (opts.webFlowError) {
-            failCallback(opts.webFlowError, cb);
+          const finish = () => {
+            if (opts.webFlowError) {
+              failCallback(opts.webFlowError, cb);
+              return;
+            }
+            if (opts.silentFails && authUrl.searchParams.get('prompt') === 'none') {
+              failCallback('Authorization page could not be loaded.', cb);
+              return;
+            }
+            if (opts.webFlowRedirect) {
+              cb(typeof opts.webFlowRedirect === 'function' ? opts.webFlowRedirect(authUrl, details) : opts.webFlowRedirect);
+              return;
+            }
+            const state = authUrl.searchParams.get('state');
+            const token = opts.webToken || 'ya29.web-token';
+            const redirect = 'https://' + runtime.id + '.chromiumapp.org/#access_token=' + encodeURIComponent(token) + '&expires_in=3600&token_type=Bearer&state=' + encodeURIComponent(state);
+            cb(redirect);
+          };
+          if (opts.holdWebFlow && details.interactive) {
+            pendingWebFlows.push(finish);
             return;
           }
-          if (opts.silentFails && authUrl.searchParams.get('prompt') === 'none') {
-            failCallback('Authorization page could not be loaded.', cb);
-            return;
-          }
-          if (opts.webFlowRedirect) {
-            cb(typeof opts.webFlowRedirect === 'function' ? opts.webFlowRedirect(authUrl, details) : opts.webFlowRedirect);
-            return;
-          }
-          const state = authUrl.searchParams.get('state');
-          const token = opts.webToken || 'ya29.web-token';
-          const redirect = 'https://' + runtime.id + '.chromiumapp.org/#access_token=' + encodeURIComponent(token) + '&expires_in=3600&token_type=Bearer&state=' + encodeURIComponent(state);
-          cb(redirect);
+          finish();
         }
       },
       storage: {
@@ -148,6 +161,11 @@ function load(opts) {
     calls,
     tokens,
     stored,
+    onMessage: onMessageListener,
+    releaseWebFlows() {
+      const queued = pendingWebFlows.splice(0);
+      queued.forEach((fn) => fn());
+    },
     fn: (name) => vm.runInContext(name, sandbox)
   };
 }
@@ -165,6 +183,16 @@ async function attempt(promise) {
 
 function authParams(url) {
   return new URL(url.replace(/^WEB_URL /, ''));
+}
+
+function interactiveCalls(calls) {
+  return calls.filter((c) => c === 'GET_AUTH true' || /interactive=true/.test(c));
+}
+
+function send(env, msg, sender) {
+  return new Promise((resolve) => {
+    env.onMessage(msg, sender || {}, resolve);
+  });
 }
 
 async function run() {
@@ -279,6 +307,7 @@ async function run() {
     check('the stale chrome token was evicted', env.calls.some((c) => c.indexOf('EVICT chrome-tok-') === 0), env.calls);
     check('the retry used a different chrome token', env.tokens[0] !== env.tokens[1], env.tokens);
     check('a chrome 401 does not open the web flow', !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);
+    check('a chrome 401 refresh stays non-interactive', interactiveCalls(env.calls).length === 0, env.calls);
   }
 
   console.log('\n--- browser sign-in off uses the web flow token ---\n');
@@ -290,7 +319,10 @@ async function run() {
     });
     const out = await attempt(env.fn('getGoogleAccessToken')(true));
     check('fallback returns the web token', out.ok && out.value.token === 'ya29.from-web' && out.value.source === 'web', out);
-    check('getAuthToken ran before the web flow', env.calls[0] === 'GET_AUTH true' && env.calls[1].indexOf('WEB prompt=select_account') === 0, env.calls);
+    check('getAuthToken ran before the web flow',
+      env.calls[0] === 'GET_AUTH true' && env.calls.some((c) => c.indexOf('WEB prompt=select_account interactive=true') === 0),
+      env.calls);
+    check('the redirect URI comes from chrome.identity.getRedirectURL', env.calls.indexOf('REDIRECT_URL') !== -1, env.calls);
     const url = authParams(env.calls.find((c) => c.indexOf('WEB_URL ') === 0));
     check('web flow uses the web client, not the chrome-extension client',
       url.searchParams.get('client_id') === WEB_CLIENT && url.searchParams.get('client_id') !== CHROME_CLIENT, url.searchParams.get('client_id'));
@@ -362,8 +394,11 @@ async function run() {
     check('a task write succeeds on the refreshed web token', out.ok && out.value && out.value.ok === true, out);
     check('the first bearer was the stored web token', env.tokens[0] === 'ya29.for-tasks', env.tokens);
     check('the retry bearer is a new web token', env.tokens[1] && env.tokens[1] !== 'ya29.for-tasks', env.tokens);
-    check('getAuthToken was still tried before each web token',
-      env.calls.filter((c) => c === 'GET_AUTH true').length >= 2, env.calls);
+    check('getAuthToken was tried silently before the stored web token',
+      env.calls.indexOf('GET_AUTH false') !== -1, env.calls);
+    check('a web 401 retries with prompt=none and never interactive true',
+      env.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0) && interactiveCalls(env.calls).length === 0,
+      env.calls);
   }
   {
     const env = load({
@@ -407,6 +442,113 @@ async function run() {
       out.ok && env.stored.googleTasksAuth == null && env.stored.googleWebAuth == null, env.stored);
     check('no chrome token is evicted when there is none', env.calls.indexOf('EVICT undefined') === -1 && !env.calls.some((c) => c.indexOf('EVICT ') === 0), env.calls);
     check('clearAllCachedAuthTokens still runs', env.calls.indexOf('CLEAR_ALL') !== -1, env.calls);
+  }
+
+  console.log('\n--- auto-connect and Do It never open a consent window ---\n');
+  {
+    const env = load();
+    check('a content-script sender is not an explicit Connect', env.fn('googleConnectWantsInteractive')({ tab: { id: 3 } }) === false);
+    check('the popup sender is an explicit Connect', env.fn('googleConnectWantsInteractive')({ url: 'chrome-extension://id/popup/popup.html' }) === true);
+    check('a missing sender stays an explicit Connect', env.fn('googleConnectWantsInteractive')(null) === true);
+  }
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      stored: { googleWebAuth: { accessToken: 'ya29.silent', expiresAt: Date.now() + 3600e3 } },
+      routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_G', title: 'Glance' }] }) }]]
+    });
+    const out = await send(env, { type: 'flow:connect', connectorId: 'googleTasks' }, { tab: { id: 4, url: 'https://mail.google.com/mail/u/0/' } });
+    check('auto-connect finishes on a stored token', out && out.ok === true, out);
+    check('auto-connect never calls interactive true', interactiveCalls(env.calls).length === 0, env.calls);
+    check('auto-connect recorded the Glance list', env.stored.googleTasksAuth && env.stored.googleTasksAuth.taskListId === 'LIST_G', env.stored.googleTasksAuth);
+  }
+  {
+    const env = load({ getAuthTokenError: SIGNIN_OFF, holdWebFlow: true });
+    const out = await send(env, { type: 'flow:connect', connectorId: 'googleTasks' }, { tab: { id: 4, url: 'https://mail.google.com/mail/u/0/' } });
+    check('auto-connect without a token fails quietly', out && out.ok === false, out);
+    check('auto-connect without a token does not open the web flow', interactiveCalls(env.calls).length === 0 && !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);
+    check('a failed auto-connect does not mark Google connected', !env.stored.googleTasksAuth, env.stored);
+  }
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      webToken: 'ya29.popup',
+      routes: [[/\/users\/@me\/lists/, { reply: res(200, { items: [{ id: 'LIST_P', title: 'Glance' }] }) }]]
+    });
+    const out = await send(env, { type: 'flow:connect', connectorId: 'googleTasks' }, { url: 'chrome-extension://' + EXTENSION_ID + '/popup/popup.html' });
+    check('popup Connect still opens the interactive web flow',
+      out && out.ok === true && env.calls.some((c) => c.indexOf('WEB prompt=select_account interactive=true') === 0),
+      { out, calls: env.calls });
+  }
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      omitGetRedirectURL: true,
+      webToken: 'ya29.hand-built'
+    });
+    const out = await attempt(env.fn('getGoogleAccessToken')(true));
+    const url = authParams(env.calls.find((c) => c.indexOf('WEB_URL ') === 0) || '');
+    check('a missing getRedirectURL still uses the chromiumapp origin',
+      out.ok && url.searchParams.get('redirect_uri') === 'https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/',
+      url.searchParams.get('redirect_uri'));
+  }
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      stored: { googleTasksAuth: { taskListId: 'LIST_A' } }
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({ label: 'Send the SOW', facts: {}, senderName: 'Dana' }));
+    check('a Do It with no silent token is not-connected',
+      out.ok && out.value && out.value.ok === false && out.value.reason === 'not-connected', out);
+    check('that Do It does not open a consent window',
+      interactiveCalls(env.calls).length === 0 && !env.calls.some((c) => c.indexOf('WEB ') === 0), env.calls);
+  }
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      silentFails: true,
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleWebAuth: { accessToken: 'ya29.revoked', expiresAt: Date.now() + 3600e3 }
+      },
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: { ok: false, status: 401, json: async () => ({}) } }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({ label: 'Send the SOW', facts: {}, senderName: 'Dana' }));
+    check('a 401 whose silent refresh fails is not-connected',
+      out.ok && out.value && out.value.reason === 'not-connected', out);
+    check('that 401 retry never calls interactive true', interactiveCalls(env.calls).length === 0, env.calls);
+    check('that 401 retry did try prompt=none',
+      env.calls.some((c) => c.indexOf('WEB prompt=none interactive=false') === 0), env.calls);
+  }
+
+  console.log('\n--- disconnect invalidates an in-flight consent window ---\n');
+  {
+    const env = load({
+      getAuthTokenError: SIGNIN_OFF,
+      holdWebFlow: true,
+      silentFails: true,
+      webToken: 'ya29.late-approval',
+      stored: {
+        googleTasksAuth: { taskListId: 'LIST_A' },
+        googleWebAuth: { accessToken: 'ya29.expired', expiresAt: Date.now() - 5000 }
+      }
+    });
+    const pending = env.fn('getGoogleAccessToken')(true);
+    for (let i = 0; i < 20 && !env.calls.some((c) => c.indexOf('WEB prompt=select_account interactive=true') === 0); i++) {
+      await new Promise((r) => setImmediate(r));
+    }
+    check('the consent window is open before disconnect',
+      env.calls.some((c) => c.indexOf('WEB prompt=select_account interactive=true') === 0), env.calls);
+    const disconnected = await attempt(env.fn('disconnectConnector')('googleTasks'));
+    check('disconnect succeeds while the window is open',
+      disconnected.ok && disconnected.value && disconnected.value.ok === true, disconnected);
+    check('storage is clear before the late approval',
+      env.stored.googleWebAuth == null && env.stored.googleTasksAuth == null, env.stored);
+    env.releaseWebFlows();
+    const out = await attempt(pending);
+    await new Promise((r) => setImmediate(r));
+    check('the late approval is not a saved token', out.ok === false, out);
+    check('the late approval does not restore googleWebAuth', env.stored.googleWebAuth == null, env.stored);
   }
 
   console.log('\nTOTAL FAILURES:', failures);
