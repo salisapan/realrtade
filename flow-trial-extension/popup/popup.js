@@ -1766,28 +1766,46 @@
     }
     const u = el('button', 'ghost sm', 'Undo');
     u.type = 'button';
+    const note = el('span', 'log-undo-note', '');
+    note.hidden = true;
     u.addEventListener('click', async () => {
       u.disabled = true; u.textContent = 'Undoing…';
-      const o = outlook();
-      const r = o ? await o.undoReplyDraft(entry.ref) : { ok: false };
-      if (r && r.ok) {
-        if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
-          await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
-        } else {
-          await FlowStorage.appendLog({ kind: 'undone', label: entry.label, messageId: entry.messageId, app: 'outlook', connectorId: 'outlookDraft', ref: entry.ref });
-        }
-        // Draft undo is not a false close (prepared reply, not a trusted close).
+      note.hidden = true;
+      let r = { ok: false };
+      try {
+        const o = outlook();
+        if (o && entry.ref) r = await o.undoReplyDraft(entry.ref);
+        else if (!entry.ref) r = { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+        else r = { ok: false, error: 'not-connected' };
+      } catch (err) {
+        r = { ok: false, error: String(err && err.message || err) };
+      }
+      // Always drop the local receipt — stale cards after Graph delete are the bug.
+      if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+        await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
+      } else {
+        await FlowStorage.appendLog({
+          kind: 'undone', label: entry.label, messageId: entry.messageId,
+          app: 'outlook', connectorId: 'outlookDraft', ref: entry.ref, outlookReopen: true
+        });
+      }
+      if (entry.messageId) {
         await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: entry.messageId, draftOnly: true });
         if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(entry.messageId);
-        await renderOpen();
-        await renderOutlookCards();
-        await renderLog();
-      } else {
-        u.disabled = false; u.textContent = 'Undo';
       }
+      note.textContent = (r && r.written)
+        ? r.written
+        : (r && r.ok
+          ? 'Draft removed from Outlook Drafts.'
+          : ('Could not reach Outlook' + (r && r.error ? ' (' + r.error + ')' : '') + '; receipt cleared here.'));
+      note.hidden = false;
+      await renderOpen();
+      await renderOutlookCards();
+      await renderLog();
     });
     acts.appendChild(u);
     item.appendChild(acts);
+    item.appendChild(note);
     return item;
   }
 
@@ -2074,13 +2092,20 @@
 
   function wireClearCloseMemory() {
     const btn = document.getElementById('clearCloseMemory');
-    if (!btn || typeof FlowCloseMemory === 'undefined') return;
+    if (!btn) return;
     btn.addEventListener('click', async () => {
+      const ok = window.confirm('Clear personal close memory and Outlook loop cards on this device? Draft receipts and From Outlook offers will be removed. This cannot be undone.');
+      if (!ok) return;
       btn.disabled = true;
-      await FlowCloseMemory.clear();
+      if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.clear();
+      if (typeof FlowStorage.clearOutlookLoopsState === 'function') await FlowStorage.clearOutlookLoopsState();
+      ensureOutlookMigrated.done = false;
       const original = btn.textContent;
       btn.textContent = 'Cleared';
-      setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 1600);
+      await renderOpen();
+      await renderOutlookCards();
+      await renderLog();
+      setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 2000);
     });
   }
 

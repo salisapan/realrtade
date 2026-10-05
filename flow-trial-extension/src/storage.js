@@ -1241,7 +1241,8 @@ const FlowStorage = (() => {
     const log = (state && state.log) || [];
     const undone = new Set();
     for (const e of log) {
-      if (e && e.kind === 'undone' && e.messageId && (e.connectorId === 'outlookDraft' || e.app === 'outlook')) {
+      // Any undone for this messageId suppresses the receipt (0.9.3 undos had no app tag).
+      if (e && e.kind === 'undone' && e.messageId) {
         undone.add(e.messageId + '|' + (e.ref || ''));
         undone.add(e.messageId);
       }
@@ -1302,6 +1303,45 @@ const FlowStorage = (() => {
   }
 
   // One-shot upgrade from 0.9.3/0.9.4 leftovers: merge HANDLED+UNDONE, scrub false-close.
+
+  // Clears Outlook loop UI state: pending cards, draft receipts, and draft-undo
+  // false-close leftovers. Used by "Clear close memory" so the button matches
+  // what the person sees in Loops / Activity.
+  const clearOutlookLoopsState = serialize(async function clearOutlookLoopsState() {
+    const state = await get();
+    const log0 = state.log || [];
+    const dropIds = new Set();
+    const log = [];
+    for (const e of log0) {
+      if (!e) continue;
+      if (e.connectorId === 'outlookDraft' || (e.app === 'outlook' && (e.outlookReceipt || e.kind === 'written' || e.kind === 'undone' || e.kind === 'shown'))) {
+        if (e.messageId) dropIds.add(e.messageId);
+        // Keep non-draft outlook rows? Drop draft written/undone receipts; keep shown so asks can return after migrate reopen.
+        if (e.kind === 'written' && e.connectorId === 'outlookDraft') continue;
+        if (e.kind === 'undone' && (e.connectorId === 'outlookDraft' || e.outlookReopen || dropIds.has(e.messageId))) continue;
+      }
+      log.push(e);
+    }
+    // Scrub false-close ids that belonged to dropped outlook drafts.
+    let cq = state.closeQuality;
+    let so = state.stillOpenMetrics;
+    const M = migrateMod();
+    if (M && dropIds.size) {
+      const scrub = M.scrubFalseClose(cq, so, dropIds);
+      cq = scrub.closeQuality || cq;
+      so = scrub.stillOpenMetrics || so;
+    }
+    const resolved = (state.resolvedMessageIds || []).filter((id) => !dropIds.has(id));
+    await set({
+      log: trimLog(log, new Set(resolved)),
+      resolvedMessageIds: resolved,
+      outlookPending: { offers: [], asks: [], incoming: [] },
+      closeQuality: cq,
+      stillOpenMetrics: so
+    });
+    return { ok: true, dropped: dropIds.size };
+  });
+
   const migrateOutlookDraftState = serialize(async function migrateOutlookDraftState() {
     const M = migrateMod();
     if (!M) return { ok: false, skipped: true };
@@ -1346,7 +1386,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, migrateOutlookDraftState, markOutlookDraftSent, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

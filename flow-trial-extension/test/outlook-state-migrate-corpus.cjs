@@ -42,5 +42,26 @@ console.log('\n--- scrub false-close for draft undos ---\n');
   check('second migrate is no-op', again.migrated === false && again.changed === false);
 }
 
+
+console.log('\n--- bare 0.9.3 undone (no app tag) ---\n');
+{
+  const state = {
+    outlookMigrateVersion: 0,
+    log: [
+      { kind: 'written', messageId: 'pilot', connectorId: 'outlookDraft', label: 'Reply draft ready in Outlook Drafts. Not sent.', ref: 'd1', url: 'https://x', app: 'outlook', ts: 2 },
+      { kind: 'undone', messageId: 'pilot', label: 'Reply draft ready in Outlook Drafts. Not sent.', ts: 1 }
+    ],
+    resolvedMessageIds: ['pilot'],
+    closeQuality: { success: 0, return: 0, falseDoIt: 1, falseDoItIds: ['pilot'], successIds: [], recent: [{ kind: 'falseDoIt', id: 'pilot', reason: 'undo' }], lastDoItDay: null },
+    stillOpenMetrics: { shown: 1, doIt: 1, undo: 0, falseClose: 1, notifyDismiss: 0, shownIds: ['pilot'], doItIds: ['pilot'], undoIds: [], falseCloseIds: ['pilot'], recent: [] }
+  };
+  const r = M.migrate(state);
+  const written = (r.state.log || []).filter((e) => e.kind === 'written' && e.messageId === 'pilot');
+  const undone = (r.state.log || []).filter((e) => e.kind === 'undone' && e.messageId === 'pilot');
+  check('bare undone merges away HANDLED twin', written.length === 0 && undone.length === 1, r.state.log);
+  check('false-close 100% scrubbed', r.state.closeQuality.falseDoIt === 0, r.state.closeQuality);
+  check('pilot not resolved after migrate', r.state.resolvedMessageIds.indexOf('pilot') === -1, r.state.resolvedMessageIds);
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 process.exit(failures ? 1 : 0);

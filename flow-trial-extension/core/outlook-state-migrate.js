@@ -6,7 +6,7 @@
 // the pair into one Undone row and recomputes stats under the draftOnly rule
 // (prepared draft undo is not a false close).
 const FlowOutlookStateMigrate = (() => {
-  const MIGRATE_VERSION = 1;
+  const MIGRATE_VERSION = 2;
 
   function isOutlookDraftRow(e) {
     if (!e) return false;
@@ -21,16 +21,19 @@ const FlowOutlookStateMigrate = (() => {
     for (const e of log || []) {
       if (!e || !e.messageId) continue;
       if (e.kind === 'written' && isOutlookDraftRow(e)) written[e.messageId] = true;
-      if (e.kind === 'undone' && (isOutlookDraftRow(e) || e.outlookReopen || e.app === 'outlook')) undone[e.messageId] = true;
+      // 0.9.3 appended bare { kind: 'undone', messageId } with no app/connectorId.
+      if (e.kind === 'undone') undone[e.messageId] = true;
     }
     const ids = new Set();
-    Object.keys(undone).forEach((id) => {
-      // Any outlook-tagged undone, or undone that had a matching outlook written.
-      if (undone[id]) ids.add(id);
-    });
     Object.keys(written).forEach((id) => {
       if (undone[id]) ids.add(id);
     });
+    // Also outlook-tagged undos with no surviving written twin.
+    for (const e of log || []) {
+      if (e && e.kind === 'undone' && e.messageId && (isOutlookDraftRow(e) || e.outlookReopen || e.app === 'outlook')) {
+        ids.add(e.messageId);
+      }
+    }
     return ids;
   }
 

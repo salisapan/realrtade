@@ -532,9 +532,7 @@ const FlowOutlook = (() => {
       const log = (st && st.log) || [];
       const undone = new Set();
       log.forEach((e) => {
-        if (e && e.kind === 'undone' && e.messageId && (e.connectorId === 'outlookDraft' || e.app === 'outlook')) {
-          undone.add(e.messageId);
-        }
+        if (e && e.kind === 'undone' && e.messageId) undone.add(e.messageId);
       });
       const out = [];
       const seen = new Set();
