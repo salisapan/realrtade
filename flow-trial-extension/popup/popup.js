@@ -823,7 +823,17 @@
     row.appendChild(top);
     row.appendChild(el('div', 'wait-note', OUTLOOK_COPY));
     if (!st.configured) row.appendChild(el('div', 'wait-note', 'It needs a Microsoft app registration first. Redirect address for it: ' + st.redirectUri));
-    if (st.connected) row.appendChild(el('div', 'wait-note', ((st.primary || (st.account && st.account.address)) ? 'Signed in as ' + (st.primary || st.account.address) + '. ' : '') + (st.lastAt ? 'Last checked ' + new Date(st.lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + st.lastCount + ' conversations.' : 'Not checked yet.')));
+    if (st.connected) {
+      const who = st.primary || (st.account && st.account.address) || '';
+      const idN = (typeof st.ownAddressCount === 'number' ? st.ownAddressCount : ((st.ownAddresses && st.ownAddresses.length) || (who ? 1 : 0)));
+      const checked = st.lastAt
+        ? ('Last checked ' + new Date(st.lastAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          + ', ' + st.lastCount + ' conversations'
+          + (typeof st.lastIncoming === 'number' ? (', ' + st.lastIncoming + ' incoming') : '')
+          + '.')
+        : 'Not checked yet.';
+      row.appendChild(el('div', 'wait-note', (who ? ('Signed in as ' + who + '. ') : '') + idN + ' identities. ' + checked));
+    }
     if (st.error) {
       const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
         ? FlowOutlookAuth.errorSentence(st.error, st.errorDetail, st.aadsts)
@@ -1040,12 +1050,36 @@
     const block = document.getElementById('outlookBlock');
     const o = outlook();
     if (!block || !o) return;
-    const pend = (await FlowStorage.get()).outlookPending || { offers: [], asks: [] };
+    const pend = (await FlowStorage.get()).outlookPending || { offers: [], asks: [], incoming: [] };
     const host = document.getElementById('outlook-card');
     host.replaceChildren();
-    const offers = pend.offers || [], asks = pend.asks || [];
-    block.hidden = offers.length + asks.length === 0;
-    const mk = (label, fn) => { const b = el('button', 'ghost sm', label); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; await fn(); await renderOutlookCards(); await renderWaiting(); }); return b; };
+    const offers = pend.offers || [], asks = pend.asks || [], incoming = pend.incoming || [];
+    block.hidden = offers.length + asks.length + incoming.length === 0;
+    const mk = (label, fn) => { const b = el('button', 'ghost sm', label); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; await fn(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === 'function') await renderOpen(); }); return b; };
+    for (const x of incoming) {
+      const item = el('div', 'wait-item');
+      const top = el('div', 'wait-top');
+      const who = (x.sender && (x.sender.name || x.sender.email)) || 'Outlook';
+      top.appendChild(el('span', 'wait-who', who));
+      top.appendChild(el('span', 'wait-state', x.label || (x.intent && x.intent.label) || 'Reply requested'));
+      item.appendChild(top);
+      const what = (x.subject || '') || (x.text || '').split('\n')[0] || '';
+      if (what) item.appendChild(el('div', 'wait-what', '\u201c' + String(what).slice(0, 160) + '\u201d'));
+      const acts = el('div', 'wait-acts');
+      const doIt = el('button', 'primary sm', 'Do It');
+      doIt.type = 'button';
+      doIt.addEventListener('click', async () => {
+        doIt.disabled = true;
+        await closeStillOpenFromPopup(x);
+        if (typeof o.dismissIncoming === 'function') await o.dismissIncoming(x.key || x.messageId);
+        await renderOutlookCards();
+        if (typeof renderOpen === 'function') await renderOpen();
+      });
+      acts.appendChild(doIt);
+      acts.appendChild(mk('Not now', () => o.declineIncoming(x.key || x.messageId)));
+      item.appendChild(acts);
+      host.appendChild(item);
+    }
     for (const x of offers) {
       const item = el('div', 'wait-item');
       const top = el('div', 'wait-top');

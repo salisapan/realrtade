@@ -291,6 +291,78 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     check('after 20h runner calls launchSilent before Graph (or on refresh fail)', w3.calls.some((c) => c.method === 'SILENT') || s3.ok, w3.calls.map((c) => c.method + ' ' + String(c.url).slice(0, 60)));
   }
 
+
+  console.log('\n--- MSA inbox learning + stateVersion wipe (live silence repro) ---\n');
+  {
+    const fs = require('fs'); const path = require('path'); const vm = require('vm');
+    const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+    vm.createContext(sandbox);
+    for (const f of ['domains.js','extract.js','judgment.js','google-closes.js','close-families.js','fact-reply.js','intent.js','actions.js']) {
+      vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+    }
+    const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+    const FlowActions = vm.runInContext('FlowActions', sandbox);
+    const OUT = 'glance.salisapan@outlook.com';
+    const GMAIL_ME = 'salisapan1@gmail.com';
+    const ask = { id: 'a1', conversationId: 'convA', subject: 'Could you review the pilot proposal and confirm by Wednesday?', isDraft: false,
+      from: { emailAddress: { name: 'AI Local Flow', address: 'ai.local.flow@gmail.com' } },
+      toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+      receivedDateTime: '2026-10-05T09:00:00Z', webLink: 'https://outlook.office.com/mail/a1',
+      body: { contentType: 'text', content: 'Hi Sali,\nCould you review the pilot proposal and confirm by Wednesday? Also, please send me the name of the onboarding owner.\nThanks' } };
+    const selfMail = { id: 'p1', conversationId: 'convB', subject: 'Signed contract', isDraft: false,
+      from: { emailAddress: { name: 'Sali', address: GMAIL_ME } },
+      toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+      receivedDateTime: '2026-10-05T08:00:00Z',
+      body: { contentType: 'text', content: 'Can you send me the signed vendor contract by Thursday, October 8?' } };
+    // Personal MSA: /me has only the Google UPN, no mail/otherMails/proxyAddresses; sentitems empty.
+    const w = world({
+      me: { mail: '', userPrincipalName: GMAIL_ME, displayName: 'Sali', otherMails: [], proxyAddresses: [] },
+      inbox: [ask, selfMail], sent: []
+    });
+    const baseDeps = w.deps();
+    const o = O.create(Object.assign({}, baseDeps, {
+      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent },
+      actions: FlowActions
+    }));
+    const r = await o.connect();
+    const own = (w.store.outlookAuth && w.store.outlookAuth.ownAddresses) || [];
+    check('MSA /me without otherMails: learns outlook alias from inbox sole toRecipient', r.ok && own.indexOf(OUT) !== -1, own);
+    check('MSA primary is the outlook alias (not gmail UPN)', (w.store.outlookAuth.account.address) === OUT, w.store.outlookAuth.account);
+    const pend = w.store.outlookPending || {};
+    check('MSA: incoming ask card present in outlookPending.incoming', (pend.incoming || []).length >= 1 && (pend.incoming || []).some((x) => x.messageId === 'a1'), pend);
+    check('MSA: self-mail does not become a From Outlook offer', !(pend.offers || []).some((x) => x.base && x.base.counterpart && x.base.counterpart.email === OUT), pend.offers);
+    const st = await o.status();
+    check('status exposes ownAddressCount >= 2', st.ownAddressCount >= 2, st);
+
+    // Stale 0.9.0 offer + old stateVersion → wiped on next sync
+    const w2 = world({
+      me: { mail: '', userPrincipalName: GMAIL_ME, displayName: 'Sali', otherMails: [], proxyAddresses: [] },
+      inbox: [ask, selfMail], sent: []
+    });
+    w2.store.outlookAuth = {
+      token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW },
+      account: { address: GMAIL_ME, userPrincipalName: GMAIL_ME },
+      ownAddresses: [GMAIL_ME],
+      profile: { mail: '', userPrincipalName: GMAIL_ME, otherMails: [], proxyAddresses: [] }
+    };
+    w2.store.outlookPending = {
+      offers: [{ key: 'stale', base: { counterpart: { email: OUT }, threadId: 'ol:convB' }, ask: { what: 'signed vendor contract', direction: 'theirs' } }],
+      asks: [], incoming: []
+    };
+    w2.store.outlookSync = { lastAt: NOW - 1000, lastCount: 2, offered: { 'convB|p1': NOW }, declined: {}, stateVersion: 1 };
+    const o2 = O.create(Object.assign({}, w2.deps(), {
+      planDeps: { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent },
+      actions: FlowActions
+    }));
+    const s2 = await o2.sync({ force: true });
+    const pend2 = w2.store.outlookPending || {};
+    check('upgrade wipe: stale self-offer gone after stateVersion bump', !(pend2.offers || []).some((x) => x.key === 'stale' || (x.base && x.base.counterpart && x.base.counterpart.email === OUT)), pend2);
+    check('upgrade wipe: stateVersion written to 2', w2.store.outlookSync && w2.store.outlookSync.stateVersion === 2, w2.store.outlookSync);
+    check('upgrade wipe: incoming ask appears after re-judge', (pend2.incoming || []).some((x) => x.messageId === 'a1'), pend2);
+    check('upgrade sync ok', s2.ok, s2);
+  }
+
+
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
   console.log('TOTAL FAILURES: ' + failures);
   process.exit(failures ? 1 : 0);

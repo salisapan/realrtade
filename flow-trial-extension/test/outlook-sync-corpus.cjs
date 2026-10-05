@@ -162,6 +162,24 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
   check('a draft alone does NOT close the incoming item', !draftOnly.patches.some((p) => p.patch && p.patch.status === 'resolved'), draftOnly.patches);
 }
 
+
+console.log('\n--- learn own addresses from inbox recipients ---\n');
+{
+  const { FlowGraphMail: G } = require('../core/graph-mail.js');
+  const OUT = 'glance.salisapan@outlook.com';
+  const GMAIL_ME = 'salisapan1@gmail.com';
+  const ask = { from: { emailAddress: { address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { address: OUT } }] };
+  const selfIn = { from: { emailAddress: { address: GMAIL_ME } }, toRecipients: [{ emailAddress: { address: OUT } }] };
+  const multi = { from: { emailAddress: { address: 'boss@acme.com' } }, toRecipients: [
+    { emailAddress: { address: 'a@acme.com' } }, { emailAddress: { address: 'b@acme.com' } }
+  ] };
+  const learned = G.learnOwnFromMessages([ask, selfIn, multi], []);
+  check('learnOwnFromMessages picks sole inbox toRecipient', learned.indexOf(OUT) !== -1, learned);
+  check('learnOwnFromMessages does not add multi-recipient coworkers from one message', learned.indexOf('a@acme.com') === -1 && learned.indexOf('b@acme.com') === -1, learned);
+  const primary = G.pickPrimary([GMAIL_ME, OUT], { mail: '', userPrincipalName: GMAIL_ME }, [OUT, OUT]);
+  check('pickPrimary prefers outlook alias over gmail UPN when inbox-received', primary === OUT, primary);
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

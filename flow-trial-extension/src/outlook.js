@@ -19,6 +19,8 @@ const FlowOutlook = (() => {
   const SILENT_REAUTH_AFTER_MS = 20 * 60 * 60 * 1000; // 20h into the 24h SPA window
   const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,webLink';
   const OWN_LEARNED_CAP = 20;
+  // Bump to wipe stale outlookPending/offers from older builds (0.9.0 silence bug).
+  const STATE_VERSION = 2;
 
   // Non-GET Graph paths Glance is allowed to call. Anything else throws.
   const WRITE_ALLOW = [
@@ -35,25 +37,71 @@ const FlowOutlook = (() => {
     async function read(key, fallback) { const st = await deps.storage.get(); return st && st[key] != null ? st[key] : fallback; }
     async function write(key, value) { await deps.storage.set({ [key]: value }); }
 
+
+    function gm() {
+      if (deps.graphMail) return deps.graphMail;
+      try { return typeof require !== 'undefined' ? require('../core/graph-mail.js').FlowGraphMail : (typeof FlowGraphMail !== 'undefined' ? FlowGraphMail : null); }
+      catch (e) { return typeof FlowGraphMail !== 'undefined' ? FlowGraphMail : null; }
+    }
+
+    function normAddr(a) {
+      return String(a || '').trim().toLowerCase();
+    }
+
+    function meSetList(auth) {
+      const raw = (auth && auth.ownAddresses && auth.ownAddresses.length)
+        ? auth.ownAddresses
+        : (auth && auth.account && auth.account.address ? [auth.account.address] : []);
+      return raw.map(normAddr).filter(Boolean);
+    }
+
+    function isOwnEmail(email, ownList) {
+      const e = normAddr(email);
+      return Boolean(e && (ownList || []).indexOf(e) !== -1);
+    }
+
+    async function clearOutlookJudgmentState() {
+      await write(PENDING_KEY, { offers: [], asks: [], incoming: [] });
+      const st = await read(STATE_KEY, {});
+      await write(STATE_KEY, Object.assign({}, st, {
+        offered: {}, declined: {}, incomingDeclined: {},
+        lastAt: null, lastCount: 0, lastIncoming: 0, lastOffers: 0,
+        error: null, stateVersion: STATE_VERSION
+      }));
+    }
+
+    // On upgrade from a build that silenced incoming asks, wipe judgment caches once (keep tokens).
+    async function ensureStateVersion() {
+      const st = await read(STATE_KEY, {});
+      if (st && st.stateVersion === STATE_VERSION) return false;
+      await clearOutlookJudgmentState();
+      return true;
+    }
+
     function primaryAddress(auth) {
       if (!auth) return null;
-      const learned = (auth.ownAddresses || []).filter(Boolean);
-      if (learned.length) return learned[0];
+      // account.address is set by pickPrimary (inbox alias preferred over UPN).
       if (auth.account && auth.account.address) return auth.account.address;
-      return null;
+      const learned = (auth.ownAddresses || []).filter(Boolean);
+      return learned[0] || null;
     }
 
     async function status() {
       const auth = await read(AUTH_KEY, null);
       const st = await read(STATE_KEY, {});
       const pending = await read(PENDING_KEY, { offers: [], asks: [] });
+      const own = (auth && auth.ownAddresses) || [];
       return {
         configured: Boolean(cfg.CLIENT_ID), connected: Boolean(auth && auth.token), account: auth && auth.account || null,
         primary: primaryAddress(auth),
+        ownAddresses: own.slice(), ownAddressCount: own.length || (auth && auth.account && auth.account.address ? 1 : 0),
         needsSignIn: Boolean(st.needsSignIn), draftConsentNeeded: Boolean(st.draftConsentNeeded),
         lastAt: st.lastAt || null, lastCount: st.lastCount || 0,
+        lastIncoming: st.lastIncoming || 0, lastOffers: st.lastOffers || 0,
         error: st.error || null, errorDetail: st.errorDetail || null, aadsts: st.aadsts || null,
-        redirectUri: deps.redirectUri(), offers: (pending.offers || []).length, asks: (pending.asks || []).length, origins: ORIGINS
+        redirectUri: deps.redirectUri(),
+        offers: (pending.offers || []).length, asks: (pending.asks || []).length,
+        incoming: (pending.incoming || []).length, origins: ORIGINS
       };
     }
 
@@ -151,7 +199,8 @@ const FlowOutlook = (() => {
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
       await write(AUTH_KEY, { token: r.token, account, ownAddresses, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
-      await write(STATE_KEY, { lastAt: null, lastCount: 0, error: null, needsSignIn: false, draftConsentNeeded: false, offered: {}, declined: {}, incomingDeclined: {} });
+      // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
+      await clearOutlookJudgmentState();
       const s = await sync({ force: true });
       return Object.assign({ ok: true, account }, { sync: s });
     }
@@ -184,6 +233,7 @@ const FlowOutlook = (() => {
       const o = opts || {};
       let auth = await read(AUTH_KEY, null);
       if (!cfg.CLIENT_ID || !auth || !auth.token) return { ok: false, error: 'not-connected' };
+      await ensureStateVersion();
       let st = await read(STATE_KEY, {});
       const now = deps.now();
       if (!o.force && st.lastAt && now - st.lastAt < MIN_INTERVAL_MS) return { ok: true, skipped: true };
@@ -224,17 +274,25 @@ const FlowOutlook = (() => {
         const since = new Date(now - cfg.LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString();
         const inbox = await folder(fresh.token.accessToken, 'inbox', since);
         const sent = await folder(fresh.token.accessToken, 'sentitems', since);
-        // Learn own addresses from sentitems senders.
-        const learned = [];
-        sent.forEach((m) => {
-          const a = m.from && m.from.emailAddress && m.from.emailAddress.address;
-          if (a) learned.push(String(a).toLowerCase());
+        // Learn own addresses: profile + sentitems from + inbox toRecipients that are not the sender.
+        const g = gm();
+        const learnedMsg = (g && g.learnOwnFromMessages)
+          ? g.learnOwnFromMessages(inbox, sent)
+          : [];
+        const inboxLearned = [];
+        inbox.forEach((m) => {
+          const from = normAddr(m.from && m.from.emailAddress && m.from.emailAddress.address);
+          (m.toRecipients || []).forEach((r) => {
+            const a = normAddr(r && r.emailAddress && r.emailAddress.address);
+            if (a && a !== from) inboxLearned.push(a);
+          });
         });
         const prevOwn = auth.ownAddresses || [];
-        const ownAddresses = buildOwnAddresses(auth.profile || { mail: auth.account && auth.account.mail, userPrincipalName: auth.account && auth.account.userPrincipalName }, prevOwn.concat(learned)).slice(0, OWN_LEARNED_CAP);
-        // Primary = sentitems sender if known, else mail, else UPN.
-        const sentPrimary = learned[0] || null;
-        const primary = sentPrimary || ownAddresses[0] || (auth.account && auth.account.address);
+        const profile = auth.profile || { mail: auth.account && auth.account.mail, userPrincipalName: auth.account && auth.account.userPrincipalName };
+        const ownAddresses = buildOwnAddresses(profile, prevOwn.concat(learnedMsg)).slice(0, OWN_LEARNED_CAP);
+        const primary = (g && g.pickPrimary)
+          ? (g.pickPrimary(ownAddresses, profile, inboxLearned) || ownAddresses[0] || (auth.account && auth.account.address))
+          : (inboxLearned[0] || learnedMsg[0] || ownAddresses[0] || (auth.account && auth.account.address));
         if (ownAddresses.join('|') !== (prevOwn || []).join('|') || (auth.account && auth.account.address) !== primary) {
           await write(AUTH_KEY, Object.assign({}, auth, {
             ownAddresses,
@@ -276,25 +334,35 @@ const FlowOutlook = (() => {
         }
       }
 
-      // Offers and asks (existing).
-      const pending = await read(PENDING_KEY, { offers: [], asks: [] });
+      // Offers / asks / incoming. Drop offers whose "counterpart" is actually me (stale identity).
+      const ownList = meSetList(auth);
+      const pending = await read(PENDING_KEY, { offers: [], asks: [], incoming: [] });
       const offered = Object.assign({}, st.offered);
-      const offers = (pending.offers || []).filter((x) => !watches.some((w) => w.id === x.base.threadId && deps.followUp.isActive(w)));
-      p.offers.forEach((x) => { if (!offers.some((y) => y.key === x.key)) { offers.push(x); } offered[x.key] = now; });
+      let offers = (pending.offers || []).filter((x) => {
+        if (!x || !x.base) return false;
+        if (watches.some((w) => w.id === x.base.threadId && deps.followUp.isActive(w))) return false;
+        if (isOwnEmail(x.base.counterpart && x.base.counterpart.email, ownList)) return false;
+        return true;
+      });
+      (p.offers || []).forEach((x) => {
+        if (isOwnEmail(x.base && x.base.counterpart && x.base.counterpart.email, ownList)) return;
+        if (!offers.some((y) => y.key === x.key)) offers.push(x);
+        offered[x.key] = now;
+      });
       const asks = (pending.asks || []).slice();
-      p.asks.forEach((x) => { if (!asks.some((y) => y.key === x.key)) asks.push(x); });
-      await write(PENDING_KEY, { offers: offers.slice(-5), asks: asks.slice(-5) });
+      (p.asks || []).forEach((x) => { if (!asks.some((y) => y.key === x.key)) asks.push(x); });
 
-      // Incoming asks: store the SAME way Gmail stores a shown chip / still-open item.
+      // Incoming asks: Still Open + pending.incoming (Loops / From Outlook with Do It).
+      const incomingCards = [];
       for (const inc of (p.incoming || [])) {
         const intent = inc.intent;
         const actions = deps.actions || (typeof FlowActions !== 'undefined' ? FlowActions : null);
         if (!actions || !intent) continue;
         const process = actions.planFor(intent, { threadUrl: inc.base.threadUrl, hasThreadAttachment: false });
         if (!process) continue;
-        // Map gmailDraft -> outlookDraft for Outlook items; never run gmailDraft on an Outlook item.
         const steps = (process.steps || []).map((s) => s.kind === 'gmailDraft' ? Object.assign({}, s, { kind: 'outlookDraft', id: (s.id || 'draft').replace(/^gmail/, 'outlook') }) : s);
         const outlookProcess = Object.assign({}, process, { steps });
+        const text = (inc.base.subject ? inc.base.subject + '\n' : '') + (inc.base.text || '');
         const entry = {
           messageId: inc.messageId,
           threadId: inc.base.threadId,
@@ -305,14 +373,16 @@ const FlowOutlook = (() => {
           app: 'outlook',
           intent: intent,
           process: outlookProcess,
-          text: (inc.base.subject ? inc.base.subject + '\n' : '') + (inc.base.text || ''),
+          text: text,
           outlookIncomingId: inc.messageId,
-          outlookConversationId: inc.conversationId
+          outlookConversationId: inc.conversationId,
+          key: inc.key,
+          label: (intent && intent.label) || 'Reply requested'
         };
+        incomingCards.push(entry);
         if (typeof deps.storage.upsertStillOpenScan === 'function') {
           try { await deps.storage.upsertStillOpenScan(entry); } catch (e) { /* keep going */ }
         }
-        // Also a shown log row so getPending / Brief see it (deduped by messageId).
         if (typeof deps.storage.appendLog === 'function') {
           try {
             const st2 = await deps.storage.get();
@@ -324,26 +394,32 @@ const FlowOutlook = (() => {
                 process: { id: outlookProcess.id, name: outlookProcess.name, steps: outlookProcess.steps },
                 threadUrl: inc.base.threadUrl, threadId: inc.base.threadId,
                 sender: entry.sender, subject: inc.base.subject, intent: intent, app: 'outlook',
-                outlookIncomingId: inc.messageId
+                text: text, outlookIncomingId: inc.messageId
               });
             }
           } catch (e) { /* optional */ }
         }
       }
+      // Keep prior incoming cards that were not re-emitted this pass (until Not now / close).
+      const priorIncoming = (pending.incoming || []).filter((x) => x && x.messageId && !incomingCards.some((y) => y.messageId === x.messageId) && !isOwnEmail(x.sender && x.sender.email, ownList));
+      const incoming = incomingCards.concat(priorIncoming).slice(0, 5);
+
+      await write(PENDING_KEY, { offers: offers.slice(-5), asks: asks.slice(-5), incoming: incoming });
 
       const offeredKeys = Object.keys(offered);
       if (offeredKeys.length > 200) offeredKeys.slice(0, offeredKeys.length - 200).forEach((k) => { delete offered[k]; });
       await write(STATE_KEY, {
-        lastAt: now, lastCount: p.stats.conversations, error: null, needsSignIn: false,
-        draftConsentNeeded: Boolean(st.draftConsentNeeded),
-        offered, declined: st.declined || {}, incomingDeclined: st.incomingDeclined || {}
+        lastAt: now, lastCount: p.stats.conversations, lastIncoming: (p.incoming || []).length, lastOffers: offers.length,
+        error: null, needsSignIn: false, draftConsentNeeded: Boolean(st.draftConsentNeeded),
+        offered, declined: st.declined || {}, incomingDeclined: st.incomingDeclined || {},
+        stateVersion: STATE_VERSION
       });
       return {
         ok: true, conversations: p.stats.conversations, closed: p.stats.closed, moved: p.stats.moved,
-        offers: p.offers.length, asks: p.asks.length, incoming: (p.incoming || []).length, lines: p.lines
+        offers: offers.length, asks: p.asks.length, incoming: (p.incoming || []).length,
+        ownAddressCount: ownList.length, primary: primaryAddress(auth), lines: p.lines
       };
     }
-
     // ---- Do It: create a reply draft in Outlook Drafts (never send) --------------------------------------
     async function ensureDraftScope(auth, st) {
       if (hasScope(auth.token, 'Mail.ReadWrite')) return { ok: true, auth };
@@ -435,21 +511,37 @@ const FlowOutlook = (() => {
         if (made && made.ok && made.ref) watch.taskRef = made.ref;
         await deps.storage.upsertWatch(watch);
       }
-      await write(PENDING_KEY, { offers: pending.offers.filter((x) => x.key !== key), asks: pending.asks || [] });
+      await write(PENDING_KEY, { offers: pending.offers.filter((x) => x.key !== key), asks: pending.asks || [], incoming: pending.incoming || [] });
       return { ok: true };
     }
 
     async function declineOffer(key) {
       const pending = await read(PENDING_KEY, { offers: [], asks: [] });
       const st = await read(STATE_KEY, {});
-      await write(PENDING_KEY, { offers: (pending.offers || []).filter((x) => x.key !== key), asks: pending.asks || [] });
+      await write(PENDING_KEY, { offers: (pending.offers || []).filter((x) => x.key !== key), asks: pending.asks || [], incoming: pending.incoming || [] });
       await write(STATE_KEY, Object.assign({}, st, { declined: Object.assign({}, st.declined, { [key]: deps.now() }) }));
       return { ok: true };
     }
 
     async function declineIncoming(key) {
+      const pending = await read(PENDING_KEY, { offers: [], asks: [], incoming: [] });
       const st = await read(STATE_KEY, {});
+      const incoming = (pending.incoming || []).filter((x) => x && x.key !== key && x.messageId !== key);
+      await write(PENDING_KEY, { offers: pending.offers || [], asks: pending.asks || [], incoming });
       await write(STATE_KEY, Object.assign({}, st, { incomingDeclined: Object.assign({}, st.incomingDeclined, { [key]: deps.now() }) }));
+      if (typeof deps.storage.forgetStillOpenScan === 'function') {
+        try {
+          const hit = (pending.incoming || []).find((x) => x && (x.key === key || x.messageId === key));
+          if (hit && hit.messageId) await deps.storage.forgetStillOpenScan(hit.messageId);
+        } catch (e) { /* optional */ }
+      }
+      return { ok: true };
+    }
+
+    async function dismissIncoming(key) {
+      const pending = await read(PENDING_KEY, { offers: [], asks: [], incoming: [] });
+      const incoming = (pending.incoming || []).filter((x) => x && x.key !== key && x.messageId !== key);
+      await write(PENDING_KEY, { offers: pending.offers || [], asks: pending.asks || [], incoming });
       return { ok: true };
     }
 
@@ -462,13 +554,13 @@ const FlowOutlook = (() => {
         await deps.storage.updateWatch(ask.watchId, ask.yes);
         if (w && ask.yes.status === 'resolved' && w.taskRef) await deps.send({ type: 'flow:follow-complete', ref: w.taskRef });
       }
-      await write(PENDING_KEY, { offers: pending.offers || [], asks: pending.asks.filter((x) => x.key !== key) });
+      await write(PENDING_KEY, { offers: pending.offers || [], asks: pending.asks.filter((x) => x.key !== key), incoming: pending.incoming || [] });
       return { ok: true };
     }
 
     return {
       ORIGINS, status, connect, disconnect, sync, acceptOffer, declineOffer, declineIncoming, answerAsk,
-      createReplyDraft, undoReplyDraft, assertAllowedWrite, hasScope, primaryAddress
+      createReplyDraft, undoReplyDraft, assertAllowedWrite, hasScope, primaryAddress, clearOutlookJudgmentState, dismissIncoming, STATE_VERSION
     };
   }
 

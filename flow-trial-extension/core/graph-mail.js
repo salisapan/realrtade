@@ -104,7 +104,53 @@ const FlowGraphMail = (() => {
     return s;
   }
 
-  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn };
+  // Learn mailbox aliases from fetched mail when /me lacks them (common on personal MSA).
+  // - sentitems from-address
+  // - inbox toRecipient that is not the sender (safe heuristic: an address that receives
+  //   inbox mail and is not the sender counts as me)
+  function learnOwnFromMessages(inbox, sent) {
+    const out = [];
+    const seen = new Set();
+    function add(a) {
+      const e = channel.normalizeEmail(a);
+      if (!e || seen.has(e)) return;
+      seen.add(e);
+      out.push(e);
+    }
+    (sent || []).forEach((m) => {
+      const a = m && m.from && m.from.emailAddress && m.from.emailAddress.address;
+      if (a) add(a);
+    });
+    // Inbox: prefer sole toRecipient (≠ sender). Multi-recipient rows only count
+    // toward a frequency vote so we do not treat every CC/To coworker as me.
+    const freq = Object.create(null);
+    (inbox || []).forEach((m) => {
+      if (!m) return;
+      const from = channel.normalizeEmail(m.from && m.from.emailAddress && m.from.emailAddress.address);
+      const tos = (m.toRecipients || []).map((r) => channel.normalizeEmail(r && r.emailAddress && r.emailAddress.address)).filter((e) => e && e !== from);
+      if (tos.length === 1) add(tos[0]);
+      tos.forEach((e) => { freq[e] = (freq[e] || 0) + 1; });
+    });
+    Object.keys(freq).forEach((e) => { if (freq[e] >= 2) add(e); });
+    return out;
+  }
+
+  // Prefer a non-UPN mailbox alias as primary when we have one (outlook.com etc.),
+  // else the most common inbox-received address, else first learned, else profile mail/UPN.
+  function pickPrimary(ownList, profile, inboxLearned) {
+    const list = (ownList || []).map((a) => channel.normalizeEmail(a)).filter(Boolean);
+    const inboxSet = new Set((inboxLearned || []).map((a) => channel.normalizeEmail(a)).filter(Boolean));
+    const alias = list.find((e) => inboxSet.has(e) && !/@gmail\.com$/i.test(e));
+    if (alias) return alias;
+    const inboxFirst = (inboxLearned || []).map((a) => channel.normalizeEmail(a)).filter(Boolean)[0];
+    if (inboxFirst) return inboxFirst;
+    const p = profile || {};
+    const mail = channel.normalizeEmail(p.mail);
+    if (mail) return mail;
+    return list[0] || channel.normalizeEmail(p.userPrincipalName) || null;
+  }
+
+  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, pickPrimary };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGraphMail };
