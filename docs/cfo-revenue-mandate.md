@@ -1,264 +1,264 @@
-# CFO revenue mandate — Glance & Flow
+# מנדט CFO להכנסות — Glance ו-Flow
 
 <!-- LOCKED-IDENTITY:START -->
 **Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
 <!-- LOCKED-IDENTITY:END -->
 
-> Written 2026-10-06. Evidence from `main`, branch `claude/install-uiux-pro-max-skill-a4agox`, live Supabase project `flow-ai`, `docs/open-tasks.md`, `docs/product-architecture.md`, and branch docs `docs/monetization.md` / `docs/revenue-routines.md`.  
-> **No invented user counts.** Installs, conversion, and revenue are **unknown** — none exist as measurements in the repository. Waitlist row count below is live DB, not marketing.
+> נכתב 2026-10-06. ראיות מ־`main`, מהענף `claude/install-uiux-pro-max-skill-a4agox`, מפרויקט Supabase החי `flow-ai`, מ־`docs/open-tasks.md`, מ־`docs/product-architecture.md`, וממסמכי הענף `docs/monetization.md` / `docs/revenue-routines.md`.  
+> **אין מספרי משתמשים מומצאים.** התקנות, המרה והכנסה — **לא ידוע**. מספר שורות ב־waitlist למטה הוא חי מה־DB, לא שיווק.
 
 ---
 
-## 1. Executive CFO diagnosis
+## 1. אבחון CFO (עמוד אחד)
 
-**You cannot collect a dollar on `main` today.** Pricing shows "Notify me" for Glance Pro and "Get a deployment plan" for Flow. There is no Stripe checkout, webhook, licence activation, or billing portal deployed from `main`. The payment rails exist on an unmerged product branch; they are not live.
+**ב־`main` אי אפשר לגבות דולר אחד היום.** בדף התמחור Glance Pro הוא "Notify me" ו־Flow הוא "Get a deployment plan". אין Stripe Checkout, אין webhook, אין רישיון ואין פורטל חיוב שפורסים מ־`main`. מסילות התשלום קיימות בענף מוצר שלא מוזג; הן לא חיות.
 
-**The business is blocked by distribution and cash plumbing, not by feature poverty.** The product branch is overweight (72 `core/` modules vs 21 on `main`). Monetization, Waiting-on, Pro licence gate, and AI ladder live on that branch. `main` ships a free Chrome-extension install path (zip + Load unpacked) and a waitlist. That is not a revenue machine.
+**העסק חסום בגלל הפצה וצנרת כסף — לא בגלל מחסור בפיצ'רים.** ענף המוצר שמן (72 מודולי `core/` מול 21 ב־`main`). מונטיזציה, Waiting-on, שער רישיון Pro וסולם ה־AI חיים בענף הזה. `main` מוכר נתיב התקנה חינמי (zip + Load unpacked) ורשימת המתנה. זה לא מכונת הכנסות.
 
-**Live infrastructure truth (2026-10-06):**
+**אמת תשתית חיה (2026-10-06):**
 
-| Asset | Status |
+| נכס | מצב |
 |---|---|
-| Supabase `flow-ai` | **ACTIVE_HEALTHY** (open-tasks row 2 is stale — it still says INACTIVE) |
-| `waitlist` | **1 row** |
-| `leads` | **0 rows** |
-| `licenses` | table exists, **0 rows** (migrations applied; no paying customers) |
-| `ai_usage` | table exists, **0 rows** |
-| Stripe on production | **not chargeable** — no checkout functions on `main` |
-| Chrome Web Store | **not published** — install is Developer-mode / Load unpacked |
-| Usage / conversion / MRR | **unknown** — not measured in-repo |
+| Supabase `flow-ai` | **ACTIVE_HEALTHY** (שורה 2 ב־open-tasks מיושנת — עדיין כתוב INACTIVE) |
+| `waitlist` | **שורה אחת** |
+| `leads` | **0** |
+| `licenses` | הטבלה קיימת, **0 שורות** (מיגרציות הוחלו; אין משלמים) |
+| `ai_usage` | הטבלה קיימת, **0 שורות** |
+| Stripe בפרודקשן | **לא ניתן לגבות** — אין פונקציות checkout ב־`main` |
+| Chrome Web Store | **לא פורסם** — התקנה במצב מפתח / Load unpacked |
+| שימוש / המרה / MRR | **לא ידוע** — לא נמדד בריפו |
 
-**Glance money and Flow money are different machines.** Glance is self-serve freemium at $14/user/mo. Flow is quote-led enterprise at $80/user/mo + setup. One Flow deal of ~20 seats ≈ $1,600/mo — same as ~115 Glance Pro seats. Domain-cluster emails from Glance signups are the only built bridge into Flow sales. With 1 waitlist row, that bridge is idle.
+**כסף של Glance וכסף של Flow הם מכונות נפרדות.** Glance = פרימיום עצמי ב־$14 למשתמש לחודש. Flow = אנטרפרייז בהצעת מחיר ב־$80 למשתמש לחודש + דמי הקמה. עסקת Flow של ~20 מושבים ≈ $1,600 לחודש — כמו ~115 מנויי Glance Pro. התראות אשכול־דומיין מהרשמות Glance הן הגשר היחיד שבנוי למכירות Flow. עם שורת waitlist אחת הגשר רדום.
 
-**Weakest link in the revenue system today:**  
-attention → **install** → activation → value → paywall → **payment** → retention  
+**החוליה החלשה ביותר במערכת ההכנסות היום:**  
+תשומת לב → **התקנה** → הפעלה → רגע ערך → חומת תשלום → **תשלום** → שימור  
 
-Install (no Web Store) and payment (not on `main`) are both broken. Fix those before decorating recognition, hybrid execution, or more surfaces.
+התקנה (אין חנות) ותשלום (לא ב־`main`) שתיהן שבורות. לתקן אותן לפני קישוט זיהוי, hybrid או משטחים נוספים.
 
-**One-sentence sell tests:**
+**מבחן משפט אחד למכירה:**
 
-- Glance Pro that can convert: *"Stop losing the money and replies you already asked for — chase every open loop until it closes."*
-- Flow that can convert: *"Your team closes email decisions into your system of record under your security review — we deploy it; you don't download it."*
+- Glance Pro שיכול להמיר: *"מפסיקים לאבד את הכסף ואת התשובות שכבר ביקשתם — רודפים אחרי כל לולאה פתוחה עד שהיא נסגרת."*
+- Flow שיכול להמיר: *"הצוות סוגר החלטות ממייל למערכת הרשומות שלכם תחת סקירת אבטחה — אנחנו פורסים; אתם לא מורידים."*
 
-If Pro is still sold as "small team shared setup" while the only built paid surface is individual follow-through + AI, a skeptical buyer will smell packaging fiction. Resolve that in one sentence before `PRO_PUBLIC=1`.
+אם Pro עדיין נמכר כ"הגדרה משותפת לצוות קטן" בזמן שמה שנבנה באמת הוא מעקב אישי + AI — קונה סקפטי יריח אריזה בדויה. לסגור את זה במשפט אחד לפני `PRO_PUBLIC=1`.
 
 ---
 
-## 2. Glance money plan
+## 2. תוכנית כסף — Glance
 
-### Revenue truth audit (Glance)
+### ביקורת אמת הכנסות (Glance)
 
-| Question | Answer (evidence) |
+| שאלה | תשובה (ראיה) |
 |---|---|
-| What can charge money **today** (`main`)? | **Nothing.** Pricing CTA is waitlist email (`pricing.html` → Supabase `waitlist` + `send-confirmation`). No Stripe. |
-| What is **built but not live**? | On branch: Stripe Checkout (`create-checkout`), webhook, derived licence keys, `verify-license`, billing portal, `pro-welcome.html`, Pro panel card, Free 3-loop Waiting-on cap, Draft-It / summaries licence-gated, founding coupon, 14-day card-required trial. DB: `licenses` + `ai_usage` already exist (0 rows). |
-| What is **live but not chargeable**? | Free Do It path (Gmail → Calendar / Tasks / draft / Drive). Sign-up → zip download. Inbox Scan / Almost Missed acquisition pages. Domain-cluster owner alerts in `confirm-signup`. `glance-assist` on `main` has **no licence gate** — if model keys are set, AI cost can burn with $0 revenue. |
-| What would **not survive a skeptical buyer**? | "Pro = small team" (`product-architecture.md` §2) while branch monetization sells individual follow-through. Masked secure cloud / Flow-Edge language near Glance. Claiming Waiting-on / money-owed works without a real-Gmail pass. Quoting accuracy of the deeper read before eval runs. Any implied user base — waitlist is 1. |
-| Where is **revenue leaking**? | (1) Load-unpacked install friction. (2) Pro not purchasable. (3) Packaging contradiction Free/Pro. (4) No lifecycle email (consent undecided). (5) Free AI endpoint ungated on `main`. (6) Branch not merged → payment code never reaches production. |
+| מה יכול לגבות כסף **היום** (`main`)? | **כלום.** ה־CTA בתמחור הוא מייל לרשימת המתנה (`pricing.html` → Supabase `waitlist` + `send-confirmation`). אין Stripe. |
+| מה **בנוי ולא חי**? | בענף: Stripe Checkout (`create-checkout`), webhook, מפתחות רישיון נגזרים, `verify-license`, פורטל חיוב, `pro-welcome.html`, כרטיס Pro בפאנל, תקרת 3 לולאות Waiting-on בחינם, Draft-It / סיכומים מאחורי רישיון, קופון מייסדים, ניסיון 14 יום עם כרטיס. ב־DB: `licenses` + `ai_usage` כבר קיימים (0 שורות). |
+| מה **חי אבל לא ניתן לגבייה**? | נתיב Do It חינמי (Gmail → יומן / משימות / טיוטה / Drive). הרשמה → הורדת zip. דפי רכישה Inbox Scan / Almost Missed. התראות אשכול־דומיין לבעלים ב־`confirm-signup`. `glance-assist` ב־`main` **בלי שער רישיון** — אם מפתחות מודל מוגדרים, עלות AI יכולה להישרף עם $0 הכנסה. |
+| מה **לא ישרוד קונה סקפטי**? | "Pro = צוות קטן" (`product-architecture.md` §2) בזמן שענף המונטיזציה מוכר מעקב אישי. שפת ענן ממוסך / Flow-Edge ליד Glance. לטעון ש־Waiting-on / כסף־שחייבים עובדים בלי בדיקת Gmail אמיתית. לצטט דיוק של הקריאה השנייה לפני הרצת eval. כל רמז לבסיס משתמשים — ב־waitlist יש 1. |
+| איפה **דולפת הכנסה**? | (1) חיכוך התקנת Load-unpacked. (2) אי אפשר לקנות Pro. (3) סתירת אריזה Free/Pro. (4) אין מייל מחזור חיים (הסכמה לא הוכרעה). (5) נקודת AI חינמית בלי שער ב־`main`. (6) הענף לא מוזג → קוד תשלום לא מגיע לפרודקשן. |
 
-### Now (this week — gate 0)
+### עכשיו (השבוע — שער 0)
 
-1. Merge the product branch that contains Stripe + Waiting-on + Pro packaging into `main` and deploy (open-tasks #1 / #11). Without this, every other Glance revenue idea is theater.
-2. Stripe account + prices ($14 mo / $132 yr) + portal + webhook + Netlify env — **do not** set `PRO_PUBLIC=1` until test path passes (`docs/monetization.md` §5 on the branch).
-3. Real-Gmail script: Waiting-on, Draft-It, licence activate/cancel (`docs/open-loops.md` §6 on branch).
-4. Chrome Web Store submission package (`flow-trial-extension/docs/chrome-web-store-submission.md`). No store = no volume.
-5. Freeze new `core/` features that do not touch install → first close → paywall.
+1. למזג את ענף המוצר עם Stripe + Waiting-on + אריזת Pro ל־`main` ולפרוס (open-tasks #1 / #11). בלי זה כל רעיון הכנסה אחר הוא תיאטרון.
+2. חשבון Stripe + מחירים ($14 לחודש / $132 לשנה) + פורטל + webhook + משתני Netlify — **לא** להגדיר `PRO_PUBLIC=1` עד שנתיב הבדיקה עובר (`docs/monetization.md` §5 בענף).
+3. סקריפט Gmail אמיתי: Waiting-on, Draft-It, הפעלת/ביטול רישיון (`docs/open-loops.md` §6 בענף).
+4. הגשת Chrome Web Store (`flow-trial-extension/docs/chrome-web-store-submission.md`). בלי חנות = בלי נפח.
+5. להקפיא פיצ'רי `core/` חדשים שלא נוגעים בהתקנה → סגירה ראשונה → חומת תשלום.
 
-### 30 days
+### 30 יום
 
-- `PRO_PUBLIC=1` after test-mode purchase + cancel + licence revoke proven.
-- Founding coupon live (real scarcity from Stripe `max_redemptions`).
-- Annual default on pricing (cash-flow lever already designed).
-- In-product upgrade moment: 4th open loop + money-owed tease (built on branch).
-- Measure: installs, first Do It close, trial starts, trial→paid, cancels. **Unknown until instrumented and used.**
-- Founder replies to every early user personally (day-3/day-10 automation blocked on consent).
+- `PRO_PUBLIC=1` אחרי רכישת בדיקה + ביטול + ביטול רישיון שמוכחים.
+- קופון מייסדים חי (מחסור אמיתי מ־`max_redemptions` ב־Stripe).
+- שנתי כברירת מחדל בתמחור (מנוף תזרים שכבר תוכנן).
+- רגע שדרוג במוצר: לולאה רביעית + רמז לסכום שחייבים (בנוי בענף).
+- למדוד: התקנות, Do It ראשון, התחלות ניסיון, ניסיון→תשלום, ביטולים. **לא ידוע עד שמודדים ומשתמשים.**
+- מייסד עונה אישית לכל משתמש מוקדם (אוטומציה ליום 3/10 חסומה על הסכמה).
 
-### 90 days
+### 90 יום
 
-- Only then: lifecycle email if consent decided; team billing if ≥3 real teams ask via Contact; deeper-read server on after precision gate (`ai-ladder` eval).
-- Target planning math (assumptions, not measurements): ~85 Pro @ ~$12 blended ≈ $1K MRR; ~420 ≈ $5K. Needs thousands of active free users at 2–5% conversion — **distribution problem**, not a model problem.
+- רק אז: מייל מחזור חיים אם הוחלט על הסכמה; חיוב צוות אם ≥3 צוותים אמיתיים מבקשים דרך Contact; שרת קריאה שנייה אחרי שער דיוק (eval של ai-ladder).
+- מתמטיקת תכנון (הנחות, לא מדידות): ~85 Pro ב־~$12 ממוצע ≈ $1K MRR; ~420 ≈ $5K. בשיעורי המרה 2–5% צריך אלפי משתמשי Free פעילים — **בעיית הפצה**, לא בעיית מודל.
 
 ---
 
-## 3. Flow money plan
+## 3. תוכנית כסף — Flow
 
-### Revenue truth audit (Flow)
+### ביקורת אמת הכנסות (Flow)
 
-| Question | Answer (evidence) |
+| שאלה | תשובה (ראיה) |
 |---|---|
-| What can charge money **today**? | **Nothing automatically.** Path is `/contact.html` → human quote. No Stripe for seats. `leads` table: **0 rows**. |
-| What is **built but not live / not sellable as promised**? | Enterprise story: SSO, audit log, admin console, masked cloud, Flow-Edge — described; not an operational product a buyer can buy and run. Connectors beyond Google are code-present but UI-dormant (`product-architecture.md` §0a). |
-| What is **live but not chargeable**? | Marketing site, playbook PDF waitlist, contact form, security/compliance narrative pages. Domain-cluster alerts from Glance signups (warm leads) — idle at 1 signup. |
-| What would **not survive a skeptical buyer**? | Selling masked secure cloud or Flow-Edge as available. Claiming five connectors when onboarding exposes Google only. Implying Trial Pro shares Flow security posture. Blog/solutions volume for industries not in the wedge. |
-| Revenue leak | No pipeline discipline on Contact leads. Enterprise features promised ahead of ops. Glance→Flow lead bridge unused. Sales motion requires humans and none are scheduled against a CRM of leads (0). |
+| מה יכול לגבות כסף **היום**? | **כלום אוטומטית.** הנתיב הוא `/contact.html` → הצעת מחיר אנושית. אין Stripe למושבים. טבלת `leads`: **0 שורות**. |
+| מה **בנוי ולא חי / לא ניתן למכירה כפי שהובטח**? | סיפור אנטרפרייז: SSO, יומן ביקורת, קונסולת אדמין, ענן ממוסך, Flow-Edge — מתוארים; לא מוצר תפעולי שאפשר לקנות ולהריץ. מחברים מעבר ל־Google קיימים בקוד אבל רדומים ב־UI (`product-architecture.md` §0a). |
+| מה **חי אבל לא ניתן לגבייה**? | אתר שיווקי, רשימת המתנה עם PDF Playbook, טופס יצירת קשר, דפי אבטחה/ציות. התראות אשכול־דומיין מהרשמות Glance (לידים חמים) — רדומות עם הרשמה אחת. |
+| מה **לא ישרוד קונה סקפטי**? | למכור ענן ממוסך או Flow-Edge כזמינים. לטעון חמישה מחברים כשבהתקנה יש רק Google. לרמוז ש־Trial Pro נושא את יציבות האבטחה של Flow. נפח blog/solutions לתעשיות מחוץ לטריז. |
+| דליפת הכנסה | אין משמעת צינור על לידי Contact. פיצ'רי אנטרפרייז מובטחים לפני תפעול. גשר Glance→Flow לא בשימוש. מכירה דורשת אנשים — ואין לידים ב־CRM (0). |
 
-### Now
+### עכשיו
 
-1. **Sell what is operationally true in one sentence:** scoped deployment of the loop-closure engine for regulated teams, Google-surface first, with DPA/security review as the paid wedge — not a self-serve download.
-2. Answer every Contact and every domain-cluster alert **same day**. Zero leads in DB means either forms are broken in production or there is zero demand signal — verify end-to-end after deploy (#9).
-3. Stop writing more solutions/blog pages until Search Console shows which URLs earn impressions.
+1. **למכור מה שנכון תפעולית במשפט אחד:** פריסה מתוחמת של מנוע סגירת לולאות לצוותים מפוקחים, משטח Google קודם, עם סקירת DPA/אבטחה כטריז בתשלום — לא הורדה עצמית.
+2. לענות על כל Contact ועל כל התראת אשכול־דומיין **באותו יום**. אפס לידים ב־DB אומר או שהטפסים שבורים בפרודקשן או שאין אות ביקוש — לאמת מקצה לקצה אחרי פריסה (#9).
+3. להפסיק לכתוב דפי solutions/blog עד ש־Search Console מראה אילו URL מרוויחים הופעות.
 
-### 30 days
+### 30 יום
 
-- One outbound list: 20 named firms in legal / insurance / security (owner network + domain clusters).
-- One demo script that shows: open Gmail → Do It → reversible write → what audit/DPA engagement buys. Do not demo dormant connectors as live.
-- Pricing posture: **seat ($80/user/mo annual) + scoped setup** is fine. Do not invent workflow/outcome pricing until one customer pays seats. Outcome pricing without measured closure rates is fiction.
+- רשימת outbound אחת: 20 חברות בשמות במשפט / ביטוח / אבטחה (רשת הבעלים + אשכולות דומיין).
+- סקריפט דמו אחד שמראה: Gmail פתוח → Do It → כתיבה הפיכה → מה שסקירת אבטחה/DPA קונה. לא להדגים מחברים רדומים כחיים.
+- תנוחת מחיר: **מושב ($80 למשתמש לחודש שנתי) + הקמה מתוחמת** בסדר. לא להמציא תמחור workflow/תוצאה עד שלקוח אחד משלם על מושבים. תמחור תוצאה בלי שיעורי סגירה נמדדים הוא בדותה.
 
-### 90 days
+### 90 יום
 
-- First paid pilot: even 5–10 seats + setup fee beats months of Glance freemium at current distribution.
-- Only after a paying pilot: custom connector as line item; Edge only if the contract requires it.
+- פיילוט בתשלום ראשון: גם 5–10 מושבים + דמי הקמה מנצחים חודשים של Glance freemium בהפצה הנוכחית.
+- רק אחרי פיילוט משלם: מחבר מותאם כפריט שורה; Edge רק אם החוזה דורש.
 
 ---
 
-## 4. Unit economics
+## 4. כלכלת יחידה
 
-### Glance Pro (planning model)
+### Glance Pro (מודל תכנון)
 
-| Item | Value | Confidence |
+| פריט | ערך | ביטחון |
 |---|---|---|
-| What is sold | Individual Pro: unlimited Waiting-on, money-owed view, firmer nudges, Draft-It, attachment summaries, deeper-read allowance | Branch packaging; not live |
-| To whom | Prosumer / individual operator of email money & deadlines | Stated |
-| List price | $14 / mo or $132 / yr (~$11 / mo) | Designed; Stripe prices not confirmed live |
-| Stripe fee | ~2.9% + $0.30 / charge (**estimated**) | Standard US card |
-| Deeper-read COGS | Free ~$0.15 / mo worst case; Pro ~$1.80–$2 / mo at full allowance (**estimated** provider prices) | Branch `docs/ai-ladder.md` §4 |
-| Draft-It / summary COGS | Variable per call; must stay licence-gated | On branch gated; **on main ungated** |
-| Contribution margin works if | (1) AI stays capped & gated, (2) most Free users stay local-only, (3) annual mix is high, (4) churn < ~8–10%/mo after trial | Model, not measured |
-| Free becomes dangerous when | Deeper-read or Draft-It runs without caps/gates; daily global cap (3,000 units ≈ ~$3.6/day **estimated**) is the hard stop | Branch design |
+| מה נמכר | Pro אישי: Waiting-on בלי הגבלה, מבט על כסף שחייבים, נדנודים חזקים יותר, Draft-It, סיכומי קבצים, מכסת קריאה שנייה | אריזת הענף; לא חי |
+| למי | פרוסיומר / מפעיל אישי של כסף ומועדים במייל | מצוין |
+| מחיר מחירון | $14 לחודש או $132 לשנה (~$11 לחודש) | מתוכנן; מחירי Stripe לא אושרו כחיים |
+| עמלת Stripe | ~2.9% + $0.30 לחיוב (**משוער**) | כרטיס US סטנדרטי |
+| עלות קריאה שנייה | Free ~$0.15 לחודש במקרה גרוע; Pro ~$1.80–$2 לחודש במכסה מלאה (**משוער** לפי מחירי ספקים) | ענף `docs/ai-ladder.md` §4 |
+| עלות Draft-It / סיכום | משתנה לפי קריאה; חייבת להישאר מאחורי רישיון | בענף עם שער; **ב־`main` בלי שער** |
+| שולי תרומה עובדים אם | (1) AI נשאר עם תקרה ושער, (2) רוב משתמשי Free נשארים מקומיים, (3) תמהיל שנתי גבוה, (4) נטישה < ~8–10% לחודש אחרי ניסיון | מודל, לא נמדד |
+| Free הופך מסוכן כש | קריאה שנייה או Draft-It רצים בלי תקרות/שערים; התקרה הגלובלית היומית (3,000 יחידות ≈ ~$3.6 ליום **משוער**) היא עצירת החירום | עיצוב הענף |
 
-**Do It itself is cheap** (local + user's Google APIs). **Do not finance product fantasy with unmeasured AI.** Keep Free valuable on local closes; put variable cost behind Pro + server counters.
+**Do It עצמו זול** (מקומי + API של Google של המשתמש). **לא לממן פנטזיית מוצר בעלויות AI לא נמדדות.** לשמור על Free חזק בסגירות מקומיות; לשים עלות משתנה מאחורי Pro + מונים בשרת.
 
-### Flow Enterprise (planning model)
+### Flow Enterprise (מודל תכנון)
 
-| Item | Value | Confidence |
+| פריט | ערך | ביטחון |
 |---|---|---|
-| What is sold | Seats + scoped setup (discovery, DPA, connector, deployment model) | Published |
-| To whom | Regulated orgs (legal, insurance, security) | Stated |
-| Seat price | $80 / user / mo, billed annually | Published |
-| Setup | Scoped — not flat | Stated |
-| Delivery COGS | Human time (sales, security review, integration). Cloud tenant cost **unknown**. Edge shifts compute to customer | Honest gap |
-| Contribution works if | Setup fee covers first integration + review; seats cover support load; no free "security theater" in Trial Pro | Qualitative |
-| Dangerous | Promising Edge/SSO/audit before staffed delivery; discounting seats to win logos without setup | |
+| מה נמכר | מושבים + הקמה מתוחמת (גילוי, DPA, מחבר, מודל פריסה) | מפורסם |
+| למי | ארגונים מפוקחים (משפט, ביטוח, אבטחה) | מצוין |
+| מחיר מושב | $80 למשתמש לחודש, חיוב שנתי | מפורסם |
+| הקמה | מתוחמת — לא שטוחה | מצוין |
+| עלות אספקה | זמן אדם (מכירות, סקירת אבטחה, אינטגרציה). עלות tenant בענן **לא ידועה**. Edge מעביר compute ללקוח | פער כנה |
+| תרומה עובדת אם | דמי הקמה מכסים אינטגרציה+סקירה ראשונים; מושבים מכסים עומס תמיכה; אין "תיאטרון אבטחה" חינמי ב־Trial Pro | איכותני |
+| מסוכן | להבטיח Edge/SSO/ביקורת לפני יכולת אספקה; להוזיל מושבים בלי הקמה | |
 
-**Illustrative (not a quote):** 20 seats × $80 = $1,600/mo ($19.2K/yr) before setup. One such deal > ~130 Glance Pros.
+**להמחשה (לא הצעת מחיר):** 20 מושבים × $80 = $1,600 לחודש ($19.2K לשנה) לפני הקמה. עסקה אחת כזו > ~130 מנויי Glance Pro.
 
 ---
 
-## 5. Packaging recommendations
+## 5. המלצות אריזה
 
-### Glance — change this
+### Glance — מה לשנות
 
-| Current risk | Change |
+| סיכון נוכחי | שינוי |
 |---|---|
-| Live page + architecture still imply Pro as "small team"; branch sells personal follow-through | **Lock Pro = personal depth layer** (Waiting-on + money + Draft-It + deeper read). Team = Contact / later. Close open-tasks decision. |
-| Free on live pricing undersells habit (Do It only); paid reason soft ("coming soon") | After merge: Free = Do It unlimited + **3 Waiting-on**. Paid reason = **protection/closure**, not "higher limits" as the headline. Limits enforce; the story is money/deadlines. |
-| Cap on Waiting-on vs "do not cap free closes" | Keep **Do It uncapped**. Cap only pursuit inventory (3). That is the conversion wedge. |
-| Notify-me CTA | Replace with checkout only when `PRO_PUBLIC=1`; until then keep honesty ("Coming soon") — never fake a Buy button. |
-| AI on Free | Deeper read with hard allowance OK; Draft-It Pro-only. Never open `glance-assist` without licence on production. |
+| הדף החי + הארכיטקטורה עדיין רומזים ש־Pro = "צוות קטן"; הענף מוכר מעקב אישי | **לנעול Pro = שכבת עומק אישית** (Waiting-on + כסף + Draft-It + קריאה שנייה). צוות = Contact / מאוחר יותר. לסגור את החלטת open-tasks. |
+| Free בדף החי ממעיט בהרגל (רק Do It); נימוק התשלום רך ("בקרוב") | אחרי מיזוג: Free = Do It בלי הגבלה + **3 Waiting-on**. נימוק התשלום = **הגנה/סגירה**, לא "מכסות גבוהות יותר" ככותרת. המכסות אוכפות; הסיפור הוא כסף/מועדים. |
+| תקרה על Waiting-on מול "אל תגבילו סגירות חינמיות" | להשאיר **Do It בלי תקרה**. להגביל רק מלאי רדיפה (3). זה טריז ההמרה. |
+| CTA של Notify-me | להחליף ב־checkout רק כש־`PRO_PUBLIC=1`; עד אז לשמור על כנות ("בקרוב") — אף פעם לא כפתור קנייה מזויף. |
+| AI בחינם | קריאה שנייה עם מכסה קשיחה בסדר; Draft-It רק ב־Pro. לעולם לא לפתוח `glance-assist` בלי רישיון בפרודקשן. |
 
-**Paid reason sharp enough for a non-technical payer next month?**  
-Yes — *if* Waiting-on works on their real mail: "You're tracking 3 of 3 and Pro shows what you're owed."  
-No — if Pro is "shared Notion setup for a team of 5" that was never built.
+**האם נימוק התשלום חד מספיק שמשתמש לא־טכני ישלם בחודש הבא?**  
+כן — *אם* Waiting-on עובד על המייל האמיתי שלו: "אתם עוקבים אחרי 3 מתוך 3 ו־Pro מראה מה חייבים לכם."  
+לא — אם Pro הוא "הגדרת Notion משותפת לצוות של 5" שמעולם לא נבנתה.
 
-### Flow — change this
+### Flow — מה לשנות
 
-| Current risk | Change |
+| סיכון נוכחי | שינוי |
 |---|---|
-| Roadmap items on pricing (masked cloud badge) next to a buy CTA | Keep badge. In sales calls, sell **engagement now**: security review + DPA + Google-path deployment. Roadmap is roadmap. |
-| Seat vs workflow vs outcome | **Seat + setup now.** Workflow/outcome pricing needs measured closure rates you do not have. |
-| Do not promise | Live SSO, audit export, Flow-Edge, five connectors in onboarding, compliance certification — until operationally true. |
+| פריטי roadmap בתמחור (תג ענן ממוסך) ליד CTA קנייה | להשאיר את התג. בשיחות מכירה למכור **התקשרות עכשיו**: סקירת אבטחה + DPA + פריסת נתיב Google. Roadmap הוא roadmap. |
+| מושב מול workflow מול תוצאה | **מושב + הקמה עכשיו.** תמחור workflow/תוצאה דורש שיעורי סגירה שאין לכם. |
+| מה לא להבטיח | SSO חי, ייצוא ביקורת, Flow-Edge, חמישה מחברים בהתקנה, הסמכת ציות — עד שנכון תפעולית. |
 
 ---
 
-## 6. P0 action list
+## 6. רשימת P0
 
-### Code (Claude / engineering)
+### קוד (Claude / הנדסה)
 
-1. **Merge payment + Waiting-on + Pro packaging branch → `main`**, deploy Netlify. Treat missing payments on `main` as P0.
-2. Gate `glance-assist` on licence **before** any production model keys are relied on (branch has this; `main` does not).
-3. Pricing page: checkout when `create-checkout` returns `enabled:true`; else Notify me (already designed).
-4. Instrument funnel events end-to-end: `pro_start_clicked`, `pro_activated`, `pricing_pro_checkout_click`, `pro_checkout_complete` — verify they fire in GA4 after go-live.
-5. Failed-payment / cancel: webhook already mirrors `past_due` / `canceled` on branch — confirm Draft-It dies immediately; no silent grace beyond designed 7-day offline.
-6. Do **not** build: hybrid execution activation, community learning, encoder experiments, more multi-platform surfaces, blog/solutions expansion — until Gate 0 cash path is live.
+1. **למזג את ענף התשלום + Waiting-on + אריזת Pro → `main`**, לפרוס Netlify. תשלומים חסרים ב־`main` = P0.
+2. לשער את `glance-assist` ברישיון **לפני** שמסתמכים על מפתחות מודל בפרודקשן (בענף יש; ב־`main` אין).
+3. דף תמחור: checkout כש־`create-checkout` מחזיר `enabled:true`; אחרת Notify me (כבר מתוכנן).
+4. לאשר אירועי משפך מקצה לקצה: `pro_start_clicked`, `pro_activated`, `pricing_pro_checkout_click`, `pro_checkout_complete` — לוודא שהם יורים ב־GA4 אחרי עלייה לאוויר.
+5. תשלום שנכשל / ביטול: ה־webhook כבר משקף `past_due` / `canceled` בענף — לאשר ש־Draft-It מת חד; בלי חסד שקט מעבר ל־7 ימי offline שתוכננו.
+6. **לא לבנות:** הפעלת hybrid, community learning, ניסויי encoder, עוד משטחים רב־פלטפורמה, הרחבת blog/solutions — עד שנתיב הכסף של שער 0 חי.
 
-### Sally / humans (owner)
+### סאלי / בני אדם (הבעלים)
 
-1. Stripe account, products, prices, Tax/VAT decision, Customer portal, webhook secret, `LICENSE_SECRET`, Netlify env. Order in branch `docs/monetization.md` §5.
-2. Confirm 14-day refund promise in `terms.html` or change it.
-3. Decide **Pro = individual** (recommended) vs small-team architecture fiction — one line, then docs/pricing match.
-4. Real-Gmail acceptance of Waiting-on + payment path; then `PRO_PUBLIC=1`.
-5. Chrome Web Store submit; set `chromeStoreUrl` when live.
-6. Confirm Resend / signup path after deploy (open-tasks #3–4). Update open-tasks #2: Supabase is already healthy.
-7. Founding coupon parameters (or skip).
-8. Consent decision for day-3 / day-10 email — until then, personal founder replies only.
+1. חשבון Stripe, מוצרים, מחירים, החלטת מס/מע״מ, Customer portal, סוד webhook, `LICENSE_SECRET`, משתני Netlify. הסדר ב־`docs/monetization.md` §5 בענף.
+2. לאשר הבטחת החזר 14 יום ב־`terms.html` או לשנות אותה.
+3. להחליט **Pro = אישי** (מומלץ) מול בדיית ארכיטקטורת צוות קטן — שורה אחת, ואז docs/תמחור תואמים.
+4. קבלת Waiting-on + נתיב תשלום ב־Gmail אמיתי; אחר כך `PRO_PUBLIC=1`.
+5. להגיש ל־Chrome Web Store; להגדיר `chromeStoreUrl` כשחי.
+6. לאשר נתיב Resend / הרשמה אחרי פריסה (open-tasks #3–4). לעדכן open-tasks #2: Supabase כבר בריא.
+7. פרמטרי קופון מייסדים (או לדלג).
+8. החלטת הסכמה למייל יום 3 / יום 10 — עד אז רק תשובות אישיות של מייסד.
 
-### Distribution / sales
+### הפצה / מכירות
 
-1. **Glance:** Web Store + one acquisition loop (Inbox Scan / Almost Missed / personal network). No ads until install→activate measured.
-2. **Flow:** Same-day reply to Contact + domain clusters. 20-account outbound. One demo that matches §0a shipping truth.
-3. Kill vanity: do not quote hypothetical "if we had 10,000 users."
+1. **Glance:** רישום בחנות + לולאת רכישה אחת (Inbox Scan / Almost Missed / רשת אישית). בלי מודעות עד ש־התקנה→הפעלה נמדדת.
+2. **Flow:** תשובה באותו יום ל־Contact + אשכולות דומיין. Outbound ל־20 חשבונות. דמו אחד שתואם את אמת §0a.
+3. להרוג יוהרה: לא לצטט "אם היו לנו 10,000 משתמשים."
 
-### Fastest path to cash
+### הנתיב המהיר ביותר למזומן
 
-| Milestone | Ruthless path |
+| אבן דרך | נתיב אכזרי |
 |---|---|
-| First **$1** | Merge → Stripe test→live → one founding/self purchase of Glance Pro **or** one Flow setup invoice. Whichever Sally can close first. Flow invoice can beat Pro if a warm org exists. |
-| First **$1K** | ~70–85 Pro (blended) **or** one ~10–15 seat Flow ACV slice / setup. Prefer Flow if network is enterprise; prefer Pro if Web Store unlocks consumer install. |
-| First **$10K** | Mix: 1–2 Flow pilots (seats+setup) plus Pro base. Do not plan $10K on Glance freemium alone without Store + measured conversion. |
+| **$1** ראשון | מיזוג → Stripe בדיקה→חי → רכישת מייסדים/עצמית אחת של Glance Pro **או** חשבונית הקמה אחת של Flow. מה שסאלי יכולה לסגור קודם. חשבונית Flow יכולה לנצח את Pro אם יש ארגון חם. |
+| **$1K** ראשון | ~70–85 Pro (ממוצע) **או** פרוסת ACV של ~10–15 מושבי Flow / הקמה. להעדיף Flow אם הרשת אנטרפרייז; להעדיף Pro אם החנות פותחת התקנת צרכן. |
+| **$10K** ראשון | תמהיל: 1–2 פיילוטי Flow (מושבים+הקמה) פלוס בסיס Pro. לא לתכנן $10K על Glance freemium לבד בלי חנות + המרה נמדדת. |
 
 ---
 
-## 7. Kill list (next 30–60 days)
+## 7. רשימת הריגה (30–60 הימים הבאים)
 
-Work that consumes time and does **not** move cash collection:
+עבודה שצורכת זמן ו**לא** מזיזה גביית מזומן:
 
-1. Hybrid execution switch-on / 2GB model download path.
-2. Community (cross-user) learning wiring.
-3. Encoder / small-LM browser experiments already failed gates.
-4. Additional multi-platform surfaces beyond what's needed for one real-Gmail money path (WhatsApp polish, more Outlook chrome) — until Pro can charge.
-5. New blog / solutions long pages for off-wedge industries.
-6. Team Pro features (shared connectors, digest, history dashboard) until individual Pro is live and selling.
-7. REMOTE_CLASSIFY / whole-message remote classification.
-8. Billing connector / bank-read / CRM for receipt issuance — future; does not collect SaaS revenue now.
-9. Packaging debates that re-open "Pro as security upgrade."
-10. Site redesign churn unrelated to Get Glance → install → pay.
+1. הדלקת hybrid execution / נתיב הורדת מודל של 2GB.
+2. חיווט community learning בין משתמשים.
+3. ניסויי encoder / LM בדפדפן שכבר נכשלו בשערים.
+4. משטחים רב־פלטפורמה מעבר לנדרש לנתיב כסף אחד ב־Gmail אמיתי (ליטוש WhatsApp, עוד chrome ל־Outlook) — עד ש־Pro יכול לגבות.
+5. דפי blog / solutions ארוכים חדשים לתעשיות מחוץ לטריז.
+6. פיצ'רי Pro צוותיים (מחברים משותפים, digest, לוח היסטוריה) עד ש־Pro אישי חי ומוכר.
+7. `REMOTE_CLASSIFY` / סיווג מרוחק של הודעה שלמה.
+8. מחבר חיוב / קריאת בנק / CRM להנפקת קבלות — עתיד; לא גובה SaaS עכשיו.
+9. דיוני אריזה שפותחים מחדש "Pro כשדרוג אבטחה."
+10. שינויי עיצוב אתר שלא קשורים ל־Get Glance → התקנה → תשלום.
 
-Impressive ≠ payable.
+מרשים ≠ ניתן לגבייה.
 
 ---
 
-## 8. Weekly revenue operating cadence
+## 8. קצב תפעול הכנסות שבועי
 
-**One page, same day each week.** One number per stage. Fix only the weakest link.
+**עמוד אחד, באותו יום בכל שבוע.** מספר אחד לכל שלב. לתקן רק את החוליה החלשה ביותר.
 
-| Stage | Metric | Source |
+| שלב | מדד | מקור |
 |---|---|---|
-| Attention | Sessions to `/trial.html`, `/pricing.html` | GA4 |
-| Sign-up | Confirmed waitlist / downloads | Supabase `waitlist`, Resend |
-| Install | Extension active pings / Store installs | `track-event`, CWS dashboard |
-| Activation | First Do It close / first Waiting-on accept per install | Extension events (anonymous) |
-| Value | Closes per active user; loops hitting 3/3 | Extension |
-| Paywall | Pricing checkout clicks; in-panel Pro start | GA4 + events |
-| Payment | Trial starts, paid conversions, failed payments | Stripe |
-| Retention | Cancels + reason; past_due recovery | Stripe portal / webhook |
-| Flow | Contact leads, domain clusters, demos booked, proposals out | `leads` + inbox |
-| AI COGS | Units / day; Free hitting cap; cost vs MRR | `ai_usage` + provider bills (**estimated $ until verified**) |
+| תשומת לב | ביקורים ב־`/trial.html`, `/pricing.html` | GA4 |
+| הרשמה | waitlist מאושר / הורדות | Supabase `waitlist`, Resend |
+| התקנה | פינגים פעילים של התוסף / התקנות בחנות | `track-event`, לוח CWS |
+| הפעלה | Do It ראשון / קבלת Waiting-on ראשונה להתקנה | אירועי תוסף (אנונימיים) |
+| ערך | סגירות למשתמש פעיל; לולאות שמגיעות ל־3/3 | תוסף |
+| חומת תשלום | לחיצות checkout בתמחור; התחלת Pro בפאנל | GA4 + אירועים |
+| תשלום | התחלות ניסיון, המרות לתשלום, תשלומים שנכשלו | Stripe |
+| שימור | ביטולים + סיבה; החלמה מ־past_due | פורטל Stripe / webhook |
+| Flow | לידי Contact, אשכולות דומיין, דמו שנקבעו, הצעות שיצאו | `leads` + תיבה |
+| עלות AI | יחידות ליום; Free שמגיע לתקרה; עלות מול MRR | `ai_usage` + חשבונות ספקים (**$ משוער עד אימות**) |
 
-**Rules:** no vanity feature demos in the revenue meeting. If payment is still not on `main`, the only agenda item is Gate 0. If install conversion is the trough, the only build is Web Store / install UX. Quote no user or revenue number that is not in Stripe or the DB.
+**כללים:** בלי דמויי פיצ'ר יוקרתיים בישיבת הכנסות. אם תשלום עדיין לא ב־`main`, סעיף האג'נדה היחיד הוא שער 0. אם המרת התקנה היא השפל, הבנייה היחידה היא חנות / UX התקנה. לא לצטט מספר משתמשים או הכנסה שאינו ב־Stripe או ב־DB.
 
 ---
 
-## Evidence index
+## אינדקס ראיות
 
-| Claim | Where |
+| טענה | איפה |
 |---|---|
-| No Stripe on `main` | `flow-landing/netlify/functions/` listing — no `create-checkout` / `stripe-webhook` |
-| Payment built on branch | `origin/claude/install-uiux-pro-max-skill-a4agox` — checkout, webhook, licenses migration, `docs/monetization.md` |
-| Pricing is Notify me | `flow-landing/pricing.html` |
-| Supabase healthy; licenses 0; waitlist 1 | Live Supabase MCP 2026-10-06 |
-| Pro packaging contradiction | `docs/product-architecture.md` §2 vs branch `docs/monetization.md` |
-| Shipping scope (Google only) | `docs/product-architecture.md` §0a |
-| AI cost estimates | Branch `docs/ai-ladder.md` §4 |
-| Open blockers | `docs/open-tasks.md` rows 1, 7, 11, 33 |
-| Domain clusters | `confirm-signup.js` thresholds 3/5/10/20/50 |
-| glance-assist ungated on main | `glance-assist.js` — no licence check |
+| אין Stripe ב־`main` | רשימת `flow-landing/netlify/functions/` — אין `create-checkout` / `stripe-webhook` |
+| תשלום בנוי בענף | `origin/claude/install-uiux-pro-max-skill-a4agox` — checkout, webhook, מיגרציית licenses, `docs/monetization.md` |
+| תמחור הוא Notify me | `flow-landing/pricing.html` |
+| Supabase בריא; licenses 0; waitlist 1 | Supabase MCP חי 2026-10-06 |
+| סתירת אריזת Pro | `docs/product-architecture.md` §2 מול `docs/monetization.md` בענף |
+| היקף שילוח (Google בלבד) | `docs/product-architecture.md` §0a |
+| אומדני עלות AI | ענף `docs/ai-ladder.md` §4 |
+| חסמים פתוחים | `docs/open-tasks.md` שורות 1, 7, 11, 33 |
+| אשכולות דומיין | `confirm-signup.js` ספים 3/5/10/20/50 |
+| glance-assist בלי שער ב־main | `glance-assist.js` — אין בדיקת רישיון |
