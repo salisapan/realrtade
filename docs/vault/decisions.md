@@ -5,6 +5,7 @@ tags: [decisions]
 
 One line per decision: `date · decision · who · where it is written in docs/`. Full status stays in [[open-tasks]]; this is the fast index for a new chat.
 
+- 2026-10-06 · Owner approved merge of CEO launch PR #91 (`cursor/ceo-launch-execute-5a1c`) to `main`; Netlify deploy still requires a separate OK · Sali · [[open-tasks]] row 1
 - 2026-10-06 · Supabase flow-ai ACTIVE; licenses + ai_usage migrations applied; no Netlify deploy without owner OK · Claude · [[open-tasks]] rows 1–2, 10, 30, 34
 - 2026-10-05 · Claude ↔ CoS realtime wake is comments on permanent draft PR #77 (branch `cos/bridge-live-inbox`; never merge, never close; no webhook secret, no Telegram). File drop on main stays the durable archive · Claude · [[vault/bridge/README]], [[open-tasks]] row 41
 - 2026-10-05 · Claude Code ↔ CoS bridge is a file drop under `vault/bridge/` (webhook optional, no secrets in git); messaging only · Sali · [[vault/bridge/README]], [[open-tasks]] row 41

@@ -7,13 +7,13 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-06 (CWS zip builds; live signup probe: `trial-signup` 404 until deploy; waitlist create works; **no Netlify deploy without owner OK**).
+Last updated: 2026-10-06 (owner approved merge of PR #91 to `main`; **Netlify deploy still waiting for separate OK**).
 
 ## Open
 
 | # | Task | Status | Owner | Due | Notes |
 |---|------|--------|-------|-----|-------|
-| 1 | Merge PR `cursor/ceo-launch-execute-5a1c` into `main` (product branch + main redesign). **Deploy to Netlify only after the owner says so** | open | owner | 2026-10-07 | Supersedes the old a4agox-only merge. Live site still shows the old copy until deploy is approved. ClickUp: https://app.clickup.com/t/z8vk7p8nh3 |
+| 1 | Merge PR `cursor/ceo-launch-execute-5a1c` into `main` (product branch + main redesign). **Deploy to Netlify only after the owner says so** | done | owner | 2026-10-06 | Merged to `main` 2026-10-06 after owner approval. **Netlify production deploy NOT done** — waiting for a separate explicit OK. Live site still shows the old copy until that deploy. ClickUp: https://app.clickup.com/t/z8vk7p8nh3 |
 | 2 | Restore the Supabase project `flow-ai` (currently INACTIVE) | done | owner | 2026-10-06 | Confirmed ACTIVE_HEALTHY (`zjquktirlrhbqcnkfaok`) on 2026-10-06. Waitlist / leads / catches present. |
 | 3 | Confirm Netlify env vars: `SUPABASE_SERVICE_ROLE_KEY`, `EMAIL_VERIFY_SECRET`, `RESEND_API_KEY` | open | owner | 2026-10-07 | Needed by `trial-signup`, `send-trial-access`, `download-trial-zip`. Checklist: `.env.example` at repo root. **Do not set production deploy switches until row 1 is approved.** |
 | 4 | Test a real Glance sign-up end to end after deploy | blocked | Claude + owner | after #1 deploy OK | **2026-10-06 probe (no new deploy):** live `/.netlify/functions/trial-signup` is **404** — the instant-download path is not on production yet. Live `trial.html` still uses the old `send-confirmation` → confirm link path; `POST send-confirmation kind=trial` returned `{ok:true}` (confirmation email + owner notify). Full E2E of the new path (waitlist row + zip download) needs an **owner-approved Netlify deploy** of this PR. Unit corpus `trial-signup.test.cjs`: all passed. Signup zip builds: `package_trial_extension.py --profile lite` → ~970 KB. |
