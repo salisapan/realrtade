@@ -16,12 +16,15 @@ the full split.
 
 ## What actually works today
 
-**Judgment runs on this device.** `core/judgment.js` scores each message from
-weighted, named signals — a currency figure, a commitment verb, a dated
-obligation, a direct request, a stated loss — against negative ones like an
-automated sender or mailing-list boilerplate. It speaks only above a threshold
-that moves as you click and dismiss. No email text is sent anywhere to reach
-this decision.
+**Judgment runs on this device in the Chrome extension.** `core/judgment.js`
+scores each message from weighted, named signals — a currency figure, a
+commitment verb, a dated obligation, a direct request, a stated loss —
+against negative ones like an automated sender or mailing-list boilerplate.
+It speaks only above a threshold that moves as you click and dismiss. No
+email text is sent anywhere to reach this decision. The Gmail add-on
+(`glance-gmail-addon/`) runs the same file inside Google Apps Script, not
+on the device. That host still does not send the message to Flow or to a
+model in order to decide.
 
 **Facts are extracted, not just detected.** `core/extract.js` pulls the amount
 (with currency, `k`/`m` suffixes, and a refusal to treat a bare number or a
@@ -96,10 +99,12 @@ Two different things happen to that masked text after masking, and the
 distinction matters:
 
 - **The judgment engine never sends anything anywhere.** `core/judgment.js`
-  and `core/extract.js` score plain text entirely on this device. A quiet
-  decision (noise, a hedge, a low-confidence catch-all, a Drive close that
-  stayed silent) stays on the device. The chip asks the masked classifier
-  only when that local pass found nothing and did not choose silence.
+  and `core/extract.js` score plain text with no network call of their own.
+  In this extension that run is on the device. In the Gmail add-on the same
+  files run in Google Apps Script. A quiet decision (noise, a hedge, a
+  low-confidence catch-all, a Drive close that stayed silent) makes no
+  model call. The chip asks the masked classifier only when that pass found
+  nothing and did not choose silence. The add-on does not make that call.
 - **Draft-It, the attachment X-ray, and that one classify fallback call a
   routed model** — `netlify/functions/glance-assist/glance-assist.js`. They
   only ever receive masked text: placeholder tokens, never the real
@@ -546,7 +551,7 @@ manifest.json          MV3, pinned key so the extension ID is stable
 core/domains.js         per-field vocabulary and phrasing — never rules
 core/connectors.js      catalog: what each destination is and how it authenticates
 core/extract.js         money / date / decisive-sentence extraction (no network)
-core/judgment.js        weighted on-device scorer + adaptive threshold + precision/harm calibration
+core/judgment.js        weighted scorer + adaptive threshold + precision/harm calibration (on-device in this extension; Google Apps Script in the Gmail add-on)
 core/intent.js          classifies extracted facts into one of five intent types
 core/actions.js         intent -> named PROCESS -> ordered steps, biased by Execution Memory
 core/execution-memory.js  local event log of what a user keeps/strips/undoes per named process — biases future step order and drops a net-rejected step (see "What actually works today"); storage is an injected adapter, not hardcoded

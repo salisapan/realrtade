@@ -4,9 +4,10 @@
 // Without it the best a note can say is "Flow saw an email"; with it the note
 // carries the number, the date and the sentence that actually decided something.
 //
-// Everything here runs on the device against text already on screen. There is no
-// network call in this file, and there is no model — it is deterministic pattern
-// work, which is why it can state exactly what it found and why.
+// There is no network call in this file, and there is no model — it is
+// deterministic pattern work, which is why it can state exactly what it
+// found and why. The Chrome extension runs it on the device. The Gmail
+// add-on runs the same file in Google Apps Script, not on the device.
 
 const FlowExtract = (() => {
   const MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];

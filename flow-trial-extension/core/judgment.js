@@ -1,15 +1,15 @@
 // The judgment engine: decides whether one email is worth speaking up about.
 //
-// This file itself runs entirely on the device and sends nothing anywhere —
-// still true, and still the default path for every message, English or
-// Hebrew, that its patterns actually cover. It is a fixed keyword/regex
-// corpus, not language understanding, so it has a real ceiling: a message
-// this file scores { type: null } is not "Glance stayed local," it's
-// "Glance found nothing" — content-gmail.js's ensureRemoteClassification()
-// is the one place that gap gets a second, masked-text-only attempt (see
-// glance-assist.js). Growing the corpus below keeps more real Hebrew and
-// English business email inside this free, instant, fully local path
-// rather than needing that fallback at all.
+// This file sends nothing anywhere. In the Chrome extension it runs on the
+// device. In the Gmail add-on the same file runs inside Google Apps Script,
+// on Google's servers, not on the device — still with no call to Flow and
+// no model. It is a fixed keyword/regex corpus, not language understanding,
+// so it has a real ceiling: a message this file scores { type: null } is
+// not "Glance stayed quiet on purpose," it's "Glance found nothing" —
+// content-gmail.js's ensureRemoteClassification() is the one place that
+// gap gets a second, masked-text-only attempt (see glance-assist.js). The
+// Gmail add-on does not make that second call. Growing the corpus below
+// keeps more real Hebrew and English business email inside this path.
 //
 // It is not a keyword match. Each signal carries a weight and a reason; the
 // score is their sum, and the chip only appears once the score clears a

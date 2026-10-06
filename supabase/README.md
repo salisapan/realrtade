@@ -69,7 +69,7 @@ for `zjquktirlrhbqcnkfaok`, not RealTrade.
 
 | Variable | Required for | Notes |
 |---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | `submit-waitlist`, `submit-lead`, `confirm-signup`, `submit-catch` | Service-role key for `zjquktirlrhbqcnkfaok`. The functions hardcode that project's URL. They do not read a Supabase URL from the environment. Without this key those handlers return 500 and write nothing. |
+| `SUPABASE_SERVICE_ROLE_KEY` | `submit-waitlist`, `submit-lead`, `confirm-signup`, `submit-catch` | Service-role key for `zjquktirlrhbqcnkfaok`. The functions hardcode that project's URL. They do not read a Supabase URL from the environment. Without this key those handlers return 500 and write nothing, except `submit-lead`, which still succeeds when the owner email sends (the email says the lead was not stored and lists every field); it errors only when the email also fails. |
 | `EMAIL_VERIFY_SECRET` | `submit-waitlist` (both steps), `send-confirmation`, `confirm-signup` | Shared HMAC secret. Waitlist create/update refuses to run without it. The homepage qualification step cannot finish without it. |
 | `RESEND_API_KEY` | Mail after a row is stored | `submit-lead` still stores the row when this is unset; the sales notification is skipped. Confirmation and playbook mail do not send without it. |
 

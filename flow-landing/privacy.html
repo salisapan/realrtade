@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Flow's Privacy Policy — what the website and waitlist collect, what the Glance Chrome extension reads and what stays on your device, and your rights.">
+<meta name="description" content="Flow's Privacy Policy — what the website and waitlist collect, what the Glance Chrome extension reads on your device, what the Gmail add-on reads in Google Apps Script, and your rights.">
 <meta name="theme-color" content="#07090F">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
@@ -108,7 +108,7 @@ footer.site a{color:var(--muted)}
   <div class="wrap">
     <span class="eyebrow">Legal</span>
     <h1 class="title">Privacy Policy</h1>
-    <div class="updated">Last updated: September 8, 2026</div>
+    <div class="updated">Last updated: October 5, 2026</div>
     <article>
 
 <p>This Privacy Policy explains what information Flow ("Flow", "we", "us") collects when you visit theflow-ai.com, join our early-access waitlist, or install the Glance Chrome extension — how it's used, and the choices you have. Flow is currently in pre-release, early-access status; this policy will be expanded as the product moves toward general availability.</p>
@@ -161,6 +161,15 @@ footer.site a{color:var(--muted)}
 </ul>
 <p>Glance is intended for general business use. It is a separate product from Flow, it is not designed for regulated or otherwise sensitive material, and it carries none of the contractual or compliance guarantees described on our <a href="/security.html">Security</a> page.</p>
 
+<h2>5a. Glance (the Gmail add-on)</h2>
+<p>The Gmail add-on is the same product on a different host: Gmail on the web and the Gmail apps on iOS and Android. It is not the Chrome extension above, and it does not judge on your device.</p>
+<ul>
+<li><b>Where the decision runs.</b> In Google Apps Script, on Google's servers, inside the Google account that installed the add-on. Flow's servers do not receive the message, and the decision is not a model call.</li>
+<li><b>What it reads.</b> The message you have open: its plain text, subject, and sender. The scope is the current message, not the mailbox.</li>
+<li><b>What a click writes.</b> Nothing, until you press Do It. That click can create a Google Calendar event, a Google Task, or a Gmail draft, or the short combination of those three the message actually calls for. The draft is not sent. Undo deletes what that click created. Those writes use your Google account. We do not receive a copy.</li>
+<li><b>What stays in the add-on.</b> Undo needs the ids of what was just written, and a count of full closes so the receipt can tell the first ones apart. Those values sit in Apps Script user properties on your Google account. They are not the message body. Removing the add-on removes them.</li>
+</ul>
+
 <h2>6. Enterprise enquiries</h2>
 <p>If you submit the form on our <a href="/contact.html">Contact</a> page, we collect what you enter there — your email address and, where you provide them, your name, organisation, role, approximate number of seats, preferred deployment model, timeline, and message. We use it to answer your enquiry and to keep a record of the conversation. It is stored with Supabase and notified to us by email through Resend.</p>
 
@@ -168,7 +177,7 @@ footer.site a{color:var(--muted)}
 <p>Google Analytics sets standard analytics cookies to distinguish returning visitors and measure site usage in aggregate. You can block or clear these at any time through your browser settings without affecting your ability to use the site or join the waitlist.</p>
 
 <h2>8. Data Retention</h2>
-<p>We keep waitlist submissions and enterprise enquiries for as long as the signup or conversation is active, and for a reasonable period afterward for our own records, unless you ask us to delete them sooner (see Section 10). Data held inside the Glance extension lives on your own device and is removed when you uninstall it.</p>
+<p>We keep waitlist submissions and enterprise enquiries for as long as the signup or conversation is active, and for a reasonable period afterward for our own records, unless you ask us to delete them sooner (see Section 10). Data held inside the Glance Chrome extension lives on your own device and is removed when you uninstall it. The Gmail add-on's undo ids live in your Google account, as described in Section 5a, and are removed when you remove the add-on.</p>
 
 <h2>9. International Transfers</h2>
 <p>Our service providers may process data in the United States and other countries. Where required, we rely on those providers' own standard contractual safeguards for cross-border transfers.</p>

@@ -25,6 +25,11 @@ Verified in code (`flow-trial-extension/core/connectors.js`, `flow-trial-extensi
 | Sensitivity | — | not a setup input. It self-adjusts from clicks and dismissals; the popup only displays where it landed. |
 | Notion | "works today" | code path works; unreachable from onboarding. |
 
+The Gmail add-on in `glance-gmail-addon/` is a second host for that same
+Google close, not a third product and not a Marketplace listing. Its
+judgment runs in Google Apps Script, not on the device. It may write a
+Calendar event, a Task, or a Gmail draft. It does not send.
+
 Two consequences that bind future work:
 
 1. **`manifest.json`'s `host_permissions` match the reachable set, not the
@@ -451,7 +456,7 @@ We must be the clear leader in the following combination:
 | **Precision**               | Prefer silence over a wrong action                | Trust is everything |
 | **Zero-Prompt UX**          | Silent by default. Appears only when relevant     | Attention is sacred |
 | **Process-level execution** | Closes short, meaningful loops — not single tasks | Real value |
-| **Local-first judgment**    | Core decisioning happens on-device when possible  | Privacy + speed + trust |
+| **Judgment**                | Chrome extension: on the device. Gmail add-on: the same rules in Google Apps Script, not on the device, and not sent to Flow | Privacy + speed + trust |
 | **Personal Execution Memory** | Learns how *this* user closes things             | Compounding advantage |
 | **Reversibility**           | Every action is undoable                          | Reduces fear of automation |
 | **Proactive closing**       | Surfaces unclosed intentions (Morning Brief etc.) | Creates habit & stickiness |
