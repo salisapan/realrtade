@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-06 (CFO revenue mandate: `docs/cfo-revenue-mandate.md` — cash path blocked by payments-not-on-main + no Chrome Web Store; Supabase `flow-ai` is healthy again).
+Last updated: 2026-10-06 (מנדט CFO בעברית: `docs/cfo-revenue-mandate.md` — נתיב הכסף חסום כי תשלומים לא ב־`main` ואין Chrome Web Store; Supabase `flow-ai` בריא שוב).
 
 ## Open
 
