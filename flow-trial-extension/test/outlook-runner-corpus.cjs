@@ -49,8 +49,23 @@ function world(over) {
       w.drafts = w.drafts || {};
       const id = 'draft-' + Object.keys(w.drafts).length + 1;
       const body = init.body ? JSON.parse(init.body) : {};
-      w.drafts[id] = { id, isDraft: true, webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' } };
+      w.drafts[id] = { id, isDraft: true, webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
       return { ok: true, status: 201, json: async () => w.drafts[id], text: async () => JSON.stringify(w.drafts[id]) };
+    }
+    const attMatch = u.match(/\/me\/messages\/([^/?]+)\/attachments$/i);
+    if (attMatch && (init.method || 'GET').toUpperCase() === 'POST') {
+      w.drafts = w.drafts || {};
+      const id = decodeURIComponent(attMatch[1]);
+      if (!w.drafts[id]) return { ok: false, status: 404, json: async () => ({}), text: async () => '{}' };
+      const body = init.body ? JSON.parse(init.body) : {};
+      if (w.attachNoId) {
+        const payload = { name: body.name || 'file' };
+        return { ok: true, status: 201, json: async () => payload, text: async () => JSON.stringify(payload) };
+      }
+      const attId = 'att-' + (Object.keys(w.drafts[id].attachments || {}).length + 1);
+      w.drafts[id].attachments[attId] = { id: attId, name: body.name, contentType: body.contentType };
+      const payload = { id: attId, name: body.name, contentType: body.contentType };
+      return { ok: true, status: 201, json: async () => payload, text: async () => JSON.stringify(payload) };
     }
     const msgMatch = u.match(/\/me\/messages\/([^/?]+)/i);
     if (msgMatch && !u.includes('mailFolders')) {
@@ -281,6 +296,24 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     let refused = false;
     try { o.assertAllowedWrite(CFG.GRAPH + '/me/messages/x/send', 'POST'); } catch (e) { refused = e.code === 'refused'; }
     check('allow-list refuses /send', refused);
+    let attachAllowed = true;
+    try { o.assertAllowedWrite(CFG.GRAPH + '/me/messages/draft-1/attachments', 'POST'); } catch (e) { attachAllowed = false; }
+    check('allow-list permits POST fileAttachment on a draft', attachAllowed);
+
+    const file = { name: 'Invoice 204.pdf', contentType: 'application/pdf', contentBytes: Buffer.from('invoice-pdf').toString('base64') };
+    const withFile = await o.createReplyDraft('a1', 'The invoice is on this draft.', { file: file });
+    const attPosts = w.calls.filter((c) => c.method === 'POST' && /\/attachments$/.test(c.url));
+    check('Do It attaches the file with Mail.ReadWrite and keeps the attachment id', withFile.ok && withFile.attachmentId && /attached/.test(withFile.written) && attPosts.length === 1 && w.drafts[withFile.ref].attachments[withFile.attachmentId], { withFile, att: attPosts.map((c) => c.url) });
+    const attBody = attPosts[0] && attPosts[0].body ? JSON.parse(attPosts[0].body) : {};
+    check('the attachment call is a fileAttachment and not a send', attBody['@odata.type'] === '#microsoft.graph.fileAttachment' && attBody.contentBytes === file.contentBytes && !/\/(send|reply|replyAll|forward|sendMail)(\b|$)/i.test(attPosts[0].url), attBody['@odata.type']);
+    const beforeUndo = Object.keys(w.drafts[withFile.ref].attachments);
+    const undoFile = await o.undoReplyDraft(withFile.ref);
+    check('Undo deletes the draft together with the file', undoFile.ok && !w.drafts[withFile.ref] && beforeUndo.length === 1, { undoFile, left: w.drafts[withFile.ref] });
+
+    w.attachNoId = true;
+    const draftsBefore = Object.keys(w.drafts).length;
+    const noId = await o.createReplyDraft('a1', 'Should not claim a file.', { file: file });
+    check('no attachment id deletes the draft and does not claim attached', noId.ok === false && noId.reason === 'outlook-file-found-no-attach' && !(noId.written && /attach/i.test(noId.written)) && Object.keys(w.drafts).length === draftsBefore, noId);
 
     // Silent reauth after 20h
     const w3 = world({ sent: [], inbox: [] });

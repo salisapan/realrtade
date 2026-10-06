@@ -123,6 +123,17 @@ console.log('\n--- silence is a reason code, once per message ---\n');
     FlowQuietMetrics.reasonFor({ type: null, googleSilence: true }) === 'google');
   check('an explicit code wins',
     FlowQuietMetrics.reasonFor({ type: null, quiet: 'family', googleSilence: true }) === 'family');
+  const third = FlowQuietMetrics.noteSilence(start, { messageId: 's-third', reason: 'third-party', ts: THIS_TS });
+  const noAttach = FlowQuietMetrics.noteSilence(third, { messageId: 's-outlook', reason: 'outlook-file-found-no-attach', ts: THIS_TS });
+  const named = FlowQuietMetrics.snapshot(noAttach, THIS_TS);
+  check('third-party and outlook-file-found-no-attach are silence reasons',
+    named.silenceWeek.byReason['third-party'] === 1 && named.silenceWeek.byReason['outlook-file-found-no-attach'] === 1, named.silenceWeek.byReason);
+  check('those reasons are on the activity line and a body is not',
+    FlowQuietMetrics.activityLine(named).indexOf('third-party 1') !== -1 &&
+    FlowQuietMetrics.activityLine(named).indexOf('outlook-file-found-no-attach 1') !== -1 &&
+    FlowQuietMetrics.activityLine(named).indexOf('invoice') === -1);
+  check('reasonFor names a third-party silence',
+    FlowQuietMetrics.reasonFor({ type: null, quiet: 'third-party' }) === 'third-party');
 
   const line = FlowQuietMetrics.activityLine(snap);
   check('the activity line names the week counts and not a message',

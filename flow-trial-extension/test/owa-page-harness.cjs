@@ -270,7 +270,7 @@ async function runPage(opts) {
       driveFiles: [{ id: 'f1', name: 'Invoice 204.pdf', mimeType: 'application/pdf' }]
     });
     const reasons = (found.store.outlookPageDiag || []).map((d) => d.reason);
-    check('one Drive file is not drafted as attached', !found.chip && reasons.indexOf('outlook:file-found-no-attach') >= 0, reasons);
+    check('one Drive file offers Do It and does not claim the file is already attached', found.chip && found.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(found.chip.textContent) && !/attached/i.test(found.chip.textContent) && reasons.indexOf('outlook:file-found-no-attach') < 0, { reasons, text: found.chip && found.chip.textContent });
     const he = (h) => h.replace(
       'Could you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.',
       'שלח לי את החשבונית עד יום חמישי.'

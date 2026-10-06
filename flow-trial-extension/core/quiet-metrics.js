@@ -21,7 +21,7 @@
 // as a reason code. Not a miss the classifier never named, and not a
 // chip the user then dismissed (that is already a false-Do-It).
 // Codes: noise, hedge, family, low, google, calibrated, memory, file,
-// fact. See docs/quiet-metrics.md.
+// fact, third-party, outlook-file-found-no-attach. See docs/quiet-metrics.md.
 const FlowQuietMetrics = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
   const ID_CAP = 300;
@@ -29,7 +29,7 @@ const FlowQuietMetrics = (() => {
   const ID_MAX = 128;
   // Order is the Activity line order. Adding a code here is the only
   // way a reason can be stored — anything else is dropped.
-  const REASONS = ['noise', 'hedge', 'family', 'low', 'google', 'calibrated', 'memory', 'file', 'fact'];
+  const REASONS = ['noise', 'hedge', 'family', 'low', 'google', 'calibrated', 'memory', 'file', 'fact', 'third-party', 'outlook-file-found-no-attach'];
 
   function emptyCounts() {
     const byReason = {};

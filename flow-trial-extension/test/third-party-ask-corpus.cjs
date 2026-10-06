@@ -40,7 +40,9 @@ const THIRD = [
   ['HE ask accounting', 'תבקש מחשבונאות לשלוח לי את החשבונית', invoice],
   ['HE tell Dana', 'תגיד לדנה שתשלח את החוזה', contract],
   ['HE Dana will send', 'שדנה ישלח את החשבונית', invoice],
-  ['HE he will send', 'שישלח לי את החשבונית', invoice]
+  ['HE he will send', 'שישלח לי את החשבונית', invoice],
+  ['EN he will send', "He'll send the invoice.", invoice],
+  ['HE Dana feminine will send', 'שדנה תשלח לי את החשבונית', invoice]
 ];
 
 console.log('--- someone else must act: no file prepare ---');
@@ -94,7 +96,10 @@ console.log('--- nearby sentences that are not "get someone else to send" ---');
   'Please get the invoice to me.',
   'Could you check with your finance team and get back to me with the PO number by Thursday?',
   'Have a great weekend, and send me the invoice when you can.',
-  'תגיד לי את מספר החשבונית'
+  'תגיד לי את מספר החשבונית',
+  "I'll send the invoice.",
+  "You'll send the invoice.",
+  'שתשלח לי את החשבונית'
 ].forEach((text) => {
   check('not third-party: ' + text, A.asksThirdParty(text) === false, text);
 });
