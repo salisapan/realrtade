@@ -804,11 +804,16 @@ async function run() {
   store = {};
   {
     const now = Date.now();
-    const success = await FlowStorage.recordCloseQuality({ kind: 'success', messageId: 't1', ts: now });
+    const success = await FlowStorage.recordCloseQuality({
+      kind: 'success', messageId: 't1', ts: now,
+      app: 'gmail', product: 'free', proposed: 1, succeeded: 1,
+      receiptFull: true, receiptStatus: 'Handled.', kinds: ['googleTask']
+    });
     check('a full write is still a close-quality success', success && success.kind === 'success', success);
     const snap = await FlowStorage.getQuietSnapshot(now);
-    check('that full write is one trusted close this week and no Undo',
-      snap.trusted.trusted === 1 && snap.trusted.handled === 1 && snap.trusted.undone === 0 && snap.trusted.undoRate === 0, snap.trusted);
+    check('that Free Gmail Google write is one trusted close this week and no Undo',
+      snap.trusted.trusted === 1 && snap.trusted.handled === 1 && snap.trusted.undone === 0 &&
+      snap.trusted.undoRate === 0 && snap.trusted.path === 'free-gmail-google', snap.trusted);
 
     await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: 't1', reason: 'undo', ts: now });
     const undone = await FlowStorage.getQuietSnapshot(now);
@@ -819,6 +824,21 @@ async function run() {
     const afterDismiss = await FlowStorage.getQuietSnapshot(now);
     check('dismissing a chip is not an Undo of a trusted close',
       dismissed && dismissed.reason === 'dismiss' && afterDismiss.trusted.undone === 1, afterDismiss.trusted);
+
+    await FlowStorage.recordCloseQuality({ kind: 'success', messageId: 't-bare', ts: now });
+    await FlowStorage.recordCloseQuality({
+      kind: 'success', messageId: 't-notion', ts: now,
+      app: 'gmail', product: 'free', proposed: 1, succeeded: 1,
+      receiptFull: true, receiptStatus: 'Handled.', kinds: ['notion']
+    });
+    await FlowStorage.recordCloseQuality({
+      kind: 'success', messageId: 't-partial', ts: now,
+      app: 'gmail', product: 'free', proposed: 2, succeeded: 1,
+      receiptFull: false, receiptStatus: 'Partly handled.', kinds: ['googleTask']
+    });
+    const still = await FlowStorage.getQuietSnapshot(now);
+    check('a bare success, a Notion write, and a partial receipt do not inflate trusted closes',
+      still.trusted.trusted === 0 && still.trusted.handled === 1 && still.trusted.undone === 1, still.trusted);
 
     const counted = await FlowStorage.recordSilence({ messageId: 's1', reason: 'hedge', ts: now });
     const repeat = await FlowStorage.recordSilence({ messageId: 's1', reason: 'noise', ts: now });

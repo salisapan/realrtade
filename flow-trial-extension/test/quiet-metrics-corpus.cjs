@@ -56,13 +56,13 @@ console.log('\n--- trusted close is Handled and not Undone ---\n');
 
   const start = FlowQuietMetrics.emptyState();
   const frozen = JSON.stringify(start);
-  const one = FlowQuietMetrics.noteHandled(start, { messageId: 'm1', ts: THIS_TS });
+  const one = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({ messageId: 'm1' }));
   check('noteHandled does not mutate the state it was given', JSON.stringify(start) === frozen);
   const week = FlowQuietMetrics.trustedWeek(one, THIS_TS);
   check('one full write this week is one trusted close and zero Undo',
     week.trusted === 1 && week.handled === 1 && week.undone === 0 && week.undoRate === 0, week);
 
-  const again = FlowQuietMetrics.noteHandled(one, { messageId: 'm1', ts: THIS_TS + 1 });
+  const again = FlowQuietMetrics.noteHandled(one, freeGmailGoogle({ messageId: 'm1', ts: THIS_TS + 1 }));
   check('the same message is not a second trusted close',
     FlowQuietMetrics.trustedWeek(again, THIS_TS).handled === 1);
 
@@ -79,7 +79,7 @@ console.log('\n--- trusted close is Handled and not Undone ---\n');
     FlowQuietMetrics.trustedWeek(partialUndo, THIS_TS).handled === 0 &&
     FlowQuietMetrics.trustedWeek(partialUndo, THIS_TS).undoRate === null);
 
-  const older = FlowQuietMetrics.noteHandled(start, { messageId: 'old', ts: LAST_TS });
+  const older = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({ messageId: 'old', ts: LAST_TS }));
   const thisWeek = FlowQuietMetrics.trustedWeek(older, THIS_TS);
   const lastWeek = FlowQuietMetrics.trustedWeek(older, LAST_TS);
   check('a full write last week is not this week\'s trusted count',
@@ -90,11 +90,198 @@ console.log('\n--- trusted close is Handled and not Undone ---\n');
     FlowQuietMetrics.trustedWeek(undoLater, LAST_TS).undone === 1 &&
     FlowQuietMetrics.trustedWeek(undoLater, THIS_TS).undone === 0);
 
-  const blank = FlowQuietMetrics.noteHandled(start, { messageId: '  ', ts: THIS_TS });
-  const body = FlowQuietMetrics.noteHandled(start, { messageId: 'Please send the invoice to dana@x.com', ts: THIS_TS });
+  const blank = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({ messageId: '  ' }));
+  const body = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({ messageId: 'Please send the invoice to dana@x.com' }));
   check('a blank id or a body-shaped id is not stored',
     blank.handled.length === 0 && body.handled.length === 0 &&
     JSON.stringify(body).indexOf('dana@') === -1);
+}
+
+// A Free Gmail→Google Do It that the receipt called Handled. The same
+// full-write test the chip already uses, plus the six Google writers.
+// Anything else must not move this week's trusted count.
+function freeGmailGoogle(over) {
+  over = over || {};
+  const kinds = over.kinds != null ? over.kinds : ['googleTask'];
+  const proposed = over.proposed != null ? over.proposed : (Array.isArray(kinds) && kinds.length ? kinds.length : 1);
+  const succeeded = over.succeeded != null ? over.succeeded : proposed;
+  const total = over.total != null ? over.total : proposed;
+  const receipt = FlowReceipt.confirmation({
+    succeeded: succeeded,
+    total: total,
+    priorCloses: 4,
+    lang: over.lang
+  });
+  const fullWrite = FlowCloseQuality.isFullWrite(proposed, succeeded);
+  const event = {
+    messageId: over.messageId || 'gg1',
+    ts: over.ts != null ? over.ts : THIS_TS,
+    app: over.app != null ? over.app : 'gmail',
+    product: over.product != null ? over.product : 'free',
+    proposed: proposed,
+    succeeded: succeeded,
+    kinds: kinds,
+    receiptFull: over.receiptFull != null ? over.receiptFull : (receipt.full === true && fullWrite),
+    receiptStatus: over.receiptStatus != null ? over.receiptStatus : receipt.status
+  };
+  return event;
+}
+
+console.log('\n--- trusted closes/week is a Free Gmail→Google handled receipt ---\n');
+{
+  const task = freeGmailGoogle({ messageId: 'gg-task' });
+  check('the English receipt for a full Google write says Handled.',
+    task.receiptFull === true && task.receiptStatus === 'Handled.' &&
+    FlowReceipt.confirmation({ succeeded: 1, total: 1, priorCloses: 4 }).status === 'Handled.');
+  const he = freeGmailGoogle({ messageId: 'gg-he', lang: 'he', kinds: ['calendar'] });
+  check('the Hebrew receipt for that same full write says טופל.',
+    he.receiptFull === true && he.receiptStatus === 'טופל.');
+
+  const start = FlowQuietMetrics.emptyState();
+  const frozen = JSON.stringify(start);
+  const one = FlowQuietMetrics.noteHandled(start, task);
+  check('a Free Gmail Google Task Do It with Handled does not mutate the prior state',
+    JSON.stringify(start) === frozen);
+  const week = FlowQuietMetrics.trustedWeek(one, THIS_TS);
+  check('that close is one trusted close this week',
+    week.trusted === 1 && week.handled === 1 && week.undone === 0 && week.path === 'free-gmail-google', week);
+  check('the week store keeps the id, not the step kind or the receipt words',
+    JSON.stringify(one).indexOf('googleTask') === -1 && JSON.stringify(one).indexOf('Handled') === -1);
+
+  const chain = freeGmailGoogle({
+    messageId: 'gg-chain',
+    proposed: 3,
+    succeeded: 3,
+    kinds: ['driveDoc', 'calendar', 'gmailDraft']
+  });
+  const three = FlowQuietMetrics.noteHandled(one, chain);
+  check('a Doc, Calendar, and draft chain is one close, not three',
+    FlowQuietMetrics.trustedWeek(three, THIS_TS).trusted === 2, FlowQuietMetrics.trustedWeek(three, THIS_TS));
+
+  const sheet = FlowQuietMetrics.noteHandled(three, freeGmailGoogle({
+    messageId: 'gg-sheet', kinds: ['driveSheet', 'gmailDraft']
+  }));
+  const file = FlowQuietMetrics.noteHandled(sheet, freeGmailGoogle({
+    messageId: 'gg-file', kinds: ['driveFile', 'gmailDraft']
+  }));
+  check('Sheet and Drive-file closes count on the same week',
+    FlowQuietMetrics.trustedWeek(file, THIS_TS).trusted === 4);
+
+  const hebrew = FlowQuietMetrics.noteHandled(file, he);
+  check('a Hebrew Handled receipt counts the same way',
+    FlowQuietMetrics.trustedWeek(hebrew, THIS_TS).trusted === 5);
+
+  const again = FlowQuietMetrics.noteHandled(hebrew, freeGmailGoogle({ messageId: 'gg-task', ts: THIS_TS + 5 }));
+  check('the same Gmail message is not a second trusted close',
+    FlowQuietMetrics.trustedWeek(again, THIS_TS).handled === 5);
+
+  const undone = FlowQuietMetrics.noteUndo(again, { messageId: 'gg-task' });
+  const afterUndo = FlowQuietMetrics.trustedWeek(undone, THIS_TS);
+  check('Undo of that receipt removes it from trusted and does not add a close',
+    afterUndo.trusted === 4 && afterUndo.handled === 5 && afterUndo.undone === 1, afterUndo);
+  const undoneAgain = FlowQuietMetrics.noteUndo(undone, { messageId: 'gg-task' });
+  check('a second Undo does not inflate the Undo count',
+    FlowQuietMetrics.trustedWeek(undoneAgain, THIS_TS).undone === 1 &&
+    FlowQuietMetrics.trustedWeek(undoneAgain, THIS_TS).trusted === 4);
+
+  const partialEvent = freeGmailGoogle({
+    messageId: 'gg-partial', proposed: 2, succeeded: 1, total: 2, kinds: ['googleTask', 'gmailDraft']
+  });
+  const partial = FlowQuietMetrics.noteHandled(start, partialEvent);
+  check('Partly handled is not a trusted close',
+    partialEvent.receiptStatus === 'Partly handled.' && partialEvent.receiptFull === false &&
+    FlowQuietMetrics.trustedWeek(partial, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(partial, THIS_TS).handled === 0, partialEvent.receiptStatus);
+
+  const shortened = freeGmailGoogle({
+    messageId: 'gg-short', proposed: 2, succeeded: 1, total: 1, kinds: ['calendar']
+  });
+  const shortNoted = FlowQuietMetrics.noteHandled(start, shortened);
+  check('Handled on a shortened chain is not a full write and does not count',
+    FlowReceipt.confirmation({ succeeded: 1, total: 1, priorCloses: 0 }).status === 'Handled.' &&
+    FlowCloseQuality.isFullWrite(2, 1) === false &&
+    shortened.receiptFull === false &&
+    FlowQuietMetrics.trustedWeek(shortNoted, THIS_TS).trusted === 0);
+
+  const clickOnly = FlowQuietMetrics.noteHandled(start, {
+    messageId: 'gg-click', ts: THIS_TS, app: 'gmail', product: 'free', kinds: ['googleTask']
+  });
+  check('a Do It click with no handled receipt does not count',
+    FlowQuietMetrics.trustedWeek(clickOnly, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(clickOnly, THIS_TS).handled === 0);
+
+  const notion = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({
+    messageId: 'gg-notion', kinds: ['notion']
+  }));
+  const mixed = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({
+    messageId: 'gg-mixed', proposed: 2, succeeded: 2, kinds: ['googleTask', 'slack']
+  }));
+  const outlook = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({
+    messageId: 'gg-outlook', app: 'outlook'
+  }));
+  const pro = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({
+    messageId: 'gg-pro', product: 'pro'
+  }));
+  const bare = FlowQuietMetrics.noteHandled(start, { messageId: 'gg-bare', ts: THIS_TS });
+  check('Notion, a mixed Slack step, Outlook, Pro, and a bare id do not inflate trusted closes',
+    FlowQuietMetrics.trustedWeek(notion, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(mixed, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(outlook, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(pro, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(bare, THIS_TS).trusted === 0,
+    {
+      notion: FlowQuietMetrics.trustedWeek(notion, THIS_TS).trusted,
+      mixed: FlowQuietMetrics.trustedWeek(mixed, THIS_TS).trusted,
+      outlook: FlowQuietMetrics.trustedWeek(outlook, THIS_TS).trusted,
+      pro: FlowQuietMetrics.trustedWeek(pro, THIS_TS).trusted,
+      bare: FlowQuietMetrics.trustedWeek(bare, THIS_TS).trusted
+    });
+
+  const undoStranger = FlowQuietMetrics.noteUndo(start, { messageId: 'gg-notion' });
+  check('Undo of a close that was never trusted does not invent a handled row',
+    FlowQuietMetrics.trustedWeek(undoStranger, THIS_TS).handled === 0 &&
+    FlowQuietMetrics.trustedWeek(undoStranger, THIS_TS).undone === 0 &&
+    FlowQuietMetrics.trustedWeek(undoStranger, THIS_TS).undoRate === null);
+
+  const quiet = FlowQuietMetrics.noteSilence(one, { messageId: 'gg-silent', reason: 'google', ts: THIS_TS });
+  const dismissShaped = FlowQuietMetrics.noteHandled(quiet, freeGmailGoogle({
+    messageId: 'gg-dismiss', receiptFull: false, receiptStatus: null, kinds: []
+  }));
+  check('silence and a dismiss do not add a trusted close',
+    FlowQuietMetrics.trustedWeek(dismissShaped, THIS_TS).trusted === 1 &&
+    FlowQuietMetrics.snapshot(dismissShaped, THIS_TS).silenceWeek.byReason.google === 1);
+
+  const noKinds = freeGmailGoogle({ messageId: 'gg-nokinds' });
+  noKinds.kinds = [];
+  const badKind = FlowQuietMetrics.noteHandled(start, noKinds);
+  const stringKinds = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({ messageId: 'gg-string', kinds: 'googleTask' }));
+  check('empty kinds or a kinds string is not a Google close',
+    FlowQuietMetrics.trustedWeek(badKind, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(stringKinds, THIS_TS).trusted === 0);
+
+  const lying = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({
+    messageId: 'gg-lie',
+    receiptFull: true,
+    receiptStatus: 'Partly handled.'
+  }));
+  check('a full flag with a partial status does not count',
+    FlowQuietMetrics.trustedWeek(lying, THIS_TS).trusted === 0);
+
+  const early = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({
+    messageId: 'gg-early',
+    receiptStatus: 'Nothing else to open, nothing else to check — that’s handled.'
+  }));
+  check('the early-close sentence is not the Handled status',
+    FlowQuietMetrics.trustedWeek(early, THIS_TS).trusted === 0);
+
+  const lastWeekOnly = FlowQuietMetrics.noteHandled(start, freeGmailGoogle({ messageId: 'gg-old', ts: LAST_TS }));
+  check('a Gmail Google close last week is not this week',
+    FlowQuietMetrics.trustedWeek(lastWeekOnly, THIS_TS).trusted === 0 &&
+    FlowQuietMetrics.trustedWeek(lastWeekOnly, LAST_TS).trusted === 1);
+
+  const line = FlowQuietMetrics.activityLine(FlowQuietMetrics.snapshot(one, THIS_TS));
+  check('the week line is the trusted count and Undo, not the message or the step',
+    line === 'Trusted closes 1 this week · Undo 0' && line.indexOf('gg-task') === -1 && line.indexOf('googleTask') === -1, line);
 }
 
 console.log('\n--- silence is a reason code, once per message ---\n');
@@ -147,7 +334,7 @@ console.log('\n--- silence is a reason code, once per message ---\n');
     FlowQuietMetrics.activityLine(FlowQuietMetrics.snapshot(start, THIS_TS)) === '');
 
   const trustedOnly = FlowQuietMetrics.snapshot(
-    FlowQuietMetrics.noteHandled(start, { messageId: 'm9', ts: THIS_TS }), THIS_TS);
+    FlowQuietMetrics.noteHandled(start, freeGmailGoogle({ messageId: 'm9' })), THIS_TS);
   check('trusted line shows Undo 0 when nothing was taken back',
     FlowQuietMetrics.activityLine(trustedOnly) === 'Trusted closes 1 this week · Undo 0',
     FlowQuietMetrics.activityLine(trustedOnly));

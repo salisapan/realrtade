@@ -1,0 +1,67 @@
+/* Same primary nav on every page that is not the homepage
+   (the homepage carries the same links in home.css).
+   Desktop: Glance, Flow, Pricing, Security, Contact, and Get Glance.
+   Narrow: links collapse; Get Glance stays visible. */
+
+header.site .wrap{max-width:1180px}
+header.site nav.site-bar{
+  display:flex; align-items:center; gap:16px; flex-wrap:nowrap;
+}
+header.site .site-links{
+  display:flex; align-items:center; gap:22px;
+}
+header.site .site-links a{
+  margin-inline-start:0 !important;
+  color:#AEB9D6;
+  font-family:'Assistant',system-ui,sans-serif;
+  font-size:.92rem;
+  font-weight:600;
+  text-decoration:none;
+  white-space:nowrap;
+  position:relative;
+}
+header.site .site-links a:hover,
+header.site .site-links a.active{color:#fff}
+header.site .site-links a.active::after{
+  content:""; position:absolute; inset-inline:0; inset-block-end:-6px; height:1px;
+  background:#6E9BFF;
+}
+header.site a.nav-get{
+  margin-inline-start:2px !important;
+  text-decoration:none !important;
+  white-space:nowrap;
+  color:#e6efff !important;
+}
+header.site a.nav-get::after{display:none !important}
+header.site .lang-btn{
+  margin-inline-start:4px;
+  min-width:36px; height:34px; padding:0 8px;
+  border-radius:10px; border:1px solid rgba(255,255,255,.18);
+  background:transparent; color:#EEF2F9; cursor:pointer;
+  font-family:'Assistant',system-ui,sans-serif; font-weight:700; font-size:.78rem;
+  letter-spacing:.04em;
+}
+header.site .lang-btn:hover{border-color:rgba(255,255,255,.4); background:rgba(255,255,255,.06)}
+.brand-lockup{display:flex; align-items:center; gap:10px}
+.brand-sep{color:rgba(150,166,204,.45); font-weight:300; font-size:1.05rem}
+.brand-glance{
+  font-family:'Rubik',system-ui,sans-serif;
+  font-weight:700; font-size:1.05rem; color:#5B8CFF; letter-spacing:-.01em;
+}
+
+@media (max-width:1040px){
+  header.site .site-links{display:none}
+}
+@media (min-width:1041px){
+  header.site .menu-btn{display:none}
+}
+@media (max-width:520px){
+  /* The Flow / Glance lockup plus Get Glance, menu, language, and theme
+     does not fit a 390px bar. The wordmark already says Flow. */
+  header.site .brand-sep,
+  header.site .brand-glance{display:none}
+  header.site nav.site-bar{gap:8px}
+}
+@media (max-width:420px){
+  header.site a.nav-get{--pad-y:8px; --pad-x:12px; font-size:.8rem}
+}

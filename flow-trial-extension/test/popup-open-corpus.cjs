@@ -495,7 +495,11 @@ async function run() {
     const probe = load({});
     const Quiet = vm.runInContext('FlowQuietMetrics', probe.sandbox);
     const now = Date.now();
-    let quietMetrics = Quiet.noteHandled(Quiet.emptyState(), { messageId: 'm1', ts: now });
+    let quietMetrics = Quiet.noteHandled(Quiet.emptyState(), {
+      messageId: 'm1', ts: now, app: 'gmail', product: 'free',
+      proposed: 1, succeeded: 1, receiptFull: true, receiptStatus: 'Handled.',
+      kinds: ['googleTask']
+    });
     quietMetrics = Quiet.noteSilence(quietMetrics, { messageId: 's1', reason: 'family', ts: now });
     const { sandbox, document } = load({ quietMetrics: quietMetrics });
     vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), sandbox, { filename: 'popup.js' });

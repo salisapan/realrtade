@@ -9,14 +9,18 @@ above zero. The Morning Brief stays the list of closes still open.
 
 ## Trusted closes / week
 
-A **trusted close** is one message that went Do It → real write → Handled, and was not Undone.
+A **trusted close** is one Free Gmail→Google message that went Do It → real Google write → Handled, and was not Undone. The week number is `snapshot.trusted.trusted` (`path: 'free-gmail-google'`).
 
 | Step | What counts |
 |---|---|
-| Do It | The click that runs the close. A chip that was only shown does not. |
-| Real write | Every step the chip proposed returned ok. Same test as `FlowCloseQuality.isFullWrite`. |
-| Handled | The receipt status for that full write (`FlowReceipt` "Handled." / "טופל."). "Partly handled." is not a trusted close. |
-| No Undo | That message was not later undone. An Undo drops it out of the trusted count. It stays in the week's handled count, and the Undo count goes up by one. |
+| Free Gmail | The close ran on the Gmail chip (`app: 'gmail'`, `product: 'free'`). Outlook, Pro, and a bare success id do not. |
+| Google writers | Every step that wrote is one of Calendar, Gmail draft, Google Task, Doc, Sheet, or Drive file (`calendar`, `gmailDraft`, `googleTask`, `driveDoc`, `driveSheet`, `driveFile`). Notion, Slack, and a chain that mixes in any other writer do not. |
+| Do It | The click that runs the close. A chip that was only shown, and a click that never got a receipt, do not. |
+| Real write | Every step the chip proposed returned ok. Same test as `FlowCloseQuality.isFullWrite`. A shortened chain whose receipt still says Handled is not one. |
+| Handled | The receipt status for that full write (`FlowReceipt` "Handled." / "טופל."). "Partly handled." is not a trusted close. The early-close sentence under the status is not the status. |
+| No Undo | That message was not later undone. An Undo drops it out of the trusted count. It stays in the week's handled count, and the Undo count goes up by one. An Undo of a close that was never trusted does not move the week. |
+
+Silence is a different counter. A silence decision, including a Google silence, does not add a trusted close.
 
 **This week** is the local `YYYY-Wnn` bucket from `weekKey` — the same bucket as the habit metric in `core/pmf-metrics.js`, not an ISO week. The write's timestamp picks the week. An Undo in a later week corrects the week of the write.
 

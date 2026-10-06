@@ -221,11 +221,11 @@
 .flow-chip-action-pill-x:focus-visible { outline: 2px solid #1A4EF5; outline-offset: 1px; }
 
 /* ---- attach chooser: sits under the gmailDraft pill only, and only when
-   that draft actually wants an attachment. One chip per real thread
-   attachment (the disambiguation surface when there's more than one) plus a
-   chip to pick a file from Drive instead — ghost styling, deliberately
-   quieter than the action pills above it, since this is a refinement of one
-   already-proposed action, not a new decision of its own weight. ---------- */
+   that draft actually wants an attachment the one-match Drive search did
+   not already resolve. One chip per real thread attachment (the
+   disambiguation surface when there's more than one) — ghost styling,
+   deliberately quieter than the action pills above it, since this is a
+   refinement of one already-proposed action, not a new decision. ---------- */
 .flow-chip-attach-row {
   display: flex;
   flex-wrap: wrap;
@@ -261,9 +261,6 @@
   background: rgba(40,70,150,.1);
   color: #16214a;
 }
-.flow-chip-attach-chip:disabled { cursor: default; opacity: .6; }
-.flow-chip-attach-drive { border-style: dashed; }
-
 /* ---- the Do It button: same shell/ring/shine family as the site's .doit,
    "glance" weight (thinner ring, shorter glow, quicker hover) ------------- */
 .flow-chip {

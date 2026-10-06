@@ -106,7 +106,7 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .brand{display:flex; align-items:center; gap:12px}
 .brand img{height:26px; width:auto; filter:var(--logo-shadow)}
 .brand .desc{font-family:var(--mono); font-size:.62rem; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); direction:ltr; display:none}
-@media(min-width:1040px){.brand .desc{display:block}}
+/* Wordmark only in the bar — the five links plus Get Glance need the room. */
 .nav-links{display:flex; align-items:center; gap:26px}
 .nav-links a{font-size:.92rem; color:var(--muted); transition:color .25s; position:relative}
 .nav-links a:hover{color:var(--txt-hi)}
@@ -127,7 +127,8 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .hamburger[aria-expanded="true"] .l1{transform:translateY(5px) rotate(45deg)}
 .hamburger[aria-expanded="true"] .l2{opacity:0}
 .hamburger[aria-expanded="true"] .l3{transform:translateY(-5px) rotate(-45deg)}
-@media(max-width:920px){.nav-links{display:none} .nav-cta{display:none} .hamburger{display:grid}}
+@media(max-width:1040px){.nav-links{display:none} .hamburger{display:grid}}
+@media(max-width:420px){.nav-cta .doit.sm{--pad-y:8px; --pad-x:12px; font-size:.8rem}}
 /* mobile menu overlay */
 .mobile-menu{position:fixed; inset:0; z-index:55; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; background:var(--nav-bg); backdrop-filter:blur(22px) saturate(1.2); opacity:0; transition:opacity .3s; padding:24px; overflow-y:auto}
 .mobile-menu.open{opacity:1}
@@ -137,8 +138,7 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 .mobile-menu a:hover{color:var(--accent-2)}
 /* Privacy/Terms render like every other top-level menu link — previously
    singled out with a smaller, dimmer, side-by-side treatment. */
-.mobile-menu-legal{display:flex; flex-direction:row; flex-wrap:wrap; justify-content:center; align-items:center; gap:2px 20px; max-width:340px; margin:18px auto 0; padding-top:16px; border-top:1px solid var(--line)}
-.mobile-menu nav .mobile-menu-legal a{font-size:.95rem; font-weight:500; opacity:.72; padding:6px 0}
+.mobile-menu-legal{display:flex; flex-direction:column; align-items:center; gap:2px; margin-block-start:4px}
 /* skip link */
 .skip{position:fixed; inset-block-start:8px; inset-inline-start:8px; z-index:80; padding:10px 16px; border-radius:10px; background:#1741C4; color:#fff; font-family:var(--disp); font-weight:600; transform:translateY(-160%); transition:transform .2s}
 .skip:focus{transform:none}
@@ -192,6 +192,7 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 @keyframes float1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-4%,5%) scale(1.12)}}
 @keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6%,-4%) scale(1.08)}}
 .hero-in{position:relative; z-index:3; display:flex; flex-direction:column; align-items:flex-start}
+.hero-in > picture, .cta-box > picture{display:contents}
 [dir="ltr"] .hero-in{align-items:flex-start}
 .hero-logo{width:min(206px,44vw); height:auto; margin-bottom:20px; filter:var(--logo-shadow)}
 .hero h1{font-size:var(--step-4); letter-spacing:-.02em; margin:4px 0 20px; transform-style:preserve-3d; transition:transform .3s cubic-bezier(.2,.7,.2,1)}
@@ -438,12 +439,16 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 @media (prefers-reduced-motion:reduce){.integ-track{animation:none; flex-wrap:wrap; justify-content:center; width:auto; gap:18px 34px}}
 
 /* scroll reveal animations */
+.reveal{opacity:0; animation:fadeInUp 0.7s ease-out forwards}
+.reveal.in{animation-play-state:running}
 .card{transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.35s ease, border-color .35s}
 .card:hover{transform:translateY(-6px); border-color:color-mix(in srgb,var(--accent) 40%,transparent); box-shadow:var(--card-shadow), 0 16px 44px -14px var(--glow), inset 0 0 0 1px color-mix(in srgb,var(--accent) 34%,transparent); animation:shimmerCard 2s ease-in-out infinite}
-.card.reveal{transition:opacity .8s cubic-bezier(.2,.7,.2,1), transform .6s cubic-bezier(.2,.7,.2,1), box-shadow .35s ease, border-color .35s}
-.card.reveal.in:hover{transition:transform .35s cubic-bezier(0.34,1.56,0.64,1), box-shadow .35s ease, border-color .35s}
-.card[data-d="2"].reveal{transition-delay:.08s,.08s,0s,0s}
-.card[data-d="3"].reveal{transition-delay:.16s,.16s,0s,0s}
+.card.reveal{animation:slideInLeft 0.6s cubic-bezier(0.2,0.7,0.2,1) forwards; opacity:0}
+.card[data-d="2"].reveal{animation-delay:0.1s}
+.card[data-d="3"].reveal{animation-delay:0.2s}
+.card[data-d="4"].reveal{animation-delay:0.3s}
+.card[data-d="5"].reveal{animation-delay:0.4s}
+.card[data-d="6"].reveal{animation-delay:0.5s}
 
 /* ---------- border beam: a light that travels the card's own border on a conic gradient ----------
    The gradient's *angle* is animated via the --beam-a custom property (driven by rAF in JS below) —
@@ -511,7 +516,16 @@ canvas.terrain-canvas.show{opacity:1}
 #usecases .sixgrid{grid-template-columns:1fr}
 @media(min-width:760px){#usecases .sixgrid{grid-template-columns:1fr 1fr}}
 /* Trust band */
-.trust-note{max-width:60ch; margin:28px auto 0; text-align:center; color:var(--muted); font-size:.95rem}
+.trust-sec{position:relative; overflow:hidden; border-block:1px solid var(--line); padding-block:clamp(40px,6vw,64px); background:color-mix(in srgb,var(--panel) 22%, transparent); text-align:center}
+.trust-sec::before{content:""; position:absolute; z-index:0; inset:auto; width:60vw; height:60vw; left:20%; top:-30%; border-radius:50%; background:radial-gradient(circle, var(--blob) 0%, color-mix(in srgb,var(--blob) 78%,transparent) 17%, color-mix(in srgb,var(--blob) 46%,transparent) 34%, color-mix(in srgb,var(--blob) 20%,transparent) 53%, color-mix(in srgb,var(--blob) 6%,transparent) 74%, transparent 100%); opacity:.5; pointer-events:none; animation:orbDrift 30s ease-in-out infinite}
+.trust-sec .wrap{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:22px}
+.trust-sec .eyebrow{justify-content:center}
+.trust-row{display:flex; flex-wrap:wrap; justify-content:center; gap:14px}
+.trust-badge{display:inline-flex; align-items:center; gap:9px; font-family:var(--mono); font-size:.82rem; letter-spacing:.06em; color:var(--txt-hi); padding:11px 18px; border-radius:999px; border:1px solid var(--line-hi); background:linear-gradient(180deg,var(--panel),color-mix(in srgb,var(--panel) 60%,transparent)); box-shadow:var(--card-shadow); transition:transform .3s cubic-bezier(.34,1.56,.64,1), border-color .3s}
+.trust-badge:hover{transform:translateY(-4px); border-color:color-mix(in srgb,var(--accent) 45%,transparent)}
+.trust-badge svg{width:19px; height:19px; fill:none; stroke:var(--accent-2); stroke-width:1.6; flex:0 0 auto}
+.trust-note{max-width:60ch; color:var(--muted); font-size:1rem}
+@media (prefers-reduced-motion:reduce){.trust-sec::before{animation:none}}
 :root[data-theme="light"] .agraph-sec::before,:root[data-theme="light"] .agraph-sec::after,:root[data-theme="light"] .cta-sec::before{opacity:.5}
 @media (prefers-reduced-motion:reduce){.agraph-sec::before,.agraph-sec::after,.cta-sec::before{animation:none}}
 /* Phones: shed the remaining per-element blur surfaces. Each filter:blur() box
@@ -592,6 +606,7 @@ canvas.terrain-canvas.show{opacity:1}
   box-shadow:0 20px 40px -18px rgba(0,0,0,.5), 0 0 0 1px var(--line);
   text-decoration:none;
 }
+.ins-cf-card picture{position:absolute; inset:0; display:block}
 .ins-cf-card img{width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; user-select:none}
 .ins-cf-card::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.72)); opacity:0; transition:opacity .25s}
 .ins-cf-card .t{
@@ -654,12 +669,7 @@ canvas.terrain-canvas.show{opacity:1}
    docs/design-principles.md, "the more foundational one leads"), not because
    of an oversight. */
 .cta-paths{display:grid; gap:18px; width:100%; max-width:760px; margin:6px 0 22px; text-align:start; align-items:start}
-@media (min-width:760px){ .cta-paths{grid-template-columns:minmax(0,560px); justify-content:center} }
-.cta-solo{margin:0 0 18px; font-size:.95rem; color:var(--muted); text-align:center}
-.cta-solo a{color:var(--txt-hi); font-weight:600; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--line)}
-.cta-solo a:hover{text-decoration-color:var(--cat); color:var(--cat)}
-#how .grid-3, #trust .grid-3{margin-top:8px}
-#trust .card{text-align:start}
+@media (min-width:760px){ .cta-paths{grid-template-columns:1fr 1fr} }
 .cta-path{
   display:flex; flex-direction:column; gap:8px; padding:24px 26px; border-radius:20px;
   border:1px solid var(--line); background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015));
@@ -715,6 +725,9 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 .foot-legal{width:100%; margin-top:28px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:.82rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px}
 .foot-legal .en{font-family:var(--mono); direction:ltr; letter-spacing:.05em}
 
+/* Toggled from the homepage script when a section leaves the viewport. */
+.motion-off, .motion-off *{animation-play-state:paused !important}
+
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important; scroll-behavior:auto !important; transition-duration:.001s !important}
   .reveal{opacity:1; transform:none}
@@ -726,20 +739,38 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 .skip-link{position:absolute; left:-9999px; top:0; z-index:100; background:#1741C4; color:#fff; padding:10px 18px; border-radius:0 0 8px 0; font-family:var(--sans,sans-serif); font-weight:700; font-size:.9rem}
 .skip-link:focus{left:0}
 
-:root[data-theme="light"] .nav .brand img{filter:brightness(.42) contrast(1.25)}
-
-/* who is behind Flow */
-.team-sec{padding-block:clamp(40px,6vw,72px)}
-.team-sec .sec-head{text-align:center; margin-inline:auto}
-.team-row{display:grid; gap:16px; grid-template-columns:1fr; max-width:760px; margin:28px auto 0}
-@media (min-width:700px){ .team-row{grid-template-columns:1fr 1fr} }
-.team-card{display:flex; align-items:center; gap:16px; padding:18px 20px; border:1px solid var(--line); border-radius:16px; background:linear-gradient(160deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); text-decoration:none; color:inherit; transition:transform .2s, border-color .2s}
-.team-card:hover{transform:translateY(-2px); border-color:var(--cat)}
-.team-card:focus-visible{outline:2px solid var(--cat); outline-offset:3px}
-.team-card img{width:64px; height:64px; border-radius:50%; object-fit:cover; flex:none}
-.team-card span{display:flex; flex-direction:column; gap:2px}
-.team-card b{color:var(--txt-hi); font-size:1.02rem}
-.team-card i{font-style:normal; color:var(--cat); font-size:.82rem; font-weight:600}
-.team-card small{color:var(--muted); font-size:.83rem; line-height:1.45}
-:root[data-theme="light"] .team-card{background:#fff; box-shadow:0 1px 2px rgba(20,44,100,.08), 0 14px 32px -20px rgba(20,44,100,.28)}
-:root[data-theme="light"] .team-card small{color:#566180}
+/* Two-path hero + how-it-works. First-viewport text is not .reveal / .p-reveal. */
+.hero.hero-paths{min-height:auto; align-items:flex-start; padding-block:128px 48px}
+.hero.hero-paths .hero-in{align-items:center; text-align:center}
+.hero.hero-paths .hero-logo{width:min(160px,38vw); margin-inline:auto; margin-bottom:28px}
+.hero.hero-paths .eyebrow{justify-content:center}
+.hero.hero-paths .eyebrow::before,.loop-sec .eyebrow::before{width:7px; height:7px; border-radius:50%; background:#5B8CFF; box-shadow:0 0 10px var(--glow)}
+.hero.hero-paths h1{font-size:clamp(2.05rem,1.45rem + 2.1vw,3.05rem); max-width:16em; line-height:1.12; margin-inline:auto}
+.hero.hero-paths .lead{margin-inline:auto; max-width:48ch}
+.path-label{margin:52px 0 0; font-family:var(--mono); font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted)}
+.path-split{display:grid; grid-template-columns:1fr 1fr; gap:20px; width:100%; text-align:start; margin-top:16px}
+.path-card{background:color-mix(in srgb, var(--panel) 88%, transparent); border:1px solid var(--line); border-radius:20px; padding:32px 28px 28px; display:flex; flex-direction:column; gap:14px}
+.path-card.glance-card{border-color:color-mix(in srgb, #5B8CFF 35%, var(--line))}
+.path-card .who{font-family:var(--mono); font-size:.68rem; letter-spacing:.16em; text-transform:uppercase; color:var(--accent-2)}
+.path-card.glance-card .who{color:#5B8CFF}
+.path-card h3{font-family:var(--disp); font-weight:700; font-size:1.45rem; color:var(--txt-hi); margin:0; letter-spacing:-.02em}
+.path-card p{color:var(--txt); font-size:1rem; line-height:1.6; margin:0; flex:1}
+.path-card .cta-row{margin-top:8px}
+.doit.ghost{color:var(--txt-hi); text-shadow:none}
+.doit.ghost .shell{background:transparent; box-shadow:none; border-color:var(--line-hi)}
+.doit.ghost .ring,.doit.ghost .shine{display:none}
+.loop-sec{padding:72px 0 28px; text-align:center}
+.loop-sec .eyebrow{justify-content:center}
+.loop-sec h2{margin-bottom:12px}
+.loop-sec .lead{margin:0 auto 36px; max-width:46ch}
+.pillars{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; text-align:start; max-width:960px; margin:0 auto}
+.pillar{background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:24px 22px}
+.pillar h3{font-family:var(--disp); font-weight:700; font-size:1.05rem; color:var(--txt-hi); margin:0 0 8px}
+.pillar p{font-size:.95rem; color:var(--muted); line-height:1.55; margin:0}
+.glance-now{max-width:68ch; margin:40px auto 0; text-align:start; font-size:.95rem; color:var(--txt); line-height:1.6}
+.glance-now b{color:var(--txt-hi)}
+.quiet-line{font-size:.85rem; color:var(--muted); text-align:center; padding:28px 0 8px; border-top:1px solid var(--line); margin:48px auto 0; max-width:720px; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:10px}
+.roadmap-badge{display:inline-flex; align-items:center; font-family:var(--mono); font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:transparent}
+.path-text-link{display:inline-flex; margin-top:16px; font-family:var(--disp); font-weight:600; color:var(--accent-2); border-bottom:1px solid transparent}
+.path-text-link:hover{border-bottom-color:var(--accent-2)}
+@media(max-width:800px){.path-split,.pillars{grid-template-columns:1fr} .hero.hero-paths{padding-block:108px 36px}}

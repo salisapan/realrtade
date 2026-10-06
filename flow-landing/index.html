@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Flow — Cognitive Workflow Engine: Flow watches your work and executes what happens next, updating your files and stack with no rules to write. Sensitive data is masked before processing, and high-risk steps wait for your approval.">
+<meta name="description" content="Close what is open — Glance for you, Flow for your organization. Glance starts in Gmail and never sends on your behalf. Masked secure cloud is on the roadmap.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -14,26 +14,44 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Flow — Cognitive Workflow Engine">
-<meta property="og:description" content="Flow executes what happens next, with no rules to write. Sensitive data masked before processing; high-risk steps wait for your approval.">
+<meta property="og:description" content="Glance closes personal open loops, starting in Gmail. Flow proposes updates for regulated organizations that run when you approve. Masked secure cloud is on the roadmap.">
 <meta property="og:url" content="https://theflow-ai.com/">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Flow — Cognitive Workflow Engine">
-<meta name="twitter:description" content="Flow executes what happens next, with no rules to write. Sensitive data masked before processing.">
+<meta name="twitter:description" content="Glance closes personal open loops, starting in Gmail. Flow proposes updates that run when you approve. Masked secure cloud is on the roadmap.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <title>Flow — Cognitive Workflow Engine</title>
 <script type="application/ld+json">
-{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://theflow-ai.com/#org", "name": "Flow", "alternateName": ["Flow", "The Flow AI", "theflow-ai.com"], "url": "https://theflow-ai.com/", "logo": "https://theflow-ai.com/logo.png", "description": "Flow is a cognitive workflow engine for teams with sensitive data. It watches for what happened, proposes the update across your files and stack, and writes it when you approve.", "founder": [{"@id": "https://theflow-ai.com/about.html#sali-sapan"}, {"@id": "https://theflow-ai.com/about.html#tomer-steinmetz"}], "foundingLocation": {"@type": "Place", "name": "Israel"}, "disambiguatingDescription": "Flow (theflow-ai.com) is an independent cognitive workflow engine for teams with sensitive data, founded by Sali Sapan and Tomer Steinmetz. Not affiliated with Google Flow, flow-ai.com or The Flow."}, {"@type": "SoftwareApplication", "name": "Flow", "url": "https://theflow-ai.com/", "description": "Flow — Cognitive Workflow Engine: Flow watches your work and executes what happens next, updating your files and stack with no rules to write. Sensitive data is masked before processing, and high-risk steps wait for your approval.", "applicationCategory": "BusinessApplication", "operatingSystem": "Web, Windows, macOS, Linux", "offers": {"@type": "Offer", "url": "https://theflow-ai.com/#waitlist"}, "publisher": {"@id": "https://theflow-ai.com/#org"}}, {"@type": "Person", "@id": "https://theflow-ai.com/about.html#sali-sapan", "name": "Sali Sapan", "jobTitle": "CEO & Co-Founder", "image": "https://theflow-ai.com/founder-sali.webp", "url": "https://theflow-ai.com/about.html#sali-sapan", "worksFor": {"@id": "https://theflow-ai.com/#org"}}, {"@type": "Person", "@id": "https://theflow-ai.com/about.html#tomer-steinmetz", "name": "Tomer Steinmetz", "jobTitle": "CTO & Co-Founder", "image": "https://theflow-ai.com/founder-tomer.webp", "url": "https://theflow-ai.com/about.html#tomer-steinmetz", "worksFor": {"@id": "https://theflow-ai.com/#org"}}]}
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Flow",
+  "url": "https://theflow-ai.com/",
+  "description": "Glance closes personal open loops, starting in Gmail, and never sends on your behalf. Flow proposes updates for regulated organizations that run when you approve. Masked secure cloud is on the roadmap.",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, Windows, macOS, Linux",
+  "offers": { "@type": "Offer", "url": "https://theflow-ai.com/#waitlist" }
+}
 </script>
-<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property). Loaded after load + idle so it stays off the critical path. -->
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
 </script>
 <link rel="alternate" type="application/rss+xml" title="Flow Insights" href="/blog/rss.xml">
 </head>
@@ -43,18 +61,19 @@
 (function(){
   try{
     var t=localStorage.getItem('flow_theme')||'dark';
+    var lang=localStorage.getItem('flow_lang')==='he'?'he':'en';
     var r=document.documentElement;
     r.setAttribute('data-theme',t);
-    r.setAttribute('lang','en');
-    r.setAttribute('dir','ltr');
+    r.setAttribute('lang',lang);
+    r.setAttribute('dir', lang==='he'?'rtl':'ltr');
   }catch(e){ document.documentElement.setAttribute('data-theme','dark'); document.documentElement.setAttribute('dir','ltr'); }
   document.title='Flow — Cognitive Workflow Engine';
 })();
 </script>
-<!-- The hero wordmark is this page's LCP element. Preloading it lets the fetch
-     start alongside the stylesheet instead of waiting for CSS to parse and the
-     <img> to be discovered, which is the whole gap between first paint and LCP. -->
-<link rel="preload" as="image" href="/logo.png" fetchpriority="high">
+<!-- Measured mobile LCP is the header wordmark, not the hero. Preload that
+     small PNG. The hero is a 440px AVIF/WebP discovered from the picture below
+     and must not be fetched ahead of the header image or the stylesheets. -->
+<link rel="preload" as="image" href="/logo-header.png" fetchpriority="high">
 <link rel="stylesheet" href="/assets/fonts.css">
 <link rel="stylesheet" href="/assets/home.css">
 
@@ -64,23 +83,23 @@
 
 <header class="nav" id="nav">
   <div class="nav-in">
-    <a class="brand" href="#top" aria-label="Flow — Cognitive Workflow Engine">
+    <a class="brand" href="#top" aria-label="Flow">
       <img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async">
-      <span class="desc" data-i18n="nav.desc">Cognitive Workflow Engine</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#how" data-i18n="nav.product">Product</a>
-      <a href="/solutions/" data-i18n="nav.solutions">Solutions</a>
-      <a href="/security.html" data-i18n="nav.security">Security</a>
+      <a href="/trial.html" data-i18n="nav.trial">Glance</a>
+      <a href="/#organization" data-i18n="nav.flow">Flow</a>
       <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
+      <a href="/security.html" data-i18n="nav.security">Security</a>
       <a href="/contact.html" data-i18n="nav.contact">Contact</a>
     </nav>
     <div class="nav-tools">
+      <button class="icon-btn lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
       <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
       </button>
-      <span class="magnetic nav-cta"><a class="doit sm" href="#waitlist" data-ga="nav_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Get started</span></a></span>
+      <span class="magnetic nav-cta"><a class="doit sm" href="/trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Get Glance</span></a></span>
       <button class="icon-btn hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <svg viewBox="0 0 24 24"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg>
       </button>
@@ -90,15 +109,17 @@
 
 <div class="mobile-menu" id="mobileMenu" hidden>
   <nav aria-label="Mobile">
-    <a href="#how" data-i18n="nav.product">Product</a>
-    <a href="/solutions/" data-i18n="nav.solutions">Solutions</a>
+    <a href="#top" data-i18n="nav.home">Home</a>
+    <a href="/trial.html" data-i18n="nav.trial">Glance</a>
+    <a href="/#organization" data-i18n="nav.flow">Flow</a>
+    <a href="/missed-deadline.html" data-i18n="nav.scan">Inbox Scan</a>
     <a href="/security.html" data-i18n="nav.security">Security</a>
     <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
+    <a href="/solutions/" data-i18n="nav.solutions">Solutions</a>
+    <a href="/about.html" data-i18n="nav.about">About</a>
+    <a href="/blog/" data-i18n="nav.blog">Insights</a>
     <a href="/contact.html" data-i18n="nav.contact">Contact</a>
     <div class="mobile-menu-legal">
-      <a href="/trial.html" data-i18n="nav.trial">Glance</a>
-      <a href="/about.html" data-i18n="nav.about">About</a>
-      <a href="/blog/" data-i18n="nav.blog">Insights</a>
       <a href="/privacy.html" data-i18n="nav.privacy">Privacy</a>
       <a href="/terms.html" data-i18n="nav.terms">Terms</a>
     </div>
@@ -107,20 +128,61 @@
 
 <main id="top">
   <!-- HERO -->
-  <section class="hero" id="hero">
+  <section class="hero hero-paths" id="hero">
     <div class="hero-blobs" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
     <div class="wrap hero-in">
-      <img class="hero-logo reveal in" src="/logo.png" width="880" height="388" alt="Flow — Cognitive Workflow Engine">
-      <div class="eyebrow reveal in" data-d="1" style="margin-bottom:16px" data-i18n="hero.eyebrow">FOR TEAMS WITH SENSITIVE DATA</div>
-      <h1 class="reveal in" data-d="1" data-i18n="hero.h1">Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span></h1>
-      <p class="lead reveal in" data-d="2" data-i18n="hero.sub">When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve — no rules to write. Sensitive data is masked before anything is processed.</p>
-      <div class="hero-cta reveal in" data-d="3">
-        <span class="magnetic"><a class="doit lg breathe" href="#waitlist" data-ga="hero_doit"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Get a deployment plan</span></a></span>
+      <picture>
+        <source srcset="/logo.avif" type="image/avif">
+        <source srcset="/logo.webp" type="image/webp">
+        <img class="hero-logo" src="/logo.png" width="440" height="194" alt="Flow" decoding="async">
+      </picture>
+      <p class="eyebrow" data-i18n="hero.eyebrow">Two products · One team</p>
+      <h1 data-i18n="hero.h1">Close what is open — for you, or for your organization.</h1>
+      <p class="lead" data-i18n="hero.sub">Glance closes your personal open loops. Flow watches work events in regulated organizations and proposes updates that run when you approve.</p>
+      <p class="path-label" data-i18n="hero.path">Choose your path</p>
+      <div class="path-split">
+        <article class="path-card glance-card" id="glance">
+          <span class="who" data-i18n="path.you.who">For you</span>
+          <h3>Glance</h3>
+          <p data-i18n="path.you.body">Closes what you asked of others, what you promised, and what others asked of you. Starts in Gmail. Never sends on your behalf.</p>
+          <div class="cta-row">
+            <span class="magnetic"><a class="doit" href="/trial.html" data-ga="hero_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta2">Get Glance</span></a></span>
+          </div>
+        </article>
+        <article class="path-card" id="organization">
+          <span class="who" data-i18n="path.org.who">For your organization</span>
+          <h3>Flow</h3>
+          <p data-i18n="path.org.body">Watches work events across legal, insurance, and security teams. Proposes file and system updates that execute only when you approve.</p>
+          <div class="cta-row">
+            <span class="magnetic"><a class="doit ghost" href="#waitlist" data-ga="hero_deploy"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="path.org.cta">Get a deployment plan</span></a></span>
+          </div>
+        </article>
       </div>
-      <button class="hero-scroll reveal in" data-d="3" data-scroll="#how"><span data-i18n="hero.cta3">See how it works</span></button>
-      <div class="hero-foot reveal in" data-d="4"><span class="dot"></span><span data-i18n="hero.foot">Masked before processing · Approval before risky steps · Every write reversible</span></div>
     </div>
-    <div class="scroll-cue" aria-hidden="true"><span>SCROLL</span><span class="bar"></span></div>
+  </section>
+
+  <section id="how" class="loop-sec">
+    <div class="wrap">
+      <p class="eyebrow" data-i18n="how.eyebrow">How it works</p>
+      <h2 data-i18n="how.title">One loop. Detect, prepare, approve, close.</h2>
+      <p class="lead" data-i18n="how.lead">Both products follow the same idea: surface the next real move, prepare it where you already work, and wait for your approval. Nothing leaves until you say so.</p>
+      <div class="pillars">
+        <div class="pillar">
+          <h3 data-i18n="how.d.t">Detect</h3>
+          <p data-i18n="how.d.b">Watches the work in front of you — a thread, a deal close, a signed contract — and decides what is actually open.</p>
+        </div>
+        <div class="pillar">
+          <h3 data-i18n="how.p.t">Prepare</h3>
+          <p data-i18n="how.p.b">Drafts the update, the calendar event, or the file change. You see exactly what will happen before anything runs.</p>
+        </div>
+        <div class="pillar">
+          <h3 data-i18n="how.c.t">Close</h3>
+          <p data-i18n="how.c.b">On your approval it writes the change. Every write is reversible. Unsure moments stay silent.</p>
+        </div>
+      </div>
+      <p class="glance-now" data-i18n="hero.glance.p"><b>Now:</b> your personal closing layer, starting in Gmail. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it for real: a calendar event, a task, a drafted reply, or the right Drive file attached — in place, Zero-Prompt, with undo. Personal product. Own revenue. Stays quiet when it is not sure. <b>Next:</b> the same closing loop grows beyond email into the other places your day actually happens — still personal, still Zero-Prompt, still not an org runtime. Same DNA as Flow. Different line: personal closing, not regulated firm infrastructure.</p>
+      <p class="quiet-line"><span class="roadmap-badge" data-i18n="trust.b4">Masked secure cloud: roadmap / בפריסה</span><span data-i18n="roadmap.quiet">Running on your own infrastructure is on the roadmap.</span></p>
+    </div>
   </section>
 
   <!-- LEGAL DEMO -->
@@ -129,7 +191,7 @@
       <div class="sec-head reveal">
         <span class="eyebrow" data-i18n="legal.eyebrow">SEE IT WORK</span>
         <h2 data-i18n="legal.title">A real closing, end to end.</h2>
-        <p class="lead muted" data-i18n="legal.lead">Watch Flow handle a live legal / real-estate workflow — sensitive fields masked before processing.</p>
+        <p class="lead muted" data-i18n="legal.lead">Watch Flow handle a live legal / real-estate workflow — locally, on your device.</p>
       </div>
       <div class="legal-demo-preview reveal" data-d="2">
         <div class="ld-mock" aria-hidden="true">
@@ -283,66 +345,203 @@ Best,
         <div class="ld-step" data-step="end" data-scenario="legal">
           <div class="ld-end-check">✓</div>
           <div class="ld-end-lines">
-            <p class="headline" data-i18n="legal.end.line1">3 clicks. 0 manual data entry.</p>
+            <p class="headline" data-i18n="legal.end.line1">3 clicks for full compliance. 0 clicks for manual data entry.</p>
             <p data-i18n="legal.end.line2">Deed updated. Ledger recalculated. Client package dispatched.</p>
-            <p class="final" data-i18n="legal.end.line3">And the sensitive fields? Masked before anything was processed.</p>
+            <p class="final" data-i18n="legal.end.line3">And your firm's multi-million dollar transaction data? It never left your local machine.</p>
           </div>
-          <span class="magnetic"><a class="doit" id="ldCta" href="#waitlist" data-ga="legal_demo_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.end.cta">Get a deployment plan</span></a></span>
+          <a class="path-text-link" id="ldCta" href="#waitlist" data-ga="legal_demo_waitlist" data-i18n="legal.end.cta">Get a deployment plan</a>
         </div>
 
       </div>
     </div>
   </div>
 
-  <!-- HOW IT WORKS -->
-  <section id="how">
+  <!-- CHALLENGE -->
+  <section id="challenge">
     <div class="wrap">
       <div class="sec-head reveal">
-        <span class="eyebrow" data-i18n="how.eyebrow">HOW IT WORKS</span>
-        <h2 data-i18n="how.title">One loop, from the moment to the done.</h2>
-        <p class="lead muted" data-i18n="how.lead">Flow watches for the moment something happens, prepares what comes next, and finishes it when you say so.</p>
+        <span class="eyebrow" data-i18n="challenge.eyebrow">THE CHALLENGE</span>
+        <h2 data-i18n="challenge.title">Enterprise Workflows Are Broken</h2>
+        <p class="lead muted" data-i18n="challenge.lead">Modern enterprises rely on dozens of disconnected applications. The result? Inefficiency, security risk, and operational fragility.</p>
       </div>
       <div class="grid-3">
         <div class="card reveal" data-d="1">
-          <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/></svg></div>
-          <h3 data-i18n="how1.t">It notices what happened</h3>
-          <p data-i18n="how1.b">A deal closes, a contract is signed, a case is approved. Flow sees the moment and works out what needs to happen next — no rules to write.</p>
+          <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+          <h3 data-i18n="ch1.t">Fragmented Workflows</h3>
+          <p data-i18n="ch1.b">Your team jumps between 15+ apps daily. Context is lost. Time is wasted. Errors multiply.</p>
         </div>
         <div class="card reveal" data-d="2">
-          <div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div>
-          <h3 data-i18n="how2.t">You approve with one click</h3>
-          <p data-i18n="how2.b">A single Do It button appears at the right moment, with the update already prepared across your files and stack. High-risk steps always wait for your approval.</p>
+          <div class="ic"><svg viewBox="0 0 24 24"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.6A3.5 3.5 0 0 1 18 18z"/><path d="M12 13v5M9.5 15.5L12 18l2.5-2.5"/></svg></div>
+          <h3 data-i18n="ch2.t">No Control Over Where Data Goes</h3>
+          <p data-i18n="ch2.b">Most AI tools force every workflow through the same unmasked, third-party cloud — with no way to keep sensitive data local when policy requires it.</p>
         </div>
         <div class="card reveal" data-d="3">
-          <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div>
-          <h3 data-i18n="how3.t">It learns how your experts decide</h3>
-          <p data-i18n="how3.b">Flow picks up how your senior people handle real cases and replicates that judgment to the rest of the team.</p>
+          <div class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h10M4 12h16M4 17h7"/><path d="M17 15l3 3-3 3"/></svg></div>
+          <h3 data-i18n="ch3.t">Automation Bottlenecks</h3>
+          <p data-i18n="ch3.b">Traditional RPA tools break when UIs change. They can't adapt. They can't learn. They can't scale.</p>
         </div>
       </div>
-      <p class="trust-note reveal" data-d="3"><span data-i18n="trust.note">Flow is pre-certification. We will tell you in writing exactly where each framework stands, rather than have you infer it from a badge.</span> <a href="/security.html" data-i18n="trust.link">Read the security architecture →</a></p>
+    </div>
+  </section>
+
+  <!-- ACTION GRAPH -->
+  <section id="actiongraph" class="agraph-sec">
+    <div class="wrap">
+      <div class="agraph-head reveal">
+        <span class="eyebrow" data-i18n="ag.eyebrow">THE MOAT · ACTION GRAPH</span>
+        <h2 data-i18n="ag.title">The Action Graph</h2>
+        <p class="ag-tag" data-i18n="ag.tag">Turning Institutional Wisdom into Local Infrastructure.</p>
+        <p class="lead muted" data-i18n="ag.body">Flow decodes causal chains and hidden work patterns at the OS level, turning professional intuition into Execution Memory. The judgment of your most senior experts is replicated automatically to every teammate's machine — in zero clicks, at exactly the right second.</p>
+      </div>
+    </div>
+    <div class="agraph-stage" aria-hidden="true"><canvas id="agraphCanvas"></canvas></div>
+    <div class="wrap">
+      <div class="agraph-legend reveal">
+        <span><i class="exp"></i><span data-i18n="ag.l1">Senior expertise</span></span>
+        <span><i class="team"></i><span data-i18n="ag.l2">Replicated to every teammate</span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DUAL CORE -->
+  <section id="dualcore">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow" data-i18n="dual.eyebrow">DUAL-CORE ARCHITECTURE</span>
+        <h2 data-i18n="dual.title">Watch in silence. Act with power.</h2>
+        <p class="lead muted" data-i18n="dual.lead">Two engines working together — one visible, one invisible.</p>
+      </div>
+      <div class="grid-2">
+        <div class="core-beam" aria-hidden="true"></div>
+        <div class="panel shadow reveal" data-d="1">
+          <div class="art win-art" aria-hidden="true">
+            <div class="win">
+              <div class="win-bar"><span class="wd"></span><span class="wd"></span><span class="wd"></span>
+                <span class="win-title" id="winTitle">Contract.pdf</span>
+              </div>
+              <div class="win-body">
+                <div class="wv">
+                  <div class="wrow h"></div><div class="wrow"></div><div class="wrow s"></div>
+                  <div class="wdetect"><span class="wtag" id="winTag">MASKED · PII</span><span class="wbox mask"><span class="wval" id="winVal">•••• 4821</span></span></div>
+                  <div class="wrow"></div><div class="wrow s"></div>
+                </div>
+                <div class="scanline"></div>
+              </div>
+            </div>
+          </div>
+          <span class="tag">Shadow — Invisible</span>
+          <h3 data-i18n="shadow.t">A layer that runs quietly in the background — wherever you deploy it.</h3>
+          <p data-i18n="shadow.b">A CV &amp; OCR engine passively observes your work patterns and builds context. Where that processing runs is scoped per engagement.</p>
+        </div>
+        <div class="panel visible reveal" data-d="2">
+          <div class="art demo" aria-hidden="true">
+            <div class="demo-chip" data-i18n="demo.trigger">✉ New task detected</div>
+            <div class="demo-doit">[Do It]</div>
+            <ul class="demo-steps">
+              <li data-i18n="demo.s1">Update the matter file</li>
+              <li data-i18n="demo.s2">Sync the ledger fields</li>
+              <li data-i18n="demo.s3">Prepare the client package</li>
+            </ul>
+            <span class="demo-cursor" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 2l14 8.2-6.1 1.3-3 6.3L5 2z"/></svg></span>
+          </div>
+          <span class="tag">Do It — Visible</span>
+          <h3 data-i18n="doit.t">The button that appears at the right moment.</h3>
+          <p data-i18n="doit.b">The instant intent is detected, a focused execution button surfaces. No hunting for tools, no switching screens — the action is already here.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="eyebrow" data-i18n="arch.eyebrow">CORE ARCHITECTURE</span>
+        <h2 data-i18n="arch.title">Engineered for Enterprise Intelligence</h2>
+        <p class="lead muted" data-i18n="arch.lead">Six foundational pillars that make Flow the most secure, capable, and autonomous workflow engine for mission-critical operations.</p>
+      </div>
+      <div class="grid-3">
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg></div><h3><span class="en">FLEXIBLE DEPLOY</span><span data-i18n="c1.t">Two Secure Deployment Models</span></h3><p data-i18n="c1.b">Two deployment models are scoped per engagement. Neither is a live toggle today.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="2"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3><span class="en">MASKING</span><span data-i18n="c2.t">Smart Data Masking</span></h3><p data-i18n="c2.b">PII and confidential fields are automatically identified and protected before any processing.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div><h3><span class="en">ACTION GRAPH</span><span data-i18n="c3.t">Learns How Your Team Decides</span></h3><p data-i18n="c3.b">Watches who approves what, in what order, across real cases — and turns that pattern into something Flow can act on next time.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3><span class="en">INTEGRATION</span><span data-i18n="c4.t">Connects To What You Already Use</span></h3><p data-i18n="c4.b">Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="5"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3><span class="en">EXECUTION</span><span data-i18n="c5.t">Autonomous &amp; Deterministic</span></h3><p data-i18n="c5.b">Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3><span class="en">GOVERNANCE</span><span data-i18n="c6.t">Control &amp; Cryptographic Audit</span></h3><p data-i18n="c6.b">High-risk tasks require explicit human approval. An immutable audit trail is designed into regulated deployments, not a live toggle today.</p></div></div></div>
+      </div>
+      <div class="secure-note reveal">
+        <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <span data-i18n="sec.note">Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government.</span>
+      </div>
     </div>
   </section>
 
   <div class="terrain-zone">
     <canvas id="ctaTerrain" class="terrain-canvas" aria-hidden="true"></canvas>
-  <!-- WHO IS BEHIND FLOW -->
-  <section id="team" class="team-sec" aria-labelledby="teamTitle">
+  <!-- INTEGRATIONS -->
+  <section id="trust" class="integ-sec trust-sec" aria-label="Integrations &amp; Security">
     <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow">WHO IS BEHIND FLOW</span>
-        <h2 id="teamTitle">Founded by Sali Sapan and Tomer Steinmetz.</h2>
-        <p class="lead muted">A small team building Flow for organizations that cannot hand sensitive data to a black box.</p>
+      <p class="integ-title reveal" data-i18n="integ.title">Works with the systems your team already lives in. Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.</p>
+      <div class="integ-marquee reveal" data-d="1">
+        <div class="integ-track" aria-hidden="false">
+          <span class="integ-logo" title="Salesforce"><svg viewBox="0 0 24 24"><path d="M10.006 5.415a4.195 4.195 0 013.045-1.306c1.56 0 2.954.9 3.69 2.205.63-.3 1.35-.45 2.1-.45 2.85 0 5.159 2.34 5.159 5.22s-2.31 5.22-5.176 5.22c-.345 0-.69-.044-1.02-.104a3.75 3.75 0 01-3.3 1.95c-.6 0-1.155-.15-1.65-.375A4.314 4.314 0 018.88 20.4a4.302 4.302 0 01-4.05-2.82c-.27.062-.54.076-.825.076-2.204 0-4.005-1.8-4.005-4.05 0-1.5.811-2.805 2.01-3.51-.255-.57-.39-1.2-.39-1.846 0-2.58 2.1-4.65 4.65-4.65 1.53 0 2.85.705 3.72 1.8"/></svg><span>Salesforce</span></span>
+          <span class="integ-logo" title="HubSpot"><svg viewBox="0 0 24 24"><path d="M18.164 7.93V5.084a2.198 2.198 0 001.267-1.978v-.067A2.2 2.2 0 0017.238.845h-.067a2.2 2.2 0 00-2.193 2.193v.067a2.196 2.196 0 001.252 1.973l.013.006v2.852a6.22 6.22 0 00-2.969 1.31l.012-.01-7.828-6.095A2.497 2.497 0 104.3 4.656l-.012.006 7.697 5.991a6.176 6.176 0 00-1.038 3.446c0 1.343.425 2.588 1.147 3.607l-.013-.02-2.342 2.343a1.968 1.968 0 00-.58-.095h-.002a2.033 2.033 0 102.033 2.033 1.978 1.978 0 00-.1-.595l.005.014 2.317-2.317a6.247 6.247 0 104.782-11.134l-.036-.005zm-.964 9.378a3.206 3.206 0 113.215-3.207v.002a3.206 3.206 0 01-3.207 3.207z"/></svg><span>HubSpot</span></span>
+          <span class="integ-logo" title="Slack"><svg viewBox="0 0 24 24"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg><span>Slack</span></span>
+          <span class="integ-logo" title="Gmail"><svg viewBox="0 0 24 24"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg><span>Gmail</span></span>
+          <span class="integ-logo" title="Excel"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M4 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4Zm4.6 4 2 3.5L8.4 15h1.9l1.3-2.4 1.3 2.4h1.9l-2.2-3.5 2-3.5h-1.9l-1.1 2.2L11.6 8H9.7Z"/></svg><span>Excel</span></span>
+          <span class="integ-logo" title="Google Drive"><svg viewBox="0 0 24 24"><path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.081 0 3.753-.02 3.742-.047-.005-.02-1.708-3.001-3.775-6.62l-3.76-6.574zm-4.76 1.73a789.828 789.861 0 0 0-3.63 6.319L0 15.868l1.89 3.298 1.885 3.297 3.62-6.335 3.618-6.33-1.88-3.287C8.1 4.704 7.255 3.22 7.25 3.214zm2.259 12.653-.203.348c-.114.198-.96 1.672-1.88 3.287a423.93 423.948 0 0 1-1.698 2.97c-.01.026 3.24.042 7.222.042h7.244l1.796-3.157c.992-1.734 1.85-3.23 1.906-3.323l.104-.167h-7.249z"/></svg><span>Google&nbsp;Drive</span></span>
+          <span class="integ-logo" title="Notion"><svg viewBox="0 0 24 24"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg><span>Notion</span></span>
+          <span class="integ-logo" title="Jira"><svg viewBox="0 0 24 24"><path d="M12.004 0c-2.35 2.395-2.365 6.185.133 8.585l3.412 3.413-3.197 3.198a6.501 6.501 0 0 1 1.412 7.04l9.566-9.566a.95.95 0 0 0 0-1.344L12.004 0zm-1.748 1.74L.67 11.327a.95.95 0 0 0 0 1.344C4.45 16.44 8.22 20.244 12 24c2.295-2.298 2.395-6.096-.08-8.533l-3.47-3.469 3.2-3.2c-1.918-1.955-2.363-4.725-1.394-7.057z"/></svg><span>Jira</span></span>
+          <span class="integ-logo" title="Outlook"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M13 3h7a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-7v-4.2l2.4 1.5a1.2 1.2 0 0 0 1.3 0L21 15v-2.3l-4.6 2.9L13 13.5V3Zm-6.2 5.1c-2.7 0-4.3 2-4.3 4.9 0 2.9 1.6 4.9 4.2 4.9 2.7 0 4.3-2 4.3-5 0-2.9-1.5-4.8-4.2-4.8Zm0 2c1.3 0 2 1.1 2 2.9 0 1.7-.7 2.9-2 2.9s-2-1.2-2-3 .7-2.8 2-2.8Z"/></svg><span>Outlook</span></span>
+          <span class="integ-logo" title="Word"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M4 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4Zm3.4 4 1.3 7h1.7l1.1-4.3 1.1 4.3h1.7l1.3-7h-1.7l-.7 4.4-1.1-4.4h-1.4l-1.1 4.4L9.1 8H7.4Z"/></svg><span>Word</span></span>
+          <span class="integ-logo" title="iManage"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M18.5 5.2c2.3 2 2.6 6.1.4 9.3-2.2 3.2-6.5 5.1-10 4.4-3-.6-4.6-3-4-6.2.7-3.8 4-7.2 7.8-8.2 2-.5 3.9-.4 5.8.7ZM9.4 7.55a1.15 1.15 0 1 1 0 2.3 1.15 1.15 0 0 1 0-2.3ZM7.6 15.4v-4.2c0-1 .8-1.7 1.8-1.7.7 0 1.3.4 1.6 1 .3-.6.9-1 1.7-1 1.1 0 1.9.8 1.9 1.9v4h-1.5v-3.8c0-.4-.3-.7-.7-.7s-.7.3-.7.7v3.8h-1.5v-3.8c0-.4-.3-.7-.7-.7s-.6.3-.6.7v3.8H7.6Z"/></svg><span>iManage</span></span>
+          <span class="integ-logo" title="Dropbox"><svg viewBox="0 0 24 24"><path d="M6 1.807L0 5.629l6 3.822 6.001-3.822L6 1.807zM18 1.807l-6 3.822 6 3.822 6-3.822-6-3.822zM0 13.274l6 3.822 6.001-3.822L6 9.452l-6 3.822zM18 9.452l-6 3.822 6 3.822 6-3.822-6-3.822zM6 18.371l6.001 3.822 6-3.822-6-3.822L6 18.371z"/></svg><span>Dropbox</span></span>
+          <span class="integ-logo" title="Asana"><svg viewBox="0 0 24 24"><path d="M18.78 12.653c-2.882 0-5.22 2.336-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.34 5.22-5.22-2.336-5.22-5.22-5.22zm-13.56 0c-2.88 0-5.22 2.337-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.338 5.22-5.22-2.336-5.22-5.22-5.22zm12-6.525c0 2.883-2.337 5.22-5.22 5.22-2.882 0-5.22-2.337-5.22-5.22 0-2.88 2.338-5.22 5.22-5.22 2.883 0 5.22 2.34 5.22 5.22z"/></svg><span>Asana</span></span>
+          <span class="integ-logo" title="QuickBooks"><svg viewBox="0 0 24 24"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm.642 4.1335c.9554 0 1.7296.776 1.7296 1.7332v9.0667h1.6c1.614 0 2.9275-1.3156 2.9275-2.933 0-1.6173-1.3136-2.9333-2.9276-2.9333h-.6654V7.3334h.6654c2.5722 0 4.6577 2.0897 4.6577 4.667 0 2.5774-2.0855 4.6666-4.6577 4.6666H12.642zM7.9837 7.333h3.3291v12.533c-.9555 0-1.73-.7759-1.73-1.7332V9.0662H7.9837c-1.6146 0-2.9277 1.316-2.9277 2.9334 0 1.6175 1.3131 2.9333 2.9277 2.9333h.6654v1.7332h-.6654c-2.5725 0-4.6577-2.0892-4.6577-4.6665 0-2.5771 2.0852-4.6666 4.6577-4.6666Z"/></svg><span>QuickBooks</span></span>
+          <span class="integ-logo" title="Salesforce" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10.006 5.415a4.195 4.195 0 013.045-1.306c1.56 0 2.954.9 3.69 2.205.63-.3 1.35-.45 2.1-.45 2.85 0 5.159 2.34 5.159 5.22s-2.31 5.22-5.176 5.22c-.345 0-.69-.044-1.02-.104a3.75 3.75 0 01-3.3 1.95c-.6 0-1.155-.15-1.65-.375A4.314 4.314 0 018.88 20.4a4.302 4.302 0 01-4.05-2.82c-.27.062-.54.076-.825.076-2.204 0-4.005-1.8-4.005-4.05 0-1.5.811-2.805 2.01-3.51-.255-.57-.39-1.2-.39-1.846 0-2.58 2.1-4.65 4.65-4.65 1.53 0 2.85.705 3.72 1.8"/></svg><span>Salesforce</span></span>
+          <span class="integ-logo" title="HubSpot" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18.164 7.93V5.084a2.198 2.198 0 001.267-1.978v-.067A2.2 2.2 0 0017.238.845h-.067a2.2 2.2 0 00-2.193 2.193v.067a2.196 2.196 0 001.252 1.973l.013.006v2.852a6.22 6.22 0 00-2.969 1.31l.012-.01-7.828-6.095A2.497 2.497 0 104.3 4.656l-.012.006 7.697 5.991a6.176 6.176 0 00-1.038 3.446c0 1.343.425 2.588 1.147 3.607l-.013-.02-2.342 2.343a1.968 1.968 0 00-.58-.095h-.002a2.033 2.033 0 102.033 2.033 1.978 1.978 0 00-.1-.595l.005.014 2.317-2.317a6.247 6.247 0 104.782-11.134l-.036-.005zm-.964 9.378a3.206 3.206 0 113.215-3.207v.002a3.206 3.206 0 01-3.207 3.207z"/></svg><span>HubSpot</span></span>
+          <span class="integ-logo" title="Slack" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/></svg><span>Slack</span></span>
+          <span class="integ-logo" title="Gmail" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/></svg><span>Gmail</span></span>
+          <span class="integ-logo" title="Excel" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M4 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4Zm4.6 4 2 3.5L8.4 15h1.9l1.3-2.4 1.3 2.4h1.9l-2.2-3.5 2-3.5h-1.9l-1.1 2.2L11.6 8H9.7Z"/></svg><span>Excel</span></span>
+          <span class="integ-logo" title="Google Drive" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.01 1.485c-2.082 0-3.754.02-3.743.047.01.02 1.708 3.001 3.774 6.62l3.76 6.574h3.76c2.081 0 3.753-.02 3.742-.047-.005-.02-1.708-3.001-3.775-6.62l-3.76-6.574zm-4.76 1.73a789.828 789.861 0 0 0-3.63 6.319L0 15.868l1.89 3.298 1.885 3.297 3.62-6.335 3.618-6.33-1.88-3.287C8.1 4.704 7.255 3.22 7.25 3.214zm2.259 12.653-.203.348c-.114.198-.96 1.672-1.88 3.287a423.93 423.948 0 0 1-1.698 2.97c-.01.026 3.24.042 7.222.042h7.244l1.796-3.157c.992-1.734 1.85-3.23 1.906-3.323l.104-.167h-7.249z"/></svg><span>Google&nbsp;Drive</span></span>
+          <span class="integ-logo" title="Notion" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z"/></svg><span>Notion</span></span>
+          <span class="integ-logo" title="Jira" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12.004 0c-2.35 2.395-2.365 6.185.133 8.585l3.412 3.413-3.197 3.198a6.501 6.501 0 0 1 1.412 7.04l9.566-9.566a.95.95 0 0 0 0-1.344L12.004 0zm-1.748 1.74L.67 11.327a.95.95 0 0 0 0 1.344C4.45 16.44 8.22 20.244 12 24c2.295-2.298 2.395-6.096-.08-8.533l-3.47-3.469 3.2-3.2c-1.918-1.955-2.363-4.725-1.394-7.057z"/></svg><span>Jira</span></span>
+          <span class="integ-logo" title="Outlook" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M13 3h7a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1h-7v-4.2l2.4 1.5a1.2 1.2 0 0 0 1.3 0L21 15v-2.3l-4.6 2.9L13 13.5V3Zm-6.2 5.1c-2.7 0-4.3 2-4.3 4.9 0 2.9 1.6 4.9 4.2 4.9 2.7 0 4.3-2 4.3-5 0-2.9-1.5-4.8-4.2-4.8Zm0 2c1.3 0 2 1.1 2 2.9 0 1.7-.7 2.9-2 2.9s-2-1.2-2-3 .7-2.8 2-2.8Z"/></svg><span>Outlook</span></span>
+          <span class="integ-logo" title="Word" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M4 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4Zm3.4 4 1.3 7h1.7l1.1-4.3 1.1 4.3h1.7l1.3-7h-1.7l-.7 4.4-1.1-4.4h-1.4l-1.1 4.4L9.1 8H7.4Z"/></svg><span>Word</span></span>
+          <span class="integ-logo" title="iManage" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M18.5 5.2c2.3 2 2.6 6.1.4 9.3-2.2 3.2-6.5 5.1-10 4.4-3-.6-4.6-3-4-6.2.7-3.8 4-7.2 7.8-8.2 2-.5 3.9-.4 5.8.7ZM9.4 7.55a1.15 1.15 0 1 1 0 2.3 1.15 1.15 0 0 1 0-2.3ZM7.6 15.4v-4.2c0-1 .8-1.7 1.8-1.7.7 0 1.3.4 1.6 1 .3-.6.9-1 1.7-1 1.1 0 1.9.8 1.9 1.9v4h-1.5v-3.8c0-.4-.3-.7-.7-.7s-.7.3-.7.7v3.8h-1.5v-3.8c0-.4-.3-.7-.7-.7s-.6.3-.6.7v3.8H7.6Z"/></svg><span>iManage</span></span>
+          <span class="integ-logo" title="Dropbox" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 1.807L0 5.629l6 3.822 6.001-3.822L6 1.807zM18 1.807l-6 3.822 6 3.822 6-3.822-6-3.822zM0 13.274l6 3.822 6.001-3.822L6 9.452l-6 3.822zM18 9.452l-6 3.822 6 3.822 6-3.822-6-3.822zM6 18.371l6.001 3.822 6-3.822-6-3.822L6 18.371z"/></svg><span>Dropbox</span></span>
+          <span class="integ-logo" title="Asana" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18.78 12.653c-2.882 0-5.22 2.336-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.34 5.22-5.22-2.336-5.22-5.22-5.22zm-13.56 0c-2.88 0-5.22 2.337-5.22 5.22s2.338 5.22 5.22 5.22 5.22-2.338 5.22-5.22-2.336-5.22-5.22-5.22zm12-6.525c0 2.883-2.337 5.22-5.22 5.22-2.882 0-5.22-2.337-5.22-5.22 0-2.88 2.338-5.22 5.22-5.22 2.883 0 5.22 2.34 5.22 5.22z"/></svg><span>Asana</span></span>
+          <span class="integ-logo" title="QuickBooks" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm.642 4.1335c.9554 0 1.7296.776 1.7296 1.7332v9.0667h1.6c1.614 0 2.9275-1.3156 2.9275-2.933 0-1.6173-1.3136-2.9333-2.9276-2.9333h-.6654V7.3334h.6654c2.5722 0 4.6577 2.0897 4.6577 4.667 0 2.5774-2.0855 4.6666-4.6577 4.6666H12.642zM7.9837 7.333h3.3291v12.533c-.9555 0-1.73-.7759-1.73-1.7332V9.0662H7.9837c-1.6146 0-2.9277 1.316-2.9277 2.9334 0 1.6175 1.3131 2.9333 2.9277 2.9333h.6654v1.7332h-.6654c-2.5725 0-4.6577-2.0892-4.6577-4.6665 0-2.5771 2.0852-4.6666 4.6577-4.6666Z"/></svg><span>QuickBooks</span></span>
+          <span class="integ-logo" title="WhatsApp"><svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.868-2.031-.967-.273-.099-.472-.149-.671.149-.2.297-.771.967-.945 1.166-.174.199-.347.223-.644.075-.297-.149-1.255-.462-2.39-1.475-.884-.788-1.48-1.761-1.653-2.059-.174-.297-.019-.458.131-.606.134-.133.297-.347.446-.52.149-.174.199-.297.298-.496.099-.198.05-.371-.025-.52-.075-.149-.671-1.612-.92-2.207-.242-.579-.487-.501-.671-.51-.174-.009-.371-.009-.57-.009-.198 0-.52.075-.792.371-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.174-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.006c-1.735 0-3.415.566-4.759 1.617-1.344 1.051-2.057 2.439-2.057 3.927 0 .964.258 1.897.748 2.744l-1.191 3.553 3.639-1.198c.849.463 1.809.707 2.82.707 4.002 0 7.26-3.277 7.26-7.303 0-1.952-.759-3.782-2.14-5.163-1.38-1.381-3.212-2.14-5.164-2.14" fill="currentColor"/></svg><span>WhatsApp</span></span>
+          <span class="integ-logo" title="WhatsApp" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.868-2.031-.967-.273-.099-.472-.149-.671.149-.2.297-.771.967-.945 1.166-.174.199-.347.223-.644.075-.297-.149-1.255-.462-2.39-1.475-.884-.788-1.48-1.761-1.653-2.059-.174-.297-.019-.458.131-.606.134-.133.297-.347.446-.52.149-.174.199-.297.298-.496.099-.198.05-.371-.025-.52-.075-.149-.671-1.612-.92-2.207-.242-.579-.487-.501-.671-.51-.174-.009-.371-.009-.57-.009-.198 0-.52.075-.792.371-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.174-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.006c-1.735 0-3.415.566-4.759 1.617-1.344 1.051-2.057 2.439-2.057 3.927 0 .964.258 1.897.748 2.744l-1.191 3.553 3.639-1.198c.849.463 1.809.707 2.82.707 4.002 0 7.26-3.277 7.26-7.303 0-1.952-.759-3.782-2.14-5.163-1.38-1.381-3.212-2.14-5.164-2.14" fill="currentColor"/></svg><span>WhatsApp</span></span>
+        </div>
       </div>
-      <div class="team-row reveal" data-d="1">
-        <a class="team-card" href="/about.html#sali-sapan">
-          <img src="/founder-sali.webp" width="64" height="64" alt="Sali Sapan" loading="lazy" decoding="async">
-          <span><b>Sali Sapan</b><i>CEO &amp; Co-Founder</i><small>Attorney at Fischer Behar Chen. M.Sc. in Data Science &amp; Machine Learning.</small></span>
-        </a>
-        <a class="team-card" href="/about.html#tomer-steinmetz">
-          <img src="/founder-tomer.webp" width="64" height="64" alt="Tomer Steinmetz" loading="lazy" decoding="async">
-          <span><b>Tomer Steinmetz</b><i>CTO &amp; Co-Founder</i><small>AI Engineer at Amazon. Previously Team Lead at Hypernative.</small></span>
-        </a>
+      <div class="trust-divider" aria-hidden="true"></div>
+      <span class="eyebrow reveal" data-d="2" data-i18n="trust.eyebrow">SECURITY BY ARCHITECTURE</span>
+      <div class="trust-row reveal" data-d="2">
+        <span class="trust-badge"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span data-i18n="trust.b2">Every write is reversible</span></span>
       </div>
+      <p class="trust-note reveal" data-d="3"><span data-i18n="trust.note">Flow is pre-certification. We will tell you in writing exactly where each framework stands, rather than have you infer it from a badge.</span> <a href="/security.html" data-i18n="trust.link">Read the security architecture →</a></p>
+    </div>
+  </section>
+
+  <!-- INSIGHTS -->
+  <section id="insights" class="ins-sec-simple">
+    <div class="wrap">
+      <span class="eyebrow" data-i18n="ins.eyebrow">INSIGHTS</span>
+      <h2 data-i18n="ins.title">Research on Regulated AI Deployment</h2>
+      <p data-i18n="ins.lead">Compliance, architecture, and efficiency — across law, healthcare, finance, insurance, government, and technical AI infrastructure.</p>
+
+      <div class="ins-cf" id="insCoverflow">
+        <div class="ins-cf-frame" id="insCfFrame" tabIndex="0" role="region" aria-roledescription="carousel" aria-label="Recent research articles">
+          <div class="ins-cf-track" id="insCfTrack"></div>
+        </div>
+        <div class="ins-cf-nav">
+          <button type="button" class="ins-cf-btn" id="insCfPrev" aria-label="Previous article"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+          <button type="button" class="ins-cf-btn" id="insCfNext" aria-label="Next article"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></button>
+        </div>
+      </div>
+
+      <a href="/blog/" class="ins-viewall" data-i18n="ins.viewall">Read the research →</a>
     </div>
   </section>
 
@@ -351,11 +550,18 @@ Best,
   <section id="waitlist" class="cta-sec">
     <div class="wrap">
       <div class="cta-box">
+        <picture>
+          <source srcset="/logo.avif" type="image/avif">
+          <source srcset="/logo.webp" type="image/webp">
+          <img class="logo reveal in" src="/logo.png" width="440" height="194" alt="Flow" loading="lazy" decoding="async">
+        </picture>
         <span class="eyebrow reveal in" data-d="1" data-i18n="wl.eyebrow">GET STARTED</span>
-        <h2 class="reveal in" data-d="1" data-i18n="wl.title">Get a deployment plan for your team.</h2>
-        <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Leave your work email. We reply with a plan, a number, and a call to get it running.</p>
+        <h2 class="reveal in" data-d="1" data-i18n="wl.title">Ready to Reclaim Your Workflows?</h2>
+        <p class="lead reveal in" data-d="2" data-i18n="wl.lead">Two lines. Tell us how you would deploy Flow and we will come back with a real number. Glance is its own product: the Gmail close is the entry wedge, and the same loop grows beyond email.</p>
         <div class="cta-paths reveal in" data-d="2">
           <div class="cta-path cta-path-form">
+            <b data-i18n="wl.path1.t">Deploy Flow in your organization</b>
+            <span data-i18n="wl.path1.s">Tell us your work email, role, and company — we'll come back with a real deployment plan, a number, and a call to get it running.</span>
             <div class="wait-wrap" id="waitWrap">
               <form class="wait-form" id="waitForm" novalidate>
                 <input type="text" id="waitCompany" name="company" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
@@ -382,9 +588,13 @@ Best,
               </div>
             </div>
           </div>
-          
+          <a class="cta-path cta-path-link" href="/trial.html" data-ga="close_trial">
+            <b data-i18n="wl.path2.t">Get Glance</b>
+            <span data-i18n="wl.path2.s">Own product. Own revenue. Gmail Do It is the entry wedge. The same closing loop grows beyond email, still not an org runtime. No card to start, no sales conversation.</span>
+            <span class="cta-path-arrow" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+          </a>
         </div>
-        <p class="cta-solo reveal in" data-d="3"><span data-i18n="wl.solo.t">Just you, not an organization?</span> <a href="/trial.html" data-ga="close_trial" data-i18n="wl.solo.l">Get Glance — it closes open loops, starting in Gmail →</a></p>
+        <div class="cta-fine reveal" data-d="3"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span data-i18n="wl.fine">No spam. Your details stay with you — exactly like the product works.</span></div>
       </div>
     </div>
   </section>
@@ -394,13 +604,14 @@ Best,
   <div class="wrap">
     <div class="foot-in">
       <nav class="foot-links" aria-label="Footer">
-        <a href="#how" data-i18n="nav.product">Product</a>
-        <a href="/solutions/" data-i18n="nav.solutions">Solutions</a>
-        <a href="/security.html" data-i18n="nav.security">Security</a>
-        <a href="/pricing.html" data-i18n="foot.pricing">Pricing</a>
+        <a href="#architecture" data-i18n="foot.features">Features</a>
+        <a href="#architecture" data-i18n="nav.architecture">Architecture</a>
         <a href="/blog/" data-i18n="nav.blog">Insights</a>
+        <a href="#waitlist" data-i18n="nav.waitlist">Waitlist</a>
         <a href="/about.html" data-i18n="foot.about">About</a>
+        <a href="/security.html" data-i18n="nav.security">Security</a>
         <a href="/trial.html" data-i18n="nav.trial">Glance</a>
+        <a href="/pricing.html" data-i18n="foot.pricing">Pricing</a>
         <a href="/contact.html" data-i18n="foot.contact">Contact</a>
         <a href="/privacy.html" data-i18n="foot.privacy">Privacy</a>
         <a href="/terms.html" data-i18n="foot.terms">Terms</a>
@@ -408,8 +619,7 @@ Best,
     </div>
     <div class="foot-legal">
       <span data-i18n="foot.copy">© 2026 Flow — Cognitive Workflow Engine. All rights reserved.</span>
-      <span class="foot-founders"><a href="/about.html">Founded by Sali Sapan &amp; Tomer Steinmetz</a></span>
-      <span class="en">PRIVACY BY DESIGN</span>
+      <span class="en">FLEXIBLE DEPLOY · PRIVACY BY DESIGN</span>
     </div>
   </div>
 </footer>
@@ -423,49 +633,139 @@ Best,
 
   /* ---------- i18n ---------- */
   var I18N={
-    'nav.product':{en:'Product',he:'מוצר'},
-    'how.eyebrow':{en:'HOW IT WORKS',he:'איך זה עובד'},
-    'how.title':{en:'One loop, from the moment to the done.',he:'לולאה אחת, מהרגע ועד שזה גמור.'},
-    'how.lead':{en:'Flow watches for the moment something happens, prepares what comes next, and finishes it when you say so.',he:'Flow מחכה לרגע שמשהו קורה, מכין את הצעד הבא, וסוגר אותו כשתגידו.'},
-    'how1.t':{en:'It notices what happened',he:'הוא מזהה מה קרה'},
-    'how1.b':{en:'A deal closes, a contract is signed, a case is approved. Flow sees the moment and works out what needs to happen next — no rules to write.',he:'עסקה נסגרת, חוזה נחתם, תיק מאושר. Flow רואה את הרגע וקובע מה צריך לקרות אחר כך — בלי חוקים לכתוב.'},
-    'how2.t':{en:'You approve with one click',he:'אתם מאשרים בקליק אחד'},
-    'how2.b':{en:'A single Do It button appears at the right moment, with the update already prepared across your files and stack. High-risk steps always wait for your approval.',he:'כפתור Do It אחד מופיע ברגע הנכון, והעדכון כבר מוכן בין הקבצים והמערכות שלכם. צעדים בסיכון גבוה תמיד ממתינים לאישור שלכם.'},
-    'how3.t':{en:'It learns how your experts decide',he:'הוא לומד איך המומחים שלכם מחליטים'},
-    'how3.b':{en:'Flow picks up how your senior people handle real cases and replicates that judgment to the rest of the team.',he:'Flow לומד איך העובדים הבכירים מטפלים בתיקים אמיתיים, ומשכפל את שיקול הדעת הזה לשאר הצוות.'},
-    'wl.solo.t':{en:'Just you, not an organization?',he:'רק אתם, לא ארגון?'},
-    'wl.solo.l':{en:'Get Glance — it closes open loops, starting in Gmail →',he:'קבלו את Glance — הוא סוגר לולאות פתוחות, ומתחיל ב-Gmail ←'},
     'nav.desc':{en:'Cognitive Workflow Engine',he:'מנוע תהליכי עבודה קוגניטיבי'},
+    'nav.home':{en:'Home',he:'בית'},
     'nav.solutions':{en:'Solutions',he:'פתרונות'},
+    'nav.challenge':{en:'Challenge',he:'האתגר'},
+    'nav.architecture':{en:'Architecture',he:'ארכיטקטורה'},
     'nav.security':{en:'Security',he:'אבטחה'},
     'nav.trial':{en:'Glance',he:'Glance'},
+    'nav.scan':{en:'Inbox Scan',he:'סריקת תיבה'},
+    'nav.performance':{en:'Performance',he:'ביצועים'},
+    'nav.waitlist':{en:'Waitlist',he:'רשימת המתנה'},
     'nav.blog':{en:'Insights',he:'תובנות'},
     'nav.pricing':{en:'Pricing',he:'תמחור'},
     'nav.about':{en:'About',he:'אודות'},
     'nav.contact':{en:'Contact',he:'צור קשר'},
     'nav.privacy':{en:'Privacy',he:'פרטיות'},
     'nav.terms':{en:'Terms',he:'תנאים'},
+    'ins.eyebrow':{en:'INSIGHTS',he:'תובנות'},
+    'ins.title':{en:'Research on Regulated AI Deployment',he:'מחקר על פריסת AI בתעשיות מוסדרות'},
     'nav.security':{en:'Security',he:'אבטחה'},
     'nav.trial':{en:'Glance',he:'Glance'},
     'foot.about':{en:'About',he:'אודות'},
     'foot.pricing':{en:'Pricing',he:'תמחור'},
     'foot.contact':{en:'Contact',he:'צור קשר'},
-    'hero.eyebrow':{en:'FOR TEAMS WITH SENSITIVE DATA',he:'לצוותים עם מידע רגיש'},
-    'hero.h1':{en:'Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span>',he:'ביצוע אוטונומי.<br><span class="chrome-text">בתנאים שלכם.</span>'},
-    'hero.sub':{en:'When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve — no rules to write. Sensitive data is masked before anything is processed.',he:'כשעסקה נסגרת, חוזה נחתם או תיק מאושר, Flow מציע את העדכון לקבצים ולשאר המערכות שלכם, וכותב אותו ברגע שתאשרו — בלי חוקים לכתוב. מידע רגיש ממוסך לפני כל עיבוד.'},
-    'hero.cta1':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'},
+    'ins.center':{en:'Our research library.',he:'ספריית המחקר שלנו.'},
+    'ins.hint':{en:'SCROLL TO EXPLORE',he:'גללו כדי לחקור'},
+    'ins.title2':{en:'Explore the Research',he:'חקרו את המחקר'},
+    'ins.lead':{en:'Compliance, architecture, and efficiency — across law, healthcare, finance, insurance, government, and technical AI infrastructure.',he:'ציות רגולטורי, ארכיטקטורה, ויעילות — בתחומי המשפט, הבריאות, הפיננסים, הביטוח, הממשל, ותשתיות AI טכניות.'},
+    'ins.viewall':{en:'Read the research →',he:'לקריאת המחקר ←'},
+    'hero.eyebrow':{en:'Two products · One team',he:'שני מוצרים · צוות אחד'},
+    'hero.h1':{en:'Close what is open — for you, or for your organization.',he:'סוגרים את מה שפתוח — בשבילך, או בשביל הארגון.'},
+    'hero.sub':{en:'Glance closes your personal open loops. Flow watches work events in regulated organizations and proposes updates that run when you approve.',he:'Glance סוגר לולאות פתוחות אישיות. Flow עוקב אחרי אירועי עבודה בארגונים מפוקחים ומציע עדכונים שרצים כשאתם מאשרים.'},
+    'hero.path':{en:'Choose your path',he:'בחרו מסלול'},
+    'path.you.who':{en:'For you',he:'בשבילך'},
+    'path.you.body':{en:'Closes what you asked of others, what you promised, and what others asked of you. Starts in Gmail. Never sends on your behalf.',he:'סוגר את מה שביקשת מאחרים, מה שהבטחת, ומה שאחרים ביקשו ממך. מתחיל ב־Gmail. אף פעם לא שולח בשמך.'},
+    'path.org.who':{en:'For your organization',he:'לארגון'},
+    'path.org.body':{en:'Watches work events across legal, insurance, and security teams. Proposes file and system updates that execute only when you approve.',he:'עוקב אחרי אירועי עבודה בצוותי משפט, ביטוח ואבטחה. מציע עדכוני קבצים ומערכות שרצים רק כשאתם מאשרים.'},
+    'path.org.cta':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'},
+    'how.eyebrow':{en:'How it works',he:'איך זה עובד'},
+    'how.title':{en:'One loop. Detect, prepare, approve, close.',he:'לולאה אחת. מזהים, מכינים, מאשרים, סוגרים.'},
+    'how.lead':{en:'Both products follow the same idea: surface the next real move, prepare it where you already work, and wait for your approval. Nothing leaves until you say so.',he:'שני המוצרים על אותו רעיון: מציפים את הצעד האמיתי הבא, מכינים אותו במקום שבו אתם כבר עובדים, ומחכים לאישור שלכם. שום דבר לא יוצא עד שאתם אומרים.'},
+    'how.d.t':{en:'Detect',he:'זיהוי'},
+    'how.d.b':{en:'Watches the work in front of you — a thread, a deal close, a signed contract — and decides what is actually open.',he:'עוקב אחרי העבודה שלפניכם — שרשור, סגירת עסקה, חוזה חתום — ומחליט מה באמת פתוח.'},
+    'how.p.t':{en:'Prepare',he:'הכנה'},
+    'how.p.b':{en:'Drafts the update, the calendar event, or the file change. You see exactly what will happen before anything runs.',he:'מנסח את העדכון, אירוע היומן, או שינוי הקובץ. אתם רואים בדיוק מה יקרה לפני שמשהו רץ.'},
+    'how.c.t':{en:'Close',he:'סגירה'},
+    'how.c.b':{en:'On your approval it writes the change. Every write is reversible. Unsure moments stay silent.',he:'באישור שלכם הוא כותב את השינוי. כל כתיבה הפיכה. רגעים לא ודאיים נשארים בשקט.'},
+    'roadmap.quiet':{en:'Running on your own infrastructure is on the roadmap.',he:'הרצה על התשתית שלכם — בפריסה.'},
+    'hero.cta1':{en:'Do It',he:'עשו את זה'},
     'hero.cta3':{en:'See how it works',he:'איך זה עובד'},
-    'nav.cta':{en:'Get started',he:'מתחילים'},
+    'nav.cta':{en:'Get Glance',he:'קבלו את Glance'},
+    'nav.flow':{en:'Flow',he:'Flow'},
     'wl.submit':{en:'Get My Deployment Plan',he:'קבלו תוכנית פריסה'},
-    'hero.foot':{en:'Masked before processing · Approval before risky steps · Every write reversible',he:'ממוסך לפני עיבוד · אישור לפני פעולות מסוכנות · כל כתיבה הפיכה'},
+    'hero.cta2':{en:'Get Glance',he:'התקינו Glance'},
+    'hero.glance.flow':{en:'Explore Flow for organizations',he:'גלו את Flow לארגונים'},
+    'hero.glance.tag':{en:'A separate product, from the same team',he:'מוצר נפרד, מאותו צוות'},
+    'hero.glance.b':{en:'Glance closes the moment in front of you.',he:'Glance סוגר את הרגע שלפניך.'},
+    'hero.glance.p':{en:'<b>Now:</b> your personal closing layer, starting in Gmail. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it for real: a calendar event, a task, a drafted reply, or the right Drive file attached — in place, Zero-Prompt, with undo. Personal product. Own revenue. Stays quiet when it is not sure. <b>Next:</b> the same closing loop grows beyond email into the other places your day actually happens — still personal, still Zero-Prompt, still not an org runtime. Same DNA as Flow. Different line: personal closing, not regulated firm infrastructure.',he:'<b>עכשיו:</b> שכבת הסגירה האישית שלך, שמתחילה ב־Gmail. כשהשרשור הפתוח באמת מחליט משהו, <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> אחד סוגר אותו באמת: אירוע ביומן, משימה, טיוטת תשובה, או קובץ ה־Drive הנכון מצורף — במקום, Zero-Prompt, עם ביטול. מוצר אישי. מסלול הכנסה משלו. נשאר בשקט כשאינו בטוח. <b>הלאה:</b> אותה לולאת סגירה גדלה מעבר למייל אל המקומות האחרים שבהם היום באמת קורה — עדיין אישי, עדיין Zero-Prompt, עדיין לא runtime ארגוני. אותו DNA כמו Flow. קו אחר: סגירה אישית, לא תשתית לפירמה מפוקחת.'},
+    'hero.foot':{en:'Masked cloud, or Flow-Edge designed into the engagement (roadmap / בפריסה).',he:'ענן ממוסך, או Flow-Edge מתוכנן לתוך ההתקשרות (בפריסה).'},
+    'challenge.eyebrow':{en:'THE CHALLENGE',he:'THE CHALLENGE'},
+    'challenge.title':{en:'Enterprise Workflows Are Broken',he:'תהליכי העבודה בארגון שבורים'},
+    'challenge.lead':{en:'Modern enterprises rely on dozens of disconnected applications. The result? Inefficiency, security risk, and operational fragility.',he:'ארגונים מודרניים נשענים על עשרות אפליקציות מנותקות. התוצאה? חוסר יעילות, סיכון אבטחה ושבריריות תפעולית.'},
+    'ch1.t':{en:'Fragmented Workflows',he:'תהליכים מפוצלים'},
+    'ch1.b':{en:'Your team jumps between 15+ apps daily. Context is lost. Time is wasted. Errors multiply.',he:'הצוות שלכם קופץ בין 15+ אפליקציות ביום. ההקשר אובד. הזמן מתבזבז. הטעויות מתרבות.'},
+    'ch2.t':{en:'No Control Over Where Data Goes',he:'בלי שליטה על יעד המידע'},
+    'ch2.b':{en:'Most AI tools force every workflow through the same unmasked, third-party cloud — with no way to keep sensitive data local when policy requires it.',he:'רוב כלי ה-AI מעבירים כל תהליך דרך אותו ענן חיצוני לא-ממוסך — בלי אפשרות לשמור מידע רגיש מקומית כשהמדיניות דורשת זאת.'},
+    'ch3.t':{en:'Automation Bottlenecks',he:'צווארי בקבוק באוטומציה'},
+    'ch3.b':{en:"Traditional RPA tools break when UIs change. They can't adapt. They can't learn. They can't scale.",he:'כלי RPA מסורתיים נשברים כשהממשק משתנה. הם לא מסתגלים. לא לומדים. לא מתרחבים.'},
+    'dual.eyebrow':{en:'DUAL-CORE ARCHITECTURE',he:'DUAL-CORE ARCHITECTURE'},
+    'dual.title':{en:'Watch in silence. Act with power.',he:'לצפות בשקט. לפעול בעוצמה.'},
+    'dual.lead':{en:'Two engines working together — one visible, one invisible.',he:'שני מנועים שעובדים יחד — אחד נראה, אחד בלתי-נראה.'},
+    'doit.t':{en:'The button that appears at the right moment.',he:'הכפתור שמופיע ברגע הנכון.'},
+    'doit.b':{en:'The instant intent is detected, a focused execution button surfaces. No hunting for tools, no switching screens — the action is already here.',he:'ברגע שמזוהה כוונה, מוקפץ כפתור ביצוע ממוקד. בלי לחפש כלים, בלי לעבור בין מסכים — הפעולה כבר כאן.'},
+    'shadow.t':{en:'A layer that runs quietly in the background — wherever you deploy it.',he:'שכבה שרצה בשקט ברקע — בכל מקום שבו תבחרו לפרוס אותה.'},
+    'shadow.b':{en:'A CV & OCR engine passively observes your work patterns and builds context. Where that processing runs is scoped per engagement.',he:'מנוע CV ו-OCR צופה באופן פסיבי בדפוסי העבודה ובונה הקשר. איפה שהעיבוד רץ נקבע לפי ההתקשרות.'},
+    'sec.note':{en:'Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government.',he:'נבנה במיוחד לארגונים עם מידע רגיש — משפט, בריאות, פיננסים וממשל.'},
+    'arch.eyebrow':{en:'CORE ARCHITECTURE',he:'CORE ARCHITECTURE'},
+    'arch.title':{en:'Engineered for Enterprise Intelligence',he:'מהונדס לאינטליגנציה ארגונית'},
+    'arch.lead':{en:'Six foundational pillars that make Flow the most secure, capable, and autonomous workflow engine for mission-critical operations.',he:'שישה עמודי תווך שהופכים את Flow למנוע תהליכי העבודה המאובטח, היכול והאוטונומי ביותר למשימות קריטיות.'},
+    'c1.t':{en:'Two Secure Deployment Models',he:'שני מודלי פריסה מאובטחים'},
+    'c1.b':{en:'Two deployment models are scoped per engagement. Neither is a live toggle today.',he:'שני מודלי פריסה נקבעים לפי ההתקשרות. אף אחד מהם אינו מתג חי היום.'},
+    'c2.t':{en:'Smart Data Masking',he:'מיסוך נתונים חכם'},
+    'c2.b':{en:'PII and confidential fields are automatically identified and protected before any processing.',he:'שדות PII ומידע סודי מזוהים ומוגנים אוטומטית לפני כל עיבוד.'},
+    'c3.t':{en:'Learns How Your Team Decides',he:'תשתית לחוכמה ארגונית'},
+    'c3.b':{en:'Watches who approves what, in what order, across real cases — and turns that pattern into something Flow can act on next time.',he:'ממפה טלמטריית מערכת והרגלים סיבתיים, והופך שיפוט מקצועי סמוי לזיכרון ביצוע.'},
+    'c4.t':{en:'Connects To What You Already Use',he:'חיבורים לפי פרויקט'},
+    'c4.b':{en:'Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.',he:'מעבר למה ש-Glance מריץ היום — Gmail, יומן, משימות, טיוטות, ו-Drive כשיש קובץ אחד — חיבורים לפי פרויקט, לא מתגים חיים היום.'},
+    'c5.t':{en:'Autonomous & Deterministic',he:'אוטונומי ודטרמיניסטי'},
+    'c5.b':{en:'Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.',he:'מריץ תהליכים בשקט ברקע עם runtime מחמיר שמבטיח אפס הזיות.'},
+    'c6.t':{en:'Control & Cryptographic Audit',he:'בקרה וביקורת קריפטוגרפית'},
+    'c6.b':{en:'High-risk tasks require explicit human approval. An immutable audit trail is designed into regulated deployments, not a live toggle today.',he:'משימות בסיכון גבוה דורשות אישור אנושי מפורש. תיעוד ביקורת בלתי ניתן לשינוי מתוכנן לפריסות מפוקחות, לא מתג חי היום.'},
+    'trust.eyebrow':{en:'SECURITY BY ARCHITECTURE',he:'אבטחה מתוקף הארכיטקטורה'},
+    'trust.b1':{en:'Own infrastructure: roadmap / בפריסה',he:'תשתית שלכם: בפריסה'},
+    'trust.b2':{en:'Every write is reversible',he:'כל כתיבה הפיכה'},
+    'trust.b3':{en:'Audit trail: roadmap / בפריסה',he:'תיעוד ביקורת: בפריסה'},
+    'trust.b4':{en:'Masked secure cloud: roadmap / בפריסה',he:'ענן ממוסך: בפריסה'},
     'trust.note':{en:'Flow is pre-certification. We will tell you in writing exactly where each framework stands, rather than have you infer it from a badge.',he:'Flow טרם עבר הסמכה. נמסור לכם בכתב היכן בדיוק עומד כל תקן, במקום שתסיקו זאת מתגית.'},
     'trust.link':{en:'Read the security architecture →',he:'לארכיטקטורת האבטחה →'},
+    'perf.eyebrow':{en:'PERFORMANCE',he:'PERFORMANCE'},
+    'perf.title':{en:'What Flow Is Built to Do',he:'האצה מדידה'},
+    'perf.lead':{en:'What the architecture is built to deliver. The masking and deployment guarantees below are properties of how Flow is built; the speed figure is our design target, not a customer benchmark.',he:'מה שהארכיטקטורה בנויה לספק. הבטחות המיסוך והפריסה שלמטה נובעות מאופן הבנייה של Flow; נתון המהירות הוא יעד התכנון שלנו, לא מדידה אצל לקוח.'},
+    'p1.t':{en:'Faster Execution (target)',he:'ביצוע מהיר יותר'},
+    'p1.b':{en:'Design target for workflow execution speed against manual processing. Not yet a measured customer result.',he:'מהירות ביצוע תהליכים מול עבודה ידנית או כלי RPA מסורתיים.'},
+    'p2.t':{en:'Masked or Fully Local',he:'ממוסך או מקומי לחלוטין'},
+    'p2.b':{en:'Every byte is either masked before cloud processing, or never leaves your infrastructure at all — the choice is yours.',he:'כל ביט מידע או ממוסך לפני עיבוד בענן, או לא עוזב את התשתית שלכם בכלל — הבחירה בידיים שלכם.'},
+    'p3.t':{en:'External Dependencies',he:'תלויות חיצוניות'},
+    'p3.b':{en:'No third-party API keys. No mandatory external calls — whichever deployment you choose.',he:'בלי מפתחות API של צד שלישי. בלי קריאות חיצוניות חובה — בכל תצורת פריסה שתבחרו.'},
+    'ag.eyebrow':{en:'THE MOAT · ACTION GRAPH',he:'THE MOAT · ACTION GRAPH'},
+    'ag.title':{en:'The Action Graph',he:'גרף פעולות'},
+    'ag.tag':{en:'Turning Institutional Wisdom into Local Infrastructure.',he:'הופכים ידע ארגוני לתשתית מקומית.'},
+    'ag.body':{en:'Flow decodes causal chains and hidden work patterns at the OS level, turning professional intuition into Execution Memory. The judgment of your most senior experts is replicated automatically to every teammate’s machine — in zero clicks, at exactly the right second.',he:'Flow מפענחת שרשראות סיבתיות והרגלי עבודה סמויים ברמת ה‑OS, והופכת אינטואיציה מקצועית לזיכרון תפעולי (Execution Memory). שיקול הדעת של המקצוענים הבכירים שלכם משוכפל אוטומטית למחשב של כל עובד בצוות — באפס קליקים ובדיוק בשנייה הנכונה.'},
+    'ag.l1':{en:'Senior expertise',he:'ידע של מומחה בכיר'},
+    'ag.l2':{en:'Replicated to every teammate',he:'משוכפל לכל עובד בצוות'},
+    'demo.trigger':{en:'✉ New task detected',he:'✉ זוהתה משימה חדשה'},
+    'demo.s1':{en:'Update the matter file',he:'עדכון תיק העסקה'},
+    'demo.s2':{en:'Sync the ledger fields',he:'סנכרון שדות בגיליון'},
+    'demo.s3':{en:'Prepare the client package',he:'הכנת חבילת לקוח'},
+    'win.t1':{en:'Inbox',he:'תיבת דואר'},
+    'win.t2':{en:'Contract.pdf',he:'חוזה.pdf'},
+    'win.t3':{en:'CRM — Account',he:'CRM — לקוח'},
+    'win.f1':{en:'$48,200',he:'₪48,200'},
+    'win.f2':{en:'•••• 4821',he:'•••• 4821'},
+    'win.f3':{en:'Cohen Ltd.',he:'כהן בע"מ'},
     'wl.eyebrow':{en:'GET STARTED',he:'איך מתחילים'},
-    'wl.title':{en:'Get a deployment plan for your team.',he:'מוכנים להשיב לעצמכם את תהליכי העבודה?'},
-    'wl.lead':{en:'Leave your work email. We reply with a plan, a number, and a call to get it running.',he:'ספרו לנו איך הייתם פורסים את Flow ונחזור עם תוכנית אמיתית ומספר.'},
+    'wl.path1.t':{en:'Deploy Flow in your organization',he:'פרסו את Flow בארגון שלכם'},
+    'wl.path1.s':{en:"Tell us your work email, role, and company — we'll come back with a real deployment plan, a number, and a call to get it running.",he:'השאירו את האימייל, התפקיד והחברה — נחזור עם תוכנית פריסה אמיתית, מספר, ושיחה להתחלת העבודה.'},
+    'wl.path2.t':{en:'Get Glance',he:'התקינו Glance'},
+    'wl.path2.s':{en:'Own product. Own revenue. Gmail Do It is the entry wedge. The same closing loop grows beyond email, still not an org runtime. No card to start, no sales conversation.',he:'מוצר עצמאי. מסלול הכנסה משלו. Do It ב-Gmail הוא חץ הכניסה. אותה לולאת סגירה גדלה מעבר למייל, עדיין לא runtime ארגוני. בלי כרטיס כדי להתחיל, בלי שיחת מכירה.'},
+    'wl.title':{en:'Ready to Reclaim Your Workflows?',he:'מוכנים להשיב לעצמכם את תהליכי העבודה?'},
+    'wl.lead':{en:'Two lines. Tell us how you would deploy Flow and we will come back with a real number. Glance is its own product: the Gmail close is the entry wedge, and the same loop grows beyond email.',he:'שני קווים. ספרו לנו איך הייתם פורסים את Flow ונחזור עם מספר אמיתי. Glance הוא מוצר עצמאי: סגירת ה-Gmail היא חץ הכניסה, ואותה לולאה גדלה מעבר למייל.'},
     'wl.ph':{en:'Enter your work email',he:'כתובת האימייל הארגוני שלכם'},
     'wl.success':{en:"Check your inbox to confirm your email — we'll follow up with your deployment plan, a call to get started, and the Playbook.",he:'בדקו את תיבת הדואר לאישור הכתובת — נחזור עם תוכנית הפריסה, שיחת התחלה, וה-Playbook.'},
     'wl.confirm.note':{en:"Check your inbox to confirm your email — that's how we'll reach you about your deployment plan.",he:'בדקו את תיבת הדוא"ל שלכם לאישור הכתובת — כך ניצור איתכם קשר בנוגע לתוכנית הפריסה.'},
+    'wl.fine':{en:'No spam. Your details stay with you — exactly like the product works.',he:'ללא ספאם. הפרטים נשמרים אצלכם — בדיוק כמו שהמוצר עובד.'},
     'wl.err':{en:"That email doesn't look right. Please check it.",he:'כתובת האימייל לא נראית תקינה. בדקו שוב.'},
     'wl.enrich.note':{en:"Required — we need your role and company to build a real deployment plan and set up your call.",he:'חובה — אנחנו צריכים את התפקיד והחברה שלכם כדי לבנות תוכנית פריסה אמיתית ולקבוע שיחה.'},
     'wl.enrich.company':{en:'Company',he:'שם החברה'},
@@ -474,13 +774,15 @@ Best,
     'wl.enrich.btn':{en:'Request My Plan',he:'בקשו תוכנית'},
     'wl.enrich.err':{en:'Company, role, and website are all required — this is how we build your deployment plan.',he:'חברה, תפקיד ואתר — כולם שדות חובה. כך נבנה עבורכם את תוכנית הפריסה.'},
     'wl.submit.err':{en:'We could not save that. Please try again or email hello@theflow-ai.com.',he:'לא הצלחנו לשמור זאת. נסו שוב או שלחו מייל ל-hello@theflow-ai.com.'},
+    'foot.features':{en:'Features',he:'יכולות'},
     'foot.copy':{en:'© %Y% Flow — Cognitive Workflow Engine. All rights reserved.',he:'© %Y% Flow — מנוע תהליכי עבודה קוגניטיבי. כל הזכויות שמורות.'},
     'foot.privacy':{en:'Privacy',he:'פרטיות'},
     'foot.terms':{en:'Terms',he:'תנאי שימוש'},
     'a11y.skip':{en:'Skip to content',he:'דלג לתוכן'},
+    'integ.title':{en:'Works with the systems your team already lives in. Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.',he:'עובד עם המערכות שהצוות כבר חי בהן. מעבר למה ש-Glance מריץ היום — Gmail, יומן, משימות, טיוטות, ו-Drive כשיש קובץ אחד — חיבורים לפי פרויקט, לא מתגים חיים היום.'},
     'legal.eyebrow':{en:'SEE IT WORK',he:'SEE IT WORK'},
     'legal.title':{en:'A real closing, end to end.',he:'סגירת עסקה אמיתית, מקצה לקצה.'},
-    'legal.lead':{en:'Watch Flow handle a live legal / real-estate workflow — sensitive fields masked before processing.',he:'צפו כיצד Flow מנהל תהליך עבודה משפטי-נדל״ני אמיתי — שדות רגישים ממוסכים לפני עיבוד.'},
+    'legal.lead':{en:'Watch Flow handle a live legal / real-estate workflow — locally, on your device.',he:'צפו כיצד Flow מנהל תהליך עבודה משפטי-נדל״ני אמיתי — מקומית, על המכשיר שלכם.'},
     'legal.tag':{en:'Real-Estate Post-Tax Verification',he:'אימות מס לאחר עסקה — נדל״ן'},
     'legal.runtime':{en:'~1 min · 6 steps',he:'כ-1 דקה · 6 שלבים'},
     'legal.play':{en:'Play the demo',he:'הפעל את הדמו'},
@@ -534,9 +836,9 @@ Best,
     'legal.step6.tag':{en:'Step 6 of 6 · Human-in-the-Loop · The Dispatch',he:'שלב 6 מתוך 6 · אדם בלולאה · המשלוח'},
     'legal.step6.tooltip':{en:'Closing package generated. Ready for final dispatch.',he:'חבילת הסגירה הופקה. מוכנה למשלוח סופי.'},
     'legal.step6.btn':{en:'Send Email',he:'שלח מייל'},
-    'legal.end.line1':{en:'3 clicks. 0 manual data entry.',he:'3 קליקים. 0 הזנת נתונים ידנית.'},
+    'legal.end.line1':{en:'3 clicks for full compliance. 0 clicks for manual data entry.',he:'3 קליקים לעמידה מלאה ברגולציה. 0 קליקים להזנת נתונים ידנית.'},
     'legal.end.line2':{en:'Deed updated. Ledger recalculated. Client package dispatched.',he:'שטר ההעברה עודכן. הספר חושב מחדש. חבילת הלקוח נשלחה.'},
-    'legal.end.line3':{en:'And the sensitive fields? Masked before anything was processed.',he:'והשדות הרגישים? ממוסכים לפני שמשהו עובד עליהם.'},
+    'legal.end.line3':{en:"And your firm's multi-million dollar transaction data? It never left your local machine.",he:'ונתוני העסקה רבת מיליוני הדולרים של המשרד שלכם? הם מעולם לא עזבו את המכשיר המקומי שלכם.'},
     'legal.end.cta':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'}
   };
   var YEAR=new Date().getFullYear();
@@ -716,6 +1018,141 @@ Best,
     });
   }
 
+  /* ---------- insights CTA click tracking ---------- */
+  (function(){
+    var a=document.querySelector('.ins-viewall');
+    if(!a) return;
+    a.addEventListener('click',function(){ if(typeof gtag==='function') gtag('event','ins_viewall_click'); });
+  })();
+
+  /* ---------- insights coverflow: real article covers, 3D perspective ----------
+     Distance-from-center math (tilt + recession + fade), a settle animation, and
+     pointer-drag are all hand-rolled here rather than pulled in as a library —
+     consistent with the rest of this page's zero-dependency canvas/CSS work. */
+  (function(){
+    var frame=document.getElementById('insCfFrame'), track=document.getElementById('insCfTrack');
+    var prevBtn=document.getElementById('insCfPrev'), nextBtn=document.getElementById('insCfNext');
+    if(!frame||!track) return;
+
+    var SLIDES=[
+      {slug:'action-graph-institutional-knowledge', title:'The Action Graph: How Institutional Knowledge Gets Captured'},
+      {slug:'zero-retention-ai-architecture', title:'Zero-Retention AI: What It Actually Means'},
+      {slug:'hipaa-compliant-ai-automation', title:'Compliance by Design: AI Workflow Automation Under HIPAA'},
+      {slug:'ai-observability-tracing-debugging', title:'AI Observability: Tracing a Decision Back to Its Source'},
+      {slug:'prompt-injection-ai-threat-modeling', title:'Prompt Injection and Data Exfiltration: Threat Modeling'},
+      {slug:'financial-services-data-masking-ai', title:'Automated Data Masking in Regulated Financial Institutions'},
+      {slug:'edge-vs-cloud-ai-architecture', title:'Edge Versus Cloud: A Comparative Architecture'},
+      {slug:'legal-ai-workflow-automation', title:'Algorithmic Legal Workflows Within Professional Responsibility'},
+      {slug:'human-in-the-loop-ai-system-design', title:'Designing Human-in-the-Loop Systems People Actually Use'},
+      {slug:'auditability-by-design-ai-systems', title:'Auditability by Design: Logging, Provenance, Oversight'}
+    ];
+    var count=SLIDES.length;
+    track.innerHTML=SLIDES.map(function(s){
+      return '<a class="ins-cf-card" href="/blog/'+s.slug+'.html">'+
+        '<picture><source srcset="/blog/img/'+s.slug+'.webp" type="image/webp"><img src="/blog/img/'+s.slug+'.jpg" alt="" loading="lazy" decoding="async"></picture>'+
+        '<p class="t">'+s.title+'</p></a>';
+    }).join('');
+    var cards=Array.prototype.slice.call(track.querySelectorAll('.ins-cf-card'));
+
+    var rm=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var ROTATE=42, DEPTH=.62, FALLOFF=.6, FADE=.14, GAP=.14;
+    var pos=0, target=0, width=0, raf=null, autoplay=null;
+
+    function indexAt(p){ return ((Math.round(p)%count)+count)%count; }
+
+    function paint(){
+      if(!width) return;
+      var pitch=width*(1+GAP);
+      cards.forEach(function(card,i){
+        var offset=i-pos;
+        offset=((offset%count)+count)%count;
+        if(offset>count/2) offset-=count;
+        var distance=Math.abs(offset);
+        var ramp=Math.pow(distance,FALLOFF);
+        var tilt=Math.min(ROTATE*ramp,80)*Math.sign(offset);
+        card.style.transform='translateX(calc(-50% + '+(offset*pitch)+'px)) translateZ('+(-DEPTH*width*ramp)+'px) rotateY('+(-tilt)+'deg)';
+        var edge=Math.min(1,Math.max(0,count/2-distance));
+        card.style.opacity=String(Math.max(0,1-FADE*distance)*edge);
+        card.style.zIndex=String(100-Math.round(distance));
+        card.classList.toggle('is-center', distance<0.5);
+      });
+    }
+
+    function measure(){
+      var card=cards[0];
+      if(!card) return;
+      width=card.offsetWidth;
+      paint();
+    }
+
+    function settle(t){
+      if(raf!==null) cancelAnimationFrame(raf);
+      target=t;
+      if(rm){ pos=target; paint(); return; }
+      var step=function(){
+        var remaining=target-pos;
+        if(Math.abs(remaining)<0.0006){ pos=target; paint(); raf=null; return; }
+        pos+=remaining*0.18;
+        paint();
+        raf=requestAnimationFrame(step);
+      };
+      raf=requestAnimationFrame(step);
+    }
+
+    function goTo(index){
+      var t=index+Math.round((target-index)/count)*count;
+      settle(t);
+    }
+    function nudge(by){ settle(Math.round(target)+by); }
+
+    cards.forEach(function(card,i){
+      card.addEventListener('click',function(ev){
+        if(indexAt(target)!==i){ ev.preventDefault(); goTo(i); }
+      });
+    });
+    prevBtn.addEventListener('click',function(){ stopAutoplay(); nudge(-1); });
+    nextBtn.addEventListener('click',function(){ stopAutoplay(); nudge(1); });
+    frame.addEventListener('keydown',function(ev){
+      if(ev.key==='ArrowLeft'){ ev.preventDefault(); stopAutoplay(); nudge(-1); }
+      else if(ev.key==='ArrowRight'){ ev.preventDefault(); stopAutoplay(); nudge(1); }
+    });
+
+    // pointer drag
+    var drag=null;
+    frame.addEventListener('pointerdown',function(ev){
+      stopAutoplay();
+      if(raf!==null){ cancelAnimationFrame(raf); raf=null; }
+      frame.setPointerCapture(ev.pointerId);
+      target=pos;
+      drag={id:ev.pointerId, x:ev.clientX, startPos:pos};
+    });
+    frame.addEventListener('pointermove',function(ev){
+      if(!drag||drag.id!==ev.pointerId||!width) return;
+      var pitch=width*(1+GAP);
+      pos=drag.startPos-(ev.clientX-drag.x)/pitch;
+      paint();
+    });
+    function endDrag(ev){
+      if(!drag||drag.id!==ev.pointerId) return;
+      drag=null;
+      settle(Math.round(pos));
+    }
+    frame.addEventListener('pointerup',endDrag);
+    frame.addEventListener('pointercancel',endDrag);
+
+    function stopAutoplay(){ if(autoplay){ clearInterval(autoplay); autoplay=null; } }
+    function startAutoplay(){
+      if(rm||autoplay) return;
+      autoplay=setInterval(function(){ if(!document.hidden) nudge(1); },4200);
+    }
+
+    measure();
+    if('ResizeObserver' in window) new ResizeObserver(measure).observe(frame);
+    else addEventListener('resize',measure);
+    document.addEventListener('visibilitychange',function(){ if(document.hidden) stopAutoplay(); else if(!rm) startAutoplay(); });
+    startAutoplay();
+  })();
+
   /* ---------- waitlist (server-side write via submit-waitlist, graceful localStorage fallback) ---------- */
   var form=document.getElementById('waitForm'), email=document.getElementById('waitEmail'), msg=document.getElementById('waitMsg'), wrap=document.getElementById('waitWrap'), btn=document.getElementById('waitBtn'), honey=document.getElementById('waitCompany');
   var emailField=email.closest('.field');
@@ -788,17 +1225,7 @@ Best,
       waitAuth = auth || null;
       btn.classList.remove('loading'); btn.disabled=false; btn.style.pointerEvents='';
       wrap.classList.add('step2');
-      // Save typing: a work address already says who they work for. Free
-      // mailboxes (gmail.com etc.) say nothing, so those stay empty.
-      (function prefillFromEmail(addr){
-        var dom=String(addr.split('@')[1]||'').toLowerCase();
-        if(!dom || /^(gmail|googlemail|yahoo|outlook|hotmail|live|icloud|me|aol|proton|protonmail|msn|mail|gmx|yandex|zoho|fastmail)\./.test(dom)) return;
-        if(websiteInput && !websiteInput.value) websiteInput.value='https://'+dom;
-        var label=dom.split('.')[0].replace(/[-_]+/g,' ');
-        if(orgInput && !orgInput.value && label) orgInput.value=label.replace(/\b\w/g,function(c){return c.toUpperCase();});
-      })(v);
-      var firstEmpty=(orgInput && orgInput.value && roleInput) ? roleInput : orgInput;
-      if(firstEmpty) firstEmpty.focus();
+      if(orgInput) orgInput.focus();
       if(typeof gtag==='function') gtag('event','waitlist_email_submit');
     }
     function fail(){
@@ -854,6 +1281,7 @@ Best,
   /* cap the backing store: a 3x full-viewport canvas is ~12MB of GPU memory on a
      phone, and it is the first layer the compositor drops under pressure. */
   var BGDPR=Math.min(devicePixelRatio||1,1.75);
+  var narrow=matchMedia('(max-width:640px)').matches;
   function readNetColors(){
     var cs=getComputedStyle(root);
     NET=(cs.getPropertyValue('--net')||'150,170,220').trim();
@@ -861,7 +1289,7 @@ Best,
     NA=parseFloat(cs.getPropertyValue('--net-a'))||.5;
   }
   function size(){ BGDPR=Math.min(devicePixelRatio||1,1.75); W=c.width=Math.round(innerWidth*BGDPR); H=c.height=Math.round(innerHeight*BGDPR); }
-  function initNet(){ size(); var n=Math.min(66,Math.floor(innerWidth/24)); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*BGDPR,vy:(Math.random()-.5)*.14*BGDPR}); }
+  function initNet(){ size(); var n=Math.min(narrow?16:66,Math.floor(innerWidth/(narrow?36:24))); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*BGDPR,vy:(Math.random()-.5)*.14*BGDPR}); }
   function draw(){
     x.clearRect(0,0,W,H);
     for(var i=0;i<pts.length;i++){
@@ -870,6 +1298,7 @@ Best,
       for(var j=i+1;j<pts.length;j++){ var q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=dx*dx+dy*dy,R=140*BGDPR; if(d<R*R){ var a=(1-Math.sqrt(d)/R)*.2; x.strokeStyle='rgba('+NL+','+a+')'; x.lineWidth=1*BGDPR; x.beginPath(); x.moveTo(p.x,p.y); x.lineTo(q.x,q.y); x.stroke(); } }
       x.fillStyle='rgba('+NET+','+NA+')'; x.beginPath(); x.arc(p.x,p.y,1.3*BGDPR,0,6.283); x.fill();
     }
+    if(narrow || document.hidden){ raf=0; return; }
     raf=requestAnimationFrame(draw);
   }
   readNetColors();
@@ -890,12 +1319,412 @@ Best,
     // switched away and back quickly) landing inside that idle/timeout
     // window must not call draw() against an uninitialized point set.
     var netStarted=false;
-    var startNet=function(){ netStarted=true; initNet(); draw(); };
+    var startNet=function(){ netStarted=true; narrow=matchMedia('(max-width:640px)').matches; initNet(); draw(); };
     if('requestIdleCallback' in window) requestIdleCallback(startNet,{timeout:1500});
     else setTimeout(startNet,200);
-    addEventListener('resize',function(){ if(!netStarted)return; if(raf)cancelAnimationFrame(raf); initNet(); draw(); });
+    addEventListener('resize',function(){ if(!netStarted)return; narrow=matchMedia('(max-width:640px)').matches; if(raf)cancelAnimationFrame(raf); raf=0; initNet(); draw(); });
   } else { size(); }
-  document.addEventListener('visibilitychange',function(){ if(document.hidden){ if(raf)cancelAnimationFrame(raf); } else if(!rm && netStarted){ if(raf)cancelAnimationFrame(raf); draw(); } });
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ if(raf)cancelAnimationFrame(raf); raf=0; } else if(!rm && netStarted && !narrow){ if(raf)cancelAnimationFrame(raf); draw(); } });
+
+  /* Infinite CSS motion (blobs, marquee, demo loop, orbs) pauses once its
+     section leaves the viewport. Desktop still runs the motion while you
+     can see it. Reduced motion is already animation:none in home.css. */
+  (function(){
+    if(rm || !('IntersectionObserver' in window)) return;
+    var roots=document.querySelectorAll('#hero, #legal-demo, #challenge, #actiongraph, #dualcore, #trust, #waitlist');
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ e.target.classList.toggle('motion-off', !e.isIntersecting); });
+    }, {rootMargin:'80px 0px'});
+    Array.prototype.forEach.call(roots, function(el){ io.observe(el); });
+  })();
+
+  /* ---------- Action Graph: scroll-driven canvas (chaos -> ordered knowledge graph).
+     Deliberately NOT a <video>: on iOS a scrubbed video never paints a frame while
+     Low Power Mode blocks autoplay, so the whole section rendered blank. Canvas has
+     no codec, no autoplay policy and no decode step — it draws everywhere. ---------- */
+  (function(){
+    var cv=document.getElementById('agraphCanvas'); if(!cv||!cv.getContext) return;
+    var g=cv.getContext('2d'); if(!g) return;
+    var stage=cv.parentNode;
+    var EXP='214,228,255', TEAM='82,132,255', LINE='59,116,255', DIM='120,140,185';
+
+    function agColors(){
+      var cs=getComputedStyle(root);
+      EXP=(cs.getPropertyValue('--ag-exp')||EXP).trim();
+      TEAM=(cs.getPropertyValue('--ag-team')||TEAM).trim();
+      LINE=(cs.getPropertyValue('--ag-line')||LINE).trim();
+      DIM=(cs.getPropertyValue('--ag-dim')||DIM).trim();
+    }
+    window.__agraphColors=function(){ agColors(); render(); };
+
+    /* deterministic PRNG — the layout must be byte-identical across resizes and
+       reloads, otherwise the graph reshuffles every time the viewport changes. */
+    function rng(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+
+    /* True 3D now: every node carries ox/oy/oz (its settled position) and
+       cx/cy/cz (where it starts, scattered). A fixed camera tilt plus a slow
+       yaw — partly ambient, partly driven by scroll progress — means the
+       structure is never viewed flat-on, and scrolling visibly turns it
+       rather than only revealing it. Perspective divide handles size/depth;
+       a painter's-algorithm sort keeps near nodes correctly over far ones. */
+    /* Cone-of-knowledge lattice: a single apex (the senior expert's judgment)
+       radiating down through widening rings to a broad base (the whole team).
+       Meridian edges are the radial lines from apex to rim; ring edges are the
+       latitude lines crossing them — together they read as a glowing conical
+       mesh rather than the earlier hub-and-spoke cluster. */
+    var NODES=[], EDGES=[], RINGS=6, COLS=16;
+    (function build(){
+      var r=rng(20260905);
+      NODES.push({ox:0,oy:-.60,oz:0,rad:9,kind:'core',d:0});
+      var rowStart=[];
+      for(var k=1;k<RINGS;k++){
+        rowStart.push(NODES.length);
+        var t=k/(RINGS-1), y=-.60+t*1.18, rad=t*.56, twist=k*.11;
+        var kind = k===RINGS-1 ? 'team' : k===1 ? 'hub' : 'leaf';
+        var nodeRad = k===RINGS-1 ? 5 : k===1 ? 6 : 3+(RINGS-1-k)*.4;
+        for(var i=0;i<COLS;i++){
+          var a=-Math.PI/2+twist+i*(Math.PI*2/COLS), jit=(r()-.5)*.02;
+          NODES.push({ox:Math.cos(a)*rad,oy:y+jit,oz:Math.sin(a)*rad,rad:nodeRad,kind:kind,d:t*.62});
+        }
+      }
+      for(var i=0;i<COLS;i++) EDGES.push({a:0,b:rowStart[0]+i,d:.08,w:1.5,spine:true});
+      for(var k=0;k<rowStart.length-1;k++){
+        var d=.10+k*.10;
+        for(var i=0;i<COLS;i++) EDGES.push({a:rowStart[k]+i,b:rowStart[k+1]+i,d:d,w:1.15,spine:k<2});
+      }
+      for(var k=0;k<rowStart.length;k++){
+        var d2=.16+k*.10;
+        for(var i=0;i<COLS;i++) EDGES.push({a:rowStart[k]+i,b:rowStart[k]+((i+1)%COLS),d:d2,w:.9,beam:k===rowStart.length-1});
+      }
+      for(var n=0;n<NODES.length;n++){
+        var q=NODES[n];
+        /* chaos start: a scattered 3D cloud filling the view volume, not a flat scatter */
+        q.cx=(r()-.5)*1.15; q.cy=(r()-.5)*.9; q.cz=(r()-.5)*1.15; q.ph=r()*6.283; q.sp=.5+r()*.9;
+      }
+    })();
+
+    var W=0,H=0,DPR=1,prog=0,live=false,raf=null,t0=(typeof performance!=='undefined'?performance.now():Date.now());
+    var TILT=-.30, TCOS=Math.cos(TILT), TSIN=Math.sin(TILT), CAM=2.35, FOG='7,9,15';
+
+    function size(){
+      /* cap DPR: a full-bleed 2x+ canvas is the kind of layer that gets dropped
+         under compositor memory pressure on phones. */
+      DPR=Math.min(devicePixelRatio||1,2);
+      var w=stage.clientWidth||1, h=stage.clientHeight||1;
+      W=Math.max(1,Math.round(w*DPR)); H=Math.max(1,Math.round(h*DPR));
+      if(cv.width!==W) cv.width=W;
+      if(cv.height!==H) cv.height=H;
+      fit();
+    }
+
+    /* Auto-fit. The lattice is taller (1.18 units apex-to-base) than it is wide,
+       so scaling both axes by min(W,H) — as this did before — overflowed the
+       short axis of a wide, low canvas by ~18%: the apex was drawn above the
+       top edge and the base below the bottom one, which is what made the graph
+       look cropped rather than composed. Worse, yaw drifts continuously (see
+       yaw()), so the projected width changes as it turns and any scale derived
+       from a single orientation clips at some other one.
+
+       So: sample a full revolution once, take the worst-case projected bounding
+       box over every orientation AND over both ends of the settle animation,
+       and derive one stable scale and centre offset from it. Worst-case over
+       the whole revolution is what makes it stable — re-fitting per frame would
+       keep it tight, but the graph would visibly breathe as it rotated. */
+    var FITS=1, FITX=0, FITY=0, NSC=1;
+    function fit(){
+      var minx=1e9,maxx=-1e9,miny=1e9,maxy=-1e9,i,s,k;
+      for(s=0;s<48;s++){
+        var ya=s*(Math.PI*2/48), cy=Math.cos(ya), sy=Math.sin(ya);
+        for(i=0;i<NODES.length;i++){
+          var n=NODES[i];
+          for(k=0;k<2;k++){
+            var x=k?n.ox:n.cx, y=k?n.oy:n.cy, z=k?n.oz:n.cz;
+            var x1=x*cy+z*sy, z1=-x*sy+z*cy;
+            var y2=y*TCOS-z1*TSIN, z2=y*TSIN+z1*TCOS;
+            var f=CAM/(CAM+z2), ax=x1*f, ay=y2*f;
+            if(ax<minx)minx=ax; if(ax>maxx)maxx=ax;
+            if(ay<miny)miny=ay; if(ay>maxy)maxy=ay;
+          }
+        }
+      }
+      var bw=Math.max(1e-6,maxx-minx), bh=Math.max(1e-6,maxy-miny);
+      /* Reserve room for the node glow, but only the part of it that actually
+         reads: the halo is a radial gradient falling to full transparency at
+         4.6x the radius, and its outer third is already below perceptual
+         threshold, so reserving the whole 4.6x just shrinks the lattice for
+         pixels nobody can see. 2.4x keeps every visible part of the glow. */
+      var pad=9*DPR*2.4+8*DPR;
+      FITS=Math.min(Math.max(1,W-pad*2)/bw, Math.max(1,H-pad*2)/bh);
+      FITX=W/2-((minx+maxx)/2)*FITS;
+      FITY=H/2-((miny+maxy)/2)*FITS;
+      /* node radii were tuned against the old desktop scale; keep them
+         proportional so the lattice reads the same on a phone as on a monitor */
+      NSC=Math.max(.5,Math.min(1.4,FITS/850));
+    }
+
+    function scrollProg(){
+      var b=stage.getBoundingClientRect();
+      /* the arc must complete while the section is still centred on screen —
+         the earlier mapping only finished after the graph had scrolled away, so
+         visitors never saw the ordered state. */
+      var travel=Math.max(1,innerHeight*.86);
+      return Math.max(0,Math.min(1,(innerHeight-b.top)/travel));
+    }
+
+    function ease(t){ return t<0?0:t>1?1:t*t*(3-2*t); }
+
+    function yaw(p,tm){ return (rm?0:tm*.00005) + p*1.05; }
+
+    function project(x,y,z,ya){
+      /* Yaw FIRST, about the lattice's own vertical axis, then tilt the camera.
+         The reverse order (tilt, then yaw on the already-tilted coordinates)
+         rotates about the camera's Y, which is no longer the cone's axis once
+         the camera is tilted — so the cone sheared sideways as it turned, apex
+         drifting one way and base the other, instead of spinning in place.
+         That shear was the whole reason the shape read as lopsided. */
+      var cy=Math.cos(ya), sy=Math.sin(ya);
+      var x1=x*cy+z*sy, z1=-x*sy+z*cy;
+      var y2=y*TCOS-z1*TSIN, z2=y*TSIN+z1*TCOS;
+      var f=CAM/(CAM+z2);
+      return [FITX+x1*f*FITS, FITY+y2*f*FITS, f, z2];
+    }
+
+    function px(node,p,tm,ya){
+      var e=ease((p-node.d)/Math.max(.18,.72-node.d*.45)),
+          /* residual drift, strongest while scattered, a slow breath once settled */
+          amp=(1-e*.86)*.02,
+          dx=Math.cos(tm*.00042*node.sp+node.ph)*amp,
+          dy=Math.sin(tm*.00037*node.sp+node.ph*1.7)*amp,
+          dz=Math.sin(tm*.00031*node.sp+node.ph*2.3)*amp,
+          x=node.cx+(node.ox-node.cx)*e+dx,
+          y=node.cy+(node.oy-node.cy)*e+dy,
+          z=node.cz+(node.oz-node.cz)*e+dz,
+          P=project(x,y,z,ya);
+      return [P[0],P[1],P[2],P[3],e];
+    }
+
+    function fogMix(col,f){
+      var amt=Math.max(0,Math.min(1,(1-f)*2.2));
+      if(!amt) return col;
+      var c=col.split(','), g0=FOG.split(',');
+      return Math.round(+c[0]+(+g0[0]-c[0])*amt)+','+Math.round(+c[1]+(+g0[1]-c[1])*amt)+','+Math.round(+c[2]+(+g0[2]-c[2])*amt);
+    }
+
+    function render(){
+      raf=null;
+      if(!W||!H) size();
+      var tm=(typeof performance!=='undefined'?performance.now():Date.now())-t0;
+      if(rm) tm=0;
+      var p=prog, i, pos=new Array(NODES.length), ya=yaw(p,tm);
+      for(i=0;i<NODES.length;i++) pos[i]=px(NODES[i],p,tm,ya);
+
+      g.clearRect(0,0,W,H);
+      g.lineCap='round';
+
+      for(i=0;i<EDGES.length;i++){
+        var ed=EDGES[i], t=(p-ed.d)/.16;
+        if(t<=0) continue; if(t>1) t=1;
+        var A=pos[ed.a], B=pos[ed.b], favg=(A[2]+B[2])/2;
+        /* Edges used to draw as soon as scroll passed their delay threshold,
+           connecting whatever screen position each endpoint's node happened
+           to be mid-flight through on its way from the scattered start to its
+           settled spot. Two still-drifting nodes are rarely anywhere near
+           their final relative position, so the connecting line was, most of
+           the time, a long diagonal to nowhere — with dozens of edges doing
+           this at once mid-scroll, the whole thing read as tangled scribble
+           rather than a graph. Gating visibility on how *settled* the more
+           mobile endpoint is (settle, 0..1) means a line only becomes visible
+           once both ends have essentially arrived, so structure appears as
+           resolved clusters rather than crossing static the entire way there. */
+        var settle=Math.min(A[4],B[4]), svis=Math.max(0,(settle-.42)/.58); svis*=svis;
+        if(svis<=0) continue;
+        var ex=A[0]+(B[0]-A[0])*t, ey=A[1]+(B[1]-A[1])*t;
+        g.strokeStyle='rgba('+fogMix(LINE,favg)+','+(t*(ed.spine?.62:ed.beam?.46:.34)*Math.max(.35,favg)*svis).toFixed(3)+')';
+        g.lineWidth=ed.w*DPR*NSC*Math.max(.5,favg);
+        g.beginPath(); g.moveTo(A[0],A[1]); g.lineTo(ex,ey); g.stroke();
+        /* once an edge is complete, a signal keeps travelling it — this is the
+           "replicated to every teammate" beat, and it is what makes the graph
+           read as running infrastructure rather than a static diagram. */
+        if(t===1 && !rm && p>.5 && svis>.6){
+          var ph=((tm*.00028)+i*.137)%1, gx=A[0]+(B[0]-A[0])*ph, gy=A[1]+(B[1]-A[1])*ph;
+          var fade=Math.min(1,(p-.5)/.18)*(1-Math.abs(ph-.5)*1.1);
+          if(fade>0){
+            g.fillStyle='rgba('+fogMix(TEAM,favg)+','+(fade*.85*Math.max(.4,favg)).toFixed(3)+')';
+            g.beginPath(); g.arc(gx,gy,1.5*DPR*NSC*Math.max(.5,favg),0,6.283); g.fill();
+          }
+        }
+      }
+
+      /* painter's algorithm: far nodes first so near ones correctly sit in front */
+      var order=new Array(NODES.length);
+      for(i=0;i<NODES.length;i++) order[i]=i;
+      order.sort(function(a,b){ return pos[b][3]-pos[a][3]; });
+
+      for(var oi=0;oi<order.length;oi++){
+        i=order[oi];
+        var nd=NODES[i], P=pos[i], e=P[4], f=Math.max(.18,P[2]);
+        var col = fogMix(nd.kind==='team' ? TEAM : nd.kind==='leaf' ? DIM : EXP, P[2]);
+        var alpha = (nd.kind==='leaf' ? .32+e*.50 : .44+e*.54) * Math.max(.3,f);
+        var rr = nd.rad*DPR*NSC*(.62+e*.38)*f;
+
+        /* a soft, offset shadow beneath nodes near the camera — what actually
+           reads as "depth" is nearby things casting weight, not just fading
+           distant ones out. */
+        var shOff=rr*1.1*Math.max(0,f-.7)*3;
+        if(shOff>.3){
+          var shg=g.createRadialGradient(P[0]+shOff*.5,P[1]+shOff*.7,0,P[0]+shOff*.5,P[1]+shOff*.7,rr*2.4);
+          shg.addColorStop(0,'rgba(2,4,10,'+(.32*Math.min(1,f-.6)).toFixed(3)+')');
+          shg.addColorStop(1,'rgba(2,4,10,0)');
+          g.fillStyle=shg; g.beginPath(); g.arc(P[0]+shOff*.5,P[1]+shOff*.7,rr*2.4,0,6.283); g.fill();
+        }
+
+        if(nd.kind==='core'||nd.kind==='hub'||nd.kind==='team'){
+          var halo=g.createRadialGradient(P[0],P[1],0,P[0],P[1],rr*4.6);
+          halo.addColorStop(0,'rgba('+col+','+(e*(nd.kind==='core'?.40:.24)*f).toFixed(3)+')');
+          halo.addColorStop(1,'rgba('+col+',0)');
+          g.fillStyle=halo; g.beginPath(); g.arc(P[0],P[1],rr*4.6,0,6.283); g.fill();
+        }
+        g.fillStyle='rgba('+col+','+Math.max(0,alpha).toFixed(3)+')';
+        g.beginPath(); g.arc(P[0],P[1],rr,0,6.283); g.fill();
+      }
+
+      if(live && !rm) raf=requestAnimationFrame(render);
+    }
+
+    function schedule(){ if(!raf) raf=requestAnimationFrame(render); }
+    function start(){ if(live) return; live=true; schedule(); }
+    function stop(){ live=false; if(raf){ cancelAnimationFrame(raf); raf=null; } }
+
+    agColors();
+    size();
+    prog=rm?1:scrollProg();
+    /* Below the fold on a phone, this first frame is main-thread work (a
+       radial gradient per node) during the load window. Paint it now only
+       if the stage is already on screen; the observer below draws the first
+       frame when the visitor actually reaches it. */
+    if(rm || stage.getBoundingClientRect().top < innerHeight + 120) render();
+
+    if(rm){
+      /* reduced motion: one static frame of the finished graph, no rAF at all */
+      addEventListener('resize',function(){ size(); prog=1; render(); });
+      return;
+    }
+
+    addEventListener('scroll',function(){ prog=scrollProg(); if(!live) schedule(); },{passive:true});
+    addEventListener('resize',function(){ size(); prog=scrollProg(); schedule(); });
+    if('IntersectionObserver' in window){
+      new IntersectionObserver(function(es){
+        es.forEach(function(e){ if(e.isIntersecting){ prog=scrollProg(); start(); } else stop(); });
+      },{threshold:0}).observe(stage);
+    } else { start(); }
+    document.addEventListener('visibilitychange',function(){ if(document.hidden) stop(); else if(stage.getBoundingClientRect().top<innerHeight) start(); });
+  })();
+
+  /* ---------- dual-core sector carousel (window + tasks cycle per sector, synced to the 6s demo loop) ---------- */
+  (function(){
+    var wt=document.getElementById('winTitle'), tag=document.getElementById('winTag'), val=document.getElementById('winVal');
+    var steps=document.querySelectorAll('.demo-steps li'), chip=document.querySelector('.demo-chip');
+    if(!wt||!tag||!val||!steps.length) return;
+    var scenes=[
+      {title:'Contract.pdf',        tag:'MASKED · PII',         val:'•••• 4821', tasks:['demo.s1','demo.s2','demo.s3']},
+      {title:'Ledger_Q2_Final.xlsx', tag:'MASKED · REVENUE',     val:'•••• 4821', tasks:['Reconcile ledger entries','Cross-reference banking portal','Generate fiscal report']},
+      {title:'Appraisal_Report.pdf', tag:'MASKED · ASSET VALUE', val:'•••• 9021', tasks:['Verify risk parameters','Update properties database','Notify regional inspector']}
+    ];
+    var i=0;
+    function taskLabel(t){ return (I18N[t] && I18N[t][curLang]) ? I18N[t][curLang] : t; }
+    function apply(s){ wt.textContent=s.title; tag.textContent=s.tag; val.textContent=s.val; for(var k=0;k<steps.length;k++) if(s.tasks[k]) steps[k].textContent=taskLabel(s.tasks[k]); }
+    apply(scenes[0]);
+    if(rm || !chip) return;
+    /* advance at each 6s loop boundary (content is faded out there → seamless swap) */
+    chip.addEventListener('animationiteration', function(){ i=(i+1)%scenes.length; apply(scenes[i]); });
+  })();
+
+  /* ---------- border beam: rAF-driven --beam-a angle per card (see .beam-wrap CSS) ---------- */
+  (function(){
+    var wraps=document.querySelectorAll('.beam-wrap'); if(!wraps.length) return;
+    if(rm) return; /* CSS default --beam-a:40deg already gives a static lit border */
+    var SPEED=26; /* deg/s — constant, no hover acceleration */
+    var items=Array.prototype.map.call(wraps,function(w,i){ return {el:w, angle:(i*137.508)%360}; });
+    var raf=0, last=null;
+    function frame(ts){
+      if(last==null) last=ts;
+      var dt=Math.min(0.05,(ts-last)/1000); last=ts;
+      var any=false;
+      for(var i=0;i<items.length;i++){
+        var it=items[i]; if(!it.onScreen) continue;
+        any=true;
+        it.angle=(it.angle+SPEED*dt)%360;
+        it.el.style.setProperty('--beam-a', it.angle.toFixed(2)+'deg');
+      }
+      raf=any?requestAnimationFrame(frame):0;
+    }
+    function kick(){ if(!raf){ last=null; raf=requestAnimationFrame(frame); } }
+    /* Off until the observer reports them. Starting true kept a rAF loop
+       running for every card, including ones below the fold, from the first
+       line of this script. The CSS default --beam-a still draws a lit border. */
+    if(!('IntersectionObserver' in window)){
+      items.forEach(function(it){ it.onScreen=true; });
+      kick();
+      return;
+    }
+    var io=new IntersectionObserver(function(es){ es.forEach(function(e){
+      var it=items.filter(function(x){return x.el===e.target;})[0];
+      if(!it) return;
+      it.onScreen=e.isIntersecting;
+      if(e.isIntersecting) kick();
+    }); },{threshold:0});
+    items.forEach(function(it){ it.onScreen=false; io.observe(it.el); });
+  })();
+
+  /* ---------- performance stats: circular carousel (arc layout, counter, nav, autoplay) ---------- */
+  (function(){
+    var stage=document.getElementById('statsCarousel'); if(!stage) return;
+    var track=document.getElementById('ccTrack'), numEl=document.getElementById('ccNum'), dotsWrap=document.getElementById('ccDots');
+    var cards=Array.prototype.slice.call(track.querySelectorAll('.cc-card'));
+    var total=cards.length, active=0, hovered=false, focused=false, timer=null;
+    cards.forEach(function(c,i){
+      var dot=document.createElement('button');
+      dot.type='button'; dot.setAttribute('role','tab'); dot.setAttribute('aria-label','Go to metric '+(i+1));
+      dot.addEventListener('click', function(){ goTo(i); });
+      dotsWrap.appendChild(dot);
+      c.addEventListener('click', function(){ goTo(i); });
+    });
+    var dots=Array.prototype.slice.call(dotsWrap.children);
+    function layout(){
+      var rect=stage.querySelector('.cc-stage').getBoundingClientRect();
+      var RX=Math.min(230, rect.width*0.3), RY=Math.min(78, rect.width*0.11);
+      cards.forEach(function(c,i){
+        var offset=i-active;
+        if(offset>total/2) offset-=total;
+        if(offset<-total/2) offset+=total;
+        var angle=(offset/total)*Math.PI;
+        var x=Math.sin(angle)*RX, y=-Math.cos(angle)*RY;
+        var d=Math.abs(offset);
+        var scale=Math.max(.72,1-d*.22), opacity=Math.max(.35,1-d*.6), z=10-d;
+        c.style.transform='translate(-50%,-50%) translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px) scale('+scale.toFixed(3)+')';
+        c.style.opacity=opacity;
+        c.style.zIndex=z;
+        c.classList.toggle('is-active', i===active);
+        c.setAttribute('aria-selected', i===active ? 'true' : 'false');
+      });
+      dots.forEach(function(d,i){ d.classList.toggle('active', i===active); });
+      numEl.textContent=String(active+1).padStart(2,'0');
+    }
+    function goTo(i){ active=((i%total)+total)%total; layout(); }
+    document.getElementById('ccPrev').addEventListener('click', function(){ goTo(active-1); });
+    document.getElementById('ccNext').addEventListener('click', function(){ goTo(active+1); });
+    stage.addEventListener('keydown', function(e){
+      if(e.key==='ArrowLeft'){ goTo(active+(document.dir==='rtl'?1:-1)); }
+      if(e.key==='ArrowRight'){ goTo(active+(document.dir==='rtl'?-1:1)); }
+    });
+    stage.addEventListener('pointerenter', function(){ hovered=true; });
+    stage.addEventListener('pointerleave', function(){ hovered=false; });
+    stage.addEventListener('focusin', function(){ focused=true; });
+    stage.addEventListener('focusout', function(){ focused=false; });
+    layout();
+    addEventListener('resize', layout);
+    if(!rm){ timer=setInterval(function(){ if(!hovered && !focused) goTo(active+1); }, 4200); }
+  })();
 
   /* ---------- legal demo modal: 6-step state machine ---------- */
   (function(){
@@ -998,8 +1827,22 @@ Best,
     document.head.appendChild(railStyle);
   })();
 
+  var langBtn=document.getElementById('langBtn');
+  function syncLangBtn(){
+    if(!langBtn) return;
+    langBtn.textContent = curLang==='he' ? 'EN' : 'עב';
+    langBtn.setAttribute('aria-pressed', curLang==='he' ? 'true' : 'false');
+  }
+  if(langBtn) langBtn.addEventListener('click', function(){
+    var next = curLang==='he' ? 'en' : 'he';
+    try{ localStorage.setItem('flow_lang', next); }catch(e){}
+    applyLang(next);
+    syncLangBtn();
+  });
+
   /* init */
   applyLang(curLang);
+  syncLangBtn();
   document.querySelector('.grid-scan[data-anim]') && document.querySelector('.grid-scan[data-anim]').classList.add('anim');
 })();
 </script>

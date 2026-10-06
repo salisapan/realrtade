@@ -2995,13 +2995,29 @@ function lmServerLoopback(url) {
   return h === '127.0.0.1' || h === 'localhost' || h === '[::1]' || h === '::1';
 }
 
+// Must match core/local-lm-server.js schemaHint: name the JSON keys (esp. act) in the prompt.
+function lmServerSchemaHint(schema) {
+  if (!schema || typeof schema !== 'object') return '';
+  const props = schema.properties || {};
+  const keys = Object.keys(props);
+  if (!keys.length) return '';
+  const lines = keys.map((k) => {
+    const p = props[k] || {};
+    if (Array.isArray(p.enum)) return k + ': one of ' + p.enum.join('|');
+    if (Array.isArray(p.type)) return k + ': ' + p.type.join('|');
+    if (p.type) return k + ': ' + p.type;
+    return k;
+  });
+  return 'Return one JSON object with exactly these keys:\n' + lines.join('\n') + '\n\n';
+}
+
 async function lmServerPromptNow(text, schema) {
   const stored = await new Promise((r) => chrome.storage.local.get('localLmServer', r));
   const c = stored && stored.localLmServer;
   if (!c || c.enabled !== true || !c.model || !c.status) return { ok: false, reason: 'off' };
   const base = String(c.baseUrl || (c.provider === 'lmstudio' ? 'http://127.0.0.1:1234' : 'http://127.0.0.1:11434')).replace(/\/+$/, '');
   if ((c.provider !== 'ollama' && c.provider !== 'lmstudio') || !lmServerLoopback(base)) return { ok: false, reason: 'refused' };
-  const content = String(text || '').slice(0, 4000);
+  const content = (lmServerSchemaHint(schema) + String(text || '')).slice(0, 4000);
   let url, body;
   if (c.provider === 'ollama') {
     url = base + '/api/chat';

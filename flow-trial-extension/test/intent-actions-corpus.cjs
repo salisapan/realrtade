@@ -1076,6 +1076,20 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['soft if possible + invoice', 'If possible, could you send the invoice?'],
     ['soft optional follow up', 'Optional: please follow up with Dana about the invoice if you want.'],
     ['soft Hebrew maybe + invoice', 'אולי תוכל לשלוח את החשבונית?'],
+    ['HE reader-decision please-approve proposal', 'בבקשה תאשר את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['HE reader-decision na-approve proposal', 'נא לאשר את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['HE reader-decision can-you-approve proposal', 'תוכל לאשר את ההצעה על סך 3,900 שקל עד יום שני?'],
+    ['HE reader-decision please-approve feminine', 'בבקשה תאשרי את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['HE reader-decision formal ana-approve', 'אנא אשר את ההצעה על סך 3,900 שקל עד יום שני.'],
+    ['EN reader-decision please-accept proposal', 'Please accept the $18,000 proposal by Monday and route it to the legal team for the paperwork this week.'],
+    ['soft HE if-you-can send invoice', 'במידה ותוכל, תשלח לי את החשבונית עד יום שישי.'],
+    ['soft HE assuming send invoice', 'בהנחה שתספיק, תשלח לי את החשבונית עד יום שישי.'],
+    ['soft HE subject-to send invoice', 'בכפוף לאישור הצוות, תשלח לי את החשבונית עד יום שישי.'],
+    ['soft HE whenever-you send invoice', 'כשיהיה לך זמן, תשלח לי את החשבונית עד יום שישי.'],
+    ['soft HE when-convenient send invoice', 'מתי שנוח לך, תשלח לי את החשבונית עד יום שישי.'],
+    ['soft EN provided-that send contract', 'Provided that legal is fine with it, could you send the contract by Friday?'],
+    ['soft EN subject-to send invoice', 'Subject to your approval, could you send the invoice by Friday?'],
+    ['soft EN assuming send invoice', 'Assuming the numbers still hold, could you send the invoice by Friday?'],
     ['soft maybe + priced future ask', 'Could you maybe send the $4,200 invoice by October 2 for the contract renewal we discussed with the vendor last week?'],
     ['FYI dated agreement', 'FYI, we agreed to file the amendment by September 21.'],
     ['FYI confirmed amount', 'FYI the amount is confirmed at $4,200 for the year.'],
@@ -1112,6 +1126,10 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['explicit follow-up', 'Please follow up with Dana about the outstanding invoice.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['confirmed amount', 'Confirming the fee is $8,750.', FlowIntent.TYPES.DECISION_TO_LOG, 'confirmed-amount'],
     ['polite ask, not a soft one', 'Please send the invoice when you get a chance.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['Hebrew hard send ask', 'תשלח לי את החשבונית עד יום שישי בבקשה.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['Hebrew please-send still a request', 'בבקשה תשלח לי את החשבונית עד יום שישי.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['Hebrew soft opener, then a hard send', 'במידה ותוכל, תשלח לי את הטיוטה. בבקשה תשלח את החשבונית עד יום שישי.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['EN soft opener, then a hard send', 'If possible, could you send the draft? Please send the invoice by Friday, September 18.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['reader reminder, not a calendar notice', 'As a reminder, you agreed to send the invoice by Friday, September 18.', FlowIntent.TYPES.COMMITMENT_OF_READER, null],
     ['current ask that mentions a past due date', 'Please send the receipt for the invoice that was due March 3, 2024.', FlowIntent.TYPES.REQUEST, 'follow-up-ask']
   ];
@@ -1121,6 +1139,18 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
       type: intent.type, personalClose: intent.personalClose, score: intent.signals && intent.signals.score
     });
     check('show Do It chip: ' + label, FlowIntent.shouldShowChip(intent) === true, intent.confidence);
+  }
+
+  // A conditional opener is not the close when a later sentence asks plainly.
+  {
+    const laterHe = classify('במידה ותוכל, תשלח לי את הטיוטה. בבקשה תשלח את החשבונית עד יום שישי.');
+    check('a later Hebrew send is the ask, not the conditional opener',
+      laterHe && laterHe.entities && /חשבונית/.test(laterHe.entities.what || '') && !/טיוטה/.test(laterHe.entities.what || ''),
+      laterHe && laterHe.entities && laterHe.entities.what);
+    const laterEn = classify('If possible, could you send the draft? Please send the invoice by Friday, September 18.');
+    check('a later English send is the ask, not the conditional opener',
+      laterEn && laterEn.entities && /invoice/i.test(laterEn.entities.what || '') && !/draft/i.test(laterEn.entities.what || ''),
+      laterEn && laterEn.entities && laterEn.entities.what);
   }
 
   // The ask is current. The March 2024 day is why the invoice was late,

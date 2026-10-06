@@ -56,9 +56,10 @@ const FlowLocalLM = (() => {
 
   // Two differently worded sets of instructions. The answers must match.
   const DEFS_A = 'Classify ONE sentence from an email written by the person who is sending it.\n' +
-    'ASK = the writer asks the reader to do something or to answer (a request or a question that needs an answer).\n' +
-    'PROMISE = the writer commits to doing something themselves.\n' +
-    'INFORM = a statement of fact or news. ACK = thanks, a greeting or a courtesy.\n' +
+    'Return JSON with keys act, action, who, when, amount.\n' +
+    'act = ASK when the writer asks the reader to do something or to answer (a request or a question that needs an answer).\n' +
+    'act = PROMISE when the writer commits to doing something themselves.\n' +
+    'act = INFORM for a statement of fact or news. act = ACK for thanks, a greeting or a courtesy.\n' +
     'action = what must be done: pay, sign, approve, confirm, schedule, decide, review, join, complete, send, reply, or none.\n' +
     'who = who has to do it: you (the reader), me (the writer), other, or none.\n' +
     'when = the date or time words exactly as written in the sentence, or null. amount = the money exactly as written, or null.\n' +

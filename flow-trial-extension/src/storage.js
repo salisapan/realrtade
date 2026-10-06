@@ -823,10 +823,21 @@ const FlowStorage = (() => {
     if (JSON.stringify(current) !== JSON.stringify(applied.state)) {
       await set({ closeQuality: applied.state });
     }
-    // Trusted close: the same full write (Handled.) and the same Undo.
-    // A dismiss is a false-Do-It and is not an Undo of a write.
+    // Trusted close: a Free Gmail→Google full write whose receipt said
+    // Handled. noteHandled drops anything else. A dismiss is a
+    // false-Do-It and is not an Undo of a write.
     if (event.kind === 'success') {
-      await writeQuiet((s) => FlowQuietMetrics.noteHandled(s, { messageId: event.messageId, ts: ts }));
+      await writeQuiet((s) => FlowQuietMetrics.noteHandled(s, {
+        messageId: event.messageId,
+        ts: ts,
+        app: event.app,
+        product: event.product,
+        proposed: event.proposed,
+        succeeded: event.succeeded,
+        receiptFull: event.receiptFull,
+        receiptStatus: event.receiptStatus,
+        kinds: event.kinds
+      }));
     } else if (event.kind === 'falseDoIt' && event.reason === 'undo') {
       await writeQuiet((s) => FlowQuietMetrics.noteUndo(s, { messageId: event.messageId }));
     }

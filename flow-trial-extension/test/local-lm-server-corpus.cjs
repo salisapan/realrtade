@@ -71,9 +71,10 @@ const eagerModel = () => JSON.stringify({ act: 'ASK', action: 'review', who: 'yo
   const lOut = await lSess.prompt(LM.promptFor(probe, 'A'), SCHEMA);
   check('Ollama: /api/chat, the schema as `format`, no streaming, temperature 0', ollama.seen[0].url === '/api/chat' && JSON.stringify(ollama.seen[0].body.format) === JSON.stringify(SCHEMA) && ollama.seen[0].body.stream === false && ollama.seen[0].body.options.temperature === 0 && ollama.seen[0].body.model === 'llama3:8b', ollama.seen[0]);
   check('LM Studio: /v1/chat/completions, the schema as a strict json_schema response format, temperature 0', lm.seen[0].url === '/v1/chat/completions' && lm.seen[0].body.response_format.type === 'json_schema' && lm.seen[0].body.response_format.json_schema.strict === true && lm.seen[0].body.temperature === 0, lm.seen[0]);
+  check('server prompt names the act key in the schema hint', /Return one JSON object with exactly these keys/.test(ollama.seen[0].body.messages[0].content) && /\bact: one of ASK\|PROMISE\|INFORM\|ACK\b/.test(ollama.seen[0].body.messages[0].content) && /Sentence: /.test(ollama.seen[0].body.messages[0].content), ollama.seen[0].body.messages[0].content.slice(0, 200));
   check('both come back as the text core/local-lm.js parses', LM.parse(oOut) !== null && LM.parse(lOut) !== null, { oOut, lOut });
   check('no key, no cookie, no custom header is ever sent', [ollama.seen[0], lm.seen[0]].every((r) => !r.origin));
-  check('the prompt is bounded', (() => { const r = S.chatRequest(S.normalizeConfig({ provider: 'ollama', model: 'm' }), 'x'.repeat(50000)); return r.body.messages[0].content.length === 4000; })());
+  check('the prompt is bounded', (() => { const r = S.chatRequest(S.normalizeConfig({ provider: 'ollama', model: 'm' }), 'x'.repeat(50000), SCHEMA); return r.body.messages[0].content.length === 4000; })());
   const mo = await S.listModels({ provider: 'ollama', baseUrl: ollama.base }, { fetch });
   const ml = await S.listModels({ provider: 'lmstudio', baseUrl: lm.base }, { fetch });
   check('the picker lists what the server has (both dialects)', mo.ok && mo.models.join() === 'llama3:8b,gemma2:9b' && ml.ok && ml.models.join() === 'qwen2.5-7b-instruct', { mo, ml });

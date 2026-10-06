@@ -41,10 +41,28 @@ const FlowLocalLMServer = (() => {
     return { provider: p.id, baseUrl: base, model };
   }
 
+  // Tell the model the exact JSON keys (especially `act`) in the prompt itself. Constrained decoding alone
+  // is not enough: some servers ignore `format` / `response_format`, and prompt A historically named the
+  // classes without naming the key. Schema text is prepended so the caller's "Sentence: ..." still sits at the end.
+  function schemaHint(schema) {
+    if (!schema || typeof schema !== 'object') return '';
+    const props = schema.properties || {};
+    const keys = Object.keys(props);
+    if (!keys.length) return '';
+    const lines = keys.map((k) => {
+      const p = props[k] || {};
+      if (Array.isArray(p.enum)) return k + ': one of ' + p.enum.join('|');
+      if (Array.isArray(p.type)) return k + ': ' + p.type.join('|');
+      if (p.type) return k + ': ' + p.type;
+      return k;
+    });
+    return 'Return one JSON object with exactly these keys:\n' + lines.join('\n') + '\n\n';
+  }
+
   // The request for one prompt, per dialect. temperature 0: the same sentence must get the same answer.
   function chatRequest(cfg, text, schema) {
     const p = PROVIDERS[cfg.provider];
-    const content = String(text).slice(0, MAX_PROMPT_CHARS);
+    const content = (schemaHint(schema) + String(text)).slice(0, MAX_PROMPT_CHARS);
     if (p.id === 'ollama') {
       const body = { model: cfg.model, messages: [{ role: 'user', content }], stream: false, options: { temperature: 0 } };
       if (schema) body.format = schema;
@@ -137,7 +155,7 @@ const FlowLocalLMServer = (() => {
     return Boolean(saved && c && saved.model === c.model && saved.baseUrl === c.baseUrl && saved.provider === c.provider);
   }
 
-  return { PROVIDERS, DEFAULT_TIMEOUT_MS, isLoopbackUrl, normalizeConfig, chatRequest, replyText, modelNames, failure, session, listModels, originPattern, statusFits };
+  return { PROVIDERS, DEFAULT_TIMEOUT_MS, isLoopbackUrl, normalizeConfig, schemaHint, chatRequest, replyText, modelNames, failure, session, listModels, originPattern, statusFits };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowLocalLMServer };
