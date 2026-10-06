@@ -42,7 +42,9 @@ Same six steps, with no payment step (nothing here attests a payment): find what
 and close **only** when a message the person sent carries a real attachment named for it. With nothing to send and no template the card says, in one tap, "I will send it" and opens the loop, so the request is not lost
 and not marked done; the Do It chip no longer says "Handled." over an unsent draft for these asks. Never sends, issues or signs anything.
 
-Not built (needs connectors that do not exist): asking a colleague who holds the document, e-signature, a CRM. An invoice, a tax invoice and a statement keep the old chip until the receipt and document paths have been used on real mail.
+The same rule, for every other requirement, is one function (`core/close-chains.js`): derive what would close the loop (a file, a fact, a date, an approval, or an answer), search the connected sources the host already fetched, prepare a draft when exactly one of them holds it, and when every connected source was checked and none holds it, say what is missing and where it looked. One tap can draft a holding reply ("I'll send it by Thursday.") and open a promise. A template is not a file that was found. A draft, a holding reply, and a calendar event nobody has accepted are not closes. Glance does not issue an invoice.
+
+Not built (needs connectors that do not exist): asking a colleague who holds the document, e-signature, a CRM, and writing an unissued invoice draft into an invoicing system (Green Invoice / iCount). That last one is approved for the roadmap only (`docs/open-tasks.md` row 43), not now.
 
 ## 5. Before and after, as the person feels it
 
@@ -53,6 +55,7 @@ Not built (needs connectors that do not exist): asking a colleague who holds the
 | Hebrew "אעדכן" (I will update you) | closed | the chase moves out; the loop stays |
 | Someone asks you for the signed contract and a file is in Drive | the Do It chip drafts it and says "Handled." | one card: "Found X. Draft ready; it is not sent. Done when: a contract sent to Dana, as a real attachment." The loop closes when you send it with the file |
 | The same, no file anywhere | the chip may offer a blank template | "Write or sign it, send it, and I will close this when it goes out with the file." One tap keeps it open |
+| Someone asks for the invoice and it is not in Drive or this thread | a template card, which is not the invoice | "I could not find the invoice. I looked in Google Drive and this thread." One tap drafts "I'll send it by …" and opens a promise. Nothing is sent. The loop closes when you send a message with the file |
 
 ## 6. Known limits
 

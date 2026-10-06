@@ -695,8 +695,15 @@
 
     // A live chip already sitting in this exact node means there is nothing
     // to do — this is the fast path that avoids re-running judgment on every
-    // debounced mutation while a chip is already showing.
-    if (message.querySelector('.flow-chip-host')) return;
+    // debounced mutation while a chip is already showing. A needs-you card is
+    // the exception: the requirement may have shown up since the last look,
+    // so that card is rebuilt at most once a minute.
+    const chainHost = message.querySelector('.flow-chip-host[data-glance-chain="needs-you"]');
+    if (chainHost) {
+      const last = Number(chainHost.getAttribute('data-checked-at') || 0);
+      if (Date.now() - last < 60000) return;
+      chainHost.remove();
+    } else if (message.querySelector('.flow-chip-host')) return;
 
     const messageId = legacyId || hashNode(message);
     if (!messageId) return;
@@ -771,6 +778,7 @@
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
+    let chosenAttachment = attachment;
     let intent = await classifyForChip(text, {
       senderEmail: sender.email,
       senderName: sender.name,
@@ -879,38 +887,78 @@
       const searched = await new Promise((resolve) => {
         chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.query) }, resolve);
       });
-      const decision = FlowFileAttach.decide(fileGate.ask, searched && searched.ok ? searched.files : null, {
-        senderName: sender.name,
-        amount: intent.entities && intent.entities.amount,
-        when: intent.entities && intent.entities.when
-      }, text);
-      // No single file, and no single template: stay quiet. A conflict
-      // is the same silence — never a second guess, never a blank doc.
-      if (!decision || decision.action === 'silence') {
-        recordSilence(messageId, 'file');
-        return;
-      }
-      if (decision.action === 'create') {
-        injectCreateCard(message, {
-          messageId, intent, sender, subject, attachment, attachments,
-          threadUrl: threadUrl(legacyId), threadId, bodyText: text,
-          ask: fileGate.ask, decision
+      // One resolver for every file ask the resolution planner does not own.
+      // A template is not a file that was found. Mailbox-wide attachment
+      // search is not connected (compose-only Gmail). Null Drive means the
+      // search did not finish: stay quiet rather than say "not found".
+      let chainSettled = false;
+      if (typeof FlowCloseChains !== 'undefined') {
+        let watching = null;
+        try {
+          const watches = await FlowStorage.getWatches();
+          const open = (watches || []).find((w) => w && String(w.threadId) === String(threadId) && w.status === 'waiting' && w.requirement && w.requirement.kind);
+          if (open) watching = { requirement: open.requirement };
+        } catch (e) { watching = null; }
+        const threadFiles = attachments.map((meta) => ({ id: meta.url || meta.filename, name: meta.filename, filename: meta.filename }));
+        const chain = FlowCloseChains.resolve({
+          text,
+          origin: 'gmail',
+          now: Date.now(),
+          watching,
+          evidence: {
+            driveScope: 'account',
+            connected: { drive: true, thread: true, gmail: false, outlook: false, docs: false, sheets: false, calendar: false },
+            driveFiles: searched && searched.ok ? (searched.files || []) : null,
+            threadFiles
+          }
         });
-        return;
+        if (chain && chain.move === 'needs-you') {
+          injectNeedsYou(message, {
+            messageId, intent, sender, subject, attachment, attachments,
+            threadUrl: threadUrl(legacyId), threadId, bodyText: text, chain
+          });
+          return;
+        }
+        if (chain && (chain.move === 'watch' || chain.reason === 'conflict' || chain.reason === 'unclear')) {
+          recordSilence(messageId, 'file');
+          return;
+        }
+        if (chain && chain.move === 'prepare' && chain.hit && chain.hit.file && chain.hit.source === 'drive') {
+          attachFile = chain.hit.file;
+          chainSettled = true;
+        } else if (chain && chain.move === 'prepare' && chain.hit && chain.hit.file && chain.hit.source === 'thread') {
+          const match = attachments.find((meta) => meta.filename && chain.hit.file.name && meta.filename === chain.hit.file.name);
+          if (match) { chosenAttachment = match; chainSettled = true; }
+        }
       }
-      attachFile = decision.file;
+      if (!chainSettled) {
+        const decision = FlowFileAttach.decide(fileGate.ask, searched && searched.ok ? searched.files : null, {
+          senderName: sender.name,
+          amount: intent.entities && intent.entities.amount,
+          when: intent.entities && intent.entities.when
+        }, text);
+        // No single file, and no single template: stay quiet. A conflict
+        // is the same silence — never a second guess, never a blank doc.
+        // A create-from-template is not a found file, so it is not offered
+        // once the close chain already said the file is missing.
+        if (!decision || decision.action === 'silence' || decision.action === 'create') {
+          recordSilence(messageId, 'file');
+          return;
+        }
+        attachFile = decision.file;
+      }
     }
 
     const process = FlowActions.planFor(intent, {
       threadUrl: threadUrl(legacyId),
-      hasThreadAttachment: Boolean(attachment),
+      hasThreadAttachment: Boolean(chosenAttachment) || Boolean(attachFile),
       executionMemory,
       attachFile
     });
     if (!process) return; // defensive only — every catalog entry has at least an anchor step
 
     injectChip(message, {
-      messageId, intent, process, sender, subject, attachment, attachments,
+      messageId, intent, process, sender, subject, attachment: chosenAttachment, attachments,
       threadUrl: threadUrl(legacyId),
       threadId: threadId,
       // Snapshotted now, not re-read from the DOM at click time — by the
@@ -1201,6 +1249,100 @@
   // one named slot at a time when more than four facts are still missing.
   // There is no free prompt. Dismiss, or an answer that isn't the fact,
   // removes the card and does not create a file.
+  // The file (or the fact, the day, the approval, the answer) is not in any
+  // connected source. The card names what is missing and where Glance looked.
+  // Do It prepares a holding reply and opens a promise. Nothing is sent, and
+  // the receipt does not say the loop is handled.
+  function injectNeedsYou(messageNode, ctx) {
+    if (messageNode.querySelector('.flow-chip-host')) return;
+    const chain = ctx.chain || {};
+    const card = chain.card || {};
+    const he = chain.requirement && chain.requirement.lang === 'he';
+    const host = el('div', 'flow-chip-host');
+    host.setAttribute('data-glance-chain', 'needs-you');
+    host.setAttribute('data-checked-at', String(Date.now()));
+    host.setAttribute('dir', he ? 'auto' : 'ltr');
+    const textEl = el('p', 'flow-chip-text');
+    textEl.appendChild(loopMark());
+    textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
+    textEl.appendChild(document.createTextNode(' ' + [card.line, card.searched, card.why, card.skipped].filter(Boolean).join(' ')));
+    if (he) textEl.setAttribute('dir', 'auto');
+    host.appendChild(textEl);
+
+    const cardCtx = Object.assign({}, ctx, {
+      process: { id: 'reply-track', name: 'Reply & Track', steps: [] }
+    });
+    const mainRow = el('div', 'flow-chip-main-row');
+    mainRow.setAttribute('dir', 'ltr');
+    const dismiss = el('button', 'flow-chip-dismiss', '×');
+    dismiss.type = 'button';
+    dismiss.setAttribute('aria-label', 'Dismiss');
+    dismiss.addEventListener('click', (e) => { e.stopPropagation(); onDismiss(host, cardCtx); });
+    mainRow.appendChild(dismiss);
+    const chip = el('button', 'flow-chip');
+    chip.type = 'button';
+    chip.appendChild(el('span', 'shell'));
+    chip.appendChild(el('span', 'ring'));
+    chip.appendChild(el('span', 'shine'));
+    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    mainRow.appendChild(chip);
+    host.appendChild(mainRow);
+
+    let busy = false;
+    chip.addEventListener('click', async () => {
+      if (busy) return;
+      const holding = chain.holding && chain.holding.text;
+      if (!holding || !ctx.sender || !ctx.sender.email) {
+        setChipState(chip, 'flow-chip-error', 'Needs an address');
+        return;
+      }
+      busy = true;
+      setChipState(chip, 'flow-chip-pending', 'Working…');
+      const res = await new Promise((resolve) => {
+        chrome.runtime.sendMessage({
+          type: 'flow:follow-draft',
+          payload: { to: ctx.sender.email, toName: ctx.sender.name, subject: ctx.subject, body: holding }
+        }, resolve);
+      });
+      if (!res || !res.ok) {
+        setChipState(chip, 'flow-chip-error', reasonMessage(res, ctx));
+        busy = false;
+        return;
+      }
+      if (typeof FlowFollowUp !== 'undefined' && chain.promise && chain.promise.ask && ctx.threadId) {
+        const watch = FlowFollowUp.buildWatch({
+          ask: chain.promise.ask,
+          threadId: ctx.threadId,
+          messageId: ctx.messageId,
+          subject: ctx.subject,
+          counterpart: { email: ctx.sender.email, name: ctx.sender.name || null },
+          channel: 'gmail',
+          now: Date.now()
+        });
+        watch.requirement = chain.requirement;
+        await FlowStorage.upsertWatch(watch);
+      }
+      const done = el('div', 'flow-chip flow-chip-done');
+      done.setAttribute('role', 'status');
+      done.appendChild(el('span', 'flow-chip-label', he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.'));
+      const undo = el('button', 'flow-chip-undo', 'Undo');
+      undo.type = 'button';
+      undo.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const undone = await new Promise((resolve) => {
+          chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: 'gmailDraft', ref: res.ref }, resolve);
+        });
+        if (undone && undone.ok && ctx.threadId && typeof FlowStorage.updateWatch === 'function') {
+          await FlowStorage.updateWatch(ctx.threadId, { status: 'stopped', resolvedBy: 'undo' });
+        }
+        if (undone && undone.ok) host.remove();
+      });
+      done.appendChild(undo);
+      host.replaceChildren(done);
+    });
+    messageNode.insertBefore(host, messageNode.firstChild);
+  }
+
   function injectCreateCard(messageNode, ctx) {
     if (messageNode.querySelector('.flow-chip-host')) return;
     const ask = ctx.ask;

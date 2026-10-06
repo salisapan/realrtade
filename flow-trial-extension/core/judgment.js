@@ -189,6 +189,9 @@ const FlowJudgment = (() => {
     /^\s*בתאריך[\s\S]{3,200}?:\s*$/im,
     /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
     /^\s*-{2,}\s*Forwarded message\s*-{2,}\s*$/im,
+    // Hebrew forward banner ("---------- הודעה שהועברה ---------"). The same cut
+    // the Graph reader uses, so a forwarded ask is not judged as the new message.
+    /^\s*-{2,}\s*הודעה שהועברה.*$/im,
     /^\s*From:\s.*$\n^\s*Sent:\s/im,
     // Outlook's Hebrew locale equivalent of the From:/Sent: header block
     // above — same no-\b rule applies to both מאת and נשלח.
