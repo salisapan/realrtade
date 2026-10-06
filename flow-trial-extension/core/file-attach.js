@@ -47,9 +47,10 @@ const FlowFileAttach = (() => {
   const FYI = /\b(?:fyi|for your information|no action needed|no reply needed)\b|לידיעה|אין צורך בפעולה/i;
   // Someone else has to act. "ask accounting to", "have Dana send", "get Noa to send".
   // Not "ask you to", "have you send", "get me the", "get it to you", or "get back to".
-  const THIRD_EN = /\b(?:ask\s+(?!(?:me|us|you)\b)(?:[A-Za-z][\w']*\s+){1,4}to\b|have\s+(?!(?:me|us|you)\b)(?:[A-Za-z][\w']*\s+){1,4}send\b|get\s+(?!(?:me|us|you|back|it|this|that|them)\b)(?:[A-Za-z][\w']*\s+){1,4}to\s+(?:send|forward|email|share|attach|provide)\b)/i;
-  // תבקש מ-X, תגיד ל-X (not תגיד לי), ש-X ישלח, שישלח. Not שתשלח ("that you send") and not שלח לי.
-  const THIRD_HE = /תבקש(?:י|ו)?\s*מ(?!מני|כם)|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))|(?:^|[^\u0590-\u05FF])ש(?!ת)[\u0590-\u05FF]{2,24}\s+ישלח|(?:^|[^\u0590-\u05FF])שישלח(?![\u0590-\u05FF])/;
+  const THIRD_EN = /\b(?:ask\s+(?!(?:me|us|you)\b)(?:[A-Za-z][\w']*\s+){1,4}to\b|have\s+(?!(?:me|us|you)\b)(?:[A-Za-z][\w']*\s+){1,4}send\b|get\s+(?!(?:me|us|you|back|it|this|that|them)\b)(?:[A-Za-z][\w']*\s+){1,4}to\s+(?:send|forward|email|share|attach|provide)\b|(?:he|she|they)['’]ll\s+send\b|(?:he|she|they)\s+will\s+send\b)/i;
+  // תבקש מ-X, תגיד ל-X (not תגיד לי), ש-X ישלח / תשלח, שישלח.
+  // Not שתשלח ("that you send") and not שלח לי / תשלח לי with no named other person.
+  const THIRD_HE = /תבקש(?:י|ו)?\s*מ(?!מני|כם)|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))|(?:^|[^\u0590-\u05FF])ש(?!ת)[\u0590-\u05FF]{2,24}\s+(?:ישלח|תשלח)|(?:^|[^\u0590-\u05FF])שישלח(?![\u0590-\u05FF])/;
   const ALREADY = /\b(?:i|we)\s+(?:already\s+)?(?:sent|attached|forwarded|shared)\b|\b(?:please\s+find|find)\s+attached\b|מצורף|שלחתי|צירפתי/i;
 
   const UNSURE = /^(?:i don'?t know|not sure|unsure|no idea|skip|idk|לא יודע(?:ת)?|לא בטוח(?:ה)?|אין לי מושג|\?+)$/i;

@@ -63,12 +63,24 @@
     try { console.info('Glance: ' + stage, data === undefined ? '' : (typeof data === 'string' ? data : JSON.stringify(data))); } catch (e) { /* console gone */ }
   }
 
+  function quietReason(reason) {
+    const r = String(reason || '');
+    if (r === 'third-party' || r === 'page:third-party') return 'third-party';
+    if (r === 'outlook:file-found-no-attach' || r === 'outlook-file-found-no-attach') return 'outlook-file-found-no-attach';
+    return null;
+  }
+
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
   async function pageReason(reason, pane, extra) {
     lastOutcome = 'reason';
     dbg('decision', { shown: false, reason, subject: pane && pane.subject });
     const key = reason + '|' + ((pane && (pane.conversationId || pane.itemId || pane.subject)) || location.pathname);
     if (key === lastReasonKey) return;
+    const quiet = quietReason(reason);
+    const quietId = pane && (pane.itemId || pane.conversationId);
+    if (quiet && quietId && typeof FlowStorage !== 'undefined' && typeof FlowStorage.recordSilence === 'function') {
+      FlowStorage.recordSilence({ messageId: String(quietId), reason: quiet }).catch(() => {});
+    }
     lastReasonKey = key;
     try {
       const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
@@ -288,6 +300,7 @@
     const base = (typeof FlowIncomingJudge !== 'undefined')
       ? FlowIncomingJudge.draftPayload(ctx.process, { sender: ctx.sender, subject: subject })
       : { params: {}, senderName: ctx.sender && ctx.sender.name, senderEmail: ctx.sender && ctx.sender.email, subject: subject };
+    const file = ctx.attachFile && ctx.attachFile.id ? ctx.attachFile : null;
     const payload = Object.assign(base, {
       outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
       messageId: ctx.messageId,
@@ -296,15 +309,35 @@
       text: askText,
       fromAddress: fromAddress
     });
+    if (file) {
+      payload.driveFileId = file.id;
+      payload.driveFileName = file.name || null;
+      payload.driveMimeType = file.mimeType || null;
+    }
     payload.connectorId = 'outlookDraft';
     const r = await send({ type: 'flow:execute-action', payload: payload });
-    if (!r || !r.ok) {
-      FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.reason || r.error)) || 'Could not create draft');
+    // A file is attached only when Graph returned an attachment id. A success
+    // without that id is not a draft we keep, and the receipt never says attached.
+    if (!r || !r.ok || (file && !r.attachmentId)) {
+      if (r && r.ok && r.ref && file && !r.attachmentId) {
+        await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
+      }
+      if (file) {
+        await pageReason('outlook:file-found-no-attach', {
+          itemId: ctx.messageId,
+          subject: ctx.subject,
+          senderEmail: ctx.sender && ctx.sender.email
+        });
+      }
+      FlowChipHost.setChipState(chip, 'flow-chip-error', (r && !r.ok && (r.reason || r.error)) || (file ? 'Could not attach that file.' : 'Could not create draft'));
       return;
     }
+    const written = file
+      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
+      : (r.written || 'Reply draft ready in Outlook Drafts. Not sent.');
     await FlowStorage.appendLog({
       kind: 'written',
-      label: r.written || 'Reply draft ready in Outlook Drafts. Not sent.',
+      label: written,
       messageId: ctx.messageId,
       app: 'outlook',
       connectorId: 'outlookDraft',
@@ -324,7 +357,7 @@
       await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
     }
     FlowChipHost.showDraftReceipt(host, {
-      written: r.written || 'Reply draft ready in Outlook Drafts. Not sent.',
+      written: written,
       url: r.url || r.where,
       onUndo: async () => {
         const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
@@ -446,6 +479,58 @@
         return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
       }
     });
+  }
+
+  async function showFilePrepare(pane, chain, messageId) {
+    const file = chain && chain.hit && chain.hit.file;
+    if (!file || !file.id || chain.hit.source !== 'drive' || !messageId) return false;
+    const mount = mountPoint();
+    if (!mount) return false;
+    const he = chain.requirement && chain.requirement.lang === 'he';
+    const line = he ? 'טיוטת תשובה עם הקובץ' : 'Draft reply with the file';
+    const ctx = {
+      app: 'outlook',
+      doLabel: 'Do It',
+      messageId: messageId,
+      outlookIncomingId: messageId,
+      threadId: (pane && (pane.conversationId || pane.itemId)) || messageId,
+      subject: (pane && pane.subject) || '',
+      bodyText: (pane && pane.text) || '',
+      sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
+      attachFile: { id: file.id, name: file.name || null, mimeType: file.mimeType || null },
+      intent: { type: 'request', label: line },
+      process: {
+        id: 'reply-track',
+        name: 'Reply & Track',
+        closingLine: line,
+        steps: [{
+          kind: 'outlookDraft',
+          id: 'outlookDraft',
+          params: {
+            what: (chain.requirement && chain.requirement.label) || null,
+            includeAttachment: true,
+            driveFileId: file.id,
+            driveFileName: file.name || null,
+            driveMimeType: file.mimeType || null,
+            attachSource: 'found'
+          }
+        }]
+      }
+    };
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    const host = FlowChipHost.inject(mount, ctx, {
+      onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+      onDismiss: (h, c) => { onDismiss(h, c); }
+    });
+    if (!host) return false;
+    host.setAttribute('data-glance-chain', 'prepare');
+    lastOutcome = 'card';
+    lastKey = messageId + '|prepare';
+    dbg('decision', { shown: true, chain: 'prepare', fileId: file.id });
+    dbg('rendered', { messageId: messageId, chain: 'prepare' });
+    await clearReason(pane);
+    return true;
   }
 
   async function showHoldingChain(pane, chain, messageId) {
@@ -578,12 +663,16 @@
     if (!entry || (!entry.process && !(entry.outlookReceipt && entry.ref))) {
       decided = decideFromText(pane);
       if (!decided || decided.none) {
+        if (decided && decided.reason === 'third-party') {
+          await pageReason('page:third-party', pane);
+          return;
+        }
         if (decided && decided.reason === 'file-needs-drive') {
           const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
           const ran = await resolveFileChain(askText, pageThreadFiles(), pane.conversationId || pane.itemId);
           const chain = ran && ran.chain;
           let msgId = pane.itemId || null;
-          if (chain && chain.move === 'needs-you' && !msgId && pane.conversationId) {
+          if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && pane.conversationId) {
             const found = await messageIdForConversation(pane.conversationId, own);
             msgId = found ? found.id : null;
           }
@@ -594,6 +683,11 @@
             return;
           }
           if (chain && chain.move === 'prepare') {
+            const file = chain.hit && chain.hit.file;
+            if (file && file.id && chain.hit.source === 'drive') {
+              const shown = await showFilePrepare(pane, chain, msgId);
+              if (shown) return;
+            }
             await pageReason('outlook:file-found-no-attach', pane);
             return;
           }

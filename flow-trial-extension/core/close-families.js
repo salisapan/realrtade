@@ -731,14 +731,58 @@ const FlowCloseFamilies = (() => {
   function ambiguousClocks(text) {
     if (MOVE_EN.test(text) || MOVE_HE.test(text) || CANCEL_EN.test(text) || CANCEL_HE.test(text)) return false;
     if (replacementCue(text)) return false;
-    const clocks = String(text || '').match(new RegExp(
+    const clockRe = new RegExp(
       '\\b(?:at\\s+)?\\d{1,2}(?::\\d{2})?\\s*(?:am|pm)\\b|בשעה\\s*(?:\\d{1,2}(?::\\d{2})?|' + HE_HOUR_ALT + ')|\\b\\d{1,2}:\\d{2}\\b',
       'gi'
-    )) || [];
+    );
+    const clocks = [];
+    let m;
+    const source = String(text || '');
+    while ((m = clockRe.exec(source)) !== null) {
+      clocks.push({ raw: m[0], index: m.index, end: m.index + m[0].length });
+    }
     if (clocks.length < 2) return false;
-    return MEET_EN.test(text) || MEET_HE.test(text) ||
+    // An explicit range is one meeting: start then dash / to / until / till /
+    // עד then the end clock. Drop the end before counting starts.
+    const rangeEnd = Object.create(null);
+    const betweenRe = /^\s*(?:[-–—−]|to|until|till|עד)\s*$/i;
+    for (let i = 0; i < clocks.length - 1; i++) {
+      const gap = source.slice(clocks[i].end, clocks[i + 1].index);
+      if (betweenRe.test(gap)) rangeEnd[i + 1] = true;
+    }
+    const starts = [];
+    for (let i = 0; i < clocks.length; i++) {
+      if (rangeEnd[i]) continue;
+      starts.push(clocks[i].raw);
+    }
+    // Same start printed twice (subject + body, or an invite chip reprint)
+    // is still one slot.
+    const distinct = [];
+    for (let i = 0; i < starts.length; i++) {
+      const raw = String(starts[i]).toLowerCase().replace(/^at\s+/, '').replace(/\s+/g, '');
+      let key = raw;
+      const hm = raw.match(/(\d{1,2}):(\d{2})/);
+      if (hm) {
+        let h = Number(hm[1]);
+        if (/pm/.test(raw) && h < 12) h += 12;
+        if (/am/.test(raw) && h === 12) h = 0;
+        key = String(h).padStart(2, '0') + ':' + hm[2];
+      } else {
+        const hourOnly = raw.match(/^(\d{1,2})(am|pm)?$/);
+        if (hourOnly) {
+          let h = Number(hourOnly[1]);
+          if (hourOnly[2] === 'pm' && h < 12) h += 12;
+          if (hourOnly[2] === 'am' && h === 12) h = 0;
+          key = String(h).padStart(2, '0') + ':00';
+        }
+      }
+      if (distinct.indexOf(key) === -1) distinct.push(key);
+    }
+    if (distinct.length < 2) return false;
+    const meeting = MEET_EN.test(text) || MEET_HE.test(text) ||
       /\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i.test(text) ||
       /יום/.test(text);
+    return meeting ? distinct : false;
   }
 
   function assess(text, facts, ctx) {
@@ -749,8 +793,9 @@ const FlowCloseFamilies = (() => {
     if (!text.trim()) return null;
     if (ctx.blocked) return null;
     if (NOISE_EN.test(text) || NOISE_HE.test(text)) return null;
-    if (ambiguousFiles(text)) return hit({ suppress: true, family: 'H' });
-    if (ambiguousClocks(text)) return hit({ suppress: true, family: 'H' });
+    if (ambiguousFiles(text)) return hit({ suppress: true, family: 'H', rule: 'ambiguousFiles', matched: distinctFiles(text) });
+    const clockStarts = ambiguousClocks(text);
+    if (clockStarts) return hit({ suppress: true, family: 'H', rule: 'ambiguousClocks', matched: clockStarts });
     const now = ctx.now;
     if (!facts && typeof FlowExtract !== 'undefined') {
       facts = FlowExtract.extract(text, { now: now, senderEmail: ctx.senderEmail });

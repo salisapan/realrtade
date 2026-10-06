@@ -68,10 +68,10 @@ const FlowIncomingJudge = (() => {
     }
     const isRequest = intentApi.TYPES ? intent.type === intentApi.TYPES.REQUEST : intent.type === 'request';
     const gate = fileAttach && typeof fileAttach.gate === 'function' ? fileAttach.gate(text) : { kind: 'ignore' };
-    if (isRequest && gate.kind === 'block') return { show: false, reason: 'file', intent };
+    if (isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
     if (isRequest && gate.kind === 'clear') {
       if (resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
-      // Gmail looks for the one file in Drive before it offers this; a surface whose draft writer cannot attach stays quiet.
+      // Gmail searches Drive in the open thread before it offers this. Outlook's page does the same search and attaches only when Graph returns an attachment id. Until that search, stay quiet.
       if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-needs-drive', intent };
     }
     const process = actionsApi.planFor(intent, {

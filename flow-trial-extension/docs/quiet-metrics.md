@@ -39,6 +39,8 @@ Stored fields are a message id, a timestamp, and one reason code. No subject, se
 | `memory` | Personal close memory: this matter is already fully closed. |
 | `file` | Find-and-attach: not one clear file. |
 | `fact` | Reply-with-facts: not one cell or one paragraph. |
+| `third-party` | The ask is for someone else to send. Glance does not prepare that file. |
+| `outlook-file-found-no-attach` | One Drive file was found, and Graph did not return an attachment id. The draft is not left claiming the file. |
 
 The Activity line prefers this week's mix (`Silence this week N · hedge H · …`). If this week has none yet, it shows the all-time mix without the words "this week". Reasons with a zero count are omitted. The silence bar itself is unchanged; these codes only name a decision the chip path already made.
 

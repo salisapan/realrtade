@@ -10,7 +10,8 @@
 //     Nothing is sent to Glance's servers.
 //   - On Do It for an incoming ask, it writes a reply DRAFT into the person's Outlook Drafts (Graph createReply) with
 //     Mail.ReadWrite. It never sends: never Mail.Send, never /send, /reply, /replyAll, /forward, /sendMail.
-//   - Allowed non-GET Graph calls: createReply, PATCH of a Glance-created draft, DELETE of a Glance-created draft.
+//   - Allowed non-GET Graph calls: createReply, POST of a fileAttachment on a Glance-created draft,
+//     PATCH of a Glance-created draft, DELETE of a Glance-created draft (the file goes with the draft).
 //   - Everything it can decide on its own is a loop CLOSING or MOVING because of an answer. A new loop from an offer is
 //     only ever offered, and created when the person taps. Incoming asks appear in Still Open with Do It.
 const FlowOutlook = (() => {
@@ -31,8 +32,11 @@ const FlowOutlook = (() => {
   // Non-GET Graph paths Glance is allowed to call. Anything else throws.
   const WRITE_ALLOW = [
     /\/me\/messages\/[^/]+\/createReply$/i,
+    /\/me\/messages\/[^/]+\/attachments$/i, // fileAttachment on a Glance draft; Mail.ReadWrite
     /\/me\/messages\/[^/]+$/i  // PATCH or DELETE of a message (draft only, enforced in writers)
   ];
+  // Graph fileAttachment contentBytes is Mail.ReadWrite and stops at 3 MB.
+  const ATTACH_MAX_BYTES = 3 * 1024 * 1024;
   const FORBIDDEN_SEND = /\/(send|reply|replyAll|forward|sendMail)(\b|$)/i;
 
   // deps: { storage, cfg, auth, plan, fetch, launch, launchSilent?, redirectUri(), permissions, send, random, sha256, now,
@@ -340,7 +344,7 @@ const FlowOutlook = (() => {
       return list[0] || null;
     }
 
-    // Needs-you only. A prepare stays off this list: the Outlook draft cannot carry the file.
+    // Needs-you only. A found file is attached from the open message (Do It), not from this list.
     async function outlookFileChainCards(messages, diagnostics, now) {
       if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) return [];
       const cards = [];
@@ -567,8 +571,8 @@ const FlowOutlook = (() => {
         }
       }
       // File asks the planner left on file-needs-drive: the same Drive + thread evidence
-      // Gmail passes. Calendar, Sheets and Docs stay off. A found file is not a card
-      // here, because this draft writer cannot attach it.
+      // Gmail passes. Calendar, Sheets and Docs stay off. A found file is attached
+      // when the open message's Do It runs, not added to this list.
       const chainCards = await outlookFileChainCards(messages, p.diagnostics || [], now);
       chainCards.forEach((entry) => {
         if (!entry || incomingCards.some((y) => y.messageId === entry.messageId)) return;
@@ -690,15 +694,64 @@ const FlowOutlook = (() => {
       } else if (fromSet) {
         await write(STATE_KEY, Object.assign({}, await read(STATE_KEY, {}), { fromAliasHint: null }));
       }
+      let attachmentId = null;
+      if (o.file) {
+        const attached = await attachDraftFile(token, draft.id, o.file);
+        if (!attached) {
+          await removeDraft(token, draft.id);
+          return { ok: false, error: 'outlook-file-found-no-attach', reason: 'outlook-file-found-no-attach', attached: false };
+        }
+        attachmentId = attached.id;
+      }
       return {
         ok: true,
         ref: draft.id,
         where: draft.webLink || null,
-        written: 'Reply draft ready in Outlook Drafts. Not sent.',
+        attachmentId: attachmentId,
+        written: attachmentId
+          ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
+          : 'Reply draft ready in Outlook Drafts. Not sent.',
         fromAddress: wantFrom || null,
         fromSet: fromSet,
         fromHint: fromHint
       };
+    }
+
+    function attachBytes(file) {
+      const raw = file && (file.contentBytes || file.base64);
+      if (!raw) return null;
+      const text = String(raw);
+      const approx = Math.floor((text.length * 3) / 4);
+      if (approx <= 0 || approx > ATTACH_MAX_BYTES) return null;
+      return text;
+    }
+
+    // POST /me/messages/{draft}/attachments. The id in the response is the only
+    // proof the file is on the draft. No id means it is not attached.
+    async function attachDraftFile(token, draftId, file) {
+      const bytes = attachBytes(file);
+      if (!bytes || !draftId) return null;
+      const url = cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId) + '/attachments';
+      let created;
+      try {
+        created = await graphWrite(token, 'POST', url, {
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: String((file && (file.name || file.filename)) || 'attachment').slice(0, 180),
+          contentType: (file && (file.contentType || file.mimeType)) || 'application/octet-stream',
+          contentBytes: bytes
+        });
+      } catch (e) {
+        return null;
+      }
+      if (!created || !created.id) return null;
+      return { id: created.id };
+    }
+
+    async function removeDraft(token, draftId) {
+      if (!draftId) return;
+      try {
+        await graphWrite(token, 'DELETE', cfg.GRAPH + '/me/messages/' + encodeURIComponent(draftId), null);
+      } catch (e) { /* already gone */ }
     }
 
     async function undoReplyDraft(draftId) {

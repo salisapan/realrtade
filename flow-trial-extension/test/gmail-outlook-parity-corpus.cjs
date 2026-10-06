@@ -67,6 +67,16 @@ function background() {
       if (/\/gmail\/v1\/users\/me\/drafts$/.test(u) && method === 'POST') return json(200, { id: 'draft_1' });
       if (/\/me\/messages\/[^/]+\/createReply$/.test(u) && method === 'POST') return json(201, { id: 'odraft_1', webLink: 'https://outlook.live.com/mail/drafts/odraft_1', body: { content: body && body.comment } });
       if (/\/me\/messages\/odraft_1$/.test(u) && method === 'PATCH') return json(200, { id: 'odraft_1' });
+      if (/\/me\/messages\/odraft_1\/attachments$/.test(u) && method === 'POST') {
+        const named = body && body.name === 'noid.pdf';
+        return json(201, named ? { name: body.name } : { id: 'att-1', name: body && body.name });
+      }
+      if (/\/me\/messages\/odraft_1$/.test(u) && method === 'DELETE') return { ok: true, status: 204, json: async () => null, text: async () => '' };
+      if (/\/drive\/v3\/files\/f1\?fields=/.test(u)) return json(200, { name: 'Invoice 204.pdf', mimeType: 'application/pdf', size: '11' });
+      if (/\/drive\/v3\/files\/f1\?alt=media/.test(u)) {
+        const bytes = Buffer.from('invoice-pdf');
+        return { ok: true, status: 200, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), json: async () => ({}), text: async () => '' };
+      }
       if (/\/me\?/.test(u) || /\/me$/.test(u)) return json(200, { mail: 'glance.salisapan@outlook.com', displayName: 'Glance' });
       return json(404, {});
     },
@@ -178,8 +188,8 @@ const CASES = [
     const oShown = Boolean(entry);
     const gDraft = gShown && g.process.steps.some((s) => s.kind === 'gmailDraft');
     if (g.show === 'drive' || (gShown && !gDraft)) {
-      // The two documented connector gaps: Gmail looks for the file in Drive first (Outlook's draft cannot attach), and a
-      // close with no reply in it (an event, a Task) is written by Gmail's Google writers. Outlook stays quiet, never weaker.
+      // The planner has no Drive list, so a file ask stays file-needs-drive until the open message searches.
+      // A close with no reply in it (an event, a Task) is written by Gmail's Google writers. Outlook stays quiet, never weaker.
       const why = (r.diagnostics || []).map((d) => d.reason);
       check(m.name + ': Gmail ' + (g.show === 'drive' ? 'searches Drive first' : 'closes it with ' + g.process.steps.map((s) => s.kind).join('+')) + '; Outlook stays quiet and says why', !oShown && why.some((x) => x === 'file-needs-drive' || x === 'no-draft-close'), { gmail: g.show, outlook: oShown, why });
       continue;
@@ -284,7 +294,16 @@ const CASES = [
     const runnerSrc = read('src/outlook.js');
     check('Gmail, the Outlook page and the Outlook runner pass the same evidence helper', /FlowCloseChains\.fileEvidence\(/.test(gmailSrc) && /FlowCloseChains\.fileEvidence\(/.test(pageSrc) && /FlowCloseChains\.fileEvidence\(/.test(runnerSrc));
     check('neither Outlook host turns Calendar or Sheets on by itself', !/calendar:\s*true/.test(pageSrc) && !/sheets:\s*true/.test(pageSrc) && !/calendar:\s*true/.test(runnerSrc) && !/sheets:\s*true/.test(runnerSrc));
-    check('a file found on the Outlook page is not drafted as attached', /outlook:file-found-no-attach/.test(pageSrc) && /data-glance-chain', 'needs-you'/.test(pageSrc));
+    check('a found Drive file is a prepare Do It, and a missing attachment id stays silence', /data-glance-chain', 'prepare'/.test(pageSrc) && /attachmentId/.test(pageSrc) && /outlook:file-found-no-attach/.test(pageSrc) && /data-glance-chain', 'needs-you'/.test(pageSrc));
+    const writer = read('src/background.js');
+    check('the Outlook writer posts a fileAttachment and names attached only with an id', /\/attachments/.test(writer) && /attachmentId/.test(writer) && /with the file attached/.test(writer));
+    const attachedBg = background();
+    const attached = await attachedBg.fn('outlookDraftWrite')({ connectorId: 'outlookDraft', outlookIncomingId: 'msg1', messageId: 'msg1', driveFileId: 'f1', body: 'The invoice is on this draft.' });
+    const attCall = attachedBg.calls.find((c) => c.method === 'POST' && /\/attachments$/.test(c.url));
+    check('a Drive file is attached only when Graph returns an attachment id', attached.ok && attached.attachmentId === 'att-1' && /with the file attached/.test(attached.written) && attCall && attCall.body['@odata.type'] === '#microsoft.graph.fileAttachment' && !attachedBg.calls.some((c) => /\/(send|sendMail)(\b|$)/.test(c.url)), attached);
+    const noIdBg = background();
+    const noIdWrite = await noIdBg.fn('outlookDraftWrite')({ connectorId: 'outlookDraft', outlookIncomingId: 'msg1', messageId: 'msg1', attachment: { filename: 'noid.pdf', mimeType: 'application/pdf', base64: Buffer.from('x').toString('base64') }, body: 'No file.' });
+    check('no attachment id deletes the draft and does not claim attached', noIdWrite.ok === false && noIdWrite.reason === 'outlook-file-found-no-attach' && !(noIdWrite.written && /attach/i.test(noIdWrite.written)) && noIdBg.calls.some((c) => c.method === 'DELETE' && /\/me\/messages\/odraft_1$/.test(c.url)), noIdWrite);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

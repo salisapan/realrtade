@@ -1875,6 +1875,8 @@ async function findThreadId(senderEmail, subject) {
 // Gmail's own 25MB compose limit and chrome.runtime.sendMessage's own
 // ceiling once base64-encoded.
 const GMAIL_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+// Graph fileAttachment (Mail.ReadWrite) accepts contentBytes under 3 MB.
+const OUTLOOK_ATTACH_MAX_BYTES = 3 * 1024 * 1024;
 
 // Same chunked btoa as content-gmail.js's own arrayBufferToBase64 — kept as
 // a separate copy rather than a shared import because this file (a service
@@ -3188,15 +3190,69 @@ async function outlookDraftWrite(p) {
       }
     } catch (e) { /* createReply's comment already holds the body */ }
   }
+  let attachmentId = null;
+  if (p && (p.driveFileId || (p.attachment && p.attachment.base64))) {
+    const file = await outlookFileForDraft(p);
+    if (!file) {
+      await outlookDeleteDraft(draft.id);
+      return { ok: false, reason: 'outlook-file-found-no-attach', attached: false };
+    }
+    const attUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id) + '/attachments';
+    outlookAssertNotSend(attUrl);
+    const att = await outlookFetch(attUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        name: file.filename,
+        contentType: file.mimeType,
+        contentBytes: file.base64
+      })
+    });
+    let created = null;
+    if (att && att.ok) { try { created = await att.json(); } catch (e) { created = null; } }
+    if (!created || !created.id) {
+      await outlookDeleteDraft(draft.id);
+      return { ok: false, reason: 'outlook-file-found-no-attach', attached: false };
+    }
+    attachmentId = created.id;
+  }
   return {
     ok: true,
     ref: draft.id,
     where: draft.webLink || null,
     url: draft.webLink || null,
-    written: 'Reply draft ready in Outlook Drafts. Not sent.',
+    attachmentId: attachmentId,
+    written: attachmentId
+      ? 'Reply draft ready in Outlook Drafts, with the file attached. Not sent.'
+      : 'Reply draft ready in Outlook Drafts. Not sent.',
     fromAddress: wantFrom || null,
     fromSet: fromSet
   };
+}
+async function outlookFileForDraft(p) {
+  if (p.driveFileId) {
+    const got = await fetchDriveFileAsAttachment(p.driveFileId);
+    if (!got || !got.base64) return null;
+    const approx = Math.floor((String(got.base64).length * 3) / 4);
+    if (approx <= 0 || approx > OUTLOOK_ATTACH_MAX_BYTES) return null;
+    return got;
+  }
+  const raw = p.attachment && p.attachment.base64;
+  if (!raw) return null;
+  const approx = Math.floor((String(raw).length * 3) / 4);
+  if (approx <= 0 || approx > OUTLOOK_ATTACH_MAX_BYTES) return null;
+  return {
+    filename: p.attachment.filename || 'attachment',
+    mimeType: p.attachment.mimeType || 'application/octet-stream',
+    base64: raw
+  };
+}
+async function outlookDeleteDraft(draftId) {
+  if (!draftId) return;
+  const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draftId);
+  outlookAssertNotSend(delUrl);
+  try { await outlookFetch(delUrl, { method: 'DELETE' }); } catch (e) { /* already gone */ }
 }
 async function outlookDraftUndo(ref) {
   if (!ref) return { ok: false };
