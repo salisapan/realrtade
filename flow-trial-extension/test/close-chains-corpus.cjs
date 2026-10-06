@@ -217,7 +217,9 @@ const popup = fs.readFileSync(path.join(ROOT, 'popup/popup.html'), 'utf8');
 const scripts = manifest.content_scripts[0].js;
 check('the resolver has no per-object branch', !/===\s*'invoice'|kind === 'invoice'|id === 'invoice'|iCount|Green Invoice/.test(chainSrc));
 check('the Gmail card calls the shared resolver', gmailSrc.indexOf('FlowCloseChains.resolve') >= 0 && gmailSrc.indexOf('injectNeedsYou') >= 0);
-check('needs-you Do It is the canonical chip and the draft claims no attachment', /flow-chip-do-label', 'Do It'/.test(gmailSrc) && /type: 'flow:follow-draft'/.test(gmailSrc) && /Draft ready\. Not sent\./.test(gmailSrc));
+const needsYouSrc = gmailSrc.slice(gmailSrc.indexOf('function injectNeedsYou'), gmailSrc.indexOf('function injectCreateCard'));
+check('the needs-you chip drafts a holding reply and does not say Do It', /Draft a holding reply/.test(needsYouSrc) && /טיוטת תשובת ביניים/.test(needsYouSrc) && !/flow-chip-do-label', 'Do It'/.test(needsYouSrc) && /type: 'flow:follow-draft'/.test(gmailSrc) && /Draft ready\. Not sent\./.test(gmailSrc));
+check('the close chip stays Do It', /function injectChip[\s\S]*flow-chip-do-label', 'Do It'/.test(gmailSrc));
 check('manifest loads the shared text cut and the close chain', scripts.indexOf('core/source-text.js') > scripts.indexOf('core/judgment.js') && scripts.indexOf('core/close-chains.js') > scripts.indexOf('core/resolution.js'));
 check('popup loads both', popup.indexOf('core/source-text.js') > popup.indexOf('core/judgment.js') && popup.indexOf('core/close-chains.js') > popup.indexOf('core/file-attach.js'));
 

@@ -1251,8 +1251,9 @@
   // removes the card and does not create a file.
   // The file (or the fact, the day, the approval, the answer) is not in any
   // connected source. The card names what is missing and where Glance looked.
-  // Do It prepares a holding reply and opens a promise. Nothing is sent, and
-  // the receipt does not say the loop is handled.
+  // The button drafts a holding reply and opens a promise. It is not the close
+  // chip: that one stays "Do It". Nothing is sent, and the receipt does not
+  // say the loop is handled.
   function injectNeedsYou(messageNode, ctx) {
     if (messageNode.querySelector('.flow-chip-host')) return;
     const chain = ctx.chain || {};
@@ -1284,7 +1285,7 @@
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.appendChild(el('span', 'flow-chip-do-label', he ? 'טיוטת תשובת ביניים' : 'Draft a holding reply'));
     mainRow.appendChild(chip);
     host.appendChild(mainRow);
 

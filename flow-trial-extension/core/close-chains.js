@@ -336,10 +336,27 @@ const FlowCloseChains = (() => {
   // input: { text, origin, evidence, completion, watching, now }
   // evidence lists are plain data. null = a connected source the host did not check.
   // An `invoicing` or `billing` bag is ignored on purpose.
+  // Getting someone else to send the file is not a file this person attaches.
+  // Silence, including when a watch already stored a file requirement. No holding
+  // line that claims "I'll send it."
+  function thirdPartyAsk(text) {
+    if (!text || !attach || typeof attach.asksThirdParty !== 'function' || !attach.asksThirdParty(text)) return false;
+    if (typeof attach.gate !== 'function') return false;
+    const gated = attach.gate(text);
+    return Boolean(gated && gated.reason === 'third-party');
+  }
+
   function resolve(input) {
     const i = input || {};
     const text = fresh(i.text);
     const now = typeof i.now === 'number' ? i.now : (i.now instanceof Date ? i.now.getTime() : Date.now());
+    if (thirdPartyAsk(text)) {
+      const result = blank(null);
+      result.origin = i.origin || null;
+      result.move = 'silence';
+      result.reason = 'third-party';
+      return result;
+    }
     const req = (i.watching && i.watching.requirement) || derive(text, now);
     const result = blank(req && !req.blocked ? req : null);
     result.origin = i.origin || null;

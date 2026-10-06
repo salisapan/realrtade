@@ -72,7 +72,7 @@ it, not touching the module.
 | `exec-router.js` | The dual-tier router for a "Do It" / "Draft It" proposal (device model first, masked server only with consent, strict JSON; dormant, `docs/hybrid-execution-architecture.md`) AND `maskForServer`, the one function every send to our server goes through (also used by the deeper read). |
 | `expiry.js` | Things that run out — portable, no chrome.*, no DOM, no network, no model. |
 | `fact-reply.js` | Reply-with-facts. One inbound ask for one concrete fact that lives in a Google Sheet or Doc. |
-| `file-attach.js` | Family A (find + attach) and the handoff into Family I (create only when a company template already exists). |
+| `file-attach.js` | Family A (find + attach) and the handoff into Family I (create only when a company template already exists). An ask that gets someone else to act is not a clear file. |
 | `file-path.js` | File-backed execution for open loops — portable, no chrome.*, no DOM, no network, no model. |
 | `follow-up.js` | "Waiting on" and "what you promised": what a message asks or promises, what a reply did to a loop (including the true-close rules, `docs/true-close.md`), when to chase, the Free cap input, nudge drafts. Portable logic only. |
 | `graph-mail.js` | Outlook mail as plain utterances, from Microsoft's own mail API (Microsoft Graph). |

@@ -45,6 +45,11 @@ const FlowFileAttach = (() => {
   const NEG_HE = /(?:אל\s+תשלח|אין\s+צורך|לא\s+צריך\s+לשלוח|בלי\s+לצרף)/;
   const HEDGE = /\b(?:maybe|perhaps|possibly|if you want|if you feel like|no rush|any chance|not sure which|whichever)\b|(?:^|[\s,.])אולי(?:[\s,.]|$)|אם בא לך|לא בטוח(?:ה)?\s+איז|איזה\s+קובץ|איזו\s+חשבונית|יש סיכוי/i;
   const FYI = /\b(?:fyi|for your information|no action needed|no reply needed)\b|לידיעה|אין צורך בפעולה/i;
+  // Someone else has to act. "ask accounting to", "have Dana send", "get Noa to send".
+  // Not "ask you to", "have you send", "get me the", "get it to you", or "get back to".
+  const THIRD_EN = /\b(?:ask\s+(?!(?:me|us|you)\b)(?:[A-Za-z][\w']*\s+){1,4}to\b|have\s+(?!(?:me|us|you)\b)(?:[A-Za-z][\w']*\s+){1,4}send\b|get\s+(?!(?:me|us|you|back|it|this|that|them)\b)(?:[A-Za-z][\w']*\s+){1,4}to\s+(?:send|forward|email|share|attach|provide)\b)/i;
+  // תבקש מ-X, תגיד ל-X (not תגיד לי), ש-X ישלח, שישלח. Not שתשלח ("that you send") and not שלח לי.
+  const THIRD_HE = /תבקש(?:י|ו)?\s*מ(?!מני|כם)|תגיד(?:י|ו)?\s*ל(?!י(?:\s|$|[.,!?]))|(?:^|[^\u0590-\u05FF])ש(?!ת)[\u0590-\u05FF]{2,24}\s+ישלח|(?:^|[^\u0590-\u05FF])שישלח(?![\u0590-\u05FF])/;
   const ALREADY = /\b(?:i|we)\s+(?:already\s+)?(?:sent|attached|forwarded|shared)\b|\b(?:please\s+find|find)\s+attached\b|מצורף|שלחתי|צירפתי/i;
 
   const UNSURE = /^(?:i don'?t know|not sure|unsure|no idea|skip|idk|לא יודע(?:ת)?|לא בטוח(?:ה)?|אין לי מושג|\?+)$/i;
@@ -205,6 +210,14 @@ const FlowFileAttach = (() => {
     return null;
   }
 
+  // The ask is to get someone else to act. A file named in that sentence is not
+  // this person's file to attach.
+  function asksThirdParty(text) {
+    const body = fresh(text);
+    if (!body.trim()) return false;
+    return THIRD_EN.test(body) || THIRD_HE.test(body);
+  }
+
   // ignore: not a file ask, leave the other closes alone.
   // block: it is about a file, but not one clear object — no chip.
   // clear: one object, one need.
@@ -212,6 +225,7 @@ const FlowFileAttach = (() => {
     const body = fresh(text);
     const hits = collectHits(body);
     if (!hits.length) return { kind: 'ignore' };
+    if (asksThirdParty(body)) return { kind: 'block', reason: 'third-party' };
     if (NEG_EN.test(body) || NEG_HE.test(body) || HEDGE.test(body) || FYI.test(body)) {
       return { kind: 'block', reason: 'unclear' };
     }
@@ -439,6 +453,7 @@ const FlowFileAttach = (() => {
   function mention(text) {
     const body = fresh(text);
     if (!body.trim()) return null;
+    if (asksThirdParty(body)) return null;
     if (NEG_EN.test(body) || NEG_HE.test(body) || HEDGE.test(body) || FYI.test(body)) return null;
     const hits = narrowHits(body, collectHits(body));
     if (hits.length !== 1 || askedPlural(hits[0], body)) return null;
@@ -455,7 +470,7 @@ const FlowFileAttach = (() => {
   }
 
   return {
-    gate, decide, mention, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
+    gate, decide, mention, asksThirdParty, present, fillSlot, fillAll, decline, driveQuery, copyTitle, cardLine,
     MAX_CARD_FIELDS, ATTACH_SCORE, MAX_BYTES
   };
 })();

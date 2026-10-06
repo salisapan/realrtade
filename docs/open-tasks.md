@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-06 (generic close chain in `core/close-chains.js`: one requirement, connected sources, draft or needs-you, close only on real completion. Invoicing-system draft is roadmap only, row 43).
+Last updated: 2026-10-06 (an ask that gets someone else to act is silence, not a file prepare, in `core/file-attach.js` and `core/close-chains.js`. The needs-you chip says it drafts a holding reply. Generic close chain and invoicing-system roadmap row 43 are unchanged).
 
 ## Open
 
