@@ -74,3 +74,52 @@ engine now recognises two of them (an improvement).
 1. The owner checks the labels (a quick pass over about 175 sentences, in a spreadsheet, without the product).
 2. A larger and more varied sample, including received mail, and a second person's mail.
 3. A rule that this set is never used to train anything, and that every fix made after looking at it is declared in this file.
+
+## 7. Real-mail gold set
+
+Measured 2026-10-06 with `node scripts/intent/real-mail-eval.cjs`. The sentences are `flow-trial-extension/test/fixtures/real-mail-gold.json`: 22 masked sentences from the owner's mail of 2026-10-05 (15 real: `real_other` or `real_own`; 7 `dogfood_test`, reported on their own line and left out of the real-only line). This file is committed because it is masked. The labels were assigned by a model and have not been checked by the owner. **n is tiny.** This is the first run; there is no earlier run to compare to. The sentences are evaluation only and were not used to train anything.
+
+A sentence-intent row is the shipped pipeline, the same call as §3: unsure, INFORM and ACK are SILENT. A reply row is `classifyReply` on a waiting loop: closed, paid or declined is CLOSE, and every other outcome holds. Own mail is also checked with the loop opener (`classifyOutgoing` / `classifyCommitment`). Direction is incoming or own. rm-016 is the owner's sent ask and the same sentence on the test inbox; it is scored once.
+
+### First run, before the general fixes in this section
+
+Decision class. n is the gold count. P and R are precision and recall.
+
+| Slice | ASK P / R (n) | PROMISE P / R (n) | HOLD P / R (n) | CLOSE P / R (n) | SILENT P / R (n) |
+|---|---|---|---|---|---|
+| All (22) | 0.8 / 1 (8) | 1 / 1 (1) | 1 / 0.667 (3) | 0.5 / 1 (1) | 1 / 0.778 (9) |
+| Real-only (15) | 0.6 / 1 (3) | 1 / 1 (1) | 1 / 0.667 (3) | 0.5 / 1 (1) | 1 / 0.714 (7) |
+| Dogfood (7) | 1 / 1 (5) | — | — | — | 1 / 1 (2) |
+| Hebrew (14) | 0.75 / 1 (3) | 1 / 1 (1) | 1 / 0.5 (2) | 0.5 / 1 (1) | 1 / 0.857 (7) |
+| English (8) | 0.833 / 1 (5) | — | 1 / 1 (1) | — | 1 / 0.5 (2) |
+| Hebrew real-only (12) | 0.75 / 1 (3) | 1 / 1 (1) | 1 / 0.5 (2) | 0.5 / 1 (1) | 1 / 0.8 (5) |
+| English real-only (3) | n=0, one false ASK, recall not defined | — | 1 / 1 (1) | — | 1 / 0.5 (2) |
+
+Source-family recall on the first run (hits / n), where it was not already 1: `forward_handoff` 0/1, `silent_negative` 4/5, `ask_to_third_party` 0/1. The other families were 1. Dogfood was 7/7. Several source families share one label, so precision is the decision-class column above, not a separate number per source family.
+
+Already right on the first run, so no change was made for them: the hedged "I hope to send it this week" (rm-001) was already a promise with no day, which holds; the out-of-office (rm-015) was already an auto-reply, which holds; the negative imperative (rm-014) and the conditional aside (rm-004, borderline) were already silent.
+
+### After those fixes, same 22 sentences
+
+| Slice | ASK P / R (n) | PROMISE P / R (n) | HOLD P / R (n) | CLOSE P / R (n) | SILENT P / R (n) |
+|---|---|---|---|---|---|
+| All (22) | 0.889 / 1 (8) | 1 / 1 (1) | 1 / 1 (3) | 1 / 1 (1) | 1 / 0.889 (9) |
+| Real-only (15) | 0.75 / 1 (3) | 1 / 1 (1) | 1 / 1 (3) | 1 / 1 (1) | 1 / 0.857 (7) |
+| Dogfood (7) | 1 / 1 (5) | — | — | — | 1 / 1 (2) |
+| Hebrew (14) | 0.75 / 1 (3) | 1 / 1 (1) | 1 / 1 (2) | 1 / 1 (1) | 1 / 0.857 (7) |
+| English (8) | 1 / 1 (5) | — | 1 / 1 (1) | — | 1 / 1 (2) |
+| Hebrew real-only (12) | 0.75 / 1 (3) | 1 / 1 (1) | 1 / 1 (2) | 1 / 1 (1) | 1 / 0.8 (5) |
+| English real-only (3) | — | — | 1 / 1 (1) | — | 1 / 1 (2) |
+
+Source-family recall after the fixes is 1 everywhere except `ask_to_third_party` (0/1). The own-loop check agrees on every own sentence (it disagreed on rm-002 at the first run).
+
+What changed, each one a general rule, each failing sentence added to an existing corpus:
+
+- A model-only "reply" with no question and no reply cue is not an ask (`core/intent-pipeline.js`). That was the marketing line "You just need to point it at something" (rm-022).
+- A short message that is only a contact line ("Phone:" / "טלפון:") holds the loop; it is a signature, not an answer (`core/follow-up.js`). That was the forward that left only a signature (rm-009), which had closed by default.
+- The Hebrew forward banner "הודעה שהועברה" is a quote cut, the same as "Forwarded message" (`core/graph-mail.js`). Without it the owner's quoted ask in that forward was still visible and read as an incoming ask.
+- "כשיהיה לך נוח" / "כשנוח לך" is the same convenience hedge as "כשיהיה לך זמן" (`core/follow-up.js`). The pipeline was already silent on rm-002; the loop opener was treating "מחכים לפירוט כשיהיה לך נוח" as a new ask.
+
+Still open: rm-003, a feminine singular imperative ("עדכני" / "אשרי") the model names as an ask to approve. The masked sentence does not say who is addressed; the name in it is the person who would receive a green light, not the addressee. Suppressing feminine imperatives would be wrong for a reader the imperative does address, and there is no account-holder identity on the sentence. Left as a miss rather than a special case.
+
+No precision gate was lowered. On the sets those gates measure, pipeline precision and recall were the same before and after the reply-cue change: teacher-eval ASK 1.00 / 0.92 and PROMISE 1.00 / 0.87; the second evaluation set ASK 0.97 / 0.82 and PROMISE 1.00 / 0.75; the blind set ASK 1.00 / 0.94 and PROMISE 1.00 / 0.83.

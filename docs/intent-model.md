@@ -16,7 +16,9 @@
 `core/intent-pipeline.js` combines tiers 0 and 1, and each checks the other:
 the model can veto the lexicon when it is nearly certain a sentence is only a
 statement (0.995), and the model can propose what the lexicon has no frame for,
-but only when it is confident (0.75) **and** can name the action. When neither
+but only when it is confident (0.75) **and** can name the action. Naming the action "reply"
+is not enough on its own: a reply-ask also needs a question or a reply cue, so "you just need to…"
+with nothing asked stays silent. When neither
 is sure the answer is "unsure" and the product stays silent.
 
 ## 2. What the model is
