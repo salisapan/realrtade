@@ -257,6 +257,36 @@ const CASES = [
     check('the Outlook page card judges with the shared judge and sends Gmail\'s payload', /FlowIncomingJudge\.judge\(/.test(page) && /FlowIncomingJudge\.draftPayload\(/.test(page));
   }
 
+  console.log('\n--- the same Drive and thread evidence, both origins ---\n');
+  {
+    const C = require('../core/close-chains.js').FlowCloseChains;
+    const when = Date.parse('2026-10-05T09:00:00Z');
+    function same(name, text, evidence) {
+      const g = C.resolve({ text, origin: 'gmail', now: when, evidence });
+      const o = C.resolve({ text, origin: 'outlook', now: when, evidence });
+      check(name + ': same move, reason, close and sends', g.move === o.move && g.reason === o.reason && g.close === o.close && g.sends === false && o.sends === false && g.creates === false && o.creates === false, { g: [g.move, g.reason, g.close], o: [o.move, o.reason, o.close] });
+      return g;
+    }
+    const one = C.fileEvidence({ driveOk: true, driveFiles: [{ id: 'f1', name: 'Invoice 204.pdf', mimeType: 'application/pdf' }], threadFiles: [] });
+    check('that evidence leaves Calendar, Sheets and Docs off', one.connected.calendar === false && one.connected.sheets === false && one.connected.docs === false && one.connected.gmail === false && one.connected.outlook === false && one.connected.drive === true && one.connected.thread === true, one.connected);
+    const prepared = same('send me the invoice, one Drive file', 'Please send me the invoice.', one);
+    check('that prepare does not close', prepared.move === 'prepare' && prepared.close === false && prepared.show === true);
+    const missing = same('send me the invoice, Drive and this thread empty', 'Please send me the invoice by Thursday.', C.fileEvidence({ driveOk: true, driveFiles: [], threadFiles: [] }));
+    check('nothing found is needs-you, and the holding line claims no file', missing.move === 'needs-you' && missing.holding && missing.holding.claimsFile === false && !/attach/i.test(missing.holding.text));
+    const third = same('ask accounting to send the invoice, one Drive file', 'Can you ask accounting to send me the invoice?', one);
+    check('a third-party ask stays silent on both', third.move === 'silence' && third.reason === 'third-party' && third.show === false);
+    const he = same('שלח לי, one Drive file', 'שלח לי את החשבונית', one);
+    check('the Hebrew direct ask prepares on both', he.move === 'prepare' && he.close === false);
+    const unread = same('attachments flagged, names unknown', 'Please send me the invoice.', C.fileEvidence({ driveOk: true, driveFiles: [], threadFiles: null }));
+    check('a thread that was not read is not "not found"', unread.move === 'silence' && unread.reason === 'unverified' && unread.show === false);
+    const gmailSrc = read('src/content-gmail.js');
+    const pageSrc = read('src/content-outlook.js');
+    const runnerSrc = read('src/outlook.js');
+    check('Gmail, the Outlook page and the Outlook runner pass the same evidence helper', /FlowCloseChains\.fileEvidence\(/.test(gmailSrc) && /FlowCloseChains\.fileEvidence\(/.test(pageSrc) && /FlowCloseChains\.fileEvidence\(/.test(runnerSrc));
+    check('neither Outlook host turns Calendar or Sheets on by itself', !/calendar:\s*true/.test(pageSrc) && !/sheets:\s*true/.test(pageSrc) && !/calendar:\s*true/.test(runnerSrc) && !/sheets:\s*true/.test(runnerSrc));
+    check('a file found on the Outlook page is not drafted as attached', /outlook:file-found-no-attach/.test(pageSrc) && /data-glance-chain', 'needs-you'/.test(pageSrc));
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 })();

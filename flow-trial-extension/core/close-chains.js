@@ -411,7 +411,22 @@ const FlowCloseChains = (() => {
     return result;
   }
 
-  return { KINDS, PLACES, derive, resolve, completionOf, holdingText, fresh };
+  // The evidence bag both inboxes pass today. Drive is account-wide. This thread is
+  // whatever names the host actually has. Gmail attachments, Outlook attachments,
+  // Docs, Sheets and Calendar stay off until both surfaces turn them on together.
+  // driveOk false → driveFiles null (not checked). threadFiles null → this thread
+  // was not read. An empty array means it was read and nothing was there.
+  function fileEvidence(input) {
+    const i = input || {};
+    return {
+      driveScope: 'account',
+      connected: { drive: true, thread: true, gmail: false, outlook: false, docs: false, sheets: false, calendar: false },
+      driveFiles: i.driveOk === true ? (Array.isArray(i.driveFiles) ? i.driveFiles : []) : null,
+      threadFiles: Object.prototype.hasOwnProperty.call(i, 'threadFiles') ? i.threadFiles : []
+    };
+  }
+
+  return { KINDS, PLACES, derive, resolve, completionOf, holdingText, fresh, fileEvidence };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseChains };

@@ -67,7 +67,7 @@ const FlowChipHost = (() => {
     chip.appendChild(el('span', 'shell'));
     chip.appendChild(el('span', 'ring'));
     chip.appendChild(el('span', 'shine'));
-    chip.appendChild(el('span', 'flow-chip-do-label', 'Do It'));
+    chip.appendChild(el('span', 'flow-chip-do-label', ctx.doLabel || 'Do It'));
     chip.addEventListener('click', () => {
       if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);
     });

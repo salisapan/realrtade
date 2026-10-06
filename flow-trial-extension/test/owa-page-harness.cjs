@@ -72,6 +72,10 @@ async function runPage(opts) {
       if (/\/me\/messages\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
       return { ok: false, status: 404, body: '{}' };
     }
+    if (msg.type === 'flow:search-drive') {
+      if (o.driveDown) return { ok: false };
+      return { ok: true, files: o.driveFiles || [] };
+    }
     return { ok: true };
   }
   w.chrome = {
@@ -248,6 +252,31 @@ async function runPage(opts) {
       parsedLines);
     const judged = again.logs.filter((l) => /^Glance: judged/.test(l));
     check('the date row does not judge the same message on every tick', judged.length === 2, judged.map((l) => l.slice(0, 160)));
+  }
+
+  console.log('\n--- a file ask: Drive and this thread, the same chain as Gmail ---\n');
+  {
+    const invoice = (h) => h.replace(
+      'Could you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.',
+      'Please send me the invoice by Thursday.'
+    );
+    const missing = await runPage({ htmlPatch: invoice, emptyInbox: true, urlId: MSG, driveFiles: [], store: { glanceDebug: true }, waitMs: 5000 });
+    check('the open invoice ask searches Drive', missing.sent.some((m) => m.type === 'flow:search-drive'), missing.sent.map((m) => m.type));
+    check('nothing in Drive or this thread: a holding card', missing.chip && missing.chip.getAttribute('data-glance-chain') === 'needs-you', missing.logs.filter((l) => /^Glance:/.test(l)));
+    check('that card drafts a holding reply and is not labelled Do It', missing.chip && /Draft a holding reply/.test(missing.chip.textContent) && !/Do It/.test(missing.chip.textContent), missing.chip && missing.chip.textContent);
+    check('the page did not send', !missing.sent.some((m) => /send/i.test(String(m.type)) && m.type !== 'flow:search-drive'));
+    const found = await runPage({
+      htmlPatch: invoice, emptyInbox: true, urlId: MSG, waitMs: 4000,
+      driveFiles: [{ id: 'f1', name: 'Invoice 204.pdf', mimeType: 'application/pdf' }]
+    });
+    const reasons = (found.store.outlookPageDiag || []).map((d) => d.reason);
+    check('one Drive file is not drafted as attached', !found.chip && reasons.indexOf('outlook:file-found-no-attach') >= 0, reasons);
+    const he = (h) => h.replace(
+      'Could you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.',
+      'שלח לי את החשבונית עד יום חמישי.'
+    );
+    const hebrew = await runPage({ htmlPatch: he, emptyInbox: true, urlId: MSG, driveFiles: [], waitMs: 5000 });
+    check('the Hebrew direct ask gets the Hebrew holding label', hebrew.chip && hebrew.chip.getAttribute('data-glance-chain') === 'needs-you' && /טיוטת תשובת ביניים/.test(hebrew.chip.textContent), hebrew.chip && hebrew.chip.textContent);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

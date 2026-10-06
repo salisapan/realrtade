@@ -345,6 +345,149 @@
     });
   }
 
+  function holdingLabel(chain) {
+    return chain && chain.requirement && chain.requirement.lang === 'he' ? 'טיוטת תשובת ביניים' : 'Draft a holding reply';
+  }
+
+  function chainLine(chain) {
+    const card = (chain && chain.card) || {};
+    return [card.line, card.searched, card.why, card.skipped].filter(Boolean).join(' ');
+  }
+
+  // OWA does not give attachment names. No chip on the page is an empty thread,
+  // the same evidence Gmail passes when the open message has no attachment chips.
+  function pageThreadFiles() {
+    return [];
+  }
+
+  async function resolveFileChain(text, threadFiles, threadId) {
+    if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) return null;
+    const gate = FlowFileAttach.gate(text);
+    if (!gate || gate.kind !== 'clear' || !gate.ask) return { quiet: (gate && gate.reason) || 'file' };
+    const searched = await send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.query) });
+    let watching = null;
+    try {
+      const watches = await FlowStorage.getWatches();
+      const open = (watches || []).find((w) => w && threadId && String(w.threadId) === String(threadId) && w.status === 'waiting' && w.requirement && w.requirement.kind);
+      if (open) watching = { requirement: open.requirement };
+    } catch (e) { watching = null; }
+    const chain = FlowCloseChains.resolve({
+      text,
+      origin: 'outlook',
+      now: Date.now(),
+      watching,
+      evidence: FlowCloseChains.fileEvidence({
+        driveOk: Boolean(searched && searched.ok),
+        driveFiles: (searched && searched.files) || [],
+        threadFiles: threadFiles
+      })
+    });
+    return { chain };
+  }
+
+  async function onHoldingDoIt(host, chip, ctx) {
+    const chain = ctx.chain || {};
+    const holding = chain.holding && chain.holding.text;
+    if (!holding || !ctx.sender || !ctx.sender.email) {
+      FlowChipHost.setChipState(chip, 'flow-chip-error', 'Needs an address');
+      return;
+    }
+    FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Working…');
+    let fromAddress = null;
+    try {
+      const st = await FlowStorage.get();
+      fromAddress = preferHumanFrom(st && st.outlookAuth);
+    } catch (e) { /* From resolved again in background */ }
+    const r = await send({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'outlookDraft',
+        outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
+        messageId: ctx.messageId,
+        body: holding,
+        params: {},
+        senderEmail: ctx.sender.email,
+        senderName: ctx.sender.name || null,
+        subject: ctx.subject || '',
+        fromAddress: fromAddress
+      }
+    });
+    if (!r || !r.ok) {
+      FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.reason || r.error)) || 'Could not create draft');
+      return;
+    }
+    if (typeof FlowFollowUp !== 'undefined' && chain.promise && chain.promise.ask && ctx.threadId) {
+      const watch = FlowFollowUp.buildWatch({
+        ask: chain.promise.ask,
+        threadId: ctx.threadId,
+        messageId: ctx.messageId,
+        subject: ctx.subject,
+        counterpart: { email: ctx.sender.email, name: ctx.sender.name || null },
+        channel: 'outlook',
+        now: Date.now()
+      });
+      watch.requirement = chain.requirement;
+      await FlowStorage.upsertWatch(watch);
+    }
+    const he = chain.requirement && chain.requirement.lang === 'he';
+    FlowChipHost.showDraftReceipt(host, {
+      status: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
+      written: he ? 'הטיוטה מוכנה. לא נשלח.' : 'Draft ready. Not sent.',
+      url: r.url || r.where,
+      onUndo: async () => {
+        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
+        if (u && u.ok && ctx.threadId && typeof FlowStorage.updateWatch === 'function') {
+          await FlowStorage.updateWatch(ctx.threadId, { status: 'stopped', resolvedBy: 'undo' });
+        }
+        lastKey = '';
+        lastSig = '';
+        try { host.remove(); } catch (e) { /* already gone */ }
+        schedule();
+        return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
+      }
+    });
+  }
+
+  async function showHoldingChain(pane, chain, messageId) {
+    if (!chain || chain.move !== 'needs-you' || chain.sends !== false || chain.close !== false) return false;
+    if (!chain.holding || !chain.holding.text || chain.holding.claimsFile) return false;
+    const mount = mountPoint();
+    if (!mount || !messageId) return false;
+    const line = chainLine(chain);
+    const ctx = {
+      app: 'outlook',
+      doLabel: holdingLabel(chain),
+      messageId: messageId,
+      outlookIncomingId: messageId,
+      threadId: (pane && (pane.conversationId || pane.itemId)) || messageId,
+      subject: (pane && pane.subject) || '',
+      bodyText: chain.holding.text,
+      sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
+      intent: { type: 'request', label: line },
+      process: {
+        id: 'reply-track',
+        name: 'Reply & Track',
+        closingLine: line,
+        steps: [{ kind: 'outlookDraft', id: 'outlookDraft', params: {} }]
+      },
+      chain: chain
+    };
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    const host = FlowChipHost.inject(mount, ctx, {
+      onDoIt: (h, chip, c) => { onHoldingDoIt(h, chip, c); },
+      onDismiss: (h, c) => { onDismiss(h, c); }
+    });
+    if (!host) return false;
+    host.setAttribute('data-glance-chain', 'needs-you');
+    lastOutcome = 'card';
+    lastKey = messageId + '|needs-you';
+    dbg('decision', { shown: true, chain: 'needs-you', label: ctx.doLabel });
+    dbg('rendered', { messageId: messageId, chain: 'needs-you' });
+    await clearReason(pane);
+    return true;
+  }
+
   async function onDismiss(host, ctx) {
     host.remove();
     if (!ctx || !ctx.messageId) return;
@@ -420,9 +563,49 @@
 
     // Same silence bar as Gmail: if no stored candidate, judge the open text with the same chain.
     let decided = null;
+    if (entry && entry.glanceChain === 'needs-you' && entry.holdingText) {
+      const shown = await showHoldingChain(pane, {
+        move: 'needs-you',
+        sends: false,
+        close: false,
+        holding: { text: entry.holdingText, claimsFile: false },
+        card: entry.card || { line: entry.cardLine || '' },
+        requirement: entry.requirement,
+        promise: entry.promise || null
+      }, entry.messageId || entry.outlookIncomingId);
+      if (shown) return;
+    }
     if (!entry || (!entry.process && !(entry.outlookReceipt && entry.ref))) {
       decided = decideFromText(pane);
       if (!decided || decided.none) {
+        if (decided && decided.reason === 'file-needs-drive') {
+          const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
+          const ran = await resolveFileChain(askText, pageThreadFiles(), pane.conversationId || pane.itemId);
+          const chain = ran && ran.chain;
+          let msgId = pane.itemId || null;
+          if (chain && chain.move === 'needs-you' && !msgId && pane.conversationId) {
+            const found = await messageIdForConversation(pane.conversationId, own);
+            msgId = found ? found.id : null;
+          }
+          if (chain && chain.move === 'needs-you') {
+            const shown = await showHoldingChain(pane, chain, msgId);
+            if (shown) return;
+            await pageReason('page:no-message-id', pane);
+            return;
+          }
+          if (chain && chain.move === 'prepare') {
+            await pageReason('outlook:file-found-no-attach', pane);
+            return;
+          }
+          if (ran && ran.quiet) {
+            await pageReason('page:' + ran.quiet, pane);
+            return;
+          }
+          if (chain && chain.reason) {
+            await pageReason('page:' + chain.reason, pane);
+            return;
+          }
+        }
         // The planner's own reason for this conversation, when it has one, says more than "the open text was quiet".
         const diags = (st.outlookSync && st.outlookSync.diagnostics) || [];
         const conv = FlowOwaParse.canonId(pane.conversationId);

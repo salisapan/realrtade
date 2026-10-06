@@ -46,6 +46,8 @@ The same rule, for every other requirement, is one function (`core/close-chains.
 
 An ask that gets someone else to act is not a file prepare. English: "ask X to", "have X send", "get X to send". Hebrew: "תבקש מ-X", "תגיד ל-X", "ש-X ישלח". One Drive hit does not attach that file, and Glance does not draft "I'll send it" for that sentence. The outcome is silence. "Send me the invoice" and "שלח לי את החשבונית" still prepare. "שתשלח" ("that you send") stays a direct ask.
 
+Gmail and Outlook pass the same Drive and thread evidence into that function. Calendar, Sheets and Docs are not searched on either surface. The Outlook draft cannot carry a Drive file, so a file that was found stays quiet there instead of a draft that says it is attached. A missing file can still draft a holding reply. Nothing is sent.
+
 Not built (needs connectors that do not exist): asking a colleague who holds the document, e-signature, a CRM, and writing an unissued invoice draft into an invoicing system (Green Invoice / iCount). That last one is approved for the roadmap only (`docs/open-tasks.md` row 43), not now.
 
 ## 5. Before and after, as the person feels it

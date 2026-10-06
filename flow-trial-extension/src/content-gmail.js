@@ -905,12 +905,11 @@
           origin: 'gmail',
           now: Date.now(),
           watching,
-          evidence: {
-            driveScope: 'account',
-            connected: { drive: true, thread: true, gmail: false, outlook: false, docs: false, sheets: false, calendar: false },
-            driveFiles: searched && searched.ok ? (searched.files || []) : null,
+          evidence: FlowCloseChains.fileEvidence({
+            driveOk: Boolean(searched && searched.ok),
+            driveFiles: (searched && searched.files) || [],
             threadFiles
-          }
+          })
         });
         if (chain && chain.move === 'needs-you') {
           injectNeedsYou(message, {
