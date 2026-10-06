@@ -573,6 +573,77 @@ async function run() {
     check('a failed search is null, not an empty "no match"', failed === null, failed);
   }
 
+  console.log('\n--- background.js: a missing Drive scope is one eviction, then a named failure ---\n');
+  {
+    const cls = load({ stored: CONNECTED });
+    const miss = cls.fn('driveSearchFailure')(403, { error: { errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' } });
+    const scoped = cls.fn('driveSearchFailure')(403, { error: { details: [{ reason: 'ACCESS_TOKEN_SCOPE_INSUFFICIENT' }], message: 'Request had insufficient authentication scopes.' } });
+    const other = cls.fn('driveSearchFailure')(403, { error: { message: 'forbidden' } });
+    const down = cls.fn('driveSearchFailure')(500, { error: { message: 'backend' } });
+    check('403 insufficientPermissions is drive-not-granted', miss.reason === 'drive-not-granted' && /Insufficient Permission/.test(miss.error), miss);
+    check('403 ACCESS_TOKEN_SCOPE_INSUFFICIENT is drive-not-granted', scoped.reason === 'drive-not-granted', scoped);
+    check('a 403 that is not a missing scope is drive-search-failed', other.reason === 'drive-search-failed', other);
+    check('a 500 is drive-search-failed', down.reason === 'drive-search-failed' && down.error === 'backend', down);
+
+    let n = 0;
+    const once = load({
+      stored: CONNECTED,
+      routes: [[/\/drive\/v3\/files\?q=/, { reply: () => {
+        n += 1;
+        if (n === 1) return res(403, { error: { errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' } });
+        return res(200, { files: [{ id: 'q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }] });
+      } }]]
+    });
+    const recovered = await attempt(once.fn('searchDriveFiles')("name contains 'glance-pricing-q4'"));
+    check('one scope 403 drops the cached token and the retry returns the file', Array.isArray(recovered) && recovered.length === 1 && recovered[0].id === 'q4', recovered);
+    check('the cached token is evicted once', once.calls.filter((c) => c.indexOf('EVICT ') === 0).length === 1, once.calls);
+    check('Drive is listed twice, not left on the first 403', once.calls.filter((c) => c.indexOf('/drive/v3/files?q=') >= 0).length === 2, once.calls);
+
+    const twice = load({
+      stored: CONNECTED,
+      routes: [[/\/drive\/v3\/files\?q=/, { reply: res(403, { error: { errors: [{ reason: 'insufficientPermissions' }], message: 'Insufficient Permission' } }) }]]
+    });
+    const detail = {};
+    const denied = await attempt(twice.fn('searchDriveFiles')("name contains 'glance-pricing-q4'", detail));
+    check('a second scope 403 is null and drive-not-granted', denied === null && detail.reason === 'drive-not-granted' && detail.status === 403, { denied, detail });
+    check('the second 403 does not evict again', twice.calls.filter((c) => c.indexOf('EVICT ') === 0).length === 1, twice.calls);
+    check('a missing scope is not retried forever', twice.calls.filter((c) => c.indexOf('/drive/v3/files?q=') >= 0).length === 2, twice.calls);
+
+    const http = {};
+    const five = load({ stored: CONNECTED, routes: [[/\/drive\/v3\/files\?q=/, { reply: res(500, { error: { message: 'backend' } }) }]] });
+    const fiveOut = await attempt(five.fn('searchDriveFiles')("name contains 'invoice'", http));
+    check('a 500 stays null, drive-search-failed, and does not evict', fiveOut === null && http.reason === 'drive-search-failed' && http.error === 'backend' && !five.calls.some((c) => c.indexOf('EVICT ') === 0), { fiveOut, http, calls: five.calls });
+
+    const emptyDetail = {};
+    const blank = load({ stored: CONNECTED });
+    const blankOut = await attempt(blank.fn('searchDriveFiles')('', emptyDetail));
+    check('an empty query does not call Drive', blankOut === null && emptyDetail.reason === 'drive-search-failed' && emptyDetail.error === 'empty-query' && blank.calls.length === 0, { blankOut, emptyDetail, calls: blank.calls });
+
+    const off = load({ stored: {} });
+    const notConn = await attempt(off.fn('searchDriveMessage')({ query: "name contains 'x'", trace: true }));
+    check('Google not connected is drive-not-granted', notConn && notConn.ok === false && notConn.reason === 'drive-not-granted' && notConn.error === 'not-connected' && notConn.fileCount === 0, notConn);
+
+    const traced = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/drive\/v3\/files\?q=/, { reply: res(200, { files: [{ id: 'q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }] }) }],
+        [/\/oauth2\/v3\/tokeninfo/, { reply: res(200, { scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/tasks' }) }]
+      ]
+    });
+    const withTrace = await attempt(traced.fn('searchDriveMessage')({ query: "name contains 'glance-pricing-q4'", trace: true }));
+    const noTrace = await attempt(traced.fn('searchDriveMessage')({ query: "name contains 'glance-pricing-q4'" }));
+    check('a traced search returns the file count and the token scopes', withTrace && withTrace.ok === true && withTrace.status === 200 && withTrace.fileCount === 1 && withTrace.scopes && withTrace.scopes.ok === true && withTrace.scopes.scopes.indexOf('https://www.googleapis.com/auth/drive.readonly') >= 0, withTrace);
+    check('the access token is not in the search result', withTrace && JSON.stringify(withTrace).indexOf('tok') < 0, withTrace);
+    check('without the trace, scopes are absent', noTrace && noTrace.ok === true && noTrace.fileCount === 1 && noTrace.scopes == null, noTrace);
+
+    const failedMsg = load({
+      stored: CONNECTED,
+      routes: [[/\/drive\/v3\/files\?q=/, { reply: res(503, { error: { message: 'backend' } }) }]]
+    });
+    const msgOut = await attempt(failedMsg.fn('searchDriveMessage')({ query: "name contains 'x'" }));
+    check('a failed search message is drive-search-failed with the HTTP status', msgOut && msgOut.ok === false && msgOut.reason === 'drive-search-failed' && msgOut.status === 503 && msgOut.fileCount === 0, msgOut);
+  }
+
   console.log('\n--- background.js: gmailDraftWrite — a real thread attachment always outranks a Drive guess ---\n');
   {
     // params.includeAttachment + a real attachment the user already saw on

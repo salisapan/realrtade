@@ -71,8 +71,8 @@ const FlowIncomingJudge = (() => {
     if (isRequest && gate.kind === 'block') return { show: false, reason: gate.reason === 'third-party' ? 'third-party' : 'file', intent };
     if (isRequest && gate.kind === 'clear') {
       if (resolution && typeof resolution.owns === 'function' && resolution.owns(gate.ask.id)) return { show: false, reason: 'file', intent };
-      // Gmail searches Drive in the open thread before it offers this. Outlook's page does the same search and attaches only when Graph returns an attachment id. Until that search, stay quiet.
-      if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-needs-drive', intent };
+      // Gmail searches Drive in the open thread before it offers this. Outlook's page and mailbox check do the same search and attach only when Graph returns an attachment id. Until that search runs, the silence is file-chain-not-run (the chain has not been called). A failed search is drive-not-granted or drive-search-failed, written by the host that called Drive, not here.
+      if (i.surface && i.surface !== 'gmail') return { show: false, reason: 'file-chain-not-run', intent };
     }
     const process = actionsApi.planFor(intent, {
       threadUrl: i.threadUrl || null,

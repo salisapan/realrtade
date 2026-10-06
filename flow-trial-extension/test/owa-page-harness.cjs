@@ -59,7 +59,7 @@ async function runPage(opts) {
   const sent = [];
   const graphMsg = { id: MSG, conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: false, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
-    receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: BODY } };
+    receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
   function reply(msg) {
     sent.push(msg);
     if (msg.type === 'flow:outlook-session') return { ok: true, token: store.outlookAuth.token, changed: false, how: 'fresh' };
@@ -73,8 +73,13 @@ async function runPage(opts) {
       return { ok: false, status: 404, body: '{}' };
     }
     if (msg.type === 'flow:search-drive') {
-      if (o.driveDown) return { ok: false };
-      return { ok: true, files: o.driveFiles || [] };
+      const base = o.driveResult
+        ? o.driveResult
+        : (o.driveDown
+          ? { ok: false, reason: 'drive-search-failed', status: 500, error: 'down', files: [], fileCount: 0 }
+          : { ok: true, status: 200, files: o.driveFiles || [], fileCount: (o.driveFiles || []).length });
+      if (msg.trace) return Object.assign({}, base, { scopes: o.driveScopes || { ok: true, scopes: ['https://www.googleapis.com/auth/drive.readonly', 'https://www.googleapis.com/auth/tasks'] } });
+      return base;
     }
     return { ok: true };
   }
@@ -277,6 +282,65 @@ async function runPage(opts) {
     );
     const hebrew = await runPage({ htmlPatch: he, emptyInbox: true, urlId: MSG, driveFiles: [], waitMs: 5000 });
     check('the Hebrew direct ask gets the Hebrew holding label', hebrew.chip && hebrew.chip.getAttribute('data-glance-chain') === 'needs-you' && /טיוטת תשובת ביניים/.test(hebrew.chip.textContent), hebrew.chip && hebrew.chip.textContent);
+  }
+
+  console.log('\n--- Q4 pricing sheet: mocked Drive, the file chain actually runs ---\n');
+  {
+    const Q4 = "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?";
+    const q4html = (h) => h.replace(
+      'Could you review the attached pilot proposal and confirm by Wednesday whether we can start next week? Also, please send me the name of the person on your side who will own onboarding.',
+      Q4
+    );
+    const file = { id: 'f-q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' };
+    const reasonsOf = (r) => ({
+      page: (r.store.outlookPageDiag || []).map((d) => d.reason),
+      plan: ((r.store.outlookSync && r.store.outlookSync.diagnostics) || []).map((d) => d.reason)
+    });
+    const stalled = (bag) => bag.page.indexOf('file-needs-drive') >= 0 || bag.plan.indexOf('file-needs-drive') >= 0 || bag.page.indexOf('file-chain-not-run') >= 0 || bag.plan.indexOf('file-chain-not-run') >= 0;
+
+    const one = await runPage({ htmlPatch: q4html, mailBody: Q4, driveFiles: [file], afterMs: 800, waitMs: 6000 });
+    const oneQuery = (one.sent.find((m) => m.type === 'flow:search-drive') || {}).query || '';
+    check('one Drive file: the query names the cited slug', /glance-pricing-q4/.test(oneQuery), one.sent.filter((m) => m.type === 'flow:search-drive'));
+    check('one Drive file: Do It is ready to attach, and the search was not traced', one.chip && one.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(one.chip.textContent) && !one.sent.some((m) => m.type === 'flow:search-drive' && m.trace), { text: one.chip && one.chip.textContent, traced: one.sent.filter((m) => m.trace) });
+    const oneWhy = reasonsOf(one);
+    check('one Drive file: Why not shown drops the file stall', !stalled(oneWhy), oneWhy);
+
+    const none = await runPage({ htmlPatch: q4html, mailBody: Q4, driveFiles: [], waitMs: 6000 });
+    check('zero Drive files: a holding card, not Do It', none.chip && none.chip.getAttribute('data-glance-chain') === 'needs-you' && /Draft a holding reply/.test(none.chip.textContent) && !/Do It/.test(none.chip.textContent), none.chip && none.chip.textContent);
+
+    const failed = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
+      driveResult: { ok: false, reason: 'drive-search-failed', status: 503, error: 'backend', files: [], fileCount: 0 }
+    });
+    const failedWhy = reasonsOf(failed);
+    check('a failed search stays silent', !failed.chip, failed.chip && failed.chip.textContent);
+    check('a failed search says drive-search-failed', failedWhy.page.indexOf('drive-search-failed') >= 0 || failedWhy.plan.indexOf('drive-search-failed') >= 0, failedWhy);
+    check('a failed search is not file-needs-drive or file-chain-not-run', !stalled(failedWhy), failedWhy);
+
+    const denied = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
+      driveResult: { ok: false, reason: 'drive-not-granted', status: 403, error: 'insufficientPermissions', files: [], fileCount: 0 }
+    });
+    const deniedWhy = reasonsOf(denied);
+    check('a missing Drive grant says drive-not-granted', !denied.chip && (deniedWhy.page.indexOf('drive-not-granted') >= 0 || deniedWhy.plan.indexOf('drive-not-granted') >= 0), deniedWhy);
+    check('a missing Drive grant is not the old stall', !stalled(deniedWhy), deniedWhy);
+
+    const traced = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], afterMs: 800, waitMs: 6000,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const line = traced.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
+    let payload = null;
+    try { payload = JSON.parse(line.slice('Glance: file-trace '.length)); } catch (e) { payload = { parse: e.message, line: line }; }
+    check('the armed trace logs one Glance: file-trace line', Boolean(payload && payload.decide), payload);
+    check('the trace records the decision, the search, the query, the file count, the scopes, and prepare',
+      payload && payload.decide && payload.decide.reason === 'file-chain-not-run' && payload.resolveFileChain === 'searched'
+      && payload.gate && payload.gate.kind === 'clear' && /glance-pricing-q4/.test(String(payload.driveQuery || ''))
+      && payload.search && payload.search.ok === true && payload.search.fileCount === 1
+      && payload.scopes && payload.scopes.scopes && payload.scopes.scopes.indexOf('https://www.googleapis.com/auth/drive.readonly') >= 0
+      && payload.final === 'prepare', payload);
+    check('the armed search asks the worker for scopes', traced.sent.some((m) => m.type === 'flow:search-drive' && m.trace === true), traced.sent.filter((m) => m.type === 'flow:search-drive'));
+    check('the trace still prepares the file', traced.chip && traced.chip.getAttribute('data-glance-chain') === 'prepare', traced.chip && traced.chip.getAttribute('data-glance-chain'));
   }
 
   console.log('\nTOTAL FAILURES:', failures);

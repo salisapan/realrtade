@@ -344,34 +344,70 @@ const FlowOutlook = (() => {
       return list[0] || null;
     }
 
+    function fileChainPending(reason) {
+      if (typeof FlowCloseChains !== 'undefined' && FlowCloseChains.isFileChainPending) return FlowCloseChains.isFileChainPending(reason);
+      return reason === 'file-chain-not-run' || reason === 'file-needs-drive';
+    }
+
+    function searchSilenceOf(searched) {
+      if (typeof FlowCloseChains !== 'undefined' && typeof FlowCloseChains.searchSilence === 'function') return FlowCloseChains.searchSilence(searched);
+      if (!searched) return 'file-chain-not-run';
+      if (searched.ok === true) return null;
+      return searched.reason === 'drive-not-granted' || searched.reason === 'not-connected' ? 'drive-not-granted' : 'drive-search-failed';
+    }
+
+    // silence: { conversationId, reason }. reason null drops the stall (a card, or a file the open message attaches).
+    function applyFileChainSilence(diagnostics, silence) {
+      const byConv = {};
+      (silence || []).forEach((row) => { if (row && row.conversationId) byConv[String(row.conversationId)] = row; });
+      const out = [];
+      (diagnostics || []).forEach((d) => {
+        if (!d) return;
+        const hit = byConv[String(d.conversationId || '')];
+        if (!hit || !fileChainPending(d.reason)) { out.push(d); return; }
+        if (!hit.reason) return;
+        out.push(Object.assign({}, d, { reason: hit.reason }));
+      });
+      return out;
+    }
+
     // Needs-you only. A found file is attached from the open message (Do It), not from this list.
+    // A search that does not finish replaces file-chain-not-run with drive-not-granted or drive-search-failed.
     async function outlookFileChainCards(messages, diagnostics, now) {
-      if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) return [];
       const cards = [];
+      const silence = [];
+      if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) return { cards, silence };
       for (const d of diagnostics) {
-        if (!d || d.reason !== 'file-needs-drive') continue;
+        if (!d || !fileChainPending(d.reason)) continue;
         const msg = newestInConversation(messages, d.conversationId);
-        if (!msg || !msg.id) continue;
+        if (!msg || !msg.id) { silence.push({ conversationId: d.conversationId, reason: 'file-chain-not-run' }); continue; }
         const text = chainMessageText(msg);
         const gate = FlowFileAttach.gate(text);
-        if (!gate || gate.kind !== 'clear' || !gate.ask) continue;
+        if (!gate || gate.kind !== 'clear' || !gate.ask) { silence.push({ conversationId: d.conversationId, reason: 'file-chain-not-run' }); continue; }
+        if (!deps.send) { silence.push({ conversationId: d.conversationId, reason: 'file-chain-not-run' }); continue; }
         let searched = null;
-        if (deps.send) {
-          try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) }); }
-          catch (e) { searched = null; }
-        }
+        try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) }); }
+        catch (e) { searched = { ok: false, reason: 'drive-search-failed', status: 0, error: String(e && e.message || e) }; }
+        const failed = searchSilenceOf(searched);
+        if (failed) { silence.push({ conversationId: d.conversationId, reason: failed }); continue; }
         const chain = FlowCloseChains.resolve({
           text,
           origin: 'outlook',
           now,
           evidence: FlowCloseChains.fileEvidence({
-            driveOk: Boolean(searched && searched.ok),
+            driveOk: true,
             driveFiles: (searched && searched.files) || [],
             threadFiles: msg.hasAttachments ? null : []
           })
         });
-        if (!chain || chain.move !== 'needs-you' || chain.sends !== false || chain.close !== false) continue;
-        if (!chain.holding || !chain.holding.text || chain.holding.claimsFile) continue;
+        if (chain && chain.move === 'prepare' && chain.hit && chain.hit.file && chain.hit.source === 'drive') {
+          silence.push({ conversationId: d.conversationId, reason: null });
+          continue;
+        }
+        if (!chain || chain.move !== 'needs-you' || chain.sends !== false || chain.close !== false || !chain.holding || !chain.holding.text || chain.holding.claimsFile) {
+          silence.push({ conversationId: d.conversationId, reason: (chain && chain.reason) || 'file-chain-not-run' });
+          continue;
+        }
         const he = chain.requirement && chain.requirement.lang === 'he';
         const from = (msg.from && msg.from.emailAddress) || {};
         const card = chain.card || {};
@@ -406,8 +442,9 @@ const FlowOutlook = (() => {
           key: msg.conversationId + '|' + msg.id,
           label: line
         });
+        silence.push({ conversationId: d.conversationId, reason: null });
       }
-      return cards;
+      return { cards, silence };
     }
 
     // ---- one check --------------------------------------------------------------------------------------------
@@ -570,10 +607,12 @@ const FlowOutlook = (() => {
           } catch (e) { /* optional */ }
         }
       }
-      // File asks the planner left on file-needs-drive: the same Drive + thread evidence
-      // Gmail passes. Calendar, Sheets and Docs stay off. A found file is attached
-      // when the open message's Do It runs, not added to this list.
-      const chainCards = await outlookFileChainCards(messages, p.diagnostics || [], now);
+      // File asks the planner left on file-chain-not-run (older checks said file-needs-drive):
+      // the same Drive + thread evidence Gmail passes. Calendar, Sheets and Docs stay off.
+      // A found file is attached when the open message's Do It runs, not added to this list.
+      // The silence is replaced: a card or a found file drops it; a failed search names why.
+      const chained = await outlookFileChainCards(messages, p.diagnostics || [], now);
+      const chainCards = chained.cards || [];
       chainCards.forEach((entry) => {
         if (!entry || incomingCards.some((y) => y.messageId === entry.messageId)) return;
         incomingCards.push(entry);
@@ -587,7 +626,7 @@ const FlowOutlook = (() => {
 
       const offeredKeys = Object.keys(offered);
       if (offeredKeys.length > 200) offeredKeys.slice(0, offeredKeys.length - 200).forEach((k) => { delete offered[k]; });
-      const diagnostics = (p.diagnostics || []).slice(0, 40);
+      const diagnostics = applyFileChainSilence(p.diagnostics || [], chained.silence || []).slice(0, 40);
       await write(STATE_KEY, {
         lastAt: now, lastCount: p.stats.conversations, lastIncoming: (p.incoming || []).length, lastOffers: offers.length,
         error: null, needsSignIn: false, draftConsentNeeded: Boolean(st.draftConsentNeeded),

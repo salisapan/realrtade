@@ -1917,21 +1917,84 @@ function withExportExtension(name, ext) {
 const DRIVE_SEARCH_PAGE_SIZE = 100;
 const DRIVE_SEARCH_MAX_FILES = 400;
 
+// A Drive files.list failure, as a silence the file chain can show.
+// 403 with an insufficient-scope body is drive-not-granted (the cached
+// chrome.identity token predates drive.readonly, or the grant never
+// included it). Any other failure is drive-search-failed. The list itself
+// stays null either way: a partial page is not "no file".
+function driveSearchFailure(status, body) {
+  const err = body && body.error;
+  const reasons = [];
+  if (err && Array.isArray(err.errors)) err.errors.forEach((e) => { if (e && e.reason) reasons.push(String(e.reason)); });
+  if (err && Array.isArray(err.details)) err.details.forEach((d) => { if (d && d.reason) reasons.push(String(d.reason)); });
+  const message = err && err.message ? String(err.message) : '';
+  const scopeMiss = status === 403 && (
+    reasons.indexOf('insufficientPermissions') !== -1
+    || reasons.indexOf('ACCESS_TOKEN_SCOPE_INSUFFICIENT') !== -1
+    || /insufficient authentication scopes/i.test(message)
+    || /insufficient permission/i.test(message)
+  );
+  if (scopeMiss) return { reason: 'drive-not-granted', error: message || reasons.join(',') || 'insufficientPermissions' };
+  return { reason: 'drive-search-failed', error: message || ('http-' + (status || 0)) };
+}
+
+async function readDriveFailure(res) {
+  let body = null;
+  try { body = await res.json(); } catch (e) { body = null; }
+  const classified = driveSearchFailure(res && res.status, body);
+  return { status: (res && res.status) || 0, reason: classified.reason, error: classified.error };
+}
+
+// Scopes on the token Chrome actually handed us. Only the hand-armed Outlook
+// file trace asks. The access token is not returned and not logged.
+async function googleTokenScopes() {
+  try {
+    const token = await getGoogleAuthToken(false);
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(token));
+    if (!res.ok) return { ok: false, status: res.status };
+    const data = await res.json();
+    const scopes = String((data && data.scope) || '').split(/\s+/).filter(Boolean);
+    return { ok: true, status: res.status, scopes };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
+}
+
 // q is an already-escaped Drive query (file attach, or a fact lookup built
 // here from structured label/kind/name — never a raw q from the page). A
 // failed page returns null rather than a short list — ranking a partial
 // page is how a second, unseen file becomes "the only match".
-async function searchDriveFiles(q) {
-  if (!q) return null;
+// detail, when passed, receives status/reason/error of the failure.
+// One 403 for a missing Drive scope drops the cached token and asks Chrome
+// once more (interactive), so a grant that predates drive.readonly can pick
+// up the scope already listed in the manifest. A second 403 stops.
+async function searchDriveFiles(q, detail) {
+  if (!q) {
+    if (detail) { detail.status = 0; detail.reason = 'drive-search-failed'; detail.error = 'empty-query'; }
+    return null;
+  }
   const files = [];
   let pageToken = '';
+  let scopeRetried = false;
   while (files.length < DRIVE_SEARCH_MAX_FILES) {
     let path = '/files?q=' + encodeURIComponent(q)
       + '&pageSize=' + DRIVE_SEARCH_PAGE_SIZE
       + '&corpora=user&fields=' + encodeURIComponent('nextPageToken,files(id,name,mimeType,size,modifiedTime)');
     if (pageToken) path += '&pageToken=' + encodeURIComponent(pageToken);
     const res = await googleAuthedFetch(GOOGLE_DRIVE_API, path);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const fail = await readDriveFailure(res);
+      if (fail.reason === 'drive-not-granted' && !scopeRetried) {
+        scopeRetried = true;
+        try {
+          const stale = await getGoogleAuthToken(false);
+          if (stale) await removeCachedGoogleAuthToken(stale);
+        } catch (e) { /* the retry below asks Chrome again */ }
+        continue;
+      }
+      if (detail) { detail.status = fail.status; detail.reason = fail.reason; detail.error = fail.error; }
+      return null;
+    }
     const data = await res.json();
     const batch = data.files || [];
     for (let i = 0; i < batch.length && files.length < DRIVE_SEARCH_MAX_FILES; i++) files.push(batch[i]);
@@ -1939,6 +2002,36 @@ async function searchDriveFiles(q) {
     pageToken = data.nextPageToken;
   }
   return files;
+}
+
+// flow:search-drive. files is the list only when ok. reason is drive-not-granted
+// or drive-search-failed. trace adds the scopes on the token, nothing else.
+async function searchDriveMessage(msg) {
+  const trace = Boolean(msg && msg.trace);
+  if (!(await googleConnected())) {
+    const scopes = trace ? await googleTokenScopes() : null;
+    return { ok: false, reason: 'drive-not-granted', status: 0, error: 'not-connected', files: [], fileCount: 0, scopes };
+  }
+  const detail = {};
+  let files = null;
+  try { files = await searchDriveFiles(msg && msg.query, detail); }
+  catch (e) {
+    const scopes = trace ? await googleTokenScopes() : null;
+    return { ok: false, reason: 'drive-search-failed', status: 0, error: String(e && e.message || e), files: [], fileCount: 0, scopes };
+  }
+  const scopes = trace ? await googleTokenScopes() : null;
+  if (!files) {
+    return {
+      ok: false,
+      reason: detail.reason || 'drive-search-failed',
+      status: detail.status || 0,
+      error: detail.error || null,
+      files: [],
+      fileCount: 0,
+      scopes
+    };
+  }
+  return { ok: true, status: 200, files, fileCount: files.length, scopes };
 }
 
 // Drive files are fetched here, not by content-gmail.js, because reading a
@@ -3468,14 +3561,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })());
   }
 
-  if (msg.type === 'flow:search-drive') {
-    return reply(sendResponse, (async () => {
-      if (!(await googleConnected())) return { ok: false, reason: 'not-connected' };
-      const files = await searchDriveFiles(msg.query);
-      if (!files) return { ok: false, reason: 'error' };
-      return { ok: true, files };
-    })());
-  }
+  if (msg.type === 'flow:search-drive') return reply(sendResponse, searchDriveMessage(msg));
 
   if (msg.type === 'flow:drive-find-one') {
     return reply(sendResponse, driveFindOneByName(msg.term));

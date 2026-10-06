@@ -14,6 +14,13 @@
 // Debug: chrome.storage.local.glanceDebug = true (or localStorage 'glance-debug' = '1' on the Outlook page) logs every
 // stage with a "Glance:" prefix: start, injected, parsed, matched, judged, decision, rendered (or the reason it did not).
 // Without it the page logs one line ("Glance: outlook content start") and any error.
+//
+// One file-chain trace, hand-armed, not the always-on debug log. Arm a single run, then open the mail:
+//   Service worker console: chrome.storage.local.set({ glanceOutlookFileTrace: 1 })
+//   Outlook page console: localStorage.setItem('glance-outlook-file-trace', '1')
+// The next file-ask scan logs one "Glance: file-trace" line (what decideFromText decided, whether
+// resolveFileChain searched, the gate, the Drive query, flow:search-drive ok/status/error/fileCount,
+// the scopes on the Google token, and the final silence or show reason) and clears the arm.
 (() => {
   const VERSION = (() => { try { return chrome.runtime.getManifest().version; } catch (e) { return '?'; } })();
   try { console.info('Glance: outlook content start', VERSION, location.host); } catch (e) { /* no console */ }
@@ -48,8 +55,31 @@
   // sometimes loses the address (it lives in a hover card) and would otherwise keep a worse sender.
   const senderMemory = Object.create(null);
   let debug = false;
+  let traceArmed = false;
   try { debug = window.localStorage && window.localStorage.getItem('glance-debug') === '1'; } catch (e) { /* storage blocked */ }
-  try { chrome.storage.local.get({ glanceDebug: false }, (r) => { if (r && r.glanceDebug) debug = true; dbg('injected', { version: VERSION, href: location.href }); }); } catch (e) { /* no storage */ }
+  try {
+    chrome.storage.local.get({ glanceDebug: false, glanceOutlookFileTrace: 0 }, (r) => {
+      if (r && r.glanceDebug) debug = true;
+      traceArmed = (Number(r && r.glanceOutlookFileTrace) || 0) > 0;
+      dbg('injected', { version: VERSION, href: location.href });
+      if (traceArmed) { lastSig = ''; schedule(); }
+    });
+  } catch (e) { /* no storage */ }
+
+  function localFileTrace() {
+    try { return window.localStorage && window.localStorage.getItem('glance-outlook-file-trace') === '1'; }
+    catch (e) { return false; }
+  }
+
+  function disarmFileTrace() {
+    traceArmed = false;
+    try { if (window.localStorage) window.localStorage.removeItem('glance-outlook-file-trace'); } catch (e) { /* storage blocked */ }
+    try { chrome.storage.local.set({ glanceOutlookFileTrace: 0 }); } catch (e) { /* no storage */ }
+  }
+
+  function logFileTrace(payload) {
+    try { console.info('Glance: file-trace', JSON.stringify(payload)); } catch (e) { /* console gone */ }
+  }
 
   function hashText(t) {
     let h = 0;
@@ -393,11 +423,50 @@
     return [];
   }
 
-  async function resolveFileChain(text, threadFiles, threadId) {
-    if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) return null;
-    const gate = FlowFileAttach.gate(text);
-    if (!gate || gate.kind !== 'clear' || !gate.ask) return { quiet: (gate && gate.reason) || 'file' };
-    const searched = await send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) });
+  function namedSilence(reason) {
+    const r = String(reason || 'file-chain-not-run');
+    if (typeof FlowCloseChains !== 'undefined' && FlowCloseChains.isFileSilence && FlowCloseChains.isFileSilence(r)) return r;
+    if (r === 'drive-not-granted' || r === 'drive-search-failed' || r === 'file-chain-not-run') return r;
+    if (r.indexOf('page:') === 0 || r.indexOf('outlook:') === 0) return r;
+    return 'page:' + r;
+  }
+
+  function filePendingReason(reason) {
+    if (typeof FlowCloseChains !== 'undefined' && FlowCloseChains.isFileChainPending) return FlowCloseChains.isFileChainPending(reason);
+    return reason === 'file-chain-not-run' || reason === 'file-needs-drive';
+  }
+
+  // A shown file card is the outcome. Drop the mailbox check's silence for this
+  // conversation so Why not shown does not keep an earlier drive-not-granted.
+  async function forgetFileSilence(pane) {
+    try {
+      const bag = await FlowStorage.get();
+      const sync = bag && bag.outlookSync;
+      if (!sync || !Array.isArray(sync.diagnostics)) return;
+      const conv = FlowOwaParse.canonId(pane && pane.conversationId);
+      const next = sync.diagnostics.filter((d) => {
+        if (!d || !(typeof FlowCloseChains !== 'undefined' && FlowCloseChains.isFileSilence && FlowCloseChains.isFileSilence(d.reason))) return true;
+        if (!conv) return true;
+        return FlowOwaParse.canonId(d.conversationId) !== conv;
+      });
+      if (next.length !== sync.diagnostics.length) await FlowStorage.set({ outlookSync: Object.assign({}, sync, { diagnostics: next }) });
+    } catch (e) { /* the extension was reloaded under this page */ }
+  }
+
+  async function resolveFileChain(text, threadFiles, threadId, trace) {
+    const gate = (typeof FlowFileAttach !== 'undefined' && typeof FlowFileAttach.gate === 'function') ? FlowFileAttach.gate(text) : null;
+    if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) {
+      return { ran: false, gate, query: null, searched: null, chain: null, quiet: 'file-chain-not-run' };
+    }
+    if (!gate || gate.kind !== 'clear' || !gate.ask) {
+      return { ran: false, gate, query: null, searched: null, chain: null, quiet: (gate && gate.reason) || 'file' };
+    }
+    const query = FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query);
+    const searched = await send({ type: 'flow:search-drive', query, trace: Boolean(trace) });
+    const silence = typeof FlowCloseChains.searchSilence === 'function'
+      ? FlowCloseChains.searchSilence(searched)
+      : (!searched || searched.ok !== true ? 'drive-search-failed' : null);
+    if (silence) return { ran: true, gate, query, searched, chain: null, quiet: silence };
     let watching = null;
     try {
       const watches = await FlowStorage.getWatches();
@@ -415,7 +484,7 @@
         threadFiles: threadFiles
       })
     });
-    return { chain };
+    return { ran: true, gate, query, searched, chain, quiet: null };
   }
 
   async function onHoldingDoIt(host, chip, ctx) {
@@ -530,6 +599,7 @@
     dbg('decision', { shown: true, chain: 'prepare', fileId: file.id });
     dbg('rendered', { messageId: messageId, chain: 'prepare' });
     await clearReason(pane);
+    await forgetFileSilence(pane);
     return true;
   }
 
@@ -570,6 +640,7 @@
     dbg('decision', { shown: true, chain: 'needs-you', label: ctx.doLabel });
     dbg('rendered', { messageId: messageId, chain: 'needs-you' });
     await clearReason(pane);
+    await forgetFileSilence(pane);
     return true;
   }
 
@@ -616,7 +687,7 @@
     const sig = pane
       ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text)].join('|')
       : 'none|' + location.pathname;
-    if (sig === lastSig && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) return;
+    if (sig === lastSig && !traceArmed && !localFileTrace() && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) return;
     lastSig = sig;
     lastOutcome = '';
     if (!pane) {
@@ -667,44 +738,73 @@
           await pageReason('page:third-party', pane);
           return;
         }
-        if (decided && decided.reason === 'file-needs-drive') {
-          const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
-          const ran = await resolveFileChain(askText, pageThreadFiles(), pane.conversationId || pane.itemId);
-          const chain = ran && ran.chain;
-          let msgId = pane.itemId || null;
-          if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && pane.conversationId) {
-            const found = await messageIdForConversation(pane.conversationId, own);
-            msgId = found ? found.id : null;
-          }
-          if (chain && chain.move === 'needs-you') {
-            const shown = await showHoldingChain(pane, chain, msgId);
-            if (shown) return;
-            await pageReason('page:no-message-id', pane);
-            return;
-          }
-          if (chain && chain.move === 'prepare') {
-            const file = chain.hit && chain.hit.file;
-            if (file && file.id && chain.hit.source === 'drive') {
-              const shown = await showFilePrepare(pane, chain, msgId);
-              if (shown) return;
-            }
-            await pageReason('outlook:file-found-no-attach', pane);
-            return;
-          }
-          if (ran && ran.quiet) {
-            await pageReason('page:' + ran.quiet, pane);
-            return;
-          }
-          if (chain && chain.reason) {
-            await pageReason('page:' + chain.reason, pane);
-            return;
-          }
-        }
-        // The planner's own reason for this conversation, when it has one, says more than "the open text was quiet".
         const diags = (st.outlookSync && st.outlookSync.diagnostics) || [];
         const conv = FlowOwaParse.canonId(pane.conversationId);
         const planned = conv ? diags.find((d) => FlowOwaParse.canonId(d.conversationId) === conv) : null;
-        await pageReason(planned ? planned.reason : ('page:' + ((decided && decided.reason) || 'intent-null')), pane);
+        // The open text and the mailbox check can disagree. Either one saying this
+        // is a file ask that has not been searched is enough to run the chain.
+        // Falling through used to reprint the planner's file-needs-drive forever.
+        if ((decided && filePendingReason(decided.reason)) || (planned && filePendingReason(planned.reason))) {
+          const tracing = traceArmed || localFileTrace();
+          const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
+          let ran = null;
+          let finalReason = 'file-chain-not-run';
+          try {
+            ran = await resolveFileChain(askText, pageThreadFiles(), pane.conversationId || pane.itemId, tracing);
+            const chain = ran && ran.chain;
+            let msgId = pane.itemId || null;
+            if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && pane.conversationId) {
+              const found = await messageIdForConversation(pane.conversationId, own);
+              msgId = found ? found.id : null;
+            }
+            if (chain && chain.move === 'needs-you') {
+              const shown = await showHoldingChain(pane, chain, msgId);
+              finalReason = shown ? 'needs-you' : 'page:no-message-id';
+              if (!shown) await pageReason(finalReason, pane);
+              return;
+            }
+            if (chain && chain.move === 'prepare') {
+              const file = chain.hit && chain.hit.file;
+              if (file && file.id && chain.hit.source === 'drive') {
+                const shown = await showFilePrepare(pane, chain, msgId);
+                if (shown) { finalReason = 'prepare'; return; }
+              }
+              finalReason = 'outlook:file-found-no-attach';
+              await pageReason(finalReason, pane);
+              return;
+            }
+            finalReason = namedSilence((ran && ran.quiet) || (chain && chain.reason) || 'file-chain-not-run');
+            await pageReason(finalReason, pane);
+          } finally {
+            if (tracing) {
+              const searched = ran && ran.searched;
+              const files = searched && Array.isArray(searched.files) ? searched.files : [];
+              logFileTrace({
+                decide: {
+                  show: Boolean(decided && !decided.none),
+                  reason: (decided && decided.reason) || null,
+                  type: decided && decided.intent && decided.intent.type || null,
+                  label: decided && decided.intent && decided.intent.label || null
+                },
+                resolveFileChain: ran ? (ran.ran ? 'searched' : 'not-run') : 'not-called',
+                gate: ran && ran.gate ? { kind: ran.gate.kind, reason: ran.gate.reason || null, id: ran.gate.ask && ran.gate.ask.id || null } : null,
+                driveQuery: (ran && ran.query) || null,
+                search: searched ? {
+                  ok: searched.ok === true,
+                  status: searched.status || 0,
+                  error: searched.error || searched.reason || null,
+                  fileCount: searched.ok === true ? (typeof searched.fileCount === 'number' ? searched.fileCount : files.length) : 0
+                } : null,
+                scopes: (searched && searched.scopes) || null,
+                final: finalReason
+              });
+              disarmFileTrace();
+            }
+          }
+          return;
+        }
+        // The planner's own reason for this conversation, when it has one, says more than "the open text was quiet".
+        await pageReason(planned && !filePendingReason(planned.reason) ? planned.reason : ('page:' + ((decided && decided.reason) || 'intent-null')), pane);
         return;
       }
       if (!entry) {
@@ -853,6 +953,11 @@
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.glanceDebug) debug = Boolean(changes.glanceDebug.newValue);
+      if (area === 'local' && changes.glanceOutlookFileTrace) {
+        const n = Number(changes.glanceOutlookFileTrace.newValue) || 0;
+        traceArmed = n > 0;
+        if (n > 0) { lastSig = ''; schedule(); }
+      }
       // A Do It / Undo from the panel changes what this card should say; this page's own "shown" row does not.
       const logChanged = area === 'local' && changes.log && Array.isArray(changes.log.newValue)
         && (changes.log.newValue[0] || {}).kind !== 'shown'; // the log is newest first
