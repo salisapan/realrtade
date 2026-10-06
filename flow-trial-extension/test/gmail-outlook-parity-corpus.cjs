@@ -174,7 +174,25 @@ const CASES = [
     text: 'Thanks so much for the call today, it was really helpful. Have a great weekend!' },
   { name: 'a newsletter-style FYI', subject: 'Weekly update',
     from: { name: 'Team', email: 'updates@acme.com' },
-    text: 'This week we shipped the new dashboard and fixed several bugs. No action needed on your side.' }
+    text: 'This week we shipped the new dashboard and fixed several bugs. No action needed on your side.' },
+  { name: 'a file ask whose meeting is only the deadline (Q4 pricing sheet)', subject: 'Q4 pricing sheet',
+    from: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+    text: "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?" },
+  { name: 'a deck asked for before a call', subject: 'Deck',
+    from: { name: 'Dana Cohen', email: 'dana@acme.com' },
+    text: 'Could you send me the deck before our call Thursday?' },
+  { name: 'a Hebrew contract asked for before the meeting', subject: 'חוזה',
+    from: { name: 'Dana Cohen', email: 'dana@acme.com' },
+    text: 'תשלח לי את החוזה לפני הפגישה מחר' },
+  { name: 'an explicit meet at a clock time', subject: 'Tomorrow',
+    from: { name: 'Avi Levi', email: 'avi@partner.io' },
+    text: 'Can we meet tomorrow at 10:00 to go over the rollout?' },
+  { name: 'a Hebrew meet at a clock time', subject: 'חמישי',
+    from: { name: 'Noa Bar', email: 'noa@vendor.co' },
+    text: 'נפגש ביום חמישי ב-10:00?' },
+  { name: 'a file ask and two offered times stay quiet', subject: 'Agenda',
+    from: { name: 'Dana Cohen', email: 'dana@acme.com' },
+    text: 'Could you send me the agenda, and are you free Thu 10:00 or 14:00?' }
 ];
 
 (async () => {

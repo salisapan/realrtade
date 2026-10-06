@@ -129,6 +129,16 @@ console.log('\n--- incoming asks (someone else asked you) ---\n');
   check('incoming label mentions the request and Wed Oct 7', /Reply requested/i.test(both.incoming[0].intent.label) && /Oct 7/.test(both.incoming[0].intent.label), both.incoming[0].intent.label);
   check('self mail produces no offer whose counterpart is an own address', !both.offers.some((o) => o.base.counterpart.email === OUT || o.base.counterpart.email === GMAIL_ME), both.offers);
 
+  const aliasOnly = S.plan({
+    messages: [{ id: 'alias1', conversationId: 'convAlias', subject: 'Q4 pricing sheet', isDraft: false,
+      from: { emailAddress: { name: 'Sali', address: GMAIL_ME } },
+      toRecipients: [{ emailAddress: { name: 'Glance', address: OUT } }],
+      receivedDateTime: '2026-10-06T09:00:00Z',
+      body: { contentType: 'text', content: "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?" } }],
+    me: [OUT, GMAIL_ME], watches: [], graph: I.empty(), state: {}, now: NOW2, deps: intentDeps
+  });
+  check('mail from an alias of the same account stays silent', aliasOnly.incoming.length === 0 && aliasOnly.offers.length === 0, { incoming: aliasOnly.incoming, offers: aliasOnly.offers, diag: aliasOnly.diagnostics });
+
   const oldMe = planLive(GMAIL_ME);
   check('old behaviour input (me = gmail only): incoming ask still yields one incoming item', oldMe.incoming.length === 1, oldMe.incoming);
 

@@ -357,7 +357,7 @@ const FlowOutlook = (() => {
         if (!gate || gate.kind !== 'clear' || !gate.ask) continue;
         let searched = null;
         if (deps.send) {
-          try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.query) }); }
+          try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) }); }
           catch (e) { searched = null; }
         }
         const chain = FlowCloseChains.resolve({

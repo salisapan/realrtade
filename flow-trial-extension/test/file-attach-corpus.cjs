@@ -307,6 +307,27 @@ console.log('\n--- file-attach: Drive query escapes quotes and stays on the aske
 {
   const q = FlowFileAttach.driveQuery("invoice's");
   check('a quote in the term is escaped', q.includes("invoice\\'s") && q.includes('trashed = false'), q);
+  check('a single term keeps the one-clause query', q === "trashed = false and (name contains 'invoice\\'s' or fullText contains 'invoice\\'s')", q);
+}
+
+console.log('\n--- file-attach: a pricing sheet is one file, and a cited slug finds it ---\n');
+{
+  const text = "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?";
+  const gate = FlowFileAttach.gate(text);
+  check('pricing sheet is a clear file ask', gate.kind === 'clear' && gate.ask && gate.ask.id === 'pricing-sheet' && gate.ask.creatable === false, gate);
+  check('the cited slug is a search term and a synonym', gate.ask && gate.ask.searchTerms.indexOf('glance-pricing-q4') !== -1 && gate.ask.synonym.indexOf('glance-pricing-q4') !== -1, gate.ask);
+  check('a short parenthetical is not a slug', FlowFileAttach.gate('Please send the pricing sheet (Q4).').ask.searchTerms.indexOf('Q4') === -1);
+  const q = FlowFileAttach.driveQuery(gate.ask.searchTerms);
+  check('the Drive query ORs the label and the slug, not the short word pricing', q.includes("name contains 'pricing sheet'") && q.includes("name contains 'glance-pricing-q4'") && !q.includes("name contains 'pricing'"), q);
+  const decision = FlowFileAttach.decide(gate.ask, [
+    file('generic', 'Q4 pricing overview.pdf'),
+    file('slug', 'glance-pricing-q4.pdf')
+  ], {}, text);
+  check('the cited file is the one attached', decision.action === 'attach' && decision.file && decision.file.name === 'glance-pricing-q4.pdf', decision);
+  const only = FlowFileAttach.decide(gate.ask, [file('slug', 'glance-pricing-q4.pdf')], {}, text);
+  check('the slug file alone attaches', only.action === 'attach' && only.file.name === 'glance-pricing-q4.pdf', only);
+  const pitch = FlowFileAttach.gate('Could you take a look at our new pricing plan for the team?');
+  check('a pricing plan with no sheet is not this file', pitch.kind === 'ignore', pitch);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -34,6 +34,10 @@ const FlowFileAttach = (() => {
     { id: 'logo', creatable: false, en: /\blogos?\b/gi, he: /לוגו/g, enLabel: 'logo', heLabel: 'לוגו', synonym: ['logo', 'לוגו'] },
     { id: 'transfer', creatable: false, en: /\b(?:transfer (?:confirmation|receipt)|proof of (?:payment|transfer))\b/gi, he: /אישור (?:ה)?העברה/g, enLabel: 'transfer confirmation', heLabel: 'אישור העברה', synonym: ['transfer', 'העברה', 'אישור העברה', 'אישור ההעברה'] },
     { id: 'report', creatable: false, en: /\breports?\b/gi, he: /דו["״]ח|דוח/g, enLabel: 'report', heLabel: 'דוח', synonym: ['report', 'דוח', 'דו"ח'] },
+    // "pricing sheet" is one file to attach. It is not a family-A noun: the
+    // launch-checklist mail also asks for a pricing sheet and must stay the
+    // meeting. "pricing" scores a filename; it is not a Drive search term.
+    { id: 'pricing-sheet', creatable: false, en: /\b(?:pricing|price)\s+sheets?\b/gi, he: /גיליון מחיר|גליון מחיר/g, enLabel: 'pricing sheet', heLabel: 'גיליון מחיר', synonym: ['pricing sheet', 'price sheet', 'pricing', 'גיליון מחיר', 'גליון מחיר'] },
     { id: 'signed-copy', creatable: false, en: /\bsigned (?:pdf|copy|scan|form)\b/gi, he: /עותק חתום|מסמך חתום|טופס חתום/g, enLabel: 'signed copy', heLabel: 'עותק חתום', synonym: ['signed', 'signed form', 'חתום', 'טופס חתום'] }
   ];
 
@@ -222,6 +226,46 @@ const FlowFileAttach = (() => {
   // ignore: not a file ask, leave the other closes alone.
   // block: it is about a file, but not one clear object — no chip.
   // clear: one object, one need.
+  // A parenthetical slug the sender cited, "(glance-pricing-q4)". A short
+  // "(Q4)" is not one. The slug is how Drive finds that file; the label
+  // alone ("pricing sheet") does not appear in the filename.
+  function citedSlugs(text) {
+    const out = [];
+    const seen = {};
+    const re = /\(([A-Za-z0-9][A-Za-z0-9._-]{5,80})\)/g;
+    let match;
+    const body = String(text || '');
+    while ((match = re.exec(body))) {
+      const slug = match[1];
+      if (!/[-_]/.test(slug)) continue;
+      const key = slug.toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = 1;
+      out.push(slug);
+    }
+    return out;
+  }
+
+  function askFromHit(hit, sourceText) {
+    const lang = hit.he ? 'he' : 'en';
+    const label = lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel;
+    const slugs = citedSlugs(sourceText);
+    const synonym = hit.obj.synonym.slice();
+    for (const slug of slugs) {
+      if (!synonym.some((term) => norm(term) === norm(slug))) synonym.push(slug);
+    }
+    return {
+      id: hit.obj.id,
+      creatable: hit.obj.creatable,
+      lang,
+      label,
+      query: label,
+      searchTerms: [label].concat(slugs),
+      synonym,
+      line: cardLine(lang, label)
+    };
+  }
+
   function gate(text) {
     const body = fresh(text);
     const hits = collectHits(body);
@@ -234,20 +278,7 @@ const FlowFileAttach = (() => {
     if (!picked) return { kind: 'ignore' };
     if (picked.block) return { kind: 'block', reason: 'unclear' };
     const hit = picked.hit;
-    const lang = hit.he ? 'he' : 'en';
-    const label = lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel;
-    return {
-      kind: 'clear',
-      ask: {
-        id: hit.obj.id,
-        creatable: hit.obj.creatable,
-        lang,
-        label,
-        query: lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel,
-        synonym: hit.obj.synonym.slice(),
-        line: cardLine(lang, label)
-      }
-    };
+    return { kind: 'clear', ask: askFromHit(hit, body) };
   }
 
   function cardLine(lang, label) {
@@ -255,9 +286,28 @@ const FlowFileAttach = (() => {
     return "Didn't find " + label + " — draft from template";
   }
 
-  function driveQuery(term) {
+  function driveClause(term) {
     const escaped = String(term || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-    return "trashed = false and (name contains '" + escaped + "' or fullText contains '" + escaped + "')";
+    return "(name contains '" + escaped + "' or fullText contains '" + escaped + "')";
+  }
+
+  // A string keeps the single-term query. An array ORs each term, so a
+  // cited filename slug is searched along with the label.
+  function driveQuery(term) {
+    const terms = Array.isArray(term) ? term : [term];
+    const parts = [];
+    const seen = {};
+    for (const raw of terms) {
+      const piece = String(raw || '').trim();
+      if (!piece) continue;
+      const key = piece.toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = 1;
+      parts.push(driveClause(piece));
+    }
+    if (!parts.length) return "trashed = false and (name contains '' or fullText contains '')";
+    if (parts.length === 1) return 'trashed = false and ' + parts[0];
+    return 'trashed = false and (' + parts.join(' or ') + ')';
   }
 
   function isTemplateName(name) {
@@ -458,16 +508,9 @@ const FlowFileAttach = (() => {
     if (NEG_EN.test(body) || NEG_HE.test(body) || HEDGE.test(body) || FYI.test(body)) return null;
     const hits = narrowHits(body, collectHits(body));
     if (hits.length !== 1 || askedPlural(hits[0], body)) return null;
-    const hit = hits[0];
-    const lang = hit.he ? 'he' : 'en';
-    return {
-      id: hit.obj.id,
-      creatable: hit.obj.creatable,
-      lang,
-      label: lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel,
-      query: lang === 'he' ? hit.obj.heLabel : hit.obj.enLabel,
-      synonym: hit.obj.synonym.slice()
-    };
+    const ask = askFromHit(hits[0], body);
+    delete ask.line;
+    return ask;
   }
 
   return {
