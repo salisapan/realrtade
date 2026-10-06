@@ -65,7 +65,7 @@ the path advances after each tap); the loop with its status line; popup row; Do 
 so nothing says "Handled." over an unsent draft; the issuer's file arriving in another thread advances the same loop; privacy page and store copy; 114 core checks and 38 browser checks.
 
 Wired to receipts and transfer proofs first, and since 2026-10-04 also to **the documents the person sends: contract, quote, proposal, signed copy** (`CLASSES` in `core/resolution.js`; no payment step; `docs/true-close.md` §4).
-The planner also speaks invoice, tax invoice and statement (tested), but those keep the existing Do It chip until these paths have been used on real mail. Other documents (reports, decks, forms) are untouched.
+A file ask that planner does not own (an invoice, a letter, a deck, and the same shape of ask in either language) uses the one close chain in `core/close-chains.js`: search the connected sources, attach the one file that is really there, and when it is not there say so. A template is not that file. The planner still recognises invoice, tax invoice and statement as words; it does not issue them.
 
 ## 5. What needs future connectors (not faked here)
 

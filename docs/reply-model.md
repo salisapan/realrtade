@@ -17,7 +17,7 @@ how the rules behave on non-answers, not how often real replies are non-answers)
 `core/reply-model.js`: a small on-device classifier (hashed words and word pairs, multinomial logistic regression, int8, 59 KB) that
 reads a short reply the rules could not place and says what it is: answered, interim ("looking into it"), thanks, unrelated, the ball
 back to you, or declined. It is used in exactly one way: **when it is at least 90% sure the reply is not an answer, the loop stays
-open and silent**. It never closes anything. So it can make a close rarer, never wronger.
+open and silent**. It never closes anything, including a close chain (`core/close-chains.js` closes only when completion evidence is real: a sent file, a sent fact, an accepted event, a sent approval or a sent answer). So it can make a close rarer, never wronger.
 
 Guards: only replies of up to 18 words (long substantive replies are not "thanks" and the model saw mostly short ones); never when a
 rule already decided (confirm, paid, declined, promised, handed back, or a contact-line signature, which holds on its own);

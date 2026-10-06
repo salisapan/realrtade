@@ -33,6 +33,8 @@ const FlowGraphMail = (() => {
     /^\s*>/
   ];
   function ownText(text) {
+    const shared = sibling(typeof FlowSourceText !== 'undefined' ? FlowSourceText : null, './source-text.js', 'FlowSourceText');
+    if (shared && typeof shared.ownText === 'function') return shared.ownText(text);
     const lines = String(text || '').replace(/\r/g, '').split('\n');
     const out = [];
     for (const l of lines) { if (CUT.some((re) => re.test(l))) break; out.push(l); }

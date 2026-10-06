@@ -25,7 +25,7 @@ const NOT_AN_ANSWER = [
   // in progress, waiting on someone else
   'Working on it', 'In progress', 'Still working on this', 'Need a bit more time', 'Give me a day or two', 'Waiting on legal', 'Waiting for the CFO to approve', 'It is with accounting', 'Forwarded to the team',
   // unsure
-  "I'll try", 'Hopefully by the end of the week', 'Probably tomorrow', 'I think so', 'Maybe', 'Not sure yet', 'Can we talk about it?',
+  "I'll try", 'Hopefully by the end of the week', 'Probably tomorrow', 'I think so', 'Maybe', 'Not sure yet', 'Can we talk about it?', "I'll send it by Thursday.", 'אשלח את זה עד יום חמישי.',
   // Hebrew
   'קיבלתי', 'קיבלתי, תודה', 'תודה', 'אחזור אליך', 'אחזור אליך בהקדם', 'בודק ואחזור', 'אני בודק את זה', 'מטפל בזה', 'בטיפול', 'רשמתי', 'ראיתי', 'נבדוק', 'אעדכן', 'אעדכן אותך', 'אני לא במשרד עד יום ראשון', 'תודה על פנייתך, אענה בהקדם', 'מצוין', 'נראה', 'אנסה', 'אולי', 'עוד לא', 'ממתין לאישור', 'ממתין לחתימה', 'בדרך',
   // a forward that leaves only a signature (real-mail gold rm-009), and the same shape in English

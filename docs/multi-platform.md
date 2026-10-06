@@ -113,7 +113,7 @@ both the Graph planner (`core/outlook-sync.js`) and the in-page card (`src/conte
 `buildActionPayload` sends, and `background.js` composes both drafts with `FlowDraftReply.draftBodyText`. `test/gmail-outlook-parity-corpus.cjs`
 runs the same emails through both adapters and both real writers and requires the same decision and the same draft, word for word. Two
 connector gaps stay silent on Outlook rather than weaker: a request for a file (Gmail searches Drive first; the Outlook draft cannot attach)
-and a close with no reply in it (a calendar event or a Task; Gmail writes those with the Google writers). A new ask is shown even when the
+and a close with no reply in it (a calendar event or a Task; Gmail writes those with the Google writers). The shared close chain (`core/close-chains.js`) does not care which inbox the ask came from. The Gmail card passes Drive and this thread into it. The Outlook card does not yet fetch Drive or Calendar, so a file ask there stays on that silence until the host passes evidence. No new permission was added for the chain. A new ask is shown even when the
 same person has an open loop elsewhere (as in Gmail), and "me" is learned only from strong evidence (a CC'd mail no longer makes its To
 person "me").
 
