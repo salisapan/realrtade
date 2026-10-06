@@ -15,7 +15,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
   Before starting a stream, skim `docs/vault/Home.md` (the Obsidian context cache, §5) for decisions and state carried over from earlier chats.
   `.claude/ecc-agents/INDEX.md` is the role library `CLAUDE.md` routes to. `docs/ai-assistant-context-parity.md` says what a fresh clone does and does not give an assistant.
 - **A public AI reader of the site** (`flow-landing/llms.txt`): describes only what is live. It is kept short on purpose and never describes a switch that is off.
-- **David / the owner**: `revenue-routines.md` (Hebrew) and `open-tasks.md`.
+- **David / the owner**: `revenue-routines.md` (Hebrew; lives on the product branch until merge), `cfo-revenue-mandate.md` (cash-path audit and P0 list, 2026-10-06), and `open-tasks.md`.
 
 ## 1. Topic -> the document that owns it -> the code -> the test
 
@@ -24,7 +24,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | **What Glance IS (locked identity: closes open loops, starts in Gmail), the wording rules and the anti-drift list** | `product-identity.md` (owns the verbatim block) | every file that quotes the block, `flow-landing/llms.txt`, the store listing | `test/docs-consistency-corpus.cjs`, `test/identity-copy-corpus.cjs` |
 | Two products (Glance Free/Pro vs Flow), what each may claim | `product-architecture.md`, `product-identity.md` | `flow-landing/pricing.html`, `trial.html` | `test/identity-copy-corpus.cjs` |
 | Standing review rules | `design-principles.md`, `decision-filter.md`, `local-first-principle.md`, `magic-moment.md` | - | - |
-| What is sold, the Free/Pro table, money | `monetization.md`, `revenue-routines.md` (Hebrew) | `core/entitlements.js`, `glance-assist` licence check | `test/pro-corpus.cjs` |
+| What is sold, the Free/Pro table, money | `cfo-revenue-mandate.md` (current cash truth on/off `main`), `monetization.md`, `revenue-routines.md` (Hebrew; product branch until merge) | `core/entitlements.js`, `glance-assist` licence check (branch; **ungated on `main`**) | `test/pro-corpus.cjs` |
 | **The recognition order and the one external step** | `ai-ladder.md` (owns it), `when-recognition-fails.md`, `intent-model.md` | `core/ai-ladder.js`, `glance-assist/ladder.js`, `src/background.js`, `src/follow.js` | `test/ai-ladder-*-corpus.cjs`, `glance-assist/ladder.test.cjs`, `scripts/ai-ladder/eval.cjs` |
 | **A review of every model and AI layer: what runs where, what is on or off, what was tested and failed, the numbers and their limits** (for David and any agent) | `ai-models-overview.md` (Hebrew) | see the table in that file | - |
 | The on-device engine and how it learns | `intent-model.md`, `ai-engine-upgrade.md`, `reply-model.md`, `human-eval.md` | `core/request-types.js`, `intent-model.js`, `intent-pipeline.js`, `reply-model.js` | `intent-model-corpus`, `reply-model-corpus`, `request-types-corpus` |
@@ -61,8 +61,8 @@ Any description of Glance starts from the sentence above, and any report keeps t
 `encoder-evaluation-plan.md` encoder experiment (not met) · `engineering-audit.md`, `system-audit-2026-09.md` audits · `file-backed-closure-plan.md` single-file closure · `human-eval.md` first numbers on real mail ·
 `hybrid-execution-architecture.md` device model + server for Do It proposals, dormant, packaging profiles, GPU diagnostics · `intent-model.md` the local engine and its tiers · `lm-fallback-evaluation-plan.md` small on-device model experiment (not met) ·
 `local-detection-plan.md` outcome identity and local closure · `local-first-principle.md` our code recognises first · `local-model-server.md` Ollama / LM Studio · `magic-moment.md` the first real close ·
-`monetization.md` how Glance earns · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
-`product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
+`cfo-revenue-mandate.md` blunt cash-path audit and P0 list (Glance vs Flow) · `monetization.md` how Glance earns (product branch until merge) · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
+`product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David (product branch until merge) ·
 **`true-close.md` when a loop is closed, what was found and fixed** · `when-recognition-fails.md` the steps when a sentence is not recognised.
 `vault/` the Obsidian context cache across chats (§5; not a source of truth).
 Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the numbers cited in the documents come from them.

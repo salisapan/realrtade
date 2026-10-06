@@ -1,6 +1,6 @@
 ---
 tags: [home]
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 # Home — Glance / Flow context vault
 
@@ -19,6 +19,7 @@ updated: 2026-10-05
 ## Streams (one note each)
 | Stream | Note | Owner doc(s) | Status source |
 |---|---|---|---|
+| **Cash / revenue (P0)** | [[cfo-revenue-mandate]] | [[cfo-revenue-mandate]], monetization (product branch) | [[open-tasks]] rows 1, 7, 11, 33, 42 |
 | Outlook end-to-end | [[outlook-status]] | [[multi-platform]] | [[open-tasks]] rows 21, 21b |
 | Living toolbar icon | [[living-icon-handoff]] | [[product-identity]] (Visual identity) | this note |
 | Open work, blockers | [[open-loops-pointer]] | [[open-tasks]] | [[open-tasks]] |
