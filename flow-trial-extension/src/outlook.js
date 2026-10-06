@@ -326,6 +326,86 @@ const FlowOutlook = (() => {
       return r.ok ? { ok: true, how: r.how } : { ok: false, error: r.error, needsSignIn: Boolean(r.needsSignIn) };
     }
 
+    function chainMessageText(m) {
+      const raw = (m && m.body && (m.body.content || m.body)) || '';
+      const text = typeof raw === 'string' ? raw : '';
+      const g = gm();
+      return g && g.ownText ? g.ownText(text) : text;
+    }
+
+    function newestInConversation(messages, conversationId) {
+      const id = String(conversationId || '');
+      const list = (messages || []).filter((m) => m && String(m.conversationId || '') === id && !m.isDraft);
+      list.sort((a, b) => (Date.parse(b.receivedDateTime || b.sentDateTime) || 0) - (Date.parse(a.receivedDateTime || a.sentDateTime) || 0));
+      return list[0] || null;
+    }
+
+    // Needs-you only. A prepare stays off this list: the Outlook draft cannot carry the file.
+    async function outlookFileChainCards(messages, diagnostics, now) {
+      if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) return [];
+      const cards = [];
+      for (const d of diagnostics) {
+        if (!d || d.reason !== 'file-needs-drive') continue;
+        const msg = newestInConversation(messages, d.conversationId);
+        if (!msg || !msg.id) continue;
+        const text = chainMessageText(msg);
+        const gate = FlowFileAttach.gate(text);
+        if (!gate || gate.kind !== 'clear' || !gate.ask) continue;
+        let searched = null;
+        if (deps.send) {
+          try { searched = await deps.send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.query) }); }
+          catch (e) { searched = null; }
+        }
+        const chain = FlowCloseChains.resolve({
+          text,
+          origin: 'outlook',
+          now,
+          evidence: FlowCloseChains.fileEvidence({
+            driveOk: Boolean(searched && searched.ok),
+            driveFiles: (searched && searched.files) || [],
+            threadFiles: msg.hasAttachments ? null : []
+          })
+        });
+        if (!chain || chain.move !== 'needs-you' || chain.sends !== false || chain.close !== false) continue;
+        if (!chain.holding || !chain.holding.text || chain.holding.claimsFile) continue;
+        const he = chain.requirement && chain.requirement.lang === 'he';
+        const from = (msg.from && msg.from.emailAddress) || {};
+        const card = chain.card || {};
+        const line = [card.line, card.searched, card.why, card.skipped].filter(Boolean).join(' ');
+        cards.push({
+          messageId: msg.id,
+          threadId: 'ol:' + msg.conversationId,
+          threadUrl: msg.webLink || null,
+          sender: { name: from.name || null, email: from.address || null },
+          subject: msg.subject || d.subject || '',
+          ts: now,
+          app: 'outlook',
+          glanceChain: 'needs-you',
+          holdingText: chain.holding.text,
+          cardLine: line,
+          card: chain.card,
+          requirement: chain.requirement,
+          promise: chain.promise,
+          doLabel: he ? 'טיוטת תשובת ביניים' : 'Draft a holding reply',
+          intent: { type: 'request', label: line },
+          process: {
+            id: 'reply-track',
+            name: 'Reply & Track',
+            closingLine: line,
+            steps: [{ kind: 'outlookDraft', id: 'outlookDraft', params: {} }]
+          },
+          text: text,
+          outlookIncomingId: msg.id,
+          outlookConversationId: msg.conversationId,
+          internetMessageId: msg.internetMessageId || null,
+          receivedDateTime: msg.receivedDateTime || null,
+          key: msg.conversationId + '|' + msg.id,
+          label: line
+        });
+      }
+      return cards;
+    }
+
     // ---- one check --------------------------------------------------------------------------------------------
     async function sync(opts) {
       const o = opts || {};
@@ -486,6 +566,15 @@ const FlowOutlook = (() => {
           } catch (e) { /* optional */ }
         }
       }
+      // File asks the planner left on file-needs-drive: the same Drive + thread evidence
+      // Gmail passes. Calendar, Sheets and Docs stay off. A found file is not a card
+      // here, because this draft writer cannot attach it.
+      const chainCards = await outlookFileChainCards(messages, p.diagnostics || [], now);
+      chainCards.forEach((entry) => {
+        if (!entry || incomingCards.some((y) => y.messageId === entry.messageId)) return;
+        incomingCards.push(entry);
+      });
+
       // Keep prior incoming cards that were not re-emitted this pass (until Not now / close).
       const priorIncoming = (pending.incoming || []).filter((x) => x && x.messageId && !incomingCards.some((y) => y.messageId === x.messageId) && !isOwnEmail(x.sender && x.sender.email, ownList));
       const incoming = incomingCards.concat(priorIncoming).slice(0, 5);

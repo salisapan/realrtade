@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-06 (generic close chain in `core/close-chains.js`: one requirement, connected sources, draft or needs-you, close only on real completion. Invoicing-system draft is roadmap only, row 43).
+Last updated: 2026-10-06 (Outlook passes the same Drive and thread evidence into the close chain as Gmail. Calendar, Sheets and Docs stay off on both. A found file is not drafted as attached on Outlook. A third-party ask stays silence. Invoicing-system roadmap row 43 is unchanged).
 
 ## Open
 
