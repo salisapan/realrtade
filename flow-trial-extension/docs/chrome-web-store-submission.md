@@ -285,12 +285,14 @@ background/framing), not something to upload as-is.
 ## Still open — not something this doc can close alone
 
 - [x] Screenshot #2 (popup Setup tab) — `docs/screenshots/popup-setup-tab.png`.
-- [ ] Composite that screenshot onto a proper 1280×800 or 640×400 canvas.
+- [x] Composite that screenshot onto a proper 1280×800 canvas — `docs/screenshots/cws-popup-setup-1280x800.png` (2026-10-06).
+- [x] Build the upload zip — `python3 scripts/build_cws_zip.py` → `dist/glance-cws.zip` (v0.9.18). Owner steps: `docs/cws-owner-handoff.md`.
 - [ ] Capture the other real screenshots above (need a live Gmail account) —
       the Do It chip, the Morning Brief indicator/panel, and the receipt
       after a write are the three that matter most now that the listing
       describes the process/Brief model rather than the five-connector one.
 - [ ] Fill in the Developer Dashboard form itself using the text above.
+- [ ] Paste the public listing URL into `flow-landing/assets/site-config.js` (`chromeStoreUrl`).
 - [x] **`oauth2.client_id` in `manifest.json` is set.** The
       `YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com` placeholder
       is no longer in the manifest, so it is not a Store-submission
