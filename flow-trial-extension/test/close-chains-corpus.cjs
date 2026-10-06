@@ -223,5 +223,12 @@ check('the close chip stays Do It', /function injectChip[\s\S]*flow-chip-do-labe
 check('manifest loads the shared text cut and the close chain', scripts.indexOf('core/source-text.js') > scripts.indexOf('core/judgment.js') && scripts.indexOf('core/close-chains.js') > scripts.indexOf('core/resolution.js'));
 check('popup loads both', popup.indexOf('core/source-text.js') > popup.indexOf('core/judgment.js') && popup.indexOf('core/close-chains.js') > popup.indexOf('core/file-attach.js'));
 
+console.log('--- a Drive search result is a named silence, not a generic stall ---');
+check('a search that never ran is file-chain-not-run', C.searchSilence(null) === 'file-chain-not-run');
+check('a finished search is not a silence', C.searchSilence({ ok: true, files: [] }) === null);
+check('Google not connected is drive-not-granted', C.searchSilence({ ok: false, reason: 'not-connected' }) === 'drive-not-granted' && C.searchSilence({ ok: false, reason: 'drive-not-granted', status: 403 }) === 'drive-not-granted');
+check('any other search failure is drive-search-failed', C.searchSilence({ ok: false, reason: 'error', status: 500 }) === 'drive-search-failed' && C.searchSilence({ ok: false }) === 'drive-search-failed');
+check('the old file-needs-drive spelling still counts as the chain not having run', C.isFileChainPending('file-needs-drive') && C.isFileChainPending('file-chain-not-run') && !C.isFileChainPending('drive-search-failed'));
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

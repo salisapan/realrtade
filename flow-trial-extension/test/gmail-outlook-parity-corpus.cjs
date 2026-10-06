@@ -206,10 +206,10 @@ const CASES = [
     const oShown = Boolean(entry);
     const gDraft = gShown && g.process.steps.some((s) => s.kind === 'gmailDraft');
     if (g.show === 'drive' || (gShown && !gDraft)) {
-      // The planner has no Drive list, so a file ask stays file-needs-drive until the open message searches.
+      // The planner has no Drive list. Until the mailbox check searches, a file ask is file-chain-not-run.
       // A close with no reply in it (an event, a Task) is written by Gmail's Google writers. Outlook stays quiet, never weaker.
       const why = (r.diagnostics || []).map((d) => d.reason);
-      check(m.name + ': Gmail ' + (g.show === 'drive' ? 'searches Drive first' : 'closes it with ' + g.process.steps.map((s) => s.kind).join('+')) + '; Outlook stays quiet and says why', !oShown && why.some((x) => x === 'file-needs-drive' || x === 'no-draft-close'), { gmail: g.show, outlook: oShown, why });
+      check(m.name + ': Gmail ' + (g.show === 'drive' ? 'searches Drive first' : 'closes it with ' + g.process.steps.map((s) => s.kind).join('+')) + '; Outlook stays quiet and says why', !oShown && why.some((x) => x === 'file-chain-not-run' || x === 'no-draft-close'), { gmail: g.show, outlook: oShown, why });
       continue;
     }
     check(m.name + ': same decision (Gmail ' + (gShown ? 'shows' : 'silent') + ')', gShown === oShown, { gmail: g.show, gmailReason: g.reason, outlook: oShown, diag: r.diagnostics });

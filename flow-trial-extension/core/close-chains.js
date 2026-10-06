@@ -426,7 +426,31 @@ const FlowCloseChains = (() => {
     };
   }
 
-  return { KINDS, PLACES, derive, resolve, completionOf, holdingText, fresh, fileEvidence };
+  // The planner's "this file ask has not been searched yet" marker. file-needs-drive
+  // is the old spelling, still accepted so a diagnostic stored before the split
+  // still runs the chain. It is not written anymore.
+  function isFileChainPending(reason) {
+    return reason === 'file-chain-not-run' || reason === 'file-needs-drive';
+  }
+
+  // Why-not-shown lines a finished file chain may leave. A card drops these.
+  function isFileSilence(reason) {
+    return isFileChainPending(reason) || reason === 'drive-not-granted' || reason === 'drive-search-failed';
+  }
+
+  // Host result of flow:search-drive. null: the chain never called Drive.
+  // ok true: the resolver may run. Otherwise a silence, never the generic
+  // file-needs-drive stall. not-connected is the old worker spelling of
+  // "Google is not connected", which is Drive not granted.
+  function searchSilence(searched) {
+    if (!searched) return 'file-chain-not-run';
+    if (searched.ok === true) return null;
+    const reason = String(searched.reason || '');
+    if (reason === 'drive-not-granted' || reason === 'not-connected') return 'drive-not-granted';
+    return 'drive-search-failed';
+  }
+
+  return { KINDS, PLACES, derive, resolve, completionOf, holdingText, fresh, fileEvidence, isFileChainPending, isFileSilence, searchSilence };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseChains };

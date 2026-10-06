@@ -109,11 +109,11 @@ function fileCase(name, text, objectId) {
     check(name + ': both surfaces keep the resolution file path', g.show === false && g.reason === 'file' && !o.entry && o.why.indexOf('file') !== -1, { gmail: g, outlook: o.why });
   } else {
     check(name + ': Gmail searches Drive before a chip', g.show === 'drive', g);
-    check(name + ': Outlook stays on the file, not a schedule card', !o.entry && o.why.indexOf('file-needs-drive') !== -1, o.why);
+    check(name + ': Outlook stays on the file, not a schedule card', !o.entry && o.why.indexOf('file-chain-not-run') !== -1, o.why);
   }
   const jg = judge(text, 'gmail');
   const jo = judge(text, 'outlook');
-  const fileReason = owned ? 'file' : 'file-needs-drive';
+  const fileReason = owned ? 'file' : 'file-chain-not-run';
   check(name + ': both judges refuse schedule-confirm', jg.intent && jg.intent.type !== 'event' && (owned ? (jg.reason === 'file' && jo.reason === 'file') : jo.reason === fileReason), { gmail: jg.reason || (jg.process && jg.process.id), outlook: jo.reason });
 }
 
