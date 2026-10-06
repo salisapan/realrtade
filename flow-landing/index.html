@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Flow — Cognitive Workflow Engine: a secure AI workflow engine deployed in a masked, secure cloud or fully on your own infrastructure.">
+<meta name="description" content="Close what is open — Glance for you, Flow for your organization. Glance starts in Gmail and never sends on your behalf. Masked secure cloud is on the roadmap.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -14,14 +14,14 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Flow — Cognitive Workflow Engine">
-<meta property="og:description" content="Autonomous execution, secure by design. Deploy Flow in a masked cloud or fully on-prem — your choice.">
+<meta property="og:description" content="Glance closes personal open loops, starting in Gmail. Flow proposes updates for regulated organizations that run when you approve. Masked secure cloud is on the roadmap.">
 <meta property="og:url" content="https://theflow-ai.com/">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Flow — Cognitive Workflow Engine">
-<meta name="twitter:description" content="Autonomous execution, secure by design. Cloud or fully on-prem — your choice.">
+<meta name="twitter:description" content="Glance closes personal open loops, starting in Gmail. Flow proposes updates that run when you approve. Masked secure cloud is on the roadmap.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <title>Flow — Cognitive Workflow Engine</title>
 <script type="application/ld+json">
@@ -30,7 +30,7 @@
   "@type": "SoftwareApplication",
   "name": "Flow",
   "url": "https://theflow-ai.com/",
-  "description": "Flow — Cognitive Workflow Engine: a secure AI workflow engine deployed in a masked, secure cloud or fully on your own infrastructure.",
+  "description": "Glance closes personal open loops, starting in Gmail, and never sends on your behalf. Flow proposes updates for regulated organizations that run when you approve. Masked secure cloud is on the roadmap.",
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "Web, Windows, macOS, Linux",
   "offers": { "@type": "Offer", "url": "https://theflow-ai.com/#waitlist" }
@@ -61,10 +61,11 @@
 (function(){
   try{
     var t=localStorage.getItem('flow_theme')||'dark';
+    var lang=localStorage.getItem('flow_lang')==='he'?'he':'en';
     var r=document.documentElement;
     r.setAttribute('data-theme',t);
-    r.setAttribute('lang','en');
-    r.setAttribute('dir','ltr');
+    r.setAttribute('lang',lang);
+    r.setAttribute('dir', lang==='he'?'rtl':'ltr');
   }catch(e){ document.documentElement.setAttribute('data-theme','dark'); document.documentElement.setAttribute('dir','ltr'); }
   document.title='Flow — Cognitive Workflow Engine';
 })();
@@ -82,26 +83,23 @@
 
 <header class="nav" id="nav">
   <div class="nav-in">
-    <a class="brand" href="#top" aria-label="Flow — Cognitive Workflow Engine">
+    <a class="brand" href="#top" aria-label="Flow">
       <img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async">
-      <span class="desc" data-i18n="nav.desc">Cognitive Workflow Engine</span>
     </a>
     <nav class="nav-links" aria-label="Primary">
-      <a href="#top" data-i18n="nav.home">Home</a>
       <a href="/trial.html" data-i18n="nav.trial">Glance</a>
-      <a href="/security.html" data-i18n="nav.security">Security</a>
+      <a href="/#organization" data-i18n="nav.flow">Flow</a>
       <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
-      <a href="/solutions/" data-i18n="nav.solutions">Solutions</a>
-      <a href="/about.html" data-i18n="nav.about">About</a>
-      <a href="/blog/" data-i18n="nav.blog">Insights</a>
+      <a href="/security.html" data-i18n="nav.security">Security</a>
       <a href="/contact.html" data-i18n="nav.contact">Contact</a>
     </nav>
     <div class="nav-tools">
+      <button class="icon-btn lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
       <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
       </button>
-      <span class="magnetic nav-cta"><a class="doit sm" href="#waitlist" data-ga="nav_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Do It</span></a></span>
+      <span class="magnetic nav-cta"><a class="doit sm" href="/trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="nav.cta">Get Glance</span></a></span>
       <button class="icon-btn hamburger" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
         <svg viewBox="0 0 24 24"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg>
       </button>
@@ -113,6 +111,7 @@
   <nav aria-label="Mobile">
     <a href="#top" data-i18n="nav.home">Home</a>
     <a href="/trial.html" data-i18n="nav.trial">Glance</a>
+    <a href="/#organization" data-i18n="nav.flow">Flow</a>
     <a href="/missed-deadline.html" data-i18n="nav.scan">Inbox Scan</a>
     <a href="/security.html" data-i18n="nav.security">Security</a>
     <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
@@ -129,30 +128,61 @@
 
 <main id="top">
   <!-- HERO -->
-  <section class="hero" id="hero">
+  <section class="hero hero-paths" id="hero">
     <div class="hero-blobs" aria-hidden="true"><span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span></div>
     <div class="wrap hero-in">
       <picture>
         <source srcset="/logo.avif" type="image/avif">
         <source srcset="/logo.webp" type="image/webp">
-        <img class="hero-logo reveal in" src="/logo.png" width="440" height="194" alt="Flow — Cognitive Workflow Engine" decoding="async">
+        <img class="hero-logo" src="/logo.png" width="440" height="194" alt="Flow" decoding="async">
       </picture>
-      <div class="eyebrow reveal in" data-d="1" style="margin-bottom:16px" data-i18n="hero.eyebrow">SECURE CLOUD · FLOW-EDGE · בפריסה</div>
-      <h1 class="reveal in" data-d="1" data-i18n="hero.h1">Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span></h1>
-      <p class="lead reveal in" data-d="2" data-i18n="hero.sub">When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve, with no rules to write. Masked cloud, or Flow-Edge on your own infrastructure, is designed into the engagement (roadmap / בפריסה).</p>
-      <div class="hero-cta reveal in" data-d="3">
-        <span class="magnetic"><a class="doit lg breathe" href="#waitlist" data-ga="hero_doit"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta1">Do It</span></a></span>
+      <p class="eyebrow" data-i18n="hero.eyebrow">Two products · One team</p>
+      <h1 data-i18n="hero.h1">Close what is open — for you, or for your organization.</h1>
+      <p class="lead" data-i18n="hero.sub">Glance closes your personal open loops. Flow watches work events in regulated organizations and proposes updates that run when you approve.</p>
+      <p class="path-label" data-i18n="hero.path">Choose your path</p>
+      <div class="path-split">
+        <article class="path-card glance-card" id="glance">
+          <span class="who" data-i18n="path.you.who">For you</span>
+          <h3>Glance</h3>
+          <p data-i18n="path.you.body">Closes what you asked of others, what you promised, and what others asked of you. Starts in Gmail. Never sends on your behalf.</p>
+          <div class="cta-row">
+            <span class="magnetic"><a class="doit" href="/trial.html" data-ga="hero_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta2">Get Glance</span></a></span>
+          </div>
+        </article>
+        <article class="path-card" id="organization">
+          <span class="who" data-i18n="path.org.who">For your organization</span>
+          <h3>Flow</h3>
+          <p data-i18n="path.org.body">Watches work events across legal, insurance, and security teams. Proposes file and system updates that execute only when you approve.</p>
+          <div class="cta-row">
+            <span class="magnetic"><a class="doit ghost" href="#waitlist" data-ga="hero_deploy"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="path.org.cta">Get a deployment plan</span></a></span>
+          </div>
+        </article>
       </div>
-      <div class="hero-glance reveal in" data-d="3">
-        <div class="hero-glance-tag"><span class="hero-glance-dot" aria-hidden="true"></span><span data-i18n="hero.glance.tag">A separate product, from the same team</span></div>
-        <p><b data-i18n="hero.glance.b">Glance closes the moment in front of you.</b> <span data-i18n="hero.glance.p"><b>Now:</b> your personal closing layer, starting in Gmail. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it for real: a calendar event, a task, a drafted reply, or the right Drive file attached — in place, Zero-Prompt, with undo. Personal product. Own revenue. Stays quiet when it is not sure. <b>Next:</b> the same closing loop grows beyond email into the other places your day actually happens — still personal, still Zero-Prompt, still not an org runtime. Same DNA as Flow. Different line: personal closing, not regulated firm infrastructure.</span></p>
-        <span class="magnetic"><a class="doit sm" href="/trial.html" data-ga="hero_trial"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="hero.cta2">Get Glance</span></a></span>
-        <a class="hero-glance-flow" href="#waitlist" data-i18n="hero.glance.flow">Explore Flow for organizations</a>
-      </div>
-      <button class="hero-scroll reveal in" data-d="3" data-scroll="#challenge"><span data-i18n="hero.cta3">See how it works</span></button>
-      <div class="hero-foot reveal in" data-d="4"><span class="dot"></span><span data-i18n="hero.foot">Masked cloud, or Flow-Edge designed into the engagement (roadmap / בפריסה).</span></div>
     </div>
-    <div class="scroll-cue" aria-hidden="true"><span>SCROLL</span><span class="bar"></span></div>
+  </section>
+
+  <section id="how" class="loop-sec">
+    <div class="wrap">
+      <p class="eyebrow" data-i18n="how.eyebrow">How it works</p>
+      <h2 data-i18n="how.title">One loop. Detect, prepare, approve, close.</h2>
+      <p class="lead" data-i18n="how.lead">Both products follow the same idea: surface the next real move, prepare it where you already work, and wait for your approval. Nothing leaves until you say so.</p>
+      <div class="pillars">
+        <div class="pillar">
+          <h3 data-i18n="how.d.t">Detect</h3>
+          <p data-i18n="how.d.b">Watches the work in front of you — a thread, a deal close, a signed contract — and decides what is actually open.</p>
+        </div>
+        <div class="pillar">
+          <h3 data-i18n="how.p.t">Prepare</h3>
+          <p data-i18n="how.p.b">Drafts the update, the calendar event, or the file change. You see exactly what will happen before anything runs.</p>
+        </div>
+        <div class="pillar">
+          <h3 data-i18n="how.c.t">Close</h3>
+          <p data-i18n="how.c.b">On your approval it writes the change. Every write is reversible. Unsure moments stay silent.</p>
+        </div>
+      </div>
+      <p class="glance-now" data-i18n="hero.glance.p"><b>Now:</b> your personal closing layer, starting in Gmail. When the thread you have open actually decides something, one <img src="/do-it-inline.png" alt="Do It" class="do-it-inline" height="13" style="height:1em;width:auto;vertical-align:-0.15em;display:inline" /> closes it for real: a calendar event, a task, a drafted reply, or the right Drive file attached — in place, Zero-Prompt, with undo. Personal product. Own revenue. Stays quiet when it is not sure. <b>Next:</b> the same closing loop grows beyond email into the other places your day actually happens — still personal, still Zero-Prompt, still not an org runtime. Same DNA as Flow. Different line: personal closing, not regulated firm infrastructure.</p>
+      <p class="quiet-line"><span class="roadmap-badge" data-i18n="trust.b4">Masked secure cloud: roadmap / בפריסה</span><span data-i18n="roadmap.quiet">Running on your own infrastructure is on the roadmap.</span></p>
+    </div>
   </section>
 
   <!-- LEGAL DEMO -->
@@ -319,7 +349,7 @@ Best,
             <p data-i18n="legal.end.line2">Deed updated. Ledger recalculated. Client package dispatched.</p>
             <p class="final" data-i18n="legal.end.line3">And your firm's multi-million dollar transaction data? It never left your local machine.</p>
           </div>
-          <span class="magnetic"><a class="doit" id="ldCta" href="#waitlist" data-ga="legal_demo_waitlist"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="legal.end.cta">Do It</span></a></span>
+          <a class="path-text-link" id="ldCta" href="#waitlist" data-ga="legal_demo_waitlist" data-i18n="legal.end.cta">Get a deployment plan</a>
         </div>
 
       </div>
@@ -401,7 +431,7 @@ Best,
           </div>
           <span class="tag">Shadow — Invisible</span>
           <h3 data-i18n="shadow.t">A layer that runs quietly in the background — wherever you deploy it.</h3>
-          <p data-i18n="shadow.b">A CV &amp; OCR engine passively observes your work patterns and builds context. Processing is in our masked secure cloud, or on your own infrastructure with Flow-Edge, designed into the engagement (roadmap / בפריסה).</p>
+          <p data-i18n="shadow.b">A CV &amp; OCR engine passively observes your work patterns and builds context. Where that processing runs is scoped per engagement.</p>
         </div>
         <div class="panel visible reveal" data-d="2">
           <div class="art demo" aria-hidden="true">
@@ -431,16 +461,16 @@ Best,
         <p class="lead muted" data-i18n="arch.lead">Six foundational pillars that make Flow the most secure, capable, and autonomous workflow engine for mission-critical operations.</p>
       </div>
       <div class="grid-3">
-        <div class="beam-wrap"><div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg></div><h3><span class="en">FLEXIBLE DEPLOY</span><span data-i18n="c1.t">Two Secure Deployment Models</span></h3><p data-i18n="c1.b">Masked secure cloud, or Flow-Edge on your own infrastructure, designed into the engagement (roadmap / בפריסה).</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="1"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg></div><h3><span class="en">FLEXIBLE DEPLOY</span><span data-i18n="c1.t">Two Secure Deployment Models</span></h3><p data-i18n="c1.b">Two deployment models are scoped per engagement. Neither is a live toggle today.</p></div></div></div>
         <div class="beam-wrap"><div class="card tilt reveal" data-d="2"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="1.6" fill="currentColor" stroke="none"/><circle cx="15" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg></div><h3><span class="en">MASKING</span><span data-i18n="c2.t">Smart Data Masking</span></h3><p data-i18n="c2.b">PII and confidential fields are automatically identified and protected before any processing.</p></div></div></div>
         <div class="beam-wrap"><div class="card tilt reveal" data-d="3"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.4"/><circle cx="5" cy="6" r="1.6"/><circle cx="19" cy="6" r="1.6"/><circle cx="5" cy="18" r="1.6"/><circle cx="19" cy="18" r="1.6"/><path d="M10 11L6 7M14 11l4-4M10 13l-4 4M14 13l4 4"/></svg></div><h3><span class="en">ACTION GRAPH</span><span data-i18n="c3.t">Learns How Your Team Decides</span></h3><p data-i18n="c3.b">Watches who approves what, in what order, across real cases — and turns that pattern into something Flow can act on next time.</p></div></div></div>
-        <div class="beam-wrap"><div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3><span class="en">INTEGRATION</span><span data-i18n="c4.t">Connects To What You Already Use</span></h3><p data-i18n="c4.b">Beyond the live Glance MVP (Google + Notion), connectors are scoped per engagement, not live toggles today.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="4"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><rect x="14" y="13" width="7" height="7" rx="1.5"/><path d="M10 7h4a2 2 0 0 1 2 2v4"/></svg></div><h3><span class="en">INTEGRATION</span><span data-i18n="c4.t">Connects To What You Already Use</span></h3><p data-i18n="c4.b">Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.</p></div></div></div>
         <div class="beam-wrap"><div class="card tilt reveal" data-d="5"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3><span class="en">EXECUTION</span><span data-i18n="c5.t">Autonomous &amp; Deterministic</span></h3><p data-i18n="c5.b">Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.</p></div></div></div>
-        <div class="beam-wrap"><div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3><span class="en">GOVERNANCE</span><span data-i18n="c6.t">Control &amp; Cryptographic Audit</span></h3><p data-i18n="c6.b">High-risk tasks require explicit human approval. An immutable audit trail is designed into regulated deployments (roadmap / בפריסה), not a live toggle today.</p></div></div></div>
+        <div class="beam-wrap"><div class="card tilt reveal" data-d="6"><div class="tc"><div class="ic"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg></div><h3><span class="en">GOVERNANCE</span><span data-i18n="c6.t">Control &amp; Cryptographic Audit</span></h3><p data-i18n="c6.b">High-risk tasks require explicit human approval. An immutable audit trail is designed into regulated deployments, not a live toggle today.</p></div></div></div>
       </div>
       <div class="secure-note reveal">
         <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
-        <span data-i18n="sec.note">Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government — with automatic masking in the cloud, and Flow-Edge designed into the engagement (roadmap / בפריסה) when policy requires it.</span>
+        <span data-i18n="sec.note">Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government.</span>
       </div>
     </div>
   </section>
@@ -450,7 +480,7 @@ Best,
   <!-- INTEGRATIONS -->
   <section id="trust" class="integ-sec trust-sec" aria-label="Integrations &amp; Security">
     <div class="wrap">
-      <p class="integ-title reveal" data-i18n="integ.title">Works with the systems your team already lives in. Beyond the live Glance MVP set (Google + Notion), connectors are scoped per engagement — not live toggles today.</p>
+      <p class="integ-title reveal" data-i18n="integ.title">Works with the systems your team already lives in. Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.</p>
       <div class="integ-marquee reveal" data-d="1">
         <div class="integ-track" aria-hidden="false">
           <span class="integ-logo" title="Salesforce"><svg viewBox="0 0 24 24"><path d="M10.006 5.415a4.195 4.195 0 013.045-1.306c1.56 0 2.954.9 3.69 2.205.63-.3 1.35-.45 2.1-.45 2.85 0 5.159 2.34 5.159 5.22s-2.31 5.22-5.176 5.22c-.345 0-.69-.044-1.02-.104a3.75 3.75 0 01-3.3 1.95c-.6 0-1.155-.15-1.65-.375A4.314 4.314 0 018.88 20.4a4.302 4.302 0 01-4.05-2.82c-.27.062-.54.076-.825.076-2.204 0-4.005-1.8-4.005-4.05 0-1.5.811-2.805 2.01-3.51-.255-.57-.39-1.2-.39-1.846 0-2.58 2.1-4.65 4.65-4.65 1.53 0 2.85.705 3.72 1.8"/></svg><span>Salesforce</span></span>
@@ -488,53 +518,9 @@ Best,
       <div class="trust-divider" aria-hidden="true"></div>
       <span class="eyebrow reveal" data-d="2" data-i18n="trust.eyebrow">SECURITY BY ARCHITECTURE</span>
       <div class="trust-row reveal" data-d="2">
-        <span class="trust-badge"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg><span data-i18n="trust.b1">Own infrastructure: roadmap / בפריסה</span></span>
         <span class="trust-badge"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg><span data-i18n="trust.b2">Every write is reversible</span></span>
-        <span class="trust-badge"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="3"/></svg><span data-i18n="trust.b3">Audit trail: roadmap / בפריסה</span></span>
-        <span class="trust-badge"><svg viewBox="0 0 24 24"><rect x="4" y="9" width="16" height="11" rx="2"/><path d="M8 9V6a4 4 0 0 1 8 0v3"/></svg><span data-i18n="trust.b4">Masked secure cloud: roadmap / בפריסה</span></span>
       </div>
       <p class="trust-note reveal" data-d="3"><span data-i18n="trust.note">Flow is pre-certification. We will tell you in writing exactly where each framework stands, rather than have you infer it from a badge.</span> <a href="/security.html" data-i18n="trust.link">Read the security architecture →</a></p>
-    </div>
-  </section>
-
-  <!-- PERFORMANCE -->
-  <section id="performance">
-    <div class="wrap">
-      <div class="sec-head reveal">
-        <span class="eyebrow" data-i18n="perf.eyebrow">PERFORMANCE</span>
-        <h2 data-i18n="perf.title">What Flow Is Built to Do</h2>
-        <p class="lead muted" data-i18n="perf.lead">What the architecture is built to deliver. The masking and deployment guarantees below are properties of how Flow is built; the speed figure is our design target, not a customer benchmark.</p>
-      </div>
-      <div class="ccarousel reveal" id="statsCarousel" tabindex="0" role="region" aria-roledescription="carousel" aria-label="Performance metrics">
-        <div class="cc-stage">
-          <div class="cc-counter" aria-hidden="true"><span class="cc-num" id="ccNum">01</span><span class="cc-of">of 03</span></div>
-          <div class="cc-track" id="ccTrack">
-            <button type="button" class="cc-card" data-i="0" role="option" aria-selected="true">
-              <span class="cc-tag">Speed</span>
-              <div class="cc-big"><span data-count="10" data-i18n-num>0</span><span class="cc-u">x</span></div>
-              <h3 class="cc-title" data-i18n="p1.t">Faster Execution (target)</h3>
-              <p class="cc-desc" data-i18n="p1.b">Design target for workflow execution speed against manual processing. Not yet a measured customer result.</p>
-            </button>
-            <button type="button" class="cc-card" data-i="1" role="option" aria-selected="false">
-              <span class="cc-tag">Privacy</span>
-              <div class="cc-big"><span data-count="100" data-i18n-num>0</span><span class="cc-u">%</span></div>
-              <h3 class="cc-title" data-i18n="p2.t">Masked or Fully Local</h3>
-              <p class="cc-desc" data-i18n="p2.b">Every byte is either masked before cloud processing, or never leaves your infrastructure at all — the choice is yours.</p>
-            </button>
-            <button type="button" class="cc-card" data-i="2" role="option" aria-selected="false">
-              <span class="cc-tag">Autonomy</span>
-              <div class="cc-big"><span class="cc-u">0</span></div>
-              <h3 class="cc-title" data-i18n="p3.t">External Dependencies</h3>
-              <p class="cc-desc" data-i18n="p3.b">No third-party API keys. No mandatory external calls — whichever deployment you choose.</p>
-            </button>
-          </div>
-        </div>
-        <div class="cc-controls">
-          <button type="button" class="cc-arrow" id="ccPrev" aria-label="Previous metric"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-          <div class="cc-dots" id="ccDots" role="tablist"></div>
-          <button type="button" class="cc-arrow" id="ccNext" aria-label="Next metric"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -675,12 +661,29 @@ Best,
     'ins.title2':{en:'Explore the Research',he:'חקרו את המחקר'},
     'ins.lead':{en:'Compliance, architecture, and efficiency — across law, healthcare, finance, insurance, government, and technical AI infrastructure.',he:'ציות רגולטורי, ארכיטקטורה, ויעילות — בתחומי המשפט, הבריאות, הפיננסים, הביטוח, הממשל, ותשתיות AI טכניות.'},
     'ins.viewall':{en:'Read the research →',he:'לקריאת המחקר ←'},
-    'hero.eyebrow':{en:'SECURE CLOUD · FLOW-EDGE · בפריסה',he:'SECURE CLOUD · FLOW-EDGE · בפריסה'},
-    'hero.h1':{en:'Flow Watches Your Work.<br><span class="chrome-text">It Executes What Happens Next.</span>',he:'ביצוע אוטונומי.<br><span class="chrome-text">בתנאים שלכם.</span>'},
-    'hero.sub':{en:'When a deal closes, a contract is signed, or a case is approved, Flow proposes the update to your files and the rest of your stack, and writes it the moment you approve, with no rules to write. Masked cloud, or Flow-Edge on your own infrastructure, is designed into the engagement (roadmap / בפריסה).',he:'כשעסקה נסגרת, חוזה נחתם, או תיק מאושר, Flow מציע את העדכון לקבצים ולשאר הסטאק, וכותב אותו ברגע שאתם מאשרים, בלי חוקים לכתוב. ענן ממוסך, או Flow-Edge בתשתית שלכם, מתוכנן לתוך ההתקשרות (בפריסה).'},
+    'hero.eyebrow':{en:'Two products · One team',he:'שני מוצרים · צוות אחד'},
+    'hero.h1':{en:'Close what is open — for you, or for your organization.',he:'סוגרים את מה שפתוח — בשבילך, או בשביל הארגון.'},
+    'hero.sub':{en:'Glance closes your personal open loops. Flow watches work events in regulated organizations and proposes updates that run when you approve.',he:'Glance סוגר לולאות פתוחות אישיות. Flow עוקב אחרי אירועי עבודה בארגונים מפוקחים ומציע עדכונים שרצים כשאתם מאשרים.'},
+    'hero.path':{en:'Choose your path',he:'בחרו מסלול'},
+    'path.you.who':{en:'For you',he:'בשבילך'},
+    'path.you.body':{en:'Closes what you asked of others, what you promised, and what others asked of you. Starts in Gmail. Never sends on your behalf.',he:'סוגר את מה שביקשת מאחרים, מה שהבטחת, ומה שאחרים ביקשו ממך. מתחיל ב־Gmail. אף פעם לא שולח בשמך.'},
+    'path.org.who':{en:'For your organization',he:'לארגון'},
+    'path.org.body':{en:'Watches work events across legal, insurance, and security teams. Proposes file and system updates that execute only when you approve.',he:'עוקב אחרי אירועי עבודה בצוותי משפט, ביטוח ואבטחה. מציע עדכוני קבצים ומערכות שרצים רק כשאתם מאשרים.'},
+    'path.org.cta':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'},
+    'how.eyebrow':{en:'How it works',he:'איך זה עובד'},
+    'how.title':{en:'One loop. Detect, prepare, approve, close.',he:'לולאה אחת. מזהים, מכינים, מאשרים, סוגרים.'},
+    'how.lead':{en:'Both products follow the same idea: surface the next real move, prepare it where you already work, and wait for your approval. Nothing leaves until you say so.',he:'שני המוצרים על אותו רעיון: מציפים את הצעד האמיתי הבא, מכינים אותו במקום שבו אתם כבר עובדים, ומחכים לאישור שלכם. שום דבר לא יוצא עד שאתם אומרים.'},
+    'how.d.t':{en:'Detect',he:'זיהוי'},
+    'how.d.b':{en:'Watches the work in front of you — a thread, a deal close, a signed contract — and decides what is actually open.',he:'עוקב אחרי העבודה שלפניכם — שרשור, סגירת עסקה, חוזה חתום — ומחליט מה באמת פתוח.'},
+    'how.p.t':{en:'Prepare',he:'הכנה'},
+    'how.p.b':{en:'Drafts the update, the calendar event, or the file change. You see exactly what will happen before anything runs.',he:'מנסח את העדכון, אירוע היומן, או שינוי הקובץ. אתם רואים בדיוק מה יקרה לפני שמשהו רץ.'},
+    'how.c.t':{en:'Close',he:'סגירה'},
+    'how.c.b':{en:'On your approval it writes the change. Every write is reversible. Unsure moments stay silent.',he:'באישור שלכם הוא כותב את השינוי. כל כתיבה הפיכה. רגעים לא ודאיים נשארים בשקט.'},
+    'roadmap.quiet':{en:'Running on your own infrastructure is on the roadmap.',he:'הרצה על התשתית שלכם — בפריסה.'},
     'hero.cta1':{en:'Do It',he:'עשו את זה'},
     'hero.cta3':{en:'See how it works',he:'איך זה עובד'},
-    'nav.cta':{en:'Do It',he:'עשו את זה'},
+    'nav.cta':{en:'Get Glance',he:'קבלו את Glance'},
+    'nav.flow':{en:'Flow',he:'Flow'},
     'wl.submit':{en:'Get My Deployment Plan',he:'קבלו תוכנית פריסה'},
     'hero.cta2':{en:'Get Glance',he:'התקינו Glance'},
     'hero.glance.flow':{en:'Explore Flow for organizations',he:'גלו את Flow לארגונים'},
@@ -703,23 +706,23 @@ Best,
     'doit.t':{en:'The button that appears at the right moment.',he:'הכפתור שמופיע ברגע הנכון.'},
     'doit.b':{en:'The instant intent is detected, a focused execution button surfaces. No hunting for tools, no switching screens — the action is already here.',he:'ברגע שמזוהה כוונה, מוקפץ כפתור ביצוע ממוקד. בלי לחפש כלים, בלי לעבור בין מסכים — הפעולה כבר כאן.'},
     'shadow.t':{en:'A layer that runs quietly in the background — wherever you deploy it.',he:'שכבה שרצה בשקט ברקע — בכל מקום שבו תבחרו לפרוס אותה.'},
-    'shadow.b':{en:'A CV & OCR engine passively observes your work patterns and builds context. Processing is in our masked secure cloud, or on your own infrastructure with Flow-Edge, designed into the engagement (roadmap / בפריסה).',he:'מנוע CV ו-OCR צופה באופן פסיבי בדפוסי העבודה ובונה הקשר. העיבוד בענן המאובטח והממוסך, או בתשתית שלכם עם Flow-Edge, מתוכנן לתוך ההתקשרות (בפריסה).'},
-    'sec.note':{en:'Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government — with automatic masking in the cloud, and Flow-Edge designed into the engagement (roadmap / בפריסה) when policy requires it.',he:'נבנה במיוחד לארגונים עם מידע רגיש — משפט, בריאות, פיננסים וממשל — עם השחרה אוטומטית בענן, ו-Flow-Edge מתוכנן לתוך ההתקשרות (בפריסה) כשהמדיניות דורשת זאת.'},
+    'shadow.b':{en:'A CV & OCR engine passively observes your work patterns and builds context. Where that processing runs is scoped per engagement.',he:'מנוע CV ו-OCR צופה באופן פסיבי בדפוסי העבודה ובונה הקשר. איפה שהעיבוד רץ נקבע לפי ההתקשרות.'},
+    'sec.note':{en:'Purpose-built for organizations with sensitive data — legal, healthcare, finance, and government.',he:'נבנה במיוחד לארגונים עם מידע רגיש — משפט, בריאות, פיננסים וממשל.'},
     'arch.eyebrow':{en:'CORE ARCHITECTURE',he:'CORE ARCHITECTURE'},
     'arch.title':{en:'Engineered for Enterprise Intelligence',he:'מהונדס לאינטליגנציה ארגונית'},
     'arch.lead':{en:'Six foundational pillars that make Flow the most secure, capable, and autonomous workflow engine for mission-critical operations.',he:'שישה עמודי תווך שהופכים את Flow למנוע תהליכי העבודה המאובטח, היכול והאוטונומי ביותר למשימות קריטיות.'},
     'c1.t':{en:'Two Secure Deployment Models',he:'שני מודלי פריסה מאובטחים'},
-    'c1.b':{en:'Masked secure cloud, or Flow-Edge on your own infrastructure, designed into the engagement (roadmap / בפריסה).',he:'ענן מאובטח וממוסך, או Flow-Edge בתשתית שלכם, מתוכנן לתוך ההתקשרות (בפריסה).'},
+    'c1.b':{en:'Two deployment models are scoped per engagement. Neither is a live toggle today.',he:'שני מודלי פריסה נקבעים לפי ההתקשרות. אף אחד מהם אינו מתג חי היום.'},
     'c2.t':{en:'Smart Data Masking',he:'מיסוך נתונים חכם'},
     'c2.b':{en:'PII and confidential fields are automatically identified and protected before any processing.',he:'שדות PII ומידע סודי מזוהים ומוגנים אוטומטית לפני כל עיבוד.'},
     'c3.t':{en:'Learns How Your Team Decides',he:'תשתית לחוכמה ארגונית'},
     'c3.b':{en:'Watches who approves what, in what order, across real cases — and turns that pattern into something Flow can act on next time.',he:'ממפה טלמטריית מערכת והרגלים סיבתיים, והופך שיפוט מקצועי סמוי לזיכרון ביצוע.'},
     'c4.t':{en:'Connects To What You Already Use',he:'חיבורים לפי פרויקט'},
-    'c4.b':{en:'Beyond the live Glance MVP (Google + Notion), connectors are scoped per engagement, not live toggles today.',he:'מעבר ל-Glance MVP החי (Google + Notion), חיבורים מתומחרים לפי פרויקט, לא מתגים חיים היום.'},
+    'c4.b':{en:'Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.',he:'מעבר למה ש-Glance מריץ היום — Gmail, יומן, משימות, טיוטות, ו-Drive כשיש קובץ אחד — חיבורים לפי פרויקט, לא מתגים חיים היום.'},
     'c5.t':{en:'Autonomous & Deterministic',he:'אוטונומי ודטרמיניסטי'},
     'c5.b':{en:'Executes workflows silently in the background with a strict runtime that guarantees zero hallucinations.',he:'מריץ תהליכים בשקט ברקע עם runtime מחמיר שמבטיח אפס הזיות.'},
     'c6.t':{en:'Control & Cryptographic Audit',he:'בקרה וביקורת קריפטוגרפית'},
-    'c6.b':{en:'High-risk tasks require explicit human approval. An immutable audit trail is designed into regulated deployments (roadmap / בפריסה), not a live toggle today.',he:'משימות בסיכון גבוה דורשות אישור אנושי מפורש. תיעוד ביקורת בלתי ניתן לשינוי מתוכנן לפריסות מפוקחות (בפריסה), לא מתג חי היום.'},
+    'c6.b':{en:'High-risk tasks require explicit human approval. An immutable audit trail is designed into regulated deployments, not a live toggle today.',he:'משימות בסיכון גבוה דורשות אישור אנושי מפורש. תיעוד ביקורת בלתי ניתן לשינוי מתוכנן לפריסות מפוקחות, לא מתג חי היום.'},
     'trust.eyebrow':{en:'SECURITY BY ARCHITECTURE',he:'אבטחה מתוקף הארכיטקטורה'},
     'trust.b1':{en:'Own infrastructure: roadmap / בפריסה',he:'תשתית שלכם: בפריסה'},
     'trust.b2':{en:'Every write is reversible',he:'כל כתיבה הפיכה'},
@@ -776,7 +779,7 @@ Best,
     'foot.privacy':{en:'Privacy',he:'פרטיות'},
     'foot.terms':{en:'Terms',he:'תנאי שימוש'},
     'a11y.skip':{en:'Skip to content',he:'דלג לתוכן'},
-    'integ.title':{en:'Works with the systems your team already lives in. Beyond the live Glance MVP set (Google + Notion), connectors are scoped per engagement — not live toggles today.',he:'עובד עם המערכות שהצוות כבר חי בהן. מעבר לסט Glance MVP החי (Google + Notion), חיבורים לפי פרויקט — לא מתגים חיים היום.'},
+    'integ.title':{en:'Works with the systems your team already lives in. Beyond what Glance ships today — Gmail, Calendar, Tasks, drafts, and Drive when one file matches — connectors are scoped per engagement, not live toggles today.',he:'עובד עם המערכות שהצוות כבר חי בהן. מעבר למה ש-Glance מריץ היום — Gmail, יומן, משימות, טיוטות, ו-Drive כשיש קובץ אחד — חיבורים לפי פרויקט, לא מתגים חיים היום.'},
     'legal.eyebrow':{en:'SEE IT WORK',he:'SEE IT WORK'},
     'legal.title':{en:'A real closing, end to end.',he:'סגירת עסקה אמיתית, מקצה לקצה.'},
     'legal.lead':{en:'Watch Flow handle a live legal / real-estate workflow — locally, on your device.',he:'צפו כיצד Flow מנהל תהליך עבודה משפטי-נדל״ני אמיתי — מקומית, על המכשיר שלכם.'},
@@ -836,7 +839,7 @@ Best,
     'legal.end.line1':{en:'3 clicks for full compliance. 0 clicks for manual data entry.',he:'3 קליקים לעמידה מלאה ברגולציה. 0 קליקים להזנת נתונים ידנית.'},
     'legal.end.line2':{en:'Deed updated. Ledger recalculated. Client package dispatched.',he:'שטר ההעברה עודכן. הספר חושב מחדש. חבילת הלקוח נשלחה.'},
     'legal.end.line3':{en:"And your firm's multi-million dollar transaction data? It never left your local machine.",he:'ונתוני העסקה רבת מיליוני הדולרים של המשרד שלכם? הם מעולם לא עזבו את המכשיר המקומי שלכם.'},
-    'legal.end.cta':{en:'Do It',he:'עשו את זה'}
+    'legal.end.cta':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'}
   };
   var YEAR=new Date().getFullYear();
   var curLang=root.getAttribute('lang')||'en';
@@ -1824,8 +1827,22 @@ Best,
     document.head.appendChild(railStyle);
   })();
 
+  var langBtn=document.getElementById('langBtn');
+  function syncLangBtn(){
+    if(!langBtn) return;
+    langBtn.textContent = curLang==='he' ? 'EN' : 'עב';
+    langBtn.setAttribute('aria-pressed', curLang==='he' ? 'true' : 'false');
+  }
+  if(langBtn) langBtn.addEventListener('click', function(){
+    var next = curLang==='he' ? 'en' : 'he';
+    try{ localStorage.setItem('flow_lang', next); }catch(e){}
+    applyLang(next);
+    syncLangBtn();
+  });
+
   /* init */
   applyLang(curLang);
+  syncLangBtn();
   document.querySelector('.grid-scan[data-anim]') && document.querySelector('.grid-scan[data-anim]').classList.add('anim');
 })();
 </script>

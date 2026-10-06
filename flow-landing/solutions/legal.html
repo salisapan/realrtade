@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap / בפריסה), not live today.">
+<meta name="description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap), not live today.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/solutions/legal.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -15,12 +15,12 @@
 <title>AI Workflow Automation for Legal — Flow</title>
 <meta property="og:type" content="website">
 <meta property="og:title" content="AI Workflow Automation for Legal — Flow">
-<meta property="og:description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap / בפריסה), not live today.">
+<meta property="og:description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap), not live today.">
 <meta property="og:url" content="https://theflow-ai.com/solutions/legal.html">
 <meta property="og:image" content="https://theflow-ai.com/og.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="AI Workflow Automation for Legal — Flow">
-<meta name="twitter:description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap / בפריסה), not live today.">
+<meta name="twitter:description" content="AI automation within professional responsibility limits: human review gates for privilege-sensitive work. Flow-Edge and the append-only audit trail are a deployment offer (roadmap), not live today.">
 <meta name="twitter:image" content="https://theflow-ai.com/og.jpg">
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"Flow","url":"https://theflow-ai.com/","logo":"https://theflow-ai.com/logo.png"}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://theflow-ai.com/"},{"@type":"ListItem","position":2,"name":"Legal","item":"https://theflow-ai.com/solutions/legal.html"}]}</script>
@@ -128,17 +128,27 @@ footer.site a{color:var(--muted)}
     else setTimeout(load, 1);
   });
 </script>
+<link rel="stylesheet" href="/assets/site-nav.css">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site">
   <div class="wrap">
     <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
-    <nav>
+    <nav class="site-bar">
+      <div class="site-links">
+        <a href="/trial.html" data-nav="glance">Glance</a>
+        <a href="/#organization" data-nav="flow">Flow</a>
+        <a href="/pricing.html" data-nav="pricing">Pricing</a>
+        <a href="/security.html" data-nav="security">Security</a>
+        <a href="/contact.html" data-nav="contact">Contact</a>
+      </div>
+      <a class="doit sm nav-get" href="/trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-nav="cta">Get Glance</span></a>
       <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
         <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
       </button>
       
+      <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
       <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
@@ -157,7 +167,7 @@ footer.site a{color:var(--muted)}
     <h1 class="title">AI automation for legal teams.</h1>
     
     <article>
-<p class="note">Flow is in pre-release. Flow-Edge and the audit trail are part of the deployment offer (roadmap / בפריסה) &mdash; not capabilities marked live today. For status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
+<p class="note">Flow is in pre-release. Flow-Edge and the audit trail are part of the deployment offer (roadmap) &mdash; not capabilities marked live today. For status in writing: <a href="mailto:hello@theflow-ai.com">hello@theflow-ai.com</a>.</p>
 <p class="lead">Privileged material has a different risk profile than "sensitive data." Putting that material in someone else's cloud is the failure mode a firm has to be able to refuse.</p>
 
 <h2>The constraint</h2>
@@ -165,8 +175,8 @@ footer.site a{color:var(--muted)}
 
 <h2>How Flow addresses it</h2>
 <ul>
-<li><b>Fully local deployment (Flow-Edge) &mdash; roadmap / בפריסה.</b> When policy requires that client material stay inside the firm's own network, this is the deployment path designed into the engagement &mdash; not a live cloud toggle today.</li>
-<li><b>Immutable audit trail &mdash; roadmap / בפריסה.</b> For regulated deployments, an append-only log is planned: what was reviewed, what was proposed, who approved it, and what was executed. Not a live product toggle today; closed in the engagement. That is the record you need when the process itself is challenged.</li>
+<li><b>Fully local deployment (Flow-Edge) &mdash; roadmap.</b> When policy requires that client material stay inside the firm's own network, this is the deployment path designed into the engagement &mdash; not a live cloud toggle today.</li>
+<li><b>Immutable audit trail &mdash; roadmap.</b> For regulated deployments, an append-only log is planned: what was reviewed, what was proposed, who approved it, and what was executed. Not a live product toggle today; closed in the engagement. That is the record you need when the process itself is challenged.</li>
 <li><b>Human approval gates.</b> Judgment calls surface for a lawyer rather than executing silently.</li>
 <li><b>Deterministic execution.</b> Workflow steps run under a strict runtime rather than free-form model output.</li>
 </ul>
@@ -222,5 +232,6 @@ footer.site a{color:var(--muted)}
 })();
 </script>
 <script src="/assets/flow-premium.js" defer></script>
+<script src="/assets/site-nav.js" defer></script>
 </body>
 </html>

@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-05 (Claude ↔ CoS live inbox is draft PR #77, row 41; file bridge and Obsidian vault unchanged as archive).
+Last updated: 2026-10-06 (site redesign shipped in the landing PR; no production deploy).
 
 ## Open
 
@@ -101,4 +101,5 @@ Last updated: 2026-10-05 (Claude ↔ CoS live inbox is draft PR #77, row 41; fil
 - 2026-10-04: The receipt path now reads the issuer's answers (promised day, a no, a question, "done" with no file) and sends one reminder draft after silence; `docs/when-recognition-fails.md` records what Glance calls when it cannot recognise an intent (no external model by default; the server router and its unverified model ids; the owner's decision on an opt-in last resort).
 - 2026-10-04: A model on the person's own computer (Ollama / LM Studio) can now serve tier 2: loopback only, off until it passes the same precision test per language, proposals only. `docs/local-model-server.md`; popup row; permission and privacy copy; core, worker-parity and browser checks.
 - 2026-10-04: Encoder-as-fallback experiment prepared and its decision rule written down BEFORE running (`docs/encoder-evaluation-plan.md`; fixed 977-sentence corpus, `scripts/intent/dump-fixed-corpus.cjs`, `scripts/intent/nn/encoder-fallback-eval.py`). Blocked: `huggingface.co` still refused from the sandbox.
+- 2026-10-06: Landing redesign on `flow-landing`: two-path home, shared nav with Get Glance, pricing as two product lines, Glance page with Works today / Coming next. Invented counters removed. Masked secure cloud stays a roadmap badge (PR #84 copy kept). No Netlify production deploy in this change.
 - 2026-10-04: Encoder-as-fallback experiment RESULT: `multilingual-e5-small` added +7 (en) / +8 (he) correct proposals and 0 wrong, recall +4.9 / +6.3 points, but missed the pre-registered bar (>= +5 points AND >= 10 more right in each language; blind Hebrew no gain). Decision: no integration; nothing in the product changed.

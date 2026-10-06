@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5">
-<meta name="description" content="Glance is free for individuals. Flow for regulated organisations is $80 per seat per month plus a one-time setup fee scoped to your deployment.">
+<meta name="description" content="Glance is personal: Free, and Pro at $14 per user per month when it opens. Flow for organizations is $80 per user per month, plus a setup fee. Masked secure cloud is on the roadmap.">
 <meta name="theme-color" content="#07090F">
 <link rel="canonical" href="https://theflow-ai.com/pricing.html">
 <link rel="icon" href="/favicon.ico" sizes="any">
@@ -148,6 +148,35 @@ footer.site a{color:var(--muted)}
 .mobile-nav[hidden]{display:none}
 .mobile-nav a{font-family:var(--disp,var(--sans)); font-weight:700; font-size:1.5rem; color:#EEF2F9; text-decoration:none; padding:8px 16px}
 .mobile-nav a:hover{color:var(--accent-2,var(--cat))}
+
+.price-page{max-width:1120px; margin:0 auto; padding:0 24px}
+.price-head{text-align:center; max-width:640px; margin:0 auto 48px}
+.price-head h1.title{font-size:clamp(1.9rem,1.5rem + 1.5vw,2.6rem); margin-bottom:12px}
+.price-head .lead{margin:0 auto; max-width:42ch}
+.price-lines{display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:stretch}
+.price-line{background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:36px 32px 32px; display:flex; flex-direction:column}
+.price-line.glance{border-color:color-mix(in srgb,#5B8CFF 40%, var(--line))}
+.price-who{font-family:var(--mono); font-size:.7rem; letter-spacing:.18em; text-transform:uppercase; color:var(--accent-2); margin:0 0 10px}
+.price-line.glance .price-who{color:#5B8CFF}
+.price-line h2{margin:0 0 8px; border:0; padding:0; font-family:var(--disp); font-weight:700; font-size:clamp(1.6rem,1.3rem + .6vw,2rem); color:var(--txt-hi)}
+.price-tag{color:var(--txt); margin:0 0 28px; font-size:1rem}
+.price-tiers{display:flex; flex-direction:column; gap:16px; flex:1}
+.price-tier{background:var(--panel-2); border:1px solid var(--line); border-radius:16px; padding:20px 20px 18px; display:flex; flex-direction:column; flex:1}
+.price-top{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:6px}
+.price-name{font-family:var(--disp); font-weight:700; font-size:1.1rem; color:var(--txt-hi)}
+.price-amt{font-family:var(--disp); font-weight:700; font-size:1.55rem; color:var(--txt-hi); letter-spacing:-.02em}
+.price-amt span{font-size:.85rem; font-weight:500; color:var(--txt); letter-spacing:0}
+.price-note{font-size:.95rem; color:var(--txt); margin:0 0 14px; line-height:1.45}
+.price-tier ul{list-style:none; margin:0 0 18px; padding:0; display:flex; flex-direction:column; gap:8px}
+.price-tier li{font-size:.95rem; color:var(--txt); padding-inline-start:18px; position:relative; line-height:1.45}
+.price-tier li::before{content:""; position:absolute; inset-inline-start:0; top:.55em; width:6px; height:6px; border-radius:50%; background:#5B8CFF}
+.price-line.org .price-tier li::before{background:var(--accent-2)}
+.price-tier .cta-row{margin-top:auto}
+.price-badge{display:inline-flex; align-items:center; font-family:var(--mono); font-size:.65rem; letter-spacing:.08em; text-transform:uppercase; color:var(--txt); padding:3px 8px; border-radius:999px; border:1px solid var(--line); vertical-align:1px}
+:root[data-theme="dark"] .price-page{--txt:#C9D0DE}
+.price-foot{text-align:center; margin-top:36px; font-size:.9rem; color:var(--txt)}
+.price-tier input[type=email]{direction:ltr; text-align:start}
+@media(max-width:860px){.price-lines{grid-template-columns:1fr} .price-line{padding:28px 20px 22px}}
 </style>
 <link rel="stylesheet" href="/assets/flow-premium.css">
 <script>
@@ -170,17 +199,27 @@ footer.site a{color:var(--muted)}
     else setTimeout(load, 1);
   });
 </script>
+<link rel="stylesheet" href="/assets/site-nav.css">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="site">
   <div class="wrap">
     <a class="brand" href="/"><img src="/logo-header.png" width="177" height="78" alt="Flow" fetchpriority="high" decoding="async"></a>
-    <nav>
+    <nav class="site-bar">
+      <div class="site-links">
+        <a href="/trial.html" data-nav="glance">Glance</a>
+        <a href="/#organization" data-nav="flow">Flow</a>
+        <a href="/pricing.html" data-nav="pricing">Pricing</a>
+        <a href="/security.html" data-nav="security">Security</a>
+        <a href="/contact.html" data-nav="contact">Contact</a>
+      </div>
+      <a class="doit sm nav-get" href="/trial.html" data-ga="nav_glance"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-nav="cta">Get Glance</span></a>
       <button class="menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false" aria-controls="mobileNav">
         <svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></svg>
       </button>
       
+      <button class="lang-btn" id="langBtn" type="button" aria-label="Language">EN</button>
       <button class="theme-btn" id="themeBtn" aria-label="Toggle theme" title="Toggle theme">
         <svg class="moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
         <svg class="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
@@ -194,124 +233,78 @@ footer.site a{color:var(--muted)}
   <div class="mobile-nav-legal"><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></div>
 </div>
 <main id="main">
-  <div class="wrap">
-    <span class="eyebrow">Pricing</span>
-    <h1 class="title">How Flow is priced.</h1>
-    
-    <article>
-<p class="lead">Glance and Flow: two lines, not one ladder.</p>
-<p class="note" lang="he" dir="rtl">Glance ו־Flow: שני קווים, לא סולם אחד</p>
-<p class="note" lang="he" dir="rtl">Gmail = חץ כניסה ל־Glance, לא התקרה</p>
-<p class="note" lang="he" dir="rtl">Free = אישי; Pro = צוות קטן בתמחור בלבד; multi-seat ארגוני = Flow</p>
-
-<p class="product-eyebrow">Glance</p>
-<h2 class="product-head">Personal closing, starting in Gmail</h2>
-<p>A full product with its own revenue. Not a trial of Flow. Not Flow Lite.</p>
-<p class="note" lang="he" dir="rtl">חי עכשיו: Gmail ← Google (יומן, משימות, טיוטות Gmail, ‏Drive: מוצא ומצרף כשיש התאמה אחת) + Notion איפה שמחובר</p>
-<p class="note" lang="he" dir="rtl">בקרוב: WhatsApp, ‏Outlook, ‏Slack, ‏CRM, ויצירה ושיתוף של Doc/Sheet חדש</p>
-
-<div class="tiers-wide"><div class="tiers two">
-  <div class="tier">
-    <div class="tier-head">
-      <div class="tier-plan"><h3 class="tier-name">Free</h3><span class="tier-badge">Individual</span></div>
-      <p class="tier-price"><span class="amt">$0</span></p>
-      <p class="tier-note">Forever, no card required</p>
-      <span class="magnetic"><a class="doit ghost sm" href="/trial.html" data-ga="pricing_free"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Get Glance</a></span>
+  <div class="price-page">
+    <div class="price-head">
+      <p class="eyebrow" data-i18n="pr.eye">Pricing</p>
+      <h1 class="title" data-i18n="pr.h1">Two products. Two price lines.</h1>
+      <p class="lead" data-i18n="pr.lead">Glance is personal. Flow is organizational. They are not a ladder — pick the one that fits.</p>
     </div>
-    <div class="tier-body">
-      <p class="tier-note">Wedge today</p>
-      <ul class="tier-list">
-        <li>One Do It closes a real personal outcome from the open Gmail thread (shipped Google path; stays quiet when unsure)</li>
-        <li>Full honest loop: close → write in place → Undo → silence when unsure</li>
-        <li>Writes to Google Calendar, Tasks, Gmail drafts, and Drive: finds and attaches the right file when there is one match (and Notion where connected). Creating and sharing a new Doc or Sheet: coming soon.</li>
-        <li>Generous soft habit headroom on the shipped wedge — quality closes, not a hard weekly meter, not a tease, and not unlimited · Email support</li>
-      </ul>
-      <p class="note">Glance does not include Flow org admin, governance, or Action Graph.</p>
+    <div class="price-lines">
+      <div class="price-line glance">
+        <p class="price-who" data-i18n="pr.g.who">Glance · Personal</p>
+        <h2 data-i18n="pr.g.h">For you</h2>
+        <p class="price-tag" data-i18n="pr.g.tag">Closes your open loops. Starts in Gmail.</p>
+        <div class="price-tiers">
+          <div class="price-tier">
+            <div class="price-top">
+              <span class="price-name" data-i18n="pr.free.name">Free</span>
+              <span class="price-amt">$0</span>
+            </div>
+            <p class="price-note" data-i18n="pr.free.note">No card. Install and use.</p>
+            <ul>
+              <li data-i18n="pr.free.1">Do It on the email you have open</li>
+              <li data-i18n="pr.free.2">Calendar, Tasks, Gmail drafts — with Undo</li>
+              <li data-i18n="pr.free.3">Drive — find &amp; attach when one match</li>
+            </ul>
+            <div class="cta-row">
+              <span class="magnetic"><a class="doit" href="/trial.html" data-ga="pricing_free"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="pr.free.cta">Get Glance</span></a></span>
+            </div>
+          </div>
+          <div class="price-tier">
+            <div class="price-top">
+              <span class="price-name" data-i18n="pr.pro.name">Pro</span>
+              <span class="price-amt">$14<span>/user/mo</span></span>
+            </div>
+            <p class="price-note"><span class="price-badge" data-i18n="pr.pro.soon">Coming soon</span> <span data-i18n="pr.pro.note">Join the waitlist — we’ll email you when it opens.</span></p>
+            <ul>
+              <li data-i18n="pr.pro.1">Everything in Free</li>
+              <li data-i18n="pr.pro.2">Every open loop, until it closes</li>
+              <li data-i18n="pr.pro.3">Money-on-the-line view</li>
+            </ul>
+            <form class="tier-notify" id="proNotifyForm" novalidate>
+              <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
+              <input type="email" id="proEmail" data-i18n-ph="pr.pro.ph" placeholder="you@company.com" required autocomplete="email" aria-label="Email">
+              <span class="magnetic"><button type="submit" class="doit ghost sm" id="proNotifyBtn" data-ga="pricing_pro"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="proNotifyLabel" data-i18n="pr.pro.cta">Notify me</span></button></span>
+              <p class="tier-notify-status" id="proNotifyStatus" role="status" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="price-line org">
+        <p class="price-who" data-i18n="pr.f.who">Flow · Organization</p>
+        <h2 data-i18n="pr.f.h">For your organization</h2>
+        <p class="price-tag" data-i18n="pr.f.tag">Regulated teams: legal, insurance, security.</p>
+        <div class="price-tiers">
+          <div class="price-tier">
+            <div class="price-top">
+              <span class="price-name" data-i18n="pr.ent.name">Enterprise</span>
+              <span class="price-amt">$80<span>/user/mo</span></span>
+            </div>
+            <p class="price-note" data-i18n="pr.ent.note">Billed annually, per seat — plus a one-time setup fee scoped to your deployment.</p>
+            <ul>
+              <li data-i18n="pr.ent.1">Org admin and seat rollout</li>
+              <li data-i18n="pr.ent.2">Masked secure cloud <span class="price-badge">Roadmap</span></li>
+              <li data-i18n="pr.ent.3">Security review and DPA</li>
+              <li data-i18n="pr.ent.4">Connectors scoped per engagement</li>
+            </ul>
+            <div class="cta-row">
+              <span class="magnetic"><a class="doit" href="/contact.html" data-ga="pricing_enterprise"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span data-i18n="pr.ent.cta">Get a deployment plan</span></a></span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
-  <div class="tier tier-pro">
-    <div class="tier-head">
-      <div class="tier-plan"><h3 class="tier-name">Pro</h3><span class="tier-badge">Small team (2&ndash;10)</span></div>
-      <p class="tier-price"><span class="amt">$14</span><span class="period">/user/mo</span></p>
-      <p class="tier-note">$11/user/mo billed annually</p>
-      <form class="tier-notify" id="proNotifyForm" novalidate>
-        <input type="text" name="company" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none">
-        <input type="email" id="proEmail" placeholder="you@company.com" required autocomplete="email" aria-label="Work email">
-        <span class="magnetic"><button type="submit" class="doit sm" id="proNotifyBtn" data-ga="pricing_pro"><span class="shell"></span><span class="ring"></span><span class="shine"></span><span id="proNotifyLabel">Notify Me</span></button></span>
-        <p class="tier-notify-status" id="proNotifyStatus" role="status" aria-live="polite"></p>
-      </form>
-    </div>
-    <div class="tier-body">
-      <p class="tier-note">Small-team seats live here only — not on the home hero.</p>
-      <ul class="tier-list">
-        <li>Everything in Free</li>
-        <li>Run more than one connector at once</li>
-        <li>One shared invoice · Weekly digest · Priority support</li>
-      </ul>
-    </div>
-  </div>
-</div></div>
-
-<p class="note">The Gmail close is the entry wedge. The product roadmap deepens Glance as a personal closing layer beyond email — same loop, still separate from Flow Enterprise.</p>
-<p class="note" lang="he" dir="rtl">סגירת המייל היא חץ הכניסה. באופק Glance מעמיק כשכבת סגירה אישית מעבר למייל — אותה לולאה, עדיין נפרד מ־Flow Enterprise.</p>
-
-<div class="product-divider">
-  <p class="product-eyebrow">Flow Enterprise</p>
-  <h2 class="product-head">For organizations with sensitive data</h2>
-  <p>A separate product from Glance. Scoped project (quote → discovery → proposal). Not a self-serve upgrade from Free/Pro. Org multi-seat lives here.</p>
-  <p class="note" lang="he" dir="rtl">בפריסה / לפי פרויקט — לא חי במוצר היום</p>
-</div>
-
-<div class="tiers-wide"><div class="tier-solo">
-  <div class="tier">
-    <div class="tier-head">
-      <div class="tier-plan"><h3 class="tier-name">Enterprise</h3><span class="tier-badge">Whole department</span></div>
-      <p class="tier-price"><span class="amt">$80</span><span class="period">/user/mo</span></p>
-      <p class="tier-note">Billed annually, per seat &mdash; plus a one-time setup fee scoped to your deployment</p>
-      <span class="magnetic"><a class="doit ghost sm" href="/contact.html" data-ga="pricing_enterprise"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Do It</a></span>
-    </div>
-    <div class="tier-body">
-      <ul class="tier-list">
-        <li>Org admin and seat rollout for the department</li>
-        <li>Deployment designed into your engagement: masked secure cloud and/or on-prem path (Flow-Edge — roadmap / בפריסה)</li>
-        <li>SSO and immutable audit trail — designed into regulated deployments (roadmap / בפריסה), not live toggles today</li>
-        <li>Security review / DPA for regulated environments</li>
-        <li>Custom connectors scoped separately</li>
-        <li>Dedicated onboarding contact</li>
-      </ul>
-    </div>
-  </div>
-</div></div>
-
-<h2>What determines the setup fee</h2>
-<p>The $80/seat price is fixed. The one-time setup fee is scoped to your deployment &mdash; these are the things that change it.</p>
-<div class="cards two">
-  <div class="card">
-    <h3>Deployment Model</h3>
-    <p>Masked secure cloud and Flow-Edge are designed into the engagement (roadmap / בפריסה), not live toggles today. If a rollout includes either model, the cost structures differ: Flow-Edge would run on your infrastructure, so you would carry the compute and we would license the engine.</p>
-  </div>
-  <div class="card">
-    <h3>Custom Connectors</h3>
-    <p>Google and Notion are live on the Glance path today. HubSpot, Salesforce, Slack, Monday.com and other systems are scoped and priced per engagement when built for your stack — not bundled as live today.</p>
-  </div>
-  <div class="card">
-    <h3>Seats</h3>
-    <p>How many people have Flow observing and acting alongside their work &mdash; volume discounts apply above 50 seats.</p>
-  </div>
-  <div class="card">
-    <h3>Compliance Requirements</h3>
-    <p>Environments requiring specific controls, evidence, or deployment isolation carry additional implementation work. We would rather scope that honestly up front than discover it at contract stage.</p>
-  </div>
-</div>
-
-<div class="note">Need a budgetary figure for a planning cycle? Say so in your first email &mdash; we will give you a range with the assumptions written out, rather than asking you to sit through a call for it.</div>
-
-<div class="cta">
-  <h2>Ready to talk Enterprise?</h2>
-  <p>Tell us your deployment model and rough scope, and we will come back with a range.</p>
-  <span class="magnetic"><a class="doit" href="/contact.html" data-ga="pricing_bottom_cta"><span class="shell"></span><span class="ring"></span><span class="shine"></span>Do It</a></span>
-</div>
-    </article>
+    <p class="price-foot" data-i18n="pr.foot">The one-time setup fee is scoped to your deployment. Masked secure cloud is on the roadmap.</p>
   </div>
 </main>
 <footer class="site">
@@ -384,5 +377,40 @@ footer.site a{color:var(--muted)}
 })();
 </script>
 <script src="/assets/flow-premium.js" defer></script>
+<script>
+window.FLOW_PAGE_I18N = {
+  'pr.eye':{en:'Pricing',he:'תמחור'},
+  'pr.h1':{en:'Two products. Two price lines.',he:'שני מוצרים. שני קווי מחיר.'},
+  'pr.lead':{en:'Glance is personal. Flow is organizational. They are not a ladder — pick the one that fits.',he:'Glance אישי. Flow ארגוני. הם לא סולם — בוחרים את מה שמתאים.'},
+  'pr.g.who':{en:'Glance · Personal',he:'Glance · אישי'},
+  'pr.g.h':{en:'For you',he:'בשבילך'},
+  'pr.g.tag':{en:'Closes your open loops. Starts in Gmail.',he:'סוגר את הלולאות הפתוחות שלך. מתחיל ב־Gmail.'},
+  'pr.free.name':{en:'Free',he:'חינם'},
+  'pr.free.note':{en:'No card. Install and use.',he:'בלי כרטיס. מתקינים ומשתמשים.'},
+  'pr.free.1':{en:'Do It on the email you have open',he:'Do It על המייל שפתוח'},
+  'pr.free.2':{en:'Calendar, Tasks, Gmail drafts — with Undo',he:'יומן, משימות, טיוטות Gmail — עם ביטול'},
+  'pr.free.3':{en:'Drive — find &amp; attach when one match',he:'Drive — מוצא ומצרף כשיש התאמה אחת'},
+  'pr.free.cta':{en:'Get Glance',he:'קבלו את Glance'},
+  'pr.pro.name':{en:'Pro',he:'Pro'},
+  'pr.pro.soon':{en:'Coming soon',he:'בקרוב'},
+  'pr.pro.note':{en:'Join the waitlist — we’ll email you when it opens.',he:'הצטרפו לרשימה — נשלח מייל כשזה נפתח.'},
+  'pr.pro.1':{en:'Everything in Free',he:'כל מה שיש בחינם'},
+  'pr.pro.2':{en:'Every open loop, until it closes',he:'כל לולאה פתוחה, עד שהיא נסגרת'},
+  'pr.pro.3':{en:'Money-on-the-line view',he:'מבט על כסף שעל הכף'},
+  'pr.pro.cta':{en:'Notify me',he:'עדכנו אותי'},
+  'pr.f.who':{en:'Flow · Organization',he:'Flow · ארגון'},
+  'pr.f.h':{en:'For your organization',he:'לארגון'},
+  'pr.f.tag':{en:'Regulated teams: legal, insurance, security.',he:'צוותים מפוקחים: משפט, ביטוח, אבטחה.'},
+  'pr.ent.name':{en:'Enterprise',he:'Enterprise'},
+  'pr.ent.note':{en:'Billed annually, per seat — plus a one-time setup fee scoped to your deployment.',he:'חיוב שנתי, למושב — ועוד דמי הקמה חד־פעמיים לפי הפריסה.'},
+  'pr.ent.1':{en:'Org admin and seat rollout',he:'ניהול ארגוני ופריסת מושבים'},
+  'pr.ent.2':{en:'Masked secure cloud <span class="price-badge">Roadmap</span>',he:'ענן ממוסך <span class="price-badge">במפת הדרכים</span>'},
+  'pr.ent.3':{en:'Security review and DPA',he:'סקירת אבטחה והסכם עיבוד'},
+  'pr.ent.4':{en:'Connectors scoped per engagement',he:'מחברים לפי ההתקשרות'},
+  'pr.ent.cta':{en:'Get a deployment plan',he:'קבלו תוכנית פריסה'},
+  'pr.foot':{en:'The one-time setup fee is scoped to your deployment. Masked secure cloud is on the roadmap.',he:'דמי ההקמה נקבעים לפי הפריסה. ענן ממוסך — במפת הדרכים.'}
+};
+</script>
+<script src="/assets/site-nav.js" defer></script>
 </body>
 </html>
