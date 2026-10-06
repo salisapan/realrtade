@@ -955,7 +955,7 @@
     let attachFile = null;
     if (fileGate.kind === 'clear' && intent.type === FlowIntent.TYPES.REQUEST && typeof FlowFileAttach !== 'undefined') {
       const searched = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.query) }, resolve);
+        chrome.runtime.sendMessage({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(fileGate.ask.searchTerms || fileGate.ask.query) }, resolve);
       });
       // One resolver for every file ask the resolution planner does not own.
       // A template is not a file that was found. Mailbox-wide attachment

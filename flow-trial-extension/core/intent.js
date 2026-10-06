@@ -418,6 +418,17 @@ const FlowIntent = (() => {
     // and filing those is a confident mistake. The flag is case-insensitive
     // because "Maybe" and "Tentatively" open the sentence.
     const MEETING_SOFT = /\b(?:might|maybe|perhaps|possibly|tentatively)\b|(?:^|\s)(?:אולי|ייתכן|נראה לי)/i;
+    // "before tomorrow's meeting" / "by our call" / "לפני הפגישה" names the
+    // deadline of the thing being asked, not a meeting to put on the calendar.
+    // The preposition has to sit immediately in front of the noun (a short
+    // article or a few words). "by Friday" after the noun is a real meeting's
+    // day and is not this frame. A sentence that also proposes a meeting in
+    // its own words still counts: only this hit is skipped.
+    const DEADLINE_BEFORE_MEETING_EN = /\b(?:before|by|ahead of|prior to|in time for|until)\s+(?:(?:the|our|your|a|an|this|next|tomorrow['’]?s|today['’]?s|tonight['’]?s)\s+)*(?:[\w']+\s+){0,4}$/i;
+    const DEADLINE_BEFORE_MEETING_HE = /(?:לפני|עד)\s+ה?\s*$/;
+    function deadlineBeforeMeeting(before) {
+      return DEADLINE_BEFORE_MEETING_EN.test(before) || DEADLINE_BEFORE_MEETING_HE.test(before);
+    }
     function meetingAsserted(pattern) {
       const sentences = String(text || '').split(/(?<=[.!?;])\s+|\n+/);
       for (const s of sentences) {
@@ -430,6 +441,7 @@ const FlowIntent = (() => {
         if (index > 0 && s.charAt(index - 1) === 'ה' && (index === 1 || /\s/.test(s.charAt(index - 2)))) index -= 1;
         if (FlowJudgment.isNegatedBefore(s.slice(0, index))) continue;
         if (MEETING_SOFT.test(s)) continue;
+        if (deadlineBeforeMeeting(s.slice(0, index))) continue;
         return true;
       }
       return false;
@@ -727,6 +739,10 @@ const FlowIntent = (() => {
         if (viaLatest && viaLatest.type) return viaLatest;
       }
     }
+    // A meeting noun inside "before/by … meeting" or "לפני הפגישה" is the
+    // deadline of the request, not evidence of a meeting to schedule. A
+    // schedule close still needs an explicit proposal to meet, or a time
+    // offered for choice (family D / the explicit-ask gate below).
     const eventEvidence = hasMeetingNoun && facts.date && facts.date.iso && !calledOff && !isRecap && !isPast;
     // A clock time the extractor actually resolved. Missing either field is
     // not a time we may invent — date-only meetings stay all-day events on

@@ -397,7 +397,7 @@
     if (typeof FlowCloseChains === 'undefined' || typeof FlowFileAttach === 'undefined' || !FlowCloseChains.fileEvidence) return null;
     const gate = FlowFileAttach.gate(text);
     if (!gate || gate.kind !== 'clear' || !gate.ask) return { quiet: (gate && gate.reason) || 'file' };
-    const searched = await send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.query) });
+    const searched = await send({ type: 'flow:search-drive', query: FlowFileAttach.driveQuery(gate.ask.searchTerms || gate.ask.query) });
     let watching = null;
     try {
       const watches = await FlowStorage.getWatches();

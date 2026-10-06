@@ -91,7 +91,7 @@ const FlowCloseFamilies = (() => {
 
   // "find a time" is not in here. Naming no slot is not a hold.
   const MEET_EN = /\b(?:let'?s|let us)\s+(?:meet|sync|hop on|jump on|get on)\b|\b(?:hop|jump) on a call\b|\bgrab (?:time|\d+)\b|\bgot \d+ minutes\b|\bare you free\b|\bfree for a\b|\bquick sync\b|\b(?:can|could|would|shall)\s+(?:we|you)\s+meet(?!\s+(?:the\s+)?(?:deadline|requirement|criteria|quota|target|obligation))\b|\b(?:book|block|pencil)\b(?:\s+\w+){0,2}\s+(?:a |the |some )?(?:time|slot)\b/i;
-  const MEET_HE = /(?:בוא נקבע|בואי נקבע|בואו נקבע|יש לך זמן|יש לך רבע שעה|שיחה קצרה|נקפוץ לשיחה|פנוי(?:ה)? לשיחה|(?:^|[^\u0590-\u05FF])נקבע(?! מחדש)(?![\u0590-\u05FF])|ניפגש)/;
+  const MEET_HE = /(?:בוא נקבע|בואי נקבע|בואו נקבע|יש לך זמן|יש לך רבע שעה|שיחה קצרה|נקפוץ לשיחה|פנוי(?:ה)? לשיחה|(?:^|[^\u0590-\u05FF])נקבע(?! מחדש)(?![\u0590-\u05FF])|ניפגש|(?:^|[^\u0590-\u05FF])נפגש(?:ים|ות)?(?![\u0590-\u05FF]))/;
   const COMMIT_EN = /\b(?:i(?:'ll| will) (?:have|get|send|deliver|share|finish|complete|submit|file|pay|return|forward|email|prepare|handle)|on the hook to|i commit to|count on me to|i(?:'ll| will) take care of)\b/i;
   const COMMIT_HE = /(?:מתחייב|מתחייבת|אאשר עד|אחזיר לך|אני על זה|(?:^|[^\u0590-\u05FF])(?:אשלח|נשלח|אעביר|נעביר|אכין|נכין|אגיש|נגיש|אשלם|נשלם|אחזיר|נחזיר)(?![\u0590-\u05FF]))/;
   const FIND_TIME_EN = /\bfind (?:a |some )?time\b|\bfind (?:us )?a slot\b/i;

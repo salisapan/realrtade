@@ -914,6 +914,7 @@
     const note = el('p', 'wait-note');
     note.hidden = true;
     const acts = el('div', 'wait-acts');
+    let offRow = null;
     if (st.configured && !st.connected) {
       const c = el('button', 'ghost sm', 'Turn on');
       c.type = 'button';
@@ -943,7 +944,10 @@
       const off = el('button', 'ghost sm', 'Turn off');
       off.type = 'button';
       off.addEventListener('click', async () => { off.disabled = true; await o.disconnect(); await renderSurfaces(); await renderOutlookCards(); });
-      acts.appendChild(chk); acts.appendChild(off);
+      acts.appendChild(chk);
+      // Turn off sits on its own row, away from Check now.
+      offRow = el('div', 'wait-acts wait-off-row');
+      offRow.appendChild(off);
       // Upgrade from 0.9.6: Graph may be on without OWA host permission for the in-page card.
       (async () => {
         try {
@@ -969,6 +973,7 @@
       })();
     }
     row.appendChild(acts);
+    if (offRow) row.appendChild(offRow);
     row.appendChild(note);
     host.appendChild(row);
   }
