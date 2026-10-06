@@ -191,6 +191,7 @@ header.nav.scrolled{background:var(--nav-bg); backdrop-filter:blur(16px) saturat
 @keyframes float1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-4%,5%) scale(1.12)}}
 @keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(6%,-4%) scale(1.08)}}
 .hero-in{position:relative; z-index:3; display:flex; flex-direction:column; align-items:flex-start}
+.hero-in > picture, .cta-box > picture{display:contents}
 [dir="ltr"] .hero-in{align-items:flex-start}
 .hero-logo{width:min(206px,44vw); height:auto; margin-bottom:20px; filter:var(--logo-shadow)}
 .hero h1{font-size:var(--step-4); letter-spacing:-.02em; margin:4px 0 20px; transform-style:preserve-3d; transition:transform .3s cubic-bezier(.2,.7,.2,1)}
@@ -604,6 +605,7 @@ canvas.terrain-canvas.show{opacity:1}
   box-shadow:0 20px 40px -18px rgba(0,0,0,.5), 0 0 0 1px var(--line);
   text-decoration:none;
 }
+.ins-cf-card picture{position:absolute; inset:0; display:block}
 .ins-cf-card img{width:100%; height:100%; object-fit:cover; display:block; pointer-events:none; user-select:none}
 .ins-cf-card::after{content:''; position:absolute; inset:0; background:linear-gradient(180deg,transparent 55%,rgba(0,0,0,.72)); opacity:0; transition:opacity .25s}
 .ins-cf-card .t{
