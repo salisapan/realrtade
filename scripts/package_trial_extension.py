@@ -288,11 +288,16 @@ def collect(profile: str = "full") -> dict[str, Path]:
     return files
 
 
-def write_zip(files: dict[str, Path], out: Path) -> int:
+def write_zip(
+    files: dict[str, Path],
+    out: Path,
+    replacements: dict[str, bytes] | None = None,
+) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
         tmp.unlink()
+    replacements = replacements or {}
     # Fixed timestamps keep two builds of the same tree byte-identical.
     info_date = (2026, 1, 1, 0, 0, 0)
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED) as archive:
@@ -300,7 +305,7 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, files[rel].read_bytes())
+            archive.writestr(info, replacements.get(rel, files[rel].read_bytes()))
     os.replace(tmp, out)
     return out.stat().st_size
 

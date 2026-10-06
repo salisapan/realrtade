@@ -30,6 +30,8 @@ STORE_DESCRIPTION = (
     "Glance closes open loops in Gmail: what you asked, what you promised, "
     "what others asked of you. One click to close."
 )
+# Must match flow-trial-extension/manifest.json version on this branch.
+STORE_VERSION = "0.9.18"
 CWS_ZIP_PATH = package.EXTENSION_ROOT / "dist" / "glance-cws.zip"
 
 
@@ -52,8 +54,8 @@ def store_manifest(raw: bytes) -> bytes:
     manifest.pop("key", None)
     manifest["description"] = STORE_DESCRIPTION
     manifest["oauth2"]["client_id"] = STORE_CLIENT_ID
-    if manifest.get("version") != "0.7.5":
-        die(f"refusing to package version {manifest.get('version')}; this store build is 0.7.5")
+    if manifest.get("version") != STORE_VERSION:
+        die(f"refusing to package version {manifest.get('version')}; this store build is {STORE_VERSION}")
     encoded = (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
     packed = json.loads(encoded)
     if "key" in packed:
@@ -66,15 +68,13 @@ def store_manifest(raw: bytes) -> bytes:
 
 
 def main() -> None:
-    files = package.collect()
-    for rel in files:
-        if rel == "picker" or rel.startswith("picker/"):
-            die(f"refusing to put {rel} in the store zip")
+    # lite: no hybrid WASM in the Store upload (hybrid is off; keeps the zip small).
+    files = package.collect("lite")
     manifest_bytes = store_manifest(files["manifest.json"].read_bytes())
     package.write_zip(files, CWS_ZIP_PATH, {"manifest.json": manifest_bytes})
     print(
         f"Wrote {CWS_ZIP_PATH.relative_to(package.REPO_ROOT)} "
-        f"({CWS_ZIP_PATH.stat().st_size} bytes, {len(files)} files)"
+        f"({CWS_ZIP_PATH.stat().st_size} bytes, {len(files)} files, profile lite)"
     )
 
 
