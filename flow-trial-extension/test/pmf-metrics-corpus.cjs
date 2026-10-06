@@ -60,6 +60,14 @@ console.log('\n--- weekKey: consistent grouping, not a real ISO week number ---\
 
   const janFirst = FlowPmfMetrics.weekKey(new Date('2027-01-01T00:00:00Z'));
   check('a new year produces a key for the new year, not a throw or NaN', /^2027-W\d{2}$/.test(janFirst), janFirst);
+
+  // September is after the spring-forward in zones that observe daylight
+  // saving. Local midnight must stay in the same week as noon that day.
+  const midnight = new Date(2026, 8, 12);
+  const noon = new Date(2026, 8, 12, 12, 0, 0);
+  check('local midnight and local noon on the same day share a week key',
+    FlowPmfMetrics.weekKey(midnight) === FlowPmfMetrics.weekKey(noon),
+    { midnight: FlowPmfMetrics.weekKey(midnight), noon: FlowPmfMetrics.weekKey(noon) });
 }
 
 console.log('\n--- computeWeeklyActivity / computeRetention ---\n');
@@ -115,6 +123,15 @@ console.log('\n--- computeWeeklyHabit: real, spread-out activity AND at least on
   const staleClose = FlowPmfMetrics.computeWeeklyHabit(spreadOutDays, closeFromLastWeek, thisWeekTs);
   check('a close from a PRIOR week does not count toward THIS week\'s habit bar',
     staleClose.metThisWeek === false && staleClose.closesThisWeek === 0, staleClose);
+
+  // The storage habit trigger records active days as local-midnight date
+  // strings and the close as a timestamp during the day. Both have to
+  // count in the pinned local week (2026-09-10..12 is mid-bucket).
+  const localNoon = new Date(2026, 8, 12, 12, 0, 0).getTime();
+  const localDays = [0, 1, 2].map((off) => new Date(2026, 8, 12 - off).toDateString());
+  const localHabit = FlowPmfMetrics.computeWeeklyHabit(localDays, { recent: [{ id: 'm1', ts: localNoon }] }, localNoon);
+  check('three local midnights plus a noon close in that week meet the bar',
+    localHabit.metThisWeek === true && localHabit.activeDaysThisWeek === 3 && localHabit.closesThisWeek === 1, localHabit);
 }
 
 console.log('\n--- computeSnapshot: the one object getPmfSnapshot() hands back ---\n');

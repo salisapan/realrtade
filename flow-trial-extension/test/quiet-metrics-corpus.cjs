@@ -37,6 +37,10 @@ console.log('--- week key matches the habit metric ---\n');
     { quiet: FlowQuietMetrics.weekKey(NOW), pmf: FlowPmfMetrics.weekKey(NOW) });
   check('a date eight days earlier is a different bucket',
     FlowQuietMetrics.weekKey(new Date(LAST_TS)) !== FlowQuietMetrics.weekKey(NOW));
+  const midnight = new Date(2026, 8, 12);
+  check('weekKey agrees with FlowPmfMetrics on a local midnight',
+    FlowQuietMetrics.weekKey(midnight) === FlowPmfMetrics.weekKey(midnight),
+    { quiet: FlowQuietMetrics.weekKey(midnight), pmf: FlowPmfMetrics.weekKey(midnight) });
 }
 
 console.log('\n--- trusted close is Handled and not Undone ---\n');

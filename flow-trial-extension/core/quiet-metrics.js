@@ -13,7 +13,8 @@
 //
 // Trusted closes / week. How many of those writes have their Handled
 // timestamp in the current local week. The week key is the same
-// YYYY-Wnn bucket as core/pmf-metrics.js (day-of-year / 7, not ISO).
+// YYYY-Wnn bucket as core/pmf-metrics.js (local calendar day-of-year / 7,
+// not elapsed 24h and not ISO).
 // Week buckets are counts. The id list exists only so one Undo can
 // find the week of that write, capped like the other local id lists.
 //
@@ -48,12 +49,14 @@ const FlowQuietMetrics = (() => {
   }
 
   // Same bucket as FlowPmfMetrics.weekKey. Local calendar, not ISO.
+  // Keep the day count on the local Y-M-D so a daylight-saving shift
+  // cannot move local midnight into the previous week.
   function weekKey(date) {
     const d = new Date(date);
-    const start = new Date(d.getFullYear(), 0, 1);
-    const dayOfYear = Math.floor((d - start) / DAY_MS);
+    const year = d.getFullYear();
+    const dayOfYear = Math.round((Date.UTC(year, d.getMonth(), d.getDate()) - Date.UTC(year, 0, 1)) / DAY_MS);
     const week = Math.floor(dayOfYear / 7);
-    return d.getFullYear() + '-W' + String(week).padStart(2, '0');
+    return year + '-W' + String(week).padStart(2, '0');
   }
 
   function cleanId(id) {
