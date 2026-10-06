@@ -20,8 +20,9 @@ back to you, or declined. It is used in exactly one way: **when it is at least 9
 open and silent**. It never closes anything. So it can make a close rarer, never wronger.
 
 Guards: only replies of up to 18 words (long substantive replies are not "thanks" and the model saw mostly short ones); never when a
-rule already decided (confirm, paid, declined, promised, handed back); never on a payment loop (which already only asks); and with no
-weights the rules behave exactly as before. Each time it holds a loop open it writes one line in the learning list ("A reply
+rule already decided (confirm, paid, declined, promised, handed back, or a contact-line signature, which holds on its own);
+never on a payment loop (which already only asks); and with no
+weights the rules behave exactly as before. The signature rule is in `core/follow-up.js`, not in this model (`docs/true-close.md` §3, `docs/human-eval.md` §7). Each time it holds a loop open it writes one line in the learning list ("A reply
 "…" did not answer it (still working on it), so I kept the loop open"), so it can be checked on real threads.
 
 ## 3. Numbers, and what they do not prove

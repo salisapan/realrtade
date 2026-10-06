@@ -21,7 +21,8 @@ console.log('\n--- knowing when not to start: soft asks with nothing behind them
   'I put together a first draft of the plan. Keep me posted on how it lands with the team.',
   'Great meeting you at the conference. Feel free to reach out whenever you want to catch up.',
   'Just wanted to share the article with you, let me know what you think of it.',
-  'תודה על השיחה היום. תעדכן אותי מה אתה חושב כשיהיה לך זמן.'
+  'תודה על השיחה היום. תעדכן אותי מה אתה חושב כשיהיה לך זמן.',
+  'תודה, ושמחים שחזרת. מחכים לפירוט כשיהיה לך נוח.'
 ].forEach((t) => check('no loop for a soft ask: ' + t.slice(0, 60), out(t) === null, out(t)));
 
 console.log('\n--- but weight is never withheld from money, a deadline, or a concrete ask ---');

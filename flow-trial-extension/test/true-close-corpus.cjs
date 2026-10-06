@@ -27,7 +27,9 @@ const NOT_AN_ANSWER = [
   // unsure
   "I'll try", 'Hopefully by the end of the week', 'Probably tomorrow', 'I think so', 'Maybe', 'Not sure yet', 'Can we talk about it?',
   // Hebrew
-  'קיבלתי', 'קיבלתי, תודה', 'תודה', 'אחזור אליך', 'אחזור אליך בהקדם', 'בודק ואחזור', 'אני בודק את זה', 'מטפל בזה', 'בטיפול', 'רשמתי', 'ראיתי', 'נבדוק', 'אעדכן', 'אעדכן אותך', 'אני לא במשרד עד יום ראשון', 'תודה על פנייתך, אענה בהקדם', 'מצוין', 'נראה', 'אנסה', 'אולי', 'עוד לא', 'ממתין לאישור', 'ממתין לחתימה', 'בדרך'
+  'קיבלתי', 'קיבלתי, תודה', 'תודה', 'אחזור אליך', 'אחזור אליך בהקדם', 'בודק ואחזור', 'אני בודק את זה', 'מטפל בזה', 'בטיפול', 'רשמתי', 'ראיתי', 'נבדוק', 'אעדכן', 'אעדכן אותך', 'אני לא במשרד עד יום ראשון', 'תודה על פנייתך, אענה בהקדם', 'מצוין', 'נראה', 'אנסה', 'אולי', 'עוד לא', 'ממתין לאישור', 'ממתין לחתימה', 'בדרך',
+  // a forward that leaves only a signature (real-mail gold rm-009), and the same shape in English
+  '[NAME] מנהל חטיבת שירות טלפון: [EMAIL]', 'Alex Kim, Director. Phone: [PHONE]'
 ];
 const ANSWERS = [
   'Done', 'Done, sent it over', 'Attached is the signed contract', 'Here you go, the invoice is attached', 'Confirmed, see you Tuesday at 10', 'Approved', 'Yes, approved', 'It is signed and sent', 'Sent', 'The report is done and in your inbox', 'Yes', 'Yes please', 'Thursday works for me', 'Tuesday at 3pm', '10am', 'The PO number is 48213', 'It is $3,850', 'https://docs.example.com/plan',

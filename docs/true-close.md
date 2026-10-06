@@ -23,7 +23,7 @@ What the 21 were: very short unplaceable replies ("Perfect", "Seen", "Maybe", "I
 day ("אעדכן", "בטיפול", "מטפל בזה"); and, a real defect, **Hebrew "yes" inside other words**: the Hebrew confirmation list had no word boundary, so `כן` matched the end of "אעדכן" ("I will update") and made it a delivery.
 All the existing corpora, including the model's own precision gates, are unchanged and pass.
 
-## 3. What changed (three things, precision first, nothing lowered)
+## 3. What changed (precision first, nothing lowered)
 
 1. **Waiting on someone else is an interim.** "Waiting for…", "pending approval", "it is with…", "בטיפול", "ממתין ל…": a hold, unless the message also hands something over (attached, here is, sent it).
 2. **Promises with no day move the chase, never close**: "will revert", "will update you", Hebrew אעדכן / אחזור / אבדוק / אטפל, and their plural forms.
@@ -32,6 +32,8 @@ All the existing corpora, including the model's own precision gates, are unchang
    the trade the owner chose: a wrong close is never reminded about again, a held loop is.
 
 The Hebrew boundary fix is the same kind of change: it only stops a match inside a word.
+
+4. **A signature is not an answer, and a quoted ask is not a new one.** A short reply that is only a contact line ("Phone:" / "טלפון:", a title, a name) holds the loop. A forward often leaves nothing else once the quoted history is cut, and closing on that signature was the default. The Hebrew forward banner "הודעה שהועברה" is now the same cut as "Forwarded message", so the quoted text is not judged as the new message. Found on the real-mail gold set (`docs/human-eval.md` §7). The hold list in the corpus gained that signature line and one English contact line of the same shape. The 71/29 measurement above is the earlier experiment.
 
 ## 4. The other half: a draft is not a delivery (multi-step documents)
 

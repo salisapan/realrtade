@@ -87,6 +87,7 @@ console.log('\n--- structure must permit what the model alone proposes ---\n');
   check('not an ask or a promise, however the model feels: ' + t.slice(0, 50), r.unsure || (r.act !== 'ASK' && r.act !== 'PROMISE'), r);
 });
 check('a question the model is sure about, with no named action, is an ask for a reply', (() => { const r = P.recognize('Has the container cleared customs yet?'); return r.act === 'ASK' && r.request && r.request.action === 'reply'; })());
+check('a marketing line that only says you need to do something is not an ask', (() => { const r = P.recognize('Your agent is ready. You just need to point it at something.'); return r.unsure || (r.act !== 'ASK' && r.act !== 'PROMISE'); })());
 check('a social question is still not a task', P.recognize('How was the trip?').act !== 'ASK' && P.recognize('Will you be at the conference this year?').act !== 'ASK');
 
 console.log('\n--- the pipeline against the word lists (blind set) ---\n');

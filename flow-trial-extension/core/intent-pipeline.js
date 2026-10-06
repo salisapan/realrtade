@@ -27,6 +27,17 @@ const FlowIntentPipeline = (() => {
   // A formal request that names no action ("I would be grateful for your help on this") still waits on an answer.
   const POLITE_ASK = /(?:אודה|נודה|אבקש|נבקש|ברצוני (?:לדעת|לברר|לקבל|לוודא|לבקש)|אני מבקש|אנו מבקשים)|\b(?:i would (?:appreciate|be grateful)|i(?:'d| would) be grateful|i(?:'d| would) kindly ask|we(?:'d| would) (?:appreciate|be grateful))\b/i;
 
+  // The action head will call a second-person sentence a "reply" with nothing asked.
+  // A reply-ask asks something: a question, or a word that asks for one.
+  // "You just need to point it at something" names the reader and a need, and that is not an ask.
+  const REPLY_CUE = /[?؟]|\b(?:let me know|tell me|update me|keep me posted|get back to me|what|when|where|who|how|which|please|kindly|could you|can you|would you|will you)\b|(?:תודיע|תעדכן|תעדכני|תעדכנו|מה |מתי |איך |איפה |האם |למה |בבקשה|תוכל|אפשר)/;
+  function modelReplyHasCue(s, req) {
+    if (!req || req.action !== 'reply') return true;
+    const hits = types.lexHits(s);
+    if (hits.actions && hits.actions.length) return true;
+    return REPLY_CUE.test(s);
+  }
+
   // The request a model-proposed ask stands for: a known verb wins; otherwise
   // the model's own action head, if it is clear about it.
   function topicRequest(m, s) {
@@ -110,7 +121,7 @@ const FlowIntentPipeline = (() => {
     const hedged = types.lexHits(s).hedged;
     if (m.act === 'ASK' && m.actProb >= MODEL_MIN && !hedged && shapedAsk(s)) {
       const req = topicRequest(m, s);
-      if (req) {
+      if (req && modelReplyHasCue(s, req)) {
         out.act = 'ASK'; out.request = req; out.unsure = false; out.tier = 'model'; out.confidence = m.actProb; out.why = 'model: ask, action ' + req.action;
         return out;
       }

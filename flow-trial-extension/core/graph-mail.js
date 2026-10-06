@@ -28,7 +28,7 @@ const FlowGraphMail = (() => {
     /^\s*(?:from|מאת)\s*[:：]\s*.+/i,
     /^\s*on .{5,120} wrote:\s*$/i,
     /^\s*ב-?.{5,80}\s*(?:כתב|כתבה)\s*[:：]?\s*$/,
-    /^\s*-{2,}\s*(?:original message|forwarded message|הודעה מקורית).*$/i,
+    /^\s*-{2,}\s*(?:original message|forwarded message|הודעה מקורית|הודעה שהועברה).*$/i,
     /^\s*_{5,}\s*$/,
     /^\s*>/
   ];

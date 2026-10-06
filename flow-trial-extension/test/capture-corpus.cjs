@@ -50,6 +50,8 @@ console.log('\n--- Outlook mail from Microsoft Graph ---\n');
   check('their reply: the quoted history is cut at "On … wrote:"', inc && inc.direction === 'in' && inc.text === 'Confirmed, sending it today.' && inc.from.email === 'dana@acme.com', inc);
   const he = G.toUtterance({ id: 'x', conversationId: 'c', from: { emailAddress: { name: 'דנה', address: 'dana@acme.com' } }, body: { contentType: 'text', content: 'שלחתי לך את החוזה.\n\nמאת: אני\nנשלח: יום שני' } }, me);
   check('a Hebrew header cuts the history too', he && he.text === 'שלחתי לך את החוזה.', he);
+  const fwd = '[NAME] מנהל חטיבת שירות טלפון: [EMAIL]\n\n---------- הודעה שהועברה ---------\nנודה לתאם מולך פגישה על מנת להציג את המערכת ולדון על השילוב שלה אצלכם בחברה.';
+  check('a Hebrew forward banner cuts the quoted ask, so it is not read as incoming', G.ownText(fwd) === '[NAME] מנהל חטיבת שירות טלפון: [EMAIL]', G.ownText(fwd));
   check('a draft is never read', G.toUtterance({ id: 'd', isDraft: true, from: { emailAddress: { address: 'me@contoso.com' } }, body: { contentType: 'text', content: 'unsent' } }, me) === null);
   check('a message with no usable sender is dropped', G.toUtterance({ id: 'z', from: { emailAddress: { name: 'x', address: 'nope' } }, body: { contentType: 'text', content: 'hello there' } }, me) === null && G.toUtterance(null, me) === null);
   check('scripts and styles in the HTML are not text', !/alert|color/.test(G.htmlToText('<style>p{color:red}</style><script>alert(1)</script><p>Hello</p>')) && G.htmlToText('<p>A</p><p>B</p>') === 'A\nB');

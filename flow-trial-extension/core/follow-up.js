@@ -69,7 +69,7 @@ const FlowFollowUp = (() => {
 
   // ---- courtesy and hedge: sentences that sound like asks but are not -------
   const COURTESY = /\b(?:let me know if (?:you|there|anything|any|i can)|feel free to|don'?t hesitate|hope (?:this|that|you)|looking forward|thanks? (?:again|so much)|have a (?:great|good|nice|lovely)|talk soon|speak soon|best regards|kind regards|warm regards|if you have any (?:questions|concerns)|happy to (?:help|chat|discuss)|at your convenience)\b|(?:אל תהססו|אם יש (?:לכם )?שאלות|בברכה|שיהיה (?:לך|לכם) (?:יום|שבוע)|נשמח לעמוד)/i;
-  const HEDGE = /\b(?:no rush|whenever you (?:get a chance|can|have a moment)|if (?:you|it'?s) (?:possible|convenient)|when you (?:get|have) a (?:chance|moment)|sometime|no pressure|if you(?:'re| are) free)\b|(?:אין לחץ|כשיהיה לך זמן|כשתוכל|מתישהו|אם נוח)/i;
+  const HEDGE = /\b(?:no rush|whenever you (?:get a chance|can|have a moment)|if (?:you|it'?s) (?:possible|convenient)|when you (?:get|have) a (?:chance|moment)|sometime|no pressure|if you(?:'re| are) free)\b|(?:אין לחץ|כשיהיה לך (?:זמן|נוח)|כשנוח לך|כשתוכל|מתישהו|אם נוח)/i;
 
   // ---- asks -----------------------------------------------------------------
   const ASK_EN = [
@@ -580,6 +580,8 @@ const FlowFollowUp = (() => {
       if (na && na.p >= NOT_ANSWER_MIN) return { outcome: 'ack', promisedIso: null, basis: 'model', why: 'not an answer: ' + na.cls.toLowerCase() };
     }
     if (!delivered && kind === KINDS.REPLY && n <= SHORT_UNSURE_MAX_WORDS && !answerEvidence(body, ex, c.now)) return { outcome: 'ack', promisedIso: null, basis: 'unsure', why: 'not clearly an answer' };
+    // A contact line (name, title, "Phone:" / "טלפון:") is a signature, not the answer. A forward often leaves only that.
+    if (!delivered && kind === KINDS.REPLY && contactSignature(body)) return { outcome: 'ack', promisedIso: null, basis: 'rule', why: 'a signature is not an answer' };
     return { outcome: 'closed', promisedIso: null, basis: delivered ? 'rule' : 'default' };
   }
 
@@ -592,6 +594,15 @@ const FlowFollowUp = (() => {
   const SHORT_UNSURE_MAX_WORDS = 3;
   const YES_NO = /^(?:yes|yeah|yep|yup|sure|no|nope|nah|correct|right|exactly|absolutely|of course|definitely|כן|לא|נכון|בטח|בהחלט|כמובן|בדיוק)(?:\b|\s|$)/i;
   const DONE_WORDS = /\b(?:sent|done|attached|enclosed|signed|completed|finished|paid|approved|confirmed)\b|(?:^|\s)(?:שלחתי|שלחנו|צירפתי|צירפנו|בוצע|סיימתי|סיימנו|חתמתי|חתמנו|אישרתי|אישרנו|הועבר|שולם|שילמתי|עשיתי)(?=$|[\s,.!?])/i;
+  // A short message that is only a contact line. The label needs a colon, so "my phone number is 48213" (an answer) is not one.
+  const CONTACT_LABEL = /(?:טלפון|נייד|פקס|דוא["״']?ל|אימייל|וואטסאפ)\s*[:：]|\b(?:phone|mobile|tel|cell|e-?mail|email)\s*[:：]/i;
+  function contactSignature(body) {
+    const n = words(body);
+    if (n < 2 || n > 20) return false;
+    if (/[?؟]/.test(body)) return false;
+    if (CONFIRM.test(body) || PROMISE_EN.test(body) || PROMISE_HE.test(body) || DONE_WORDS.test(body)) return false;
+    return CONTACT_LABEL.test(body);
+  }
   function answerEvidence(body, ex, now) {
     if (/\d|https?:\/\/|@/.test(body) || YES_NO.test(body) || DONE_WORDS.test(body)) return true;
     try {
