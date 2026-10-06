@@ -36,13 +36,22 @@
   "offers": { "@type": "Offer", "url": "https://theflow-ai.com/#waitlist" }
 }
 </script>
-<!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
+<!-- Analytics: GA4 (Flow / theflow-ai.com property). Loaded after load + idle so it stays off the critical path. -->
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
 </script>
 <link rel="alternate" type="application/rss+xml" title="Flow Insights" href="/blog/rss.xml">
 </head>
@@ -1269,6 +1278,7 @@ Best,
   /* cap the backing store: a 3x full-viewport canvas is ~12MB of GPU memory on a
      phone, and it is the first layer the compositor drops under pressure. */
   var BGDPR=Math.min(devicePixelRatio||1,1.75);
+  var narrow=matchMedia('(max-width:640px)').matches;
   function readNetColors(){
     var cs=getComputedStyle(root);
     NET=(cs.getPropertyValue('--net')||'150,170,220').trim();
@@ -1276,7 +1286,7 @@ Best,
     NA=parseFloat(cs.getPropertyValue('--net-a'))||.5;
   }
   function size(){ BGDPR=Math.min(devicePixelRatio||1,1.75); W=c.width=Math.round(innerWidth*BGDPR); H=c.height=Math.round(innerHeight*BGDPR); }
-  function initNet(){ size(); var n=Math.min(66,Math.floor(innerWidth/24)); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*BGDPR,vy:(Math.random()-.5)*.14*BGDPR}); }
+  function initNet(){ size(); var n=Math.min(narrow?16:66,Math.floor(innerWidth/(narrow?36:24))); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*BGDPR,vy:(Math.random()-.5)*.14*BGDPR}); }
   function draw(){
     x.clearRect(0,0,W,H);
     for(var i=0;i<pts.length;i++){
@@ -1285,6 +1295,7 @@ Best,
       for(var j=i+1;j<pts.length;j++){ var q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=dx*dx+dy*dy,R=140*BGDPR; if(d<R*R){ var a=(1-Math.sqrt(d)/R)*.2; x.strokeStyle='rgba('+NL+','+a+')'; x.lineWidth=1*BGDPR; x.beginPath(); x.moveTo(p.x,p.y); x.lineTo(q.x,q.y); x.stroke(); } }
       x.fillStyle='rgba('+NET+','+NA+')'; x.beginPath(); x.arc(p.x,p.y,1.3*BGDPR,0,6.283); x.fill();
     }
+    if(narrow || document.hidden){ raf=0; return; }
     raf=requestAnimationFrame(draw);
   }
   readNetColors();
@@ -1305,12 +1316,24 @@ Best,
     // switched away and back quickly) landing inside that idle/timeout
     // window must not call draw() against an uninitialized point set.
     var netStarted=false;
-    var startNet=function(){ netStarted=true; initNet(); draw(); };
+    var startNet=function(){ netStarted=true; narrow=matchMedia('(max-width:640px)').matches; initNet(); draw(); };
     if('requestIdleCallback' in window) requestIdleCallback(startNet,{timeout:1500});
     else setTimeout(startNet,200);
-    addEventListener('resize',function(){ if(!netStarted)return; if(raf)cancelAnimationFrame(raf); initNet(); draw(); });
+    addEventListener('resize',function(){ if(!netStarted)return; narrow=matchMedia('(max-width:640px)').matches; if(raf)cancelAnimationFrame(raf); raf=0; initNet(); draw(); });
   } else { size(); }
-  document.addEventListener('visibilitychange',function(){ if(document.hidden){ if(raf)cancelAnimationFrame(raf); } else if(!rm && netStarted){ if(raf)cancelAnimationFrame(raf); draw(); } });
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ if(raf)cancelAnimationFrame(raf); raf=0; } else if(!rm && netStarted && !narrow){ if(raf)cancelAnimationFrame(raf); draw(); } });
+
+  /* Infinite CSS motion (blobs, marquee, demo loop, orbs) pauses once its
+     section leaves the viewport. Desktop still runs the motion while you
+     can see it. Reduced motion is already animation:none in home.css. */
+  (function(){
+    if(rm || !('IntersectionObserver' in window)) return;
+    var roots=document.querySelectorAll('#hero, #legal-demo, #challenge, #actiongraph, #dualcore, #trust, #waitlist');
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ e.target.classList.toggle('motion-off', !e.isIntersecting); });
+    }, {rootMargin:'80px 0px'});
+    Array.prototype.forEach.call(roots, function(el){ io.observe(el); });
+  })();
 
   /* ---------- Action Graph: scroll-driven canvas (chaos -> ordered knowledge graph).
      Deliberately NOT a <video>: on iOS a scrubbed video never paints a frame while
