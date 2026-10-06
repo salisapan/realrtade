@@ -20,7 +20,6 @@
 // entirely from data that already lives on the device.
 const FlowPmfMetrics = (() => {
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const WEEK_MS = 7 * DAY_MS;
 
   // How many distinct days active in the current calendar week, alongside
   // at least one real closure, counts as "a habit" this week. A single
@@ -64,10 +63,16 @@ const FlowPmfMetrics = (() => {
   // calendar or render a "week 37" badge anywhere.
   function weekKey(date) {
     const d = new Date(date);
-    const start = new Date(d.getFullYear(), 0, 1);
-    const dayOfYear = Math.floor((d - start) / DAY_MS);
+    const year = d.getFullYear();
+    // Local calendar day, not elapsed milliseconds. A daylight-saving
+    // shift makes (local midnight - 1 Jan local midnight) / 24h a
+    // fraction under an integer, and Math.floor then files that day in
+    // the previous week. activeDays are stored as local-midnight date
+    // strings, so that off-by-one drops a real day out of the habit week.
+    // Date.UTC on the local Y-M-D is an exact day count in any zone.
+    const dayOfYear = Math.round((Date.UTC(year, d.getMonth(), d.getDate()) - Date.UTC(year, 0, 1)) / DAY_MS);
     const week = Math.floor(dayOfYear / 7);
-    return d.getFullYear() + '-W' + String(week).padStart(2, '0');
+    return year + '-W' + String(week).padStart(2, '0');
   }
 
   // For each of the last `weeks` calendar weeks (including the current,
@@ -76,10 +81,10 @@ const FlowPmfMetrics = (() => {
   function computeWeeklyActivity(activeDays, now, weeks) {
     weeks = weeks || DEFAULT_RETENTION_WEEKS;
     const activeWeekKeys = new Set((activeDays || []).map((d) => weekKey(new Date(d))));
-    const nowMs = now || Date.now();
+    const anchor = new Date(now || Date.now());
     const rows = [];
     for (let i = weeks - 1; i >= 0; i--) {
-      const key = weekKey(new Date(nowMs - i * WEEK_MS));
+      const key = weekKey(new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() - i * 7));
       rows.push({ week: key, active: activeWeekKeys.has(key) });
     }
     return rows;

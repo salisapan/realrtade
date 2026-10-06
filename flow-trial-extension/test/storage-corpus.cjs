@@ -663,19 +663,23 @@ async function run() {
 
     // Build up exactly what core/pmf-metrics.js's computeWeeklyHabit needs:
     // 3 distinct active days this week, plus one real close this week.
-    // The week key buckets days as floor(dayOfYear / 7), so on the first day of a
-    // bucket (every 7th day from Jan 1) "yesterday" belongs to the previous
-    // week and this fixture would honestly report only one active day. Pin the
-    // clock to a mid-bucket day so the test does not depend on the day it runs.
-    // storage.js runs in its own vm realm, so the clock to pin is that realm's Date.
+    // activeDays are local calendar dates (Date#toDateString is local
+    // midnight). The week is that same local calendar, so these three
+    // days stay in one week in UTC and in a zone that observes daylight
+    // saving. The week key is floor(localDayOfYear / 7): on the first day
+    // of a bucket the day before belongs to the previous week, so the
+    // clock is pinned to a mid-bucket day and the test does not depend on
+    // the day it runs. storage.js runs in its own vm realm, so the clock
+    // to pin is that realm's Date.
     const sandboxDate = vm.runInContext('Date', sandbox);
     const realNow = sandboxDate.now;
-    const pinned = new Date(2026, 8, 12, 12).getTime();
+    const pinnedDate = new Date(2026, 8, 12, 12, 0, 0);
+    const pinned = pinnedDate.getTime();
     sandboxDate.now = () => pinned;
-    const today = pinned;
+    const localDay = (daysAgo) => new Date(pinnedDate.getFullYear(), pinnedDate.getMonth(), pinnedDate.getDate() - daysAgo).toDateString();
     await FlowStorage.set({
-      activeDays: [new Date(today).toDateString(), new Date(today - 1 * 86400000).toDateString(), new Date(today - 2 * 86400000).toDateString()],
-      closeStats: { total: 1, recent: [{ id: 'm1', ts: today }] }
+      activeDays: [localDay(0), localDay(1), localDay(2)],
+      closeStats: { total: 1, recent: [{ id: 'm1', ts: pinned }] }
     });
 
     const firstFire = await FlowStorage.consumeWeeklyHabitTrigger();
