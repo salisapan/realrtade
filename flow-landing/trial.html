@@ -185,7 +185,11 @@ h1.title{font-family:var(--sans); font-weight:800; font-size:clamp(1.9rem,3.4vw,
    sites use under their hero gradients. */
 .hb-bg::before{content:''; position:absolute; inset:0; opacity:.05; mix-blend-mode:overlay; pointer-events:none; transition:opacity .25s ease; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 :root[data-theme="light"] .hb-bg::before{opacity:.035}
-@media (prefers-reduced-motion:reduce){ .hb-bg::before{transition:none} }
+/* The live feTurbulence tile plus mix-blend-mode is a full-viewport composite.
+   Phones and reduced-motion drop it. Desktop keeps the grain. */
+@media (max-width:640px),(prefers-reduced-motion:reduce){
+  .hb-bg::before{content:none; background-image:none; mix-blend-mode:normal}
+}
 .hero-banner .title,.hero-banner .lead b{color:var(--ink)}
 :root:not([data-theme="light"]) .hero-banner .title{text-shadow:0 0 42px rgba(80,140,255,.28), 0 2px 20px rgba(2,6,16,.55)}
 .hero-banner .lead{color:var(--ink-2)}
@@ -436,12 +440,21 @@ footer.site a{color:var(--ink-3)}
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
 </script>
 <!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
 </script>
 </head>
 <body>
@@ -758,30 +771,36 @@ footer.site a{color:var(--ink-3)}
 /* ---------- ambient particle network (theme-aware) — same component as the homepage ---------- */
 (function(){
   var rm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var narrow = matchMedia('(max-width: 640px)').matches;
   var c=document.getElementById('bgcanvas'); if(!c) return;
   var x=c.getContext('2d'), W,H,pts,raf,NET='150,170,220',NL='59,116,255',NA=.5;
   var root=document.documentElement;
+  var DPR=1;
   window.readNetColors=function(){
     var cs=getComputedStyle(root);
     NET=(cs.getPropertyValue('--net')||'150,170,220').trim();
     NL=(cs.getPropertyValue('--net-line')||'59,116,255').trim();
     NA=parseFloat(cs.getPropertyValue('--net-a'))||.5;
   };
-  function size(){ W=c.width=innerWidth*devicePixelRatio; H=c.height=innerHeight*devicePixelRatio; }
-  function initNet(){ size(); var n=Math.min(60,Math.floor(innerWidth/26)); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*devicePixelRatio,vy:(Math.random()-.5)*.14*devicePixelRatio}); }
+  function size(){ DPR=Math.min(devicePixelRatio||1, narrow?1:1.75); W=c.width=Math.round(innerWidth*DPR); H=c.height=Math.round(innerHeight*DPR); }
+  function initNet(){ size(); var n=narrow?14:Math.min(60,Math.floor(innerWidth/26)); pts=[]; for(var i=0;i<n;i++)pts.push({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.14*DPR,vy:(Math.random()-.5)*.14*DPR}); }
   function draw(){
     x.clearRect(0,0,W,H);
     for(var i=0;i<pts.length;i++){
       var p=pts[i]; p.x+=p.vx; p.y+=p.vy;
       if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
-      for(var j=i+1;j<pts.length;j++){ var q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=dx*dx+dy*dy,R=140*devicePixelRatio; if(d<R*R){ var a=(1-Math.sqrt(d)/R)*.2; x.strokeStyle='rgba('+NL+','+a+')'; x.lineWidth=1*devicePixelRatio; x.beginPath(); x.moveTo(p.x,p.y); x.lineTo(q.x,q.y); x.stroke(); } }
-      x.fillStyle='rgba('+NET+','+NA+')'; x.beginPath(); x.arc(p.x,p.y,1.3*devicePixelRatio,0,6.283); x.fill();
+      for(var j=i+1;j<pts.length;j++){ var q=pts[j],dx=p.x-q.x,dy=p.y-q.y,d=dx*dx+dy*dy,R=140*DPR; if(d<R*R){ var a=(1-Math.sqrt(d)/R)*.2; x.strokeStyle='rgba('+NL+','+a+')'; x.lineWidth=1*DPR; x.beginPath(); x.moveTo(p.x,p.y); x.lineTo(q.x,q.y); x.stroke(); } }
+      x.fillStyle='rgba('+NET+','+NA+')'; x.beginPath(); x.arc(p.x,p.y,1.3*DPR,0,6.283); x.fill();
     }
-    raf=requestAnimationFrame(draw);
+    if(!narrow && !document.hidden) raf=requestAnimationFrame(draw);
+    else raf=0;
   }
   readNetColors();
-  if(!rm){ initNet(); draw(); addEventListener('resize',function(){ cancelAnimationFrame(raf); initNet(); draw(); }); } else { size(); }
-  document.addEventListener('visibilitychange',function(){ if(document.hidden){ cancelAnimationFrame(raf); } else if(!rm){ cancelAnimationFrame(raf); draw(); } });
+  if(!rm){
+    initNet(); draw();
+    addEventListener('resize',function(){ narrow=matchMedia('(max-width:640px)').matches; if(raf){ cancelAnimationFrame(raf); raf=0; } initNet(); draw(); });
+  } else { size(); }
+  document.addEventListener('visibilitychange',function(){ if(document.hidden){ if(raf){ cancelAnimationFrame(raf); raf=0; } } else if(!rm && !narrow){ if(raf) cancelAnimationFrame(raf); draw(); } });
 })();
 
 (function(){

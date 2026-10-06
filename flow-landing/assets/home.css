@@ -724,6 +724,9 @@ footer{border-block-start:1px solid var(--line); padding-block:52px; position:re
 .foot-legal{width:100%; margin-top:28px; padding-top:20px; border-top:1px solid var(--line); color:var(--muted); font-size:.82rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px}
 .foot-legal .en{font-family:var(--mono); direction:ltr; letter-spacing:.05em}
 
+/* Toggled from the homepage script when a section leaves the viewport. */
+.motion-off, .motion-off *{animation-play-state:paused !important}
+
 @media (prefers-reduced-motion:reduce){
   *{animation:none !important; scroll-behavior:auto !important; transition-duration:.001s !important}
   .reveal{opacity:1; transform:none}

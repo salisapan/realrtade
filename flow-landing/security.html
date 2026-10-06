@@ -110,12 +110,21 @@ footer.site a{color:var(--muted)}
 (function(){try{document.documentElement.setAttribute('data-theme', localStorage.getItem('flow_theme')||'dark');}catch(e){}})();
 </script>
 <!-- Analytics: GA4 (Flow / theflow-ai.com property) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
   gtag('config', 'G-ESYDFQYCDV', { anonymize_ip: true });
+  window.addEventListener('load', function () {
+    var load = function () {
+      var s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://www.googletagmanager.com/gtag/js?id=G-ESYDFQYCDV';
+      document.head.appendChild(s);
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(load, { timeout: 2500 });
+    else setTimeout(load, 1);
+  });
 </script>
 </head>
 <body>
