@@ -29,7 +29,9 @@ function sig(text, surface, count) {
     attachmentCount: count,
     hasThreadAttachment: count === 1,
     surface: surface,
-    now: when
+    // A host Date fails instanceof inside the vm, and the judge then uses the
+    // wall clock. A timestamp is the same instant in UTC and Asia/Jerusalem.
+    now: when.getTime()
   });
   return {
     show: r.show === true,

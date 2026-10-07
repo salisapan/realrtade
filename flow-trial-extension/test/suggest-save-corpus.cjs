@@ -34,7 +34,7 @@ function mail(over) {
 const NOW = new Date('2026-10-07T12:00:00Z');
 function judge(text, count, surface) {
   return J.judge({
-    text: text, subject: 'Gate', surface: surface || 'outlook', now: NOW,
+    text: text, subject: 'Gate', surface: surface || 'outlook', now: NOW.getTime(),
     sender: { name: 'Flow', email: 'ai.local.flow@gmail.com' },
     attachmentCount: count, hasThreadAttachment: count === 1
   });
