@@ -60,7 +60,7 @@ const FlowGoogleCloses = (() => {
   // Drive and OneDrive are the same one-file save. "our shared files" is not:
   // this write lands in the person's own OneDrive, not a shared library.
   const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
-  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב)/;
+  const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב|ב[-\u05BE]?\s*one\s?drive|בוואן\s*דרייב)/i;
   // A refusal of that save is silence. The negation has to govern the verb,
   // so a different "no need to" in the same mail does not hide a real save.
   const SAVE_NO = /\b(?:(?:do not|don't|dont|no need to)\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+צריך\s+ל|אין\s+צורך\s+ל|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
@@ -308,7 +308,7 @@ const FlowGoogleCloses = (() => {
     if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
       if (SAVE_NO.test(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
-      const onedrive = /\bone\s?drive\b/i.test(text);
+      const onedrive = /\bone\s?drive\b|וואן\s*דרייב/i.test(text);
       const close = {
         family: 'C',
         personalClose: 'drive-file',

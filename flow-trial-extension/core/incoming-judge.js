@@ -17,6 +17,16 @@
 const FlowIncomingJudge = (() => {
   const MIN_TEXT = 20;
 
+  // A phone signature is not part of the ask. "Sent from my iPhone" and
+  // "נשלח מה-iPhone" stay off the sentence the judge reads.
+  function withoutPhoneSignature(text) {
+    return String(text || '').split(/\r?\n/).filter((line) => {
+      if (/^\s*sent from my (?:iphone|ipad|android)\b/i.test(line)) return false;
+      if (/^\s*נשלח מה[-\u05BE\s]*(?:iphone|אייפון|אנדרואיד)/i.test(line)) return false;
+      return true;
+    }).join('\n').trim();
+  }
+
   function sibling(globalValue, file, name) {
     if (globalValue) return globalValue;
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
@@ -40,7 +50,7 @@ const FlowIncomingJudge = (() => {
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
-    const text = String(i.text || '').trim();
+    const text = withoutPhoneSignature(i.text);
     const factProbe = (text.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(text) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 

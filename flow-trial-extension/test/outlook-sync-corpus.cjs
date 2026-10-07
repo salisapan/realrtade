@@ -320,6 +320,20 @@ console.log('\n--- OneDrive save reaches a card, and a drop still has a reason -
   check('a message with no conversation id is a card or a reason',
     Boolean(noConvLine) && (noConvPlan.incoming.some((x) => x.messageId === noConv.id) || noConvPlan.diagnostics.some((d) => d.messageId === noConv.id)),
     { incoming: noConvPlan.incoming.map((x) => x.messageId), diagnostics: noConvPlan.diagnostics });
+  const flagOnly = [
+    ['od-flag-onedrive', 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks'],
+    ['od-flag-drive', 'Please save the attached file to Drive.']
+  ];
+  flagOnly.forEach((pair) => {
+    const row = theirs(pair[0], pair[1], 0.1, 'Gate flag only');
+    row.hasAttachments = true;
+    delete row.attachments;
+    const planned = plan([row]);
+    const why = (planned.diagnostics.find((d) => d.conversationId === pair[0]) || {}).reason;
+    check('hasAttachments without a file list is not one file: ' + pair[0],
+      planned.incoming.length === 0 && why === 'outlook:attachments-unread',
+      { incoming: planned.incoming.length, why: why, kinds: planned.incoming[0] && planned.incoming[0].process && planned.incoming[0].process.steps.map((s) => s.kind) });
+  });
 }
 
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));

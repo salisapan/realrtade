@@ -264,11 +264,13 @@
       const rows = id ? await graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,isInline', 'save-count') : null;
       if (!Array.isArray(rows)) {
         const flag = mailbox && mailbox.hasAttachments;
-        if (flag === true) attachmentCount = 1;
-        else if (flag === false) attachmentCount = 0;
+        if (flag === false) attachmentCount = 0;
         else return { none: true, reason: 'page:attachment-count-unread' };
       } else {
-        attachmentCount = rows.filter((a) => a && a.isInline !== true).length;
+        attachmentCount = rows.filter((a) => {
+          if (!a || a.isInline === true) return false;
+          return !/itemAttachment/i.test(String(a['@odata.type'] || ''));
+        }).length;
       }
     }
     const r = FlowIncomingJudge.judge({

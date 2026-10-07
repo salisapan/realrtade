@@ -327,7 +327,7 @@ console.log('\n--- wiring stays a scaffold ---\n');
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
   const storage = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8');
   const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
-  check('the extension version is 0.9.36', /"version": "0\.9\.36"/.test(manifest));
+  check('the extension version is 0.9.37', /"version": "0\.9\.37"/.test(manifest));
   const start = gmail.indexOf("copy.connectorId === 'computerClose'");
   const send = gmail.indexOf('chrome.runtime.sendMessage', start);
   const block = start > 0 && send > start ? gmail.slice(start, send) : '';

@@ -172,7 +172,7 @@ const FlowOutlookSync = (() => {
       const ikey = conv + '|' + last.id;
       const subject = String(lastRaw.subject || '');
       const counted = fileCount(lastRaw);
-      const judged = counted == null
+      let judged = counted == null
         ? { show: false, reason: 'outlook:attachments-unread', intent: null }
         : (judge ? judge.judge({
           text: last.text, subject, sender: { name: party.name, email: party.email },
@@ -180,6 +180,14 @@ const FlowOutlookSync = (() => {
           calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
           now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: counted === 1, surface: 'outlook'
         }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' });
+      // The mailbox list carries hasAttachments, not the file list. A true flag
+      // is not one file. The open page reads the real list and decides the card.
+      if (judged.show && !Array.isArray(lastRaw.attachments)) {
+        const steps = (judged.process && judged.process.steps) || [];
+        if (steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'))) {
+          judged = { show: false, reason: 'outlook:attachments-unread', intent: judged.intent };
+        }
+      }
       // Someone asking YOU for something: Gmail shows its Do It on that message whatever loops exist, so Outlook does too.
       // Their own promise or answer stays with the loop it belongs to (one item, not two).
       const isAsk = Boolean(judged.show && judged.intent && judged.intent.type === 'request');

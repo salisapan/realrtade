@@ -781,9 +781,30 @@ async function runPage(opts) {
     const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
     const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
     check('an unreadable attachment count is logged and is not a silent zero',
-      !unread.chip && unreadWhy.indexOf('page:attachment-count-unread') >= 0 &&
+      !unread.chip && (unreadWhy.indexOf('page:attachment-count-unread') >= 0 || unreadWhy.indexOf('outlook:attachments-unread') >= 0) &&
       !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
       { text: unread.chip && unread.chip.textContent, why: unreadWhy });
+    function fileIncoming(store) {
+      return ((store.outlookPending && store.outlookPending.incoming) || []).filter((e) => {
+        return ((e && e.process && e.process.steps) || []).some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));
+      });
+    }
+    const twoFiles = [file, Object.assign({}, file, { id: 'att2', name: 'other.pdf' })];
+    const two = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, waitMs: 3500 }));
+    check('two files on the resolved message stay off the card and off Loops',
+      !two.chip && fileIncoming(two.store).length === 0,
+      { text: two.chip && two.chip.textContent, incoming: fileIncoming(two.store).length, why: (two.store.outlookPageDiag || []).map((d) => d.reason) });
+    const twoFail = await runPage(Object.assign({}, gate, { attachmentFiles: twoFiles, attachmentReads: 'fail', waitMs: 3500 }));
+    check('two files with an unreadable list stay off the card and off Loops',
+      !twoFail.chip && fileIncoming(twoFail.store).length === 0,
+      { text: twoFail.chip && twoFail.chip.textContent, incoming: fileIncoming(twoFail.store).length, why: (twoFail.store.outlookPageDiag || []).map((d) => d.reason) });
+    const itemOnly = await runPage(Object.assign({}, gate, {
+      attachmentFiles: [{ id: 'mail1', name: 'Forwarded', isInline: false, '@odata.type': '#microsoft.graph.itemAttachment' }],
+      waitMs: 3500
+    }));
+    check('an attached message is not a file, so the card stays off',
+      !itemOnly.chip && fileIncoming(itemOnly.store).length === 0,
+      { text: itemOnly.chip && itemOnly.chip.textContent, incoming: fileIncoming(itemOnly.store).length, why: (itemOnly.store.outlookPageDiag || []).map((d) => d.reason) });
   }
 
   console.log('\nTOTAL FAILURES:', failures);

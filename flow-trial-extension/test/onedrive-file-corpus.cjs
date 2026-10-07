@@ -49,7 +49,7 @@ function background(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.36', content_scripts: [{ js: [] }] }),
+        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.37', content_scripts: [{ js: [] }] }),
         onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} },
         lastError: null, getURL: (s) => s, id: 'ext'
       },
@@ -223,6 +223,32 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
     const row = outlook(text, 1);
     check('Outlook stays quiet on a Hebrew refusal: ' + text, row.show === false && row.reason === 'quiet:google', row.reason);
   });
+  const signed = [
+    'תשמור את הקובץ המצורף ב-One Drive עד יום ראשון\n\nנשלח מה-iPhone שלי',
+    'תשמור את הקובץ המצורף ב\u05BEOne Drive עד יום ראשון\n\nנשלח מה-iPhone שלי',
+    'Please save the attached file to One Drive by Sunday\n\nSent from my iPhone'
+  ];
+  signed.forEach((text) => {
+    const one = outlook(text, 1);
+    const kinds = one.process && one.process.steps && one.process.steps.map((s) => s.kind);
+    check('One Drive with a phone signature shows on Outlook at one file',
+      one.show === true && kinds && kinds[0] === 'onedriveFile' && kinds[1] === 'outlookDraft',
+      { text: text.slice(0, 48), show: one.show, reason: one.reason, kinds: kinds });
+    check('that save stays quiet at zero files', outlook(text, 0).show === false, text.slice(0, 24));
+    check('that save stays quiet at two files', outlook(text, 2).show === false, text.slice(0, 24));
+    const g = gmail(text, 1);
+    check('Gmail stays quiet on that One Drive save',
+      g.show === false && g.reason === 'onedrive-target-on-gmail',
+      { text: text.slice(0, 48), show: g.show, reason: g.reason });
+  });
+  const signedNo = 'אל תשמור את הקובץ המצורף ב-One Drive\n\nנשלח מה-iPhone שלי';
+  check('a Hebrew One Drive refusal with an iPhone line stays quiet',
+    outlook(signedNo, 1).show === false && gmail(signedNo, 1).show === false,
+    { outlook: outlook(signedNo, 1).reason, gmail: gmail(signedNo, 1).reason });
+  const form = 'בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00';
+  check('attaching a form to a demo invite stays quiet',
+    outlook(form, 1).show === false && gmail(form, 1).show === false,
+    { outlook: outlook(form, 1).reason, gmail: gmail(form, 1).reason });
 }
 
 (async () => {
