@@ -17,11 +17,45 @@ const FlowOutlookConfig = {
   CLIENT_ID: '22682454-808b-41e5-80fe-6abadc1d5595',
   AUTHORITY: 'https://login.microsoftonline.com/common',
   GRAPH: 'https://graph.microsoft.com/v1.0',
+  // Default sign-in: mail only. scopesFor() adds a service's read scopes only when
+  // that box is checked on the one Connect screen. Never Mail.Send.
   SCOPES: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'],
+  // One screen, same shape as the Google connect: Select all, then one checkbox
+  // per service Graph can grant today. Mail is required. The others are optional
+  // reads. Checking one is the only way its scope is added to the sign-in.
+  // OneDrive search from a mail is not built; the box only grants Files.Read.
+  CONNECT_SERVICES: [
+    { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite'], required: true },
+    { id: 'calendar', label: 'Calendar', detail: 'Read the calendar.', scopes: ['Calendars.Read'], required: false },
+    { id: 'onedrive', label: 'OneDrive', detail: 'Read files you choose. A mail does not search OneDrive.', scopes: ['Files.Read'], required: false },
+    { id: 'contacts', label: 'Contacts', detail: 'Read contacts.', scopes: ['Contacts.Read'], required: false },
+    { id: 'teams', label: 'Teams', detail: 'Read chats you are in.', scopes: ['Chat.Read'], required: false }
+  ],
   // How far back one check looks, and how many messages per folder (newest first). A bounded window, not "the mailbox".
   LOOKBACK_DAYS: 14,
   PAGE_SIZE: 50,
   MAX_PAGES: 2
+};
+
+// ids: service ids from the Connect screen. Mail is always included.
+// Returns the scope list for that sign-in. Mail.Send is never included.
+FlowOutlookConfig.scopesFor = function scopesFor(ids) {
+  const want = {};
+  (Array.isArray(ids) ? ids : []).forEach((id) => { want[String(id)] = true; });
+  want.mail = true;
+  const out = ['offline_access', 'User.Read'];
+  (FlowOutlookConfig.CONNECT_SERVICES || []).forEach((svc) => {
+    if (!svc || !want[svc.id]) return;
+    (svc.scopes || []).forEach((sc) => {
+      if (!sc || /Mail\.Send/i.test(sc) || /\.Send$/i.test(sc)) return;
+      if (out.indexOf(sc) < 0) out.push(sc);
+    });
+  });
+  return out;
+};
+
+FlowOutlookConfig.defaultConnectIds = function defaultConnectIds() {
+  return ['mail'];
 };
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookConfig };

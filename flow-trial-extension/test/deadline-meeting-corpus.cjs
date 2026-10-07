@@ -207,6 +207,13 @@ console.log('\n--- Turn off sits away from Check now ---\n');
   const css = fs.readFileSync(path.join(ROOT, 'popup', 'popup.css'), 'utf8');
   check('Turn off is not appended beside Check now', !/acts\.appendChild\(chk\);\s*acts\.appendChild\(off\)/.test(popup));
   check('Turn off is its own row under Check now', popup.includes("el('div', 'wait-acts wait-off-row')") && /\.wait-off-row\{margin-top:var\(--space-5\)/.test(css));
+  const chkAt = popup.indexOf("st.needsSignIn ? 'Sign in again' : 'Check now'");
+  const offAt = popup.indexOf("const off = el('button', 'ghost sm', 'Turn off')");
+  const chkBody = chkAt >= 0 && offAt > chkAt ? popup.slice(chkAt, offAt) : '';
+  check('Check now does not call Turn off', chkBody.length > 0 && !/disconnect\(/.test(chkBody), chkBody.slice(0, 240));
+  check('Microsoft Connect is one screen', popup.includes('data-glance-connect", "microsoft"') || popup.includes("data-glance-connect', 'microsoft'") || popup.includes('data-glance-connect", \'microsoft\''));
+  check('that screen has Select all and one Connect button', popup.includes('data-glance-select-all') && popup.includes('data-glance-connect-go'));
+  check('services are checkboxes, not their own Connect rows', (popup.match(/data-glance-service/g) || []).length >= 1 && (popup.match(/data-glance-connect-go/g) || []).length === 1);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -3097,7 +3097,7 @@ async function outlookSession(opts) {
       fetch: (u, i) => fetch(u, i), now: () => Date.now(),
       random: (n) => crypto.getRandomValues(new Uint8Array(n)), sha256: (b) => crypto.subtle.digest('SHA-256', b),
       launchSilent: outlookLaunchSilent
-    }, cfg, auth, { redirectUri: chrome.identity.getRedirectURL(), loginHint: outlookPrimaryHint(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null });
+    }, cfg, auth, { redirectUri: chrome.identity.getRedirectURL(), loginHint: outlookPrimaryHint(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null, scopes: (auth.requestedScopes && auth.requestedScopes.length) ? auth.requestedScopes : cfg.SCOPES });
     const now = Date.now();
     if (r.ok && r.changed) {
       const cur = (await chrome.storage.local.get(OUTLOOK_AUTH_KEY))[OUTLOOK_AUTH_KEY] || auth;

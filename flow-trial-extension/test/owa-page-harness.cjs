@@ -58,7 +58,7 @@ async function runPage(opts) {
   }, o.store || {});
   const sent = [];
   const graphMsg = { id: MSG, conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: false, internetMessageId: '<pilot@mail.gmail.com>',
-    from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+    from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
     receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
   function reply(msg) {
     sent.push(msg);
@@ -341,6 +341,61 @@ async function runPage(opts) {
       && payload.final === 'prepare', payload);
     check('the armed search asks the worker for scopes', traced.sent.some((m) => m.type === 'flow:search-drive' && m.trace === true), traced.sent.filter((m) => m.type === 'flow:search-drive'));
     check('the trace still prepares the file', traced.chip && traced.chip.getAttribute('data-glance-chain') === 'prepare', traced.chip && traced.chip.getAttribute('data-glance-chain'));
+
+    const staleSchedule = {
+      messageId: MSG,
+      outlookIncomingId: MSG,
+      outlookConversationId: CONV,
+      threadId: 'ol:' + CONV,
+      subject: 'Pilot proposal',
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      intent: { type: 'event', label: 'Schedule the meeting' },
+      process: {
+        id: 'schedule-confirm',
+        name: 'Schedule & Confirm',
+        closingLine: 'Scheduling this, drafting a reply to confirm, and setting a follow-up.',
+        steps: []
+      }
+    };
+    const stuckFailed = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
+      driveResult: { ok: false, reason: 'drive-search-failed', status: 503, error: 'backend', files: [], fileCount: 0 },
+      store: { outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }, outlookSync: { stateVersion: 4 } }
+    });
+    const stuckFailedWhy = reasonsOf(stuckFailed);
+    check('a stored Scheduling card does not stay up when the search fails', !stuckFailed.chip && !/Scheduling/.test((stuckFailed.doc && stuckFailed.doc.body && stuckFailed.doc.body.textContent) || ''), stuckFailed.chip && stuckFailed.chip.textContent);
+    check('that failed search and the page agree on drive-search-failed', stuckFailedWhy.page.indexOf('drive-search-failed') >= 0, stuckFailedWhy);
+
+    const stuckDenied = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 5000,
+      driveResult: { ok: false, reason: 'drive-not-granted', status: 403, error: 'insufficientPermissions', files: [], fileCount: 0 },
+      store: { outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }, outlookSync: { stateVersion: 4 } }
+    });
+    const stuckDeniedWhy = reasonsOf(stuckDenied);
+    check('Google disconnected: no schedule card, drive-not-granted', !stuckDenied.chip && !/Scheduling/.test((stuckDenied.doc && stuckDenied.doc.body && stuckDenied.doc.body.textContent) || '') && stuckDeniedWhy.page.indexOf('drive-not-granted') >= 0, stuckDeniedWhy);
+
+    const stuckOne = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], afterMs: 800, waitMs: 6000,
+      store: { outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }, outlookSync: { stateVersion: 4 } }
+    });
+    check('one Drive file replaces the stored Scheduling card with prepare', stuckOne.chip && stuckOne.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(stuckOne.chip.textContent) && !/Scheduling/.test(stuckOne.chip.textContent), stuckOne.chip && stuckOne.chip.textContent);
+
+    const alias = await runPage({
+      htmlPatch: q4html, mailBody: Q4, waitMs: 4500,
+      graphFrom: { name: 'Sali', address: ME },
+      store: {
+        outlookAuth: {
+          token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: Date.now() + 3600e3, rtIssuedAt: Date.now() },
+          account: { address: ME, name: 'Glance' },
+          ownAddresses: [ME, 'salisapan1@gmail.com']
+        },
+        outlookSync: { stateVersion: 4, diagnostics: [{ conversationId: CONV, subject: 'Pilot proposal', reason: 'own-sender', counterpart: ME }] },
+        outlookPending: { offers: [], asks: [], incoming: [staleSchedule] }
+      }
+    });
+    const aliasWhy = reasonsOf(alias);
+    check('mail from the same account stays silent, schedule card included', !alias.chip && !/Scheduling/.test((alias.doc && alias.doc.body && alias.doc.body.textContent) || ''), alias.chip && alias.chip.textContent);
+    check('the page records own-sender or note-to-self', aliasWhy.page.indexOf('own-sender') >= 0 || aliasWhy.page.indexOf('note-to-self') >= 0 || aliasWhy.plan.indexOf('own-sender') >= 0 || aliasWhy.plan.indexOf('note-to-self') >= 0, aliasWhy);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

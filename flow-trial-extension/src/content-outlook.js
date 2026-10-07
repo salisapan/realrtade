@@ -168,7 +168,11 @@
     const auth = Object.assign({}, FlowOutlookAuth, {
       session: async (_deps, _cfg, _auth, opts) => {
         const r = await send({ type: 'flow:outlook-session', force: Boolean(opts && opts.force) });
-        return r && r.ok ? r : Object.assign({ ok: false, error: 'failed' }, r || {});
+        if (r && r.ok) return r;
+        // The worker is restarting (a reload of Outlook on the web). That is not a sign-out.
+        if (!r || !r.error) return { ok: false, error: 'network', transient: true, needsSignIn: false };
+        if (r.needsSignIn) return Object.assign({ ok: false }, r);
+        return Object.assign({ ok: false, needsSignIn: false }, r, { transient: r.transient !== false });
       }
     });
     runner.inst = FlowOutlook.create({
@@ -232,8 +236,8 @@
     return out;
   }
 
-  // Same engine as Gmail (core/incoming-judge.js), on the open message's text. Used only when the planner has not judged
-  // this message yet; the planner's own entry (Graph ids, Graph text) always wins.
+  // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
+  // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
   function decideFromText(pane) {
     if (typeof FlowIncomingJudge === 'undefined') return null;
     // The message's own words, as Gmail judges them: quoted history ("From: … Sent: …", "On … wrote:") cut off.
@@ -434,6 +438,32 @@
   function filePendingReason(reason) {
     if (typeof FlowCloseChains !== 'undefined' && FlowCloseChains.isFileChainPending) return FlowCloseChains.isFileChainPending(reason);
     return reason === 'file-chain-not-run' || reason === 'file-needs-drive';
+  }
+
+  function fileSilenceReason(reason) {
+    if (typeof FlowCloseChains !== 'undefined' && FlowCloseChains.isFileSilence) return FlowCloseChains.isFileSilence(reason);
+    return filePendingReason(reason) || reason === 'drive-not-granted' || reason === 'drive-search-failed';
+  }
+
+  function plannedRow(bag, pane) {
+    const diags = (bag && bag.outlookSync && bag.outlookSync.diagnostics) || [];
+    const conv = pane && FlowOwaParse.canonId(pane.conversationId);
+    if (!conv) return null;
+    return diags.find((d) => d && FlowOwaParse.canonId(d.conversationId) === conv) || null;
+  }
+
+  function ownSender(email, own) {
+    const e = String(email || '').trim().toLowerCase();
+    return Boolean(e && (own || []).indexOf(e) >= 0);
+  }
+
+  // A silence replaces whatever card was already floating. The schedule card
+  // from an older judgment used to stay up after the check had moved on.
+  function dropStuckCard() {
+    const mount = mountPoint();
+    const old = mount && mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    lastKey = '';
   }
 
   // A shown file card is the outcome. Drop the mailbox check's silence for this
@@ -684,8 +714,9 @@
       .map((a) => String(a || '').toLowerCase());
     const pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own }));
     const ids = FlowOwaParse.urlIds(location.href);
+    const earlyPlanned = plannedRow(st, pane);
     const sig = pane
-      ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text)].join('|')
+      ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text), (earlyPlanned && earlyPlanned.reason) || ''].join('|')
       : 'none|' + location.pathname;
     if (sig === lastSig && !traceArmed && !localFileTrace() && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) return;
     lastSig = sig;
@@ -701,7 +732,7 @@
     }
     dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, chars: (pane.text || '').length });
     // Outlook must be connected (token present); otherwise no card, and the reason says why.
-    if (!st || !st.outlookAuth || !st.outlookAuth.token) { await pageReason('page:not-connected', pane); return; }
+    if (!st || !st.outlookAuth || !st.outlookAuth.token) { dropStuckCard(); await pageReason('page:not-connected', pane); return; }
 
     let candidates = await outlookCandidates();
     let m = FlowOwaParse.matchEntryHow(pane, candidates);
@@ -717,34 +748,31 @@
     let entry = m ? m.entry : null;
     dbg('matched', m ? { how: m.how, messageId: entry.messageId, label: entry.intent && entry.intent.label, candidates: candidates.length } : { how: 'none', candidates: candidates.length });
 
-    // Same silence bar as Gmail: if no stored candidate, judge the open text with the same chain.
+    // The open text and the mailbox check decide together. A stored card from an
+    // older judgment (a Scheduling card kept after the mail became a file ask)
+    // does not win. A receipt with no process is the draft we already wrote.
     let decided = null;
-    if (entry && entry.glanceChain === 'needs-you' && entry.holdingText) {
-      const shown = await showHoldingChain(pane, {
-        move: 'needs-you',
-        sends: false,
-        close: false,
-        holding: { text: entry.holdingText, claimsFile: false },
-        card: entry.card || { line: entry.cardLine || '' },
-        requirement: entry.requirement,
-        promise: entry.promise || null
-      }, entry.messageId || entry.outlookIncomingId);
-      if (shown) return;
+    const bag = await FlowStorage.get();
+    const planned = plannedRow(bag, pane);
+    const receiptOnly = Boolean(entry && entry.outlookReceipt && entry.ref && !entry.process);
+    const selfMail = !receiptOnly && (ownSender(pane.senderEmail, own) || (planned && (planned.reason === 'note-to-self' || planned.reason === 'own-sender')));
+    if (selfMail) {
+      dropStuckCard();
+      await pageReason((planned && planned.reason) || 'note-to-self', pane);
+      return;
     }
-    if (!entry || (!entry.process && !(entry.outlookReceipt && entry.ref))) {
+    if (!receiptOnly) {
       decided = decideFromText(pane);
-      if (!decided || decided.none) {
-        if (decided && decided.reason === 'third-party') {
-          await pageReason('page:third-party', pane);
-          return;
-        }
-        const diags = (st.outlookSync && st.outlookSync.diagnostics) || [];
-        const conv = FlowOwaParse.canonId(pane.conversationId);
-        const planned = conv ? diags.find((d) => FlowOwaParse.canonId(d.conversationId) === conv) : null;
-        // The open text and the mailbox check can disagree. Either one saying this
-        // is a file ask that has not been searched is enough to run the chain.
-        // Falling through used to reprint the planner's file-needs-drive forever.
-        if ((decided && filePendingReason(decided.reason)) || (planned && filePendingReason(planned.reason))) {
+      if (decided && decided.reason === 'third-party') {
+        dropStuckCard();
+        await pageReason('page:third-party', pane);
+        return;
+      }
+      // Either side saying this is a file ask is enough to run the chain.
+      // A stored schedule process used to skip this and leave the old card up
+      // while Why not shown already said drive-search-failed.
+      const fileNow = (decided && (filePendingReason(decided.reason) || fileSilenceReason(decided.reason))) || (planned && fileSilenceReason(planned.reason));
+      if (fileNow) {
           const tracing = traceArmed || localFileTrace();
           const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
           let ran = null;
@@ -760,7 +788,7 @@
             if (chain && chain.move === 'needs-you') {
               const shown = await showHoldingChain(pane, chain, msgId);
               finalReason = shown ? 'needs-you' : 'page:no-message-id';
-              if (!shown) await pageReason(finalReason, pane);
+              if (!shown) { dropStuckCard(); await pageReason(finalReason, pane); }
               return;
             }
             if (chain && chain.move === 'prepare') {
@@ -770,10 +798,13 @@
                 if (shown) { finalReason = 'prepare'; return; }
               }
               finalReason = 'outlook:file-found-no-attach';
+              dropStuckCard();
               await pageReason(finalReason, pane);
               return;
             }
             finalReason = namedSilence((ran && ran.quiet) || (chain && chain.reason) || 'file-chain-not-run');
+            if ((!ran || ran.ran !== true) && planned && fileSilenceReason(planned.reason)) finalReason = planned.reason;
+            dropStuckCard();
             await pageReason(finalReason, pane);
           } finally {
             if (tracing) {
@@ -803,11 +834,15 @@
           }
           return;
         }
-        // The planner's own reason for this conversation, when it has one, says more than "the open text was quiet".
-        await pageReason(planned && !filePendingReason(planned.reason) ? planned.reason : ('page:' + ((decided && decided.reason) || 'intent-null')), pane);
-        return;
-      }
-      if (!entry) {
+        if (!decided || decided.none) {
+          dropStuckCard();
+          const quiet = (planned && planned.reason && !fileSilenceReason(planned.reason))
+            ? planned.reason
+            : ('page:' + ((decided && decided.reason) || 'intent-null'));
+          await pageReason(quiet, pane);
+          return;
+        }
+      if (!entry || (entry.process && decided.process && entry.process.id !== decided.process.id)) {
         // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.
         let msgId = pane.itemId || null;
         if (!msgId && pane.conversationId) {
@@ -961,7 +996,7 @@
       // A Do It / Undo from the panel changes what this card should say; this page's own "shown" row does not.
       const logChanged = area === 'local' && changes.log && Array.isArray(changes.log.newValue)
         && (changes.log.newValue[0] || {}).kind !== 'shown'; // the log is newest first
-      if (area === 'local' && (changes.outlookPending || changes.outlookAuth || logChanged)) { lastSig = ''; schedule(); }
+      if (area === 'local' && (changes.outlookPending || changes.outlookAuth || changes.outlookSync || logChanged)) { lastSig = ''; schedule(); }
     });
   } catch (e) { /* storage events unavailable */ }
   // Keep the Microsoft session alive while Outlook is open, and judge the inbox once on arrival.

@@ -422,6 +422,105 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
   }
 
 
+  console.log('\n--- Check now is not Turn off; a stale schedule card does not outlive the file check ---\n');
+  {
+    const w = world({});
+    const o = O.create(w.deps());
+    w.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME] };
+    w.store.outlookSync = { stateVersion: O.create(w.deps()).STATE_VERSION };
+    const r = await o.sync({ force: true });
+    check('Check now does not remove the Microsoft permission', r.ok === true && w.removed !== true && w.store.outlookAuth && w.store.outlookAuth.token && w.store.outlookAuth.token.accessToken === 'AT', { ok: r.ok, removed: w.removed });
+    const dropped = world({});
+    const deps = dropped.deps();
+    deps.auth = Object.assign({}, A, {
+      session: async () => ({ ok: false, error: 'network', transient: true, needsSignIn: false })
+    });
+    const oDrop = O.create(deps);
+    dropped.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME] };
+    const rDrop = await oDrop.sync({ force: true });
+    const stDrop = await oDrop.status();
+    check('a reload that misses the worker stays connected', rDrop.ok === false && rDrop.transient === true && dropped.removed !== true && stDrop.needsSignIn !== true && stDrop.connected === true, { r: rDrop, st: stDrop, removed: dropped.removed });
+
+    const fs = require('fs'); const path = require('path'); const vm = require('vm');
+    const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+    vm.createContext(sandbox);
+    for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'draft-reply.js', 'incoming-judge.js', 'close-chains.js']) {
+      vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+    }
+    const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+    const FlowActions = vm.runInContext('FlowActions', sandbox);
+    const FlowFileAttach = vm.runInContext('FlowFileAttach', sandbox);
+    const FlowCloseChains = vm.runInContext('FlowCloseChains', sandbox);
+    global.FlowFileAttach = FlowFileAttach;
+    global.FlowCloseChains = FlowCloseChains;
+    const Q4 = "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?";
+    const q4msg = inMsg('q4', 'cq4', Q4, 0);
+    q4msg.subject = 'Q4 pricing';
+    const stale = {
+      messageId: 'old-schedule',
+      outlookConversationId: 'cq4',
+      threadId: 'ol:cq4',
+      sender: { name: 'Dana Cole', email: 'dana@acme.com' },
+      intent: { type: 'event', label: 'Schedule the meeting' },
+      process: { id: 'schedule-confirm', name: 'Schedule & Confirm', closingLine: 'Scheduling this, drafting a reply to confirm, and setting a follow-up.', steps: [] }
+    };
+    function judged(send) {
+      const wj = world({ inbox: [q4msg], sent: [] });
+      const dj = wj.deps();
+      dj.planDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+      dj.actions = FlowActions;
+      dj.send = async (m) => { wj.sends.push(m); return send(m); };
+      const oj = O.create(dj);
+      wj.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME], requestedScopes: CFG.SCOPES };
+      wj.store.outlookSync = { stateVersion: oj.STATE_VERSION, lastAt: NOW - 11 * 60 * 1000 };
+      wj.store.outlookPending = { offers: [], asks: [], incoming: [stale] };
+      wj.store.stillOpenScan = [Object.assign({ app: 'outlook' }, stale)];
+      wj.storage.forgetStillOpenScan = async (_thread, messageId) => {
+        wj.store.stillOpenScan = (wj.store.stillOpenScan || []).filter((row) => !row || row.messageId !== messageId);
+      };
+      return { wj, oj };
+    }
+    const denied = judged((m) => m.type === 'flow:search-drive'
+      ? { ok: false, reason: 'drive-not-granted', status: 403, error: 'insufficientPermissions', files: [], fileCount: 0 }
+      : { ok: true });
+    NOW += 11 * 60 * 1000;
+    const deniedSync = await denied.oj.sync({ force: true });
+    const deniedIn = (denied.wj.store.outlookPending && denied.wj.store.outlookPending.incoming) || [];
+    const deniedDiag = (denied.wj.store.outlookSync && denied.wj.store.outlookSync.diagnostics) || [];
+    check('Google disconnected: the stale schedule card is gone', deniedSync.ok && !deniedIn.some((x) => x && x.process && x.process.id === 'schedule-confirm'), deniedIn);
+    check('Google disconnected: the check says drive-not-granted', deniedDiag.some((d) => d && d.conversationId === 'cq4' && d.reason === 'drive-not-granted'), deniedDiag);
+    check('Google disconnected: the still-open schedule row is forgotten', !(denied.wj.store.stillOpenScan || []).some((x) => x && x.process && x.process.id === 'schedule-confirm'), denied.wj.store.stillOpenScan);
+    check('that check did not turn Outlook off', denied.wj.removed !== true && denied.wj.store.outlookAuth.token.accessToken === 'AT');
+
+    const one = judged((m) => m.type === 'flow:search-drive'
+      ? { ok: true, status: 200, files: [{ id: 'f-q4', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' }], fileCount: 1 }
+      : { ok: true });
+    NOW += 11 * 60 * 1000;
+    const oneSync = await one.oj.sync({ force: true });
+    const oneIn = (one.wj.store.outlookPending && one.wj.store.outlookPending.incoming) || [];
+    check('one Drive file: the stale schedule card is not kept', oneSync.ok && !oneIn.some((x) => x && x.process && x.process.id === 'schedule-confirm'), oneIn);
+
+    const aliasMsg = inMsg('alias1', 'calias', Q4, 0);
+    aliasMsg.from = { emailAddress: { name: 'Me', address: ME } };
+    aliasMsg.subject = 'Note';
+    const wa = world({ inbox: [aliasMsg], sent: [] });
+    const da = wa.deps();
+    da.planDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+    da.actions = FlowActions;
+    const oa = O.create(da);
+    wa.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW }, account: { address: ME }, ownAddresses: [ME] };
+    wa.store.outlookSync = { stateVersion: oa.STATE_VERSION, lastAt: NOW - 11 * 60 * 1000 };
+    wa.store.outlookPending = { offers: [], asks: [], incoming: [Object.assign({}, stale, { outlookConversationId: 'calias', threadId: 'ol:calias' })] };
+    NOW += 11 * 60 * 1000;
+    const aliasSync = await oa.sync({ force: true });
+    const aliasIn = (wa.store.outlookPending && wa.store.outlookPending.incoming) || [];
+    const aliasDiag = (wa.store.outlookSync && wa.store.outlookSync.diagnostics) || [];
+    check('a same-account sender stays silent', aliasSync.ok && aliasIn.length === 0, aliasIn);
+    check('that silence is own-sender or note-to-self', aliasDiag.some((d) => d && (d.reason === 'own-sender' || d.reason === 'note-to-self')), aliasDiag);
+    delete global.FlowFileAttach;
+    delete global.FlowCloseChains;
+  }
+
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
   console.log('TOTAL FAILURES: ' + failures);
   process.exit(failures ? 1 : 0);
