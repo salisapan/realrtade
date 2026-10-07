@@ -117,14 +117,24 @@ R.attachmentDataUnavailable = { casesWithDeclaredAttachments: att.length, llmSav
 md += `\n## Attachment data\n\n${att.length} of ${cases.length} cases declare attachments; 0 carry the real list (size / inline / contentId / kind). LLM save proposals that went silent for that reason (suggest:attachments-unread): **${R.attachmentDataUnavailable.llmSaveProposalsAffected}**.\n`;
 const W = R.sets['ALL pooled']['propose-only + propose-gate (strict: real attachment list unread) [spec]'];
 md += `\n## Pooled wrong-Do-Its, strict gate, spec labels: ${W.raw.wdi}\n${W.wdiIds.map((x) => '- ' + x).join('\n')}\n`;
-fs.writeFileSync(path.join(OUTD, 'results.json'), JSON.stringify(R, null, 1));
-fs.writeFileSync(path.join(OUTD, 'tables.md'), md);
 const K = 'propose-only + propose-gate (strict: real attachment list unread) [spec]';
 const bar = { wdiAllZero: SETS.every(([t]) => R.sets[t][K].raw.wdi === 0), v2Missed: R.sets['v2 held-out 400'][K].raw.miss, missBar: MISS_BAR,
   ungatedWdiV2: R.sets['v2 held-out 400']['propose-only, no gate (01:22 build) [spec]'].raw.wdi,
   coverage: cases.filter((c) => c.needLLM && LLM[c.id] && LLM[c.id].pred).length + '/' + cases.filter((c) => c.needLLM).length };
 const [have, need] = bar.coverage.split('/').map(Number); bar.fullCoverage = have === need; // a missing pred falls back to engine+veto, so partial runs must not pass
 bar.pass = bar.wdiAllZero && bar.v2Missed <= MISS_BAR && bar.fullCoverage;
-R.passBar = bar; fs.writeFileSync(path.join(OUTD, 'results.json'), JSON.stringify(R, null, 1));
-md += `\n## Pass bar (strict gate, spec labels)\n\n${JSON.stringify(bar)}\n`; fs.writeFileSync(path.join(OUTD, 'tables.md'), md);
+R.passBar = bar;
+md += `\n## Pass bar (strict gate, spec labels)\n\n${JSON.stringify(bar)}\n`;
+const resultsPath = path.join(OUTD, 'results.json');
+const tablesPath = path.join(OUTD, 'tables.md');
+let unchanged = false;
+try {
+  const prev = JSON.parse(fs.readFileSync(resultsPath, 'utf8'));
+  unchanged = JSON.stringify(Object.assign({}, prev, { builtAt: 0 })) === JSON.stringify(Object.assign({}, R, { builtAt: 0 }));
+  if (unchanged) R.builtAt = prev.builtAt;
+} catch (e) { /* first score */ }
+if (!unchanged) {
+  fs.writeFileSync(resultsPath, JSON.stringify(R, null, 1));
+  fs.writeFileSync(tablesPath, md);
+}
 console.log(md); console.log((bar.pass ? 'PASS ' : 'FAIL ') + JSON.stringify(bar)); process.exitCode = bar.pass ? 0 : 3;

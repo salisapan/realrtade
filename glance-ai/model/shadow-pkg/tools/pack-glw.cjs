@@ -28,5 +28,10 @@ for (const [tag, kind, role] of [['v2', 'v2', 'primary'], ['v21', 'v21', 'second
 }
 const ref = path.join(A, 'v21.p0.glw');
 if (fs.existsSync(ref)) man.models.v21.identicalToArtifact = Buffer.compare(fs.readFileSync(ref), fs.readFileSync(path.join(W, 'v21.p0.glw'))) === 0;
-fs.writeFileSync(path.join(W, 'manifest.json'), JSON.stringify(man, null, 1) + '\n');
+const manPath = path.join(W, 'manifest.json');
+try {
+  const prev = JSON.parse(fs.readFileSync(manPath, 'utf8'));
+  if (JSON.stringify(Object.assign({}, prev, { builtAt: 0 })) === JSON.stringify(Object.assign({}, man, { builtAt: 0 }))) man.builtAt = prev.builtAt;
+} catch (e) { /* first pack */ }
+fs.writeFileSync(manPath, JSON.stringify(man, null, 1) + '\n');
 console.log(JSON.stringify(man, null, 1));

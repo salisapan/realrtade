@@ -192,6 +192,51 @@
     "newFlips": 0,
     "byNoise": {}
    }
+  },
+  "tip": {
+   "raw": {
+    "flips": 422,
+    "fixed": 0,
+    "newFlips": 0,
+    "byNoise": {
+     "nbsp": 292,
+     "nbsp+mobile": 23,
+     "nbsp+crlf": 87,
+     "nbsp+mobile+crlf": 7,
+     "rlm+mobile": 1,
+     "nbsp+rlm": 4,
+     "rlm": 7,
+     "rlm+crlf": 1
+    }
+   },
+   "minimal": {
+    "flips": 159,
+    "fixed": 266,
+    "newFlips": 3,
+    "byNoise": {
+     "nbsp": 109,
+     "nbsp+mobile": 14,
+     "nbsp+crlf": 34,
+     "nbsp+mobile+crlf": 2
+    }
+   },
+   "clean": {
+    "flips": 159,
+    "fixed": 266,
+    "newFlips": 3,
+    "byNoise": {
+     "nbsp": 109,
+     "nbsp+mobile": 14,
+     "nbsp+crlf": 34,
+     "nbsp+mobile+crlf": 2
+    }
+   },
+   "full": {
+    "flips": 0,
+    "fixed": 422,
+    "newFlips": 0,
+    "byNoise": {}
+   }
   }
  }
 }
