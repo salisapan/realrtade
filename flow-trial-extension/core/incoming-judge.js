@@ -17,12 +17,26 @@
 const FlowIncomingJudge = (() => {
   const MIN_TEXT = 20;
 
-  // A phone signature is not part of the ask. "Sent from my iPhone" and
-  // "נשלח מה-iPhone" stay off the sentence the judge reads.
+  // Invisible formatting is not part of the sentence. One pass, before the
+  // decision, on every mail path that calls this (the Gmail page, the Outlook
+  // page, the mailbox check, and judge itself). The same characters give the
+  // same decision as the text without them.
+  function prepareForJudge(text) {
+    return String(text == null ? '' : text)
+      .replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069\u061C]/g, '')
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '')
+      .replace(/[\u00A0\u202F]/g, ' ')
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+  }
+
+  // A line that is only a phone signature is not part of the ask.
+  // "Sent from my iPhone" and "נשלח מה-iPhone שלי" drop.
+  // A request on that same line stays: the line is the ask.
   function withoutPhoneSignature(text) {
-    return String(text || '').split(/\r?\n/).filter((line) => {
-      if (/^\s*sent from my (?:iphone|ipad|android)\b/i.test(line)) return false;
-      if (/^\s*נשלח מה[-\u05BE\s]*(?:iphone|אייפון|אנדרואיד)/i.test(line)) return false;
+    return String(text || '').split('\n').filter((line) => {
+      if (/^\s*sent from my (?:iphone|ipad|android)\s*\.?\s*$/i.test(line)) return false;
+      if (/^\s*נשלח מה[-\u05BE\s]*(?:iphone|אייפון|אנדרואיד)(?:\s+שלי)?\s*\.?\s*$/i.test(line)) return false;
       return true;
     }).join('\n').trim();
   }
@@ -50,7 +64,7 @@ const FlowIncomingJudge = (() => {
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
-    const text = withoutPhoneSignature(i.text);
+    const text = withoutPhoneSignature(prepareForJudge(i.text));
     const factProbe = (text.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(text) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
@@ -163,7 +177,7 @@ const FlowIncomingJudge = (() => {
     return D.draftBodyText(draftPayload(process, ctx), null, null, null);
   }
 
-  return { MIN_TEXT, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText };
+  return { MIN_TEXT, prepareForJudge, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

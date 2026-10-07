@@ -222,6 +222,10 @@ const FlowStorage = (() => {
     // src/outlook.js: the Microsoft sign-in (kept only on this device), the last check, and what waits for an answer. Never message text beyond the loop's own sentence.
     outlookAuth: null,
     outlookSync: {},
+    // A suggested save is recorded here and not drawn. suggestDismissals is
+    // the store API for Not now and Undo. No button writes it in 0.9.38.
+    suggestLog: [],
+    suggestDismissals: {},
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

@@ -37,6 +37,10 @@ their status. Whenever a task, blocker, owner action or decision comes up in
 conversation, add it there; when one is finished or changes status, update it in
 the same turn, and refresh the "Last updated" date. Link the ClickUp task when one exists.
 
+## Product facts and release order
+
+A change that moves a product fact or the release order updates the truth file that owns it (`CLAUDE.md`, `docs/open-tasks.md`, or the topic document) in the same change, and adds one short, plain, dated line to `docs/vault/decisions.md`: what shipped or changed, the version, and the Gate result when there is one.
+
 ## Product architecture — read before touching pricing, positioning, or feature scope
 
 Flow Trial (Free + Pro) and Flow (the core product) are **two separate

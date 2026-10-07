@@ -42,7 +42,10 @@
   const SCAN_EVERY_MS = 800;        // at most one scan per 0.8 s, and at least one 0.8 s after any change
   const PAGE_SYNC_MIN_MS = 60 * 1000;
   const PAGE_DIAG_KEY = 'outlookPageDiag';
+  const UNDONE_KEY = 'glanceUndoneBanners';
   let timer = null;
+  let lastPaneKey = '';
+  let suggestNote = null;
   let scanning = false;
   let again = false;
   let lastKey = '';
@@ -121,7 +124,9 @@
       list.unshift(Object.assign({
         key, reason, at: Date.now(), source: 'page',
         subject: String((pane && pane.subject) || '').slice(0, 120),
-        counterpart: (pane && pane.senderEmail) || null
+        counterpart: (pane && pane.senderEmail) || null,
+        conversationId: (pane && pane.conversationId) || null,
+        messageId: (pane && (pane.itemId || pane.pathId)) || null
       }, extra || {}));
       await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 20) }, resolve));
       lastReasonKey = key;
@@ -132,13 +137,52 @@
     }
   }
 
+  function messageIdsOf(pane) {
+    if (!pane) return [];
+    return [pane.itemId, pane.pathId, pane.conversationId].filter(Boolean).map(String);
+  }
+
+  function sameExchangeId(a, b) {
+    if (!a || !b) return false;
+    if (String(a) === String(b)) return true;
+    if (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.canonId === 'function') {
+      const ca = FlowOwaParse.canonId(a);
+      return Boolean(ca) && ca === FlowOwaParse.canonId(b);
+    }
+    return false;
+  }
+
+  function idListed(id, ids) {
+    return (ids || []).some((x) => sameExchangeId(id, x));
+  }
+
+  // A visible card is the outcome. Drop the page reason and the mailbox
+  // check's earlier quiet line for this message, so Why not shown does not
+  // list a mail that has a card.
   async function clearReason(pane) {
     lastReasonKey = '';
     try {
-      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
+      const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [], outlookSync: {} }, resolve));
+      const ids = messageIdsOf(pane);
       const id = pane && (pane.conversationId || pane.itemId || pane.subject);
-      const list = (bag[PAGE_DIAG_KEY] || []).filter((d) => d && !(id && String(d.key || '').endsWith('|' + id)));
-      if (list.length !== (bag[PAGE_DIAG_KEY] || []).length) await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list }, resolve));
+      const list = (bag[PAGE_DIAG_KEY] || []).filter((d) => {
+        if (!d) return false;
+        if (id && String(d.key || '').endsWith('|' + id)) return false;
+        if (idListed(d.conversationId, ids) || idListed(d.messageId, ids)) return false;
+        return true;
+      });
+      const sync = bag.outlookSync || {};
+      const patch = {};
+      if (list.length !== (bag[PAGE_DIAG_KEY] || []).length) patch[PAGE_DIAG_KEY] = list;
+      if (Array.isArray(sync.diagnostics)) {
+        const diagnostics = sync.diagnostics.filter((d) => {
+          if (!d) return false;
+          if (idListed(d.conversationId, ids) || idListed(d.messageId, ids)) return false;
+          return true;
+        });
+        if (diagnostics.length !== sync.diagnostics.length) patch.outlookSync = Object.assign({}, sync, { diagnostics: diagnostics });
+      }
+      if (Object.keys(patch).length) await new Promise((resolve) => chrome.storage.local.set(patch, resolve));
     } catch (e) { /* ignore */ }
   }
 
@@ -249,7 +293,10 @@
   async function decideFromText(pane, ownAddresses, mailbox) {
     if (typeof FlowIncomingJudge === 'undefined') return null;
     // The message's own words, as Gmail judges them: quoted history ("From: … Sent: …", "On … wrote:") cut off.
-    const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
+    const prepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
+      ? FlowIncomingJudge.prepareForJudge(pane.text || '')
+      : (pane.text || '');
+    const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(prepared) : prepared;
     // A save-shaped sentence is the only one that asks how many files are
     // on the message. Every other sentence stays at zero, as before.
     // The address often carries only a conversation id. Counting files on that
@@ -258,7 +305,8 @@
     if (typeof FlowGoogleCloses !== 'undefined' && typeof FlowGoogleCloses.needsOneAttachment === 'function' && FlowGoogleCloses.needsOneAttachment(own)) {
       let id = pane.itemId || null;
       if (!id) {
-        const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses);
+        const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses, pane.senderEmail);
+        if (found && found.unread) return { none: true, reason: found.reason };
         id = found && found.id;
       }
       const rows = id ? await graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,isInline', 'save-count') : null;
@@ -291,13 +339,23 @@
       .map((a) => String(a || '').toLowerCase());
   }
 
+  function fromAddress(msg) {
+    return String((msg && msg.from && msg.from.emailAddress && msg.from.emailAddress.address) || '').toLowerCase();
+  }
+
   function newestOther(list, own) {
     const rows = (list || []).filter((m) => {
-      const a = String((m && m.from && m.from.emailAddress && m.from.emailAddress.address) || '').toLowerCase();
+      const a = fromAddress(m);
       return a && (own || []).indexOf(a) < 0;
     });
     rows.sort((a, b) => (Date.parse(b.receivedDateTime) || 0) - (Date.parse(a.receivedDateTime) || 0));
     return rows[0] || null;
+  }
+
+  function sameOpenSender(from, openEmail) {
+    const a = String(from || '').toLowerCase();
+    const b = String(openEmail || '').toLowerCase();
+    return Boolean(a) && a === b;
   }
 
   // Same session the mailbox check uses. The open-page reads used to send headers: {}
@@ -369,7 +427,7 @@
     for (let p = 0; p < prefers.length; p++) {
       for (let i = 0; i < spells.length; i++) {
         const msg = await graphJson('/me/messages/' + encodeURIComponent(spells[i]) + select, 'path-rest-id', prefers[p]);
-        if (msg && msg.id && !Array.isArray(msg.value)) return { id: msg.id, how: 'path-rest-id', immutable: Boolean(prefers[p]) };
+        if (msg && msg.id && !Array.isArray(msg.value)) return { id: msg.id, how: 'path-rest-id', immutable: Boolean(prefers[p]), from: fromAddress(msg) };
       }
     }
     return null;
@@ -391,7 +449,7 @@
         for (let i = 0; i < spells.length; i++) {
           const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId&$top=25';
           const fromFilter = newestOther(await graphValues(q, 'conversation-filter', prefers[p]), own);
-          if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter', immutable: Boolean(prefers[p]) };
+          if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter', immutable: Boolean(prefers[p]), from: fromAddress(fromFilter) };
         }
       }
       const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
@@ -399,18 +457,27 @@
       for (let p = 0; p < prefers.length; p++) {
         const hits = (await graphValues(listPath, 'inbox-list', prefers[p]) || []).filter((m) => m && (FlowOwaParse.canonId(m.conversationId) === want || FlowOwaParse.canonId(m.id) === want));
         const fromList = newestOther(hits, own);
-        if (fromList && fromList.id) return { id: fromList.id, how: 'inbox-list', immutable: Boolean(prefers[p]) };
+        if (fromList && fromList.id) return { id: fromList.id, how: 'inbox-list', immutable: Boolean(prefers[p]), from: fromAddress(fromList) };
       }
       return null;
     } catch (e) { return null; }
   }
 
   // Path RestId first (GET /me/messages/{id}), then the conversation filter and the inbox list.
-  async function resolveOutlookMessageId(pathId, convId, own) {
+  // A conversation resolves to one message. The newest message from someone
+  // else is not the open message. Return its from-address; on a mismatch the
+  // result is unread and is never used as the open message.
+  async function resolveOutlookMessageId(pathId, convId, own, openSender) {
     const direct = await messageIdFromPathRest(pathId || convId);
     if (direct && direct.id) return direct;
-    if (convId) return messageIdForConversation(convId, own);
-    return null;
+    if (!convId) return null;
+    const found = await messageIdForConversation(convId, own);
+    if (!found || !found.id) return null;
+    if (!sameOpenSender(found.from, openSender)) {
+      dbg('sender-mismatch', { how: found.how, from: found.from || null, open: String(openSender || '').toLowerCase() || null });
+      return { unread: true, reason: 'page:sender-mismatch', from: found.from || null };
+    }
+    return found;
   }
 
   async function ensureOutlookMessageId(ctx) {
@@ -421,8 +488,8 @@
     if (!pathId && !convId) return null;
     let own = [];
     try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
-    const found = await resolveOutlookMessageId(pathId, convId, own);
-    if (!found || !found.id) return null;
+    const found = await resolveOutlookMessageId(pathId, convId, own, ctx && ctx.sender && ctx.sender.email);
+    if (!found || found.unread || !found.id) return null;
     ctx.messageId = found.id;
     ctx.outlookIncomingId = found.id;
     ctx.messageIdFrom = found.how;
@@ -642,28 +709,49 @@
     return outlookTodoRow(row) || outlookOnedriveRow(row);
   }
 
-  // After a reload the message body can keep a second Undo. That copy is
-  // inside the reading document and its click does nothing. The working
-  // Undo is the one host outside that document.
+  function hostIds(el) {
+    return String((el && el.getAttribute && el.getAttribute('data-glance-message')) || '').split('|').filter(Boolean);
+  }
+
+  function hostMatches(el, ids) {
+    const marked = hostIds(el);
+    if (!marked.length || !ids.length) return false;
+    return marked.some((id) => idListed(id, ids));
+  }
+
+  function readingScope(mount) {
+    return document.querySelector('#ReadingPaneContainerId') || mount || document;
+  }
+
+  // One Handled receipt for this message. A second copy, in the header or
+  // in the body, is removed. A different message's host is not this receipt.
   function stripDuplicateUndoHosts(mount) {
-    if (!mount || !mount.querySelectorAll) return null;
-    const doc = mount.querySelector('div[role="document"]');
-    if (doc) {
-      doc.querySelectorAll('.flow-chip-host').forEach((el) => {
-        if (el.getAttribute('data-glance-chain') === 'task-proof' || el.querySelector('.flow-chip-undo')) el.remove();
-      });
-    }
-    const outside = [];
-    mount.querySelectorAll('.flow-chip-host[data-glance-chain="task-proof"]').forEach((el) => {
-      if (doc && doc.contains(el)) return;
-      outside.push(el);
-    });
+    const scope = readingScope(mount);
+    if (!scope || !scope.querySelectorAll) return null;
+    const hosts = [];
+    scope.querySelectorAll('.flow-chip-host[data-glance-chain="task-proof"]').forEach((el) => hosts.push(el));
     let kept = null;
-    outside.forEach((el) => {
+    hosts.forEach((el) => {
       if (!kept && el.classList.contains('flow-chip-settled')) kept = el;
     });
-    outside.forEach((el) => { if (el !== kept) el.remove(); });
+    if (!kept && hosts.length) kept = hosts[0];
+    hosts.forEach((el) => { if (el !== kept) el.remove(); });
     return kept;
+  }
+
+  // The subject header stays on screen when the open message changes.
+  // A receipt belongs to the message that wrote it.
+  function clearForeignHosts(pane) {
+    const ids = messageIdsOf(pane);
+    const key = ids.join('|') || ((location && location.pathname) || '');
+    const changed = key !== lastPaneKey;
+    lastPaneKey = key;
+    if (!changed) return;
+    const scope = readingScope(null);
+    if (!scope || !scope.querySelectorAll) return;
+    scope.querySelectorAll('.flow-chip-host').forEach((el) => {
+      if (!hostMatches(el, ids)) el.remove();
+    });
   }
 
   function paintOutlookTodoReceipt(mount, row) {
@@ -671,22 +759,15 @@
       ? FlowProofOfClose.remountCopy(row)
       : null;
     if (!mount || !copy) return null;
-    stripDuplicateUndoHosts(mount);
-    mount.querySelectorAll('.flow-chip-host').forEach((el) => {
-      const inDoc = el.closest && el.closest('div[role="document"]');
-      if (inDoc) {
-        if (el.getAttribute('data-glance-chain') === 'task-proof' || el.querySelector('.flow-chip-undo')) el.remove();
-        return;
-      }
-      if (el.getAttribute('data-glance-chain') !== 'task-proof') el.remove();
-    });
-    const already = mount.querySelector('.flow-chip-host[data-glance-chain="task-proof"].flow-chip-settled');
-    if (already) return already;
+    const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
+    const already = stripDuplicateUndoHosts(mount);
+    if (already && already.classList.contains('flow-chip-settled') && (!ids.length || hostMatches(already, ids))) return already;
+    if (already) already.remove();
     const el = FlowChipHost.el;
     const host = el('div', 'flow-chip-host flow-chip-settled');
     host.setAttribute('dir', 'ltr');
     host.setAttribute('data-glance-chain', 'task-proof');
-    host.setAttribute('data-glance-message', row.messageId || '');
+    host.setAttribute('data-glance-message', ids.join('|'));
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
     done.setAttribute('role', 'status');
@@ -733,10 +814,11 @@
         } else if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
           await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey);
         }
-        const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean);
+        const undoneIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean);
         host.setAttribute('data-glance-undone', '1');
-        if (ids.length) host.setAttribute('data-glance-message', ids.join('|'));
+        if (undoneIds.length) host.setAttribute('data-glance-message', undoneIds.join('|'));
         done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
+        rememberUndone(undoneIds, copy.undoneLine);
         lastOutcome = 'card';
         lastKey = (row.messageId || 'open') + '|undone';
         lastSig = '';
@@ -747,8 +829,58 @@
     host.appendChild(done);
     if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
     else mount.appendChild(host);
+    stripDuplicateUndoHosts(mount);
     lastOutcome = 'card';
     lastKey = (row.messageId || 'open') + '|task-proof';
+    return host;
+  }
+
+  function rememberUndone(ids, line) {
+    const keys = (ids || []).filter(Boolean).map(String);
+    if (!keys.length || !line) return;
+    chrome.storage.local.get({ [UNDONE_KEY]: {} }, (bag) => {
+      const map = Object.assign({}, (bag && bag[UNDONE_KEY]) || {});
+      const at = Date.now();
+      keys.forEach((id) => { map[id] = { line: line, ids: keys, at: at }; });
+      chrome.storage.local.set({ [UNDONE_KEY]: map });
+    });
+  }
+
+  async function undoneBannerFor(pane) {
+    const ids = messageIdsOf(pane);
+    if (!ids.length) return null;
+    const bag = await new Promise((resolve) => chrome.storage.local.get({ [UNDONE_KEY]: {} }, resolve));
+    const map = (bag && bag[UNDONE_KEY]) || {};
+    const keys = Object.keys(map);
+    for (let i = 0; i < keys.length; i++) {
+      if (idListed(keys[i], ids) && map[keys[i]] && map[keys[i]].line) return map[keys[i]];
+    }
+    return null;
+  }
+
+  function paintUndoneStatus(mount, pane, line) {
+    const ids = messageIdsOf(pane);
+    const existing = stripDuplicateUndoHosts(mount);
+    if (existing && existing.getAttribute('data-glance-undone') === '1' && hostMatches(existing, ids)) {
+      lastOutcome = 'card';
+      return existing;
+    }
+    if (existing) existing.remove();
+    const el = FlowChipHost.el;
+    const host = el('div', 'flow-chip-host flow-chip-settled');
+    host.setAttribute('dir', 'ltr');
+    host.setAttribute('data-glance-chain', 'task-proof');
+    host.setAttribute('data-glance-undone', '1');
+    host.setAttribute('data-glance-message', ids.join('|'));
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    done.appendChild(el('span', 'flow-chip-label', line));
+    host.appendChild(done);
+    if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
+    else mount.appendChild(host);
+    stripDuplicateUndoHosts(mount);
+    lastOutcome = 'card';
     return host;
   }
 
@@ -779,10 +911,11 @@
         return true;
       }
       existing.remove();
-      return false;
     }
     if (!outlookProofRow(row)) {
-      if (existing) existing.remove();
+      const banner = await undoneBannerFor(pane);
+      if (banner && banner.line) return Boolean(paintUndoneStatus(mount, pane, banner.line));
+      if (existing && existing.isConnected) existing.remove();
       return false;
     }
     if (existing && existing.classList.contains('flow-chip-settled')) {
@@ -1617,6 +1750,7 @@
     const armed = traceArmed || localFileTrace();
     // A click rewrites the chip. That must not re-enter the file chain: re-entry was what
     // set glanceOutlookFileTrace back to 0 on Do It. One trace per open message while armed.
+    clearForeignHosts(pane);
     if (doItInFlight && document.querySelector('.flow-chip-host')) {
       dbg('decision', { shown: true, reason: 'page:do-it-in-flight' });
       return;
@@ -1629,6 +1763,7 @@
     }
     lastSig = sig;
     lastOutcome = '';
+    suggestNote = (pane && (pane.conversationId || pane.itemId || (pane.text && String(pane.text).trim()))) ? pane : null;
     if (!pane) {
       // A message is open (its id is in the address) but its body could not be found: say so, with what was on the page.
       // The subject is the id from the address, so Why not shown can name the message.
@@ -1689,6 +1824,14 @@
     }
     let entry = m ? m.entry : null;
     dbg('matched', m ? { how: m.how, messageId: entry.messageId, label: entry.intent && entry.intent.label, candidates: candidates.length } : { how: 'none', candidates: candidates.length });
+    if (entry && pane.senderEmail) {
+      const entryFrom = String((entry.sender && entry.sender.email) || (entry.base && entry.base.sender && entry.base.sender.email) || (entry.base && entry.base.counterpart && entry.base.counterpart.email) || '').toLowerCase();
+      const openFrom = String(pane.senderEmail).toLowerCase();
+      if (entryFrom && openFrom && entryFrom !== openFrom) {
+        dbg('sender-mismatch', { how: m && m.how, from: entryFrom, open: openFrom });
+        entry = null;
+      }
+    }
 
     // The open text and the mailbox check decide together. A stored card from an
     // older judgment (a Scheduling card kept after the mail became a file ask)
@@ -1717,7 +1860,10 @@
       if (fileNow) {
           const tracing = traceArmed || localFileTrace();
           graphTrace = { attempts: [] };
-          const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
+          const askPrepared = (typeof FlowIncomingJudge !== 'undefined' && FlowIncomingJudge.prepareForJudge)
+            ? FlowIncomingJudge.prepareForJudge(pane.text || '')
+            : (pane.text || '');
+          const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(askPrepared) : askPrepared;
           let ran = null;
           let finalReason = 'file-chain-not-run';
           let prepareWhy = null;
@@ -1729,8 +1875,9 @@
             let msgImmutable = false;
             msgIdHow = msgId ? 'url' : null;
             if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && (pane.pathId || pane.conversationId)) {
-              const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own);
-              if (found && found.id) { msgId = found.id; msgIdHow = found.how; msgImmutable = found.immutable === true; }
+              const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
+              if (found && found.unread) msgIdHow = 'sender-mismatch';
+              else if (found && found.id) { msgId = found.id; msgIdHow = found.how; msgImmutable = found.immutable === true; }
               else msgIdHow = 'none';
             }
             if (chain && chain.move === 'needs-you') {
@@ -1810,7 +1957,13 @@
         // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.
         let msgId = pane.itemId || null;
         if (!msgId && (pane.pathId || pane.conversationId)) {
-          const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own);
+          const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own, pane.senderEmail);
+          if (found && found.unread) {
+            dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, mismatch: true, from: found.from || null });
+            dropStuckCard();
+            await pageReason(found.reason, pane);
+            return;
+          }
           msgId = found ? found.id : null;
           dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId });
         }
@@ -1893,6 +2046,8 @@
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
     if (!host) { await pageReason('page:inject-failed', pane); return; }
+    const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+    if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
     lastOutcome = 'card';
     dbg('decision', { shown: true, label: ctx.intent && ctx.intent.label });
     dbg('rendered', { messageId: ctx.messageId, label: ctx.intent && ctx.intent.label });
@@ -1929,6 +2084,74 @@
     timer = setTimeout(runScan, SCAN_EVERY_MS);
   }
 
+  async function appendSuggestLog(entry) {
+    if (!entry || typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return;
+    const bag = await FlowStorage.get();
+    const log = Array.isArray(bag.suggestLog) ? bag.suggestLog.slice() : [];
+    const key = String(entry.messageId || '') + '|' + String(entry.reason || '');
+    if (log[0] && log[0].key === key) return;
+    log.unshift({
+      key: key, at: Date.now(), messageId: entry.messageId || null, reason: entry.reason,
+      fileCount: entry.fileCount || 0, target: entry.target || null, surface: entry.surface || 'outlook'
+    });
+    await FlowStorage.set({ suggestLog: log.slice(0, 40) });
+  }
+
+  async function suggestFiles(pane) {
+    let id = pane.itemId || null;
+    if (!id) {
+      const st = await FlowStorage.get();
+      const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddressesOf(st), pane.senderEmail);
+      if (!found || found.unread || !found.id) return null;
+      id = found.id;
+    }
+    return graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,contentType,size,isInline,contentId', 'suggest-list');
+  }
+
+  // The suggestion is not a chip. A visible card keeps suggest:other-card in
+  // the local log only. No card records the suggest reason in Why not shown
+  // and in that same log.
+  async function recordSuggestNote() {
+    const pane = suggestNote;
+    suggestNote = null;
+    if (!pane || typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return;
+    const showed = lastOutcome === 'card' || Boolean(document.querySelector('#ReadingPaneContainerId .flow-chip-host'));
+    const messageId = pane.itemId || pane.conversationId || pane.pathId || '';
+    if (showed) {
+      await clearReason(pane);
+      await appendSuggestLog({ messageId: messageId, reason: 'suggest:other-card', surface: 'outlook' });
+      return;
+    }
+    let files = null;
+    try { files = await suggestFiles(pane); } catch (e) { files = null; }
+    let bag = {};
+    try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
+    const token = bag.outlookAuth && bag.outlookAuth.token;
+    const scopes = token && (token.scopes || token.scope);
+    const consent = (typeof FlowOnedriveFile !== 'undefined' && typeof FlowOnedriveFile.hasWriteScope === 'function')
+      ? FlowOnedriveFile.hasWriteScope(scopes) : null;
+    const own = ownAddressesOf(bag);
+    const from = String(pane.senderEmail || '').toLowerCase();
+    const decision = FlowSuggestSave.suggestSave({
+      surface: 'outlook',
+      inbound: from ? own.indexOf(from) < 0 : true,
+      text: pane.text || '',
+      body: pane.text || '',
+      messageId: messageId,
+      attachments: files,
+      consent: consent,
+      otherCard: false,
+      noise: /noise|marketing/.test(String(lastLoggedReason || '')),
+      dismissals: bag.suggestDismissals || {},
+      log: bag.log || []
+    });
+    await appendSuggestLog({
+      messageId: messageId, reason: decision.reason, surface: 'outlook',
+      fileCount: decision.fileCount, target: decision.target
+    });
+    await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
+  }
+
   async function runScan() {
     timer = null;
     if (scanning) { again = true; return; }
@@ -1942,6 +2165,7 @@
       } catch (x2) { /* storage gone with the page */ }
     }
     finally {
+      try { await recordSuggestNote(); } catch (e) { /* the note is not the card */ }
       scanning = false;
       if (again) { again = false; schedule(); }
     }

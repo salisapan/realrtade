@@ -172,10 +172,15 @@ const FlowOutlookSync = (() => {
       const ikey = conv + '|' + last.id;
       const subject = String(lastRaw.subject || '');
       const counted = fileCount(lastRaw);
-      let judged = counted == null
+      const askedText = judge && typeof judge.prepareForJudge === 'function' ? judge.prepareForJudge(last.text) : last.text;
+      // A 255-character bodyPreview is not the mail. A refusal after that cut
+      // would be lost, so a file or send card from the preview stays off.
+      let judged = (graphMail.truncatedPreviewOnly && graphMail.truncatedPreviewOnly(lastRaw))
+        ? { show: false, reason: 'outlook:body-preview-only', intent: null }
+        : counted == null
         ? { show: false, reason: 'outlook:attachments-unread', intent: null }
         : (judge ? judge.judge({
-          text: last.text, subject, sender: { name: party.name, email: party.email },
+          text: askedText, subject, sender: { name: party.name, email: party.email },
           attachmentCount: counted,
           calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
           now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: counted === 1, surface: 'outlook'

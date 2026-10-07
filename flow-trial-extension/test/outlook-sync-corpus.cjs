@@ -313,6 +313,33 @@ console.log('\n--- OneDrive save reaches a card, and a drop still has a reason -
   check('an empty body falls through to bodyPreview and can show',
     previewU && /OneDrive/.test(previewU.text) && previewPlan.incoming.length === 1,
     { text: previewU && previewU.text, incoming: previewPlan.incoming.length, diagnostics: previewPlan.diagnostics });
+  const refusal = "please don't save the attachment to OneDrive.";
+  let lead = 'Hi, Please save the attachment to OneDrive by Friday so finance can file the signed pack. ';
+  while ((lead + refusal).length < 400) lead += 'The PDF is the one we discussed on the call yesterday. ';
+  const fullMail = lead + refusal;
+  const cut = fullMail.slice(0, 255);
+  check('the sample mail is about 400 characters and the preview drops the refusal',
+    fullMail.length >= 400 && fullMail.length < 520 && cut.length === 255 && !/don't save/.test(cut) && /OneDrive/.test(cut),
+    { full: fullMail.length, cut: cut.length });
+  const truncated = theirs('od-preview-cut', '', 0.12, 'Gate preview cut');
+  truncated.body = { contentType: 'text', content: '   ' };
+  truncated.bodyPreview = cut;
+  truncated.hasAttachments = true;
+  truncated.attachments = [pdf];
+  const truncatedPlan = plan([truncated]);
+  const truncatedWhy = (truncatedPlan.diagnostics.find((d) => d.conversationId === 'od-preview-cut') || {}).reason;
+  check('a truncated body preview does not show a file card',
+    truncatedPlan.incoming.length === 0 && truncatedWhy === 'outlook:body-preview-only',
+    { incoming: truncatedPlan.incoming.length, why: truncatedWhy, diagnostics: truncatedPlan.diagnostics });
+  const whole = theirs('od-preview-full', fullMail, 0.12, 'Gate preview full');
+  whole.bodyPreview = cut;
+  whole.hasAttachments = true;
+  whole.attachments = [pdf];
+  const wholePlan = plan([whole]);
+  const wholeWhy = (wholePlan.diagnostics.find((d) => d.conversationId === 'od-preview-full') || {}).reason;
+  check('the full body keeps the refusal and stays quiet',
+    wholePlan.incoming.length === 0 && wholeWhy === 'quiet:google',
+    { incoming: wholePlan.incoming.length, why: wholeWhy });
   const noConv = theirs('od5', 'Could you please send me the signed lease by Friday? I need it to release the deposit.', 0.1, 'Gate no conversation');
   delete noConv.conversationId;
   const noConvPlan = plan([noConv]);
