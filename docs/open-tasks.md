@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-07 (Outlook 0.9.22: open-page Graph reads send the mailbox bearer. Do It on the Q4 path id can write the draft. Live retest is still the owner's, row 41).
+Last updated: 2026-10-07 (Glance 0.9.23: a self-mail that names a Drive file and a clock is a Family B hold. Live Gmail retest is still CoS).
 
 ## Open
 
@@ -76,6 +76,7 @@ Last updated: 2026-10-07 (Outlook 0.9.22: open-page Graph reads send the mailbox
 
 ## Done (recent)
 
+- 2026-10-07: Gmail Family B file-on-hold (0.9.23). The Path A gate mail ("Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.") showed no Do It card. Two gaps: the place pattern required "on the calendar" and a single word with no extension, so "on my calendar" plus `glance-pricing-q4.pdf` never matched (Hebrew `ביומן` and a Latin file name missed the same way); and the reading pane skipped every message from the account, including a note addressed only to yourself. A note whose every address is your own is now judged. One Drive file still puts that file's link on the calendar event; no attachment on the mail is required; zero or two Drive matches stay silent. A reply you sent to someone else stays quiet. Live retest is CoS, unpacked 0.9.23.
 - 2026-10-07: Outlook Graph bearer on the open-page lookup (0.9.22). Live 0.9.21 kept the Q4 card and Do It returned "Could not find that message" because those Graph reads sent no Authorization. They now use the mailbox session, then `IdType="ImmutableId"` when the REST spelling returns no message. The trace logs status and the path ids. Draft only; Undo deletes. Live retest remains row 41.
 - 2026-10-07: Outlook Do It on a path RestId (0.9.21). Live 0.9.20 showed the Q4 card and then "Could not find that message" because `/inbox/id/{restId}` was only a conversation filter. Do It now GETs that id (canon spelling first). Fallbacks stay. The trace flag is not cleared on the click. Draft only; Undo deletes. Connect and Check now unchanged. Live retest remains row 41.
 - 2026-10-07: Outlook floating file card (0.9.20). Live trace on the third-party Q4 mail: Drive fileCount 1, prepare chosen, `itemId` null, final `outlook:file-found-no-attach` because `showFilePrepare` returned false. The conversationId filter was empty. The open page now resolves the Graph message id from the recent inbox list (canon id), and still shows Do It when that id is missing. The trace names `showFilePrepare` and `messageIdFrom`. Do It drafts only; Undo deletes the draft. Connect and Check now unchanged. Live retest remains row 41.

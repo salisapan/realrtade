@@ -433,6 +433,19 @@
     return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
   }
 
+  // Every [email] on the message, sender first. Same order extractSender
+  // uses for the first one. Passed to FlowGoogleCloses.messageToJudge.
+  function addressesOn(messageNode) {
+    if (!messageNode || !messageNode.querySelectorAll) return [];
+    const out = [];
+    const els = messageNode.querySelectorAll('[email]');
+    for (const el of els) {
+      const email = el.getAttribute('email');
+      if (email) out.push(email);
+    }
+    return out;
+  }
+
   // Gmail writes quoted/forwarded history into a message's own HTML inside
   // an element carrying this class — a stable, widely-documented convention
   // (not one of Gmail's internal minified names) that Gmail itself inserts
@@ -663,6 +676,9 @@
     // and re-offered to log whatever the thread was already about. Walking
     // backward for the newest message that isn't from the account itself
     // finds the thing this scanner exists to react to: mail that arrived.
+    // A note addressed only to yourself is the exception: there is no other
+    // sender, and the note is the ask (a file on your calendar, a hold).
+    // A message you sent to someone else still stays quiet.
     let ownEmail = ownEmailFromThread(messages);
     if (ownEmail) {
       rememberOwnEmail(ownEmail);
@@ -700,15 +716,21 @@
       FlowFollow.considerClock(followCtx).catch((e) => console.error('[Glance] expiry check failed', e));
     }
 
-    let message = null;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const candidate = messages[i];
-      const candidateSender = extractSender(candidate);
-      if (candidateSender.email && candidateSender.email.toLowerCase() === ownEmail.toLowerCase()) continue;
-      message = candidate;
-      break;
+    const emailLists = [];
+    for (let i = 0; i < messages.length; i++) emailLists.push(addressesOn(messages[i]));
+    let judgeAt = -1;
+    if (typeof FlowGoogleCloses !== 'undefined' && FlowGoogleCloses.messageToJudge) {
+      judgeAt = FlowGoogleCloses.messageToJudge(emailLists, ownEmail);
+    } else {
+      for (let i = emailLists.length - 1; i >= 0; i--) {
+        const sender = (emailLists[i] && emailLists[i][0]) || '';
+        if (sender && sender.toLowerCase() === ownEmail.toLowerCase()) continue;
+        judgeAt = i;
+        break;
+      }
     }
-    if (!message) return; // every visible message in the thread is the account's own outbound mail
+    const message = judgeAt >= 0 ? messages[judgeAt] : null;
+    if (!message) return; // own mail to someone else, or no message we can tell apart from one
 
     const legacyId = message.getAttribute('data-legacy-message-id');
 

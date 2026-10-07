@@ -17,6 +17,7 @@ for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
 const FlowActions = vm.runInContext('FlowActions', sandbox);
 const FlowGoogleCloses = vm.runInContext('FlowGoogleCloses', sandbox);
+const FlowExtract = vm.runInContext('FlowExtract', sandbox);
 
 const NOW = new Date('2026-09-17T12:00:00Z');
 let failures = 0;
@@ -287,6 +288,134 @@ console.log('\n--- pickOneFile ---\n');
   ], 'quote') === null);
   check('quotation is not the word quote', FlowGoogleCloses.pickOneFile([{ id: '1', name: 'quotation-backup.pdf' }], 'quote') === null);
   check('a two-word name still counts as one file', FlowGoogleCloses.pickOneFile([{ id: '1', name: 'Acme decision log.pdf' }], 'decision log').id === '1');
+}
+
+console.log('\n--- Path A gate: named pdf on my calendar, file lives in Drive ---\n');
+{
+  const OWN = 'ai.local.flow@gmail.com';
+  // Wednesday 7 Oct 2026, the day the gate mail calls Oct 8 "tomorrow".
+  const GATE_NOW = new Date(2026, 9, 7, 12, 0, 0);
+  // After that day, "tomorrow" would be the wrong slot. The written date stays.
+  const AFTER = new Date(2026, 9, 9, 12, 0, 0);
+  const EN = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
+  const HE = 'שים את glance-pricing-q4.pdf ביומן מחר (8 באוקטובר 2026) בשעה 10:00.';
+  const HE_FILE = 'שים את קובץ glance-pricing-q4.pdf ביומן מחר בשעה 10:00.';
+  function gate(text, extra) {
+    return plan(text, Object.assign({ now: GATE_NOW, senderEmail: OWN, attachmentCount: 0 }, extra));
+  }
+  const dated = FlowExtract.parseDate(EN, AFTER);
+  check('Oct 8, 2026 wins over tomorrow', dated && dated.iso === '2026-10-08', dated);
+  check('maybe 3 is not a month', FlowExtract.parseDate('maybe 3 people', GATE_NOW) === null);
+
+  const row = gate(EN, { fileMatch: 'one' });
+  check('EN gate is file-on-hold for glance-pricing-q4.pdf',
+    row.intent && row.intent.personalClose === 'file-on-hold' &&
+    row.intent.googleClose && row.intent.googleClose.family === 'B' &&
+    row.intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    row.intent.googleClose.destination === 'calendar' &&
+    row.intent.entities.dateIso === '2026-10-08' &&
+    row.intent.entities.hour === 10 && row.intent.entities.minute === 0,
+    row.intent && { personal: row.intent.personalClose, g: row.intent.googleClose, e: row.intent.entities });
+  check('EN gate calendar step carries the file term and the clock',
+    row.process && row.process.id === 'file-on-hold' && row.process.steps.length === 1 &&
+    row.process.steps[0].kind === 'calendar' &&
+    row.process.steps[0].params.fileTerm === 'glance-pricing-q4.pdf' &&
+    row.process.steps[0].params.requireTime === true &&
+    row.process.steps[0].params.dateIso === '2026-10-08' &&
+    row.process.steps[0].params.hour === 10 &&
+    row.process.steps[0].params.minute === 0,
+    row.process && row.process.steps && row.process.steps[0]);
+  check('Drive-only: no attachment is still the hold',
+    row.intent && row.intent.personalClose === 'file-on-hold' && row.intent.googleClose.copyAttachment === false);
+
+  const waiting = gate(EN, {});
+  check('unclear Drive match waits on that file name',
+    waiting.intent && waiting.intent.googleWait && waiting.intent.googleWait.fileTerm === 'glance-pricing-q4.pdf' && !waiting.intent.type,
+    waiting.intent);
+  const missing = gate(EN, { fileMatch: 'none' });
+  check('no Drive file stays silent (not a blank create)',
+    missing.intent && missing.intent.googleSilence === true && !missing.intent.type && !missing.intent.googleClose,
+    missing.intent);
+  const many = gate(EN, { fileMatch: 'many' });
+  check('two Drive files stay silent', many.intent && many.intent.googleSilence === true && !many.intent.type);
+  const hedge = gate('Maybe put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.', { fileMatch: 'one' });
+  check('a hedged calendar file stays silent', hedge.intent && hedge.intent.googleSilence === true && !hedge.intent.type);
+  const generic = gate('Put the file on my calendar tomorrow (Oct 8, 2026) at 10:00.', { fileMatch: 'one' });
+  check('a generic file stays silent', generic.intent && (generic.intent.googleSilence === true || !generic.intent.type) && generic.intent.personalClose !== 'file-on-hold', generic.intent);
+
+  const he = gate(HE, { fileMatch: 'one' });
+  check('HE שים את … ביומן is file-on-hold',
+    he.intent && he.intent.personalClose === 'file-on-hold' &&
+    he.intent.googleClose.lang === 'he' &&
+    he.intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    he.intent.entities.dateIso === '2026-10-08' &&
+    he.intent.entities.hour === 10,
+    he.intent && { g: he.intent.googleClose, e: he.intent.entities });
+  const heFile = gate(HE_FILE, { fileMatch: 'one' });
+  check('HE קובץ plus the Latin name is that file, not the word קובץ',
+    heFile.intent && heFile.intent.personalClose === 'file-on-hold' &&
+    heFile.intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    heFile.process && heFile.process.steps[0].params.fileTerm === 'glance-pricing-q4.pdf',
+    heFile.intent && heFile.intent.googleClose);
+  const heGeneric = gate('שים את הקובץ ביומן מחר בשעה 10:00.', { fileMatch: 'one' });
+  check('HE generic הקובץ stays silent',
+    heGeneric.intent && heGeneric.intent.personalClose !== 'file-on-hold' && !heGeneric.intent.type,
+    heGeneric.intent);
+
+  check('one Drive pdf matches the gate name',
+    FlowGoogleCloses.pickOneFile([{ id: '1', name: 'glance-pricing-q4.pdf' }], 'glance-pricing-q4.pdf').id === '1');
+  check('a second pdf with the same name is not one file',
+    FlowGoogleCloses.pickOneFile([
+      { id: '1', name: 'glance-pricing-q4.pdf' },
+      { id: '2', name: 'copy-glance-pricing-q4.pdf' }
+    ], 'glance-pricing-q4.pdf') === null);
+
+  check('a self-mail is the message to judge',
+    FlowGoogleCloses.messageToJudge([[OWN, OWN]], OWN) === 0);
+  check('own mail to someone else stays quiet',
+    FlowGoogleCloses.messageToJudge([[OWN, 'dana@meridian.com']], OWN) === -1);
+  check('an incoming message still wins over a later reply of yours',
+    FlowGoogleCloses.messageToJudge([['dana@meridian.com', OWN], [OWN, 'dana@meridian.com']], OWN) === 0);
+  check('no own address stays quiet',
+    FlowGoogleCloses.messageToJudge([[OWN, OWN]], '') === -1);
+}
+
+console.log('\n--- Path A gate with close-families loaded, same order as Gmail ---\n');
+{
+  const live = { module: undefined, console };
+  vm.createContext(live);
+  for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'intent.js', 'actions.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), live, { filename: f });
+  }
+  const LiveIntent = vm.runInContext('FlowIntent', live);
+  const LiveActions = vm.runInContext('FlowActions', live);
+  const GATE_NOW = new Date(2026, 9, 7, 12, 0, 0);
+  const EN = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
+  const intent = LiveIntent.classify(EN, {
+    senderEmail: 'ai.local.flow@gmail.com',
+    now: GATE_NOW,
+    fileMatch: 'one',
+    attachmentCount: 0
+  });
+  const process = intent && intent.type ? LiveActions.planFor(intent, { threadUrl: 'https://mail.google.com/x' }) : null;
+  check('live script order still files the pdf on the hold',
+    intent && intent.personalClose === 'file-on-hold' && intent.googleClose &&
+    intent.googleClose.fileTerm === 'glance-pricing-q4.pdf' &&
+    intent.quiet !== 'family' &&
+    process && process.id === 'file-on-hold' &&
+    process.steps[0].params.dateIso === '2026-10-08' &&
+    process.steps[0].params.hour === 10,
+    { personal: intent && intent.personalClose, quiet: intent && intent.quiet, family: intent && intent.closeFamily, g: intent && intent.googleClose });
+  const heIntent = LiveIntent.classify('שים את glance-pricing-q4.pdf ביומן מחר (8 באוקטובר 2026) בשעה 10:00.', {
+    senderEmail: 'ai.local.flow@gmail.com',
+    now: GATE_NOW,
+    fileMatch: 'one',
+    attachmentCount: 0
+  });
+  check('live script order keeps the Hebrew file on the hold',
+    heIntent && heIntent.personalClose === 'file-on-hold' && heIntent.googleClose &&
+    heIntent.googleClose.fileTerm === 'glance-pricing-q4.pdf' && heIntent.quiet !== 'family',
+    heIntent && { personal: heIntent.personalClose, quiet: heIntent.quiet, family: heIntent.closeFamily, g: heIntent.googleClose });
 }
 
 console.log('\n' + (failures ? failures + ' FAILED' : 'All passed'));
