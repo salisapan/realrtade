@@ -1,6 +1,6 @@
 // Engine decide() against the vendored reference oracle.
 // Compared fields: suggest, files (id, name, order), target, reason.
-// Copy is not compared. Spec §9 names the file; the oracle chip says "Save file to".
+// When the oracle shows a chip, its en/he must match the step copy.
 // Run: node test/suggest-save-parity-corpus.cjs
 'use strict';
 const fs = require('fs');
@@ -30,6 +30,11 @@ function compare(label, input) {
     if (a.reason !== b.reason) bad.push('reason ' + a.reason + ' vs ' + b.reason);
     if (targetOf(a) !== targetOf(b)) bad.push('target ' + targetOf(a) + ' vs ' + targetOf(b));
     if (JSON.stringify(filesOf(a)) !== JSON.stringify(filesOf(b))) bad.push('files');
+    if (a.suggest && a.chip) {
+      const page = Engine.suggestSave(input);
+      const copy = page.step && page.step.copy;
+      if (!copy || copy.en !== a.chip.en || copy.he !== a.chip.he) bad.push('chip/copy ' + a.chip.en + ' vs ' + (copy && copy.en) + ' / ' + a.chip.he + ' vs ' + (copy && copy.he));
+    }
   }
   if (bad.length) {
     diffs++;

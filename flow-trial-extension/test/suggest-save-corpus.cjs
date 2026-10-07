@@ -163,7 +163,7 @@ console.log('\n--- rows 1-22 ---\n');
   const oracleRow = JSON.parse(fs.readFileSync(path.join(__dirname, 'oracle/suggest-save/corpus-22.json'), 'utf8'))[0];
   const decided = S.decide(oracleRow.input);
   const named = S.suggestSave(oracleRow.input);
-  check('spec §9 names the file; the oracle chip still says Save file to',
+  check('the step names the file; engine decide chip stays Save file to',
     decided.reason === 'suggest:show' && decided.chip && decided.chip.en === 'Save file to OneDrive?' &&
     named.reason === 'suggest:eligible-hidden' && named.step.copy.en === 'Save Q3-report.pdf to OneDrive?' &&
     named.step.copy.he === 'לשמור את Q3-report.pdf ב-OneDrive?');

@@ -44,7 +44,7 @@
    "reason": "suggest:show",
    "count": 1,
    "target": "onedrive",
-   "en": "Save file to OneDrive?",
+   "en": "Save Q3-report.pdf to OneDrive?",
    "names": [
     "Q3-report.pdf"
    ]
@@ -489,7 +489,7 @@
    "reason": "suggest:show",
    "count": 1,
    "target": "drive",
-   "he": "לשמור את הקובץ ב-Drive?"
+   "he": "לשמור את דוח-רבעוני.pdf ב-Drive?"
   }
  },
  {

@@ -67,8 +67,8 @@
   function chip(files, surface) {
     var tgt = surface === 'outlook' ? 'OneDrive' : 'Drive', n = files.length;
     return { count: n, target: tgt, names: files.map(function (f) { return f.name; }),
-      en: n === 1 ? 'Save file to ' + tgt + '?' : 'Save ' + n + ' files to ' + tgt + '?',
-      he: n === 1 ? 'לשמור את הקובץ ב-' + tgt + '?' : 'לשמור ' + n + ' קבצים ב-' + tgt + '?' };
+      en: n === 1 ? 'Save ' + files[0].name + ' to ' + tgt + '?' : 'Save ' + n + ' files to ' + tgt + '?',
+      he: n === 1 ? 'לשמור את ' + files[0].name + ' ב-' + tgt + '?' : 'לשמור ' + n + ' קבצים ב-' + tgt + '?' };
   }
   function quiet(reason, extra) { return Object.assign({ suggest: false, reason: reason }, extra || {}); }
 
