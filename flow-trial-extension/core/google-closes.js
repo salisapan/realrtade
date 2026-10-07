@@ -57,8 +57,13 @@ const FlowGoogleCloses = (() => {
   const SHEET_HE = /(?:תרשום|רשום|לרשום)\s+בגיליון\s+חדש/;
   const SHEET_EXISTING = /\b(?:the|our|my)\s+(?:\w+\s+){0,3}(?:spreadsheet|sheet|tracker|workbook)\b|הגיליון\s+ה|בגיליון\s+ה/i;
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
-  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:google\s+)?drive\b/i;
+  // Drive and OneDrive are the same one-file save. "our shared files" is not:
+  // this write lands in the person's own OneDrive, not a shared library.
+  const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:(?:google\s+)?drive|one\s?drive)\b/i;
   const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב)/;
+  // A refusal of that save is silence. The negation has to govern the verb,
+  // so a different "no need to" in the same mail does not hide a real save.
+  const SAVE_NO = /\b(?:(?:do not|don't|dont|no need to)\s+(?:save|file|store|upload)|never mind)\b/i;
 
   // Save-shaped only. The open Outlook page counts file attachments for
   // this sentence and for no other, so the rest of show and silence stay put.
@@ -295,7 +300,7 @@ const FlowGoogleCloses = (() => {
     }
 
     if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
-      if (input.attachmentCount !== 1) return { silence: true };
+      if (SAVE_NO.test(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
       const close = {
         family: 'C',

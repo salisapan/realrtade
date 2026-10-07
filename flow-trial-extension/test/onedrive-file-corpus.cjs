@@ -49,7 +49,7 @@ function background(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.34', content_scripts: [{ js: [] }] }),
+        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.35', content_scripts: [{ js: [] }] }),
         onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} },
         lastError: null, getURL: (s) => s, id: 'ext'
       },
@@ -114,6 +114,8 @@ console.log('\n--- names, scope, one attachment ---\n');
   check('no bytes and no message is unclear', F.prepare({ label: 'Save' }).ok === false);
   check('save-shaped text is the only sentence that counts attachments',
     G.needsOneAttachment('Please save the attached file to Drive.') === true &&
+    G.needsOneAttachment('Please save the attachment to OneDrive.') === true &&
+    G.needsOneAttachment('Please save it to our shared files by Friday.') === false &&
     G.needsOneAttachment('We agreed to renew the passport application by Friday.') === false);
   const mapped = J.forSurface({
     id: 'file-it',
@@ -126,6 +128,52 @@ console.log('\n--- names, scope, one attachment ---\n');
     mapped.steps[0].kind === 'onedriveFile' && mapped.steps[1].kind === 'outlookDraft' && mapped.closedLine === 'Saved on OneDrive.');
   check('Gmail still writes Drive',
     J.forSurface({ steps: [{ kind: 'driveFile', id: 'file' }] }, 'gmail').steps[0].kind === 'driveFile');
+}
+
+console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files do not ---\n');
+{
+  const engine = { module: undefined, console };
+  vm.createContext(engine);
+  for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js', 'file-attach.js', 'resolution.js', 'incoming-judge.js']) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), engine, { filename: f });
+  }
+  const Judge = vm.runInContext('FlowIncomingJudge', engine);
+  const when = new Date('2026-10-07T12:00:00Z');
+  function outlook(text, count) {
+    return Judge.judge({
+      text: text,
+      subject: 'Gate 0.9.34 signed NDA attached',
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      attachmentCount: count,
+      hasThreadAttachment: count === 1,
+      surface: 'outlook',
+      now: when
+    });
+  }
+  [
+    'Please save the attachment to OneDrive.',
+    'Please store the attached file on OneDrive.',
+    'Please upload the attachment to OneDrive.'
+  ].forEach((text) => {
+    const row = outlook(text, 1);
+    const kinds = row.process && row.process.steps.map((s) => s.kind);
+    check('Outlook Do It writes OneDrive: ' + text,
+      row.show === true && kinds && kinds[0] === 'onedriveFile' && row.process.closedLine === 'Saved on OneDrive.',
+      { show: row.show, reason: row.reason, kinds: kinds });
+  });
+  [
+    "Please don't save the attachment to Drive.",
+    'Do not save the attached file to Drive.',
+    'No need to save the attachment to Drive.'
+  ].forEach((text) => {
+    const row = outlook(text, 1);
+    check('Outlook stays quiet on a refusal: ' + text, row.show === false && row.reason === 'quiet:google', row.reason);
+  });
+  const shared = outlook('Hi, Attached is the signed NDA. Please save it to our shared files by Friday, October 9. Thanks, Flow Gate', 1);
+  check('our shared files stays silent on Outlook', shared.show === false && shared.reason === 'intent-null', shared.reason);
+  check('zero files and two files stay silent',
+    outlook('Please save the attachment to OneDrive.', 0).show === false &&
+    outlook('Please save the attachment to OneDrive.', 2).show === false);
 }
 
 (async () => {
@@ -212,6 +260,20 @@ console.log('\n--- one Undo after reload ---\n');
   const remount = page.slice(page.indexOf('async function remountProvedTodoReceipt'), page.indexOf('async function onOutlookTodoDoIt'));
   check('reload drops the in-body Undo and keeps one host outside the message',
     page.indexOf('function stripDuplicateUndoHosts') > 0 && remount.indexOf('stripDuplicateUndoHosts(mount)') > 0);
+  const undoClick = page.slice(page.indexOf("undo.addEventListener('click'"), page.indexOf('done.appendChild(actionsRow)'));
+  check('a successful Undo leaves the Undone line on this message',
+    undoClick.indexOf('data-glance-undone') > 0 &&
+    undoClick.indexOf("copy.undoneLine") > undoClick.indexOf('data-glance-undone') &&
+    remount.indexOf('data-glance-undone') > 0 &&
+    remount.indexOf('data-glance-undone') < remount.indexOf('if (!outlookProofRow(row))'));
+  const ctx = page.slice(page.indexOf('function buildCtx'), page.indexOf('function preferHumanFrom'));
+  check('the open page keeps the OneDrive step when a draft sits beside it',
+    ctx.indexOf('onedriveFile') > 0 && ctx.indexOf('!hasOnedrive') > 0);
+  const outlookSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'outlook.js'), 'utf8');
+  check('the Outlook card body is the message, not the subject glued in front',
+    /const text = inc\.base\.text \|\| ''/.test(outlookSrc) &&
+    outlookSrc.indexOf("inc.base.subject + '\\n'") < 0 &&
+    /bodyText: text/.test(outlookSrc));
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
   const storage = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8');
   check('Undo rewrites the OneDrive Activity row',

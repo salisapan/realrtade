@@ -581,7 +581,9 @@ const FlowOutlook = (() => {
         // The planner already ran Gmail's chain (core/incoming-judge.js) and mapped the draft step to Outlook.
         const outlookProcess = inc.process;
         if (!intent || !outlookProcess) continue;
-        const text = (inc.base.subject ? inc.base.subject + '\n' : '') + (inc.base.text || '');
+        // The subject stays on its own field. Gluing it onto the body made
+        // the task title the subject plus the greeting.
+        const text = inc.base.text || '';
         const entry = {
           messageId: inc.messageId,
           threadId: inc.base.threadId,
@@ -593,6 +595,7 @@ const FlowOutlook = (() => {
           intent: intent,
           process: outlookProcess,
           text: text,
+          bodyText: text,
           outlookIncomingId: inc.messageId,
           outlookConversationId: inc.conversationId,
           internetMessageId: inc.internetMessageId || null,

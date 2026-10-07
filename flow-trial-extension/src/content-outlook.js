@@ -419,8 +419,11 @@
     let process = (decided && decided.process) || entry.process;
     if (!intent || !process) return null;
     // In-page Do It writes the Outlook draft only (same as popup). Drop non-draft steps from the chip.
+    // A OneDrive file step is the close. The draft beside it is the share-link step, and dropping the file
+    // would turn that Do It into a reply draft.
+    const hasOnedrive = (process.steps || []).some((s) => s && s.kind === 'onedriveFile');
     const draftSteps = (process.steps || []).filter((s) => s.kind === 'outlookDraft' || s.kind === 'gmailDraft');
-    if (draftSteps.length) {
+    if (draftSteps.length && !hasOnedrive) {
       process = Object.assign({}, process, {
         steps: draftSteps.map((s) => s.kind === 'gmailDraft'
           ? Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') })
@@ -442,7 +445,7 @@
       threadId: entry.threadId || (pane && pane.conversationId) || (entry.base && entry.base.threadId),
       threadUrl: (entry.base && entry.base.threadUrl) || entry.threadUrl || location.href,
       subject: entry.subject || (pane && pane.subject) || '',
-      bodyText: entry.text || (pane && pane.text) || '',
+      bodyText: entry.bodyText || (pane && pane.text) || entry.text || '',
       sender: sender,
       intent: intent,
       process: process,
@@ -710,8 +713,12 @@
         } else if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
           await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey);
         }
+        const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean);
+        host.setAttribute('data-glance-undone', '1');
+        if (ids.length) host.setAttribute('data-glance-message', ids.join('|'));
         done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
-        lastKey = '';
+        lastOutcome = 'card';
+        lastKey = (row.messageId || 'open') + '|undone';
         lastSig = '';
       });
     });
@@ -741,6 +748,19 @@
       threadIds: [pane.conversationId]
     });
     const existing = stripDuplicateUndoHosts(mount);
+    // Undo already replaced the receipt with its confirmation. The written
+    // row is gone, so a scan would otherwise delete that line. Keep it while
+    // this is still the same message. A different message drops it.
+    if (existing && existing.getAttribute('data-glance-undone') === '1') {
+      const marked = String(existing.getAttribute('data-glance-message') || '').split('|').filter(Boolean);
+      const ids = [pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+      if (marked.length && ids.some((id) => marked.indexOf(id) !== -1)) {
+        lastOutcome = 'card';
+        return true;
+      }
+      existing.remove();
+      return false;
+    }
     if (!outlookProofRow(row)) {
       if (existing) existing.remove();
       return false;

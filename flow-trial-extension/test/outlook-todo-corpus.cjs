@@ -168,6 +168,18 @@ console.log('\n--- write, read back, undo ---\n');
     titledPost.body.body && /From: flow/.test(titledPost.body.body.content || '') &&
     titledPost.body.title.indexOf('Passport') < 0 && titledPost.body.title.indexOf('flow') < 0,
     titledPost && titledPost.body);
+  const greeted = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+  const greetedOut = await greeted.fn('outlookTaskWrite')(Object.assign({}, PAYLOAD, {
+    label: 'Log commitment for Oct 9',
+    senderName: 'flow',
+    subject: 'Gate 0.9.34 To Do title',
+    text: 'Gate 0.9.34 To Do title\nHi, We agreed to renew the passport application by Friday. Thanks, Flow Gate'
+  }));
+  const greetedPost = greeted.calls.find((c) => c.method === 'POST');
+  check('Outlook card text with a subject line and Hi posts the commitment',
+    greetedOut.ok === true && greetedPost && greetedPost.body && greetedPost.body.title === 'Renew the passport application' &&
+    greetedPost.body.title.indexOf('Gate') < 0 && greetedPost.body.title.indexOf('Hi') < 0,
+    greetedPost && greetedPost.body);
   check('nothing was sent', !env.calls.some((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|\/|$)/i.test(c.url)));
   check('Handled is allowed only for that proof',
     env.fn('globalThis.FlowProofOfClose.allowsHandled')({ ok: true, proof: out.proof }) === true);

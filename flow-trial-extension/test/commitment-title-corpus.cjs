@@ -23,6 +23,23 @@ check('Hebrew promise keeps the source language',
 check('a date with no verb is not a title',
   T.titleFromBody('The deadline is Friday, October 10.') === '' && T.titleFromBody('by Friday') === '');
 
+check('a subject line and a Hi greeting are not the title',
+  T.fromPayload({
+    subject: 'Gate 0.9.34 To Do title',
+    text: 'Gate 0.9.34 To Do title\nHi, We agreed to renew the passport application by Friday. Thanks, Flow Gate'
+  }) === 'Renew the passport application');
+check('Hi, I will send you the signed contract drops the greeting, you, and the date',
+  T.titleFromBody('Hi, I will send you the signed contract by Friday, October 10. Thanks') === 'Send the signed contract');
+check('Hi Dana, we agreed to file the amendment drops the greeting and the date',
+  T.titleFromBody('Hi Dana, we agreed to file the amendment by October 21 please.') === 'File the amendment');
+check('a Hebrew greeting is not the title',
+  T.titleFromBody('היי, אשלח לך את החוזה עד שלישי') === 'לשלוח את החוזה');
+check('a greeting in the body wins over the subject field',
+  T.fromPayload({
+    subject: 'Gate 0.9.34 To Do title',
+    bodyText: 'Hi, We agreed to renew the passport application by Friday.'
+  }) === 'Renew the passport application');
+
 check('the span is the firing sentence, not the one beside it',
   T.titleFromBody('Thanks for the note. We agreed to renew the passport application by Friday.') === 'Renew the passport application');
 check('the subject is not the title',

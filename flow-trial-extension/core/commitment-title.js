@@ -41,8 +41,20 @@ const FlowCommitmentTitle = (() => {
     return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
   }
 
+  // Split before whitespace is collapsed. A subject glued on with a newline
+  // is its own sentence, and it is not the commitment.
   function sentences(text) {
-    return clean(text).split(/\n+|(?<=[.!?])\s+/).map((part) => part.replace(/[.!?]+$/, '').trim()).filter(Boolean);
+    return String(text == null ? '' : text)
+      .replace(/\r/g, '')
+      .split(/\n+|(?<=[.!?])\s+/)
+      .map((part) => clean(part).replace(/[.!?]+$/, '').trim())
+      .filter(Boolean);
+  }
+
+  function stripGreeting(sentence) {
+    return sentence
+      .replace(/^(?:hi|hello|hey|dear)(?:\s+[\w.'-]+){0,4}\s*,\s*/i, '')
+      .replace(/^(?:היי|הי|שלום)(?:\s+\S+){0,3}\s*,\s*/, '');
   }
 
   function fires(sentence) {
@@ -70,10 +82,15 @@ const FlowCommitmentTitle = (() => {
     return value.charAt(0).toUpperCase() + value.slice(1);
   }
 
+  const EN_TRIGGER = /(?:we|i)\s+agreed\s+to\s+|(?:i|we)(?:'ll|\s+will)\s+/i;
+
   function englishSpan(sentence) {
-    let t = sentence.replace(/\s*,?\s*please\s*$/i, '').replace(/^(?:please\s+)/i, '');
-    t = t.replace(/^(?:we|i)\s+agreed\s+to\s+/i, '');
-    t = t.replace(/^(?:i|we)(?:'ll|\s+will)\s+/i, '');
+    let t = stripGreeting(sentence).replace(/\s*,?\s*please\s*$/i, '').replace(/^(?:please\s+)/i, '');
+    const at = t.search(EN_TRIGGER);
+    if (at < 0) return '';
+    // The lead-in may sit after a greeting or a subject that stayed in the
+    // same sentence. The title starts after the trigger, not at the start.
+    t = t.slice(at).replace(EN_TRIGGER, '');
     t = t.replace(/^(\w+)\s+(?:you|me|us)\s+/i, '$1 ');
     t = t.replace(/\s+(?:by|due|until|before|no later than)\b[\s\S]*$/i, '');
     t = clean(t).replace(/[,:;]+$/, '');
@@ -83,7 +100,13 @@ const FlowCommitmentTitle = (() => {
   }
 
   function hebrewSpan(sentence) {
-    let t = sentence.replace(/\s*בבקשה\s*$/, '').replace(/^בבקשה\s+/, '');
+    let t = stripGreeting(sentence).replace(/\s*בבקשה\s*$/, '').replace(/^בבקשה\s+/, '');
+    const verbAt = t.search(/(?:(?:אני|אנחנו)\s+)?(?:אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר)/);
+    const agreedAt = t.search(/סוכם\s+ש|הסכמנו\s+ל/);
+    let at = -1;
+    if (verbAt >= 0 && agreedAt >= 0) at = Math.min(verbAt, agreedAt);
+    else at = verbAt >= 0 ? verbAt : agreedAt;
+    if (at > 0) t = t.slice(at);
     t = t.replace(/^(?:סוכם\s+ש|הסכמנו\s+ל)\s*/, '');
     t = clean(t);
     for (let i = 0; i < HE_VERBS.length; i++) {
@@ -111,9 +134,11 @@ const FlowCommitmentTitle = (() => {
   // (a replay that stored the ask and not the mail). Subject is ignored.
   function fromPayload(p) {
     const row = p || {};
-    const body = clean(row.text || row.bodyText || '');
-    const what = row.params && row.params.what ? clean(row.params.what) : '';
-    return titleFromBody(body || what);
+    const rawText = row.text == null ? '' : String(row.text);
+    const rawBody = row.bodyText == null ? '' : String(row.bodyText);
+    const body = rawText.trim() ? rawText : rawBody;
+    const what = row.params && row.params.what ? String(row.params.what) : '';
+    return titleFromBody(body.trim() ? body : what);
   }
 
   return { titleFromBody: titleFromBody, fromPayload: fromPayload, MAX: MAX };
