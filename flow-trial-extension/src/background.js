@@ -3511,6 +3511,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
 
   // Outlook: the durable session and the page's read-only network (see outlookProxyFetch).
+  if (msg.type === 'flow:outlook-file-trace') {
+    if (!sender || sender.id !== chrome.runtime.id) return reply(sendResponse, Promise.resolve({ ok: false, error: 'foreign-sender' }));
+    try { console.info('Glance: file-trace', JSON.stringify(msg.payload || {})); } catch (e) { /* console gone */ }
+    return reply(sendResponse, Promise.resolve({ ok: true }));
+  }
   if (msg.type === 'flow:outlook-fetch') return reply(sendResponse, outlookProxyFetch(msg, sender));
   if (msg.type === 'flow:outlook-session') return reply(sendResponse, outlookSessionForPage(msg, sender));
   if (msg.type === 'flow:outlook-keepalive') {

@@ -323,6 +323,7 @@ const FlowOwaParse = (() => {
     return {
       itemId: ids.itemId,
       conversationId: ids.conversationId,
+      pathId: ids.raw || null,
       idKind: ids.kind,
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
