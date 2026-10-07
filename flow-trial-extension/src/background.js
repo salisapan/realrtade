@@ -3188,11 +3188,13 @@ async function outlookProxyFetch(msg, sender) {
   if (method !== 'GET' || !OUTLOOK_PROXY_GET.test(url)) return { ok: false, status: 0, error: 'refused' };
   const headers = {};
   const h = (msg.init && msg.init.headers) || {};
-  if (h.Authorization) headers.Authorization = String(h.Authorization);
   if (h.Prefer) headers.Prefer = String(h.Prefer);
+  // The page used to forward an empty header set. The bearer is the mailbox
+  // session, with one 401 retry, the same as outlookFetch.
   try {
-    const res = await fetch(url, { method: 'GET', headers });
-    return { ok: res.ok, status: res.status, body: await res.text() };
+    const res = await outlookFetch(url, { method: 'GET', headers: headers });
+    if (res && res.notConnected) return { ok: false, status: 0, error: 'not-connected' };
+    return { ok: Boolean(res && res.ok), status: (res && res.status) || 0, body: res && res.text ? await res.text() : '' };
   } catch (e) {
     return { ok: false, status: 0, error: 'network' };
   }
@@ -3255,7 +3257,9 @@ async function outlookDraftWrite(p) {
   }
   const url = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(incomingId) + '/createReply';
   outlookAssertNotSend(url);
-  const res = await outlookFetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment: comment }) });
+  const immutable = p && p.outlookImmutableId === true;
+  const prefer = immutable ? { Prefer: 'IdType="ImmutableId"' } : {};
+  const res = await outlookFetch(url, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ comment: comment }) });
   if (res.notConnected) return { ok: false, reason: 'not-connected' };
   if (res.status === 401) return { ok: false, reason: 'not-connected' };
   if (res.status === 403) return { ok: false, reason: 'consent', error: 'Outlook draft permission not granted yet: open Glance and reconnect Outlook once.' };
@@ -3275,11 +3279,11 @@ async function outlookDraftWrite(p) {
   }
   if (draft.isDraft !== false) {
     try {
-      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patchBody) });
+      const pr = await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify(patchBody) });
       fromSet = Boolean(pr && pr.ok && patchBody.from);
       if (pr && !pr.ok && patchBody.from) {
         // The alias was refused (common on personal accounts): keep the body, leave From as Outlook set it.
-        await outlookFetch(patchUrl, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ body: patchBody.body }) });
+        await outlookFetch(patchUrl, { method: 'PATCH', headers: Object.assign({ 'Content-Type': 'application/json' }, prefer), body: JSON.stringify({ body: patchBody.body }) });
       }
     } catch (e) { /* createReply's comment already holds the body */ }
   }
@@ -3287,14 +3291,14 @@ async function outlookDraftWrite(p) {
   if (p && (p.driveFileId || (p.attachment && p.attachment.base64))) {
     const file = await outlookFileForDraft(p);
     if (!file) {
-      await outlookDeleteDraft(draft.id);
+      await outlookDeleteDraft(draft.id, prefer);
       return { ok: false, reason: 'outlook-file-found-no-attach', attached: false };
     }
     const attUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draft.id) + '/attachments';
     outlookAssertNotSend(attUrl);
     const att = await outlookFetch(attUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: Object.assign({ 'Content-Type': 'application/json' }, prefer),
       body: JSON.stringify({
         '@odata.type': '#microsoft.graph.fileAttachment',
         name: file.filename,
@@ -3305,7 +3309,7 @@ async function outlookDraftWrite(p) {
     let created = null;
     if (att && att.ok) { try { created = await att.json(); } catch (e) { created = null; } }
     if (!created || !created.id) {
-      await outlookDeleteDraft(draft.id);
+      await outlookDeleteDraft(draft.id, prefer);
       return { ok: false, reason: 'outlook-file-found-no-attach', attached: false };
     }
     attachmentId = created.id;
@@ -3341,17 +3345,19 @@ async function outlookFileForDraft(p) {
     base64: raw
   };
 }
-async function outlookDeleteDraft(draftId) {
+async function outlookDeleteDraft(draftId, prefer) {
   if (!draftId) return;
   const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(draftId);
   outlookAssertNotSend(delUrl);
-  try { await outlookFetch(delUrl, { method: 'DELETE' }); } catch (e) { /* already gone */ }
+  const headers = prefer || {};
+  try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
-async function outlookDraftUndo(ref) {
+async function outlookDraftUndo(ref, hint) {
   if (!ref) return { ok: false };
+  const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
   const getUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref) + '?$select=id,isDraft';
   outlookAssertNotSend(getUrl);
-  const got = await outlookFetch(getUrl, {});
+  const got = await outlookFetch(getUrl, { headers: prefer });
   if (got.notConnected) return { ok: false, reason: 'not-connected' };
   if (got.status === 404) return { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
   if (!got.ok) return { ok: false, reason: 'http-' + got.status };
@@ -3359,7 +3365,7 @@ async function outlookDraftUndo(ref) {
   if (!msg || msg.isDraft === false) return { ok: true, alreadySent: true, written: 'Already sent, so nothing was undone.' };
   const delUrl = OUTLOOK_GRAPH + '/me/messages/' + encodeURIComponent(ref);
   outlookAssertNotSend(delUrl);
-  const del = await outlookFetch(delUrl, { method: 'DELETE' });
+  const del = await outlookFetch(delUrl, { method: 'DELETE', headers: prefer });
   if (!del.ok && del.status !== 204) return { ok: false, reason: 'http-' + del.status };
   return { ok: true, written: 'Draft removed from Outlook Drafts.' };
 }
@@ -3473,7 +3479,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:undo-action') {
     const undoer = UNDOERS[msg.connectorId];
     if (!undoer) return reply(sendResponse, Promise.resolve({ ok: false }));
-    return reply(sendResponse, undoer(msg.ref));
+    return reply(sendResponse, undoer(msg.ref, msg));
   }
 
   if (msg.type === 'flow:draft-reply') {

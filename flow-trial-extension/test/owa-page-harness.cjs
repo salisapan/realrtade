@@ -65,7 +65,11 @@ async function runPage(opts) {
     if (msg.type === 'flow:outlook-session') return { ok: true, token: store.outlookAuth.token, changed: false, how: 'fresh' };
     if (msg.type === 'flow:outlook-fetch') {
       const u = String(msg.url);
+      const hdrs = (msg.init && msg.init.headers) || {};
+      const bearer = /^Bearer\s+\S+/.test(String(hdrs.Authorization || ''));
+      const immutable = /IdType="ImmutableId"/.test(String(hdrs.Prefer || ''));
       if (o.graphDown) return { ok: false, status: 0, error: 'network' };
+      if (o.requireOutlookAuth && !bearer) return { ok: false, status: 401, body: '{"error":{"code":"InvalidAuthenticationToken"}}' };
       if (/\/me\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ mail: ME, displayName: 'Glance' }) };
       if (/mailFolders\/inbox\/messages/.test(u)) {
         if (o.inboxLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
@@ -81,6 +85,8 @@ async function runPage(opts) {
       }
       const directMsg = u.match(/\/me\/messages\/([^?]+)/);
       if (directMsg) {
+        if (o.pathRestMissUntilClick && !o._doIt) return { ok: false, status: 404, body: '{}' };
+        if (o.pathRestNeedsImmutable && !immutable) return { ok: false, status: 404, body: '{}' };
         if (typeof o.pathRestMisses === 'number' && o.pathRestMisses > 0) {
           o.pathRestMisses -= 1;
           return { ok: false, status: 404, body: '{}' };
@@ -146,6 +152,7 @@ async function runPage(opts) {
   if (o.afterMs) await new Promise((r) => setTimeout(r, o.afterMs));
   let chipMessage = null;
   if (o.clickDoIt) {
+    o._doIt = true;
     const hostBefore = w.document.querySelector('.flow-chip-host');
     chipMessage = hostBefore && hostBefore.getAttribute('data-glance-message');
     const btn = w.document.querySelector('.flow-chip-host .flow-chip');
@@ -508,7 +515,7 @@ async function runPage(opts) {
     const pathLate = await runPage({
       htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
       convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
-      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH, pathRestMisses: 2,
+      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH, pathRestMissUntilClick: true,
       clickDoIt: true,
       store: { glanceOutlookFileTrace: 1 }
     });
@@ -519,6 +526,40 @@ async function runPage(opts) {
     }).find((p) => p && p.phase === 'do-it');
     check('a card that mounted without a message id still drafts on Do It from the path RestId', pathLate.chip && pathLate.chip.getAttribute('data-glance-message') === '' && lateDrafts.length === 1 && lateDraft && lateDraft.outlookIncomingId === PATH_GRAPH && lateDraft.driveFileId === file.id && lateDraft.connectorId === 'outlookDraft', { attr: pathLate.chip && pathLate.chip.getAttribute('data-glance-message'), id: lateDraft && lateDraft.outlookIncomingId, text: pathLate.chip && pathLate.chip.textContent });
     check('the click trace names path-rest-id and the flag stays armed', lateDoIt && lateDoIt.messageIdFrom === 'path-rest-id' && lateDoIt.resolved === true && pathLate.store.glanceOutlookFileTrace === 1, { lateDoIt, flag: pathLate.store.glanceOutlookFileTrace });
+
+    // Live 0.9.21: the same path id, Drive hit, messageIdFrom none. The page GET carried no bearer.
+    function traceLines(r) {
+      return r.logs.filter((l) => l.indexOf('Glance: file-trace ') === 0).map((l) => {
+        try { return JSON.parse(l.slice('Glance: file-trace '.length)); } catch (e) { return null; }
+      }).filter(Boolean);
+    }
+    const authed = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      requireOutlookAuth: true, pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH,
+      clickDoIt: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const authDoIt = traceLines(authed).find((p) => p.phase === 'do-it');
+    const authScan = traceLines(authed).find((p) => p.final === 'prepare');
+    const authGets = authed.sent.filter((m) => m.type === 'flow:outlook-fetch' && /\/me\/messages\/[^?]/.test(String(m.url)));
+    const authDraft = (authed.sent.find((m) => m.type === 'flow:execute-action') || {}).payload;
+    check('the path GET carries the mailbox bearer and Do It drafts that message', authGets.length >= 1 && authGets.every((m) => /^Bearer\s+AT$/.test(String((m.init && m.init.headers && m.init.headers.Authorization) || ''))) && authDraft && authDraft.outlookIncomingId === PATH_GRAPH && authDraft.driveFileId === file.id && authDraft.connectorId === 'outlookDraft', { gets: authGets.map((m) => m.init && m.init.headers), id: authDraft && authDraft.outlookIncomingId });
+    check('the click trace records status, pathId, conversationId, and itemId', authDoIt && authDoIt.resolved === true && authDoIt.messageIdFrom === 'path-rest-id' && authDoIt.pathId === PATH_REST && authDoIt.conversationId === PATH_REST && authDoIt.itemId == null && Array.isArray(authDoIt.graph) && authDoIt.graph.some((a) => a && a.status === 200 && a.how === 'path-rest-id'), authDoIt);
+    check('the scan trace names the same path id', authScan && authScan.pathId === PATH_REST && authScan.conversationId === PATH_REST && authScan.messageIdFrom === 'path-rest-id', authScan);
+
+    const imm = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      requireOutlookAuth: true, pathRestNeedsImmutable: true,
+      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH,
+      clickDoIt: true, clickUndo: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const immDraft = (imm.sent.find((m) => m.type === 'flow:execute-action') || {}).payload;
+    const immGets = imm.sent.filter((m) => m.type === 'flow:outlook-fetch' && /\/me\/messages\/[^?]/.test(String(m.url)) && /IdType="ImmutableId"/.test(String((m.init && m.init.headers && m.init.headers.Prefer) || '')));
+    const immUndo = imm.sent.find((m) => m.type === 'flow:undo-action');
+    check('an AQQk id that Graph only accepts as an immutable id still drafts, and Undo keeps that header flag', immGets.length >= 1 && immDraft && immDraft.outlookIncomingId === PATH_GRAPH && immDraft.outlookImmutableId === true && immUndo && immUndo.outlookImmutableId === true, { prefer: immGets.length, immutable: immDraft && immDraft.outlookImmutableId, undo: immUndo && immUndo.outlookImmutableId });
   }
 
   console.log('\nTOTAL FAILURES:', failures);
