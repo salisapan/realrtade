@@ -242,9 +242,8 @@ const FlowOutlook = (() => {
       const o = opts || {};
       const prev = await read(AUTH_KEY, null);
       const chosen = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
-      // A sign-in from before Tasks.ReadWrite kept that shorter list. The
-      // default scopes are always included so the next Connect asks for To Do.
-      // Mail.Send is never added.
+      // Mail scopes stay on every sign-in. Tasks.ReadWrite is included only when
+      // the Connect screen passed it (the To Do checkbox). Mail.Send is never added.
       const scopes = [];
       (chosen || []).concat(cfg.SCOPES || []).forEach((s) => {
         if (!s || /Mail\.Send/i.test(s) || /\.Send$/i.test(s)) return;

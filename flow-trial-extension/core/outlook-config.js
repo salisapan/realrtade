@@ -10,24 +10,26 @@
 // manifest.json "key"). SPA refresh tokens last 24h and do not slide; silent renewal (outlook-auth
 // silentReauth) renews without a window before that window ends.
 //
-// Delegated Graph: Mail.Read, Mail.ReadWrite (drafts only, by code: createReply / PATCH / DELETE of
-// Glance's own draft on the person's Do It), Tasks.ReadWrite (one To Do task on a task-only Do It,
-// then a GET of that task; Undo deletes it), User.Read, offline_access. Never Mail.Send. Glance
-// never sends on the person's behalf. The Entra app must list Tasks.ReadWrite or consent fails
-// until the person signs in again.
+// Delegated Graph on the default sign-in: Mail.Read, Mail.ReadWrite (drafts only, by code:
+// createReply / PATCH / DELETE of Glance's own draft on the person's Do It), User.Read,
+// offline_access. Tasks.ReadWrite is the To Do checkbox, not Mail. Never Mail.Send. Glance
+// never sends on the person's behalf. The Entra app must list Tasks.ReadWrite or the To Do
+// box's consent fails until the person signs in again with that box checked.
 const FlowOutlookConfig = {
   CLIENT_ID: '22682454-808b-41e5-80fe-6abadc1d5595',
   AUTHORITY: 'https://login.microsoftonline.com/common',
   GRAPH: 'https://graph.microsoft.com/v1.0',
   // Default sign-in: mail only. scopesFor() adds a service's scopes only when
   // that box is checked on the one Connect screen. Never Mail.Send.
-  SCOPES: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite'],
+  SCOPES: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'],
   // One screen: Select all, then one checkbox per service. Mail is required.
-  // Calendar asks Calendars.ReadWrite only when that box is checked. The Entra
-  // app must list that delegated permission or consent for the box fails.
+  // To Do asks Tasks.ReadWrite only when that box is checked. Calendar asks
+  // Calendars.ReadWrite only when that box is checked. The Entra app must list
+  // that delegated permission or consent for the box fails.
   // OneDrive search from a mail is not built; the box only grants Files.Read.
   CONNECT_SERVICES: [
-    { id: 'mail', label: 'Mail', detail: 'Read mail, write a reply draft, and add a To Do task. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite'], required: true },
+    { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite'], required: true },
+    { id: 'todo', label: 'To Do', detail: 'Add one task on a task-only Do It. Glance reads it back before it is handled. Undo deletes that task.', scopes: ['Tasks.ReadWrite'], required: false },
     // Write one event for a named file at a clock. Not added to the default
     // mail sign-in. Never Mail.Send, never Calendars.ReadWrite.Shared.
     { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite'], required: false },
