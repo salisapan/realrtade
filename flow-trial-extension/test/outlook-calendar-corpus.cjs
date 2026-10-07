@@ -94,8 +94,8 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
   const ids = (Cfg.CONNECT_SERVICES || []).map((s) => s.id);
   check('one screen still lists Mail, To Do, Calendar, OneDrive, Contacts and Teams',
     ['mail', 'todo', 'calendar', 'onedrive', 'contacts', 'teams'].every((id) => ids.indexOf(id) >= 0), ids);
-  check('Select all adds To Do, the calendar write and the other optional reads',
-    ['Tasks.ReadWrite', 'Calendars.ReadWrite', 'Files.Read', 'Contacts.Read', 'Chat.Read'].every((s) => every.indexOf(s) >= 0) && every.indexOf('Mail.Send') < 0 && !every.some((s) => /send/i.test(s)), every);
+  check('Select all adds To Do, the calendar write, OneDrive write, and the other optional reads',
+    ['Tasks.ReadWrite', 'Calendars.ReadWrite', 'Files.ReadWrite', 'Contacts.Read', 'Chat.Read'].every((s) => every.indexOf(s) >= 0) && every.indexOf('Files.Read') < 0 && every.indexOf('Mail.Send') < 0 && !every.some((s) => /send/i.test(s)), every);
   const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
   check('the worker posts /me/events for this connector and deletes that event',
     /outlookCalendar: outlookCalendarWrite/.test(bg) &&

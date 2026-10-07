@@ -100,17 +100,21 @@ const FlowIncomingJudge = (() => {
   function forSurface(process, surface) {
     if (!process || surface !== 'outlook') return process;
     const tasks = taskOnlyProcess(process);
-    return Object.assign({}, process, {
-      steps: (process.steps || []).map((s) => {
-        if (s && s.kind === 'gmailDraft') {
-          return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
-        }
-        if (tasks && s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
-          return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
-        }
-        return s;
-      })
+    const steps = (process.steps || []).map((s) => {
+      if (s && s.kind === 'gmailDraft') {
+        return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
+      }
+      if (tasks && s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
+        return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
+      }
+      if (s && s.kind === 'driveFile') {
+        return Object.assign({}, s, { kind: 'onedriveFile', id: 'onedriveFile' });
+      }
+      return s;
     });
+    const out = Object.assign({}, process, { steps: steps });
+    if (steps.some((s) => s && s.kind === 'onedriveFile')) out.closedLine = 'Saved on OneDrive.';
+    return out;
   }
 
   function draftStepOf(process) {

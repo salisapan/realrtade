@@ -151,9 +151,23 @@ console.log('\n--- write, read back, undo ---\n');
     out.proof.externalId === 'TASK9' && out.ref.externalId === 'TASK9' && out.ref.taskListId === 'DEF' &&
     post && /\/me\/todo\/lists\/DEF\/tasks$/.test(post.url) && gets.length === 1 && /\/tasks\/TASK9$/.test(gets[0].url),
     { out, calls: env.calls.map((c) => c.method + ' ' + c.url) });
-  check('the task title and due day are what was asked',
-    post && post.body && post.body.title === 'Dana — File the amendment' && post.body.dueDateTime && post.body.dueDateTime.dateTime.indexOf('2026-10-10') === 0,
+  check('the task title is the chip label when the body has no verb span, with no sender prefix',
+    post && post.body && post.body.title === 'File the amendment' && post.body.title.indexOf('Dana') < 0 &&
+    post.body.dueDateTime && post.body.dueDateTime.dateTime.indexOf('2026-10-10') === 0,
     post && post.body);
+  const titled = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+  const titledOut = await titled.fn('outlookTaskWrite')(Object.assign({}, PAYLOAD, {
+    label: 'Log commitment for Oct 9',
+    senderName: 'flow',
+    subject: 'Passport',
+    text: 'We agreed to file the amendment by October 21 please.'
+  }));
+  const titledPost = titled.calls.find((c) => c.method === 'POST');
+  check('a firing sentence becomes the title and the subject does not',
+    titledOut.ok === true && titledPost && titledPost.body && titledPost.body.title === 'File the amendment' &&
+    titledPost.body.body && /From: flow/.test(titledPost.body.body.content || '') &&
+    titledPost.body.title.indexOf('Passport') < 0 && titledPost.body.title.indexOf('flow') < 0,
+    titledPost && titledPost.body);
   check('nothing was sent', !env.calls.some((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|\/|$)/i.test(c.url)));
   check('Handled is allowed only for that proof',
     env.fn('globalThis.FlowProofOfClose.allowsHandled')({ ok: true, proof: out.proof }) === true);

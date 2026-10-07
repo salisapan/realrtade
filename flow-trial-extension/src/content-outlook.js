@@ -239,14 +239,27 @@
 
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
-  function decideFromText(pane) {
+  async function decideFromText(pane) {
     if (typeof FlowIncomingJudge === 'undefined') return null;
     // The message's own words, as Gmail judges them: quoted history ("From: … Sent: …", "On … wrote:") cut off.
     const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
+    // A save-shaped sentence is the only one that asks how many files are
+    // on the message. Every other sentence stays at zero, as before.
+    let attachmentCount = 0;
+    if (typeof FlowGoogleCloses !== 'undefined' && typeof FlowGoogleCloses.needsOneAttachment === 'function' && FlowGoogleCloses.needsOneAttachment(own)) {
+      const id = pane.itemId || pane.pathId;
+      if (id) {
+        const rows = await graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,isInline', 'save-count');
+        if (Array.isArray(rows)) attachmentCount = rows.filter((a) => a && a.isInline !== true).length;
+      }
+    }
     const r = FlowIncomingJudge.judge({
       text: own, subject: pane.subject || '',
       sender: { name: pane.senderName, email: pane.senderEmail },
-      now: new Date(), threadUrl: location.href, hasThreadAttachment: false, surface: 'outlook'
+      now: new Date(), threadUrl: location.href,
+      hasThreadAttachment: attachmentCount === 1,
+      attachmentCount: attachmentCount,
+      surface: 'outlook'
     });
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
@@ -460,6 +473,7 @@
 
   async function onDoIt(host, chip, ctx) {
     doItInFlight = true;
+    try {
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     let resolvedId = null;
     try {
@@ -476,14 +490,19 @@
           graph: graphTraceSnapshot()
         });
       }
-    } finally {
-      doItInFlight = false;
+    } catch (e) {
+      resolvedId = null;
     }
     if (!resolvedId) {
       FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message');
       return;
     }
     const steps = (ctx.process && ctx.process.steps) || [];
+    const fileStep = steps.find((s) => s && s.kind === 'onedriveFile');
+    if (fileStep) {
+      await onOnedriveDoIt(host, chip, ctx, fileStep);
+      return;
+    }
     const hasDraft = steps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
     const taskStep = steps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
     if (taskStep && !hasDraft) {
@@ -579,6 +598,9 @@
         return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
       }
     });
+    } finally {
+      doItInFlight = false;
+    }
   }
 
   function outlookTodoRow(row) {
@@ -587,13 +609,56 @@
     return row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo';
   }
 
+  function outlookOnedriveRow(row) {
+    if (!row) return false;
+    if (row.system === 'microsoft/onedrive') return true;
+    return row.connectorId === 'onedriveFile';
+  }
+
+  function outlookProofRow(row) {
+    return outlookTodoRow(row) || outlookOnedriveRow(row);
+  }
+
+  // After a reload the message body can keep a second Undo. That copy is
+  // inside the reading document and its click does nothing. The working
+  // Undo is the one host outside that document.
+  function stripDuplicateUndoHosts(mount) {
+    if (!mount || !mount.querySelectorAll) return null;
+    const doc = mount.querySelector('div[role="document"]');
+    if (doc) {
+      doc.querySelectorAll('.flow-chip-host').forEach((el) => {
+        if (el.getAttribute('data-glance-chain') === 'task-proof' || el.querySelector('.flow-chip-undo')) el.remove();
+      });
+    }
+    const outside = [];
+    mount.querySelectorAll('.flow-chip-host[data-glance-chain="task-proof"]').forEach((el) => {
+      if (doc && doc.contains(el)) return;
+      outside.push(el);
+    });
+    let kept = null;
+    outside.forEach((el) => {
+      if (!kept && el.classList.contains('flow-chip-settled')) kept = el;
+    });
+    outside.forEach((el) => { if (el !== kept) el.remove(); });
+    return kept;
+  }
+
   function paintOutlookTodoReceipt(mount, row) {
     const copy = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.remountCopy)
       ? FlowProofOfClose.remountCopy(row)
       : null;
     if (!mount || !copy) return null;
-    const old = mount.querySelector('.flow-chip-host');
-    if (old) old.remove();
+    stripDuplicateUndoHosts(mount);
+    mount.querySelectorAll('.flow-chip-host').forEach((el) => {
+      const inDoc = el.closest && el.closest('div[role="document"]');
+      if (inDoc) {
+        if (el.getAttribute('data-glance-chain') === 'task-proof' || el.querySelector('.flow-chip-undo')) el.remove();
+        return;
+      }
+      if (el.getAttribute('data-glance-chain') !== 'task-proof') el.remove();
+    });
+    const already = mount.querySelector('.flow-chip-host[data-glance-chain="task-proof"].flow-chip-settled');
+    if (already) return already;
     const el = FlowChipHost.el;
     const host = el('div', 'flow-chip-host flow-chip-settled');
     host.setAttribute('dir', 'ltr');
@@ -634,13 +699,16 @@
           undo.textContent = copy.undoHint;
           undo.disabled = false;
           hint.hidden = false;
-          hint.textContent = 'Still there — the To Do task was not removed.';
+          hint.textContent = copy.undoFailed || 'Still there — the To Do task was not removed.';
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
           return;
         }
         const messageId = row.messageId;
-        if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
-          await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, row.threadId || row.outlookConversationId);
+        const threadKey = row.threadId || row.outlookConversationId;
+        if (copy.connectorId === 'onedriveFile' && typeof FlowStorage.markOnedriveFileUndone === 'function') {
+          await FlowStorage.markOnedriveFileUndone(messageId, copy.ref, threadKey);
+        } else if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
+          await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey);
         }
         done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
         lastKey = '';
@@ -667,13 +735,13 @@
     let bag = null;
     try { bag = await FlowStorage.get(); } catch (e) { return false; }
     const log = (bag && bag.log) || [];
-    const todoLog = log.filter((e) => outlookTodoRow(e));
+    const todoLog = log.filter((e) => outlookProofRow(e));
     const row = FlowProofOfClose.taskReceiptFromLog(todoLog, {
       messageIds: [pane.itemId, pane.pathId, pane.conversationId],
       threadIds: [pane.conversationId]
     });
-    const existing = mount.querySelector('.flow-chip-host[data-glance-chain="task-proof"]');
-    if (!outlookTodoRow(row)) {
+    const existing = stripDuplicateUndoHosts(mount);
+    if (!outlookProofRow(row)) {
       if (existing) existing.remove();
       return false;
     }
@@ -757,6 +825,91 @@
       ref: r.ref,
       url: r.url || null,
       system: 'microsoft/todo',
+      externalId: r.proof && r.proof.externalId,
+      verifiedAt: r.proof && r.proof.verifiedAt,
+      fetchedBack: true,
+      writtenLine: r.written,
+      processName: ctx.process && ctx.process.name,
+      closedLine: ctx.process && ctx.process.closedLine,
+      receiptStatus: status
+    }, fields || {});
+    if (mount) paintOutlookTodoReceipt(mount, row);
+  }
+
+  async function onOnedriveDoIt(host, chip, ctx, fileStep) {
+    const params = (fileStep && fileStep.params) || {};
+    const he = ctx.intent && ctx.intent.lang === 'he';
+    const r = await send({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'onedriveFile',
+        params: params,
+        label: (ctx.intent && ctx.intent.label) || 'File',
+        senderName: ctx.sender && ctx.sender.name,
+        senderEmail: ctx.sender && ctx.sender.email,
+        subject: ctx.subject || '',
+        text: ctx.bodyText || '',
+        threadUrl: ctx.threadUrl || null,
+        outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
+        messageId: ctx.messageId,
+        facts: (ctx.intent && ctx.intent.facts) || null,
+        entities: (ctx.intent && (ctx.intent.entities || ctx.intent.facts)) || null
+      }
+    });
+    const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+      ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
+      : false;
+    if (!proved) {
+      const why = (r && r.reason === 'files-not-granted')
+        ? 'Reconnect Outlook to allow OneDrive'
+        : ((r && (r.error || r.reason)) || 'Could not confirm the file');
+      FlowChipHost.setChipState(chip, 'flow-chip-error', why);
+      return;
+    }
+    const status = he ? 'טופל.' : 'Handled.';
+    const fields = FlowProofOfClose.receiptLogFields
+      ? FlowProofOfClose.receiptLogFields(r.proof, {
+        writtenLine: r.written,
+        processName: ctx.process && ctx.process.name,
+        closedLine: ctx.process && ctx.process.closedLine,
+        status: status
+      })
+      : null;
+    const threadId = ctx.threadId || ctx.conversationId || null;
+    await FlowStorage.appendLog(Object.assign({
+      kind: 'written',
+      label: (ctx.intent && ctx.intent.label) || r.written,
+      messageId: ctx.messageId,
+      itemId: ctx.itemId || null,
+      pathId: ctx.pathId || null,
+      threadId: threadId,
+      outlookConversationId: ctx.conversationId || null,
+      outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
+      app: 'outlook',
+      connectorId: 'onedriveFile',
+      ref: r.ref,
+      where: r.where,
+      url: r.url || null,
+      intent: ctx.intent,
+      process: ctx.process,
+      sender: ctx.sender,
+      subject: ctx.subject,
+      text: ctx.bodyText
+    }, fields || {}));
+    if (ctx.messageId) {
+      await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
+      await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
+    }
+    const mount = host.parentElement || mountPoint();
+    const row = Object.assign({
+      kind: 'written',
+      messageId: ctx.messageId,
+      threadId: threadId,
+      outlookConversationId: ctx.conversationId || null,
+      connectorId: 'onedriveFile',
+      ref: r.ref,
+      url: r.url || null,
+      system: 'microsoft/onedrive',
       externalId: r.proof && r.proof.externalId,
       verifiedAt: r.proof && r.proof.verifiedAt,
       fetchedBack: true,
@@ -1492,7 +1645,7 @@
       return;
     }
     if (!receiptOnly) {
-      decided = decideFromText(pane);
+      decided = await decideFromText(pane);
       if (decided && decided.reason === 'third-party') {
         dropStuckCard();
         await pageReason('page:third-party', pane);

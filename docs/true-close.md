@@ -72,13 +72,17 @@ Not built (needs connectors that do not exist): asking a colleague who holds the
 
 ## 7. Close-fabric wedge: a task is Handled only after a read-back
 
-A prepared draft, an attached file, and a calendar hold are not this close. This slice is the `fetchedBack` proof for Google Tasks and for Microsoft To Do.
+A prepared draft, an attached file on a draft, and a calendar hold are not this close. This slice is the `fetchedBack` proof for Google Tasks, for Microsoft To Do, and for one OneDrive file.
 
 `core/proof-of-close.js` builds `{ system, externalId, url?, number?, fetchedBack: true, verifiedAt }`. After a Google Task is created, that task is read back by id. The receipt says Handled (or טופל) only when `proof.fetchedBack === true`. Activity stores `system: "google/tasks"`, `externalId`, and `verifiedAt`. Undo deletes that task by `externalId`.
 
 The same contract is a Microsoft To Do task. A task-only Do It on Outlook posts to the default list (`/me/todo/lists/{listId}/tasks`), then reads that task by id. Handled only when `proof.fetchedBack === true`. Activity stores `system: "microsoft/todo"`, `externalId`, and `verifiedAt`. Undo deletes that task by `externalId`. A reply that still has a draft stays a draft. The To Do checkbox asks `Tasks.ReadWrite`. Mail-only sign-in does not. The Entra app must list that delegated permission, and a person who connected before it was asked signs in again with that box checked. Nothing is sent.
 
-If the create has no id, the result is `proof_pending`. If the read-back misses, returns another id, or shows the task deleted, the result is `verify_failed`. Neither is Handled, and neither is a trusted close. Calendar, Drive, and drafts are not on this gate. Nothing is sent.
+The same contract is one OneDrive file. A save of the one attached file writes that file (`PUT` content), then reads the item by id. Handled only when `proof.fetchedBack === true`. Activity stores `system: "microsoft/onedrive"`, `externalId`, and `verifiedAt`. Undo deletes a file this write created. A file that was already there is replaced only when a previous version can be restored, and Undo restores that version. The OneDrive checkbox asks `Files.ReadWrite` only when it is checked. Mail-only sign-in does not. A mail does not search OneDrive. The Entra app must list that delegated permission. Nothing is sent.
+
+The task title, for Google Tasks and for To Do, is the verb and object of the sentence that fired the intent. The date stays on the due field. The sender and the thread link stay in the notes. A sentence with no clean span keeps the chip label. The subject is not the title.
+
+If the create has no id, the result is `proof_pending`. If the read-back misses, returns another id, or shows the task deleted, the result is `verify_failed`. Neither is Handled, and neither is a trusted close. Calendar, Google Drive, and drafts are not on this gate. Nothing is sent.
 
 The on-thread receipt is that Activity row. After Gmail rebuilds the thread (a reload, or inbox and back), the Handled banner is mounted again when `fetchedBack` is true, or when the row still has `system`, `externalId`, and `verifiedAt` from a proved write. The match is the legacy message id and the thread id. A hash of the message text is not enough: Gmail rewrites the clock line in that text on reload. After Outlook rebuilds the thread, the match is the item id, the path id, or the conversation id. A newer undo or dismiss does not put the banner back. Undo rewrites the Activity row, so it does not stay Handled after the task is gone.
 

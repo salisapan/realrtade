@@ -1,7 +1,8 @@
 // Proof of close. A loop is Handled only after the system that received the
 // write is read back. A draft, an attachment, and a calendar hold are not
 // this proof. This slice speaks for Google Tasks, Microsoft To Do, and one
-// allowlisted page the floating extension already sees (`computer/<host>`).
+// allowlisted page the floating extension already sees (`computer/<host>`),
+// and one OneDrive file (`microsoft/onedrive`).
 //
 // Shape (execution architecture, decision 5):
 //   { system, externalId, url?, number?, fetchedBack: true, verifiedAt }
@@ -17,12 +18,13 @@
 // This path does not ask Sali.
 //
 // Portable: no chrome.*, no DOM, no network. The service worker performs
-// the POST and the GET for Tasks and To Do. A computer close takes an
+// the POST and the GET for Tasks, To Do, and one OneDrive file. A computer close takes an
 // injected reader (`query`) so this file never touches a page. The live
 // page driver is not wired.
 const FlowProofOfClose = (() => {
   const SYSTEM_GOOGLE_TASKS = 'google/tasks';
   const SYSTEM_MICROSOFT_TODO = 'microsoft/todo';
+  const SYSTEM_MICROSOFT_ONEDRIVE = 'microsoft/onedrive';
   const SYSTEM_COMPUTER_PREFIX = 'computer/';
   const LOCAL_FILE_PREFIX = 'computer/local/';
   const REASON_PENDING = 'proof_pending';
@@ -123,11 +125,15 @@ const FlowProofOfClose = (() => {
     return kind === 'computerClose';
   }
 
+  function isOnedriveKind(kind) {
+    return kind === 'onedriveFile';
+  }
+
   // Writers that must be read back before Handled. Calendar, drafts,
-  // and Drive are not in this list. A computer close is on this list:
-  // Handled only when fetchedBack is true.
+  // and Google Drive are not in this list. One OneDrive file is.
+  // A computer close is on this list: Handled only when fetchedBack is true.
   function isProofTaskKind(kind) {
-    return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind) || isComputerKind(kind);
+    return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind) || isOnedriveKind(kind) || isComputerKind(kind);
   }
 
   // One step of a Do It. A task counts only with a proof. Every other
@@ -163,6 +169,12 @@ const FlowProofOfClose = (() => {
   const UNDONE_LINE = 'Undone — the Google Task was removed.';
   const TODO_UNDO_HINT = 'Undo removes the To Do task.';
   const TODO_UNDONE_LINE = 'Undone — the To Do task was removed.';
+  const TODO_UNDO_FAILED = 'Still there — the To Do task was not removed.';
+  const ONEDRIVE_UNDO_HINT = 'Undo removes the OneDrive file.';
+  const ONEDRIVE_UNDONE_LINE = 'Undone — the OneDrive file was removed.';
+  const ONEDRIVE_UNDO_FAILED = 'Still there — the OneDrive file was not removed.';
+  const ONEDRIVE_RESTORE_HINT = 'Undo restores the previous OneDrive file.';
+  const ONEDRIVE_RESTORED_LINE = 'Undone — the previous OneDrive file was restored.';
 
   function clip(value, max) {
     const s = clean(value).replace(/\s+/g, ' ');
@@ -176,7 +188,7 @@ const FlowProofOfClose = (() => {
     if (top) return top;
     const ref = row.ref;
     if (!ref || typeof ref !== 'object') return '';
-    return clean(ref.externalId) || clean(ref.taskId);
+    return clean(ref.externalId) || clean(ref.taskId) || clean(ref.fileId) || clean(ref.itemId);
   }
 
   // Gmail legacy ids and Outlook ids are the same id in more than one
@@ -203,6 +215,16 @@ const FlowProofOfClose = (() => {
     return isMicrosoftTodoConnector(row);
   }
 
+  function isOnedriveConnector(row) {
+    return !!(row && row.connectorId === 'onedriveFile');
+  }
+
+  function isOnedriveRow(row) {
+    if (!row) return false;
+    if (clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
+    return isOnedriveConnector(row);
+  }
+
   // A written Activity row that is still a trusted task close.
   // fetchedBack true is the proof. The 0.9.28 triple (system, externalId,
   // verifiedAt) counts the same. A task write that stored ref but
@@ -219,8 +241,8 @@ const FlowProofOfClose = (() => {
       if (!isComputerSystem(computerSystemName)) return false;
       return computerHostAllowlisted(computerSystemName.slice(SYSTEM_COMPUTER_PREFIX.length));
     }
-    if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO) return true;
-    return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row);
+    if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO || clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
+    return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row) || isOnedriveConnector(row);
   }
 
   function addCanon(set, id) {
@@ -282,8 +304,8 @@ const FlowProofOfClose = (() => {
       if (!entry || !rowMatches(entry, found.messageIds, found.threadIds)) continue;
       if (entry.kind === 'undone' || entry.kind === 'dismissed') {
         const sameMessage = rowMessageIds(entry).some((id) => found.messageIds.has(id));
-        const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry) || isComputerRow(entry)
-          || clean(entry.system) === SYSTEM_GOOGLE_TASKS || clean(entry.system) === SYSTEM_MICROSOFT_TODO;
+        const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry) || isOnedriveConnector(entry) || isComputerRow(entry)
+          || clean(entry.system) === SYSTEM_GOOGLE_TASKS || clean(entry.system) === SYSTEM_MICROSOFT_TODO || clean(entry.system) === SYSTEM_MICROSOFT_ONEDRIVE;
         if (sameMessage || taskUndo) return null;
         continue;
       }
@@ -322,6 +344,7 @@ const FlowProofOfClose = (() => {
     if (!isTaskReceiptRow(row)) return null;
     const externalId = externalIdOf(row);
     if (isComputerSystem(clean(row.system).toLowerCase())) return computerRemountCopy(row, externalId);
+    if (isOnedriveRow(row)) return onedriveRemountCopy(row, externalId);
     const ref = { taskId: externalId, externalId: externalId };
     const listId = row.ref && typeof row.ref === 'object' ? clean(row.ref.taskListId) : '';
     if (listId) ref.taskListId = listId;
@@ -337,6 +360,7 @@ const FlowProofOfClose = (() => {
       closedLine: clip(row.closedLine, 180),
       undoHint: microsoft ? TODO_UNDO_HINT : UNDO_HINT,
       undoneLine: microsoft ? TODO_UNDONE_LINE : UNDONE_LINE,
+      undoFailed: microsoft ? TODO_UNDO_FAILED : 'Still there — the Google Task was not removed.',
       url: url.slice(0, 8) === 'https://' ? url : '',
       connectorId: connector,
       externalId: externalId,
@@ -606,6 +630,31 @@ const FlowProofOfClose = (() => {
     return successSelector ? { actionId: actionId, successSelector: successSelector } : { actionId: actionId };
   }
 
+  function onedriveRemountCopy(row, externalId) {
+    const src = row.ref && typeof row.ref === 'object' ? row.ref : {};
+    const ref = { fileId: externalId, itemId: externalId, externalId: externalId };
+    if (src.created === false) ref.created = false;
+    else if (src.created === true) ref.created = true;
+    const previous = clean(src.previousVersionId);
+    if (previous) ref.previousVersionId = previous;
+    const restore = ref.created === false && !!ref.previousVersionId;
+    const url = clean(row.url);
+    return {
+      status: receiptStatusOf(row),
+      writtenLine: clip(row.writtenLine, 180) || 'OneDrive',
+      processName: clip(row.processName, 80),
+      closedLine: clip(row.closedLine, 180),
+      undoHint: restore ? ONEDRIVE_RESTORE_HINT : ONEDRIVE_UNDO_HINT,
+      undoneLine: restore ? ONEDRIVE_RESTORED_LINE : ONEDRIVE_UNDONE_LINE,
+      undoFailed: ONEDRIVE_UNDO_FAILED,
+      url: url.slice(0, 8) === 'https://' ? url : '',
+      connectorId: 'onedriveFile',
+      externalId: externalId,
+      system: SYSTEM_MICROSOFT_ONEDRIVE,
+      ref: ref
+    };
+  }
+
   function computerRemountCopy(row, externalId) {
     const inverse = inverseOf(row);
     const ref = { externalId: externalId };
@@ -705,6 +754,7 @@ const FlowProofOfClose = (() => {
   return {
     SYSTEM_GOOGLE_TASKS: SYSTEM_GOOGLE_TASKS,
     SYSTEM_MICROSOFT_TODO: SYSTEM_MICROSOFT_TODO,
+    SYSTEM_MICROSOFT_ONEDRIVE: SYSTEM_MICROSOFT_ONEDRIVE,
     SYSTEM_COMPUTER_PREFIX: SYSTEM_COMPUTER_PREFIX,
     LOCAL_FILE_PREFIX: LOCAL_FILE_PREFIX,
     REASON_PENDING: REASON_PENDING,
@@ -719,6 +769,7 @@ const FlowProofOfClose = (() => {
     isGoogleTaskKind: isGoogleTaskKind,
     isMicrosoftTodoKind: isMicrosoftTodoKind,
     isComputerKind: isComputerKind,
+    isOnedriveKind: isOnedriveKind,
     isComputerSystem: isComputerSystem,
     isProofTaskKind: isProofTaskKind,
     stepCountsAsHandled: stepCountsAsHandled,

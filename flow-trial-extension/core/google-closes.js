@@ -59,6 +59,13 @@ const FlowGoogleCloses = (() => {
   const SHEET_MUTATE = /\b(?:update|edit|change|append|add a row)\b|עדכן|תעדכן|תוסיף\s+שורה/i;
   const SAVE_EN = /\b(?:save|file|store|upload)\b(?:\s+\w+){0,6}\s+(?:the\s+)?(?:attached\s+file|attachment|attached\s+pdf)\b[^.!?\n]{0,50}\b(?:to|in|into|on)\s+(?:google\s+)?drive\b/i;
   const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב)/;
+
+  // Save-shaped only. The open Outlook page counts file attachments for
+  // this sentence and for no other, so the rest of show and silence stay put.
+  function needsOneAttachment(text) {
+    const t = String(text || '');
+    return SAVE_EN.test(t) || SAVE_HE.test(t);
+  }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
   const HEDGE = /\b(?:maybe|might|perhaps|possibly)\b|(?:^|\s)(?:אולי|ייתכן)/i;
@@ -594,6 +601,7 @@ const FlowGoogleCloses = (() => {
 
   return {
     consider: consider,
+    needsOneAttachment: needsOneAttachment,
     detailMode: detailMode,
     cardPlan: cardPlan,
     chatLine: chatLine,

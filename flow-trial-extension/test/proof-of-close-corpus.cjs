@@ -207,7 +207,7 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a proved write stores the banner lines on the Activity row',
     gmail.indexOf('FlowProofOfClose.receiptLogFields') > 0);
   const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
-  check('the extension version is 0.9.33', /"version": "0\.9\.33"/.test(manifest));
+  check('the extension version is 0.9.34', /"version": "0\.9\.34"/.test(manifest));
 
   // Live 0.9.29: Do It stored a hash of the message text. After reload that
   // hash changed (the clock line in the row changed) and the scan treated

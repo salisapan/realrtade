@@ -43,6 +43,8 @@ import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConf
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
+import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
+import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -1105,8 +1107,10 @@ async function connectGoogleTasks() {
 }
 
 function googleTaskTitle(p) {
-  const identity = (p.senderName || '').trim();
-  return identity ? identity + ' — ' + p.label : p.label;
+  const Title = globalThis.FlowCommitmentTitle;
+  const span = Title && typeof Title.fromPayload === 'function' ? Title.fromPayload(p) : '';
+  if (span) return String(span).slice(0, 255);
+  return String((p && p.label) || '').replace(/\s+/g, ' ').trim().slice(0, 255);
 }
 
 // A date the close is willing to write. Anything else — a month that
@@ -3603,13 +3607,173 @@ async function outlookDraftUndo(ref, hint) {
   return { ok: true, written: 'Draft removed from Outlook Drafts.' };
 }
 
+function outlookHasFilesScope(token) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || typeof Files.hasWriteScope !== 'function') return false;
+  return Files.hasWriteScope(outlookGrantedScopes(token));
+}
+
+async function outlookReadJson(res) {
+  if (!res || typeof res.json !== 'function') return null;
+  try { return await res.json(); } catch (e) { return null; }
+}
+
+// Exactly one non-inline file on the message. Zero or two-plus is unclear.
+// The list call often omits contentBytes; the item call has them.
+async function outlookOneFileAttachment(messageId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !messageId) return null;
+  const listUrl = OUTLOOK_GRAPH + Files.attachmentsPath(messageId) + '?$select=id,name,contentType,size,isInline';
+  outlookAssertNotSend(listUrl);
+  const listed = await outlookFetch(listUrl, { method: 'GET' });
+  if (!listed || !listed.ok) return null;
+  const body = await outlookReadJson(listed);
+  const rows = body && Array.isArray(body.value) ? body.value : [];
+  const files = rows.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || '')));
+  if (files.length !== 1) return null;
+  const one = files[0];
+  if (one.size && Number(one.size) > Files.MAX_BYTES) return null;
+  let b64 = one.contentBytes || '';
+  if (!b64 && one.id) {
+    const itemUrl = OUTLOOK_GRAPH + Files.attachmentItemPath(messageId, one.id);
+    outlookAssertNotSend(itemUrl);
+    const item = await outlookFetch(itemUrl, { method: 'GET' });
+    const itemBody = await outlookReadJson(item);
+    b64 = itemBody && itemBody.contentBytes;
+  }
+  const bytes = Files.bytesFromBase64(b64);
+  if (!bytes || !bytes.length || bytes.length > Files.MAX_BYTES) return null;
+  return { bytes: bytes, name: one.name || '', contentType: one.contentType || 'application/octet-stream' };
+}
+
+// One file on the person's OneDrive. Creating or replacing it is not the
+// close: Handled waits for a GET of that item id. A file that already
+// exists is replaced only when a previous version can be restored. Never
+// Mail.Send. A mail does not search the drive.
+async function outlookFileWrite(p) {
+  const Files = globalThis.FlowOnedriveFile;
+  const Proof = globalThis.FlowProofOfClose;
+  if (!Files || typeof Files.prepare !== 'function') return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const scope = outlookHasFilesScope(session.token);
+  if (scope === false) return { ok: false, reason: 'files-not-granted' };
+
+  const prepared = Files.prepare(p || {});
+  if (!prepared || !prepared.ok) return { ok: false, reason: (prepared && prepared.reason) || 'unclear' };
+  let name = prepared.name;
+  let bytes = prepared.bytes;
+  let contentType = prepared.contentType || 'application/octet-stream';
+  if (prepared.fetchOne) {
+    const got = await outlookOneFileAttachment(prepared.messageId);
+    if (!got) return { ok: false, reason: 'unclear' };
+    bytes = got.bytes;
+    contentType = got.contentType || contentType;
+    if (!prepared.nameLocked) {
+      const fromFile = Files.safeName(got.name);
+      if (fromFile) name = fromFile.indexOf('.') < 0 ? Files.safeName(fromFile + '.txt') : fromFile;
+    }
+  }
+  if (!name || !bytes || !bytes.length || bytes.length > Files.MAX_BYTES) return { ok: false, reason: 'unclear' };
+
+  const lookupUrl = OUTLOOK_GRAPH + Files.rootItemPath(name);
+  outlookAssertNotSend(lookupUrl);
+  const looked = await outlookFetch(lookupUrl, { method: 'GET' });
+  if (looked && looked.notConnected) return { ok: false, reason: 'not-connected' };
+  if (looked && (looked.status === 401 || looked.status === 403)) return { ok: false, reason: 'files-not-granted' };
+  const missing = !looked || looked.status === 404;
+  const existing = !missing && looked.ok ? await outlookReadJson(looked) : null;
+  if (!missing && (!existing || !existing.id)) return { ok: false, reason: 'http-' + ((looked && looked.status) || 0) };
+
+  let created = true;
+  let previousVersionId = '';
+  let putUrl = OUTLOOK_GRAPH + Files.createContentPath(name);
+  if (!missing) {
+    const versionsUrl = OUTLOOK_GRAPH + Files.versionsPath(existing.id);
+    outlookAssertNotSend(versionsUrl);
+    const vers = await outlookFetch(versionsUrl, { method: 'GET' });
+    if (vers && (vers.status === 401 || vers.status === 403)) return { ok: false, reason: 'files-not-granted' };
+    const versionId = Files.versionIdOf(await outlookReadJson(vers));
+    if (!versionId) return { ok: false, reason: 'unclear', error: 'No previous version to restore.' };
+    created = false;
+    previousVersionId = versionId;
+    putUrl = OUTLOOK_GRAPH + Files.itemContentPath(existing.id);
+  }
+  outlookAssertNotSend(putUrl);
+  const put = await outlookFetch(putUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: bytes
+  });
+  if (put && put.notConnected) return { ok: false, reason: 'not-connected' };
+  if (put && (put.status === 401 || put.status === 403)) return { ok: false, reason: 'files-not-granted' };
+  if (!put || !put.ok) return { ok: false, reason: 'http-' + ((put && put.status) || 0) };
+  const writtenItem = await outlookReadJson(put);
+  const itemId = (writtenItem && writtenItem.id) || (existing && existing.id) || '';
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
+  const base = { where: 'OneDrive', target: name, written: 'OneDrive · ' + name, url: null };
+  if (!itemId) return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
+
+  const ref = { fileId: itemId, itemId: itemId, externalId: itemId, created: created };
+  if (previousVersionId) ref.previousVersionId = previousVersionId;
+  const fetched = await outlookFileFetchBack(itemId);
+  if (!fetched.ok) return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  const link = fetched.item && fetched.item.webUrl && String(fetched.item.webUrl).slice(0, 8) === 'https://' ? fetched.item.webUrl : null;
+  if (link) base.url = link;
+  const proof = Proof && Proof.buildProof({
+    system: (Proof && Proof.SYSTEM_MICROSOFT_ONEDRIVE) || 'microsoft/onedrive',
+    externalId: itemId,
+    url: link || undefined,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+  return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+}
+
+async function outlookFileFetchBack(itemId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !itemId) return { ok: false };
+  const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(url);
+  let res;
+  try { res = await outlookFetch(url, { method: 'GET' }); } catch (e) { return { ok: false }; }
+  if (!res || !res.ok) return { ok: false };
+  const body = await outlookReadJson(res);
+  if (!body || body.id !== itemId) return { ok: false };
+  return { ok: true, item: body };
+}
+
+async function outlookFileUndo(ref) {
+  const Files = globalThis.FlowOnedriveFile;
+  const itemId = ref && (ref.externalId || ref.fileId || ref.itemId);
+  if (!Files || !itemId) return { ok: false };
+  if (ref.created === false && ref.previousVersionId) {
+    const url = OUTLOOK_GRAPH + Files.restorePath(itemId, ref.previousVersionId);
+    outlookAssertNotSend(url);
+    const res = await outlookFetch(url, { method: 'POST' });
+    if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+    if (res && (res.ok || res.status === 204)) return { ok: true, written: 'Previous OneDrive file restored.' };
+    return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  }
+  if (ref.created !== true) return { ok: false, reason: 'unclear' };
+  const url = OUTLOOK_GRAPH + Files.itemPath(itemId);
+  outlookAssertNotSend(url);
+  const del = await outlookFetch(url, { method: 'DELETE' });
+  if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
+  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'OneDrive file removed.' };
+  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+}
+
 const WRITERS = {
   hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
-  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite
+  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
+  onedriveFile: outlookFileWrite
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
@@ -3617,7 +3781,8 @@ const UNDOERS = {
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
-  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo
+  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
+  onedriveFile: outlookFileUndo
 };
 
 async function connectorStatus() {
