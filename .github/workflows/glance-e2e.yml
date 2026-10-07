@@ -14,7 +14,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        tz: [UTC, Asia/Jerusalem]
+        include:
+          - tz: UTC
+            artifact: glance-e2e-UTC
+          - tz: Asia/Jerusalem
+            artifact: glance-e2e-Asia-Jerusalem
     env:
       TZ: ${{ matrix.tz }}
     steps:
@@ -37,7 +41,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: glance-e2e-${{ matrix.tz }}
+          name: ${{ matrix.artifact }}
           path: |
             flow-trial-extension/e2e-report/
             flow-trial-extension/test-results/
