@@ -93,6 +93,7 @@ it, not touching the module.
 | `outcome-labels.js` | Labels the product earns for free from what happens next — portable, no chrome.*, no DOM, no network. |
 | `outlook-auth.js` | Sign in to Microsoft (OAuth 2.0 authorization code with PKCE) and keep the session alive: `session()` refreshes inside the 24-hour single-page-application window, renews silently (prompt=none) from hour 16, and treats a failed attempt as transient unless Microsoft says a person must sign in. |
 | `incoming-judge.js` | The one decision for "someone asked you something", shared by every mail surface: Gmail's chain (own text, classify with sender and subject, silence bar, file gate, planFor) as a pure function, plus the Gmail-shaped draft payload. Outlook (Graph planner and the Outlook-on-the-web card) uses it, so only the connector differs. |
+| `outlook-calendar.js` | Outlook Family B file-on-hold: one named file and one clock become one calendar event body (file link in the description, no attendees). The Calendar checkbox asks `Calendars.ReadWrite`. Mail-only sign-in does not. A token without that scope stays quiet. No network. |
 | `outlook-config.js` | The application (client) ID of the registered "Glance Outlook" Microsoft Entra app. Public; a placeholder until the owner registers it (open-tasks). |
 | `outlook-sync.js` | What to do with the last couple of weeks of an Outlook mailbox. |
 | `outlook-state-migrate.js` | One-shot upgrade: merge leftover HANDLED+UNDONE Outlook draft rows and scrub false-close counts for prepared-draft undos. |

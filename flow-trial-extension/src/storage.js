@@ -1345,7 +1345,56 @@ const FlowStorage = (() => {
       break;
     }
     if (!hit) {
+      const calendarWritten = log.some((e) => e && e.kind === 'written' && e.messageId === messageId && e.connectorId === 'outlookCalendar');
+      if (calendarWritten) return { ok: true, skipped: true };
       log.unshift({ ts: Date.now(), kind: 'undone', label: 'Reply draft removed. Not sent.', messageId, ref: ref || null, app: 'outlook', connectorId: 'outlookDraft', outlookReopen: true });
+    }
+    const resolved = (state.resolvedMessageIds || []).filter((id) => id !== messageId);
+    await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
+    return { ok: true };
+  });
+
+  function outlookEventRefMatches(stored, wanted) {
+    if (!wanted) return true;
+    if (stored === wanted) return true;
+    const a = stored && typeof stored === 'object' ? stored.eventId : stored;
+    const b = wanted && typeof wanted === 'object' ? wanted.eventId : wanted;
+    return Boolean(a) && a === b;
+  }
+
+  // Convert the matching written Outlook calendar row into undone in place.
+  // A calendar write is not a reply draft. Draft undo must not relabel it.
+  const markOutlookCalendarUndone = serialize(async function markOutlookCalendarUndone(messageId, ref) {
+    if (!messageId) return { ok: false };
+    const state = await get();
+    const log = (state.log || []).slice();
+    let hit = false;
+    for (let i = 0; i < log.length; i++) {
+      const e = log[i];
+      if (!e || e.kind !== 'written' || e.messageId !== messageId) continue;
+      if (e.connectorId !== 'outlookCalendar') continue;
+      if (!outlookEventRefMatches(e.ref, ref)) continue;
+      log[i] = Object.assign({}, e, {
+        kind: 'undone',
+        label: 'Calendar event removed.',
+        undone: true,
+        outlookReopen: true,
+        url: null,
+        ref: null
+      });
+      hit = true;
+      break;
+    }
+    if (!hit) {
+      log.unshift({
+        ts: Date.now(),
+        kind: 'undone',
+        label: 'Calendar event removed.',
+        messageId,
+        app: 'outlook',
+        connectorId: 'outlookCalendar',
+        outlookReopen: true
+      });
     }
     const resolved = (state.resolvedMessageIds || []).filter((id) => id !== messageId);
     await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
@@ -1374,7 +1423,7 @@ const FlowStorage = (() => {
       if (e.connectorId === 'outlookDraft' || (e.app === 'outlook' && (e.outlookReceipt || e.kind === 'written' || e.kind === 'undone' || e.kind === 'shown'))) {
         if (e.messageId) dropIds.add(e.messageId);
         // Keep non-draft outlook rows? Drop draft written/undone receipts; keep shown so asks can return after migrate reopen.
-        if (e.kind === 'written' && e.connectorId === 'outlookDraft') continue;
+        if (e.kind === 'written' && (e.connectorId === 'outlookDraft' || e.connectorId === 'outlookCalendar')) continue;
         if (e.kind === 'undone' && (e.connectorId === 'outlookDraft' || e.outlookReopen || dropIds.has(e.messageId))) continue;
       }
       log.push(e);
@@ -1443,7 +1492,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

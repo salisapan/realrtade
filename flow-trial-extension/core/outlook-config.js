@@ -17,16 +17,18 @@ const FlowOutlookConfig = {
   CLIENT_ID: '22682454-808b-41e5-80fe-6abadc1d5595',
   AUTHORITY: 'https://login.microsoftonline.com/common',
   GRAPH: 'https://graph.microsoft.com/v1.0',
-  // Default sign-in: mail only. scopesFor() adds a service's read scopes only when
+  // Default sign-in: mail only. scopesFor() adds a service's scopes only when
   // that box is checked on the one Connect screen. Never Mail.Send.
   SCOPES: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'],
-  // One screen, same shape as the Google connect: Select all, then one checkbox
-  // per service Graph can grant today. Mail is required. The others are optional
-  // reads. Checking one is the only way its scope is added to the sign-in.
+  // One screen: Select all, then one checkbox per service. Mail is required.
+  // Calendar asks Calendars.ReadWrite only when that box is checked. The Entra
+  // app must list that delegated permission or consent for the box fails.
   // OneDrive search from a mail is not built; the box only grants Files.Read.
   CONNECT_SERVICES: [
     { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite'], required: true },
-    { id: 'calendar', label: 'Calendar', detail: 'Read the calendar.', scopes: ['Calendars.Read'], required: false },
+    // Write one event for a named file at a clock. Not added to the default
+    // mail sign-in. Never Mail.Send, never Calendars.ReadWrite.Shared.
+    { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite'], required: false },
     { id: 'onedrive', label: 'OneDrive', detail: 'Read files you choose. A mail does not search OneDrive.', scopes: ['Files.Read'], required: false },
     { id: 'contacts', label: 'Contacts', detail: 'Read contacts.', scopes: ['Contacts.Read'], required: false },
     { id: 'teams', label: 'Teams', detail: 'Read chats you are in.', scopes: ['Chat.Read'], required: false }

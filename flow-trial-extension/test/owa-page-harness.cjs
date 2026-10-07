@@ -103,12 +103,19 @@ async function runPage(opts) {
       }
       return { ok: false, status: 404, body: '{}' };
     }
+    if (msg.type === 'flow:drive-find-one') return o.driveFind || { match: 'none' };
     if (msg.type === 'flow:execute-action') {
       const p = msg.payload || {};
+      if (p.connectorId === 'outlookCalendar') {
+        return { ok: true, ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar', url: 'https://outlook.live.com/calendar/item/ev-hold-1', written: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00' };
+      }
       if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
       return { ok: true, ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
     }
-    if (msg.type === 'flow:undo-action') return { ok: true, written: 'Reply draft removed. Not sent.' };
+    if (msg.type === 'flow:undo-action') {
+      if (msg.connectorId === 'outlookCalendar') return { ok: true, written: 'Calendar event removed.' };
+      return { ok: true, written: 'Reply draft removed. Not sent.' };
+    }
     if (msg.type === 'flow:search-drive') {
       const base = o.driveResult
         ? o.driveResult
@@ -560,6 +567,52 @@ async function runPage(opts) {
     const immGets = imm.sent.filter((m) => m.type === 'flow:outlook-fetch' && /\/me\/messages\/[^?]/.test(String(m.url)) && /IdType="ImmutableId"/.test(String((m.init && m.init.headers && m.init.headers.Prefer) || '')));
     const immUndo = imm.sent.find((m) => m.type === 'flow:undo-action');
     check('an AQQk id that Graph only accepts as an immutable id still drafts, and Undo keeps that header flag', immGets.length >= 1 && immDraft && immDraft.outlookIncomingId === PATH_GRAPH && immDraft.outlookImmutableId === true && immUndo && immUndo.outlookImmutableId === true, { prefer: immGets.length, immutable: immDraft && immDraft.outlookImmutableId, undo: immUndo && immUndo.outlookImmutableId });
+  }
+
+  console.log('\n--- Family B file on the calendar (engineering gate, 0.9.25) ---\n');
+  {
+    const GATE = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
+    const gateHtml = (h) => h
+      .replace('flow &lt;ai.local.flow@gmail.com&gt;', 'Glance &lt;' + ME + '&gt;')
+      .replace('aria-label="מאת: flow">flow', 'aria-label="מאת: Glance">Glance')
+      .replace(/<div>Hi Sali,<\/div>[\s\S]*?<div>Flow team<\/div>/, '<div>' + GATE + '</div>');
+    const file = { id: 'f1', name: 'glance-pricing-q4.pdf', url: 'https://drive.google.com/file/d/f1/view' };
+    const blocked = await runPage({
+      htmlPatch: gateHtml, waitMs: 2500,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.Read', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    const blockedWhy = (blocked.store.outlookPageDiag || []).map((d) => d.reason);
+    check('without Calendars.ReadWrite the note stays quiet and names the missing scope', !blocked.chip && blockedWhy.indexOf('outlook-calendar-write-not-granted') >= 0, blockedWhy);
+    check('that quiet path does not draft a reply', !blocked.sent.some((m) => m.type === 'flow:execute-action'), blocked.sent.map((m) => m.type));
+
+    const shown = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    check('a note to yourself with one Drive file shows Hold it',
+      Boolean(shown.chip) && /Hold it/.test(shown.chip.textContent) && shown.chip.getAttribute('data-glance-chain') === 'calendar-hold' && /Do It/.test(shown.chip.textContent),
+      shown.chip && shown.chip.textContent);
+    const acted = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    const holdPayload = (acted.sent.find((m) => m.type === 'flow:execute-action' && m.payload && m.payload.connectorId === 'outlookCalendar') || {}).payload;
+    const params = holdPayload && holdPayload.params;
+    check('Do It posts the calendar event with the file link and the clock',
+      params && params.fileUrl === file.url && params.fileName === file.name && params.dateIso === '2026-10-08' && params.hour === 10 && params.minute === 0 && params.fileTerm === 'glance-pricing-q4.pdf',
+      params);
+    check('the receipt says Handled and does not draft a reply',
+      Boolean(acted.chip) && /Handled\./.test(acted.chip.textContent) && /Open event/.test(acted.chip.textContent) && !acted.sent.some((m) => m.payload && m.payload.connectorId === 'outlookDraft'),
+      acted.chip && acted.chip.textContent);
+    const undone = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, clickUndo: true,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    check('Undo deletes that calendar event', undone.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-hold-1'), undone.sent.filter((m) => m.type === 'flow:undo-action'));
   }
 
   console.log('\nTOTAL FAILURES:', failures);

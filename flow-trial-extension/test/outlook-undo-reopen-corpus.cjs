@@ -166,6 +166,43 @@ async function main() {
   );
   assert.strictEqual(byInternet.messageId, 'g', 'internetMessageId match');
 
+  // Activity: a calendar write is its own row. Draft undo must not relabel it.
+  store = {};
+  await FlowStorage.appendLog({
+    kind: 'shown',
+    messageId: 'cal-1',
+    label: 'Hold the file',
+    process: { id: 'file-on-hold', name: 'File on hold', steps: [{ kind: 'calendar', id: 'cal' }] },
+    app: 'outlook'
+  });
+  await FlowStorage.appendLog({
+    kind: 'written',
+    messageId: 'cal-1',
+    label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00',
+    connectorId: 'outlookCalendar',
+    ref: { eventId: 'ev-hold-1' },
+    where: 'Outlook Calendar',
+    url: 'https://outlook.live.com/calendar/item/ev-hold-1',
+    app: 'outlook'
+  });
+  assert.strictEqual(await FlowStorage.hasTerminalOutcome('cal-1'), true, 'calendar write is handled');
+  const beforeDraftUndo = (await FlowStorage.get()).log.filter((e) => e.messageId === 'cal-1' && e.kind === 'written');
+  await FlowStorage.markOutlookDraftUndone('cal-1', { eventId: 'ev-hold-1' });
+  const afterDraftUndo = (await FlowStorage.get()).log.filter((e) => e.messageId === 'cal-1');
+  assert.ok(afterDraftUndo.some((e) => e.kind === 'written' && e.connectorId === 'outlookCalendar'), 'draft undo leaves the calendar row');
+  assert.ok(!afterDraftUndo.some((e) => e.connectorId === 'outlookDraft'), 'draft undo does not invent a draft row');
+  assert.strictEqual(beforeDraftUndo.length, 1);
+  await FlowStorage.markOutlookCalendarUndone('cal-1', { eventId: 'ev-hold-1' });
+  const after = (await FlowStorage.get()).log.filter((e) => e.messageId === 'cal-1' && e.kind !== 'shown');
+  assert.strictEqual(after.length, 1, 'one Activity row, not a second Handled');
+  assert.strictEqual(after[0].kind, 'undone');
+  assert.strictEqual(after[0].connectorId, 'outlookCalendar');
+  assert.strictEqual(after[0].label, 'Calendar event removed.');
+  assert.strictEqual(after[0].outlookReopen, true);
+  assert.strictEqual(await FlowStorage.hasTerminalOutcome('cal-1'), false, 'calendar undo reopens the page card');
+  const receiptsAfter = await FlowStorage.getActiveOutlookReceipts();
+  assert.ok(!receiptsAfter.some((e) => e.messageId === 'cal-1'), 'a calendar close is not an Outlook draft receipt');
+
   console.log('PASS: outlook undo reopen — page card and popup still-open agree');
   console.log('outlook-undo-reopen-corpus: ok');
 }

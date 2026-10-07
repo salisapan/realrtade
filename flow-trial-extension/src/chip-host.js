@@ -94,7 +94,7 @@ const FlowChipHost = (() => {
 
     const actions = el('span', 'flow-chip-actions');
     if (o.url) {
-      const a = el('a', 'flow-chip-link', 'Open draft');
+      const a = el('a', 'flow-chip-link', o.linkLabel || 'Open draft');
       a.href = o.url; a.target = '_blank'; a.rel = 'noopener';
       actions.appendChild(a);
     }
