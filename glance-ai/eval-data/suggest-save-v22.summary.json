@@ -1,0 +1,67 @@
+{
+ "rows": 8191,
+ "byTarget": {
+  "explicit-card": 1320,
+  "suggest-save": 2025,
+  "SILENT": 4846
+ },
+ "byReason": {
+  "suggest:other-card": 624,
+  "suggest:no-consent": 429,
+  "suggest:show": 2025,
+  "suggest:not-inbound": 1070,
+  "suggest:no-files": 2251,
+  "suggest:already-saved": 36,
+  "suggest:too-large": 51,
+  "suggest:attachments-unread": 67,
+  "suggest:drive-target-on-outlook": 397,
+  "suggest:bulk": 554,
+  "suggest:dismissed": 36,
+  "suggest:onedrive-target-on-gmail": 293,
+  "suggest:other-target": 52,
+  "suggest:negated": 306
+ },
+ "bySurface": {
+  "gmail:quiet": 3002,
+  "outlook:suggest": 913,
+  "outlook:quiet": 3164,
+  "gmail:suggest": 1112
+ },
+ "byLang": {
+  "en:quiet": 3120,
+  "en:suggest": 1018,
+  "he:suggest": 1007,
+  "he:quiet": 3046
+ },
+ "bySplit": {
+  "train:quiet": 4084,
+  "train:suggest": 1474,
+  "test:quiet": 1168,
+  "test:suggest": 353,
+  "val:suggest": 192,
+  "val:quiet": 896,
+  "spec:suggest": 6,
+  "spec:quiet": 18
+ },
+ "trapsHasAttachmentsNoRealFile": 800,
+ "trapsQuiet": 800,
+ "explicitConverted": 0,
+ "newExplicitCards": 0,
+ "suggestOnRefShow": 0,
+ "attCount": {
+  "1:quiet": 2975,
+  "1:suggest": 1910,
+  "2:quiet": 190,
+  "2:suggest": 115,
+  "0:quiet": 3001
+ },
+ "specRows": 24,
+ "note": "attachment metadata is SYNTHESIZED (seeded) over real dataset rows; it tests the rule and gives a training target, it is not evidence of real-traffic rates",
+ "relabel": {
+  "chipWordingAlignedToFilename": 1921,
+  "showToQuiet": 167,
+  "quietReasonOnly": 105,
+  "newChips": 0,
+  "why": "Outlook bare Drive or דרייב now stays quiet. The target is chosen by the host only. Single-file chip wording uses the file name, matching the 22-row corpus. No row gained a chip."
+ }
+}

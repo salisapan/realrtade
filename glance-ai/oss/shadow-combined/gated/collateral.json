@@ -1,0 +1,91 @@
+{
+ "shadow796": {
+  "rows": 796,
+  "show": 328,
+  "silent": 466,
+  "fire": {
+   "no-deadline-cue (would need a future engine date)": {
+    "onClose": 44,
+    "onSilent": 0,
+    "closeIds": [
+     "oss-en-save-070",
+     "oss-en-save-072",
+     "oss-en-save-074",
+     "oss-D-rm-020",
+     "v2syn-3721",
+     "v2syn-3744",
+     "v2syn-3753",
+     "v2syn-3818"
+    ]
+   },
+   "gate:unsupported-kind:create-doc": {
+    "onClose": 0,
+    "onSilent": 7,
+    "closeIds": []
+   },
+   "gate:unsupported-kind:attach-to-invite": {
+    "onClose": 5,
+    "onSilent": 4,
+    "closeIds": [
+     "v2syn-9372",
+     "v2syn-9380",
+     "v2syn-9389",
+     "v2syn-9392",
+     "v2syn-9402"
+    ]
+   },
+   "gate:money-offer-acceptance": {
+    "onClose": 0,
+    "onSilent": 1,
+    "closeIds": []
+   }
+  }
+ },
+ "v2test6982": {
+  "rows": 6982,
+  "show": 1255,
+  "silent": 5727,
+  "fire": {
+   "no-deadline-cue (would need a future engine date)": {
+    "onClose": 277,
+    "onSilent": 0,
+    "closeIds": [
+     "v2syn-216",
+     "v2syn-880",
+     "v2syn-3710",
+     "v2syn-3711",
+     "v2syn-3712",
+     "v2syn-3713",
+     "v2syn-3714",
+     "v2syn-3715"
+    ]
+   },
+   "gate:unsupported-kind:create-doc": {
+    "onClose": 1,
+    "onSilent": 142,
+    "closeIds": [
+     "v2rtest-close-families-corpus-305"
+    ]
+   },
+   "gate:unsupported-kind:attach-to-invite": {
+    "onClose": 15,
+    "onSilent": 30,
+    "closeIds": [
+     "v2syn-9361",
+     "v2syn-9363",
+     "v2syn-9364",
+     "v2syn-9372",
+     "v2syn-9373",
+     "v2syn-9374",
+     "v2syn-9377",
+     "v2syn-9380"
+    ]
+   },
+   "gate:money-offer-acceptance": {
+    "onClose": 0,
+    "onSilent": 7,
+    "closeIds": []
+   }
+  }
+ }
+}

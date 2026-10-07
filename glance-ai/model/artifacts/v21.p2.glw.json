@@ -1,0 +1,15 @@
+{
+ "out": "artifacts/v21.p2.glw",
+ "prune": 2,
+ "bytes": 188283,
+ "gzipBytes": 130641,
+ "jsonBytes": 1622252,
+ "nnzGate": 30390,
+ "nnzChooser": 63143,
+ "parityV2Test": {
+  "n": 6982,
+  "sameDecision": 6972,
+  "prunedAddsShow": 3,
+  "prunedDropsShow": 7
+ }
+}

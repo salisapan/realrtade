@@ -1,0 +1,5955 @@
+{
+  "generatedAt": "2026-10-07T20:13:14.147Z",
+  "sets": {
+    "test": 4111,
+    "gold22": 22,
+    "adversarial": 41
+  },
+  "variants": {
+    "v1": {
+      "tau": 0.95,
+      "overall": {
+        "teacherV2": {
+          "n": 4111,
+          "agree": "99.27%",
+          "showSilenceAgree": "99.27%",
+          "wrongDoIt": "0.00%",
+          "wrongDoItN": "0/3142",
+          "wrongDoItModelFreeRegion": "0.00% (0/2089)",
+          "missedClose": "3.10%",
+          "missedN": "30/969",
+          "wrongActionWhenBothShow": "0.00%"
+        },
+        "model": {
+          "n": 4111,
+          "agree": "82.90%",
+          "showSilenceAgree": "84.09%",
+          "wrongDoIt": "0.70%",
+          "wrongDoItN": "22/3142",
+          "wrongDoItModelFreeRegion": "0.48% (10/2089)",
+          "missedClose": "65.22%",
+          "missedN": "632/969",
+          "wrongActionWhenBothShow": "3.56%"
+        },
+        "modelVeto": {
+          "n": 4111,
+          "agree": "82.70%",
+          "showSilenceAgree": "83.90%",
+          "wrongDoIt": "0.29%",
+          "wrongDoItN": "9/3142",
+          "wrongDoItModelFreeRegion": "0.43% (9/2089)",
+          "missedClose": "67.39%",
+          "missedN": "653/969",
+          "wrongActionWhenBothShow": "3.80%"
+        },
+        "modelVetoV2": {
+          "n": 4111,
+          "agree": "82.70%",
+          "showSilenceAgree": "83.90%",
+          "wrongDoIt": "0.29%",
+          "wrongDoItN": "9/3142",
+          "wrongDoItModelFreeRegion": "0.43% (9/2089)",
+          "missedClose": "67.39%",
+          "missedN": "653/969",
+          "wrongActionWhenBothShow": "3.80%"
+        }
+      },
+      "bySource": {
+        "teacherV2": {
+          "repo": {
+            "n": 640,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/576",
+            "wrongDoItModelFreeRegion": "0.00% (0/472)",
+            "missedClose": "0.00%",
+            "missedN": "0/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "99.41%",
+            "showSilenceAgree": "99.41%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/396",
+            "wrongDoItModelFreeRegion": "0.00% (0/270)",
+            "missedClose": "2.61%",
+            "missedN": "3/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "99.09%",
+            "showSilenceAgree": "99.09%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/2170",
+            "wrongDoItModelFreeRegion": "0.00% (0/1347)",
+            "missedClose": "3.42%",
+            "missedN": "27/790",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "repo": {
+            "n": 640,
+            "agree": "90.78%",
+            "showSilenceAgree": "90.94%",
+            "wrongDoIt": "0.52%",
+            "wrongDoItN": "3/576",
+            "wrongDoItModelFreeRegion": "0.21% (1/472)",
+            "missedClose": "85.94%",
+            "missedN": "55/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "84.54%",
+            "showSilenceAgree": "84.54%",
+            "wrongDoIt": "1.01%",
+            "wrongDoItN": "4/396",
+            "wrongDoItModelFreeRegion": "1.11% (3/270)",
+            "missedClose": "65.22%",
+            "missedN": "75/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "80.91%",
+            "showSilenceAgree": "82.53%",
+            "wrongDoIt": "0.69%",
+            "wrongDoItN": "15/2170",
+            "wrongDoItModelFreeRegion": "0.45% (6/1347)",
+            "missedClose": "63.54%",
+            "missedN": "502/790",
+            "wrongActionWhenBothShow": "4.17%"
+          }
+        },
+        "modelVeto": {
+          "repo": {
+            "n": 640,
+            "agree": "90.63%",
+            "showSilenceAgree": "90.78%",
+            "wrongDoIt": "0.17%",
+            "wrongDoItN": "1/576",
+            "wrongDoItModelFreeRegion": "0.21% (1/472)",
+            "missedClose": "90.63%",
+            "missedN": "58/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "84.34%",
+            "showSilenceAgree": "84.34%",
+            "wrongDoIt": "0.76%",
+            "wrongDoItN": "3/396",
+            "wrongDoItModelFreeRegion": "1.11% (3/270)",
+            "missedClose": "66.96%",
+            "missedN": "77/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "80.71%",
+            "showSilenceAgree": "82.33%",
+            "wrongDoIt": "0.23%",
+            "wrongDoItN": "5/2170",
+            "wrongDoItModelFreeRegion": "0.37% (5/1347)",
+            "missedClose": "65.57%",
+            "missedN": "518/790",
+            "wrongActionWhenBothShow": "4.41%"
+          }
+        },
+        "modelVetoV2": {
+          "repo": {
+            "n": 640,
+            "agree": "90.63%",
+            "showSilenceAgree": "90.78%",
+            "wrongDoIt": "0.17%",
+            "wrongDoItN": "1/576",
+            "wrongDoItModelFreeRegion": "0.21% (1/472)",
+            "missedClose": "90.63%",
+            "missedN": "58/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "84.34%",
+            "showSilenceAgree": "84.34%",
+            "wrongDoIt": "0.76%",
+            "wrongDoItN": "3/396",
+            "wrongDoItModelFreeRegion": "1.11% (3/270)",
+            "missedClose": "66.96%",
+            "missedN": "77/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "80.71%",
+            "showSilenceAgree": "82.33%",
+            "wrongDoIt": "0.23%",
+            "wrongDoItN": "5/2170",
+            "wrongDoItModelFreeRegion": "0.37% (5/1347)",
+            "missedClose": "65.57%",
+            "missedN": "518/790",
+            "wrongActionWhenBothShow": "4.41%"
+          }
+        }
+      },
+      "byScenario": {
+        "teacherV2": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "0.00%",
+            "missedN": "0/19",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "0.00%",
+            "missedN": "0/143",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "0.00%",
+            "missedN": "0/11",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/7",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "0.00%",
+            "missedN": "0/32",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "0.00%",
+            "missedN": "0/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/122",
+            "wrongDoItModelFreeRegion": "0.00% (0/110)",
+            "missedClose": "0.00%",
+            "missedN": "0/38",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "0.00%",
+            "missedN": "0/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "0.00%",
+            "missedN": "0/5",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "0.00%",
+            "missedN": "0/31",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/300",
+            "wrongDoItModelFreeRegion": "0.00% (0/154)",
+            "missedClose": "0.00%",
+            "missedN": "0/220",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "0.00%",
+            "missedN": "0/44",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "100.00%",
+            "missedN": "19/19",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "50.36%",
+            "showSilenceAgree": "66.07%",
+            "wrongDoIt": "2.92%",
+            "wrongDoItN": "4/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "63.64%",
+            "missedN": "91/143",
+            "wrongActionWhenBothShow": "21.15%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "51.67%",
+            "showSilenceAgree": "51.67%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "53.21%",
+            "missedN": "58/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "72.50%",
+            "showSilenceAgree": "72.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "100.00%",
+            "missedN": "11/11",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "82.50%",
+            "showSilenceAgree": "82.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "7/7",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "84.00%",
+            "showSilenceAgree": "84.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "100.00%",
+            "missedN": "32/32",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "98.75%",
+            "showSilenceAgree": "98.75%",
+            "wrongDoIt": "1.25%",
+            "wrongDoItN": "2/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "74.50%",
+            "showSilenceAgree": "76.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "57.14%",
+            "missedN": "48/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/122",
+            "wrongDoItModelFreeRegion": "0.00% (0/110)",
+            "missedClose": "100.00%",
+            "missedN": "38/38",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "5.00%",
+            "missedN": "1/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "97.50%",
+            "showSilenceAgree": "97.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "100.00%",
+            "missedN": "5/5",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "66.25%",
+            "showSilenceAgree": "66.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "87.10%",
+            "missedN": "27/31",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "80.00%",
+            "showSilenceAgree": "80.19%",
+            "wrongDoIt": "3.00%",
+            "wrongDoItN": "9/300",
+            "wrongDoItModelFreeRegion": "3.90% (6/154)",
+            "missedClose": "42.73%",
+            "missedN": "94/220",
+            "wrongActionWhenBothShow": "0.79%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "45.00%",
+            "showSilenceAgree": "45.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "100.00%",
+            "missedN": "44/44",
+            "wrongActionWhenBothShow": "n/a"
+          }
+        },
+        "modelVeto": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "100.00%",
+            "missedN": "19/19",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "51.79%",
+            "showSilenceAgree": "67.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "63.64%",
+            "missedN": "91/143",
+            "wrongActionWhenBothShow": "21.15%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "51.67%",
+            "showSilenceAgree": "51.67%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "53.21%",
+            "missedN": "58/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "72.50%",
+            "showSilenceAgree": "72.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "100.00%",
+            "missedN": "11/11",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "82.50%",
+            "showSilenceAgree": "82.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "7/7",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "84.00%",
+            "showSilenceAgree": "84.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "100.00%",
+            "missedN": "32/32",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "74.50%",
+            "showSilenceAgree": "76.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "57.14%",
+            "missedN": "48/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/122",
+            "wrongDoItModelFreeRegion": "0.00% (0/110)",
+            "missedClose": "100.00%",
+            "missedN": "38/38",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "5.00%",
+            "missedN": "1/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "97.50%",
+            "showSilenceAgree": "97.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "100.00%",
+            "missedN": "5/5",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "66.25%",
+            "showSilenceAgree": "66.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "87.10%",
+            "missedN": "27/31",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "77.69%",
+            "showSilenceAgree": "77.88%",
+            "wrongDoIt": "1.67%",
+            "wrongDoItN": "5/300",
+            "wrongDoItModelFreeRegion": "3.25% (5/154)",
+            "missedClose": "50.00%",
+            "missedN": "110/220",
+            "wrongActionWhenBothShow": "0.91%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "45.00%",
+            "showSilenceAgree": "45.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "100.00%",
+            "missedN": "44/44",
+            "wrongActionWhenBothShow": "n/a"
+          }
+        },
+        "modelVetoV2": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "100.00%",
+            "missedN": "19/19",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "51.79%",
+            "showSilenceAgree": "67.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "63.64%",
+            "missedN": "91/143",
+            "wrongActionWhenBothShow": "21.15%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "51.67%",
+            "showSilenceAgree": "51.67%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "53.21%",
+            "missedN": "58/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "72.50%",
+            "showSilenceAgree": "72.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "100.00%",
+            "missedN": "11/11",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "82.50%",
+            "showSilenceAgree": "82.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "7/7",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "84.00%",
+            "showSilenceAgree": "84.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "100.00%",
+            "missedN": "32/32",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "74.50%",
+            "showSilenceAgree": "76.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "57.14%",
+            "missedN": "48/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/122",
+            "wrongDoItModelFreeRegion": "0.00% (0/110)",
+            "missedClose": "100.00%",
+            "missedN": "38/38",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "5.00%",
+            "missedN": "1/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "97.50%",
+            "showSilenceAgree": "97.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "100.00%",
+            "missedN": "5/5",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "66.25%",
+            "showSilenceAgree": "66.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "87.10%",
+            "missedN": "27/31",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "77.69%",
+            "showSilenceAgree": "77.88%",
+            "wrongDoIt": "1.67%",
+            "wrongDoItN": "5/300",
+            "wrongDoItModelFreeRegion": "3.25% (5/154)",
+            "missedClose": "50.00%",
+            "missedN": "110/220",
+            "wrongActionWhenBothShow": "0.91%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "45.00%",
+            "showSilenceAgree": "45.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "100.00%",
+            "missedN": "44/44",
+            "wrongActionWhenBothShow": "n/a"
+          }
+        }
+      },
+      "byTeacherLabel": {
+        "teacherV2": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/3142",
+            "wrongDoItModelFreeRegion": "0.00% (0/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/10",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "30.77%",
+            "showSilenceAgree": "30.77%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "69.23%",
+            "missedN": "27/39",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "98.76%",
+            "showSilenceAgree": "98.76%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "1.24%",
+            "missedN": "2/161",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "99.78%",
+            "showSilenceAgree": "99.78%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.22%",
+            "missedN": "1/464",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "99.30%",
+            "showSilenceAgree": "99.30%",
+            "wrongDoIt": "0.70%",
+            "wrongDoItN": "22/3142",
+            "wrongDoItModelFreeRegion": "0.48% (10/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "10/10",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "59.26%",
+            "showSilenceAgree": "70.37%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "29.63%",
+            "missedN": "8/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "5.63%",
+            "showSilenceAgree": "5.63%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "94.37%",
+            "missedN": "67/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "47.37%",
+            "showSilenceAgree": "47.37%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "52.63%",
+            "missedN": "60/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "14.93%",
+            "showSilenceAgree": "64.18%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "35.82%",
+            "missedN": "24/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "6.25%",
+            "showSilenceAgree": "6.25%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "93.75%",
+            "missedN": "15/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "39/39",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "29.19%",
+            "showSilenceAgree": "36.65%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "63.35%",
+            "missedN": "102/161",
+            "wrongActionWhenBothShow": "18.64%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "33.62%",
+            "showSilenceAgree": "33.84%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "66.16%",
+            "missedN": "307/464",
+            "wrongActionWhenBothShow": "0.64%"
+          }
+        },
+        "modelVeto": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "99.71%",
+            "showSilenceAgree": "99.71%",
+            "wrongDoIt": "0.29%",
+            "wrongDoItN": "9/3142",
+            "wrongDoItModelFreeRegion": "0.43% (9/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "10/10",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "59.26%",
+            "showSilenceAgree": "70.37%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "29.63%",
+            "missedN": "8/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "5.63%",
+            "showSilenceAgree": "5.63%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "94.37%",
+            "missedN": "67/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "47.37%",
+            "showSilenceAgree": "47.37%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "52.63%",
+            "missedN": "60/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "14.93%",
+            "showSilenceAgree": "64.18%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "35.82%",
+            "missedN": "24/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "6.25%",
+            "showSilenceAgree": "6.25%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "93.75%",
+            "missedN": "15/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "39/39",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "29.19%",
+            "showSilenceAgree": "36.65%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "63.35%",
+            "missedN": "102/161",
+            "wrongActionWhenBothShow": "18.64%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "29.09%",
+            "showSilenceAgree": "29.31%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "70.69%",
+            "missedN": "328/464",
+            "wrongActionWhenBothShow": "0.74%"
+          }
+        },
+        "modelVetoV2": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "99.71%",
+            "showSilenceAgree": "99.71%",
+            "wrongDoIt": "0.29%",
+            "wrongDoItN": "9/3142",
+            "wrongDoItModelFreeRegion": "0.43% (9/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "10/10",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "59.26%",
+            "showSilenceAgree": "70.37%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "29.63%",
+            "missedN": "8/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "5.63%",
+            "showSilenceAgree": "5.63%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "94.37%",
+            "missedN": "67/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "47.37%",
+            "showSilenceAgree": "47.37%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "52.63%",
+            "missedN": "60/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "14.93%",
+            "showSilenceAgree": "64.18%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "35.82%",
+            "missedN": "24/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "6.25%",
+            "showSilenceAgree": "6.25%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "93.75%",
+            "missedN": "15/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "39/39",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "29.19%",
+            "showSilenceAgree": "36.65%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "63.35%",
+            "missedN": "102/161",
+            "wrongActionWhenBothShow": "18.64%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "29.09%",
+            "showSilenceAgree": "29.31%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "70.69%",
+            "missedN": "328/464",
+            "wrongActionWhenBothShow": "0.74%"
+          }
+        }
+      },
+      "byLang": {
+        "teacherV2": {
+          "en": {
+            "n": 2517,
+            "agree": "98.85%",
+            "showSilenceAgree": "98.85%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/1830",
+            "wrongDoItModelFreeRegion": "0.00% (0/1228)",
+            "missedClose": "4.22%",
+            "missedN": "29/687",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "99.94%",
+            "showSilenceAgree": "99.94%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/1312",
+            "wrongDoItModelFreeRegion": "0.00% (0/861)",
+            "missedClose": "0.35%",
+            "missedN": "1/282",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "en": {
+            "n": 2517,
+            "agree": "81.84%",
+            "showSilenceAgree": "83.79%",
+            "wrongDoIt": "1.04%",
+            "wrongDoItN": "19/1830",
+            "wrongDoItModelFreeRegion": "0.73% (9/1228)",
+            "missedClose": "56.62%",
+            "missedN": "389/687",
+            "wrongActionWhenBothShow": "4.03%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "84.57%",
+            "showSilenceAgree": "84.57%",
+            "wrongDoIt": "0.23%",
+            "wrongDoItN": "3/1312",
+            "wrongDoItModelFreeRegion": "0.12% (1/861)",
+            "missedClose": "86.17%",
+            "missedN": "243/282",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "modelVeto": {
+          "en": {
+            "n": 2517,
+            "agree": "81.61%",
+            "showSilenceAgree": "83.55%",
+            "wrongDoIt": "0.44%",
+            "wrongDoItN": "8/1830",
+            "wrongDoItModelFreeRegion": "0.65% (8/1228)",
+            "missedClose": "59.10%",
+            "missedN": "406/687",
+            "wrongActionWhenBothShow": "4.27%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "84.44%",
+            "showSilenceAgree": "84.44%",
+            "wrongDoIt": "0.08%",
+            "wrongDoItN": "1/1312",
+            "wrongDoItModelFreeRegion": "0.12% (1/861)",
+            "missedClose": "87.59%",
+            "missedN": "247/282",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "modelVetoV2": {
+          "en": {
+            "n": 2517,
+            "agree": "81.61%",
+            "showSilenceAgree": "83.55%",
+            "wrongDoIt": "0.44%",
+            "wrongDoItN": "8/1830",
+            "wrongDoItModelFreeRegion": "0.65% (8/1228)",
+            "missedClose": "59.10%",
+            "missedN": "406/687",
+            "wrongActionWhenBothShow": "4.27%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "84.44%",
+            "showSilenceAgree": "84.44%",
+            "wrongDoIt": "0.08%",
+            "wrongDoItN": "1/1312",
+            "wrongDoItModelFreeRegion": "0.12% (1/861)",
+            "missedClose": "87.59%",
+            "missedN": "247/282",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        }
+      },
+      "gold22": {
+        "teacherV2": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "50.00%",
+            "silenceRecall": "95.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "5.00% (1/20)"
+          }
+        },
+        "model": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          }
+        },
+        "modelVeto": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          }
+        },
+        "modelVetoV2": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          }
+        },
+        "teacher": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "50.00%",
+            "silenceRecall": "95.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "5.00% (1/20)"
+          }
+        }
+      },
+      "adversarial": {
+        "teacherV2": {
+          "correct": "34/40",
+          "fails": [
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "od-save-5(draft)",
+            "od-save-he(draft)"
+          ]
+        },
+        "model": {
+          "correct": "31/40",
+          "fails": [
+            "neg-drive-4(file_save)",
+            "neg-he-1(file_save)",
+            "neg-he-2(file_save)",
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "od-save-5(draft)",
+            "od-save-he(SILENT)"
+          ]
+        },
+        "modelVeto": {
+          "correct": "31/40",
+          "fails": [
+            "neg-drive-4(file_save)",
+            "neg-he-1(file_save)",
+            "neg-he-2(file_save)",
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "od-save-5(draft)",
+            "od-save-he(SILENT)"
+          ]
+        },
+        "modelVetoV2": {
+          "correct": "34/40",
+          "fails": [
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "od-save-5(draft)",
+            "od-save-he(SILENT)"
+          ]
+        },
+        "teacher": {
+          "correct": "26/40",
+          "fails": [
+            "neg-drive-1(file_save)",
+            "neg-drive-2(file_save)",
+            "neg-drive-3(file_save)",
+            "neg-drive-4(file_save)",
+            "neg-he-1(file_save)",
+            "neg-he-2(file_save)",
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "od-save-5(draft)",
+            "od-save-he(draft)",
+            "mkt-he(calendar)",
+            "cond-amt(task)"
+          ]
+        }
+      },
+      "adversarialRows": [
+        {
+          "id": "adv-neg-drive-1",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.042,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-drive-2",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.024,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-drive-3",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.612,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-drive-4",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "drive-file|file_save",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.985,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-od-1",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-od-2",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.102,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-he-1",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "drive-file|file_save",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.998,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-he-2",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "drive-file|file_save",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.995,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-send",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-fwd",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-meet",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.003,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-pay",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-1",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.363,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-2",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.002,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-od-save-3",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.003,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-4",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.009,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-5",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "follow-up-ask|draft",
+          "model": "follow-up-ask|draft",
+          "modelVetoV2": "follow-up-ask|draft",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.999,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-od-save-he",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "follow-up-ask|draft",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.083,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-hedge",
+          "kind": "hedge",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-od-noatt",
+          "kind": "no-attachment",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.026,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-att0",
+          "kind": "no-attachment",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:google",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.002,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-att2",
+          "kind": "ambiguous-file",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:google",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-hedge",
+          "kind": "hedge",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:google",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.006,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-pos",
+          "kind": "control",
+          "expect": "file_save",
+          "teacher": "drive-file|file_save",
+          "model": "drive-file|file_save",
+          "modelVetoV2": "drive-file|file_save",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.953,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-meet-pos",
+          "kind": "control",
+          "expect": "calendar",
+          "teacher": "calendar-hold|calendar",
+          "model": "calendar-hold|calendar",
+          "modelVetoV2": "calendar-hold|calendar",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.994,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-req-pos",
+          "kind": "control",
+          "expect": "draft",
+          "teacher": "follow-up-ask|draft",
+          "model": "follow-up-ask|draft",
+          "modelVetoV2": "follow-up-ask|draft",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 1,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-past-1",
+          "kind": "past",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.003,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-past-2",
+          "kind": "past",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-cancel-1",
+          "kind": "cancelled (calendar-cancel = delete existing hold; plausible close, excluded from scoring)",
+          "expect": "AMBIGUOUS",
+          "teacher": "calendar-cancel|calendar",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.866,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-ooo-1",
+          "kind": "ooo",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.002,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-mkt-1",
+          "kind": "marketing",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:noise",
+            "v2": "marketing",
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-mkt-he",
+          "kind": "marketing",
+          "expect": "SILENT",
+          "teacher": "event|calendar",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "marketing",
+            "cap": null
+          },
+          "pShow": 0.045,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-3p-1",
+          "kind": "third-party",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "file",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.12,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-3p-he",
+          "kind": "third-party",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-fwd-quoted",
+          "kind": "quoted",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:noise",
+            "v2": "quoted-only",
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-inject-1",
+          "kind": "injection",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "payment-injection",
+            "cap": null
+          },
+          "pShow": 0.002,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-inject-2",
+          "kind": "injection",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "payment-injection",
+            "cap": null
+          },
+          "pShow": 0.002,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-cond-amt",
+          "kind": "conditional",
+          "expect": "SILENT",
+          "teacher": "confirmed-amount|task",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "undecided",
+            "cap": null
+          },
+          "pShow": 0.135,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-fyi-he",
+          "kind": "fyi",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:noise",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-self-out",
+          "kind": "outbound",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "own-sender",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-self-out-o",
+          "kind": "outbound",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "own-sender",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        }
+      ],
+      "gold22Rows": [
+        {
+          "id": "rm-001",
+          "m0": "SILENT",
+          "prior": "HOLD",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-002",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-003",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-004",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-005",
+          "m0": "SILENT",
+          "prior": "CLOSE",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-006",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-007",
+          "m0": "SILENT",
+          "prior": "PROMISE",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-008",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-009",
+          "m0": "SILENT",
+          "prior": "HOLD",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-010",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-011",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-012",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-013",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-014",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-015",
+          "m0": "SILENT",
+          "prior": "HOLD",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-016",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-017",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-018",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "follow-up-ask|draft",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-019",
+          "m0": "ASK",
+          "prior": "ASK",
+          "teacherTextOnly": "follow-up-ask|draft",
+          "modelTextOnly": "follow-up-ask|draft",
+          "modelVetoV2TextOnly": "follow-up-ask|draft"
+        },
+        {
+          "id": "rm-020",
+          "m0": "ASK",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-021",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-022",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        }
+      ],
+      "v2SilencedTeacherShows": [
+        {
+          "id": "syn-5203",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hello,\nPlease don't save the attachment to Drive.\nCheers"
+        },
+        {
+          "id": "syn-5205",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nPlease don't save the attachment to Google Drive.\nBest,\nRachel"
+        },
+        {
+          "id": "syn-5208",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi Sali,\nHope you are well.\nPlease don't save the attachment to Drive."
+        },
+        {
+          "id": "syn-5212",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Good morning,\nPlease don't save the attachment to Google Drive.\nThanks, David"
+        },
+        {
+          "id": "syn-5213",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey, Please don't save the attachment to Drive."
+        },
+        {
+          "id": "syn-5215",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey, Please don't save the attachment to Drive. Thanks, Noa"
+        },
+        {
+          "id": "syn-5218",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi there,\nPlease don't save the attachment to Drive.\nThank you!"
+        },
+        {
+          "id": "syn-5219",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Please don't save the attachment to Google Drive."
+        },
+        {
+          "id": "syn-5221",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Good morning, Please don't save the attachment to Drive. Thanks"
+        },
+        {
+          "id": "syn-5224",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nHope you are well.\nPlease don't save the attachment to Drive.\nBest,\nRachel"
+        },
+        {
+          "id": "syn-5229",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi,\nPlease don't save the attachment to Drive.\nThanks, Maya"
+        },
+        {
+          "id": "syn-5230",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Please don't save the attachment to Google Drive."
+        },
+        {
+          "id": "syn-5236",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey, Please don't save the attachment to Drive. Thanks, Avi"
+        },
+        {
+          "id": "syn-5238",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Happy Monday!\nPlease don't save the attachment to Google Drive.\nBest,\nDavid"
+        },
+        {
+          "id": "syn-5240",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5244",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Drive.\nRegards,\nMaya"
+        },
+        {
+          "id": "syn-5246",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Drive."
+        },
+        {
+          "id": "syn-5248",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Drive."
+        },
+        {
+          "id": "syn-5249",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hope you are well.\nDo not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5253",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi there,\nDo not save the attached file to Drive.\nThanks, Avi"
+        },
+        {
+          "id": "syn-5254",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5259",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nDo not save the attached file to Google Drive.\nBest,\nDana"
+        },
+        {
+          "id": "syn-5260",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi Sali,\nDo not save the attached file to Drive.\nBest,\nTom"
+        },
+        {
+          "id": "syn-5261",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hello,\nDo not save the attached file to Google Drive.\nThanks"
+        },
+        {
+          "id": "syn-5265",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5273",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi there, Do not save the attached file to Google Drive. Best,\nMichael"
+        },
+        {
+          "id": "syn-5275",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nHappy Monday!\nDo not save the attached file to Google Drive.\nThanks, Sarah"
+        },
+        {
+          "id": "rtest-follow-up-corpus-704",
+          "rule": "negation",
+          "teacher": "event|calendar",
+          "body": "תודה רבה על הפגישה היום, אם יש שאלות אל תהססו לפנות אליי."
+        },
+        {
+          "id": "rtest-intent-actions-corpus-898",
+          "rule": "marketing",
+          "teacher": "follow-up-ask|draft",
+          "body": "Please send me the webinar recording by Monday."
+        },
+        {
+          "id": "rtest-intent-actions-corpus-902",
+          "rule": "marketing",
+          "teacher": "event|calendar",
+          "body": "The webinar is on Thursday at 11am."
+        }
+      ],
+      "tauSweep": [
+        {
+          "tau": 0.3,
+          "wrongDoIt": "4.07% (128)",
+          "missedClose": "34.37%"
+        },
+        {
+          "tau": 0.4,
+          "wrongDoIt": "3.12% (98)",
+          "missedClose": "36.64%"
+        },
+        {
+          "tau": 0.5,
+          "wrongDoIt": "2.32% (73)",
+          "missedClose": "40.56%"
+        },
+        {
+          "tau": 0.6,
+          "wrongDoIt": "1.78% (56)",
+          "missedClose": "44.27%"
+        },
+        {
+          "tau": 0.7,
+          "wrongDoIt": "1.40% (44)",
+          "missedClose": "49.23%"
+        },
+        {
+          "tau": 0.8,
+          "wrongDoIt": "1.02% (32)",
+          "missedClose": "54.90%"
+        },
+        {
+          "tau": 0.9,
+          "wrongDoIt": "0.45% (14)",
+          "missedClose": "62.64%"
+        },
+        {
+          "tau": 0.95,
+          "wrongDoIt": "0.29% (9)",
+          "missedClose": "67.39%"
+        }
+      ],
+      "wrongDoItRowsForOwnerReview": [
+        {
+          "id": "syn-482",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.96,
+          "body": "Hi there, We still need the CV from you on Monday before we can onboard."
+        },
+        {
+          "id": "syn-483",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 1,
+          "body": "Hey, We still need the lease from you by October 15 before we can onboard. Best, Sarah"
+        },
+        {
+          "id": "syn-484",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.98,
+          "body": "We still need the budget spreadsheet from you by Thursday before we can onboard. Thank you!"
+        },
+        {
+          "id": "syn-508",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.98,
+          "body": "Hey, We still need the lease from you before Sunday before we can onboard. Thanks"
+        },
+        {
+          "id": "syn-510",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 1,
+          "body": "Hi, We still need the lease from you by November 2 before we can onboard. Cheers"
+        },
+        {
+          "id": "repo-intent-teacher-eval-188-gmail",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.98,
+          "body": "אני צריך את המספר הסידורי של הלפטופ, תוכל למצוא ולשלוח?"
+        },
+        {
+          "id": "rtest-capture-corpus-50",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 1,
+          "body": "Can you send the lease please?"
+        },
+        {
+          "id": "rtest-judgment-corpus-1276",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "confirmed-amount|task",
+          "pShow": 0.98,
+          "body": "Suppose we approved the $40,000 for the pilot — would that actually work on your side?"
+        },
+        {
+          "id": "rtest-request-types-corpus-1578",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 1,
+          "body": "Can you countersign the lease and send it back?"
+        }
+      ]
+    },
+    "v1c": {
+      "tau": 0.96,
+      "overall": {
+        "teacherV2": {
+          "n": 4111,
+          "agree": "99.27%",
+          "showSilenceAgree": "99.27%",
+          "wrongDoIt": "0.00%",
+          "wrongDoItN": "0/3142",
+          "wrongDoItModelFreeRegion": "0.00% (0/2089)",
+          "missedClose": "3.10%",
+          "missedN": "30/969",
+          "wrongActionWhenBothShow": "0.00%"
+        },
+        "model": {
+          "n": 4111,
+          "agree": "79.96%",
+          "showSilenceAgree": "80.71%",
+          "wrongDoIt": "0.92%",
+          "wrongDoItN": "29/3142",
+          "wrongDoItModelFreeRegion": "1.24% (26/2089)",
+          "missedClose": "78.84%",
+          "missedN": "764/969",
+          "wrongActionWhenBothShow": "7.32%"
+        },
+        "modelVeto": {
+          "n": 4111,
+          "agree": "79.88%",
+          "showSilenceAgree": "80.64%",
+          "wrongDoIt": "0.83%",
+          "wrongDoItN": "26/3142",
+          "wrongDoItModelFreeRegion": "1.24% (26/2089)",
+          "missedClose": "79.46%",
+          "missedN": "770/969",
+          "wrongActionWhenBothShow": "7.54%"
+        },
+        "modelVetoV2": {
+          "n": 4111,
+          "agree": "79.88%",
+          "showSilenceAgree": "80.64%",
+          "wrongDoIt": "0.83%",
+          "wrongDoItN": "26/3142",
+          "wrongDoItModelFreeRegion": "1.24% (26/2089)",
+          "missedClose": "79.46%",
+          "missedN": "770/969",
+          "wrongActionWhenBothShow": "7.54%"
+        }
+      },
+      "bySource": {
+        "teacherV2": {
+          "repo": {
+            "n": 640,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/576",
+            "wrongDoItModelFreeRegion": "0.00% (0/472)",
+            "missedClose": "0.00%",
+            "missedN": "0/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "99.41%",
+            "showSilenceAgree": "99.41%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/396",
+            "wrongDoItModelFreeRegion": "0.00% (0/270)",
+            "missedClose": "2.61%",
+            "missedN": "3/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "99.09%",
+            "showSilenceAgree": "99.09%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/2170",
+            "wrongDoItModelFreeRegion": "0.00% (0/1347)",
+            "missedClose": "3.42%",
+            "missedN": "27/790",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "repo": {
+            "n": 640,
+            "agree": "90.63%",
+            "showSilenceAgree": "90.63%",
+            "wrongDoIt": "0.35%",
+            "wrongDoItN": "2/576",
+            "wrongDoItModelFreeRegion": "0.00% (0/472)",
+            "missedClose": "90.63%",
+            "missedN": "58/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "82.19%",
+            "showSilenceAgree": "82.19%",
+            "wrongDoIt": "0.51%",
+            "wrongDoItN": "2/396",
+            "wrongDoItModelFreeRegion": "0.74% (2/270)",
+            "missedClose": "77.39%",
+            "missedN": "89/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "77.26%",
+            "showSilenceAgree": "78.31%",
+            "wrongDoIt": "1.15%",
+            "wrongDoItN": "25/2170",
+            "wrongDoItModelFreeRegion": "1.78% (24/1347)",
+            "missedClose": "78.10%",
+            "missedN": "617/790",
+            "wrongActionWhenBothShow": "8.67%"
+          }
+        },
+        "modelVeto": {
+          "repo": {
+            "n": 640,
+            "agree": "90.78%",
+            "showSilenceAgree": "90.78%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/576",
+            "wrongDoItModelFreeRegion": "0.00% (0/472)",
+            "missedClose": "92.19%",
+            "missedN": "59/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "82.00%",
+            "showSilenceAgree": "82.00%",
+            "wrongDoIt": "0.51%",
+            "wrongDoItN": "2/396",
+            "wrongDoItModelFreeRegion": "0.74% (2/270)",
+            "missedClose": "78.26%",
+            "missedN": "90/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "77.16%",
+            "showSilenceAgree": "78.21%",
+            "wrongDoIt": "1.11%",
+            "wrongDoItN": "24/2170",
+            "wrongDoItModelFreeRegion": "1.78% (24/1347)",
+            "missedClose": "78.61%",
+            "missedN": "621/790",
+            "wrongActionWhenBothShow": "8.88%"
+          }
+        },
+        "modelVetoV2": {
+          "repo": {
+            "n": 640,
+            "agree": "90.78%",
+            "showSilenceAgree": "90.78%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/576",
+            "wrongDoItModelFreeRegion": "0.00% (0/472)",
+            "missedClose": "92.19%",
+            "missedN": "59/64",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "repo-test-strings": {
+            "n": 511,
+            "agree": "82.00%",
+            "showSilenceAgree": "82.00%",
+            "wrongDoIt": "0.51%",
+            "wrongDoItN": "2/396",
+            "wrongDoItModelFreeRegion": "0.74% (2/270)",
+            "missedClose": "78.26%",
+            "missedN": "90/115",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "synthetic": {
+            "n": 2960,
+            "agree": "77.16%",
+            "showSilenceAgree": "78.21%",
+            "wrongDoIt": "1.11%",
+            "wrongDoItN": "24/2170",
+            "wrongDoItModelFreeRegion": "1.78% (24/1347)",
+            "missedClose": "78.61%",
+            "missedN": "621/790",
+            "wrongActionWhenBothShow": "8.88%"
+          }
+        }
+      },
+      "byScenario": {
+        "teacherV2": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "0.00%",
+            "missedN": "0/19",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "0.00%",
+            "missedN": "0/143",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "0.00%",
+            "missedN": "0/11",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/7",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "0.00%",
+            "missedN": "0/32",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "0.00%",
+            "missedN": "0/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/122",
+            "wrongDoItModelFreeRegion": "0.00% (0/110)",
+            "missedClose": "0.00%",
+            "missedN": "0/38",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "0.00%",
+            "missedN": "0/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "0.00%",
+            "missedN": "0/5",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "0.00%",
+            "missedN": "0/31",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/300",
+            "wrongDoItModelFreeRegion": "0.00% (0/154)",
+            "missedClose": "0.00%",
+            "missedN": "0/220",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "0.00%",
+            "missedN": "0/44",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "100.00%",
+            "missedN": "19/19",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "50.00%",
+            "showSilenceAgree": "58.21%",
+            "wrongDoIt": "0.73%",
+            "wrongDoItN": "1/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "81.12%",
+            "missedN": "116/143",
+            "wrongActionWhenBothShow": "25.93%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "39.17%",
+            "showSilenceAgree": "39.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "66.97%",
+            "missedN": "73/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "72.50%",
+            "showSilenceAgree": "72.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "100.00%",
+            "missedN": "11/11",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "82.50%",
+            "showSilenceAgree": "82.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "7/7",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "84.00%",
+            "showSilenceAgree": "84.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "100.00%",
+            "missedN": "32/32",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "61.50%",
+            "showSilenceAgree": "61.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "91.67%",
+            "missedN": "77/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "62.50%",
+            "showSilenceAgree": "67.50%",
+            "wrongDoIt": "18.03%",
+            "wrongDoItN": "22/122",
+            "wrongDoItModelFreeRegion": "20.00% (22/110)",
+            "missedClose": "78.95%",
+            "missedN": "30/38",
+            "wrongActionWhenBothShow": "100.00%"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "5.00%",
+            "missedN": "1/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "97.50%",
+            "showSilenceAgree": "97.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "100.00%",
+            "missedN": "5/5",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "61.25%",
+            "showSilenceAgree": "61.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "100.00%",
+            "missedN": "31/31",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "71.92%",
+            "showSilenceAgree": "71.92%",
+            "wrongDoIt": "0.67%",
+            "wrongDoItN": "2/300",
+            "wrongDoItModelFreeRegion": "1.30% (2/154)",
+            "missedClose": "65.45%",
+            "missedN": "144/220",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "45.00%",
+            "showSilenceAgree": "45.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "100.00%",
+            "missedN": "44/44",
+            "wrongActionWhenBothShow": "n/a"
+          }
+        },
+        "modelVeto": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "100.00%",
+            "missedN": "19/19",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "50.36%",
+            "showSilenceAgree": "58.57%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "81.12%",
+            "missedN": "116/143",
+            "wrongActionWhenBothShow": "25.93%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "39.17%",
+            "showSilenceAgree": "39.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "66.97%",
+            "missedN": "73/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "72.50%",
+            "showSilenceAgree": "72.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "100.00%",
+            "missedN": "11/11",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "82.50%",
+            "showSilenceAgree": "82.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "7/7",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "84.00%",
+            "showSilenceAgree": "84.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "100.00%",
+            "missedN": "32/32",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "61.50%",
+            "showSilenceAgree": "61.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "91.67%",
+            "missedN": "77/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "62.50%",
+            "showSilenceAgree": "67.50%",
+            "wrongDoIt": "18.03%",
+            "wrongDoItN": "22/122",
+            "wrongDoItModelFreeRegion": "20.00% (22/110)",
+            "missedClose": "78.95%",
+            "missedN": "30/38",
+            "wrongActionWhenBothShow": "100.00%"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "5.00%",
+            "missedN": "1/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "97.50%",
+            "showSilenceAgree": "97.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "100.00%",
+            "missedN": "5/5",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "61.25%",
+            "showSilenceAgree": "61.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "100.00%",
+            "missedN": "31/31",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "71.15%",
+            "showSilenceAgree": "71.15%",
+            "wrongDoIt": "0.67%",
+            "wrongDoItN": "2/300",
+            "wrongDoItModelFreeRegion": "1.30% (2/154)",
+            "missedClose": "67.27%",
+            "missedN": "148/220",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "45.00%",
+            "showSilenceAgree": "45.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "100.00%",
+            "missedN": "44/44",
+            "wrongActionWhenBothShow": "n/a"
+          }
+        },
+        "modelVetoV2": {
+          "ack": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/105)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "cancelled": {
+            "n": 80,
+            "agree": "76.25%",
+            "showSilenceAgree": "76.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/61",
+            "wrongDoItModelFreeRegion": "0.00% (0/36)",
+            "missedClose": "100.00%",
+            "missedN": "19/19",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "commitment_reader": {
+            "n": 280,
+            "agree": "50.36%",
+            "showSilenceAgree": "58.57%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/137",
+            "wrongDoItModelFreeRegion": "0.00% (0/76)",
+            "missedClose": "81.12%",
+            "missedN": "116/143",
+            "wrongActionWhenBothShow": "25.93%"
+          },
+          "create_doc": {
+            "n": 120,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/120",
+            "wrongDoItModelFreeRegion": "0.00% (0/109)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "decision": {
+            "n": 120,
+            "agree": "39.17%",
+            "showSilenceAgree": "39.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/11",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "66.97%",
+            "missedN": "73/109",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive_save": {
+            "n": 40,
+            "agree": "72.50%",
+            "showSilenceAgree": "72.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/29",
+            "wrongDoItModelFreeRegion": "0.00% (0/16)",
+            "missedClose": "100.00%",
+            "missedN": "11/11",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "file_place": {
+            "n": 40,
+            "agree": "82.50%",
+            "showSilenceAgree": "82.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/33",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "7/7",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "fyi": {
+            "n": 200,
+            "agree": "84.00%",
+            "showSilenceAgree": "84.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/168",
+            "wrongDoItModelFreeRegion": "0.00% (0/42)",
+            "missedClose": "100.00%",
+            "missedN": "32/32",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "hedge": {
+            "n": 160,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/160",
+            "wrongDoItModelFreeRegion": "0.00% (0/113)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "marketing": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/23)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "meeting": {
+            "n": 200,
+            "agree": "61.50%",
+            "showSilenceAgree": "61.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/116",
+            "wrongDoItModelFreeRegion": "0.00% (0/37)",
+            "missedClose": "91.67%",
+            "missedN": "77/84",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "negation": {
+            "n": 160,
+            "agree": "83.13%",
+            "showSilenceAgree": "83.13%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/133",
+            "wrongDoItModelFreeRegion": "0.00% (0/99)",
+            "missedClose": "100.00%",
+            "missedN": "27/27",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "onedrive_save": {
+            "n": 160,
+            "agree": "62.50%",
+            "showSilenceAgree": "67.50%",
+            "wrongDoIt": "18.03%",
+            "wrongDoItN": "22/122",
+            "wrongDoItModelFreeRegion": "20.00% (22/110)",
+            "missedClose": "78.95%",
+            "missedN": "30/38",
+            "wrongActionWhenBothShow": "100.00%"
+          },
+          "ooo": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/67)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "own_commitment_self": {
+            "n": 120,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/100",
+            "wrongDoItModelFreeRegion": "0.00% (0/39)",
+            "missedClose": "5.00%",
+            "missedN": "1/20",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "past": {
+            "n": 200,
+            "agree": "97.50%",
+            "showSilenceAgree": "97.50%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/195",
+            "wrongDoItModelFreeRegion": "0.00% (0/169)",
+            "missedClose": "100.00%",
+            "missedN": "5/5",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "payment": {
+            "n": 80,
+            "agree": "61.25%",
+            "showSilenceAgree": "61.25%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/49",
+            "wrongDoItModelFreeRegion": "0.00% (0/41)",
+            "missedClose": "100.00%",
+            "missedN": "31/31",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "quoted_forward": {
+            "n": 40,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/40",
+            "wrongDoItModelFreeRegion": "0.00% (0/34)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "reply_with_file": {
+            "n": 80,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/80",
+            "wrongDoItModelFreeRegion": "0.00% (0/64)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "request_reply": {
+            "n": 520,
+            "agree": "71.15%",
+            "showSilenceAgree": "71.15%",
+            "wrongDoIt": "0.67%",
+            "wrongDoItN": "2/300",
+            "wrongDoItModelFreeRegion": "1.30% (2/154)",
+            "missedClose": "67.27%",
+            "missedN": "148/220",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "third_party": {
+            "n": 80,
+            "agree": "45.00%",
+            "showSilenceAgree": "45.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/36",
+            "wrongDoItModelFreeRegion": "0.00% (0/13)",
+            "missedClose": "100.00%",
+            "missedN": "44/44",
+            "wrongActionWhenBothShow": "n/a"
+          }
+        }
+      },
+      "byTeacherLabel": {
+        "teacherV2": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/3142",
+            "wrongDoItModelFreeRegion": "0.00% (0/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/10",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "100.00%",
+            "showSilenceAgree": "100.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.00%",
+            "missedN": "0/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "30.77%",
+            "showSilenceAgree": "30.77%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "69.23%",
+            "missedN": "27/39",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "98.76%",
+            "showSilenceAgree": "98.76%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "1.24%",
+            "missedN": "2/161",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "99.78%",
+            "showSilenceAgree": "99.78%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "0.22%",
+            "missedN": "1/464",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "99.08%",
+            "showSilenceAgree": "99.08%",
+            "wrongDoIt": "0.92%",
+            "wrongDoItN": "29/3142",
+            "wrongDoItModelFreeRegion": "1.24% (26/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "10/10",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "3.70%",
+            "showSilenceAgree": "3.70%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "96.30%",
+            "missedN": "26/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "1.41%",
+            "showSilenceAgree": "1.41%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "98.59%",
+            "missedN": "70/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "34.21%",
+            "showSilenceAgree": "34.21%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "65.79%",
+            "missedN": "75/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "7.46%",
+            "showSilenceAgree": "31.34%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "68.66%",
+            "missedN": "46/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "6.25%",
+            "showSilenceAgree": "6.25%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "93.75%",
+            "missedN": "15/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "2.56%",
+            "showSilenceAgree": "2.56%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "97.44%",
+            "missedN": "38/39",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "19.88%",
+            "showSilenceAgree": "24.22%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "75.78%",
+            "missedN": "122/161",
+            "wrongActionWhenBothShow": "17.95%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "20.26%",
+            "showSilenceAgree": "21.98%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "78.02%",
+            "missedN": "362/464",
+            "wrongActionWhenBothShow": "7.84%"
+          }
+        },
+        "modelVeto": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.83%",
+            "wrongDoItN": "26/3142",
+            "wrongDoItModelFreeRegion": "1.24% (26/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "10/10",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "3.70%",
+            "showSilenceAgree": "3.70%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "96.30%",
+            "missedN": "26/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "1.41%",
+            "showSilenceAgree": "1.41%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "98.59%",
+            "missedN": "70/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "34.21%",
+            "showSilenceAgree": "34.21%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "65.79%",
+            "missedN": "75/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "7.46%",
+            "showSilenceAgree": "31.34%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "68.66%",
+            "missedN": "46/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "6.25%",
+            "showSilenceAgree": "6.25%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "93.75%",
+            "missedN": "15/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "2.56%",
+            "showSilenceAgree": "2.56%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "97.44%",
+            "missedN": "38/39",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "19.88%",
+            "showSilenceAgree": "24.22%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "75.78%",
+            "missedN": "122/161",
+            "wrongActionWhenBothShow": "17.95%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "18.97%",
+            "showSilenceAgree": "20.69%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "79.31%",
+            "missedN": "368/464",
+            "wrongActionWhenBothShow": "8.33%"
+          }
+        },
+        "modelVetoV2": {
+          "SILENT": {
+            "n": 3142,
+            "agree": "99.17%",
+            "showSilenceAgree": "99.17%",
+            "wrongDoIt": "0.83%",
+            "wrongDoItN": "26/3142",
+            "wrongDoItModelFreeRegion": "1.24% (26/2089)",
+            "missedClose": "n/a",
+            "missedN": "0/0",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-cancel|calendar": {
+            "n": 10,
+            "agree": "0.00%",
+            "showSilenceAgree": "0.00%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "100.00%",
+            "missedN": "10/10",
+            "wrongActionWhenBothShow": "n/a"
+          },
+          "calendar-hold|calendar": {
+            "n": 27,
+            "agree": "3.70%",
+            "showSilenceAgree": "3.70%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "96.30%",
+            "missedN": "26/27",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "commitment|task": {
+            "n": 71,
+            "agree": "1.41%",
+            "showSilenceAgree": "1.41%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "98.59%",
+            "missedN": "70/71",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "confirmed-amount|task": {
+            "n": 114,
+            "agree": "34.21%",
+            "showSilenceAgree": "34.21%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "65.79%",
+            "missedN": "75/114",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "dated-commitment|task": {
+            "n": 67,
+            "agree": "7.46%",
+            "showSilenceAgree": "31.34%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "68.66%",
+            "missedN": "46/67",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "decision|task": {
+            "n": 16,
+            "agree": "6.25%",
+            "showSilenceAgree": "6.25%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "93.75%",
+            "missedN": "15/16",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "drive-file|file_save": {
+            "n": 39,
+            "agree": "2.56%",
+            "showSilenceAgree": "2.56%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "97.44%",
+            "missedN": "38/39",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "event|calendar": {
+            "n": 161,
+            "agree": "19.88%",
+            "showSilenceAgree": "24.22%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "75.78%",
+            "missedN": "122/161",
+            "wrongActionWhenBothShow": "17.95%"
+          },
+          "follow-up-ask|draft": {
+            "n": 464,
+            "agree": "18.97%",
+            "showSilenceAgree": "20.69%",
+            "wrongDoIt": "n/a",
+            "wrongDoItN": "0/0",
+            "wrongDoItModelFreeRegion": "n/a (0/0)",
+            "missedClose": "79.31%",
+            "missedN": "368/464",
+            "wrongActionWhenBothShow": "8.33%"
+          }
+        }
+      },
+      "byLang": {
+        "teacherV2": {
+          "en": {
+            "n": 2517,
+            "agree": "98.85%",
+            "showSilenceAgree": "98.85%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/1830",
+            "wrongDoItModelFreeRegion": "0.00% (0/1228)",
+            "missedClose": "4.22%",
+            "missedN": "29/687",
+            "wrongActionWhenBothShow": "0.00%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "99.94%",
+            "showSilenceAgree": "99.94%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/1312",
+            "wrongDoItModelFreeRegion": "0.00% (0/861)",
+            "missedClose": "0.35%",
+            "missedN": "1/282",
+            "wrongActionWhenBothShow": "0.00%"
+          }
+        },
+        "model": {
+          "en": {
+            "n": 2517,
+            "agree": "78.07%",
+            "showSilenceAgree": "78.98%",
+            "wrongDoIt": "1.58%",
+            "wrongDoItN": "29/1830",
+            "wrongDoItModelFreeRegion": "2.12% (26/1228)",
+            "missedClose": "72.78%",
+            "missedN": "500/687",
+            "wrongActionWhenBothShow": "3.74%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "82.94%",
+            "showSilenceAgree": "83.44%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/1312",
+            "wrongDoItModelFreeRegion": "0.00% (0/861)",
+            "missedClose": "93.62%",
+            "missedN": "264/282",
+            "wrongActionWhenBothShow": "44.44%"
+          }
+        },
+        "modelVeto": {
+          "en": {
+            "n": 2517,
+            "agree": "77.99%",
+            "showSilenceAgree": "78.90%",
+            "wrongDoIt": "1.42%",
+            "wrongDoItN": "26/1830",
+            "wrongDoItModelFreeRegion": "2.12% (26/1228)",
+            "missedClose": "73.51%",
+            "missedN": "505/687",
+            "wrongActionWhenBothShow": "3.85%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "82.87%",
+            "showSilenceAgree": "83.38%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/1312",
+            "wrongDoItModelFreeRegion": "0.00% (0/861)",
+            "missedClose": "93.97%",
+            "missedN": "265/282",
+            "wrongActionWhenBothShow": "47.06%"
+          }
+        },
+        "modelVetoV2": {
+          "en": {
+            "n": 2517,
+            "agree": "77.99%",
+            "showSilenceAgree": "78.90%",
+            "wrongDoIt": "1.42%",
+            "wrongDoItN": "26/1830",
+            "wrongDoItModelFreeRegion": "2.12% (26/1228)",
+            "missedClose": "73.51%",
+            "missedN": "505/687",
+            "wrongActionWhenBothShow": "3.85%"
+          },
+          "he": {
+            "n": 1594,
+            "agree": "82.87%",
+            "showSilenceAgree": "83.38%",
+            "wrongDoIt": "0.00%",
+            "wrongDoItN": "0/1312",
+            "wrongDoItModelFreeRegion": "0.00% (0/861)",
+            "missedClose": "93.97%",
+            "missedN": "265/282",
+            "wrongActionWhenBothShow": "47.06%"
+          }
+        }
+      },
+      "gold22": {
+        "teacherV2": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "50.00%",
+            "silenceRecall": "95.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "5.00% (1/20)"
+          }
+        },
+        "model": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          }
+        },
+        "modelVeto": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          }
+        },
+        "modelVetoV2": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          }
+        },
+        "teacher": {
+          "asDirection": {
+            "doItPrecision": "100.00%",
+            "silenceRecall": "100.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "0.00% (0/20)"
+          },
+          "textOnlyInbound": {
+            "doItPrecision": "50.00%",
+            "silenceRecall": "95.00%",
+            "askRecall": "50.00%",
+            "wrongDoIt": "5.00% (1/20)"
+          }
+        }
+      },
+      "adversarial": {
+        "teacherV2": {
+          "correct": "34/40",
+          "fails": [
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "od-save-5(draft)",
+            "od-save-he(draft)"
+          ]
+        },
+        "model": {
+          "correct": "35/40",
+          "fails": [
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "drive-pos(SILENT)"
+          ]
+        },
+        "modelVeto": {
+          "correct": "35/40",
+          "fails": [
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "drive-pos(SILENT)"
+          ]
+        },
+        "modelVetoV2": {
+          "correct": "35/40",
+          "fails": [
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "drive-pos(SILENT)"
+          ]
+        },
+        "teacher": {
+          "correct": "26/40",
+          "fails": [
+            "neg-drive-1(file_save)",
+            "neg-drive-2(file_save)",
+            "neg-drive-3(file_save)",
+            "neg-drive-4(file_save)",
+            "neg-he-1(file_save)",
+            "neg-he-2(file_save)",
+            "od-save-1(SILENT)",
+            "od-save-2(SILENT)",
+            "od-save-3(SILENT)",
+            "od-save-4(SILENT)",
+            "od-save-5(draft)",
+            "od-save-he(draft)",
+            "mkt-he(calendar)",
+            "cond-amt(task)"
+          ]
+        }
+      },
+      "adversarialRows": [
+        {
+          "id": "adv-neg-drive-1",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-drive-2",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.014,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-drive-3",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.005,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-drive-4",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.008,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-od-1",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.014,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-od-2",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.421,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-he-1",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-he-2",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.028,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-neg-send",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-fwd",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.005,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-meet",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.018,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-neg-pay",
+          "kind": "negation",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "negation",
+            "cap": null
+          },
+          "pShow": 0.003,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-1",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.946,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-2",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.918,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-od-save-3",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.758,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-4",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.902,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-save-5",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "follow-up-ask|draft",
+          "model": "drive-file|file_save",
+          "modelVetoV2": "drive-file|file_save",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 1,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-od-save-he",
+          "kind": "onedrive",
+          "expect": "file_save",
+          "teacher": "follow-up-ask|draft",
+          "model": "drive-file|file_save",
+          "modelVetoV2": "drive-file|file_save",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.987,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-od-hedge",
+          "kind": "hedge",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.005,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-od-noatt",
+          "kind": "no-attachment",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.087,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-att0",
+          "kind": "no-attachment",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:google",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.007,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-att2",
+          "kind": "ambiguous-file",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:google",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-hedge",
+          "kind": "hedge",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:google",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-drive-pos",
+          "kind": "control",
+          "expect": "file_save",
+          "teacher": "drive-file|file_save",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.511,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-meet-pos",
+          "kind": "control",
+          "expect": "calendar",
+          "teacher": "calendar-hold|calendar",
+          "model": "calendar-hold|calendar",
+          "modelVetoV2": "calendar-hold|calendar",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.973,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-req-pos",
+          "kind": "control",
+          "expect": "draft",
+          "teacher": "follow-up-ask|draft",
+          "model": "follow-up-ask|draft",
+          "modelVetoV2": "follow-up-ask|draft",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.997,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-past-1",
+          "kind": "past",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.02,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-past-2",
+          "kind": "past",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.001,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-cancel-1",
+          "kind": "cancelled (calendar-cancel = delete existing hold; plausible close, excluded from scoring)",
+          "expect": "AMBIGUOUS",
+          "teacher": "calendar-cancel|calendar",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.763,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-ooo-1",
+          "kind": "ooo",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.007,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-mkt-1",
+          "kind": "marketing",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:noise",
+            "v2": "marketing",
+            "cap": null
+          },
+          "pShow": 0.007,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-mkt-he",
+          "kind": "marketing",
+          "expect": "SILENT",
+          "teacher": "event|calendar",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "marketing",
+            "cap": null
+          },
+          "pShow": 0.214,
+          "seenInTrain": true
+        },
+        {
+          "id": "adv-3p-1",
+          "kind": "third-party",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "file",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.192,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-3p-he",
+          "kind": "third-party",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.002,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-fwd-quoted",
+          "kind": "quoted",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:noise",
+            "v2": "quoted-only",
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-inject-1",
+          "kind": "injection",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "payment-injection",
+            "cap": null
+          },
+          "pShow": 0.007,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-inject-2",
+          "kind": "injection",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "payment-injection",
+            "cap": null
+          },
+          "pShow": 0.009,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-cond-amt",
+          "kind": "conditional",
+          "expect": "SILENT",
+          "teacher": "confirmed-amount|task",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": null,
+            "v2": "undecided",
+            "cap": null
+          },
+          "pShow": 0.236,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-fyi-he",
+          "kind": "fyi",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "quiet:noise",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0.007,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-self-out",
+          "kind": "outbound",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "own-sender",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        },
+        {
+          "id": "adv-self-out-o",
+          "kind": "outbound",
+          "expect": "SILENT",
+          "teacher": "SILENT",
+          "model": "SILENT",
+          "modelVetoV2": "SILENT",
+          "veto": {
+            "base": "own-sender",
+            "v2": null,
+            "cap": null
+          },
+          "pShow": 0,
+          "seenInTrain": false
+        }
+      ],
+      "gold22Rows": [
+        {
+          "id": "rm-001",
+          "m0": "SILENT",
+          "prior": "HOLD",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-002",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-003",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-004",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-005",
+          "m0": "SILENT",
+          "prior": "CLOSE",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-006",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-007",
+          "m0": "SILENT",
+          "prior": "PROMISE",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-008",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-009",
+          "m0": "SILENT",
+          "prior": "HOLD",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-010",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-011",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-012",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-013",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-014",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-015",
+          "m0": "SILENT",
+          "prior": "HOLD",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-016",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-017",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-018",
+          "m0": "SILENT",
+          "prior": "ASK",
+          "teacherTextOnly": "follow-up-ask|draft",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-019",
+          "m0": "ASK",
+          "prior": "ASK",
+          "teacherTextOnly": "follow-up-ask|draft",
+          "modelTextOnly": "follow-up-ask|draft",
+          "modelVetoV2TextOnly": "follow-up-ask|draft"
+        },
+        {
+          "id": "rm-020",
+          "m0": "ASK",
+          "prior": "ASK",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-021",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        },
+        {
+          "id": "rm-022",
+          "m0": "SILENT",
+          "prior": "SILENT",
+          "teacherTextOnly": "SILENT",
+          "modelTextOnly": "SILENT",
+          "modelVetoV2TextOnly": "SILENT"
+        }
+      ],
+      "v2SilencedTeacherShows": [
+        {
+          "id": "syn-5203",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hello,\nPlease don't save the attachment to Drive.\nCheers"
+        },
+        {
+          "id": "syn-5205",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nPlease don't save the attachment to Google Drive.\nBest,\nRachel"
+        },
+        {
+          "id": "syn-5208",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi Sali,\nHope you are well.\nPlease don't save the attachment to Drive."
+        },
+        {
+          "id": "syn-5212",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Good morning,\nPlease don't save the attachment to Google Drive.\nThanks, David"
+        },
+        {
+          "id": "syn-5213",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey, Please don't save the attachment to Drive."
+        },
+        {
+          "id": "syn-5215",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey, Please don't save the attachment to Drive. Thanks, Noa"
+        },
+        {
+          "id": "syn-5218",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi there,\nPlease don't save the attachment to Drive.\nThank you!"
+        },
+        {
+          "id": "syn-5219",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Please don't save the attachment to Google Drive."
+        },
+        {
+          "id": "syn-5221",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Good morning, Please don't save the attachment to Drive. Thanks"
+        },
+        {
+          "id": "syn-5224",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nHope you are well.\nPlease don't save the attachment to Drive.\nBest,\nRachel"
+        },
+        {
+          "id": "syn-5229",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi,\nPlease don't save the attachment to Drive.\nThanks, Maya"
+        },
+        {
+          "id": "syn-5230",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Please don't save the attachment to Google Drive."
+        },
+        {
+          "id": "syn-5236",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey, Please don't save the attachment to Drive. Thanks, Avi"
+        },
+        {
+          "id": "syn-5238",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Happy Monday!\nPlease don't save the attachment to Google Drive.\nBest,\nDavid"
+        },
+        {
+          "id": "syn-5240",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5244",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Drive.\nRegards,\nMaya"
+        },
+        {
+          "id": "syn-5246",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Drive."
+        },
+        {
+          "id": "syn-5248",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Drive."
+        },
+        {
+          "id": "syn-5249",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hope you are well.\nDo not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5253",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi there,\nDo not save the attached file to Drive.\nThanks, Avi"
+        },
+        {
+          "id": "syn-5254",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5259",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nDo not save the attached file to Google Drive.\nBest,\nDana"
+        },
+        {
+          "id": "syn-5260",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi Sali,\nDo not save the attached file to Drive.\nBest,\nTom"
+        },
+        {
+          "id": "syn-5261",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hello,\nDo not save the attached file to Google Drive.\nThanks"
+        },
+        {
+          "id": "syn-5265",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Do not save the attached file to Google Drive."
+        },
+        {
+          "id": "syn-5273",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hi there, Do not save the attached file to Google Drive. Best,\nMichael"
+        },
+        {
+          "id": "syn-5275",
+          "rule": "negation",
+          "teacher": "drive-file|file_save",
+          "body": "Hey,\nHappy Monday!\nDo not save the attached file to Google Drive.\nThanks, Sarah"
+        },
+        {
+          "id": "rtest-follow-up-corpus-704",
+          "rule": "negation",
+          "teacher": "event|calendar",
+          "body": "תודה רבה על הפגישה היום, אם יש שאלות אל תהססו לפנות אליי."
+        },
+        {
+          "id": "rtest-intent-actions-corpus-898",
+          "rule": "marketing",
+          "teacher": "follow-up-ask|draft",
+          "body": "Please send me the webinar recording by Monday."
+        },
+        {
+          "id": "rtest-intent-actions-corpus-902",
+          "rule": "marketing",
+          "teacher": "event|calendar",
+          "body": "The webinar is on Thursday at 11am."
+        }
+      ],
+      "tauSweep": [
+        {
+          "tau": 0.3,
+          "wrongDoIt": "6.14% (193)",
+          "missedClose": "30.75%"
+        },
+        {
+          "tau": 0.4,
+          "wrongDoIt": "4.96% (156)",
+          "missedClose": "34.06%"
+        },
+        {
+          "tau": 0.5,
+          "wrongDoIt": "4.01% (126)",
+          "missedClose": "40.66%"
+        },
+        {
+          "tau": 0.6,
+          "wrongDoIt": "2.96% (93)",
+          "missedClose": "46.23%"
+        },
+        {
+          "tau": 0.7,
+          "wrongDoIt": "2.13% (67)",
+          "missedClose": "52.73%"
+        },
+        {
+          "tau": 0.8,
+          "wrongDoIt": "1.56% (49)",
+          "missedClose": "59.75%"
+        },
+        {
+          "tau": 0.9,
+          "wrongDoIt": "1.18% (37)",
+          "missedClose": "69.14%"
+        },
+        {
+          "tau": 0.95,
+          "wrongDoIt": "0.99% (31)",
+          "missedClose": "77.40%"
+        }
+      ],
+      "wrongDoItRowsForOwnerReview": [
+        {
+          "id": "syn-483",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.98,
+          "body": "Hey, We still need the lease from you by October 15 before we can onboard. Best, Sarah"
+        },
+        {
+          "id": "syn-510",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.98,
+          "body": "Hi, We still need the lease from you by November 2 before we can onboard. Cheers"
+        },
+        {
+          "id": "syn-3447",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.97,
+          "body": "Hi there, Attached is the receipt. Please save the attached file to OneDrive by Oct 20. Thanks"
+        },
+        {
+          "id": "syn-3476",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.97,
+          "body": "Hello, Attached is the budget spreadsheet. Please save the attached file to OneDrive by October 15. Regards, Dana"
+        },
+        {
+          "id": "syn-3481",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.98,
+          "body": "Hi, Please save the attachment to OneDrive. Thanks"
+        },
+        {
+          "id": "syn-3482",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.96,
+          "body": "Good morning, Please save the attachment to OneDrive. Cheers"
+        },
+        {
+          "id": "syn-3496",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Hi there, Please save the attachment to OneDrive. Regards, David"
+        },
+        {
+          "id": "syn-3497",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.97,
+          "body": "Hello, Please save the attachment to OneDrive. Regards, Noa"
+        },
+        {
+          "id": "syn-3498",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.98,
+          "body": "Hi, Please save the attachment to OneDrive. Thank you!"
+        },
+        {
+          "id": "syn-3499",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.98,
+          "body": "Please save the attachment to OneDrive. Best, Michael"
+        },
+        {
+          "id": "syn-3505",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.98,
+          "body": "Please save the attachment to OneDrive. Cheers"
+        },
+        {
+          "id": "syn-3506",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Hey, Please save the attachment to OneDrive."
+        },
+        {
+          "id": "syn-3511",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Hi Sali, Please save the attachment to OneDrive. Thanks"
+        },
+        {
+          "id": "syn-3516",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Please save the attachment to OneDrive. Thanks, Ethan"
+        },
+        {
+          "id": "syn-3761",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.97,
+          "body": "Hi, Please save this attachment to OneDrive. Regards, Lior"
+        },
+        {
+          "id": "syn-3768",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.98,
+          "body": "Hi, Hope you are well. Please save this attachment to OneDrive. Thanks, David"
+        },
+        {
+          "id": "syn-3770",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Hi Sali, Please save this attachment to OneDrive. Thanks"
+        },
+        {
+          "id": "syn-3771",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.98,
+          "body": "Please save this attachment to OneDrive. Regards, Lior"
+        },
+        {
+          "id": "syn-3772",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Please save this attachment to OneDrive. Thanks"
+        },
+        {
+          "id": "syn-3774",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Please save this attachment to OneDrive."
+        },
+        {
+          "id": "syn-3775",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Please save this attachment to OneDrive. Thank you!"
+        },
+        {
+          "id": "syn-3778",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Hi Sali, Please save this attachment to OneDrive. Thanks"
+        },
+        {
+          "id": "syn-3783",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 0.99,
+          "body": "Please save this attachment to OneDrive. Thank you!"
+        },
+        {
+          "id": "syn-3784",
+          "surface": "outlook",
+          "teacherReason": "intent-null",
+          "model": "drive-file|file_save",
+          "pShow": 1,
+          "body": "Please save this attachment to OneDrive."
+        },
+        {
+          "id": "rtest-capture-corpus-50",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.99,
+          "body": "Can you send the lease please?"
+        },
+        {
+          "id": "rtest-request-types-corpus-1578",
+          "surface": "gmail",
+          "teacherReason": "intent-null",
+          "model": "follow-up-ask|draft",
+          "pShow": 0.98,
+          "body": "Can you countersign the lease and send it back?"
+        }
+      ]
+    }
+  }
+}
