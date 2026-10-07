@@ -928,7 +928,8 @@
       const screen = el('div', 'ms-connect');
       screen.setAttribute('data-glance-connect', 'microsoft');
       const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
-        { id: 'mail', label: 'Mail', detail: 'Read mail, write a reply draft, and add a To Do task. Never sends.', required: true }
+        { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', required: true },
+        { id: 'todo', label: 'To Do', detail: 'Add one task on a task-only Do It. Glance reads it back before it is handled. Undo deletes that task.', scopes: ['Tasks.ReadWrite'], required: false }
       ];
       const boxes = {};
       const all = document.createElement('label');
