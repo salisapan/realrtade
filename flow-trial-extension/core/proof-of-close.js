@@ -98,34 +98,114 @@ const FlowProofOfClose = (() => {
     return clean(ref.externalId) || clean(ref.taskId);
   }
 
+  // Gmail legacy ids and Outlook ids are the same id in more than one
+  // spelling. A hash of the message text is not stable across a reload.
+  function canonId(id) {
+    if (typeof id !== 'string' && typeof id !== 'number') return '';
+    const s = String(id).trim().toLowerCase().replace(/\//g, '_');
+    return s;
+  }
+
+  function isGoogleTaskConnector(row) {
+    const kind = row && row.connectorId;
+    return kind === 'googleTask' || kind === 'googleTasks';
+  }
+
   // A written Activity row that is still a trusted Google Task close.
-  // fetchedBack true is the proof. A 0.9.28 row stored only system,
-  // externalId, and verifiedAt — those three are written only after a
-  // real read-back, so they count the same. fetchedBack false does not.
+  // fetchedBack true is the proof. The 0.9.28 triple (system, externalId,
+  // verifiedAt) counts the same. A googleTask write that stored ref but
+  // not that triple still counts: the receipt already said Handled, and
+  // a verify miss never appends a written row. fetchedBack false does not.
   function isTaskReceiptRow(row) {
     if (!row || row.kind !== 'written') return false;
-    if (clean(row.system) !== SYSTEM_GOOGLE_TASKS) return false;
-    if (!externalIdOf(row)) return false;
-    const verifiedAt = clean(row.verifiedAt);
-    if (!verifiedAt || Number.isNaN(Date.parse(verifiedAt))) return false;
     if (row.fetchedBack === false) return false;
-    return true;
+    if (!externalIdOf(row)) return false;
+    if (clean(row.system) === SYSTEM_GOOGLE_TASKS) return true;
+    return isGoogleTaskConnector(row);
+  }
+
+  function addCanon(set, id) {
+    const c = canonId(id);
+    if (c) set.add(c);
+  }
+
+  // A string is one message id (existing callers). An object also carries
+  // every id the open thread can see: legacy message id, the text hash,
+  // and the thread id. Any one match is enough.
+  function queryIds(messageIdOrQuery) {
+    const messageIds = new Set();
+    const threadIds = new Set();
+    if (typeof messageIdOrQuery === 'string' || typeof messageIdOrQuery === 'number') {
+      addCanon(messageIds, messageIdOrQuery);
+      return { messageIds: messageIds, threadIds: threadIds };
+    }
+    const query = messageIdOrQuery || {};
+    const mids = query.messageIds != null ? query.messageIds : query.messageId;
+    const midList = Array.isArray(mids) ? mids : (mids != null && mids !== '' ? [mids] : []);
+    for (let i = 0; i < midList.length; i++) addCanon(messageIds, midList[i]);
+    const tids = query.threadIds != null ? query.threadIds : query.threadId;
+    const tidList = Array.isArray(tids) ? tids : (tids != null && tids !== '' ? [tids] : []);
+    for (let j = 0; j < tidList.length; j++) addCanon(threadIds, tidList[j]);
+    return { messageIds: messageIds, threadIds: threadIds };
+  }
+
+  function rowMessageIds(entry) {
+    const ids = [];
+    if (!entry) return ids;
+    [entry.messageId, entry.legacyMessageId, entry.gmailMessageId].forEach((id) => {
+      const c = canonId(id);
+      if (c) ids.push(c);
+    });
+    return ids;
+  }
+
+  function rowMatches(entry, messageIds, threadIds) {
+    const ids = rowMessageIds(entry);
+    for (let i = 0; i < ids.length; i++) {
+      if (messageIds.has(ids[i])) return true;
+      if (ids[i].indexOf('scan:') === 0 && threadIds.has(ids[i].slice(5))) return true;
+    }
+    const thread = canonId(entry.threadId);
+    if (thread && threadIds.has(thread)) return true;
+    return false;
   }
 
   // Newest log entry wins. The log is stored newest first. A later undo
-  // or dismiss means the banner stays down. A later shown line does not
-  // hide a proved task — that is the reload bug this picker exists for.
-  function taskReceiptFromLog(log, messageId) {
-    if (typeof messageId !== 'string' || !messageId) return null;
+  // or dismiss of this task means the banner stays down. A later shown
+  // line does not hide a proved task. A different hash after reload still
+  // matches the legacy message id or the thread id stored on the row.
+  function taskReceiptFromLog(log, messageIdOrQuery) {
+    const found = queryIds(messageIdOrQuery);
+    if (!found.messageIds.size && !found.threadIds.size) return null;
     const rows = Array.isArray(log) ? log : [];
     for (let i = 0; i < rows.length; i++) {
       const entry = rows[i];
-      if (!entry || entry.messageId !== messageId) continue;
-      if (entry.kind === 'undone' || entry.kind === 'dismissed') return null;
+      if (!entry || !rowMatches(entry, found.messageIds, found.threadIds)) continue;
+      if (entry.kind === 'undone' || entry.kind === 'dismissed') {
+        const sameMessage = rowMessageIds(entry).some((id) => found.messageIds.has(id));
+        const taskUndo = isGoogleTaskConnector(entry) || clean(entry.system) === SYSTEM_GOOGLE_TASKS;
+        if (sameMessage || taskUndo) return null;
+        continue;
+      }
       if (entry.kind !== 'written') continue;
       if (isTaskReceiptRow(entry)) return entry;
     }
     return null;
+  }
+
+  // What the Gmail scan should do once the thread node has been rebuilt.
+  // hasTerminalOutcome true is not a reason to leave the thread with no
+  // chip: a proved task receipt mounts. No host and no receipt stays quiet.
+  function scanReceiptDecision(input) {
+    input = input || {};
+    if (input.hasHost) return 'keep';
+    const row = taskReceiptFromLog(input.log, {
+      messageIds: input.messageIds,
+      threadIds: input.threadIds
+    });
+    if (row) return 'mount';
+    if (input.terminal) return 'silent';
+    return 'judge';
   }
 
   function receiptStatusOf(row) {
@@ -206,7 +286,9 @@ const FlowProofOfClose = (() => {
     stepCountsAsHandled: stepCountsAsHandled,
     shouldRecordTrustedClose: shouldRecordTrustedClose,
     activityFields: activityFields,
+    canonId: canonId,
     taskReceiptFromLog: taskReceiptFromLog,
+    scanReceiptDecision: scanReceiptDecision,
     remountCopy: remountCopy,
     receiptLogFields: receiptLogFields,
     googleTasksAdapter: googleTasksAdapter

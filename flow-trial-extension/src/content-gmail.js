@@ -570,13 +570,7 @@
   // missing attribute is not guessed at — personal close memory treats a
   // missing thread id as "not clear" unless the subject itself is specific.
   function threadIdFrom(message) {
-    let node = message;
-    while (node && node.getAttribute) {
-      const id = node.getAttribute('data-legacy-thread-id');
-      if (id) return id;
-      node = node.parentElement;
-    }
-    return null;
+    return gmailAttr(message, 'data-legacy-thread-id') || null;
   }
 
   // Prefer silence when this open message clearly continues a personal
@@ -661,6 +655,98 @@
     return intent || { type: null };
   }
 
+  // data-legacy-message-id and data-legacy-thread-id sit on the message
+  // (.adn), which is inside the listitem, not always on the listitem
+  // itself. The hash of the row text changes when Gmail rewrites
+  // "0 minutes ago". The legacy id and the thread id do not.
+  function gmailAttr(node, name) {
+    if (!node || !node.getAttribute) return '';
+    const own = node.getAttribute(name);
+    if (own) return own;
+    if (node.querySelector) {
+      try {
+        const child = node.querySelector('[' + name + ']');
+        const fromChild = child && child.getAttribute(name);
+        if (fromChild) return fromChild;
+      } catch (e) { /* attribute selector is a fixed name */ }
+    }
+    let parent = node.parentElement;
+    let hops = 0;
+    while (parent && hops < 8) {
+      const value = parent.getAttribute && parent.getAttribute(name);
+      if (value) return value;
+      parent = parent.parentElement;
+      hops++;
+    }
+    return '';
+  }
+
+  function stableMessageKey(message) {
+    const legacy = gmailAttr(message, 'data-legacy-message-id');
+    const threadId = gmailAttr(message, 'data-legacy-thread-id');
+    let hash = '';
+    try { hash = hashNode(message) || ''; } catch (e) { hash = ''; }
+    const messageIds = [];
+    if (legacy) messageIds.push(legacy);
+    if (hash) messageIds.push(hash);
+    if (threadId) messageIds.push('scan:' + threadId);
+    return {
+      messageId: legacy || hash,
+      legacy: legacy,
+      threadId: threadId,
+      messageIds: messageIds,
+      threadIds: threadId ? [threadId] : []
+    };
+  }
+
+  // Before own-email, before "which message to judge", before the terminal
+  // return. A proved Google Task is mounted again whenever this thread has
+  // the receipt and the chip is gone. Classification staying quiet must
+  // not leave the thread blank.
+  async function remountProvedTaskReceipts(messages) {
+    if (typeof FlowProofOfClose === 'undefined' || !FlowProofOfClose.taskReceiptFromLog) return false;
+    let settled = null;
+    let fallback = null;
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      if (!message || !message.isConnected || message.querySelector('.flow-chip-host')) continue;
+      const ids = stableMessageKey(message);
+      if (!ids.messageIds.length && !ids.threadIds.length) continue;
+      if (!settled) {
+        try { settled = await FlowStorage.get(); }
+        catch (e) { return false; }
+      }
+      const taskRow = FlowProofOfClose.taskReceiptFromLog(settled.log, {
+        messageIds: ids.messageIds,
+        threadIds: ids.threadIds
+      });
+      const decision = FlowProofOfClose.scanReceiptDecision
+        ? FlowProofOfClose.scanReceiptDecision({
+          log: settled.log,
+          messageIds: ids.messageIds,
+          threadIds: ids.threadIds,
+          hasHost: false,
+          terminal: true
+        })
+        : (taskRow ? 'mount' : 'silent');
+      if (decision !== 'mount' || !taskRow) continue;
+      const direct = ids.messageIds.some((id) => {
+        const c = FlowProofOfClose.canonId ? FlowProofOfClose.canonId(id) : id;
+        if (!c) return false;
+        return c === (FlowProofOfClose.canonId ? FlowProofOfClose.canonId(taskRow.messageId) : taskRow.messageId)
+          || c === (FlowProofOfClose.canonId ? FlowProofOfClose.canonId(taskRow.legacyMessageId) : taskRow.legacyMessageId);
+      });
+      if (direct) {
+        mountProvedTaskReceipt(message, taskRow);
+        return true;
+      }
+      fallback = { message: message, taskRow: taskRow };
+    }
+    if (!fallback) return false;
+    mountProvedTaskReceipt(fallback.message, fallback.taskRow);
+    return true;
+  }
+
   async function scanReadingPane() {
     if (!watching) return;
     const main = document.querySelector('div[role="main"]');
@@ -668,6 +754,12 @@
 
     const messages = main.querySelectorAll('div[role="listitem"]');
     if (!messages.length) return;
+
+    try {
+      await remountProvedTaskReceipts(messages);
+    } catch (e) {
+      console.error('[Glance] failed to remount a handled task', e);
+    }
 
     // Only the newest message in the thread — this mirrors "an email arrived",
     // not "re-judge the entire history on every DOM mutation". But the newest
@@ -732,7 +824,8 @@
     const message = judgeAt >= 0 ? messages[judgeAt] : null;
     if (!message) return; // own mail to someone else, or no message we can tell apart from one
 
-    const legacyId = message.getAttribute('data-legacy-message-id');
+    const stable = stableMessageKey(message);
+    const legacyId = stable.legacy || null;
 
     // A stale Feature 3 hover card is otherwise left floating in
     // document.body: it's appended independent of the chip's own DOM
@@ -749,7 +842,7 @@
       sender: extractSender(message),
       subject: currentSubject(),
       legacyId,
-      messageId: legacyId || hashNode(message),
+      messageId: stable.messageId,
       threadUrl: threadUrl(legacyId)
     };
     // Only worth re-checking when the message actually being looked at
@@ -780,7 +873,7 @@
       chainHost.remove();
     } else if (message.querySelector('.flow-chip-host')) return;
 
-    const messageId = legacyId || hashNode(message);
+    const messageId = stable.messageId;
     if (!messageId) return;
 
     // A message can reach "seen" with no live chip in front of you two very
@@ -804,14 +897,25 @@
     // after a read-back. A newer undo or dismiss does not come back.
     // Other writers still stop at the terminal check below.
     const settled = await FlowStorage.get();
+    const taskQuery = { messageIds: stable.messageIds, threadIds: stable.threadIds };
     const taskRow = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.taskReceiptFromLog)
-      ? FlowProofOfClose.taskReceiptFromLog(settled && settled.log, messageId)
+      ? FlowProofOfClose.taskReceiptFromLog(settled && settled.log, taskQuery)
       : null;
-    if (taskRow) {
-      // Gmail may clear this node's children and keep the node (inbox and
-      // back). Mount whenever the receipt is missing. The insert is
-      // synchronous, so a second scan in the same turn sees the host.
-      if (message.isConnected && !message.querySelector('.flow-chip-host')) {
+    const taskDecision = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.scanReceiptDecision)
+      ? FlowProofOfClose.scanReceiptDecision({
+        log: settled && settled.log,
+        messageIds: stable.messageIds,
+        threadIds: stable.threadIds,
+        hasHost: false,
+        terminal: !!(FlowStorage.hasTerminalOutcomeFrom && FlowStorage.hasTerminalOutcomeFrom(settled, messageId))
+      })
+      : (taskRow ? 'mount' : 'silent');
+    if (taskRow && taskDecision === 'mount') {
+      // One receipt for the thread. The pass above already mounted it when
+      // the legacy id or the thread id matched. Do not add a second banner
+      // on a different message in the same thread.
+      const already = main.querySelector('.flow-chip-host[data-glance-chain="task-proof"]');
+      if (!already && message.isConnected && !message.querySelector('.flow-chip-host')) {
         mountProvedTaskReceipt(message, taskRow);
       }
       return;
@@ -1068,7 +1172,7 @@
     if (!process) return; // defensive only — every catalog entry has at least an anchor step
 
     injectChip(message, {
-      messageId, intent, process, sender, subject, attachment: chosenAttachment, attachments,
+      messageId, legacyMessageId: legacyId || null, intent, process, sender, subject, attachment: chosenAttachment, attachments,
       threadUrl: threadUrl(legacyId),
       threadId: threadId,
       // Snapshotted now, not re-read from the DOM at click time — by the
@@ -2198,12 +2302,21 @@
             .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
         }
         done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
-        FlowStorage.appendLog({
-          kind: 'undone',
-          label: row.label || 'Google Task',
-          messageId: messageId,
-          app: SOURCE_APP,
-          connectorId: copy.connectorId
+        const mark = typeof FlowStorage.markGoogleTaskUndone === 'function'
+          ? FlowStorage.markGoogleTaskUndone(messageId, copy.ref, row.threadId)
+          : Promise.resolve({ hit: false });
+        mark.then((marked) => {
+          if (marked && marked.hit) return null;
+          return FlowStorage.appendLog({
+            kind: 'undone',
+            label: row.label || 'Google Task',
+            messageId: messageId,
+            threadId: row.threadId || null,
+            externalId: copy.externalId,
+            app: SOURCE_APP,
+            connectorId: copy.connectorId,
+            undone: true
+          });
         }).catch((e) => console.error('[Glance] failed to record an undone task — the task itself was already removed', e));
         chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state && state.domainId } });
       });
@@ -2333,7 +2446,23 @@
         if (result.ok) {
           const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres);
           done.replaceChildren(el('span', 'flow-chip-label', undone));
-          FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
+          const taskSteps = succeeded.filter(taskKind);
+          const markTask = taskSteps.length && typeof FlowStorage.markGoogleTaskUndone === 'function'
+            ? Promise.all(taskSteps.map((r) => FlowStorage.markGoogleTaskUndone(ctx.messageId, r.response && r.response.ref, ctx.threadId)))
+            : Promise.resolve([]);
+          markTask.then((marked) => {
+            const covered = taskSteps.length > 0 && Array.isArray(marked) && marked.some((m) => m && (m.hit || m.ok));
+            if (taskSteps.length === succeeded.length && covered) return null;
+            return FlowStorage.appendLog({
+              kind: 'undone',
+              label: ctx.intent.label,
+              messageId: ctx.messageId,
+              threadId: ctx.threadId || null,
+              connectorId: taskSteps.length === succeeded.length ? 'googleTask' : undefined,
+              undone: true,
+              app: SOURCE_APP
+            });
+          }).catch((e) => console.error('[Glance] failed to record an undone task — the task itself was already removed', e));
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
           // The button stays Undo. Replacing its label with the failure
@@ -2419,6 +2548,8 @@
         kind: 'written',
         label: ctx.intent.label,
         messageId: ctx.messageId,
+        legacyMessageId: ctx.legacyMessageId || null,
+        threadId: ctx.threadId || null,
         where: r.response.where,
         url: r.response.url,
         ref: r.response.ref,

@@ -150,8 +150,10 @@ console.log('\n--- Handled survives a thread reload ---\n');
     FlowProofOfClose.taskReceiptFromLog([writtenRow({ fetchedBack: false })], 'm1') === null);
   check('a row with no external id is not a receipt',
     FlowProofOfClose.taskReceiptFromLog([writtenRow({ externalId: '', ref: {} })], 'm1') === null);
-  check('a row with no verifiedAt is not a receipt',
-    FlowProofOfClose.taskReceiptFromLog([writtenRow({ verifiedAt: '' })], 'm1') === null);
+  check('a google task write with an id still remounts when verifiedAt was not stored',
+    FlowProofOfClose.taskReceiptFromLog([writtenRow({ verifiedAt: '', system: '' })], 'm1') !== null);
+  check('a row with no task id and no google task connector is not a receipt',
+    FlowProofOfClose.taskReceiptFromLog([writtenRow({ verifiedAt: '', system: '', externalId: '', ref: {}, connectorId: 'calendar' })], 'm1') === null);
   check('an empty log does not remount', FlowProofOfClose.taskReceiptFromLog([], 'm1') === null);
   check('a missing log does not remount', FlowProofOfClose.taskReceiptFromLog(null, 'm1') === null);
 
@@ -205,7 +207,76 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a proved write stores the banner lines on the Activity row',
     gmail.indexOf('FlowProofOfClose.receiptLogFields') > 0);
   const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
-  check('the extension version is 0.9.29', /"version": "0\.9\.29"/.test(manifest));
+  check('the extension version is 0.9.30', /"version": "0\.9\.30"/.test(manifest));
+
+  // Live 0.9.29: Do It stored a hash of the message text. After reload that
+  // hash changed (the clock line in the row changed) and the scan treated
+  // the written row as terminal, so the thread had no banner. Activity
+  // still showed HANDLED. The scan must mount, not stay silent.
+  const oldHash = 'h111';
+  const newHash = 'h222';
+  const threadId = 'thread_9';
+  const legacyId = '18f3abc';
+  const stored = writtenRow({
+    messageId: oldHash,
+    threadId: threadId,
+    legacyMessageId: legacyId,
+    fetchedBack: true,
+    writtenLine: 'Google Task · due Oct 10'
+  });
+  const reloadQuery = { messageIds: [newHash, legacyId], threadIds: [threadId] };
+  check('a changed text-hash still finds the receipt by legacy id and thread id',
+    FlowProofOfClose.taskReceiptFromLog([stored], reloadQuery) === stored);
+  check('slash and underscore are the same message id',
+    FlowProofOfClose.canonId('18f3/ABC') === FlowProofOfClose.canonId('18f3_abc'));
+  const terminalNoHost = FlowProofOfClose.scanReceiptDecision({
+    log: [stored],
+    messageIds: [newHash, legacy],
+    threadIds: [threadId],
+    hasHost: false,
+    terminal: true
+  });
+  check('terminal outcome with no chip mounts the proved task, it does not stay silent',
+    terminalNoHost === 'mount', terminalNoHost);
+  const hashOnly = FlowProofOfClose.scanReceiptDecision({
+    log: [writtenRow({ messageId: oldHash, threadId: threadId })],
+    messageIds: [newHash],
+    threadIds: [threadId],
+    hasHost: false,
+    terminal: true
+  });
+  check('thread id alone remounts when the reload hash does not match the stored hash',
+    hashOnly === 'mount', hashOnly);
+  const bareTask = {
+    kind: 'written', messageId: oldHash, connectorId: 'googleTask', threadId: threadId,
+    where: 'Google Tasks', ref: { taskListId: 'LIST_A', taskId: 'task_9', externalId: 'task_9' }
+  };
+  check('a written google task with a ref remounts even without the proof triple',
+    FlowProofOfClose.scanReceiptDecision({
+      log: [bareTask], messageIds: [newHash], threadIds: [threadId], hasHost: false, terminal: true
+    }) === 'mount');
+  check('a newer undo on that thread does not remount',
+    FlowProofOfClose.scanReceiptDecision({
+      log: [{ kind: 'undone', messageId: oldHash, threadId: threadId, connectorId: 'googleTask', undone: true }, stored],
+      messageIds: [newHash], threadIds: [threadId], hasHost: false, terminal: true
+    }) === 'silent');
+  check('no receipt and a terminal row stays silent',
+    FlowProofOfClose.scanReceiptDecision({
+      log: [{ kind: 'written', messageId: 'other', connectorId: 'calendar', ref: { eventId: 'ev' } }],
+      messageIds: [newHash], threadIds: ['other-thread'], hasHost: false, terminal: true
+    }) === 'silent');
+  check('a host already on the thread is left alone',
+    FlowProofOfClose.scanReceiptDecision({
+      log: [stored], messageIds: [newHash], threadIds: [threadId], hasHost: true, terminal: true
+    }) === 'keep');
+
+  const ownAt = gmail.indexOf('if (!ownEmail) return');
+  const earlyAt = gmail.indexOf('remountProvedTaskReceipts');
+  check('remount runs before the scan can return for a missing own-email or a quiet classification',
+    earlyAt > 0 && ownAt > earlyAt, { earlyAt: earlyAt, ownAt: ownAt });
+  check('a successful task undo rewrites the HANDLED row instead of leaving it',
+    gmail.indexOf('markGoogleTaskUndone') > 0 &&
+    fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8').indexOf('markGoogleTaskUndone') > 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);
