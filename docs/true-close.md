@@ -81,3 +81,13 @@ The same contract is a Microsoft To Do task. A task-only Do It on Outlook posts 
 If the create has no id, the result is `proof_pending`. If the read-back misses, returns another id, or shows the task deleted, the result is `verify_failed`. Neither is Handled, and neither is a trusted close. Calendar, Drive, and drafts are not on this gate. Nothing is sent.
 
 The on-thread receipt is that Activity row. After Gmail rebuilds the thread (a reload, or inbox and back), the Handled banner is mounted again when `fetchedBack` is true, or when the row still has `system`, `externalId`, and `verifiedAt` from a proved write. The match is the legacy message id and the thread id. A hash of the message text is not enough: Gmail rewrites the clock line in that text on reload. After Outlook rebuilds the thread, the match is the item id, the path id, or the conversation id. A newer undo or dismiss does not put the banner back. Undo rewrites the Activity row, so it does not stay Handled after the task is gone.
+
+## 8. Own-computer wedge: one allowlisted page, read back from the page
+
+Glance closes open loops. Gmail is where it starts today. The floating extension follows the person. This close is a page that extension already sees. It does not replace the extension, and it is not a new site.
+
+**Current implementation status (0.9.32).** Scaffold only. One allowlisted web UI: `system: "computer/example.com"`, path `/fixture/glance-close`, action `mark-done`. `fetchedBack` is a DOM re-read: the URL matches, and the success selector is present. A visible id is `externalId` when the page has one; otherwise `host:path:actionDigest`, stored on Activity. Handled (or טופל) only when `proof.fetchedBack === true`. A click is not that read. A screenshot hash may be kept as audit and is not the gate. A password field or מאשר pauses as `proof_pending`. Escalation is CoS. This path does not ask Sali.
+
+Undo prefers the inverse page action (`mark-open`) when a re-read shows that inverse. If there is no inverse, the line is Undo unavailable. Either way the Activity row is rewritten and does not stay Handled. A reload mounts the banner again from the message id or the thread id.
+
+The live page driver is not wired. Corpus tests inject the DOM reader (`test/computer-proof-corpus.cjs`). The CoS checklist is `docs/computer-proof-gate.md`. `computer/local/<app>` is a later gate and is not a proof in this tip. Google Tasks and Microsoft To Do are unchanged. Nothing is sent.

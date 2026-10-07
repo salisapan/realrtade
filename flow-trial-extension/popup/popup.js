@@ -2285,11 +2285,19 @@
     return out;
   }
 
+  function isComputerActivityRow(e) {
+    if (!e) return false;
+    if (e.connectorId === 'computerClose') return true;
+    if (typeof e.system !== 'string') return false;
+    return e.system.indexOf('computer/') === 0 && e.system.indexOf('computer/local/') !== 0;
+  }
+
   function newerTaskUndo(log, index) {
     const e = log[index];
     if (!e || e.kind !== 'written') return false;
     const task = e.connectorId === 'googleTask' || e.connectorId === 'googleTasks' || e.system === 'google/tasks'
-      || e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
+      || e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo'
+      || isComputerActivityRow(e);
     if (!task) return false;
     const ext = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
     for (let i = 0; i < index; i++) {
@@ -2298,7 +2306,8 @@
       if (e.messageId && newer.messageId === e.messageId) return true;
       const newerTask = newer.connectorId === 'googleTask' || newer.connectorId === 'googleTasks'
         || newer.connectorId === 'outlookTask' || newer.connectorId === 'microsoftTodo'
-        || newer.system === 'google/tasks' || newer.system === 'microsoft/todo';
+        || newer.system === 'google/tasks' || newer.system === 'microsoft/todo'
+        || isComputerActivityRow(newer);
       if (e.threadId && newer.threadId && e.threadId === newer.threadId && newerTask) return true;
       const nextExt = newer.externalId || (newer.ref && (newer.ref.externalId || newer.ref.taskId)) || '';
       if (ext && nextExt && ext === nextExt) return true;
@@ -2336,6 +2345,28 @@
         const note = el('span', 'log-undo-note', hintLine);
         undoNote = note;
         u.addEventListener('click', async () => {
+          if (isComputerActivityRow(e) && typeof FlowStorage.markComputerUndone === 'function') {
+            u.textContent = 'Undoing…';
+            u.disabled = true;
+            const marked = await FlowStorage.markComputerUndone(e.messageId, e.ref, e.threadId);
+            if (marked && marked.hit && marked.stayedHandled === false) {
+              if (typeof FlowCloseMemory !== 'undefined') await FlowCloseMemory.forgetMessage(e.messageId);
+              if (e.messageId) {
+                await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
+                await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId });
+              }
+              await renderLog();
+              if (typeof renderOpen === 'function') await renderOpen();
+            } else {
+              const line = 'Undo unavailable.';
+              u.textContent = 'Undo';
+              u.disabled = false;
+              u.setAttribute('aria-label', line);
+              note.textContent = line;
+              note.className = 'log-undo-note log-undo-failed';
+            }
+            return;
+          }
           u.textContent = 'Undoing…';
           u.disabled = true;
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
