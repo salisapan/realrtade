@@ -266,6 +266,76 @@ console.log('\n--- every incoming message ends in a card or a reason (never neit
   check('a declined ask says incoming-declined', why('k7') === 'incoming-declined', why('k7'));
 }
 
+console.log('\n--- OneDrive save reaches a card, and a drop still has a reason ---\n');
+{
+  const { FlowOwaParse: Owa } = require('../core/owa-parse.js');
+  const { FlowGraphMail: GM } = require('../core/graph-mail.js');
+  const upper = Owa.urlIds('https://outlook.live.com/mail/0/inbox/id/AQQKADAwATM0MDAAMS0wZTAw');
+  const lower = Owa.urlIds('https://outlook.live.com/mail/0/inbox/id/AQQkADAwATM0MDAAMS0wZTAw');
+  check('an uppercase AQQK address is a conversation, not a message id',
+    upper.kind === 'conversation' && upper.itemId == null && upper.conversationId && /^AQQK/i.test(upper.conversationId), upper);
+  check('a lowercase AQQk address is still a conversation',
+    lower.kind === 'conversation' && lower.itemId == null, lower);
+  const SAVE = 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks';
+  const pdf = { id: 'att1', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
+  const one = theirs('od1', SAVE, 0.1, 'Gate 0.9.35 OneDrive save');
+  one.hasAttachments = true;
+  one.attachments = [pdf];
+  one.from.emailAddress.address = 'ai.local.flow@gmail.com';
+  one.toRecipients = [{ emailAddress: { name: 'Glance', address: ME } }];
+  const shown = plan([one]);
+  const kinds = shown.incoming[0] && shown.incoming[0].process && shown.incoming[0].process.steps.map((s) => s.kind);
+  check('one PDF on a OneDrive save is an incoming card',
+    shown.incoming.length === 1 && kinds && kinds[0] === 'onedriveFile' && kinds[1] === 'outlookDraft' &&
+    shown.incoming[0].process.steps[0].label === 'OneDrive' && shown.diagnostics.length === 0,
+    { incoming: shown.incoming.map((x) => x.subject), kinds, diagnostics: shown.diagnostics });
+  const two = theirs('od2', SAVE, 0.1, 'Gate two files');
+  two.hasAttachments = true;
+  two.attachments = [pdf, Object.assign({}, pdf, { id: 'att2', name: 'other.pdf' })];
+  const twoPlan = plan([two]);
+  const twoWhy = (twoPlan.diagnostics.find((d) => d.conversationId === 'od2') || {}).reason;
+  check('two non-inline files stay silent with a reason',
+    twoPlan.incoming.length === 0 && twoWhy === 'quiet:google', { incoming: twoPlan.incoming.length, why: twoWhy });
+  const unread = theirs('od3', SAVE, 0.1, 'Gate attachments unread');
+  unread.hasAttachments = true;
+  unread.attachmentsUnread = true;
+  const unreadPlan = plan([unread]);
+  const unreadWhy = (unreadPlan.diagnostics.find((d) => d.conversationId === 'od3') || {}).reason;
+  check('an attachment list that could not be read is not a fake count',
+    unreadPlan.incoming.length === 0 && unreadWhy === 'outlook:attachments-unread', unreadWhy);
+  const preview = theirs('od4', '', 0.1, 'Gate preview');
+  preview.body = { contentType: 'text', content: '' };
+  preview.bodyPreview = SAVE;
+  preview.hasAttachments = true;
+  preview.attachments = [pdf];
+  const previewU = GM.toUtterance(preview, ME);
+  const previewPlan = plan([preview]);
+  check('an empty body falls through to bodyPreview and can show',
+    previewU && /OneDrive/.test(previewU.text) && previewPlan.incoming.length === 1,
+    { text: previewU && previewU.text, incoming: previewPlan.incoming.length, diagnostics: previewPlan.diagnostics });
+  const noConv = theirs('od5', 'Could you please send me the signed lease by Friday? I need it to release the deposit.', 0.1, 'Gate no conversation');
+  delete noConv.conversationId;
+  const noConvPlan = plan([noConv]);
+  const noConvLine = noConvPlan.diagnostics.find((d) => d.messageId === noConv.id) || noConvPlan.incoming.find((x) => x.messageId === noConv.id);
+  check('a message with no conversation id is a card or a reason',
+    Boolean(noConvLine) && (noConvPlan.incoming.some((x) => x.messageId === noConv.id) || noConvPlan.diagnostics.some((d) => d.messageId === noConv.id)),
+    { incoming: noConvPlan.incoming.map((x) => x.messageId), diagnostics: noConvPlan.diagnostics });
+  const flagOnly = [
+    ['od-flag-onedrive', 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks'],
+    ['od-flag-drive', 'Please save the attached file to Drive.']
+  ];
+  flagOnly.forEach((pair) => {
+    const row = theirs(pair[0], pair[1], 0.1, 'Gate flag only');
+    row.hasAttachments = true;
+    delete row.attachments;
+    const planned = plan([row]);
+    const why = (planned.diagnostics.find((d) => d.conversationId === pair[0]) || {}).reason;
+    check('hasAttachments without a file list is not one file: ' + pair[0],
+      planned.incoming.length === 0 && why === 'outlook:attachments-unread',
+      { incoming: planned.incoming.length, why: why, kinds: planned.incoming[0] && planned.incoming[0].process && planned.incoming[0].process.steps.map((s) => s.kind) });
+  });
+}
+
 console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));
 console.log('TOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

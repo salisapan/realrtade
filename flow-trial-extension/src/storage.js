@@ -1498,6 +1498,54 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
+  // Same in-place rewrite for the OneDrive file. A second HANDLED row is
+  // not how Undo clears the close.
+  const markOnedriveFileUndone = serialize(async function markOnedriveFileUndone(messageId, ref, threadId) {
+    const state = await get();
+    const log = (state.log || []).slice();
+    const ext = (ref && (ref.externalId || ref.fileId || ref.itemId)) || '';
+    let hit = false;
+    for (let i = 0; i < log.length; i++) {
+      const e = log[i];
+      if (!e || e.kind !== 'written') continue;
+      const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.fileId || e.ref.itemId)) || '';
+      const fileRow = e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive';
+      if (!fileRow) continue;
+      if (ext && rowExt && rowExt !== ext) continue;
+      const idHit = messageId && (e.messageId === messageId || e.itemId === messageId || e.pathId === messageId || e.outlookIncomingId === messageId);
+      const extHit = ext && rowExt === ext;
+      const threadHit = threadId && ((e.threadId && e.threadId === threadId) || (e.outlookConversationId && e.outlookConversationId === threadId));
+      if (!idHit && !extHit && !threadHit) continue;
+      log[i] = Object.assign({}, e, {
+        kind: 'undone',
+        undone: true,
+        connectorId: e.connectorId || 'onedriveFile',
+        url: null,
+        ref: null,
+        where: null
+      });
+      hit = true;
+      break;
+    }
+    if (!hit && (messageId || ext || threadId)) {
+      log.unshift({
+        ts: Date.now(),
+        kind: 'undone',
+        undone: true,
+        label: 'OneDrive file removed.',
+        messageId: messageId || null,
+        threadId: threadId || null,
+        externalId: ext || null,
+        app: 'outlook',
+        connectorId: 'onedriveFile',
+        system: 'microsoft/onedrive'
+      });
+      hit = true;
+    }
+    await set({ log: trimLog(log, new Set(state.resolvedMessageIds || [])) });
+    return { ok: true, hit: hit };
+  });
+
   // Own-computer close. Rewrite the written row so Activity does not stay
   // HANDLED. The page driver is not called from here.
   const markComputerUndone = serialize(async function markComputerUndone(messageId, ref, threadId) {
@@ -1613,7 +1661,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

@@ -8,6 +8,7 @@ const path = require('path');
 const vm = require('vm');
 const { webcrypto } = require('crypto');
 const { FlowIncomingJudge: J } = require('../core/incoming-judge.js');
+const { FlowGraphMail: Mail } = require('../core/graph-mail.js');
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -151,9 +152,66 @@ console.log('\n--- write, read back, undo ---\n');
     out.proof.externalId === 'TASK9' && out.ref.externalId === 'TASK9' && out.ref.taskListId === 'DEF' &&
     post && /\/me\/todo\/lists\/DEF\/tasks$/.test(post.url) && gets.length === 1 && /\/tasks\/TASK9$/.test(gets[0].url),
     { out, calls: env.calls.map((c) => c.method + ' ' + c.url) });
-  check('the task title and due day are what was asked',
-    post && post.body && post.body.title === 'Dana — File the amendment' && post.body.dueDateTime && post.body.dueDateTime.dateTime.indexOf('2026-10-10') === 0,
+  check('the task title is the chip label when the body has no verb span, with no sender prefix',
+    post && post.body && post.body.title === 'File the amendment' && post.body.title.indexOf('Dana') < 0 &&
+    post.body.dueDateTime && post.body.dueDateTime.dateTime.indexOf('2026-10-10') === 0,
     post && post.body);
+  const titled = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+  const titledOut = await titled.fn('outlookTaskWrite')(Object.assign({}, PAYLOAD, {
+    label: 'Log commitment for Oct 9',
+    senderName: 'flow',
+    subject: 'Passport',
+    text: 'We agreed to file the amendment by October 21 please.'
+  }));
+  const titledPost = titled.calls.find((c) => c.method === 'POST');
+  check('a firing sentence becomes the title and the subject does not',
+    titledOut.ok === true && titledPost && titledPost.body && titledPost.body.title === 'File the amendment' &&
+    titledPost.body.body && /From: flow/.test(titledPost.body.body.content || '') &&
+    titledPost.body.title.indexOf('Passport') < 0 && titledPost.body.title.indexOf('flow') < 0,
+    titledPost && titledPost.body);
+  const greeted = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+  const greetedOut = await greeted.fn('outlookTaskWrite')(Object.assign({}, PAYLOAD, {
+    label: 'Log commitment for Oct 9',
+    senderName: 'flow',
+    subject: 'Gate 0.9.34 To Do title',
+    text: 'Gate 0.9.34 To Do title\nHi, We agreed to renew the passport application by Friday. Thanks, Flow Gate'
+  }));
+  const greetedPost = greeted.calls.find((c) => c.method === 'POST');
+  check('Outlook card text with a subject line and Hi posts the commitment',
+    greetedOut.ok === true && greetedPost && greetedPost.body && greetedPost.body.title === 'Renew the passport application' &&
+    greetedPost.body.title.indexOf('Gate') < 0 && greetedPost.body.title.indexOf('Hi') < 0,
+    greetedPost && greetedPost.body);
+  const blank = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+  const blankOut = await blank.fn('outlookTaskWrite')(Object.assign({}, PAYLOAD, {
+    label: 'Hi, We agreed to renew the passport application',
+    senderName: 'flow',
+    subject: 'Gate 0.9.35 To Do title',
+    text: 'Hi,\n\nWe agreed to renew the passport application by Friday.\n\nThanks, Flow Gate'
+  }));
+  const blankPost = blank.calls.find((c) => c.method === 'POST');
+  check('blank lines in the Outlook body post the commitment, not Hi',
+    blankOut.ok === true && blankPost && blankPost.body && blankPost.body.title === 'Renew the passport application',
+    blankPost && blankPost.body);
+  const GATE_HTML = '<html><body><div dir="auto">Hi,<br/><br/>We agreed to renew the passport application by Friday.<br/><br/>Thanks, Flow Gate</div></body></html>';
+  const gateBodies = [
+    ['Gate HTML through htmlToText and ownText', Mail.ownText(Mail.htmlToText(GATE_HTML))],
+    ['CRLF blank lines', 'Hi,\r\n\r\nWe agreed to renew the passport application by Friday.\r\n\r\nThanks, Flow Gate'],
+    ['a non-breaking space', 'Hi,\u00a0\n\nWe agreed to renew the passport application by Friday.\n\nThanks, Flow Gate'],
+    ['a zero-width mark inside the verb', 'Hi,\n\nWe\u200b agreed to renew the passport\u200b application by Friday.\n\nThanks, Flow Gate'],
+    ['the r34 subject line plus the body', 'Gate 0.9.34 To Do title\nHi, We agreed to renew the passport application by Friday. Thanks, Flow Gate']
+  ];
+  for (const row of gateBodies) {
+    const wrote = background({ routes: happyRoutes(200, { id: 'TASK9', status: 'notStarted' }) });
+    const out = await wrote.fn('outlookTaskWrite')(Object.assign({}, PAYLOAD, {
+      label: 'Log commitment for Oct 9',
+      subject: 'Gate 0.9.35 To Do title',
+      text: row[1]
+    }));
+    const post = wrote.calls.find((c) => c.method === 'POST');
+    check(row[0] + ' posts the commitment',
+      out.ok === true && post && post.body && post.body.title === 'Renew the passport application',
+      post && post.body && post.body.title);
+  }
   check('nothing was sent', !env.calls.some((c) => /\/(send|reply|replyAll|forward|sendMail)(\b|\/|$)/i.test(c.url)));
   check('Handled is allowed only for that proof',
     env.fn('globalThis.FlowProofOfClose.allowsHandled')({ ok: true, proof: out.proof }) === true);

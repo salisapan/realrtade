@@ -1085,6 +1085,9 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['no reply + date', 'Looping you in for visibility. We agreed to file the amendment by September 21. No need to reply.'],
     ['Hebrew FYI + date', 'לידיעתך, סוכם שנגיש את התיקון עד 21 בספטמבר.'],
     ['Hebrew no action + amount', 'אין צורך בפעולה. מאשרים שהסכום הוא 4,200 שקל.'],
+    ['Hebrew FYI לא נדרשת פעולה', 'מצורפת ההצעה לתיעוד, לא נדרשת פעולה מצדך'],
+    ['Hebrew FYI לא נדרש ממך', 'לידיעתך, לא נדרש ממך דבר בנוגע להצעה המצורפת.'],
+    ['Hebrew FYI לא נדרשים כלום', 'עדכון בלבד. לא נדרשים ממך כלום.'],
     ['hedge once legal', 'I will send the signed contract by Friday once legal approves it.'],
     ['hedge hoping to agree', 'We are hoping to agree on $4,200 by September 21.'],
     ['past call worded as already held', 'The call was on Monday at 3pm.'],
@@ -1113,7 +1116,8 @@ console.log('\n--- google-loop silence: soft, FYI, hedge, past, noise ---\n');
     ['confirmed amount', 'Confirming the fee is $8,750.', FlowIntent.TYPES.DECISION_TO_LOG, 'confirmed-amount'],
     ['polite ask, not a soft one', 'Please send the invoice when you get a chance.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
     ['reader reminder, not a calendar notice', 'As a reminder, you agreed to send the invoice by Friday, September 18.', FlowIntent.TYPES.COMMITMENT_OF_READER, null],
-    ['current ask that mentions a past due date', 'Please send the receipt for the invoice that was due March 3, 2024.', FlowIntent.TYPES.REQUEST, 'follow-up-ask']
+    ['current ask that mentions a past due date', 'Please send the receipt for the invoice that was due March 3, 2024.', FlowIntent.TYPES.REQUEST, 'follow-up-ask'],
+    ['Hebrew action required', 'נדרשת פעולה: נא לאשר את ההצעה עד יום שישי.', FlowIntent.TYPES.REQUEST, 'follow-up-ask']
   ];
   for (const [label, text, type, personalClose] of mustShow) {
     const intent = classify(text);

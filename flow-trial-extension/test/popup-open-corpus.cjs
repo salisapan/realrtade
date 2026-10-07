@@ -111,6 +111,10 @@ function load(stored, opts) {
         if (msg && msg.type === 'flow:hybrid-status') { if (cb) cb(opts.hybridStatus || { ok: true }); return; }
         if (msg && msg.type === 'flow:hybrid-consent') { (opts.hybridConsents = opts.hybridConsents || []).push(msg.patch); if (cb) cb({ ok: true }); return; }
         if (msg && msg.type === 'flow:follow-draft') { (opts.drafts = opts.drafts || []).push(msg.payload); if (cb) cb({ ok: true }); return; }
+        if (msg && msg.type === 'flow:build-stamp') {
+          if (cb) cb(opts.workerBuild == null ? { ok: true } : { ok: true, build: opts.workerBuild });
+          return;
+        }
         if (cb) cb(msg && msg.type === 'flow:connector-status' ? {} : { ok: true });
       }
     }
@@ -121,6 +125,7 @@ function load(stored, opts) {
   // just enough surface that the call doesn't throw ReferenceError.
   const sandbox = {
     module: undefined, console, document, chrome: chromeStub,
+    FlowBuild: opts.pageStamp ? { STAMP: opts.pageStamp } : undefined,
     crypto: { randomUUID: () => 'test-uuid' },
     navigator: { clipboard: { writeText: async () => {} } },
     Blob: class { constructor(parts, opts) { this.parts = parts; this.type = opts && opts.type; } },
@@ -729,6 +734,27 @@ async function run() {
     const buttons = find(host, 'ghost').map((b) => b.textContent);
     check('once it passed, the row names the model and each language\'s honest result', notes.some((t) => /Ollama · llama3:8b/.test(t) && /English: on \(precision 0\.98, recall 0\.61\)/.test(t) && /Hebrew: off \(precision 0\.91, needs 0\.97\)/.test(t)), notes);
     check('and offers Test again and Turn off', buttons.includes('Test again') && buttons.includes('Turn off'), buttons);
+  }
+
+  console.log('\n--- popup.js: a stale worker asks for Reload Glance ---\n');
+  {
+    const fresh = load({}, {});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), fresh.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('without a page stamp the reload line stays hidden', fresh.document.getElementById('reloadGlance').hidden === true);
+    const stale = load({}, { pageStamp: '0.9.37', workerBuild: '0.9.34' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), stale.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const staleLine = stale.document.getElementById('reloadGlance');
+    check('a worker still on the previous stamp shows Reload Glance', staleLine.hidden === false && staleLine.textContent === 'Reload Glance', staleLine.textContent);
+    const quiet = load({}, { pageStamp: '0.9.37', workerBuild: '' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), quiet.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('a worker that does not answer the stamp shows Reload Glance', quiet.document.getElementById('reloadGlance').hidden === false && quiet.document.getElementById('reloadGlance').textContent === 'Reload Glance');
+    const same = load({}, { pageStamp: '0.9.37', workerBuild: '0.9.37' });
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), same.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    check('matching stamps keep the reload line hidden', same.document.getElementById('reloadGlance').hidden === true);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

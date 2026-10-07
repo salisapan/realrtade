@@ -17,6 +17,16 @@
 const FlowIncomingJudge = (() => {
   const MIN_TEXT = 20;
 
+  // A phone signature is not part of the ask. "Sent from my iPhone" and
+  // "נשלח מה-iPhone" stay off the sentence the judge reads.
+  function withoutPhoneSignature(text) {
+    return String(text || '').split(/\r?\n/).filter((line) => {
+      if (/^\s*sent from my (?:iphone|ipad|android)\b/i.test(line)) return false;
+      if (/^\s*נשלח מה[-\u05BE\s]*(?:iphone|אייפון|אנדרואיד)/i.test(line)) return false;
+      return true;
+    }).join('\n').trim();
+  }
+
   function sibling(globalValue, file, name) {
     if (globalValue) return globalValue;
     try { return typeof require !== 'undefined' ? require(file)[name] : null; } catch (e) { return null; }
@@ -40,7 +50,7 @@ const FlowIncomingJudge = (() => {
     if (!intentApi || typeof intentApi.classify !== 'function') return { show: false, reason: 'no-intent-api', intent: null };
     if (!actionsApi || typeof actionsApi.planFor !== 'function') return { show: false, reason: 'no-actions-api', intent: null };
 
-    const text = String(i.text || '').trim();
+    const text = withoutPhoneSignature(i.text);
     const factProbe = (text.length >= 12 && factReply && typeof factReply.detect === 'function') ? factReply.detect(text) : null;
     if (text.length < MIN_TEXT && !factProbe) return { show: false, reason: 'too-short', intent: null };
 
@@ -87,6 +97,11 @@ const FlowIncomingJudge = (() => {
     if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process)) {
       return { show: false, reason: 'no-draft-close', intent };
     }
+    // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
+    const asked = intent.googleClose;
+    if ((i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
+      return { show: false, reason: 'onedrive-target-on-gmail', intent };
+    }
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 
@@ -100,17 +115,30 @@ const FlowIncomingJudge = (() => {
   function forSurface(process, surface) {
     if (!process || surface !== 'outlook') return process;
     const tasks = taskOnlyProcess(process);
-    return Object.assign({}, process, {
-      steps: (process.steps || []).map((s) => {
-        if (s && s.kind === 'gmailDraft') {
-          return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
-        }
-        if (tasks && s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
-          return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
-        }
-        return s;
-      })
+    const steps = (process.steps || []).map((s) => {
+      if (s && s.kind === 'gmailDraft') {
+        return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
+      }
+      if (tasks && s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
+        return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
+      }
+      if (s && s.kind === 'driveFile') {
+        return Object.assign({}, s, {
+          kind: 'onedriveFile',
+          id: 'onedriveFile',
+          label: 'OneDrive',
+          hint: 'Save the attached file to OneDrive'
+        });
+      }
+      return s;
     });
+    const out = Object.assign({}, process, { steps: steps });
+    if (steps.some((s) => s && s.kind === 'onedriveFile')) {
+      out.closedLine = 'Saved on OneDrive.';
+      const he = /[\u0590-\u05FF]/.test(String(out.closingLine || ''));
+      out.closingLine = he ? 'שומר את הקובץ המצורף ב-OneDrive.' : 'Saving the attached file to OneDrive.';
+    }
+    return out;
   }
 
   function draftStepOf(process) {

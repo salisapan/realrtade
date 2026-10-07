@@ -898,6 +898,28 @@ async function run() {
       out.written === 'Google Task · due Sep 21', out.written);
   }
 
+  console.log('\n--- background.js: a Gmail task title ignores Hi and the subject ---\n');
+  {
+    const env = load({
+      stored: CONNECTED,
+      routes: [[/\/lists\/LIST_A\/tasks$/, { reply: res(200, { id: 'task_hi' }) }]]
+    });
+    const out = await attempt(env.fn('googleTasksWrite')({
+      label: 'Log commitment for Oct 9',
+      senderName: 'flow',
+      subject: 'Gate 0.9.34 To Do title',
+      bodyText: 'Hi, We agreed to renew the passport application by Friday.',
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/abc',
+      now: '2026-10-07T12:00:00.000Z',
+      params: { dateIso: '2026-10-09', what: 'renew the passport application' }
+    }));
+    const body = env.bodies.find((b) => b && b.title) || {};
+    check('Gmail posts the commitment, not the subject or the greeting',
+      out.ok === true && body.title === 'Renew the passport application' &&
+      body.title.indexOf('Gate') < 0 && body.title.indexOf('Hi') < 0 && body.title.indexOf('flow') < 0,
+      body);
+  }
+
   console.log('\n--- background.js: a confirmed amount with no date is the close, and only that ---\n');
   {
     const env = load({

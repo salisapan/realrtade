@@ -234,6 +234,69 @@ console.log('\n--- family C: create is the ask ---\n');
   check('two attachments are not one file', two.intent.googleSilence === true);
   const none = plan('Please save the attached pdf to Drive.', { attachmentCount: 0 });
   check('no attachment is not a Drive save', none.intent.googleSilence === true);
+  const refused = [
+    "Please don't save the attachment to Drive.",
+    'Do not save the attached file to Drive.',
+    'No need to save the attachment to Drive.',
+    'Never mind, do not save the attached file to Drive.'
+  ];
+  refused.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file',
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const still = plan('No need to call. Please save the attached file to Drive.', { attachmentCount: 1 });
+  check('a different no-need does not hide a real save',
+    still.intent && still.intent.personalClose === 'drive-file', still.intent && still.intent.personalClose);
+}
+
+console.log('\n--- OneDrive wording is the same save; shared files are not ---\n');
+{
+  const fires = [
+    'Please save the attachment to OneDrive.',
+    'Please store the attached file on OneDrive.',
+    'Please upload the attachment to OneDrive.'
+  ];
+  fires.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('one file to OneDrive is a drive-file save: ' + text,
+      row.intent && row.intent.personalClose === 'drive-file' && row.intent.googleClose && row.intent.googleClose.target === 'onedrive' &&
+      row.process && row.process.steps[0].kind === 'driveFile' && row.process.steps[0].label === 'OneDrive',
+      row.intent && { type: row.intent.type, personal: row.intent.personalClose, quiet: row.intent.quiet, target: row.intent.googleClose && row.intent.googleClose.target });
+  });
+  const heNo = [
+    'אל תשמור את הקובץ המצורף בדרייב.',
+    'לא צריך לשמור את הקובץ בדרייב.',
+    'אין צורך לשמור את הקובץ המצורף בדרייב.',
+    'לא לשמור את הקובץ בדרייב.'
+  ];
+  heNo.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a Hebrew refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file',
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const forget = plan("Don't forget to save the attached file to OneDrive.", { attachmentCount: 1 });
+  check('don\'t forget to save still names OneDrive',
+    forget.intent && forget.intent.personalClose === 'drive-file' && forget.intent.googleClose && forget.intent.googleClose.target === 'onedrive',
+    forget.intent && { type: forget.intent.type, personal: forget.intent.personalClose, target: forget.intent.googleClose && forget.intent.googleClose.target });
+  const zero = plan('Please save the attachment to OneDrive.', { attachmentCount: 0 });
+  const two = plan('Please save the attachment to OneDrive.', { attachmentCount: 2 });
+  check('zero or two OneDrive files stay silent',
+    zero.intent && zero.intent.googleSilence === true && !zero.intent.type &&
+    two.intent && two.intent.googleSilence === true && !two.intent.type);
+  const hedge = plan('Maybe save the attachment to OneDrive.', { attachmentCount: 1 });
+  check('a hedged OneDrive save stays silent', hedge.intent && hedge.intent.googleSilence === true && !hedge.intent.type, hedge.intent);
+  const fyi = plan('FYI, please save the attachment to OneDrive.', { attachmentCount: 1 });
+  check('FYI stays noise, not a save', fyi.intent && !fyi.intent.type && fyi.intent.quiet === 'noise' && fyi.intent.personalClose !== 'drive-file', fyi.intent);
+  const shared = plan('Hi, Attached is the signed NDA. Please save it to our shared files by Friday, October 9. Thanks, Flow Gate', { attachmentCount: 1 });
+  check('save it to our shared files stays an ordinary miss',
+    shared.intent && !shared.intent.type && !shared.intent.quiet && shared.intent.personalClose !== 'drive-file',
+    shared.intent && { type: shared.intent.type, quiet: shared.intent.quiet, personal: shared.intent.personalClose });
+  check('shared files do not ask for an attachment count',
+    FlowGoogleCloses.needsOneAttachment('Please save it to our shared files by Friday, October 9.') === false &&
+    FlowGoogleCloses.needsOneAttachment('Please save the attachment to OneDrive.') === true);
 }
 
 console.log('\n--- family B: one file, one target ---\n');

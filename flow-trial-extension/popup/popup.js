@@ -69,6 +69,7 @@
   renderSurfaces().catch(() => {});
   renderOutlookCards().catch(() => {});
   outlookAutoSync().catch(() => {});
+  renderBuildStamp().catch(() => {});
 
 
   // ---- Glance Pro -----------------------------------------------------------
@@ -168,6 +169,24 @@
 
   function send(msg) {
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
+  }
+
+  // The popup loads this package's stamp. The worker answers with the stamp
+  // of the registration that is actually running. They differ when that
+  // registration is still the previous build.
+  async function renderBuildStamp() {
+    const line = document.getElementById('reloadGlance');
+    if (!line) return;
+    const mine = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+    if (!mine) { line.hidden = true; return; }
+    let theirs = '';
+    try {
+      const r = await send({ type: 'flow:build-stamp' });
+      theirs = (r && r.build) || '';
+    } catch (e) { theirs = ''; }
+    const stale = !theirs || theirs !== mine;
+    line.hidden = !stale;
+    if (stale) line.textContent = 'Reload Glance';
   }
 
   function el(tag, cls, text) {
@@ -2298,19 +2317,21 @@
     if (!e || e.kind !== 'written') return false;
     const task = e.connectorId === 'googleTask' || e.connectorId === 'googleTasks' || e.system === 'google/tasks'
       || e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo'
+      || e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive'
       || isComputerActivityRow(e);
     if (!task) return false;
-    const ext = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
+    const ext = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId || e.ref.fileId || e.ref.itemId)) || '';
     for (let i = 0; i < index; i++) {
       const newer = log[i];
       if (!newer || newer.kind !== 'undone') continue;
       if (e.messageId && newer.messageId === e.messageId) return true;
       const newerTask = newer.connectorId === 'googleTask' || newer.connectorId === 'googleTasks'
         || newer.connectorId === 'outlookTask' || newer.connectorId === 'microsoftTodo'
-        || newer.system === 'google/tasks' || newer.system === 'microsoft/todo'
+        || newer.connectorId === 'onedriveFile'
+        || newer.system === 'google/tasks' || newer.system === 'microsoft/todo' || newer.system === 'microsoft/onedrive'
         || isComputerActivityRow(newer);
       if (e.threadId && newer.threadId && e.threadId === newer.threadId && newerTask) return true;
-      const nextExt = newer.externalId || (newer.ref && (newer.ref.externalId || newer.ref.taskId)) || '';
+      const nextExt = newer.externalId || (newer.ref && (newer.ref.externalId || newer.ref.taskId || newer.ref.fileId || newer.ref.itemId)) || '';
       if (ext && nextExt && ext === nextExt) return true;
     }
     return false;
@@ -2382,6 +2403,8 @@
               await FlowStorage.markGoogleTaskUndone(e.messageId, e.ref, e.threadId);
             } else if ((e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo') && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
               await FlowStorage.markMicrosoftTodoUndone(e.messageId, e.ref, e.threadId);
+            } else if ((e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
+              await FlowStorage.markOnedriveFileUndone(e.messageId, e.ref, e.threadId);
             } else {
               await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId, connectorId: e.connectorId, ref: e.ref, app: e.app });
             }

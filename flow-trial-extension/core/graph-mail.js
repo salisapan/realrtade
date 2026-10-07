@@ -69,7 +69,10 @@ const FlowGraphMail = (() => {
     const meSet = meSetOf(me);
     const fromSent = msg._folder === 'sentitems';
     const own = fromSent || isOwn(from.email, meSet);
-    const raw = msg.body && msg.body.content != null ? (String(msg.body.contentType).toLowerCase() === 'html' ? htmlToText(msg.body.content) : String(msg.body.content)) : String(msg.bodyPreview || '');
+    const content = msg.body && msg.body.content != null ? String(msg.body.content) : '';
+    const raw = content.trim()
+      ? (String(msg.body && msg.body.contentType).toLowerCase() === 'html' ? htmlToText(content) : content)
+      : String(msg.bodyPreview || '');
     const ts = Date.parse(msg.sentDateTime || msg.receivedDateTime || '');
     return channel.utterance({ channel: 'outlook', thread: msg.conversationId, id: msg.id, ts: Number.isFinite(ts) ? ts : null, direction: own ? 'out' : 'in', from: own ? Object.assign({}, from, { name: from.name }) : from, text: ownText(raw) });
   }

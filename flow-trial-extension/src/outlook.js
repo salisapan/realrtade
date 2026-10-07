@@ -23,7 +23,7 @@ const FlowOutlook = (() => {
   const PENDING_KEY = 'outlookPending';
   const MIN_INTERVAL_MS = 10 * 60 * 1000;
   const SILENT_REAUTH_AFTER_MS = 16 * 60 * 60 * 1000; // first silent renewal at hour 16 of the 24h SPA window (outlook-auth SILENT_AFTER_MS)
-  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,webLink,hasAttachments,internetMessageId';
+  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,bodyPreview,webLink,hasAttachments,internetMessageId';
   const OWN_LEARNED_CAP = 20;
   // Bump to wipe stale outlookPending/offers from older builds (0.9.0 silence bug; 0.9.14: own addresses learned from
   // other people's To lines and asks swallowed by a loop in another app; 0.9.19: a schedule card
@@ -581,7 +581,9 @@ const FlowOutlook = (() => {
         // The planner already ran Gmail's chain (core/incoming-judge.js) and mapped the draft step to Outlook.
         const outlookProcess = inc.process;
         if (!intent || !outlookProcess) continue;
-        const text = (inc.base.subject ? inc.base.subject + '\n' : '') + (inc.base.text || '');
+        // The subject stays on its own field. Gluing it onto the body made
+        // the task title the subject plus the greeting.
+        const text = inc.base.text || '';
         const entry = {
           messageId: inc.messageId,
           threadId: inc.base.threadId,
@@ -593,6 +595,7 @@ const FlowOutlook = (() => {
           intent: intent,
           process: outlookProcess,
           text: text,
+          bodyText: text,
           outlookIncomingId: inc.messageId,
           outlookConversationId: inc.conversationId,
           internetMessageId: inc.internetMessageId || null,

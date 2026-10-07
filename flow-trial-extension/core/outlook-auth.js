@@ -3,7 +3,9 @@
 //
 // What the default sign-in asks: Mail.Read, Mail.ReadWrite (drafts only, by code), User.Read
 // and offline_access. Tasks.ReadWrite is asked only when the To Do checkbox is checked
-// (one To Do task, read back, Undo deletes it). Never Mail.Send.
+// (one To Do task, read back, Undo deletes it). Files.ReadWrite is asked only when
+// the OneDrive checkbox is checked (one file, read back, Undo deletes or restores it).
+// Never Mail.Send.
 // The tokens are kept only in this browser's extension storage. Nothing here talks to Glance's servers.
 //
 // SPA refresh tokens last 24h and do not slide (Microsoft). silentReauth renews with prompt=none before that window
