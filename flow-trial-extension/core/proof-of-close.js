@@ -77,6 +77,114 @@ const FlowProofOfClose = (() => {
     return { system: proof.system, externalId: proof.externalId, verifiedAt: proof.verifiedAt };
   }
 
+  const STATUS_HANDLED = 'Handled.';
+  const STATUS_HANDLED_HE = 'טופל.';
+  const STATUS_PARTIAL = 'Partly handled.';
+  const UNDO_HINT = 'Undo removes the Google Task.';
+  const UNDONE_LINE = 'Undone — the Google Task was removed.';
+
+  function clip(value, max) {
+    const s = clean(value).replace(/\s+/g, ' ');
+    if (!s) return '';
+    return s.length > max ? s.slice(0, max) : s;
+  }
+
+  function externalIdOf(row) {
+    if (!row) return '';
+    const top = clean(row.externalId);
+    if (top) return top;
+    const ref = row.ref;
+    if (!ref || typeof ref !== 'object') return '';
+    return clean(ref.externalId) || clean(ref.taskId);
+  }
+
+  // A written Activity row that is still a trusted Google Task close.
+  // fetchedBack true is the proof. A 0.9.28 row stored only system,
+  // externalId, and verifiedAt — those three are written only after a
+  // real read-back, so they count the same. fetchedBack false does not.
+  function isTaskReceiptRow(row) {
+    if (!row || row.kind !== 'written') return false;
+    if (clean(row.system) !== SYSTEM_GOOGLE_TASKS) return false;
+    if (!externalIdOf(row)) return false;
+    const verifiedAt = clean(row.verifiedAt);
+    if (!verifiedAt || Number.isNaN(Date.parse(verifiedAt))) return false;
+    if (row.fetchedBack === false) return false;
+    return true;
+  }
+
+  // Newest log entry wins. The log is stored newest first. A later undo
+  // or dismiss means the banner stays down. A later shown line does not
+  // hide a proved task — that is the reload bug this picker exists for.
+  function taskReceiptFromLog(log, messageId) {
+    if (typeof messageId !== 'string' || !messageId) return null;
+    const rows = Array.isArray(log) ? log : [];
+    for (let i = 0; i < rows.length; i++) {
+      const entry = rows[i];
+      if (!entry || entry.messageId !== messageId) continue;
+      if (entry.kind === 'undone' || entry.kind === 'dismissed') return null;
+      if (entry.kind !== 'written') continue;
+      if (isTaskReceiptRow(entry)) return entry;
+    }
+    return null;
+  }
+
+  function receiptStatusOf(row) {
+    if (!row) return STATUS_HANDLED;
+    if (row.receiptStatus === STATUS_HANDLED || row.receiptStatus === STATUS_HANDLED_HE || row.receiptStatus === STATUS_PARTIAL) {
+      return row.receiptStatus;
+    }
+    return STATUS_HANDLED;
+  }
+
+  // What the on-thread banner says when Gmail has rebuilt the message node.
+  // Null when this row is not a trusted task close.
+  function remountCopy(row) {
+    if (!isTaskReceiptRow(row)) return null;
+    const externalId = externalIdOf(row);
+    const ref = { taskId: externalId, externalId: externalId };
+    const listId = row.ref && typeof row.ref === 'object' ? clean(row.ref.taskListId) : '';
+    if (listId) ref.taskListId = listId;
+    const connector = (row.connectorId === 'googleTask' || row.connectorId === 'googleTasks') ? row.connectorId : 'googleTask';
+    const url = clean(row.url);
+    return {
+      status: receiptStatusOf(row),
+      writtenLine: clip(row.writtenLine, 180) || 'Google Task',
+      processName: clip(row.processName, 80),
+      closedLine: clip(row.closedLine, 180),
+      undoHint: UNDO_HINT,
+      undoneLine: UNDONE_LINE,
+      url: url.slice(0, 8) === 'https://' ? url : '',
+      connectorId: connector,
+      externalId: externalId,
+      ref: ref
+    };
+  }
+
+  // Fields added to the written Activity row so a later scan can rebuild
+  // the same banner. A miss stores nothing. activityFields stays the
+  // short proof triple; this adds fetchedBack and the lines on the chip.
+  function receiptLogFields(proof, display) {
+    const fields = activityFields(proof);
+    if (!fields) return null;
+    const record = {
+      system: fields.system,
+      externalId: fields.externalId,
+      verifiedAt: fields.verifiedAt,
+      fetchedBack: true
+    };
+    display = display || {};
+    const writtenLine = clip(display.writtenLine, 180);
+    const processName = clip(display.processName, 80);
+    const closedLine = clip(display.closedLine, 180);
+    if (writtenLine) record.writtenLine = writtenLine;
+    if (processName) record.processName = processName;
+    if (closedLine) record.closedLine = closedLine;
+    if (display.status === STATUS_HANDLED || display.status === STATUS_HANDLED_HE || display.status === STATUS_PARTIAL) {
+      record.receiptStatus = display.status;
+    }
+    return record;
+  }
+
   // Shape only. The live Google Tasks path is the service worker writer,
   // which POSTs, GETs, and undoes by externalId. Later adapters can share
   // this capabilities list. This stub does not call a network.
@@ -98,6 +206,9 @@ const FlowProofOfClose = (() => {
     stepCountsAsHandled: stepCountsAsHandled,
     shouldRecordTrustedClose: shouldRecordTrustedClose,
     activityFields: activityFields,
+    taskReceiptFromLog: taskReceiptFromLog,
+    remountCopy: remountCopy,
+    receiptLogFields: receiptLogFields,
     googleTasksAdapter: googleTasksAdapter
   };
 })();

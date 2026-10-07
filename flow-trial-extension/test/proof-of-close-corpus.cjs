@@ -111,5 +111,102 @@ console.log('\n--- POST + GET ok is Handled ---\n');
   check('a partial chain does not say Handled', partial.status === 'Partly handled.' && partial.full === false, partial);
 }
 
+console.log('\n--- Handled survives a thread reload ---\n');
+{
+  function writtenRow(extra) {
+    return Object.assign({
+      kind: 'written',
+      messageId: 'm1',
+      label: 'Gate 0.9.28 ProofOfClose task',
+      where: 'Google Tasks',
+      url: 'https://tasks.google.com/embed/list/LIST_A?pli=1',
+      connectorId: 'googleTask',
+      ref: { taskListId: 'LIST_A', taskId: 'task_1', externalId: 'task_1' },
+      system: 'google/tasks',
+      externalId: 'task_1',
+      verifiedAt: VERIFIED
+    }, extra || {});
+  }
+
+  const legacy = writtenRow();
+  check('a 0.9.28 Activity row (no fetchedBack field) is still the receipt',
+    FlowProofOfClose.taskReceiptFromLog([legacy], 'm1') === legacy);
+  const proved = writtenRow({ fetchedBack: true, writtenLine: 'Google Task · due Oct 9', processName: 'Log It', closedLine: 'Logged and tracked.', receiptStatus: 'Handled.' });
+  check('fetchedBack true is the receipt',
+    FlowProofOfClose.taskReceiptFromLog([proved], 'm1') === proved);
+  check('a newer undo hides the banner',
+    FlowProofOfClose.taskReceiptFromLog([{ kind: 'undone', messageId: 'm1' }, proved], 'm1') === null);
+  check('a newer dismiss hides the banner',
+    FlowProofOfClose.taskReceiptFromLog([{ kind: 'dismissed', messageId: 'm1' }, proved], 'm1') === null);
+  check('a later shown line does not hide the receipt',
+    FlowProofOfClose.taskReceiptFromLog([{ kind: 'shown', messageId: 'm1', process: { id: 'log' } }, proved], 'm1') === proved);
+  check('an older undo does not hide a newer write',
+    FlowProofOfClose.taskReceiptFromLog([proved, { kind: 'undone', messageId: 'm1' }], 'm1') === proved);
+  check('another message does not supply this receipt',
+    FlowProofOfClose.taskReceiptFromLog([writtenRow({ messageId: 'other' })], 'm1') === null);
+  check('a calendar write is not this remount',
+    FlowProofOfClose.taskReceiptFromLog([{ kind: 'written', messageId: 'm1', connectorId: 'calendar', ref: { eventId: 'ev' } }], 'm1') === null);
+  check('fetchedBack false is not a receipt',
+    FlowProofOfClose.taskReceiptFromLog([writtenRow({ fetchedBack: false })], 'm1') === null);
+  check('a row with no external id is not a receipt',
+    FlowProofOfClose.taskReceiptFromLog([writtenRow({ externalId: '', ref: {} })], 'm1') === null);
+  check('a row with no verifiedAt is not a receipt',
+    FlowProofOfClose.taskReceiptFromLog([writtenRow({ verifiedAt: '' })], 'm1') === null);
+  check('an empty log does not remount', FlowProofOfClose.taskReceiptFromLog([], 'm1') === null);
+  check('a missing log does not remount', FlowProofOfClose.taskReceiptFromLog(null, 'm1') === null);
+
+  const copy = FlowProofOfClose.remountCopy(proved);
+  check('the remounted banner says Handled, names the task, and keeps Undo',
+    copy && copy.status === 'Handled.' && copy.writtenLine === 'Google Task · due Oct 9' &&
+    copy.processName === 'Log It' && copy.closedLine === 'Logged and tracked.' &&
+    copy.undoHint === FlowReceipt.undoHint(['Google Tasks']) &&
+    copy.undoneLine === FlowReceipt.undoneLine(['Google Tasks']) &&
+    copy.connectorId === 'googleTask' && copy.externalId === 'task_1' &&
+    copy.ref.externalId === 'task_1' && copy.ref.taskId === 'task_1' && copy.ref.taskListId === 'LIST_A' &&
+    copy.url.indexOf('tasks.google.com') !== -1,
+    copy);
+  const legacyCopy = FlowProofOfClose.remountCopy(legacy);
+  check('a row without the written line still says Handled and Undo',
+    legacyCopy && legacyCopy.status === 'Handled.' && legacyCopy.writtenLine === 'Google Task' &&
+    legacyCopy.undoHint === 'Undo removes the Google Task.' && legacyCopy.processName === '' && legacyCopy.closedLine === '',
+    legacyCopy);
+  check('undo and dismiss are not a banner',
+    FlowProofOfClose.remountCopy({ kind: 'undone', messageId: 'm1', system: 'google/tasks', externalId: 'task_1', verifiedAt: VERIFIED }) === null);
+
+  const logged = FlowProofOfClose.receiptLogFields(proof(), {
+    writtenLine: 'Google Task · due Oct 9',
+    processName: 'Log It',
+    closedLine: 'Logged and tracked.',
+    status: 'Handled.'
+  });
+  check('a proved write stores fetchedBack and the banner lines',
+    logged && logged.fetchedBack === true && logged.system === 'google/tasks' && logged.externalId === 'task_1' &&
+    logged.verifiedAt === VERIFIED && logged.writtenLine === 'Google Task · due Oct 9' &&
+    logged.processName === 'Log It' && logged.closedLine === 'Logged and tracked.' && logged.receiptStatus === 'Handled.',
+    logged);
+  const roundTrip = Object.assign({ kind: 'written', messageId: 'm1', where: 'Google Tasks', connectorId: 'googleTask', ref: { taskListId: 'LIST_A', taskId: 'task_1', externalId: 'task_1' }, url: 'https://tasks.google.com/embed/list/LIST_A?pli=1' }, logged);
+  check('that stored row remounts after a reload',
+    FlowProofOfClose.taskReceiptFromLog([roundTrip], 'm1') === roundTrip &&
+    FlowProofOfClose.remountCopy(roundTrip).writtenLine === 'Google Task · due Oct 9');
+  check('a verify miss stores no remount fields',
+    FlowProofOfClose.receiptLogFields(null, { writtenLine: 'Google Task', status: 'Handled.' }) === null);
+  const he = FlowProofOfClose.remountCopy(writtenRow({ receiptStatus: 'טופל.', fetchedBack: true }));
+  check('a Hebrew receipt stays טופל after reload', he && he.status === 'טופל.', he);
+  check('a non-https link is not put back on the thread',
+    FlowProofOfClose.remountCopy(writtenRow({ url: 'javascript:alert(1)', fetchedBack: true })).url === '');
+
+  const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
+  const pickAt = gmail.indexOf('FlowProofOfClose.taskReceiptFromLog');
+  const stopAt = gmail.indexOf('hasTerminalOutcomeFrom(settled, messageId)');
+  check('the Gmail scan remounts a proved task before it treats the message as finished',
+    pickAt > 0 && stopAt > pickAt);
+  check('the remounted banner is built from the stored receipt',
+    gmail.indexOf('FlowProofOfClose.remountCopy') > 0 && gmail.indexOf('function mountProvedTaskReceipt') > 0);
+  check('a proved write stores the banner lines on the Activity row',
+    gmail.indexOf('FlowProofOfClose.receiptLogFields') > 0);
+  const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
+  check('the extension version is 0.9.29', /"version": "0\.9\.29"/.test(manifest));
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

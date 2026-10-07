@@ -77,3 +77,5 @@ A prepared draft, an attached file, and a calendar hold are not this close. This
 `core/proof-of-close.js` builds `{ system, externalId, url?, number?, fetchedBack: true, verifiedAt }`. After a Google Task is created, that task is read back by id. The receipt says Handled (or טופל) only when `proof.fetchedBack === true`. Activity stores `system: "google/tasks"`, `externalId`, and `verifiedAt`. Undo deletes that task by `externalId`.
 
 If the create has no id, the result is `proof_pending`. If the read-back misses, returns another id, or shows the task deleted, the result is `verify_failed`. Neither is Handled, and neither is a trusted close. Calendar, Drive, Gmail drafts, and Outlook are not on this gate yet. Nothing is sent.
+
+The on-thread receipt is that Activity row. After Gmail rebuilds the thread (a reload, or inbox and back), the Handled banner is mounted again when `fetchedBack` is true, or when the row still has `system`, `externalId`, and `verifiedAt` from a proved write. A newer undo or dismiss does not put the banner back.

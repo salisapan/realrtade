@@ -797,7 +797,26 @@
     if (openedThreadId && await FlowStorage.hasTerminalOutcome('scan:' + openedThreadId)) {
       await FlowStorage.markAlreadyClosed(messageId);
     }
-    if (await FlowStorage.hasTerminalOutcome(messageId)) return;
+    // A proved Google Task stays on the thread after Gmail rebuilds this
+    // node (reload, or inbox and back). Activity already has the row.
+    // Mount that receipt again when fetchedBack is true, or when the row
+    // is the 0.9.28 triple (system, externalId, verifiedAt) written only
+    // after a read-back. A newer undo or dismiss does not come back.
+    // Other writers still stop at the terminal check below.
+    const settled = await FlowStorage.get();
+    const taskRow = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.taskReceiptFromLog)
+      ? FlowProofOfClose.taskReceiptFromLog(settled && settled.log, messageId)
+      : null;
+    if (taskRow) {
+      // Gmail may clear this node's children and keep the node (inbox and
+      // back). Mount whenever the receipt is missing. The insert is
+      // synchronous, so a second scan in the same turn sees the host.
+      if (message.isConnected && !message.querySelector('.flow-chip-host')) {
+        mountProvedTaskReceipt(message, taskRow);
+      }
+      return;
+    }
+    if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) return;
 
     // ownMessageText (not a bare .innerText) both guards against Gmail
     // detaching or replacing this exact node between the synchronous work
@@ -2113,6 +2132,88 @@
     return !!(r && r.response && r.response.ok && !r.response.skipped);
   }
 
+  // The Handled banner after Gmail tears the message node down. Same
+  // receipt as the Do It that just landed: status, written line, process
+  // name, Undo (deletes the task by externalId), and View.
+  function mountProvedTaskReceipt(messageNode, row) {
+    if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
+    const copy = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.remountCopy)
+      ? FlowProofOfClose.remountCopy(row)
+      : null;
+    if (!copy) return;
+
+    const host = el('div', 'flow-chip-host flow-chip-settled');
+    host.setAttribute('dir', 'ltr');
+    host.setAttribute('data-glance-chain', 'task-proof');
+    host.setAttribute('data-glance-message', row.messageId || '');
+
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    const icon = el('span', 'flow-chip-done-icon', '✓');
+    icon.setAttribute('aria-hidden', 'true');
+    done.appendChild(icon);
+    done.appendChild(el('span', 'flow-chip-handled', copy.status));
+    if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
+    if (copy.processName || copy.closedLine) {
+      const detail = el('span', 'flow-chip-detail');
+      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
+      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
+      done.appendChild(detail);
+    }
+
+    const undo = el('button', 'flow-chip-undo', copy.undoHint);
+    undo.type = 'button';
+    const hint = el('span', 'flow-chip-undo-hint');
+    hint.hidden = true;
+    const actionsRow = el('span', 'flow-chip-actions');
+    actionsRow.appendChild(undo);
+    if (copy.url) {
+      const view = el('a', 'flow-chip-link', 'View');
+      view.href = copy.url;
+      view.target = '_blank';
+      view.rel = 'noopener';
+      actionsRow.appendChild(view);
+    }
+    undo.addEventListener('click', () => {
+      undo.textContent = 'Undoing…';
+      undo.disabled = true;
+      new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }, resolve);
+      }).then((result) => {
+        if (!(result && result.ok)) {
+          undo.textContent = copy.undoHint;
+          undo.disabled = false;
+          hint.hidden = false;
+          hint.textContent = 'Still there — the Google Task was not removed.';
+          hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+          return;
+        }
+        const messageId = row.messageId;
+        if (messageId && typeof FlowCloseMemory !== 'undefined') {
+          FlowCloseMemory.forgetMessage(messageId).catch(() => {});
+        }
+        if (messageId) {
+          FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: messageId, reason: 'undo' })
+            .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
+        }
+        done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
+        FlowStorage.appendLog({
+          kind: 'undone',
+          label: row.label || 'Google Task',
+          messageId: messageId,
+          app: SOURCE_APP,
+          connectorId: copy.connectorId
+        }).catch((e) => console.error('[Glance] failed to record an undone task — the task itself was already removed', e));
+        chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state && state.domainId } });
+      });
+    });
+    done.appendChild(actionsRow);
+    done.appendChild(hint);
+    host.appendChild(done);
+    messageNode.insertBefore(host, messageNode.firstChild);
+  }
+
   async function showMultiActionReceipt(host, chip, ctx, results) {
     const succeeded = results.filter(stepHandled);
 
@@ -2300,8 +2401,20 @@
       ? FlowStorage.recordMeeting({ id: ctx.messageId, title: ctx.intent.label, dateIso: meetingIso, threadUrl: window.location.href })
           .catch((e) => console.error('[Glance] failed to remember the meeting for its debrief', e))
       : null;
+    const closedLine = closedSummary(succeeded, ctx);
     const bookkeeping = succeeded.map((r) => {
-      const proofFields = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.activityFields(r.response && r.response.proof)) || null;
+      const proof = r.response && r.response.proof;
+      let proofFields = null;
+      if (typeof FlowProofOfClose !== 'undefined') {
+        proofFields = FlowProofOfClose.receiptLogFields
+          ? FlowProofOfClose.receiptLogFields(proof, {
+            writtenLine: r.response && r.response.written,
+            processName: ctx.process && ctx.process.name,
+            closedLine: closedLine,
+            status: copy.status
+          })
+          : (FlowProofOfClose.activityFields(proof) || null);
+      }
       return FlowStorage.appendLog(Object.assign({
         kind: 'written',
         label: ctx.intent.label,
