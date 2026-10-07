@@ -1,0 +1,1 @@
+{ "name": "glance-shadow-pkg-tests", "private": true, "version": "0.0.0", "description": "test-only deps (not shipped)", "devDependencies": { "fake-indexeddb": "6.2.5" } }

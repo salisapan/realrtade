@@ -38,3 +38,29 @@ flow-trial-extension/core/dense-prior-data.js
 
 # Human-text eval set built from the owner's own sent mail (masked, local only, never committed)
 flow-trial-extension/test/fixtures/private/
+
+# Glance model lab (glance-ai/): regenerated datasets, local envs, and large weights.
+# The checked-in int8 JSON and .glw files under glance-ai/model/artifacts and
+# glance-ai/model/shadow-pkg/weights are the shadow candidates (each inside the
+# on-device budget). They are not this ignore. ONNX, GGUF, LLM checkpoints, and
+# anything a generator writes into dataset/out* are.
+glance-ai/**/.venv/
+glance-ai/**/node_modules/
+glance-ai/**/*.gguf
+glance-ai/**/*.onnx
+glance-ai/**/*.safetensors
+glance-ai/**/*.pt
+glance-ai/**/*.bin
+glance-ai/model/dataset/out/
+glance-ai/model/dataset/out-*/
+glance-ai/model/train/*.npz
+glance-ai/oss/finetune/data/
+glance-ai/oss/finetune/tools/
+glance-ai/oss/finetune/gguf/
+glance-ai/oss/finetune/runs/
+glance-ai/oss/models/
+glance-ai/oss/.venv/
+glance-ai/model/suggest-save/out/
+glance-ai/model/strip/out/
+glance-ai/model/shadow-pkg/test/out/
+glance-ai/model/shadow-pkg/bench/out/

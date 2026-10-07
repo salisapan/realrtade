@@ -37,6 +37,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Community (cross-user) learning (**dormant**) | `community-learning.md` | `core/community.js` | `community-corpus` |
 | Packaging, the Chrome Web Store, setup | `flow-trial-extension/docs/SETUP.md`, `chrome-web-store-submission.md`, `hybrid-execution-architecture.md` §0c | `scripts/package_trial_extension.py` (lite/full), `scripts/verify_trial_install.py` | `verify_trial_install.py` |
 | Open work, blockers, decisions | `open-tasks.md` | - | - |
+| Glance's own model lab (offline; v2 default, v2.1 in shadow). Flow is not this lab | `docs/glance-ai/STATE.md` | `glance-ai/README.md` | `glance-ai/oss/veto/test-hebrew-amount.cjs`, `glance-ai/model/suggest-save/test-corpus.cjs`, `glance-ai/model/suggest-save/check_dataset.py` |
 
 ## 2. When X changes, update these in the SAME commit
 
@@ -64,7 +65,8 @@ Any description of Glance starts from the sentence above, and any report keeps t
 `local-detection-plan.md` outcome identity and local closure · `local-first-principle.md` our code recognises first · `local-model-server.md` Ollama / LM Studio · `magic-moment.md` the first real close ·
 `monetization.md` how Glance earns · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
 `product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
-**`true-close.md` when a loop is closed, what was found and fixed** · `computer-proof-gate.md` CoS checklist for the own-computer ProofOfClose wedge (one allowlisted page, DOM re-read; live driver not wired; local-file gate later) · `when-recognition-fails.md` the steps when a sentence is not recognised.
+**`true-close.md` when a loop is closed, what was found and fixed** · `computer-proof-gate.md` CoS checklist for the own-computer ProofOfClose wedge (one allowlisted page, DOM re-read; live driver not wired; local-file gate later) · `when-recognition-fails.md` the steps when a sentence is not recognised ·
+`docs/glance-ai/STATE.md` Glance model lab: candidates, headline metrics, gated Qwen table, blockers, next stages.
 Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the numbers cited in the documents come from them.
 
 ## 4. Run everything (what "the tests pass" means)
