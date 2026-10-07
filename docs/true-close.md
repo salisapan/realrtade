@@ -69,3 +69,11 @@ Not built (needs connectors that do not exist): asking a colleague who holds the
 - The three-word rule is a number picked by hand (`SHORT_UNSURE_MAX_WORDS`), not fitted.
 - Hebrew coverage is by word list; the reply model is trained on short sentences and is unchanged.
 - The document path has been run through the browser harness (found, none, claimed-but-not-attached, delivered), never on real Gmail.
+
+## 7. Close-fabric wedge: Google Tasks is Handled only after a read-back
+
+A prepared draft, an attached file, and a calendar hold are not this close. This slice is the first `fetchedBack` proof, and it covers Google Tasks only.
+
+`core/proof-of-close.js` builds `{ system, externalId, url?, number?, fetchedBack: true, verifiedAt }`. After a Google Task is created, that task is read back by id. The receipt says Handled (or טופל) only when `proof.fetchedBack === true`. Activity stores `system: "google/tasks"`, `externalId`, and `verifiedAt`. Undo deletes that task by `externalId`.
+
+If the create has no id, the result is `proof_pending`. If the read-back misses, returns another id, or shows the task deleted, the result is `verify_failed`. Neither is Handled, and neither is a trusted close. Calendar, Drive, Gmail drafts, and Outlook are not on this gate yet. Nothing is sent.

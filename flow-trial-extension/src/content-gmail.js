@@ -1750,6 +1750,8 @@
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
+    if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
+    if (response.reason === 'proof_pending') return 'Not closed — the task was not confirmed.';
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
     if (response.skipped) return 'Skipped — an earlier step in this process didn’t complete.';
     return response.error || 'Couldn’t complete that action.';
@@ -2097,11 +2099,26 @@
   // — accepted-then-undone is a stronger "don't propose this" signal than a
   // pre-execution removal, since the user only learned they didn't want it
   // after seeing it actually happen.
+  function taskKind(r) {
+    const kind = r && r.action && r.action.kind;
+    return kind === 'googleTask' || kind === 'googleTasks';
+  }
+
+  // Google Tasks is Handled only after fetchedBack. Other writers in this
+  // slice are unchanged. If the proof module is missing, a task does not
+  // count as closed.
+  function stepHandled(r) {
+    if (typeof FlowProofOfClose !== 'undefined') return FlowProofOfClose.stepCountsAsHandled(r);
+    if (taskKind(r)) return false;
+    return !!(r && r.response && r.response.ok && !r.response.skipped);
+  }
+
   async function showMultiActionReceipt(host, chip, ctx, results) {
-    const succeeded = results.filter((r) => r.response && r.response.ok);
+    const succeeded = results.filter(stepHandled);
 
     if (!succeeded.length) {
-      setChipState(chip, 'flow-chip-error', reasonMessage(results[0] && results[0].response, ctx));
+      const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
+      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
       return;
     }
 
@@ -2121,12 +2138,23 @@
     const he = /[\u0590-\u05FF]/.test(
       ((ctx && ctx.subject) || '') + ((ctx && ctx.bodyText) || '') + ((ctx && ctx.intent && ctx.intent.label) || '')
     );
+    const taskSteps = results.filter(taskKind);
     const copy = FlowReceipt.confirmation({
       succeeded: succeeded.length,
       total: results.length,
       priorCloses,
-      lang: he ? 'he' : 'en'
+      lang: he ? 'he' : 'en',
+      requireProof: taskSteps.length > 0,
+      proofs: taskSteps.length
+        ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
+        : undefined,
+      verifyStatus: (taskSteps[0] && taskSteps[0].response && taskSteps[0].response.reason) || undefined
     });
+    if (!copy.status) {
+      const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
+      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
+      return;
+    }
 
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
@@ -2272,16 +2300,29 @@
       ? FlowStorage.recordMeeting({ id: ctx.messageId, title: ctx.intent.label, dateIso: meetingIso, threadUrl: window.location.href })
           .catch((e) => console.error('[Glance] failed to remember the meeting for its debrief', e))
       : null;
-    const bookkeeping = succeeded.map((r) =>
-      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
-        .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e))
-    );
+    const bookkeeping = succeeded.map((r) => {
+      const proofFields = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.activityFields(r.response && r.response.proof)) || null;
+      return FlowStorage.appendLog(Object.assign({
+        kind: 'written',
+        label: ctx.intent.label,
+        messageId: ctx.messageId,
+        where: r.response.where,
+        url: r.response.url,
+        ref: r.response.ref,
+        connectorId: r.action.kind,
+        app: SOURCE_APP
+      }, proofFields))
+        .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e));
+    });
     if (meetingNote) bookkeeping.push(meetingNote);
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a
     // storage key with close-quality metrics.
-    if (typeof FlowCloseMemory !== 'undefined' && ctx.intent && ctx.intent.personalClose && FlowCloseMemory.fullWriteOf(results)) {
+    const trustedClose = typeof FlowProofOfClose !== 'undefined'
+      ? FlowProofOfClose.shouldRecordTrustedClose(results)
+      : results.length > 0 && !results.some(taskKind) && results.every((r) => r && r.response && r.response.ok === true && !r.response.skipped);
+    if (typeof FlowCloseMemory !== 'undefined' && ctx.intent && ctx.intent.personalClose && FlowCloseMemory.fullWriteOf(results) && trustedClose) {
       bookkeeping.push(
         FlowCloseMemory.recordClose({
           personalClose: ctx.intent.personalClose,
@@ -2297,7 +2338,7 @@
     // success: every step the chip proposed actually wrote. Partials stay
     // out. This count does not follow the receipt string ("Handled." vs
     // "Partly handled."). Local only; not a flow:track event.
-    if (typeof FlowCloseQuality !== 'undefined' && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length)) {
+    if (typeof FlowCloseQuality !== 'undefined' && trustedClose && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length)) {
       bookkeeping.push(
         FlowStorage.recordCloseQuality({ kind: 'success', messageId: ctx.messageId })
           .catch((e) => console.error('[Glance] failed to record a full-close success', e))

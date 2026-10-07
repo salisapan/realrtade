@@ -858,6 +858,28 @@ async function run() {
     check('reset empties the ledger and every stored adjustment', (await FlowStorage.getLedger()).length === 0 && Object.keys(after.act).length === 0, after);
   }
 
+  console.log('\n--- storage.js: a proved Google Task keeps its proof fields ---\n');
+  store = {};
+  {
+    await FlowStorage.appendLog({
+      kind: 'written',
+      label: 'Send the signed SOW',
+      messageId: 'm-proof',
+      where: 'Google Tasks',
+      url: 'https://tasks.google.com/embed/list/LIST_A?pli=1',
+      ref: { taskListId: 'LIST_A', taskId: 'task_1', externalId: 'task_1' },
+      connectorId: 'googleTask',
+      app: 'gmail',
+      system: 'google/tasks',
+      externalId: 'task_1',
+      verifiedAt: '2026-10-07T12:00:00.000Z'
+    });
+    const row = (await FlowStorage.get()).log[0];
+    check('Activity stores system, externalId, and verifiedAt on the written row',
+      row && row.kind === 'written' && row.system === 'google/tasks' && row.externalId === 'task_1' && row.verifiedAt === '2026-10-07T12:00:00.000Z' && row.ref.externalId === 'task_1',
+      row);
+  }
+
   console.log('\nTOTAL FAILURES:', failures);
   process.exit(failures ? 1 : 0);
 }
