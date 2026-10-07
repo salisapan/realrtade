@@ -423,7 +423,10 @@
       surface: 'outlook-web',
       messageId: entry.messageId || entry.outlookIncomingId,
       outlookIncomingId: entry.outlookIncomingId || entry.messageId,
-      threadId: entry.threadId || (entry.base && entry.base.threadId),
+      itemId: (pane && pane.itemId) || entry.itemId || null,
+      pathId: (pane && pane.pathId) || entry.pathId || null,
+      conversationId: (pane && pane.conversationId) || entry.outlookConversationId || null,
+      threadId: entry.threadId || (pane && pane.conversationId) || (entry.base && entry.base.threadId),
       threadUrl: (entry.base && entry.base.threadUrl) || entry.threadUrl || location.href,
       subject: entry.subject || (pane && pane.subject) || '',
       bodyText: entry.text || (pane && pane.text) || '',
@@ -478,6 +481,13 @@
     }
     if (!resolvedId) {
       FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message');
+      return;
+    }
+    const steps = (ctx.process && ctx.process.steps) || [];
+    const hasDraft = steps.some((s) => s && (s.kind === 'outlookDraft' || s.kind === 'gmailDraft'));
+    const taskStep = steps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+    if (taskStep && !hasDraft) {
+      await onOutlookTodoDoIt(host, chip, ctx, taskStep);
       return;
     }
     const askText = ctx.bodyText || ctx.text || '';
@@ -569,6 +579,193 @@
         return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
       }
     });
+  }
+
+  function outlookTodoRow(row) {
+    if (!row) return false;
+    if (row.system === 'microsoft/todo') return true;
+    return row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo';
+  }
+
+  function paintOutlookTodoReceipt(mount, row) {
+    const copy = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.remountCopy)
+      ? FlowProofOfClose.remountCopy(row)
+      : null;
+    if (!mount || !copy) return null;
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    const el = FlowChipHost.el;
+    const host = el('div', 'flow-chip-host flow-chip-settled');
+    host.setAttribute('dir', 'ltr');
+    host.setAttribute('data-glance-chain', 'task-proof');
+    host.setAttribute('data-glance-message', row.messageId || '');
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    const icon = el('span', 'flow-chip-done-icon', '✓');
+    icon.setAttribute('aria-hidden', 'true');
+    done.appendChild(icon);
+    done.appendChild(el('span', 'flow-chip-handled', copy.status));
+    if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
+    if (copy.processName || copy.closedLine) {
+      const detail = el('span', 'flow-chip-detail');
+      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
+      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
+      done.appendChild(detail);
+    }
+    const undo = el('button', 'flow-chip-undo', copy.undoHint);
+    undo.type = 'button';
+    const hint = el('span', 'flow-chip-undo-hint');
+    hint.hidden = true;
+    const actionsRow = el('span', 'flow-chip-actions');
+    actionsRow.appendChild(undo);
+    if (copy.url) {
+      const view = el('a', 'flow-chip-link', 'View');
+      view.href = copy.url;
+      view.target = '_blank';
+      view.rel = 'noopener';
+      actionsRow.appendChild(view);
+    }
+    undo.addEventListener('click', () => {
+      undo.textContent = 'Undoing…';
+      undo.disabled = true;
+      send({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }).then(async (result) => {
+        if (!(result && result.ok)) {
+          undo.textContent = copy.undoHint;
+          undo.disabled = false;
+          hint.hidden = false;
+          hint.textContent = 'Still there — the To Do task was not removed.';
+          hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+          return;
+        }
+        const messageId = row.messageId;
+        if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
+          await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, row.threadId || row.outlookConversationId);
+        }
+        done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
+        lastKey = '';
+        lastSig = '';
+      });
+    });
+    done.appendChild(actionsRow);
+    done.appendChild(hint);
+    host.appendChild(done);
+    if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
+    else mount.appendChild(host);
+    lastOutcome = 'card';
+    lastKey = (row.messageId || 'open') + '|task-proof';
+    return host;
+  }
+
+  // Handled after a reload or a return to this thread. The match is the
+  // Outlook item id, the path id, or the conversation id. A hash of the
+  // pane text is not an id.
+  async function remountProvedTodoReceipt(pane) {
+    if (!pane || typeof FlowProofOfClose === 'undefined' || typeof FlowProofOfClose.taskReceiptFromLog !== 'function') return false;
+    const mount = mountPoint();
+    if (!mount) return false;
+    let bag = null;
+    try { bag = await FlowStorage.get(); } catch (e) { return false; }
+    const log = (bag && bag.log) || [];
+    const todoLog = log.filter((e) => outlookTodoRow(e));
+    const row = FlowProofOfClose.taskReceiptFromLog(todoLog, {
+      messageIds: [pane.itemId, pane.pathId, pane.conversationId],
+      threadIds: [pane.conversationId]
+    });
+    const existing = mount.querySelector('.flow-chip-host[data-glance-chain="task-proof"]');
+    if (!outlookTodoRow(row)) {
+      if (existing) existing.remove();
+      return false;
+    }
+    if (existing && existing.classList.contains('flow-chip-settled')) {
+      lastOutcome = 'card';
+      lastKey = (row.messageId || 'open') + '|task-proof';
+      return true;
+    }
+    return Boolean(paintOutlookTodoReceipt(mount, row));
+  }
+
+  async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
+    const params = (taskStep && taskStep.params) || {};
+    const he = ctx.intent && ctx.intent.lang === 'he';
+    const r = await send({
+      type: 'flow:execute-action',
+      payload: {
+        connectorId: 'outlookTask',
+        params: params,
+        label: (ctx.intent && ctx.intent.label) || params.title || 'Task',
+        senderName: ctx.sender && ctx.sender.name,
+        senderEmail: ctx.sender && ctx.sender.email,
+        subject: ctx.subject || '',
+        text: ctx.bodyText || '',
+        threadUrl: ctx.threadUrl || null,
+        facts: (ctx.intent && ctx.intent.facts) || null,
+        entities: (ctx.intent && (ctx.intent.entities || ctx.intent.facts)) || null
+      }
+    });
+    const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+      ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
+      : false;
+    if (!proved) {
+      const why = (r && r.reason === 'tasks-not-granted')
+        ? 'Reconnect Outlook to allow To Do'
+        : ((r && (r.error || r.reason)) || 'Could not confirm the task');
+      FlowChipHost.setChipState(chip, 'flow-chip-error', why);
+      return;
+    }
+    const status = he ? 'טופל.' : 'Handled.';
+    const fields = FlowProofOfClose.receiptLogFields
+      ? FlowProofOfClose.receiptLogFields(r.proof, {
+        writtenLine: r.written,
+        processName: ctx.process && ctx.process.name,
+        closedLine: ctx.process && ctx.process.closedLine,
+        status: status
+      })
+      : null;
+    const threadId = ctx.threadId || ctx.conversationId || null;
+    await FlowStorage.appendLog(Object.assign({
+      kind: 'written',
+      label: (ctx.intent && ctx.intent.label) || r.written,
+      messageId: ctx.messageId,
+      itemId: ctx.itemId || null,
+      pathId: ctx.pathId || null,
+      threadId: threadId,
+      outlookConversationId: ctx.conversationId || null,
+      outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
+      app: 'outlook',
+      connectorId: 'outlookTask',
+      ref: r.ref,
+      where: r.where,
+      url: r.url || null,
+      intent: ctx.intent,
+      process: ctx.process,
+      sender: ctx.sender,
+      subject: ctx.subject,
+      text: ctx.bodyText
+    }, fields || {}));
+    if (ctx.messageId) {
+      await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
+      await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: ctx.messageId });
+    }
+    const mount = host.parentElement || mountPoint();
+    const row = Object.assign({
+      kind: 'written',
+      messageId: ctx.messageId,
+      threadId: threadId,
+      outlookConversationId: ctx.conversationId || null,
+      connectorId: 'outlookTask',
+      ref: r.ref,
+      url: r.url || null,
+      system: 'microsoft/todo',
+      externalId: r.proof && r.proof.externalId,
+      verifiedAt: r.proof && r.proof.verifiedAt,
+      fetchedBack: true,
+      writtenLine: r.written,
+      processName: ctx.process && ctx.process.name,
+      closedLine: ctx.process && ctx.process.closedLine,
+      receiptStatus: status
+    }, fields || {});
+    if (mount) paintOutlookTodoReceipt(mount, row);
   }
 
   function holdingLabel(chain) {
@@ -1243,6 +1440,12 @@
     dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, chars: (pane.text || '').length });
     // Outlook must be connected (token present); otherwise no card, and the reason says why.
     if (!st || !st.outlookAuth || !st.outlookAuth.token) { dropStuckCard(); await pageReason('page:not-connected', pane); return; }
+
+    // A proved To Do task is mounted before a quiet return. The ids are the
+    // Outlook item, the path, and the conversation — not a hash of the text.
+    try {
+      if (await remountProvedTodoReceipt(pane)) return;
+    } catch (e) { glanceError('todo receipt', e); }
 
     // A file placed on the calendar is judged before note-to-self. The gate
     // mail is a note addressed only to yourself. A reply you sent to someone

@@ -3466,6 +3466,125 @@ async function outlookCalendarUndo(ref) {
   return { ok: false, reason: 'http-' + (del.status || 0) };
 }
 
+// One Microsoft To Do task on the person's default list. Creating it is not
+// the close: Handled waits for a GET of that id. Never Mail.Send.
+function outlookGrantedScopes(token) {
+  const raw = token && token.grantedScopes;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') return raw.split(/\s+/).filter(Boolean);
+  return null;
+}
+
+function outlookHasTasksScope(token) {
+  const list = outlookGrantedScopes(token);
+  if (!list) return null;
+  return list.some((s) => s === 'Tasks.ReadWrite' || s === 'https://graph.microsoft.com/Tasks.ReadWrite');
+}
+
+function outlookTodoListIdFrom(body) {
+  const lists = body && Array.isArray(body.value) ? body.value : [];
+  const named = lists.find((l) => l && l.id && l.wellknownListName === 'defaultList');
+  if (named) return named.id;
+  const first = lists.find((l) => l && l.id);
+  return first ? first.id : '';
+}
+
+async function outlookTaskWrite(p) {
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  const scope = outlookHasTasksScope(session.token);
+  if (scope === false) return { ok: false, reason: 'tasks-not-granted' };
+
+  const listUrl = OUTLOOK_GRAPH + '/me/todo/lists';
+  outlookAssertNotSend(listUrl);
+  const listed = await outlookFetch(listUrl, { method: 'GET' });
+  if (listed && listed.notConnected) return { ok: false, reason: 'not-connected' };
+  if (listed && (listed.status === 401 || listed.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (!listed || !listed.ok) return { ok: false, reason: 'http-' + ((listed && listed.status) || 0) };
+  let lists = null;
+  try { lists = await listed.json(); } catch (e) { lists = null; }
+  const taskListId = outlookTodoListIdFrom(lists);
+  if (!taskListId) return { ok: false, reason: 'no-list' };
+
+  const close = taskClosePayload(p || {});
+  const titled = googleTaskTitle(p || {});
+  const title = (typeof titled === 'string' ? titled : '').trim().slice(0, 255);
+  if (!title) return { ok: false, reason: 'unclear', error: 'Nothing to put on the task.' };
+  const notesLines = factLines(close.forNotes);
+  if (p && p.threadUrl) notesLines.push(['Open in Outlook', p.threadUrl]);
+  const notes = notesLines.map(([k, v]) => k + ': ' + v).join('\n').slice(0, 8000);
+  const body = { title: title };
+  if (notes) body.body = { contentType: 'text', content: notes };
+  if (close.dueIso) body.dueDateTime = { dateTime: close.dueIso + 'T00:00:00.0000000', timeZone: 'UTC' };
+
+  const postUrl = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks';
+  outlookAssertNotSend(postUrl);
+  const res = await outlookFetch(postUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (res && res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res && (res.status === 401 || res.status === 403)) return { ok: false, reason: 'tasks-not-granted' };
+  if (!res || !res.ok) return { ok: false, reason: 'http-' + ((res && res.status) || 0) };
+  let task = null;
+  try { task = await res.json(); } catch (e) { task = null; }
+  const written = taskWrittenLine(close.dueIso, close.amount).replace(/^Google Task/, 'To Do');
+  const base = { where: 'Microsoft To Do', target: 'default list', written: written, url: null };
+  const Proof = globalThis.FlowProofOfClose;
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
+  if (!task || typeof task.id !== 'string' || !task.id) {
+    return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
+  }
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
+  const fetched = await outlookTaskFetchBack(taskListId, task.id);
+  if (!fetched.ok) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  }
+  const link = task.webLink && String(task.webLink).slice(0, 8) === 'https://' ? task.webLink : null;
+  if (link) base.url = link;
+  const proof = Proof && Proof.buildProof({
+    system: Proof.SYSTEM_MICROSOFT_TODO,
+    externalId: task.id,
+    url: link || undefined,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) {
+    return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+  }
+  return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+}
+
+async function outlookTaskFetchBack(taskListId, taskId) {
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  let res;
+  try {
+    res = await outlookFetch(url, { method: 'GET' });
+  } catch (e) {
+    return { ok: false };
+  }
+  if (!res || !res.ok) return { ok: false };
+  let body = null;
+  try { body = await res.json(); } catch (e) { return { ok: false }; }
+  if (!body || body.id !== taskId) return { ok: false };
+  return { ok: true, task: body };
+}
+
+async function outlookTaskUndo(ref) {
+  const taskId = ref && (ref.externalId || ref.taskId);
+  const listId = ref && ref.taskListId;
+  if (!taskId || !listId) return { ok: false };
+  const url = OUTLOOK_GRAPH + '/me/todo/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId);
+  outlookAssertNotSend(url);
+  const del = await outlookFetch(url, { method: 'DELETE' });
+  if (del && del.notConnected) return { ok: false, reason: 'not-connected' };
+  if (del && (del.ok || del.status === 204 || del.status === 404)) return { ok: true, written: 'To Do task removed.' };
+  return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
+}
+
 async function outlookDraftUndo(ref, hint) {
   if (!ref) return { ok: false };
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
@@ -3489,14 +3608,16 @@ const WRITERS = {
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
-  outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite
+  outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
+  outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
-  outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo
+  outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
+  outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo
 };
 
 async function connectorStatus() {

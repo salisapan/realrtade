@@ -241,7 +241,15 @@ const FlowOutlook = (() => {
       if (!granted) return { ok: false, error: 'permission' };
       const o = opts || {};
       const prev = await read(AUTH_KEY, null);
-      const scopes = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
+      const chosen = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
+      // A sign-in from before Tasks.ReadWrite kept that shorter list. The
+      // default scopes are always included so the next Connect asks for To Do.
+      // Mail.Send is never added.
+      const scopes = [];
+      (chosen || []).concat(cfg.SCOPES || []).forEach((s) => {
+        if (!s || /Mail\.Send/i.test(s) || /\.Send$/i.test(s)) return;
+        if (scopes.indexOf(s) < 0) scopes.push(s);
+      });
       const r = await deps.auth.signIn(authDeps(), cfg, deps.redirectUri(), { prompt: o.prompt, loginHint: o.loginHint, scopes: scopes });
       if (!r.ok) return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null };
       const profile = await fetchProfile(r.token.accessToken);

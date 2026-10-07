@@ -1,6 +1,6 @@
 // Proof of close. A loop is Handled only after the system that received the
 // write is read back. A draft, an attachment, and a calendar hold are not
-// this proof. This slice speaks for Google Tasks only.
+// this proof. This slice speaks for Google Tasks and Microsoft To Do.
 //
 // Shape (execution architecture, decision 5):
 //   { system, externalId, url?, number?, fetchedBack: true, verifiedAt }
@@ -11,6 +11,7 @@
 // the POST and the GET. This file only builds the proof and gates Handled.
 const FlowProofOfClose = (() => {
   const SYSTEM_GOOGLE_TASKS = 'google/tasks';
+  const SYSTEM_MICROSOFT_TODO = 'microsoft/todo';
   const REASON_PENDING = 'proof_pending';
   const REASON_FAILED = 'verify_failed';
 
@@ -51,12 +52,22 @@ const FlowProofOfClose = (() => {
     return kind === 'googleTask' || kind === 'googleTasks';
   }
 
-  // One step of a Do It. Google Tasks counts only with a proof. Every other
+  function isMicrosoftTodoKind(kind) {
+    return kind === 'outlookTask' || kind === 'microsoftTodo';
+  }
+
+  // Task writers that must be read back before Handled. Calendar, drafts,
+  // and Drive are not in this list.
+  function isProofTaskKind(kind) {
+    return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind);
+  }
+
+  // One step of a Do It. A task counts only with a proof. Every other
   // kind keeps the write it already had: this slice does not verify them.
   function stepCountsAsHandled(result) {
     if (!result || !result.response || result.response.ok !== true || result.response.skipped) return false;
     const kind = result.action && result.action.kind;
-    if (isGoogleTaskKind(kind)) return allowsHandled(result.response);
+    if (isProofTaskKind(kind)) return allowsHandled(result.response);
     return true;
   }
 
@@ -82,6 +93,8 @@ const FlowProofOfClose = (() => {
   const STATUS_PARTIAL = 'Partly handled.';
   const UNDO_HINT = 'Undo removes the Google Task.';
   const UNDONE_LINE = 'Undone — the Google Task was removed.';
+  const TODO_UNDO_HINT = 'Undo removes the To Do task.';
+  const TODO_UNDONE_LINE = 'Undone — the To Do task was removed.';
 
   function clip(value, max) {
     const s = clean(value).replace(/\s+/g, ' ');
@@ -111,17 +124,28 @@ const FlowProofOfClose = (() => {
     return kind === 'googleTask' || kind === 'googleTasks';
   }
 
-  // A written Activity row that is still a trusted Google Task close.
+  function isMicrosoftTodoConnector(row) {
+    const kind = row && row.connectorId;
+    return kind === 'outlookTask' || kind === 'microsoftTodo';
+  }
+
+  function isMicrosoftTodoRow(row) {
+    if (!row) return false;
+    if (clean(row.system) === SYSTEM_MICROSOFT_TODO) return true;
+    return isMicrosoftTodoConnector(row);
+  }
+
+  // A written Activity row that is still a trusted task close.
   // fetchedBack true is the proof. The 0.9.28 triple (system, externalId,
-  // verifiedAt) counts the same. A googleTask write that stored ref but
+  // verifiedAt) counts the same. A task write that stored ref but
   // not that triple still counts: the receipt already said Handled, and
   // a verify miss never appends a written row. fetchedBack false does not.
   function isTaskReceiptRow(row) {
     if (!row || row.kind !== 'written') return false;
     if (row.fetchedBack === false) return false;
     if (!externalIdOf(row)) return false;
-    if (clean(row.system) === SYSTEM_GOOGLE_TASKS) return true;
-    return isGoogleTaskConnector(row);
+    if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO) return true;
+    return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row);
   }
 
   function addCanon(set, id) {
@@ -152,7 +176,7 @@ const FlowProofOfClose = (() => {
   function rowMessageIds(entry) {
     const ids = [];
     if (!entry) return ids;
-    [entry.messageId, entry.legacyMessageId, entry.gmailMessageId].forEach((id) => {
+    [entry.messageId, entry.legacyMessageId, entry.gmailMessageId, entry.outlookIncomingId, entry.itemId, entry.pathId].forEach((id) => {
       const c = canonId(id);
       if (c) ids.push(c);
     });
@@ -165,7 +189,7 @@ const FlowProofOfClose = (() => {
       if (messageIds.has(ids[i])) return true;
       if (ids[i].indexOf('scan:') === 0 && threadIds.has(ids[i].slice(5))) return true;
     }
-    const thread = canonId(entry.threadId);
+    const thread = canonId(entry.threadId) || canonId(entry.outlookConversationId);
     if (thread && threadIds.has(thread)) return true;
     return false;
   }
@@ -183,7 +207,8 @@ const FlowProofOfClose = (() => {
       if (!entry || !rowMatches(entry, found.messageIds, found.threadIds)) continue;
       if (entry.kind === 'undone' || entry.kind === 'dismissed') {
         const sameMessage = rowMessageIds(entry).some((id) => found.messageIds.has(id));
-        const taskUndo = isGoogleTaskConnector(entry) || clean(entry.system) === SYSTEM_GOOGLE_TASKS;
+        const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry)
+          || clean(entry.system) === SYSTEM_GOOGLE_TASKS || clean(entry.system) === SYSTEM_MICROSOFT_TODO;
         if (sameMessage || taskUndo) return null;
         continue;
       }
@@ -224,15 +249,18 @@ const FlowProofOfClose = (() => {
     const ref = { taskId: externalId, externalId: externalId };
     const listId = row.ref && typeof row.ref === 'object' ? clean(row.ref.taskListId) : '';
     if (listId) ref.taskListId = listId;
-    const connector = (row.connectorId === 'googleTask' || row.connectorId === 'googleTasks') ? row.connectorId : 'googleTask';
+    const microsoft = isMicrosoftTodoRow(row);
+    const connector = microsoft
+      ? ((row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo') ? row.connectorId : 'outlookTask')
+      : ((row.connectorId === 'googleTask' || row.connectorId === 'googleTasks') ? row.connectorId : 'googleTask');
     const url = clean(row.url);
     return {
       status: receiptStatusOf(row),
-      writtenLine: clip(row.writtenLine, 180) || 'Google Task',
+      writtenLine: clip(row.writtenLine, 180) || (microsoft ? 'To Do' : 'Google Task'),
       processName: clip(row.processName, 80),
       closedLine: clip(row.closedLine, 180),
-      undoHint: UNDO_HINT,
-      undoneLine: UNDONE_LINE,
+      undoHint: microsoft ? TODO_UNDO_HINT : UNDO_HINT,
+      undoneLine: microsoft ? TODO_UNDONE_LINE : UNDONE_LINE,
       url: url.slice(0, 8) === 'https://' ? url : '',
       connectorId: connector,
       externalId: externalId,
@@ -277,12 +305,15 @@ const FlowProofOfClose = (() => {
 
   return {
     SYSTEM_GOOGLE_TASKS: SYSTEM_GOOGLE_TASKS,
+    SYSTEM_MICROSOFT_TODO: SYSTEM_MICROSOFT_TODO,
     REASON_PENDING: REASON_PENDING,
     REASON_FAILED: REASON_FAILED,
     buildProof: buildProof,
     isProof: isProof,
     allowsHandled: allowsHandled,
     isGoogleTaskKind: isGoogleTaskKind,
+    isMicrosoftTodoKind: isMicrosoftTodoKind,
+    isProofTaskKind: isProofTaskKind,
     stepCountsAsHandled: stepCountsAsHandled,
     shouldRecordTrustedClose: shouldRecordTrustedClose,
     activityFields: activityFields,

@@ -928,7 +928,7 @@
       const screen = el('div', 'ms-connect');
       screen.setAttribute('data-glance-connect', 'microsoft');
       const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
-        { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', required: true }
+        { id: 'mail', label: 'Mail', detail: 'Read mail, write a reply draft, and add a To Do task. Never sends.', required: true }
       ];
       const boxes = {};
       const all = document.createElement('label');
@@ -2288,14 +2288,18 @@
   function newerTaskUndo(log, index) {
     const e = log[index];
     if (!e || e.kind !== 'written') return false;
-    const task = e.connectorId === 'googleTask' || e.connectorId === 'googleTasks' || e.system === 'google/tasks';
+    const task = e.connectorId === 'googleTask' || e.connectorId === 'googleTasks' || e.system === 'google/tasks'
+      || e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo';
     if (!task) return false;
     const ext = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
     for (let i = 0; i < index; i++) {
       const newer = log[i];
       if (!newer || newer.kind !== 'undone') continue;
       if (e.messageId && newer.messageId === e.messageId) return true;
-      if (e.threadId && newer.threadId && e.threadId === newer.threadId && (newer.connectorId === 'googleTask' || newer.connectorId === 'googleTasks')) return true;
+      const newerTask = newer.connectorId === 'googleTask' || newer.connectorId === 'googleTasks'
+        || newer.connectorId === 'outlookTask' || newer.connectorId === 'microsoftTodo'
+        || newer.system === 'google/tasks' || newer.system === 'microsoft/todo';
+      if (e.threadId && newer.threadId && e.threadId === newer.threadId && newerTask) return true;
       const nextExt = newer.externalId || (newer.ref && (newer.ref.externalId || newer.ref.taskId)) || '';
       if (ext && nextExt && ext === nextExt) return true;
     }
@@ -2344,6 +2348,8 @@
               await FlowStorage.markOutlookCalendarUndone(e.messageId, e.ref);
             } else if ((e.connectorId === 'googleTask' || e.connectorId === 'googleTasks') && typeof FlowStorage.markGoogleTaskUndone === 'function') {
               await FlowStorage.markGoogleTaskUndone(e.messageId, e.ref, e.threadId);
+            } else if ((e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo') && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
+              await FlowStorage.markMicrosoftTodoUndone(e.messageId, e.ref, e.threadId);
             } else {
               await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId, connectorId: e.connectorId, ref: e.ref, app: e.app });
             }

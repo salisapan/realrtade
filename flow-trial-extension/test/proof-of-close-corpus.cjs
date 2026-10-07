@@ -207,7 +207,7 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a proved write stores the banner lines on the Activity row',
     gmail.indexOf('FlowProofOfClose.receiptLogFields') > 0);
   const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
-  check('the extension version is 0.9.30', /"version": "0\.9\.30"/.test(manifest));
+  check('the extension version is 0.9.31', /"version": "0\.9\.31"/.test(manifest));
 
   // Live 0.9.29: Do It stored a hash of the message text. After reload that
   // hash changed (the clock line in the row changed) and the scan treated
@@ -277,6 +277,93 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a successful task undo rewrites the HANDLED row instead of leaving it',
     gmail.indexOf('markGoogleTaskUndone') > 0 &&
     fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8').indexOf('markGoogleTaskUndone') > 0);
+}
+
+console.log('\n--- Microsoft To Do ---\n');
+{
+  const todo = FlowProofOfClose.buildProof({
+    system: FlowProofOfClose.SYSTEM_MICROSOFT_TODO,
+    externalId: 'todo_1',
+    fetchedBack: true,
+    verifiedAt: VERIFIED
+  });
+  check('a To Do read-back is system microsoft/todo',
+    todo && todo.system === 'microsoft/todo' && todo.externalId === 'todo_1' && todo.fetchedBack === true, todo);
+  check('a To Do step without fetchedBack is not Handled',
+    FlowProofOfClose.stepCountsAsHandled({
+      action: { kind: 'outlookTask' },
+      response: { ok: true, proof: null }
+    }) === false);
+  check('a To Do step with fetchedBack is Handled',
+    FlowProofOfClose.stepCountsAsHandled({
+      action: { kind: 'outlookTask' },
+      response: { ok: true, proof: todo }
+    }) === true);
+  const oldItem = 'AAMkOLD';
+  const conv = 'conv/9';
+  const storedTodo = {
+    kind: 'written',
+    messageId: oldItem,
+    threadId: conv,
+    outlookConversationId: conv,
+    itemId: oldItem,
+    pathId: 'path_9',
+    connectorId: 'outlookTask',
+    system: 'microsoft/todo',
+    externalId: 'todo_1',
+    verifiedAt: VERIFIED,
+    fetchedBack: true,
+    ref: { taskListId: 'LIST_T', taskId: 'todo_1', externalId: 'todo_1' },
+    writtenLine: 'To Do · due Oct 10',
+    processName: 'Log It',
+    closedLine: 'Logged and tracked.',
+    receiptStatus: 'Handled.'
+  };
+  const reload = { messageIds: ['AAMkNEW', 'path_9', conv], threadIds: [conv] };
+  check('an Outlook reload finds the To Do receipt by conversation id, not the old item id',
+    FlowProofOfClose.taskReceiptFromLog([storedTodo], reload) === storedTodo);
+  check('terminal with no chip mounts the To Do receipt',
+    FlowProofOfClose.scanReceiptDecision({
+      log: [storedTodo], messageIds: ['AAMkNEW'], threadIds: [conv], hasHost: false, terminal: true
+    }) === 'mount');
+  const copy = FlowProofOfClose.remountCopy(storedTodo);
+  check('the To Do banner says Handled and Undo removes the To Do task',
+    copy && copy.status === 'Handled.' && copy.connectorId === 'outlookTask' &&
+    copy.undoHint === 'Undo removes the To Do task.' && copy.undoneLine === 'Undone — the To Do task was removed.' &&
+    copy.externalId === 'todo_1' && copy.ref.taskListId === 'LIST_T',
+    copy);
+  check('a newer To Do undo does not remount',
+    FlowProofOfClose.taskReceiptFromLog([
+      { kind: 'undone', messageId: oldItem, threadId: conv, connectorId: 'outlookTask', system: 'microsoft/todo', undone: true },
+      storedTodo
+    ], reload) === null);
+  check('fetchedBack false is not a To Do receipt',
+    FlowProofOfClose.remountCopy(Object.assign({}, storedTodo, { fetchedBack: false })) === null);
+  const he = FlowProofOfClose.remountCopy(Object.assign({}, storedTodo, { receiptStatus: 'טופל.' }));
+  check('a Hebrew To Do receipt stays טופל', he && he.status === 'טופל.', he);
+
+  const outlook = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+  const remountAt = outlook.indexOf('remountProvedTodoReceipt');
+  const terminalAt = outlook.indexOf('hasTerminalOutcome');
+  check('the Outlook scan remounts a proved To Do task before it can treat the thread as finished',
+    remountAt > 0 && terminalAt > remountAt, { remountAt: remountAt, terminalAt: terminalAt });
+  check('the Outlook lookup uses the item, the path, and the conversation, not a text hash',
+    outlook.indexOf('messageIds: [pane.itemId, pane.pathId, pane.conversationId]') > 0 &&
+    outlook.indexOf('taskReceiptFromLog') > 0);
+  check('a task-only Do It calls the To Do writer and a draft Do It stays a draft',
+    outlook.indexOf("connectorId: 'outlookTask'") > 0 && outlook.indexOf("payload.connectorId = 'outlookDraft'") > 0);
+  const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');
+  const storage = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage.js'), 'utf8');
+  check('Undo rewrites the To Do Activity row so it does not stay HANDLED',
+    storage.indexOf('markMicrosoftTodoUndone') > 0 && popup.indexOf('markMicrosoftTodoUndone') > 0 &&
+    outlook.indexOf('markMicrosoftTodoUndone') > 0);
+  const bg = fs.readFileSync(path.join(__dirname, '..', 'src', 'background.js'), 'utf8');
+  check('the To Do writer is registered and follow-up chase is not that writer',
+    bg.indexOf('outlookTask: outlookTaskWrite') > 0 && bg.indexOf("system: Proof.SYSTEM_MICROSOFT_TODO") > 0);
+  const follow = bg.indexOf('async function followTaskCreate');
+  const followEnd = bg.indexOf('async function followTaskComplete');
+  check('the waiting-on chase does not write Microsoft To Do',
+    follow > 0 && followEnd > follow && bg.slice(follow, followEnd).indexOf('/me/todo/') === -1);
 }
 
 console.log('\nTOTAL FAILURES:', failures);
