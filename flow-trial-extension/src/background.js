@@ -44,6 +44,7 @@ import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
 import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
+import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import { LADDER } from '../config/ladder.public.js';
 
@@ -3838,6 +3839,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (hybridAnswer) return reply(sendResponse, hybridAnswer);
 
   if (msg.type === 'flow:connector-status') return reply(sendResponse, connectorStatus());
+
+  if (msg.type === 'flow:build-stamp') {
+    const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+    return reply(sendResponse, Promise.resolve({ ok: true, build: stamp }));
+  }
 
   if (msg.type === 'flow:connect') {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks().then(() => ({ ok: true })));

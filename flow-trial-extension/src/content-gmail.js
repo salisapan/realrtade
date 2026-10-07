@@ -1056,6 +1056,11 @@
       });
       return;
     }
+    // The ask named OneDrive. This surface writes Drive. Stay quiet rather than save it there.
+    if (intent.googleClose && intent.googleClose.target === 'onedrive') {
+      recordSilence(messageId, 'onedrive-target-on-gmail');
+      return;
+    }
 
     // A file-shaped message that is not one clear object (two files, a
     // hedge, a "don't send") must not become a Do It. Other closes are
@@ -1974,6 +1979,7 @@
     }
 
     if (action.kind === 'driveFile') {
+      if (action.params && action.params.googleClose && action.params.googleClose.target === 'onedrive') return null;
       const only = ctx.attachments && ctx.attachments.length === 1 ? ctx.attachments[0] : null;
       if (!only) return null;
       const fetched = await fetchAttachmentBase64(only);

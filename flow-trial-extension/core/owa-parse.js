@@ -30,7 +30,7 @@ const FlowOwaParse = (() => {
     const m = raw.match(/\/id\/([^/?#&]+)/i) || raw.match(/[?&#]ItemID=([^&#]+)/i) || raw.match(/[?&#]id=([^&#]+)/i) || raw.match(/restid=([^&#]+)/i);
     if (m && m[1]) { try { id = decodeURIComponent(m[1]); } catch (e) { id = m[1]; } }
     if (!id) return { itemId: null, conversationId: null, kind: null };
-    const conv = /^A[AQ]Qk/.test(id);
+    const conv = /^A[AQ]Qk/i.test(id);
     return { itemId: conv ? null : id, conversationId: conv ? id : null, kind: conv ? 'conversation' : 'message', raw: id };
   }
 

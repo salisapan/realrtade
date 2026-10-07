@@ -64,7 +64,8 @@ it, not touching the module.
 | `capture.js` | "Stay on this", from anywhere. Portable: no chrome.*, no DOM, no network. |
 | `channel.js` | What a conversation partner and a message look like, whatever app they were in. |
 | `classification-metrics.js` | Turns the durable local counters `storage.js` keeps into the one signal for "own code first, a model last": the share of messages decided locally, by the remote fallback, or not at all. |
-| `commitment-title.js` | Task title for Google Tasks and Microsoft To Do. The verb and object come from the same sentence that fired the dated commitment or the sender promise. Openers, the date phrase, and a sender prefix stay off the title. No clean span keeps the chip label. Subject is not a title. No model. No network. |
+| `commitment-title.js` | Task title for Google Tasks and Microsoft To Do. The verb and object come from the same sentence that fired the dated commitment or the sender promise. Openers, the date phrase, and a sender prefix stay off the title. A zero-width mark inside a word is not part of the title. No clean span keeps the chip label. Subject is not a title. No model. No network. |
+| `build-stamp.js` | One build stamp, loaded by the service worker and by the page. The panel compares the two and says Reload Glance when the running worker is still a previous registration. This is not `chrome.runtime.getManifest`. |
 | `community-key.js` | The public key slot for community learning (empty = no delta can ever be applied; the safe default). Community learning is DORMANT (`docs/community-learning.md`). |
 | `community.js` | Community learning, client side — portable, no chrome.*, no DOM, no network. |
 | `cross-channel.js` | An answer in one app that settles a loop opened in another. |

@@ -49,6 +49,8 @@
   let lastPageSyncAt = 0;
   let syncing = null;
   let lastReasonKey = '';
+  let lastReasonStored = false;
+  let lastLoggedReason = '';
   let lastHref = location.href;
   // What the last finished scan looked at, and how it ended ('card' or 'reason'). Same open message, same text, and the
   // card still on the page (or its reason already recorded): nothing to do, nothing to log.
@@ -104,15 +106,15 @@
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
   async function pageReason(reason, pane, extra) {
     lastOutcome = 'reason';
+    lastLoggedReason = reason;
     dbg('decision', { shown: false, reason, subject: pane && pane.subject });
     const key = reason + '|' + ((pane && (pane.conversationId || pane.itemId || pane.subject)) || location.pathname);
-    if (key === lastReasonKey) return;
+    if (key === lastReasonKey && lastReasonStored) return;
     const quiet = quietReason(reason);
     const quietId = pane && (pane.itemId || pane.conversationId);
     if (quiet && quietId && typeof FlowStorage !== 'undefined' && typeof FlowStorage.recordSilence === 'function') {
       FlowStorage.recordSilence({ messageId: String(quietId), reason: quiet }).catch(() => {});
     }
-    lastReasonKey = key;
     try {
       const bag = await new Promise((resolve) => chrome.storage.local.get({ [PAGE_DIAG_KEY]: [] }, resolve));
       const list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => d && d.key !== key);
@@ -122,7 +124,12 @@
         counterpart: (pane && pane.senderEmail) || null
       }, extra || {}));
       await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 20) }, resolve));
-    } catch (e) { /* the extension was reloaded under this page */ }
+      lastReasonKey = key;
+      lastReasonStored = true;
+    } catch (e) {
+      lastReasonStored = false;
+      try { console.error('Glance: page reason not stored', reason); } catch (x) { /* console gone */ }
+    }
   }
 
   async function clearReason(pane) {
@@ -239,18 +246,29 @@
 
   // Same engine as Gmail (core/incoming-judge.js), on the open message's text.
   // A stored process does not win. The page and the mailbox check agree, and a file ask runs the chain.
-  async function decideFromText(pane) {
+  async function decideFromText(pane, ownAddresses, mailbox) {
     if (typeof FlowIncomingJudge === 'undefined') return null;
     // The message's own words, as Gmail judges them: quoted history ("From: … Sent: …", "On … wrote:") cut off.
     const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
     // A save-shaped sentence is the only one that asks how many files are
     // on the message. Every other sentence stays at zero, as before.
+    // The address often carries only a conversation id. Counting files on that
+    // id fails, and a failed read must not become a silent zero.
     let attachmentCount = 0;
     if (typeof FlowGoogleCloses !== 'undefined' && typeof FlowGoogleCloses.needsOneAttachment === 'function' && FlowGoogleCloses.needsOneAttachment(own)) {
-      const id = pane.itemId || pane.pathId;
-      if (id) {
-        const rows = await graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,isInline', 'save-count');
-        if (Array.isArray(rows)) attachmentCount = rows.filter((a) => a && a.isInline !== true).length;
+      let id = pane.itemId || null;
+      if (!id) {
+        const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddresses);
+        id = found && found.id;
+      }
+      const rows = id ? await graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,isInline', 'save-count') : null;
+      if (!Array.isArray(rows)) {
+        const flag = mailbox && mailbox.hasAttachments;
+        if (flag === true) attachmentCount = 1;
+        else if (flag === false) attachmentCount = 0;
+        else return { none: true, reason: 'page:attachment-count-unread' };
+      } else {
+        attachmentCount = rows.filter((a) => a && a.isInline !== true).length;
       }
     }
     const r = FlowIncomingJudge.judge({
@@ -1597,16 +1615,28 @@
     const armed = traceArmed || localFileTrace();
     // A click rewrites the chip. That must not re-enter the file chain: re-entry was what
     // set glanceOutlookFileTrace back to 0 on Do It. One trace per open message while armed.
-    if (doItInFlight && document.querySelector('.flow-chip-host')) return;
-    if (sig === lastSig && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) return;
+    if (doItInFlight && document.querySelector('.flow-chip-host')) {
+      dbg('decision', { shown: true, reason: 'page:do-it-in-flight' });
+      return;
+    }
+    if (sig === lastSig && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) {
+      if (lastOutcome === 'reason' && !lastReasonStored) {
+        await pageReason(lastLoggedReason || 'page:same-signature', pane || { subject: (ids && (ids.raw || ids.conversationId || ids.itemId)) || '' });
+      }
+      return;
+    }
     lastSig = sig;
     lastOutcome = '';
     if (!pane) {
       // A message is open (its id is in the address) but its body could not be found: say so, with what was on the page.
+      // The subject is the id from the address, so Why not shown can name the message.
       if (ids.kind) {
         const report = FlowOwaParse.rootsReport ? FlowOwaParse.rootsReport(document) : {};
         dbg('parsed', { ok: false, ids, anchors: report });
-        await pageReason('page:pane-unreadable', null, { anchors: report });
+        const named = ids.raw || ids.itemId || ids.conversationId || '';
+        await pageReason('page:pane-unreadable', { subject: named, conversationId: ids.conversationId, itemId: ids.itemId }, { anchors: report });
+      } else {
+        await pageReason('page:no-pane', { subject: (location && location.pathname) || '(no subject)' });
       }
       return;
     }
@@ -1617,8 +1647,15 @@
     // A proved To Do task is mounted before a quiet return. The ids are the
     // Outlook item, the path, and the conversation — not a hash of the text.
     try {
-      if (await remountProvedTodoReceipt(pane)) return;
-    } catch (e) { glanceError('todo receipt', e); }
+      if (await remountProvedTodoReceipt(pane)) {
+        dbg('decision', { shown: true, reason: 'page:receipt-mounted', subject: pane.subject });
+        return;
+      }
+    } catch (e) {
+      glanceError('todo receipt', e);
+      await pageReason('page:scan-error', pane);
+      return;
+    }
 
     // A file placed on the calendar is judged before note-to-self. The gate
     // mail is a note addressed only to yourself. A reply you sent to someone
@@ -1665,7 +1702,7 @@
       return;
     }
     if (!receiptOnly) {
-      decided = await decideFromText(pane);
+      decided = await decideFromText(pane, own, entry);
       if (decided && decided.reason === 'third-party') {
         dropStuckCard();
         await pageReason('page:third-party', pane);
@@ -1755,9 +1792,10 @@
         }
         if (!decided || decided.none) {
           dropStuckCard();
+          const named = (decided && decided.reason) || 'intent-null';
           const quiet = (planned && planned.reason && !fileSilenceReason(planned.reason))
             ? planned.reason
-            : ('page:' + ((decided && decided.reason) || 'intent-null'));
+            : (String(named).indexOf('page:') === 0 ? named : ('page:' + named));
           await pageReason(quiet, pane);
           return;
         }
@@ -1889,7 +1927,13 @@
     if (scanning) { again = true; return; }
     scanning = true;
     try { await scan(); }
-    catch (e) { try { console.error('Glance: outlook scan error', e && e.message ? e.message : e); } catch (x) { /* console gone */ } }
+    catch (e) {
+      try { console.error('Glance: outlook scan error', e && e.message ? e.message : e); } catch (x) { /* console gone */ }
+      try {
+        const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? FlowOwaParse.urlIds(location.href) : {};
+        await pageReason('page:scan-error', { subject: (ids && (ids.raw || ids.itemId || ids.conversationId)) || '' });
+      } catch (x2) { /* storage gone with the page */ }
+    }
     finally {
       scanning = false;
       if (again) { again = false; schedule(); }

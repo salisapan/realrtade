@@ -87,6 +87,11 @@ const FlowIncomingJudge = (() => {
     if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process)) {
       return { show: false, reason: 'no-draft-close', intent };
     }
+    // OneDrive was named. Gmail must not save that file to Drive. Outlook still writes OneDrive.
+    const asked = intent.googleClose;
+    if ((i.surface || 'gmail') !== 'outlook' && asked && asked.target === 'onedrive') {
+      return { show: false, reason: 'onedrive-target-on-gmail', intent };
+    }
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 
@@ -108,12 +113,21 @@ const FlowIncomingJudge = (() => {
         return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
       }
       if (s && s.kind === 'driveFile') {
-        return Object.assign({}, s, { kind: 'onedriveFile', id: 'onedriveFile' });
+        return Object.assign({}, s, {
+          kind: 'onedriveFile',
+          id: 'onedriveFile',
+          label: 'OneDrive',
+          hint: 'Save the attached file to OneDrive'
+        });
       }
       return s;
     });
     const out = Object.assign({}, process, { steps: steps });
-    if (steps.some((s) => s && s.kind === 'onedriveFile')) out.closedLine = 'Saved on OneDrive.';
+    if (steps.some((s) => s && s.kind === 'onedriveFile')) {
+      out.closedLine = 'Saved on OneDrive.';
+      const he = /[\u0590-\u05FF]/.test(String(out.closingLine || ''));
+      out.closingLine = he ? 'שומר את הקובץ המצורף ב-OneDrive.' : 'Saving the attached file to OneDrive.';
+    }
     return out;
   }
 

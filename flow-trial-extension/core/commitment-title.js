@@ -38,7 +38,8 @@ const FlowCommitmentTitle = (() => {
   ];
 
   function clean(value) {
-    return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
+    // Outlook sometimes leaves a zero-width mark inside a word. It is not a letter.
+    return String(value == null ? '' : value).replace(/[\u200B\u200C\u200D\uFEFF\u2060]/g, '').replace(/\s+/g, ' ').trim();
   }
 
   // Split before whitespace is collapsed. A subject glued on with a newline

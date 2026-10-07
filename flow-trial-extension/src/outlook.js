@@ -23,7 +23,7 @@ const FlowOutlook = (() => {
   const PENDING_KEY = 'outlookPending';
   const MIN_INTERVAL_MS = 10 * 60 * 1000;
   const SILENT_REAUTH_AFTER_MS = 16 * 60 * 60 * 1000; // first silent renewal at hour 16 of the 24h SPA window (outlook-auth SILENT_AFTER_MS)
-  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,webLink,hasAttachments,internetMessageId';
+  const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,bodyPreview,webLink,hasAttachments,internetMessageId';
   const OWN_LEARNED_CAP = 20;
   // Bump to wipe stale outlookPending/offers from older builds (0.9.0 silence bug; 0.9.14: own addresses learned from
   // other people's To lines and asks swallowed by a loop in another app; 0.9.19: a schedule card

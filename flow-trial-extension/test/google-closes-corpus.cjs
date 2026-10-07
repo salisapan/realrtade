@@ -261,9 +261,26 @@ console.log('\n--- OneDrive wording is the same save; shared files are not ---\n
   fires.forEach((text) => {
     const row = plan(text, { attachmentCount: 1 });
     check('one file to OneDrive is a drive-file save: ' + text,
-      row.intent && row.intent.personalClose === 'drive-file' && row.process && row.process.steps[0].kind === 'driveFile',
-      row.intent && { type: row.intent.type, personal: row.intent.personalClose, quiet: row.intent.quiet });
+      row.intent && row.intent.personalClose === 'drive-file' && row.intent.googleClose && row.intent.googleClose.target === 'onedrive' &&
+      row.process && row.process.steps[0].kind === 'driveFile' && row.process.steps[0].label === 'OneDrive',
+      row.intent && { type: row.intent.type, personal: row.intent.personalClose, quiet: row.intent.quiet, target: row.intent.googleClose && row.intent.googleClose.target });
   });
+  const heNo = [
+    'אל תשמור את הקובץ המצורף בדרייב.',
+    'לא צריך לשמור את הקובץ בדרייב.',
+    'אין צורך לשמור את הקובץ המצורף בדרייב.',
+    'לא לשמור את הקובץ בדרייב.'
+  ];
+  heNo.forEach((text) => {
+    const row = plan(text, { attachmentCount: 1 });
+    check('a Hebrew refusal to save stays silent: ' + text,
+      row.intent && !row.intent.type && row.intent.googleSilence === true && row.intent.personalClose !== 'drive-file',
+      row.intent && { type: row.intent.type, quiet: row.intent.quiet, personal: row.intent.personalClose });
+  });
+  const forget = plan("Don't forget to save the attached file to OneDrive.", { attachmentCount: 1 });
+  check('don\'t forget to save still names OneDrive',
+    forget.intent && forget.intent.personalClose === 'drive-file' && forget.intent.googleClose && forget.intent.googleClose.target === 'onedrive',
+    forget.intent && { type: forget.intent.type, personal: forget.intent.personalClose, target: forget.intent.googleClose && forget.intent.googleClose.target });
   const zero = plan('Please save the attachment to OneDrive.', { attachmentCount: 0 });
   const two = plan('Please save the attachment to OneDrive.', { attachmentCount: 2 });
   check('zero or two OneDrive files stay silent',

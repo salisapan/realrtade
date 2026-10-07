@@ -57,7 +57,7 @@ async function runPage(opts) {
     outlookSync: { stateVersion: 3 }
   }, o.store || {});
   const sent = [];
-  const graphMsg = { id: MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: false, internetMessageId: '<pilot@mail.gmail.com>',
+  const graphMsg = { id: o.messageId || MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: o.hasAttachments === true, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
     receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
   function reply(msg) {
@@ -82,6 +82,21 @@ async function runPage(opts) {
         if (o.convFilterEmpty && /conversationId/.test(decodeURIComponent(u))) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+      }
+      // Attachments are not the message. A conversation id on this path is a 400.
+      // Handle it before the message GET, which would otherwise swallow "/attachments".
+      if (o.gateAttachments && /\/me\/messages\/[^?]+\/attachments/.test(u)) {
+        const asked = decodeURIComponent((u.match(/\/me\/messages\/([^?]+)\/attachments/) || [])[1] || '');
+        const conv = String(o.urlId || o.listedConversationId || '');
+        const canon = (s) => String(s || '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+        if (conv && (asked === conv || canon(asked) === canon(conv))) {
+          return { ok: false, status: 400, body: '{"error":{"code":"ErrorInvalidIdMalformed"}}' };
+        }
+        if (o.attachmentReads === 'fail') return { ok: false, status: 0, error: 'network' };
+        if (asked === graphMsg.id) {
+          return { ok: true, status: 200, body: JSON.stringify({ value: o.attachmentFiles || [] }) };
+        }
+        return { ok: false, status: 404, body: '{}' };
       }
       const directMsg = u.match(/\/me\/messages\/([^?]+)/);
       if (directMsg) {
@@ -731,6 +746,44 @@ async function runPage(opts) {
       driveFind: { match: 'one', file: file }
     });
     check('Undo on a reopened thread deletes the event from that receipt', undoneReload.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-from-log'), undoneReload.sent.filter((m) => m.type === 'flow:undo-action'));
+  }
+
+  console.log('\n--- Gate 0.9.36: a conversation id is not the attachment message ---\n');
+  {
+    const GATE_CONV = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEACS7fLEBJtdQIrOsX/C+aXV';
+    const SAVE = 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks';
+    const DONT = "Hi, Please don't save the attachment to OneDrive. Thanks";
+    const file = { id: 'att1', name: 'Gate-0935-signed-NDA.pdf', isInline: false, '@odata.type': '#microsoft.graph.fileAttachment' };
+    const gateHtml = (text) => (h) => h
+      .replace('title="Pilot proposal">Pilot proposal', 'title="Gate 0.9.35 OneDrive save">Gate 0.9.35 OneDrive save')
+      .replace(/<div>Hi Sali,<\/div>[\s\S]*?<div>Flow team<\/div>/, '<div>' + text + '</div>');
+    const gate = {
+      htmlPatch: gateHtml(SAVE), urlId: GATE_CONV, listedConversationId: GATE_CONV,
+      listedSubject: 'Gate 0.9.35 OneDrive save', messageId: 'M1', mailBody: SAVE,
+      gateAttachments: true, attachmentFiles: [file], hasAttachments: true, waitMs: 4500
+    };
+    const shown = await runPage(gate);
+    const shownLog = (shown.store.log || []).find((e) => e && e.kind === 'shown');
+    const kinds = shownLog && shownLog.process && shownLog.process.steps && shownLog.process.steps.map((s) => s.kind);
+    const fetches = shown.sent.filter((m) => m.type === 'flow:outlook-fetch').map((m) => String(m.url));
+    const att = fetches.filter((u) => /\/attachments/.test(u));
+    check('the open page resolves M1 and shows OneDrive plus the Outlook draft',
+      Boolean(shown.chip) && /OneDrive/.test(shown.chip.textContent) && /Do It/.test(shown.chip.textContent) &&
+      kinds && kinds[0] === 'onedriveFile' && kinds[1] === 'outlookDraft' &&
+      att.some((u) => /\/messages\/M1\/attachments/.test(u)) &&
+      !att.some((u) => /AQQk/.test(decodeURIComponent(u))),
+      { text: shown.chip && shown.chip.textContent, kinds: kinds, att: att, why: (shown.store.outlookPageDiag || []).map((d) => d.reason), parsed: shown.parsed && { itemId: shown.parsed.itemId, pathId: shown.parsed.pathId, subject: shown.parsed.subject, text: shown.parsed.text } });
+    const refused = await runPage(Object.assign({}, gate, { htmlPatch: gateHtml(DONT), mailBody: DONT, waitMs: 3500 }));
+    const refusedWhy = (refused.store.outlookPageDiag || []).map((d) => d.reason);
+    check('don\'t save stays quiet when the resolved message has one file',
+      !refused.chip && refusedWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
+      { text: refused.chip && refused.chip.textContent, why: refusedWhy });
+    const unread = await runPage(Object.assign({}, gate, { attachmentReads: 'fail', attachmentsUnread: true, waitMs: 3500 }));
+    const unreadWhy = (unread.store.outlookPageDiag || []).map((d) => d.reason);
+    check('an unreadable attachment count is logged and is not a silent zero',
+      !unread.chip && unreadWhy.indexOf('page:attachment-count-unread') >= 0 &&
+      !unreadWhy.some((r) => r === 'quiet:google' || r === 'page:quiet:google'),
+      { text: unread.chip && unread.chip.textContent, why: unreadWhy });
   }
 
   console.log('\nTOTAL FAILURES:', failures);

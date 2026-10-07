@@ -310,7 +310,7 @@ const FlowIntent = (() => {
   // The sender said not to act. A dated agreement or a figure underneath
   // is context, not a close. Hard gates never read the score, so "FYI, we
   // agreed…" chipped at 17.
-  const INFO_ONLY = /\b(?:fyi|for your information|no action (?:needed|required|necessary)|no reply needed|no need to (?:reply|respond|do anything)|informational only|for visibility only|for (?:your )?awareness|looping you(?: in)? for (?:visibility|awareness))\b|(?:^|\s)(?:לידיעתך|לידיעה בלבד|אין צורך בפעולה|אין צורך להגיב)/i;
+  const INFO_ONLY = /\b(?:fyi|for your information|no action (?:needed|required|necessary)|no reply needed|no need to (?:reply|respond|do anything)|informational only|for visibility only|for (?:your )?awareness|looping you(?: in)? for (?:visibility|awareness))\b|(?:^|\s)(?:לידיעתך|לידיעה בלבד|אין צורך בפעולה|אין צורך להגיב)|לא נדרש(?:ת|ים)?\s+(?:ממך\s+)?(?:פעולה|דבר|כלום|ממך)/i;
   // Bumps and calendar-acceptance mail the existing noise list does not
   // name. "Just following up — could you share the contract" is not in
   // here; that ask still chips.

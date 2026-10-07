@@ -63,7 +63,7 @@ const FlowGoogleCloses = (() => {
   const SAVE_HE = /(?:תשמור|שמור|לשמור|תתייק)[^\n]{0,40}(?:בדרייב|בגוגל\s*דרייב)/;
   // A refusal of that save is silence. The negation has to govern the verb,
   // so a different "no need to" in the same mail does not hide a real save.
-  const SAVE_NO = /\b(?:(?:do not|don't|dont|no need to)\s+(?:save|file|store|upload)|never mind)\b/i;
+  const SAVE_NO = /\b(?:(?:do not|don't|dont|no need to)\s+(?:save|file|store|upload)|never mind)\b|(?:אל\s+ת|לא\s+צריך\s+ל|אין\s+צורך\s+ל|לא\s+ל)(?:שמור|שמרי|לשמור|תתייק)/i;
 
   // Save-shaped only. The open Outlook page counts file attachments for
   // this sentence and for no other, so the rest of show and silence stay put.
@@ -251,6 +251,12 @@ const FlowGoogleCloses = (() => {
       };
     }
     if (close.copyAttachment) {
+      if (close.target === 'onedrive') {
+        return {
+          cardLine: 'Saving the attached file to OneDrive.',
+          cardLineHe: 'שומר את הקובץ המצורף ב-OneDrive.'
+        };
+      }
       return {
         cardLine: 'Saving the attached file to Drive.',
         cardLineHe: 'שומר את הקובץ המצורף בדרייב.'
@@ -302,6 +308,7 @@ const FlowGoogleCloses = (() => {
     if (SAVE_EN.test(text) || SAVE_HE.test(text)) {
       if (SAVE_NO.test(text) || input.attachmentCount !== 1) return { silence: true };
       const lang = hebrewText(text) ? 'he' : 'en';
+      const onedrive = /\bone\s?drive\b/i.test(text);
       const close = {
         family: 'C',
         personalClose: 'drive-file',
@@ -309,6 +316,7 @@ const FlowGoogleCloses = (() => {
         kind: 'file',
         copyAttachment: true,
         destination: 'draft',
+        target: onedrive ? 'onedrive' : 'drive',
         fileTerm: null,
         slots: [],
         filled: {},

@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-07 (Glance 0.9.35: a save to OneDrive is the same one-file write. A refusal to save stays silent. Shared files stay silent. A task title is the commitment after a greeting, without the subject. Undo leaves an Undone line. Never `Mail.Send`.)
+Last updated: 2026-10-07 (Glance 0.9.36: the open Outlook page resolves a conversation id before it counts files, and an unread count is `page:attachment-count-unread`. Gmail stays quiet when the ask names OneDrive. A Hebrew refusal to save stays silent. A Hebrew FYI that says no action is required stays silent, and "נדרשת פעולה:" still shows. A stale worker shows Reload Glance. Never `Mail.Send`.)
 
 ## Open
 
@@ -81,6 +81,7 @@ Last updated: 2026-10-07 (Glance 0.9.35: a save to OneDrive is the same one-file
 
 ## Done (recent)
 
+- 2026-10-07: Outlook OneDrive card, Gmail stays off that write, Hebrew silence (0.9.36). The Gate address carries a conversation id and no item id. The open page resolves that id, then counts files on the message. A failed attachment read is not zero: it uses the mailbox `hasAttachments` flag, or it logs `page:attachment-count-unread`. A scan that exits without a card logs a reason, and a scan exception logs `page:scan-error`. One non-inline file on "save to OneDrive" shows an OneDrive step. Two files stay silent. "don't save" stays quiet at one file. A list the mailbox check could not read is `outlook:attachments-unread`. An empty body uses `bodyPreview`. A message with no conversation id still leaves a card or a reason. Gmail does not save that file to Drive (`onedrive-target-on-gmail`). Hebrew "אל תשמור / לא צריך לשמור / אין צורך לשמור / לא לשמור" stays silent. "Don't forget to save … to OneDrive" on Outlook still shows. "לא נדרשת פעולה" stays silent. "נדרשת פעולה:" still shows. The To Do title on 0.9.35 already keeps the commitment when the greeting sits on its own line. A worker still running an older registration shows Reload Glance. Never `Mail.Send`. Live check is row 49.
 - 2026-10-07: OneDrive wording, a refusal, and the task title (0.9.35). Saving the one attached file to OneDrive is the same write as Drive. "don't / do not / no need to / never mind" stays silent. Shared files stay silent. The task title is the commitment after a greeting, and the subject is not glued on. Undo leaves the Undone line on that message. Never `Mail.Send`. Live check is row 49.
 - 2026-10-07: OneDrive file write (0.9.34). One attached file is written, read back, and Handled only then. Undo deletes a created file or restores the previous version. `Files.ReadWrite` is the OneDrive checkbox. Mail-only sign-in does not ask it. A mail does not search OneDrive. Task titles are the verb and object of the firing sentence. One Undo remains after reload. Never `Mail.Send`. Live check is row 49.
 - 2026-10-07: To Do is its own checkbox on the one Connect screen (0.9.33). Mail scopes are `Mail.Read` and `Mail.ReadWrite`. `Tasks.ReadWrite` is asked only when To Do is checked. Select all still includes it. Never `Mail.Send`. The Entra app must list delegated `Tasks.ReadWrite` or that box's consent fails. Handled still waits for a To Do read-back. Live check stays row 47.

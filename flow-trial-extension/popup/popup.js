@@ -69,6 +69,7 @@
   renderSurfaces().catch(() => {});
   renderOutlookCards().catch(() => {});
   outlookAutoSync().catch(() => {});
+  renderBuildStamp().catch(() => {});
 
 
   // ---- Glance Pro -----------------------------------------------------------
@@ -168,6 +169,24 @@
 
   function send(msg) {
     return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
+  }
+
+  // The popup loads this package's stamp. The worker answers with the stamp
+  // of the registration that is actually running. They differ when that
+  // registration is still the previous build.
+  async function renderBuildStamp() {
+    const line = document.getElementById('reloadGlance');
+    if (!line) return;
+    const mine = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+    if (!mine) { line.hidden = true; return; }
+    let theirs = '';
+    try {
+      const r = await send({ type: 'flow:build-stamp' });
+      theirs = (r && r.build) || '';
+    } catch (e) { theirs = ''; }
+    const stale = !theirs || theirs !== mine;
+    line.hidden = !stale;
+    if (stale) line.textContent = 'Reload Glance';
   }
 
   function el(tag, cls, text) {

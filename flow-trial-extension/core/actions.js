@@ -437,11 +437,12 @@ const FlowActions = (() => {
       };
     }
     if (g.personalClose === 'drive-file') {
+      const onedrive = g.target === 'onedrive';
       const fileStep = {
         id: 'file',
         kind: 'driveFile',
-        label: 'Drive',
-        hint: 'Save the attached file',
+        label: onedrive ? 'OneDrive' : 'Drive',
+        hint: onedrive ? 'Save the attached file to OneDrive' : 'Save the attached file',
         dependsOn: null,
         params: { copyAttachment: true, googleClose: g }
       };
@@ -457,7 +458,7 @@ const FlowActions = (() => {
         id: 'file-it',
         name: 'File it',
         closingLine: g.cardLine,
-        closedLine: 'Saved to Drive, link drafted.',
+        closedLine: onedrive ? 'Saved on OneDrive.' : 'Saved to Drive, link drafted.',
         steps: [fileStep, draftStep]
       };
     }

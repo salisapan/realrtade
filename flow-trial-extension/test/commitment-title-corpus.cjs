@@ -5,6 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const { FlowCommitmentTitle: T } = require('../core/commitment-title.js');
+const { FlowGraphMail: Mail } = require('../core/graph-mail.js');
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -39,6 +40,24 @@ check('a greeting in the body wins over the subject field',
     subject: 'Gate 0.9.34 To Do title',
     bodyText: 'Hi, We agreed to renew the passport application by Friday.'
   }) === 'Renew the passport application');
+const GATE_HTML = '<html><body><div dir="auto">Hi,<br/><br/>We agreed to renew the passport application by Friday.<br/><br/>Thanks, Flow Gate</div></body></html>';
+const GATE_PLAIN = 'Hi,\n\nWe agreed to renew the passport application by Friday.\n\nThanks, Flow Gate';
+function titled(raw) {
+  return T.titleFromBody(Mail.ownText(Mail.htmlToText(raw)));
+}
+check('blank lines keep the greeting off the title', titled(GATE_PLAIN) === 'Renew the passport application');
+check('a collapsed Hi label with the date already gone is still the commitment',
+  T.titleFromBody('Hi, We agreed to renew the passport application') === 'Renew the passport application');
+check('Gate HTML through htmlToText and ownText is the commitment', titled(GATE_HTML) === 'Renew the passport application');
+check('CRLF blank lines are the same title', titled(GATE_PLAIN.replace(/\n/g, '\r\n')) === 'Renew the passport application');
+check('a non-breaking space in the greeting is the same title',
+  titled('Hi,\u00a0\n\nWe agreed to renew the passport application by Friday.\n\nThanks, Flow Gate') === 'Renew the passport application');
+check('a zero-width mark inside the verb is the same title',
+  titled('Hi,\n\nWe\u200b agreed to renew the passport\u200b application by Friday.\n\nThanks, Flow Gate') === 'Renew the passport application');
+check('the r34 subject line plus the body is the commitment',
+  titled('Gate 0.9.34 To Do title\nHi, We agreed to renew the passport application by Friday. Thanks, Flow Gate') === 'Renew the passport application');
+check('the write payload is that plain text, not the HTML',
+  T.fromPayload({ subject: 'Gate 0.9.35 To Do title', text: Mail.ownText(Mail.htmlToText(GATE_HTML)) }) === 'Renew the passport application');
 
 check('the span is the firing sentence, not the one beside it',
   T.titleFromBody('Thanks for the note. We agreed to renew the passport application by Friday.') === 'Renew the passport application');

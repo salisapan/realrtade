@@ -49,7 +49,7 @@ function background(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.35', content_scripts: [{ js: [] }] }),
+        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.36', content_scripts: [{ js: [] }] }),
         onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} },
         lastError: null, getURL: (s) => s, id: 'ext'
       },
@@ -125,7 +125,8 @@ console.log('\n--- names, scope, one attachment ---\n');
     ]
   }, 'outlook');
   check('Outlook keeps the draft step and writes the file on OneDrive',
-    mapped.steps[0].kind === 'onedriveFile' && mapped.steps[1].kind === 'outlookDraft' && mapped.closedLine === 'Saved on OneDrive.');
+    mapped.steps[0].kind === 'onedriveFile' && mapped.steps[0].label === 'OneDrive' && mapped.steps[1].kind === 'outlookDraft' &&
+    mapped.closedLine === 'Saved on OneDrive.' && mapped.closingLine === 'Saving the attached file to OneDrive.');
   check('Gmail still writes Drive',
     J.forSurface({ steps: [{ kind: 'driveFile', id: 'file' }] }, 'gmail').steps[0].kind === 'driveFile');
 }
@@ -174,6 +175,54 @@ console.log('\n--- Outlook wording: OneDrive fires, a refusal and shared files d
   check('zero files and two files stay silent',
     outlook('Please save the attachment to OneDrive.', 0).show === false &&
     outlook('Please save the attachment to OneDrive.', 2).show === false);
+  const forget = outlook("Don't forget to save the attached file to OneDrive.", 1);
+  const forgetKinds = forget.process && forget.process.steps.map((s) => s.kind);
+  check('don\'t forget to save the attached file to OneDrive still shows on Outlook',
+    forget.show === true && forgetKinds && forgetKinds[0] === 'onedriveFile' && forget.process.steps[0].label === 'OneDrive',
+    { show: forget.show, reason: forget.reason, kinds: forgetKinds, label: forget.process && forget.process.steps[0].label });
+  function gmail(text, count) {
+    return Judge.judge({
+      text: text,
+      subject: 'Please save this',
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      attachmentCount: count,
+      hasThreadAttachment: count === 1,
+      surface: 'gmail',
+      now: when
+    });
+  }
+  const { FlowGraphMail: Mail } = require('../core/graph-mail.js');
+  const HTML_SAVE = '<html><body><div dir="auto">Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks</div></body></html>';
+  const HTML_DONT = '<html><body><div dir="auto">Hi, Please don&#39;t save the attachment to OneDrive. Thanks</div></body></html>';
+  const htmlOne = outlook(Mail.ownText(Mail.htmlToText(HTML_SAVE)), 1);
+  const htmlKinds = htmlOne.process && htmlOne.process.steps.map((s) => s.kind);
+  check('Gate HTML with one PDF is OneDrive plus the Outlook draft',
+    htmlOne.show === true && htmlKinds && htmlKinds[0] === 'onedriveFile' && htmlKinds[1] === 'outlookDraft' &&
+    htmlOne.process.steps[0].label === 'OneDrive',
+    { show: htmlOne.show, reason: htmlOne.reason, kinds: htmlKinds });
+  check('Gate HTML with zero files stays quiet', outlook(Mail.ownText(Mail.htmlToText(HTML_SAVE)), 0).show === false);
+  check('Gate HTML with two files stays quiet', outlook(Mail.ownText(Mail.htmlToText(HTML_SAVE)), 2).show === false);
+  const htmlDont = outlook(Mail.ownText(Mail.htmlToText(HTML_DONT)), 1);
+  check('Gate HTML don\'t save stays quiet with one file',
+    /don't save/.test(Mail.htmlToText(HTML_DONT)) && htmlDont.show === false && htmlDont.reason === 'quiet:google',
+    { text: Mail.htmlToText(HTML_DONT), show: htmlDont.show, reason: htmlDont.reason });
+  const gmailSave = gmail('Please save the attached file to OneDrive.', 1);
+  check('Gmail stays quiet when the ask names OneDrive',
+    gmailSave.show === false && gmailSave.reason === 'onedrive-target-on-gmail' && !(gmailSave.process && gmailSave.process.steps),
+    { show: gmailSave.show, reason: gmailSave.reason });
+  const gmailDrive = gmail('Please save the attached file to Drive.', 1);
+  check('Gmail still shows a Drive save',
+    gmailDrive.show === true && gmailDrive.process.steps[0].kind === 'driveFile' && gmailDrive.process.steps[0].label === 'Drive',
+    { show: gmailDrive.show, reason: gmailDrive.reason, label: gmailDrive.process && gmailDrive.process.steps[0].label });
+  [
+    'אל תשמור את הקובץ המצורף בדרייב בבקשה.',
+    'לא צריך לשמור את הקובץ המצורף בדרייב.',
+    'אין צורך לשמור את הקובץ המצורף בדרייב.',
+    'לא לשמור את הקובץ המצורף בדרייב.'
+  ].forEach((text) => {
+    const row = outlook(text, 1);
+    check('Outlook stays quiet on a Hebrew refusal: ' + text, row.show === false && row.reason === 'quiet:google', row.reason);
+  });
 }
 
 (async () => {

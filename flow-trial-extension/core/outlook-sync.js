@@ -74,13 +74,31 @@ const FlowOutlookSync = (() => {
 
     const threads = {};
     const unreadable = {};
+    function fileCount(msg) {
+      if (!msg) return 0;
+      if (msg.attachmentsUnread) return null;
+      if (Array.isArray(msg.attachments)) {
+        return msg.attachments.filter((a) => a && a.isInline !== true).length;
+      }
+      return msg.hasAttachments ? 1 : 0;
+    }
     Object.keys(byId).forEach((id) => {
-      const u = graphMail.toUtterance(byId[id], me);
+      const raw0 = byId[id];
+      const u = graphMail.toUtterance(raw0, me);
+      if (u && u.text.trim() && !u.thread && raw0 && raw0.id && !raw0.isDraft) u.thread = 'msg:' + raw0.id;
       if (!u || !u.thread || !u.text.trim()) {
         // A message with no readable text (an empty body, an attachment only): it still gets a line in Why not shown.
-        const raw = byId[id];
+        // A message with no conversation id is not dropped: the line uses the message id.
+        const raw = raw0;
+        if (raw && raw.isDraft) {
+          const conv = raw.conversationId;
+          if (conv) unreadable[conv] = unreadable[conv] || { conversationId: conv, messageId: id, subject: String(raw.subject || '').slice(0, 120) || '(no subject)', reason: 'no-text', direction: null };
+          return;
+        }
         const conv = raw && raw.conversationId;
-        if (conv) unreadable[conv] = unreadable[conv] || { conversationId: conv, subject: String(raw.subject || '').slice(0, 120), reason: 'no-text', direction: u ? u.direction : null };
+        const row = { conversationId: conv || null, messageId: id, subject: String((raw && raw.subject) || '').slice(0, 120) || '(no subject)', reason: 'no-text', direction: u ? u.direction : null };
+        if (conv) unreadable[conv] = unreadable[conv] || row;
+        else out.diagnostics.push(row);
         return;
       }
       (threads[u.thread] = threads[u.thread] || []).push(u);
@@ -153,12 +171,15 @@ const FlowOutlookSync = (() => {
       // with that person elsewhere, so Outlook does too.
       const ikey = conv + '|' + last.id;
       const subject = String(lastRaw.subject || '');
-      const judged = judge ? judge.judge({
-        text: last.text, subject, sender: { name: party.name, email: party.email },
-        attachmentCount: lastRaw.hasAttachments ? 1 : 0,
-        calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
-        now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: Boolean(lastRaw.hasAttachments), surface: 'outlook'
-      }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' };
+      const counted = fileCount(lastRaw);
+      const judged = counted == null
+        ? { show: false, reason: 'outlook:attachments-unread', intent: null }
+        : (judge ? judge.judge({
+          text: last.text, subject, sender: { name: party.name, email: party.email },
+          attachmentCount: counted,
+          calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
+          now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: counted === 1, surface: 'outlook'
+        }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' });
       // Someone asking YOU for something: Gmail shows its Do It on that message whatever loops exist, so Outlook does too.
       // Their own promise or answer stays with the loop it belongs to (one item, not two).
       const isAsk = Boolean(judged.show && judged.intent && judged.intent.type === 'request');
