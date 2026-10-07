@@ -172,7 +172,7 @@ Use these verbatim — each is traceable to the exact code that uses it.
 | Permission | Justification |
 |---|---|
 | `storage` | Stores the user's chosen connector, line-of-work profile, sensitivity calibration, the local activity log, and the local Execution Memory log (which steps of a process this account tends to keep or remove) — entirely in `chrome.storage.local` on the user's own device (`src/storage.js`, `core/execution-memory.js`). Never synced to a Glance-owned server. |
-| `identity` | Used only for `chrome.identity.getAuthToken()` — Chrome's own native Google account chooser — so Glance can write to Google Calendar, Google Tasks, and Gmail drafts using an OAuth grant to the Google account the user is already signed into (`src/background.js`). No redirect page, no third-party auth screen. |
+| `identity` | Used for `chrome.identity.getAuthToken()` — Chrome's Google account chooser — and, when that fails because browser sign-in is off or the identity API is unavailable, for `chrome.identity.launchWebAuthFlow()` against the same Google scopes. Glance then writes to Calendar, Tasks, Gmail drafts, and Drive (`src/background.js`). The web-flow redirect is this extension's own `chromiumapp.org` address. A consent window opens only after an explicit Connect click. |
 | `scripting` | Registers Glance's reader for other websites (WhatsApp Web; Outlook on the web when Outlook is on) after the person turns them on in the setup and the browser grants that site's optional permission (`src/background.js`, `registerSurface`). Nothing is injected anywhere else. |
 | `contextMenus` | Adds one right-click item, "Glance: stay on this", on selected text. Only the selection and the page's address without its query are stored, until the person answers one question (`src/background.js`, `core/capture.js`). |
 | `offscreen` | Opens ONE hidden page that would hold an on-device language model (`src/hybrid-sw.js`, `src/offscreen.html`). **Declared but inert in this build:** `config/hybrid.public.js` has `enabled: false`, so the page is never created and nothing is downloaded. When it is turned on it runs only on a computer that passes a silent capability check, and the person can switch it off and free the disk. The extension-pages policy also gains `'wasm-unsafe-eval'`, which the model's WebAssembly library needs (the library is a file of the package: `vendor/`, Apache-2.0 for the runtime). |
@@ -295,7 +295,14 @@ background/framing), not something to upload as-is.
       `YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com` placeholder
       is no longer in the manifest, so it is not a Store-submission
       blocker. See `README.md`'s "Set up Google" section if it needs to be
-      rotated.
+      rotated. That field is the Chrome-extension client for
+      `getAuthToken` only. `launchWebAuthFlow` uses a separate Web
+      application client, `WEB_OAUTH_CLIENT_ID` in `config/oauth.public.js`
+      (`93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleusercontent.com`).
+      The store build does not swap that Web client. Its redirect URIs are
+      `https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/` (unpacked)
+      and `https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/` (store
+      item `lbihckfmoffgjjlnneoeaehbhoonfenh`).
 - [x] `privacy.html` checked against this doc's data-usage table and the
       actual `ALLOWED_EVENTS` list. Section 5's "What stays local" and
       "Connection credentials" bullets already covered the Morning

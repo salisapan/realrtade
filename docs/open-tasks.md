@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-08 (Standup 07:30 IL filed verbatim in `docs/vault/sessions/2026-10-08.md`. Last Gate PASS 0.9.37 ~01:00 IL. Dima's stream is 0.9.38, PR #106 draft; #104 is in Gate and not PASS; #108 waits on #106; #107 merged @`e83db811`. Netlify and Morning still HOLD until «מאשר». Outreach 36/50 as of 2026-10-07 15:38 IL; the final day count is not verified. Glance batch-001 is in git awaiting the owner's answers; owner-verified labels stay 0/200.)
+Last updated: 2026-10-08 (Standup 07:30 IL filed verbatim in `docs/vault/sessions/2026-10-08.md`. Last Gate PASS 0.9.37 ~01:00 IL. Dima's stream is 0.9.38, PR #106 draft; #104 / 0.9.39 Connect Google fallback is in Gate and not PASS; #108 waits on #106; #107 merged @`e83db811`. Netlify and Morning still HOLD until «מאשר». Outreach 36/50 as of 2026-10-07 15:38 IL; the final day count is not verified. Glance batch-001 is in git awaiting the owner's answers; owner-verified labels stay 0/200. Product locks: `CLAUDE.md` "Owner product locks".)
 
 ## Glance release order (owner, 2026-10-08)
 
@@ -106,6 +106,7 @@ In Gate now: PR #104 / 0.9.39 (row 50).
 ## Done (recent)
 
 - 2026-10-08: Standup 07:30 IL filed verbatim in `docs/vault/sessions/2026-10-08.md`. Last Gate PASS remains 0.9.37, clocked there at ~01:00 IL. No product code changed. PR #106 is the 0.9.38 draft (row 51). PR #108 waits on it (row 56). Outreach, deals, and overdue ClickUp are rows 57-59. Netlify «מאשר» and the August ClickUp close-or-re-date are still waiting.
+- 2026-10-07: Connect Google fallback (0.9.39), ported from main #69 and #71 (shipped in 0.7.5), rebased onto OneDrive 0.9.37. `getAuthToken` stays primary. When it fails because browser sign-in is off (or the same identity failure on Brave/Edge) and the user did not cancel, `launchWebAuthFlow` uses the Web client in `config/oauth.public.js`. Auto-connect, Do It, and a 401 retry stay `interactive: false`. Disconnect drops an in-flight consent window so a late approval cannot write `googleWebAuth` back. Hebrew reader-decision and soft asks stay silent (main #64). Trusted closes/week (main #65) was skipped: this branch already counts a trusted week, and that PR also touches `storage.js` and `content-gmail.js`. Live check is row 50.
 - 2026-10-07: 0.9.37 Gate PASS (row 49). Outlook attachment → OneDrive card ~1.5s, Handled ~10s, remount 0.33s, Undo deletes the file. Hebrew mail works. To Do title and due date correct. PR #103 squash-merged @`c6be8e1a`.
 - 2026-10-07: PR #102 merged @`e96c725f`: Instinct Connect, To Do as its own checkbox. PR #101 merged @`a0b1c500`: own-computer scaffold (row 48).
 - 2026-10-07: 0.9.31 Gate PASS (row 47): Outlook → Microsoft To Do. PR #100 merged @`321f6144`. 0.9.30 Gate PASS (row 46): Google Tasks ProofOfClose.
