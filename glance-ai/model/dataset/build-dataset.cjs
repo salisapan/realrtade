@@ -102,7 +102,9 @@ const nRepo = rows.length - nSyn;
 // ---- 3. natural-language string literals harvested from the tip's test corpora (engineer-written cases)
 const testDir = path.join(TIP, 'test');
 let nTest = 0;
-for (const f of fs.readdirSync(testDir).filter((x) => x.endsWith('.cjs'))) {
+// Filename order, not directory order. Directory order is not stable across machines, and the
+// checked-in v2 dataset hash was produced from this sorted walk (test corpora at engine 0.9.34).
+for (const f of fs.readdirSync(testDir).filter((x) => x.endsWith('.cjs')).sort()) {
   const src = fs.readFileSync(path.join(testDir, f), 'utf8');
   const re = /(^|[^\w])(check|test|it|console\.log|describe|ok|eq|assert\w*|fail)?\s*\(?\s*(['"])((?:\\.|(?!\3)[^\\\n]){25,320})\3/g;
   let m;

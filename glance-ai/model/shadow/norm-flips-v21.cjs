@@ -5,7 +5,8 @@
 //   clean    = runtime/normalize.cjs cleanText (minimal + whitespace/blank-line collapse, line trim)
 //   full     = runtime/normalize.cjs stripBoilerplate (clean + signature / disclaimer / [image] / mobile-footer strip) = v2 model path
 // Also counts NEW flips (rows whose engine decision on the normalized live body differs from the clean-render decision
-// although the raw live decision agreed). Engines 0.9.35 (reference engine), 0.9.34 and r35p. Output: shadow/out-v21/norm-flips.json
+// although the raw live decision agreed). Engines: 0.9.35 (the 767 reference), tip (this repo's extension), 0.9.34 and r35p
+// when GLANCE_ENGINE_ROOTS names them. Output: shadow/out-v21/norm-flips.json
 const fs = require('fs'), path = require('path');
 const { makeEngine } = require('../teacher/engine.cjs');
 const { normalizeText } = require('../runtime/normalize-v21.cjs');
@@ -14,7 +15,7 @@ const OUT = path.join(__dirname, 'out-v21'); fs.mkdirSync(OUT, { recursive: true
 const rows = fs.readFileSync(path.join(__dirname, '..', 'dataset', 'out-v2', 'all.jsonl'), 'utf8').trim().split('\n').map(JSON.parse).filter((r) => r.provenance === 'synthetic-v2' && r.augment !== 'typo');
 const NORM = { raw: (t) => t, minimal: normalizeText, clean: cleanText, full: stripBoilerplate };
 const res = {};
-for (const en of ['0.9.35', '0.9.34', 'r35p']) {
+for (const en of ['0.9.35', 'tip', '0.9.34', 'r35p']) {
   const E = makeEngine(en); if (!E) continue;
   const m = {}; for (const k of Object.keys(NORM)) m[k] = { flips: 0, fixed: 0, newFlips: 0, byNoise: {} };
   for (const r of rows) {
@@ -31,6 +32,23 @@ for (const en of ['0.9.35', '0.9.34', 'r35p']) {
   res[en] = m;
 }
 const v2fs = rows.filter((r) => r.formatSensitive).length;
-const out = { builtAt: new Date().toISOString(), rows: rows.length, v2FormatSensitiveTagged: v2fs, note: 'flips = engine(normalized live body) != engine(clean render); raw = no normalization (the v2 dataset formatSensitive tag, typo twins excluded since they inherit labels)', engines: res };
-fs.writeFileSync(path.join(OUT, 'norm-flips.json'), JSON.stringify(out, null, 1));
-console.log(JSON.stringify({ rows: rows.length, v2fs, ...Object.fromEntries(Object.entries(res).map(([e, m]) => [e, Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { flips: v.flips, fixed: v.fixed, newFlips: v.newFlips }]))])) }, null, 1));
+const outPath = path.join(OUT, 'norm-flips.json');
+let prev = {};
+try { prev = JSON.parse(fs.readFileSync(outPath, 'utf8')); } catch (e) { /* first measurement */ }
+// Keep engines this run did not load (0.9.34 / r35p live only on the training machine).
+const engines = Object.assign({}, prev.engines || {});
+for (const name of Object.keys(res)) engines[name] = res[name];
+const ordered = {};
+for (const name of ['0.9.35', '0.9.34', 'r35p', 'tip']) if (engines[name]) ordered[name] = engines[name];
+for (const name of Object.keys(engines)) if (!ordered[name]) ordered[name] = engines[name];
+const note = prev.note || 'flips = engine(normalized live body) != engine(clean render); raw = no normalization (the v2 dataset formatSensitive tag, typo twins excluded since they inherit labels)';
+const unchanged = prev.rows === rows.length && JSON.stringify(prev.engines) === JSON.stringify(ordered);
+if (!unchanged) {
+  const out = { builtAt: prev.builtAt || new Date().toISOString(), rows: rows.length, v2FormatSensitiveTagged: v2fs, note, engines: ordered };
+  fs.writeFileSync(outPath, JSON.stringify(out, null, 1) + '\n');
+}
+const summary = { rows: rows.length, v2fs, ...Object.fromEntries(Object.entries(res).map(([e, m]) => [e, Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { flips: v.flips, fixed: v.fixed, newFlips: v.newFlips }]))])) };
+console.log(JSON.stringify(summary, null, 1));
+const e35 = res['0.9.35'];
+if (process.env.GLANCE_ENGINE_ROOTS && !e35) process.exit(1);
+if (e35 && !(e35.raw.flips === 767 && e35.full.flips === 0 && e35.full.newFlips === 0)) process.exit(1);

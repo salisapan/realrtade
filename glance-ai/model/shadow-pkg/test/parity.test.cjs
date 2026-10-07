@@ -54,8 +54,10 @@ for (const k of ['v2', 'v21']) {
   R.maxDp[k] = +R.maxDp[k].toFixed(5);
 }
 R.secs = (Date.now() - t0) / 1000;
-R.pySkipped = pySkipped ? 'artifacts/v2.test-preds.jsonl and artifacts/v21.test-preds.jsonl are not in git (sklearn float preds from the training machine). Feature parity and JS dense parity still run.' : null;
-R.pass = R.feat.v2 === R.n && R.feat.v21 === R.n && R.js.v2 === R.n && R.js.v21 === R.n && (pySkipped || (R.py.v2.rate >= 0.999 && R.py.v21.rate >= 0.999));
+R.pySkipped = pySkipped ? 'artifacts/v2.test-preds.jsonl and artifacts/v21.test-preds.jsonl are missing. Feature parity and JS dense parity still run.' : null;
+// Locked to the checked-in sklearn preds. 6,977/6,982 and 6,976/6,982 are both above the 99.9% spec gate.
+const pyExact = pySkipped || LIMIT > 0 || (R.py.v2.same === 6977 && R.py.v2.n === 6982 && R.py.v21.same === 6976 && R.py.v21.n === 6982);
+R.pass = R.feat.v2 === R.n && R.feat.v21 === R.n && R.js.v2 === R.n && R.js.v21 === R.n && (pySkipped || (R.py.v2.rate >= 0.999 && R.py.v21.rate >= 0.999 && pyExact));
 fs.writeFileSync(path.join(__dirname, 'out', 'parity.json'), JSON.stringify(R, null, 1));
 console.log(JSON.stringify({ n: R.n, featV2: R.feat.v2, featV21: R.feat.v21, pyV2: R.py.v2.same + '/' + R.py.v2.n + ' (' + R.py.v2.rate + ')', pyV21: R.py.v21.same + '/' + R.py.v21.n + ' (' + R.py.v21.rate + ')',
   jsDenseV2: R.js.v2, jsDenseV21: R.js.v21, maxDp: R.maxDp, masked: R.masked, pass: R.pass, secs: R.secs }));
