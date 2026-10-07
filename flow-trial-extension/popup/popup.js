@@ -916,11 +916,64 @@
     const acts = el('div', 'wait-acts');
     let offRow = null;
     if (st.configured && !st.connected) {
-      const c = el('button', 'ghost sm', 'Turn on');
+      // One Connect screen: Select all, then one checkbox per Graph service.
+      // Mail stays on. Extra scopes are added only for a checked box.
+      const screen = el('div', 'ms-connect');
+      screen.setAttribute('data-glance-connect', 'microsoft');
+      const services = (typeof FlowOutlookConfig !== 'undefined' && FlowOutlookConfig.CONNECT_SERVICES) || [
+        { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', required: true }
+      ];
+      const boxes = {};
+      const all = document.createElement('label');
+      all.className = 'ms-svc';
+      const allBox = document.createElement('input');
+      allBox.type = 'checkbox';
+      allBox.setAttribute('data-glance-select-all', '1');
+      all.appendChild(allBox);
+      all.appendChild(el('span', null, 'Select all'));
+      screen.appendChild(all);
+      services.forEach((svc) => {
+        const lab = document.createElement('label');
+        lab.className = 'ms-svc';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.setAttribute('data-glance-service', svc.id);
+        const required = Boolean(svc.required || svc.id === 'mail');
+        if (required) { box.checked = true; box.disabled = true; }
+        boxes[svc.id] = box;
+        const copy = el('span', null, svc.label || svc.id);
+        if (svc.detail) {
+          const small = document.createElement('small');
+          small.textContent = svc.detail;
+          copy.appendChild(small);
+        }
+        lab.appendChild(box);
+        lab.appendChild(copy);
+        screen.appendChild(lab);
+      });
+      function optionalBoxes() {
+        return services.filter((svc) => !(svc.required || svc.id === 'mail')).map((svc) => boxes[svc.id]).filter(Boolean);
+      }
+      function syncAll() {
+        const opt = optionalBoxes();
+        allBox.checked = opt.length > 0 && opt.every((box) => box.checked);
+      }
+      allBox.addEventListener('change', () => {
+        optionalBoxes().forEach((box) => { box.checked = allBox.checked; });
+      });
+      optionalBoxes().forEach((box) => box.addEventListener('change', syncAll));
+      const c = el('button', 'ghost sm', 'Connect');
       c.type = 'button';
+      c.setAttribute('data-glance-connect-go', '1');
       c.addEventListener('click', async () => {
         c.disabled = true;
-        const r = await o.connect();
+        const ids = services.filter((svc) => {
+          const box = boxes[svc.id];
+          return box && (box.checked || box.disabled);
+        }).map((svc) => svc.id);
+        const scopes = (typeof FlowOutlookConfig !== 'undefined' && typeof FlowOutlookConfig.scopesFor === 'function')
+          ? FlowOutlookConfig.scopesFor(ids) : null;
+        const r = scopes ? await o.connect({ scopes: scopes }) : await o.connect();
         if (!r.ok) {
           c.disabled = false; note.hidden = false;
           const sentence = (typeof FlowOutlookAuth !== 'undefined' && FlowOutlookAuth.errorSentence)
@@ -931,7 +984,8 @@
         }
         await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
       });
-      acts.appendChild(c);
+      screen.appendChild(c);
+      acts.appendChild(screen);
     } else if (st.connected) {
       const chk = el('button', 'ghost sm', st.needsSignIn ? 'Sign in again' : 'Check now');
       chk.type = 'button';

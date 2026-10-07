@@ -26,8 +26,9 @@ const FlowOutlook = (() => {
   const SELECT = 'id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,isDraft,body,webLink,hasAttachments,internetMessageId';
   const OWN_LEARNED_CAP = 20;
   // Bump to wipe stale outlookPending/offers from older builds (0.9.0 silence bug; 0.9.14: own addresses learned from
-  // other people's To lines and asks swallowed by a loop in another app).
-  const STATE_VERSION = 3;
+  // other people's To lines and asks swallowed by a loop in another app; 0.9.19: a schedule card
+  // kept after the mail was rejudged as a file ask).
+  const STATE_VERSION = 4;
 
   // Non-GET Graph paths Glance is allowed to call. Anything else throws.
   const WRITE_ALLOW = [
@@ -239,7 +240,9 @@ const FlowOutlook = (() => {
       const granted = await deps.permissions.request({ origins: ORIGINS.concat(OWA_ORIGINS) });
       if (!granted) return { ok: false, error: 'permission' };
       const o = opts || {};
-      const r = await deps.auth.signIn(authDeps(), cfg, deps.redirectUri(), { prompt: o.prompt, loginHint: o.loginHint });
+      const prev = await read(AUTH_KEY, null);
+      const scopes = (o.scopes && o.scopes.length) ? o.scopes : ((prev && prev.requestedScopes && prev.requestedScopes.length) ? prev.requestedScopes : cfg.SCOPES);
+      const r = await deps.auth.signIn(authDeps(), cfg, deps.redirectUri(), { prompt: o.prompt, loginHint: o.loginHint, scopes: scopes });
       if (!r.ok) return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null };
       const profile = await fetchProfile(r.token.accessToken);
       if (!profile) return { ok: false, error: 'profile' };
@@ -247,7 +250,7 @@ const FlowOutlook = (() => {
       const primary = ownAddresses[0] || String(profile.mail || profile.userPrincipalName || '').toLowerCase();
       if (!primary) return { ok: false, error: 'profile' };
       const account = { address: primary, name: profile.displayName || null, mail: profile.mail || null, userPrincipalName: profile.userPrincipalName || null };
-      await write(AUTH_KEY, { token: r.token, account, ownAddresses, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
+      await write(AUTH_KEY, { token: r.token, account, ownAddresses, requestedScopes: scopes, profile: { mail: profile.mail, userPrincipalName: profile.userPrincipalName, otherMails: profile.otherMails || [], proxyAddresses: profile.proxyAddresses || [] } });
       // Always wipe stale offers/asks/incoming and watermarks on connect/re-consent (0.9.0 left silence + wrong offers).
       await clearOutlookJudgmentState();
       // Register the OWA content script (same chip as Gmail) while Outlook is on.
@@ -283,7 +286,8 @@ const FlowOutlook = (() => {
         return f.ok ? { ok: true, token: f.token, auth: Object.assign({}, auth, { token: f.token }) } : { ok: false, error: f.error, needsSignIn: Boolean(f.reauth), aadsts: f.aadsts || null, description: f.description || null };
       }
       const r = await deps.auth.session(authDeps(), cfg, auth, {
-        redirectUri: deps.redirectUri(), loginHint: primaryAddress(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null
+        redirectUri: deps.redirectUri(), loginHint: primaryAddress(auth), force: Boolean(o.force), lastSilentAt: st.lastSilentAt || null,
+        scopes: (auth.requestedScopes && auth.requestedScopes.length) ? auth.requestedScopes : cfg.SCOPES
       });
       const now = deps.now();
       let nextAuth = auth;
@@ -298,6 +302,9 @@ const FlowOutlook = (() => {
       if (r.ok) {
         if (st.needsSignIn || st.error) Object.assign(patch, { needsSignIn: false, error: null, aadsts: null, errorDetail: null });
         if (r.how === 'silent') patch.lastRenewedAt = now;
+      } else if (r.transient && !r.needsSignIn) {
+        // A reload, a worker that is not ready, or a dropped network call is not Turn off.
+        // The token stays. The next check tries again. Check now never reaches disconnect().
       } else {
         Object.assign(patch, { error: r.error || 'expired', needsSignIn: Boolean(r.needsSignIn), aadsts: r.aadsts || null, errorDetail: r.description || null });
         if (r.error === 'consent_required') patch.draftConsentNeeded = true;
@@ -618,15 +625,50 @@ const FlowOutlook = (() => {
         incomingCards.push(entry);
       });
 
-      // Keep prior incoming cards that were not re-emitted this pass (until Not now / close).
-      const priorIncoming = (pending.incoming || []).filter((x) => x && x.messageId && !incomingCards.some((y) => y.messageId === x.messageId) && !isOwnEmail(x.sender && x.sender.email, ownList));
+      // A conversation this check judged and did not show again must not keep an older card.
+      // That is how a schedule card stayed up after the mail became a file ask (Why not shown
+      // already said drive-search-failed). Cards for mail outside this window are kept.
+      const diagnostics = applyFileChainSilence(p.diagnostics || [], chained.silence || []).slice(0, 40);
+      function convOfEntry(x) {
+        if (!x) return '';
+        if (x.outlookConversationId) return String(x.outlookConversationId);
+        const t = String(x.threadId || '');
+        return t.indexOf('ol:') === 0 ? t.slice(3) : '';
+      }
+      const silenced = new Set();
+      diagnostics.forEach((d) => { if (d && d.conversationId) silenced.add(String(d.conversationId)); });
+      // A file prepare drops the stall row (the open message attaches on Do It).
+      // That conversation was still judged this pass, so an older schedule card
+      // must not stay beside a prepare or a drive-not-granted line.
+      const judgedNow = new Set(silenced);
+      (chained.silence || []).forEach((row) => { if (row && row.conversationId) judgedNow.add(String(row.conversationId)); });
+      incomingCards.forEach((x) => { const c = convOfEntry(x); if (c) judgedNow.add(c); });
+      const priorIncoming = (pending.incoming || []).filter((x) => {
+        if (!x || !x.messageId) return false;
+        if (incomingCards.some((y) => y.messageId === x.messageId)) return false;
+        if (isOwnEmail(x.sender && x.sender.email, ownList)) return false;
+        const conv = convOfEntry(x);
+        if (conv && judgedNow.has(conv)) return false;
+        return true;
+      });
       const incoming = incomingCards.concat(priorIncoming).slice(0, 5);
+      if (typeof deps.storage.forgetStillOpenScan === 'function') {
+        try {
+          const bag = await deps.storage.get();
+          const scan = (bag && bag.stillOpenScan) || [];
+          for (const row of scan) {
+            const conv = convOfEntry(row);
+            if (!row || !row.messageId || !conv || !judgedNow.has(conv)) continue;
+            if (incomingCards.some((y) => y.messageId === row.messageId)) continue;
+            await deps.storage.forgetStillOpenScan(null, row.messageId);
+          }
+        } catch (e) { /* still-open is optional in tests */ }
+      }
 
       await write(PENDING_KEY, { offers: offers.slice(-5), asks: asks.slice(-5), incoming: incoming });
 
       const offeredKeys = Object.keys(offered);
       if (offeredKeys.length > 200) offeredKeys.slice(0, offeredKeys.length - 200).forEach((k) => { delete offered[k]; });
-      const diagnostics = applyFileChainSilence(p.diagnostics || [], chained.silence || []).slice(0, 40);
       await write(STATE_KEY, {
         lastAt: now, lastCount: p.stats.conversations, lastIncoming: (p.incoming || []).length, lastOffers: offers.length,
         error: null, needsSignIn: false, draftConsentNeeded: Boolean(st.draftConsentNeeded),

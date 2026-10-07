@@ -61,6 +61,20 @@ const FlowOutlookAuth = (() => {
   function codeBody(o) { return form({ client_id: o.clientId, grant_type: 'authorization_code', code: o.code, redirect_uri: o.redirectUri, code_verifier: o.verifier, scope: o.scopes.join(' ') }); }
   function refreshBody(o) { return form({ client_id: o.clientId, grant_type: 'refresh_token', refresh_token: o.refreshToken, scope: o.scopes.join(' ') }); }
 
+  // The scopes this sign-in will ask for. A passed list wins (the Connect screen).
+  // Otherwise the config default (mail). Mail.Send is dropped if it ever appears.
+  function scopeList(cfg, scopes) {
+    const base = Array.isArray(cfg && cfg.SCOPES) ? cfg.SCOPES : [];
+    const raw = Array.isArray(scopes) && scopes.length ? scopes : base;
+    const out = [];
+    raw.forEach((s) => {
+      const x = String(s || '');
+      if (!x || /Mail\.Send/i.test(x) || /\.Send$/i.test(x)) return;
+      if (out.indexOf(x) < 0) out.push(x);
+    });
+    return out.length ? out : base.slice();
+  }
+
   // The token endpoint's answer -> what is stored. A minute of margin so a token is never used in its last seconds.
   // rtIssuedAt is set when a CODE is redeemed (interactive or silent). A refresh_token grant keeps the previous rtIssuedAt
   // (SPA refresh tokens inherit the original 24h expiry).
@@ -99,9 +113,10 @@ const FlowOutlookAuth = (() => {
   async function signIn(deps, cfg, redirectUri, opts) {
     if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured' };
     const o = opts || {};
+    const scopes = scopeList(cfg, o.scopes);
     const pk = await newPkce(deps);
     const url = authorizeUrl({
-      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: cfg.SCOPES,
+      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: scopes,
       challenge: pk.challenge, state: pk.state, prompt: o.prompt || 'select_account', loginHint: o.loginHint || null
     });
     let back;
@@ -109,7 +124,7 @@ const FlowOutlookAuth = (() => {
     if (!back) return { ok: false, error: 'cancelled' };
     const r = parseRedirect(back, pk.state);
     if (r.error) return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null };
-    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: cfg.SCOPES }));
+    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: scopes }));
     if (!t.ok) return { ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null };
     const tok = normalizeToken(t.data, deps.now(), null, true);
     return tok ? { ok: true, token: tok } : { ok: false, error: 'no-token' };
@@ -117,12 +132,13 @@ const FlowOutlookAuth = (() => {
 
   // Silent renewal: same authorize URL with prompt=none and login_hint. deps.launchSilent(url) -> redirect url | null.
   // Never opens a visible window. Returns { ok, token } or { ok:false, error, aadsts, needsInteraction }.
-  async function silentReauth(deps, cfg, redirectUri, loginHint) {
+  async function silentReauth(deps, cfg, redirectUri, loginHint, scopes) {
     if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured', needsInteraction: true };
     if (typeof deps.launchSilent !== 'function') return { ok: false, error: 'no-silent', needsInteraction: true };
+    const list = scopeList(cfg, scopes);
     const pk = await newPkce(deps);
     const url = authorizeUrl({
-      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: cfg.SCOPES,
+      authority: cfg.AUTHORITY, clientId: cfg.CLIENT_ID, redirectUri, scopes: list,
       challenge: pk.challenge, state: pk.state, prompt: 'none', loginHint: loginHint || null
     });
     // launchSilent resolves the redirect address, null, or { error } (Chrome's own message, e.g. "User interaction required.").
@@ -139,7 +155,7 @@ const FlowOutlookAuth = (() => {
       // failed attempt, retried later, never a reason to drop the connection.
       return { ok: false, error: r.error, description: r.description || null, aadsts: r.aadsts || null, needsInteraction: Boolean(INTERACTION_ERRORS[r.error]) };
     }
-    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: cfg.SCOPES }));
+    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', codeBody({ clientId: cfg.CLIENT_ID, code: r.code, redirectUri, verifier: pk.verifier, scopes: list }));
     if (!t.ok) {
       return { ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null, needsInteraction: Boolean(INTERACTION_ERRORS[t.error]) };
     }
@@ -152,7 +168,7 @@ const FlowOutlookAuth = (() => {
     if (!token || !token.accessToken) return { ok: false, error: 'not-connected', reauth: true };
     if (token.expiresAt > deps.now()) return { ok: true, token, refreshed: false };
     if (!token.refreshToken) return { ok: false, error: 'expired', reauth: true };
-    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: cfg.SCOPES }));
+    const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: scopeList(cfg, token.grantedScopes) }));
     if (!t.ok) {
       return {
         ok: false, error: t.error, description: t.description || null, aadsts: t.aadsts || null,
@@ -204,6 +220,7 @@ const FlowOutlookAuth = (() => {
     if (!cfg.CLIENT_ID) return { ok: false, error: 'not-configured', needsSignIn: false, transient: false };
     if (!token || !token.accessToken) return { ok: false, error: 'not-connected', needsSignIn: true, transient: false };
     const now = deps.now();
+    const scopes = scopeList(cfg, o.scopes || (token && token.grantedScopes));
     const allowSilent = o.allowSilent !== false && typeof deps.launchSilent === 'function' && Boolean(o.redirectUri);
     const silentDue = !o.lastSilentAt || now - o.lastSilentAt >= SILENT_RETRY_MS;
     let silentTried = false;
@@ -211,7 +228,7 @@ const FlowOutlookAuth = (() => {
 
     async function silent() {
       silentTried = true;
-      const r = await silentReauth(deps, cfg, o.redirectUri, o.loginHint || null);
+      const r = await silentReauth(deps, cfg, o.redirectUri, o.loginHint || null, scopes);
       if (r.ok) return r.token;
       silentFail = r;
       return null;
@@ -229,7 +246,7 @@ const FlowOutlookAuth = (() => {
     // 3. Refresh inside the 24 hours.
     let refreshFail = null;
     if (refreshTokenAlive(token, now)) {
-      const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: cfg.SCOPES }));
+      const t = await post(deps, cfg.AUTHORITY + '/oauth2/v2.0/token', refreshBody({ clientId: cfg.CLIENT_ID, refreshToken: token.refreshToken, scopes: scopes }));
       if (t.ok) {
         const next = normalizeToken(t.data, now, token, false);
         if (next) return { ok: true, token: next, changed: true, how: 'refresh', silentTried };
@@ -260,7 +277,7 @@ const FlowOutlookAuth = (() => {
   }
 
   return {
-    b64url, newPkce, authorizeUrl, parseRedirect, codeBody, refreshBody, normalizeToken,
+    b64url, newPkce, authorizeUrl, parseRedirect, codeBody, refreshBody, normalizeToken, scopeList,
     explainError, errorSentence, signIn, ensureFresh, silentReauth,
     session, rtAgeOf, refreshTokenAlive, RT_LIFETIME_MS, SILENT_AFTER_MS, ACCESS_MARGIN_MS, SILENT_RETRY_MS
   };

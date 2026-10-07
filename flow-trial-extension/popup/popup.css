@@ -342,6 +342,9 @@ main{padding:var(--space-5)}
 .wait-acts{display:flex; gap:var(--space-2); flex-wrap:wrap}
 .wait-acts .ghost{margin-top:0}
 .wait-off-row{margin-top:var(--space-5); justify-content:flex-end}
+.ms-connect{display:flex; flex-direction:column; gap:var(--space-2); margin-top:var(--space-2)}
+.ms-svc{display:flex; gap:var(--space-2); align-items:flex-start; font-size:.78rem; color:var(--ink)}
+.ms-svc small{display:block; color:var(--ink-2); font-size:.7rem; font-weight:500}
 .wait-note{font-size:.74rem; color:var(--ink-2); margin:0}
 #waiting-list{max-height:none; overflow:visible}
 
