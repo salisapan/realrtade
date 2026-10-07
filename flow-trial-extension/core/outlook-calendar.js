@@ -77,12 +77,15 @@ const FlowOutlookCalendar = (() => {
     if (quote) lines.push(quote);
     lines.push('File: ' + name);
     lines.push(link);
+    // POST /me/events. attendees is an empty list so the event invites nobody.
+    // isOnlineMeeting is omitted. body.content is plain text and includes the https file link.
     return {
       subject: name,
       body: { contentType: 'Text', content: lines.join('\n') },
       start: { dateTime: dateTime(date, hour, minute, 0), timeZone: zone },
       end: { dateTime: dateTime(date, hour, minute, DURATION_MIN), timeZone: zone },
-      showAs: 'busy'
+      showAs: 'busy',
+      attendees: []
     };
   }
 

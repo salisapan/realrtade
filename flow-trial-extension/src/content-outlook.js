@@ -887,6 +887,95 @@
     return (token && token.grantedScopes) || [];
   }
 
+  function calendarEventRef(ref) {
+    if (!ref || typeof ref !== 'object') return null;
+    const id = ref.eventId;
+    return typeof id === 'string' && id ? ref : null;
+  }
+
+  async function writtenCalendarRow(messageId) {
+    const bag = await FlowStorage.get();
+    const log = (bag && bag.log) || [];
+    for (const e of log) {
+      if (!e || e.messageId !== messageId) continue;
+      if (e.kind === 'undone' && e.outlookReopen) return null;
+      if (e.kind === 'written' && e.connectorId === 'outlookCalendar' && calendarEventRef(e.ref)) return e;
+      if (e.kind === 'written' || e.kind === 'undone' || e.kind === 'dismissed') return null;
+      return null;
+    }
+    return null;
+  }
+
+  function calendarUndoHandler(host, messageId, ref) {
+    return async () => {
+      const u = await send({ type: 'flow:undo-action', connectorId: 'outlookCalendar', ref: ref });
+      if (!(u && u.ok)) return { ok: false };
+      if (typeof FlowStorage.markOutlookCalendarUndone === 'function') {
+        await FlowStorage.markOutlookCalendarUndone(messageId, ref);
+      } else {
+        await FlowStorage.appendLog({
+          kind: 'undone',
+          label: (u && u.written) || 'Calendar event removed.',
+          messageId: messageId,
+          app: 'outlook',
+          connectorId: 'outlookCalendar',
+          outlookReopen: true
+        });
+      }
+      if (messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: messageId });
+      lastKey = '';
+      lastSig = '';
+      try { host.remove(); } catch (e) { /* already gone */ }
+      schedule();
+      return { ok: true, written: (u && u.written) || 'Calendar event removed.', reopen: true };
+    };
+  }
+
+  // Handled stays on the open message. A settled card from this click is left
+  // in place. A reload, or a scan that arrives after the write, mounts it again
+  // from the Activity row, with the same Undo.
+  async function keepCalendarReceipt(pane, messageId) {
+    const row = await writtenCalendarRow(messageId);
+    if (!row) return false;
+    const mount = mountPoint();
+    if (!mount) return false;
+    const existing = mount.querySelector('.flow-chip-host');
+    if (existing && existing.classList.contains('flow-chip-settled') && existing.getAttribute('data-glance-message') === String(messageId)) {
+      lastOutcome = 'card';
+      lastKey = messageId + '|calendar-hold';
+      return true;
+    }
+    await mountCalendarReceipt(pane, row, messageId);
+    return Boolean(mount.querySelector('.flow-chip-host.flow-chip-settled'));
+  }
+
+  async function mountCalendarReceipt(pane, row, messageId) {
+    const mount = mountPoint();
+    if (!mount) return;
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    const host = FlowChipHost.inject(mount, {
+      app: 'outlook',
+      doLabel: 'Do It',
+      messageId: messageId,
+      process: { name: 'File on hold', steps: [{ kind: 'calendar' }] },
+      intent: { label: row.label || 'On your calendar' }
+    }, { onDoIt: () => {}, onDismiss: (h) => h.remove() });
+    if (!host) return;
+    host.setAttribute('data-glance-chain', 'calendar-hold');
+    host.setAttribute('data-glance-message', messageId || '');
+    lastOutcome = 'card';
+    lastKey = (messageId || 'open') + '|calendar-hold';
+    FlowChipHost.showDraftReceipt(host, {
+      status: 'Handled.',
+      written: row.label || 'On your calendar, with the file.',
+      url: row.url || null,
+      linkLabel: 'Open event',
+      onUndo: calendarUndoHandler(host, messageId, row.ref)
+    });
+    await clearReason(pane);
+  }
+
   // Family B on the open page: one named file, one clock, one Outlook event.
   // A note to yourself is the ask (the same gate as Gmail). A meeting with
   // no file is left to the existing judge, which stays quiet. The card is
@@ -902,6 +991,11 @@
     if (probe.move !== 'wait') return false;
     const messageId = (pane && (pane.itemId || pane.conversationId || pane.pathId)) || ('hold:' + (probe.fileTerm || 'file'));
     if (await FlowStorage.hasTerminalOutcome(messageId)) {
+      // A written calendar row is Handled on this thread, not a reason to
+      // remove the card. The next scan (the Activity log write) used to
+      // drop the receipt and leave Handled only in the side panel.
+      const kept = await keepCalendarReceipt(pane, messageId);
+      if (kept) return true;
       dropStuckCard();
       await pageReason('page:already-handled', pane);
       return true;
@@ -1029,28 +1123,7 @@
         written: written,
         url: r.url || null,
         linkLabel: 'Open event',
-        onUndo: async () => {
-          const u = await send({ type: 'flow:undo-action', connectorId: 'outlookCalendar', ref: r.ref });
-          if (!(u && u.ok)) return { ok: false };
-          if (typeof FlowStorage.markOutlookCalendarUndone === 'function') {
-            await FlowStorage.markOutlookCalendarUndone(ctx.messageId, r.ref);
-          } else {
-            await FlowStorage.appendLog({
-              kind: 'undone',
-              label: (u && u.written) || 'Calendar event removed.',
-              messageId: ctx.messageId,
-              app: 'outlook',
-              connectorId: 'outlookCalendar',
-              outlookReopen: true
-            });
-          }
-          if (ctx.messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: ctx.messageId });
-          lastKey = '';
-          lastSig = '';
-          try { host.remove(); } catch (e) { /* already gone */ }
-          schedule();
-          return { ok: true, written: (u && u.written) || 'Calendar event removed.', reopen: true };
-        }
+        onUndo: calendarUndoHandler(host, ctx.messageId, r.ref)
       });
     } finally {
       doItInFlight = false;

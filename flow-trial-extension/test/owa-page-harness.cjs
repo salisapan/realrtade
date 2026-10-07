@@ -167,6 +167,10 @@ async function runPage(opts) {
     const until = Date.now() + 2500;
     while (Date.now() < until && !sent.some((m) => m.type === 'flow:execute-action')) await new Promise((r) => setTimeout(r, 40));
     await new Promise((r) => setTimeout(r, 200));
+    if (o.rescan) {
+      try { vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx); } catch (e) { /* page script missing */ }
+      await new Promise((r) => setTimeout(r, o.afterClickMs || 1200));
+    }
     if (o.clickUndo) {
       const undo = w.document.querySelector('.flow-chip-undo');
       if (undo) undo.click();
@@ -174,6 +178,12 @@ async function runPage(opts) {
       while (Date.now() < untilUndo && !sent.some((m) => m.type === 'flow:undo-action')) await new Promise((r) => setTimeout(r, 40));
       await new Promise((r) => setTimeout(r, 150));
     }
+  } else if (o.clickUndo) {
+    const undo = w.document.querySelector('.flow-chip-undo');
+    if (undo) undo.click();
+    const untilUndo = Date.now() + 2000;
+    while (Date.now() < untilUndo && !sent.some((m) => m.type === 'flow:undo-action')) await new Promise((r) => setTimeout(r, 40));
+    await new Promise((r) => setTimeout(r, 150));
   }
   clearInterval(ad);
   let parsed = null;
@@ -595,7 +605,7 @@ async function runPage(opts) {
       Boolean(shown.chip) && /Hold it/.test(shown.chip.textContent) && shown.chip.getAttribute('data-glance-chain') === 'calendar-hold' && /Do It/.test(shown.chip.textContent),
       shown.chip && shown.chip.textContent);
     const acted = await runPage({
-      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true,
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, rescan: true,
       store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
       driveFind: { match: 'one', file: file }
     });
@@ -604,15 +614,47 @@ async function runPage(opts) {
     check('Do It posts the calendar event with the file link and the clock',
       params && params.fileUrl === file.url && params.fileName === file.name && params.dateIso === '2026-10-08' && params.hour === 10 && params.minute === 0 && params.fileTerm === 'glance-pricing-q4.pdf',
       params);
-    check('the receipt says Handled and does not draft a reply',
-      Boolean(acted.chip) && /Handled\./.test(acted.chip.textContent) && /Open event/.test(acted.chip.textContent) && !acted.sent.some((m) => m.payload && m.payload.connectorId === 'outlookDraft'),
-      acted.chip && acted.chip.textContent);
+    const actedWhy = (acted.store.outlookPageDiag || []).map((d) => d.reason);
+    check('the on-page receipt still says Handled after the next scan',
+      Boolean(acted.chip) && acted.chip.classList.contains('flow-chip-settled') && /Handled\./.test(acted.chip.textContent) && /Open event/.test(acted.chip.textContent) && /Undo/.test(acted.chip.textContent) && actedWhy.indexOf('page:already-handled') < 0 && !acted.sent.some((m) => m.payload && m.payload.connectorId === 'outlookDraft'),
+      { text: acted.chip && acted.chip.textContent, why: actedWhy });
+    const holdId = shown.chip && shown.chip.getAttribute('data-glance-message');
+    const reloaded = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000,
+      store: {
+        outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] },
+        log: [{
+          ts: Date.now(), kind: 'written', messageId: holdId, app: 'outlook', connectorId: 'outlookCalendar',
+          ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar',
+          url: 'https://outlook.live.com/calendar/item/ev-hold-1',
+          label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00'
+        }]
+      },
+      driveFind: { match: 'one', file: file }
+    });
+    check('opening the thread again shows Handled on the page, from the written row',
+      Boolean(holdId) && Boolean(reloaded.chip) && reloaded.chip.classList.contains('flow-chip-settled') && /Handled\./.test(reloaded.chip.textContent) && /Open event/.test(reloaded.chip.textContent) && /Undo/.test(reloaded.chip.textContent),
+      { id: holdId, text: reloaded.chip && reloaded.chip.textContent, why: (reloaded.store.outlookPageDiag || []).map((d) => d.reason) });
     const undone = await runPage({
-      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, clickUndo: true,
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, rescan: true, clickUndo: true,
       store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
       driveFind: { match: 'one', file: file }
     });
-    check('Undo deletes that calendar event', undone.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-hold-1'), undone.sent.filter((m) => m.type === 'flow:undo-action'));
+    check('Undo on the on-page receipt deletes that calendar event', undone.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-hold-1'), undone.sent.filter((m) => m.type === 'flow:undo-action'));
+    const undoneReload = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickUndo: true,
+      store: {
+        outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] },
+        log: [{
+          ts: Date.now(), kind: 'written', messageId: holdId, app: 'outlook', connectorId: 'outlookCalendar',
+          ref: { eventId: 'ev-from-log' }, where: 'Outlook Calendar',
+          url: 'https://outlook.live.com/calendar/item/ev-from-log',
+          label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00'
+        }]
+      },
+      driveFind: { match: 'one', file: file }
+    });
+    check('Undo on a reopened thread deletes the event from that receipt', undoneReload.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-from-log'), undoneReload.sent.filter((m) => m.type === 'flow:undo-action'));
   }
 
   console.log('\nTOTAL FAILURES:', failures);

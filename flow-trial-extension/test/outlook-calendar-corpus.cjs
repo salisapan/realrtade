@@ -66,9 +66,10 @@ console.log('\n--- the event body carries the file link and invites nobody ---\n
     body && body.body.contentType === 'Text' && body.body.content.indexOf(EN) === 0 &&
     body.body.content.indexOf('File: glance-pricing-q4.pdf') > 0 &&
     body.body.content.indexOf(FILE.url) > 0, body && body.body);
-  check('the body has no attendees and is not an online meeting',
-    body && !Object.prototype.hasOwnProperty.call(body, 'attendees') &&
-    !Object.prototype.hasOwnProperty.call(body, 'isOnlineMeeting'), body && Object.keys(body));
+  check('Graph body.content contains the https file URL and attendees length is 0',
+    body && body.body.content.indexOf('https://drive.google.com/file/d/f1/view') > 0 &&
+    Array.isArray(body.attendees) && body.attendees.length === 0 &&
+    body.isOnlineMeeting !== true, body && { attendees: body.attendees, online: body.isOnlineMeeting });
   check('a missing link is not an event', Cal.eventBody({ dateIso: '2026-10-08', hour: 10, minute: 0, fileName: FILE.name }) === null);
   check('an http link is not an event', Cal.eventBody({ dateIso: '2026-10-08', hour: 10, minute: 0, fileName: FILE.name, fileUrl: 'http://drive.google.com/file/d/f1/view' }) === null);
   check('a missing clock is not an event', Cal.eventBody({ dateIso: '2026-10-08', fileName: FILE.name, fileUrl: FILE.url }) === null);
@@ -100,6 +101,8 @@ console.log('\n--- Calendars.ReadWrite is the Calendar checkbox, not the default
     /outlookCalendar: outlookCalendarWrite/.test(bg) &&
     /function outlookCalendarWrite/.test(bg) &&
     /OUTLOOK_GRAPH \+ '\/me\/events'/.test(bg) &&
+    /JSON\.stringify\(body\)/.test(bg) &&
+    /body\.attendees\.length/.test(bg) &&
     /outlookCalendar: outlookCalendarUndo/.test(bg));
   check('the worker still refuses a send', /function outlookAssertNotSend/.test(bg) && /outlookAssertNotSend\(url\)/.test(bg));
   const popup = fs.readFileSync(path.join(__dirname, '..', 'popup', 'popup.js'), 'utf8');

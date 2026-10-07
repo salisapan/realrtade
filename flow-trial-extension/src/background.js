@@ -3377,7 +3377,11 @@ async function outlookCalendarWrite(p) {
     quote: params.quote
   });
   if (!body) return { ok: false, reason: 'unclear', error: 'No single file and time for this event.' };
-  if (body.attendees || body.isOnlineMeeting) return { ok: false, reason: 'refused' };
+  // Graph fields posted as-is: subject, body.contentType Text, body.content
+  // (quote, "File: name", https link), start, end, showAs busy, attendees [].
+  // A non-empty attendees list or isOnlineMeeting would invite someone.
+  const invited = Array.isArray(body.attendees) ? body.attendees.length : (body.attendees ? 1 : 0);
+  if (invited > 0 || body.isOnlineMeeting) return { ok: false, reason: 'refused' };
   const url = OUTLOOK_GRAPH + '/me/events';
   outlookAssertNotSend(url);
   const res = await outlookFetch(url, {
