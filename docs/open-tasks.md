@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-07 (Glance 0.9.26: Outlook calendar hold keeps Handled on the open thread. Engineering gate only).
+Last updated: 2026-10-07 (Glance 0.9.27: a later shown row no longer hides the Outlook calendar receipt. Engineering gate only).
 
 ## Open
 
@@ -77,6 +77,7 @@ Last updated: 2026-10-07 (Glance 0.9.26: Outlook calendar hold keeps Handled on 
 
 ## Done (recent)
 
+- 2026-10-07: Outlook calendar receipt stays Handled across rescan and reload (0.9.27). Engineering gate only. Live 0.9.26 showed Handled, then the next scan logged `shown` on top of the written row. The page treated that as still open and put Hold back, including after reload. A calendar write stays the receipt until its own Undo. A later `shown` line does not hide it. The lookup uses the same message id, in one spelling, plus the file-and-clock key stored on that row. The event body is unchanged (`attendees: []`, https file link in `body.content`).
 - 2026-10-07: Outlook calendar hold stays on the thread (0.9.26). Engineering gate only. Live 0.9.25 created the 8 Oct 10:00 event and listed Handled in Activity, then the next page scan treated that write as already handled and removed the floating receipt. The open message now keeps Handled, Open event, and Undo. Undo on that receipt deletes the event. Opening the thread again mounts the same receipt from the written row. The Graph body is `subject`, `body.content` (plain text, the sentence, `File:` name, the https link), `start`, `end`, `showAs: busy`, `attendees: []`. No online meeting. Nothing is sent.
 - 2026-10-07: Outlook Family B calendar hold (0.9.25). Engineering gate only, not a product-base priority. The open Outlook page judges a note that places one named file on the calendar at one clock, including a note to yourself. One Drive file and a token that has `Calendars.ReadWrite` show Hold it. Do It posts one Outlook event with the file link in the description and invites nobody. The receipt says Handled, and Undo deletes that event. The same Handled row lands in Activity, with Open event and an Undo that deletes that event rather than a reply draft. Without the write scope the page stays quiet and records `outlook-calendar-write-not-granted`. The Calendar checkbox on the one Connect screen asks `Calendars.ReadWrite`. Mail-only sign-in does not. OneDrive is not searched. A meeting with no file stays silent. Live write waits on row 45.
 - 2026-10-07: Gmail Family B Do It actually writes (0.9.24). Live 0.9.23 showed «Hold it». Do It returned before the activity log and before `googleCalendarWrite`: every non-attachment Google close was sent through `artifactBody`, and a file-on-hold has no template, so that body is blank and Do It stopped. The card stayed «Hold it», Activity got no calendar row, and 8 Oct 10:00 stayed empty. Do It now builds a template body only for a create-missing Doc or Sheet. A file-on-hold click runs the calendar step (Drive link in the description when one file matches). A failed write replaces the card with the error. Live retest is CoS, unpacked 0.9.24.

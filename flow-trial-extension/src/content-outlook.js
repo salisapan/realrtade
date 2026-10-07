@@ -887,21 +887,44 @@
     return (token && token.grantedScopes) || [];
   }
 
+  function glanceError(where, err) {
+    try { console.error('Glance: ' + where, err && err.message ? err.message : err); } catch (e) { /* console gone */ }
+  }
+
   function calendarEventRef(ref) {
     if (!ref || typeof ref !== 'object') return null;
     const id = ref.eventId;
     return typeof id === 'string' && id ? ref : null;
   }
 
-  async function writtenCalendarRow(messageId) {
+  function canonKey(id) {
+    if (!id) return '';
+    if (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) return FlowOwaParse.canonId(id);
+    return String(id);
+  }
+
+  function calendarHoldKey(params, fileTerm) {
+    const p = params || {};
+    const term = String(fileTerm || p.fileTerm || '');
+    if (!term || p.dateIso == null || p.hour == null || p.minute == null) return '';
+    return term + '|' + p.dateIso + '|' + p.hour + '|' + p.minute;
+  }
+
+  // Newest calendar row for this thread. A later "shown" line does not reopen
+  // a write: that is what put Hold back on the thread after Handled. Only a
+  // newer calendar Undo does. Ids match in one spelling (slash or underscore).
+  async function findWrittenCalendar(pane, holdKey) {
     const bag = await FlowStorage.get();
     const log = (bag && bag.log) || [];
+    const want = new Set([pane && pane.itemId, pane && pane.conversationId, pane && pane.pathId].map(canonKey).filter(Boolean));
     for (const e of log) {
-      if (!e || e.messageId !== messageId) continue;
+      if (!e || e.connectorId !== 'outlookCalendar') continue;
+      const ids = [e.messageId, e.outlookConversationId, e.pathId, e.itemId].map(canonKey).filter(Boolean);
+      const idHit = ids.some((id) => want.has(id));
+      const keyHit = Boolean(holdKey) && e.calendarHoldKey === holdKey;
+      if (!idHit && !keyHit) continue;
       if (e.kind === 'undone' && e.outlookReopen) return null;
-      if (e.kind === 'written' && e.connectorId === 'outlookCalendar' && calendarEventRef(e.ref)) return e;
-      if (e.kind === 'written' || e.kind === 'undone' || e.kind === 'dismissed') return null;
-      return null;
+      if (e.kind === 'written' && calendarEventRef(e.ref)) return e;
     }
     return null;
   }
@@ -934,18 +957,17 @@
   // Handled stays on the open message. A settled card from this click is left
   // in place. A reload, or a scan that arrives after the write, mounts it again
   // from the Activity row, with the same Undo.
-  async function keepCalendarReceipt(pane, messageId) {
-    const row = await writtenCalendarRow(messageId);
+  async function keepCalendarReceipt(pane, row) {
     if (!row) return false;
     const mount = mountPoint();
     if (!mount) return false;
     const existing = mount.querySelector('.flow-chip-host');
-    if (existing && existing.classList.contains('flow-chip-settled') && existing.getAttribute('data-glance-message') === String(messageId)) {
+    if (existing && existing.classList.contains('flow-chip-settled') && existing.getAttribute('data-glance-chain') === 'calendar-hold') {
       lastOutcome = 'card';
-      lastKey = messageId + '|calendar-hold';
+      lastKey = (row.messageId || 'open') + '|calendar-hold';
       return true;
     }
-    await mountCalendarReceipt(pane, row, messageId);
+    await mountCalendarReceipt(pane, row, row.messageId);
     return Boolean(mount.querySelector('.flow-chip-host.flow-chip-settled'));
   }
 
@@ -990,14 +1012,27 @@
     }
     if (probe.move !== 'wait') return false;
     const messageId = (pane && (pane.itemId || pane.conversationId || pane.pathId)) || ('hold:' + (probe.fileTerm || 'file'));
-    if (await FlowStorage.hasTerminalOutcome(messageId)) {
-      // A written calendar row is Handled on this thread, not a reason to
-      // remove the card. The next scan (the Activity log write) used to
-      // drop the receipt and leave Handled only in the side panel.
-      const kept = await keepCalendarReceipt(pane, messageId);
-      if (kept) return true;
-      dropStuckCard();
-      await pageReason('page:already-handled', pane);
+    const shaped = (typeof FlowOutlookCalendar !== 'undefined')
+      ? FlowOutlookCalendar.decide({
+        text: holdTextOf(pane),
+        subject: pane.subject || '',
+        senderEmail: pane.senderEmail || null,
+        senderName: pane.senderName || null,
+        now: new Date(),
+        fileMatch: 'one'
+      })
+      : null;
+    const holdKey = shaped && shaped.move === 'hold' ? calendarHoldKey(shaped.params, shaped.fileTerm) : '';
+    let writtenRow = null;
+    try { writtenRow = await findWrittenCalendar(pane, holdKey); }
+    catch (e) { glanceError('calendar receipt', e); writtenRow = null; }
+    if (writtenRow) {
+      try {
+        const kept = await keepCalendarReceipt(pane, writtenRow);
+        if (kept) return true;
+      } catch (e) { glanceError('calendar receipt', e); }
+      // A write is already stored. Do not put Hold back over it.
+      lastOutcome = 'card';
       return true;
     }
     const found = await send({ type: 'flow:drive-find-one', term: probe.fileTerm });
@@ -1033,8 +1068,23 @@
   }
 
   async function showCalendarHold(pane, hold, file, messageId) {
+    if (doItInFlight) return;
     const mount = mountPoint();
     if (!mount) { await pageReason('page:no-mount', pane); return; }
+    const parked = mount.querySelector('.flow-chip-host');
+    if (parked && parked.classList.contains('flow-chip-settled') && parked.getAttribute('data-glance-chain') === 'calendar-hold') {
+      lastOutcome = 'card';
+      return;
+    }
+    const holdKey = calendarHoldKey(hold && hold.params, hold && hold.fileTerm);
+    let already = null;
+    try { already = await findWrittenCalendar(pane, holdKey); }
+    catch (e) { glanceError('calendar receipt', e); }
+    if (already) {
+      try { await keepCalendarReceipt(pane, already); } catch (e) { glanceError('calendar receipt', e); }
+      lastOutcome = 'card';
+      return;
+    }
     const g = (hold.intent && hold.intent.googleClose) || {};
     const process = Object.assign({}, hold.process, {
       closingLine: g.lang === 'he' ? (g.cardLineHe || hold.process.closingLine) : (g.cardLine || hold.process.closingLine)
@@ -1049,6 +1099,10 @@
       doLabel: 'Do It',
       messageId: messageId,
       outlookIncomingId: messageId,
+      outlookConversationId: (pane && pane.conversationId) || null,
+      pathId: (pane && pane.pathId) || null,
+      itemId: (pane && pane.itemId) || null,
+      calendarHoldKey: calendarHoldKey(params, params.fileTerm),
       threadId: (pane && (pane.conversationId || pane.itemId)) || messageId,
       subject: (pane && pane.subject) || '',
       bodyText: holdTextOf(pane),
@@ -1057,7 +1111,12 @@
       process: process,
       calendarHold: { params: params }
     };
+    if (doItInFlight) return;
     const old = mount.querySelector('.flow-chip-host');
+    if (old && old.classList.contains('flow-chip-settled') && old.getAttribute('data-glance-chain') === 'calendar-hold') {
+      lastOutcome = 'card';
+      return;
+    }
     if (old) old.remove();
     const host = FlowChipHost.inject(mount, ctx, {
       onDoIt: (h, chip, c) => { onCalendarDoIt(h, chip, c); },
@@ -1072,6 +1131,13 @@
     dbg('rendered', { messageId: messageId || null, chain: 'calendar-hold' });
     await clearReason(pane);
     await forgetFileSilence(pane);
+    let lateWrite = null;
+    try { lateWrite = await findWrittenCalendar(pane, ctx.calendarHoldKey); }
+    catch (e) { glanceError('calendar receipt', e); }
+    if (lateWrite) {
+      try { await keepCalendarReceipt(pane, lateWrite); } catch (e) { glanceError('calendar receipt', e); }
+      return;
+    }
     await FlowStorage.appendLog({
       kind: 'shown',
       label: (hold.intent && hold.intent.label) || process.name,
@@ -1088,6 +1154,7 @@
   async function onCalendarDoIt(host, chip, ctx) {
     doItInFlight = true;
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+    let wrote = null;
     try {
       const hold = (ctx && ctx.calendarHold) || {};
       const r = await send({
@@ -1099,6 +1166,7 @@
         return;
       }
       const written = r.written || 'On your calendar, with the file.';
+      wrote = { ref: r.ref, written: written, url: r.url || null };
       await FlowStorage.appendLog({
         kind: 'written',
         label: written,
@@ -1112,7 +1180,11 @@
         process: ctx.process,
         sender: ctx.sender,
         subject: ctx.subject,
-        text: ctx.bodyText
+        text: ctx.bodyText,
+        outlookConversationId: ctx.outlookConversationId || null,
+        pathId: ctx.pathId || null,
+        itemId: ctx.itemId || null,
+        calendarHoldKey: ctx.calendarHoldKey || calendarHoldKey(hold.params, hold.params && hold.params.fileTerm)
       });
       if (ctx.messageId) {
         await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: ctx.messageId });
@@ -1125,6 +1197,19 @@
         linkLabel: 'Open event',
         onUndo: calendarUndoHandler(host, ctx.messageId, r.ref)
       });
+    } catch (e) {
+      glanceError('calendar receipt', e);
+      if (wrote && host && host.isConnected) {
+        try {
+          FlowChipHost.showDraftReceipt(host, {
+            status: 'Handled.',
+            written: wrote.written,
+            url: wrote.url,
+            linkLabel: 'Open event',
+            onUndo: calendarUndoHandler(host, ctx.messageId, wrote.ref)
+          });
+        } catch (e2) { glanceError('calendar receipt', e2); }
+      }
     } finally {
       doItInFlight = false;
     }

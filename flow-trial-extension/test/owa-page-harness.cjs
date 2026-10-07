@@ -167,6 +167,13 @@ async function runPage(opts) {
     const until = Date.now() + 2500;
     while (Date.now() < until && !sent.some((m) => m.type === 'flow:execute-action')) await new Promise((r) => setTimeout(r, 40));
     await new Promise((r) => setTimeout(r, 200));
+    if (o.shadowShown) {
+      const live = w.document.querySelector('.flow-chip-host');
+      const id = (live && live.getAttribute('data-glance-message')) || chipMessage;
+      const log = Array.isArray(store.log) ? store.log.slice() : [];
+      log.unshift({ ts: Date.now() + 50, kind: 'shown', messageId: id, app: 'outlook', label: 'Hold the file' });
+      store.log = log;
+    }
     if (o.rescan) {
       try { vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx); } catch (e) { /* page script missing */ }
       await new Promise((r) => setTimeout(r, o.afterClickMs || 1200));
@@ -579,7 +586,7 @@ async function runPage(opts) {
     check('an AQQk id that Graph only accepts as an immutable id still drafts, and Undo keeps that header flag', immGets.length >= 1 && immDraft && immDraft.outlookIncomingId === PATH_GRAPH && immDraft.outlookImmutableId === true && immUndo && immUndo.outlookImmutableId === true, { prefer: immGets.length, immutable: immDraft && immDraft.outlookImmutableId, undo: immUndo && immUndo.outlookImmutableId });
   }
 
-  console.log('\n--- Family B file on the calendar (engineering gate, 0.9.26) ---\n');
+  console.log('\n--- Family B file on the calendar (engineering gate, 0.9.27) ---\n');
   {
     const GATE = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
     const gateHtml = (h) => h
@@ -633,8 +640,77 @@ async function runPage(opts) {
       driveFind: { match: 'one', file: file }
     });
     check('opening the thread again shows Handled on the page, from the written row',
-      Boolean(holdId) && Boolean(reloaded.chip) && reloaded.chip.classList.contains('flow-chip-settled') && /Handled\./.test(reloaded.chip.textContent) && /Open event/.test(reloaded.chip.textContent) && /Undo/.test(reloaded.chip.textContent),
+      Boolean(holdId) && Boolean(reloaded.chip) && reloaded.chip.classList.contains('flow-chip-settled') && /Handled\./.test(reloaded.chip.textContent) && /Open event/.test(reloaded.chip.textContent) && /Undo/.test(reloaded.chip.textContent) && !/Hold it/.test(reloaded.chip.textContent),
       { id: holdId, text: reloaded.chip && reloaded.chip.textContent, why: (reloaded.store.outlookPageDiag || []).map((d) => d.reason) });
+    const shadowed = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, shadowShown: true, rescan: true,
+      store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
+      driveFind: { match: 'one', file: file }
+    });
+    check('a newer shown row does not put Hold back over Handled',
+      Boolean(shadowed.chip) && shadowed.chip.classList.contains('flow-chip-settled') && /Handled\./.test(shadowed.chip.textContent) && /Undo/.test(shadowed.chip.textContent) && !/Hold it/.test(shadowed.chip.textContent) && !/Do It/.test(shadowed.chip.textContent),
+      shadowed.chip && shadowed.chip.textContent);
+    const auth = { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] };
+    const shownOnTop = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000,
+      store: {
+        outlookAuth: auth,
+        log: [
+          { ts: Date.now(), kind: 'shown', messageId: holdId, app: 'outlook', label: 'Hold the file' },
+          {
+            ts: Date.now() - 1000, kind: 'written', messageId: holdId, app: 'outlook', connectorId: 'outlookCalendar',
+            ref: { eventId: 'ev-hold-1' }, where: 'Outlook Calendar',
+            url: 'https://outlook.live.com/calendar/item/ev-hold-1',
+            label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00',
+            calendarHoldKey: 'glance-pricing-q4.pdf|2026-10-08|10|0'
+          }
+        ]
+      },
+      driveFind: { match: 'one', file: file }
+    });
+    check('reopen with shown newest still mounts Handled, not Hold',
+      Boolean(shownOnTop.chip) && shownOnTop.chip.classList.contains('flow-chip-settled') && /Handled\./.test(shownOnTop.chip.textContent) && /Open event/.test(shownOnTop.chip.textContent) && /Undo/.test(shownOnTop.chip.textContent) && !/Hold it/.test(shownOnTop.chip.textContent),
+      shownOnTop.chip && shownOnTop.chip.textContent);
+    // Live Exchange ids differ by alphabet and padding (REST _/- versus EWS / and +, ol: prefix, trailing =).
+    // The page address uses one spelling. The written row keeps the spelling Do It stored.
+    // That stored string is the key Undo used on the leftover 0.9.25 receipt. Reload must
+    // mount Handled from it, and Undo must convert that same row, even when a newer shown
+    // line carries the page spelling.
+    const pageSpell = 'AQQkADAwAT_M0MDAA_MS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBp';
+    const storedSpell = 'ol:AQQkADAwAT_M0MDAA/MS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBp=';
+    const canonSpell = (id) => String(id || '').replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+    const spellLog = [
+      { ts: Date.now(), kind: 'shown', messageId: pageSpell, app: 'outlook', label: 'Hold the file' },
+      {
+        ts: Date.now() - 1000, kind: 'written', messageId: storedSpell, app: 'outlook', connectorId: 'outlookCalendar',
+        ref: { eventId: 'ev-spell-1' }, where: 'Outlook Calendar',
+        url: 'https://outlook.live.com/calendar/item/ev-spell-1',
+        label: 'Calendar · glance-pricing-q4.pdf · 2026-10-08 10:00'
+      }
+    ];
+    const spelled = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, urlId: pageSpell,
+      store: { outlookAuth: auth, log: spellLog },
+      driveFind: { match: 'one', file: file }
+    });
+    check('reload mounts Handled from the stored message id when the page spelling differs',
+      storedSpell !== pageSpell && canonSpell(storedSpell) === canonSpell(pageSpell) &&
+      Boolean(spelled.chip) && spelled.chip.classList.contains('flow-chip-settled') &&
+      spelled.chip.getAttribute('data-glance-message') === storedSpell &&
+      /Handled\./.test(spelled.chip.textContent) && /Open event/.test(spelled.chip.textContent) && /Undo/.test(spelled.chip.textContent) &&
+      !/Hold it/.test(spelled.chip.textContent),
+      { page: pageSpell, stored: spelled.chip && spelled.chip.getAttribute('data-glance-message'), text: spelled.chip && spelled.chip.textContent });
+    const spelledUndo = await runPage({
+      htmlPatch: gateHtml, waitMs: 4000, urlId: pageSpell, clickUndo: true,
+      store: { outlookAuth: auth, log: spellLog.map((row) => Object.assign({}, row)) },
+      driveFind: { match: 'one', file: file }
+    });
+    const storedAfter = (spelledUndo.store.log || []).filter((e) => e && e.connectorId === 'outlookCalendar' && e.messageId === storedSpell);
+    check('Undo on that reloaded receipt converts the stored row, the same key the leftover Handled used',
+      spelledUndo.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookCalendar' && m.ref && m.ref.eventId === 'ev-spell-1') &&
+      storedAfter.length === 1 && storedAfter[0].kind === 'undone' && storedAfter[0].outlookReopen === true &&
+      !(spelledUndo.store.log || []).some((e) => e && e.kind === 'written' && e.connectorId === 'outlookCalendar' && e.messageId === storedSpell),
+      storedAfter.map((e) => ({ kind: e.kind, messageId: e.messageId })));
     const undone = await runPage({
       htmlPatch: gateHtml, waitMs: 4000, clickDoIt: true, rescan: true, clickUndo: true,
       store: { outlookAuth: { token: { accessToken: 'AT', expiresAt: Date.now() + 3600e3, grantedScopes: ['Calendars.ReadWrite', 'Mail.ReadWrite'] }, account: { address: ME }, ownAddresses: [ME] } },
