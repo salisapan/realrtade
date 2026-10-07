@@ -198,7 +198,12 @@ console.log('\n--- mail from an alias of the same account stays silent ---\n');
   });
   check('Outlook planner: alias sender, no incoming and no offer', r.incoming.length === 0 && r.offers.length === 0, { incoming: r.incoming.length, offers: r.offers.length, diag: r.diagnostics });
   const gmailSrc = fs.readFileSync(path.join(ROOT, 'src', 'content-gmail.js'), 'utf8');
-  check('Gmail reading pane skips a message sent from the account address', gmailSrc.includes('candidateSender.email.toLowerCase() === ownEmail.toLowerCase()'));
+  const G = E('FlowGoogleCloses');
+  check('Gmail reading pane skips mail the account sent to someone else',
+    gmailSrc.includes('FlowGoogleCloses.messageToJudge') &&
+    G.messageToJudge([[ALIAS, 'dana@meridian.com']], ALIAS) === -1);
+  check('a note addressed only to the account is still judged',
+    G.messageToJudge([[ALIAS, ALIAS]], ALIAS) === 0);
 }
 
 console.log('\n--- Turn off sits away from Check now ---\n');

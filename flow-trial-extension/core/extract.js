@@ -18,6 +18,13 @@ const FlowExtract = (() => {
   // Gregorian month names as Israeli business mail actually writes them
   // ("7 בספטמבר"), in the same order as MONTHS so the index is the month.
   const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
+  // Short month names ("Oct 8, 2026") are the same dates as the full names
+  // above. "sept" is the four-letter form of September. Full names are
+  // matched first, so this map is only for the abbreviation.
+  const MONTH_ABBR = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7,
+    sep: 8, sept: 8, oct: 9, nov: 10, dec: 11
+  };
 
   const CURRENCY = {
     '$': 'USD', 'us$': 'USD', 'usd': 'USD',
@@ -179,6 +186,14 @@ const FlowExtract = (() => {
 
     m = text.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(' + monthNames + ')(?:,?\\s+(\\d{4}))?\\b', 'i'));
     if (m) return monthDay(m[0], MONTHS.indexOf(m[2].toLowerCase()), +m[1], m[3], now);
+
+    // "Oct 8, 2026" / "Oct. 8". Same monthDay rules as "October 8, 2026":
+    // a written year is that year, a bare day uses the window. Checked
+    // before "tomorrow", so "tomorrow (Oct 8, 2026)" keeps October 8
+    // after tomorrow has moved on. "sept" is listed before "sep" so the
+    // shorter token does not clip it.
+    m = text.match(/\b(sept|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/i);
+    if (m) return monthDay(m[0], MONTH_ABBR[m[1].toLowerCase()], +m[2], m[3], now);
 
     // "7 בספטמבר" / "ב-21 בספטמבר 2026". The ב clings to the month name
     // (בספטמבר), the same way English puts the month name next to the day.
