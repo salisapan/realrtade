@@ -1401,6 +1401,55 @@ const FlowStorage = (() => {
     return { ok: true };
   });
 
+  // The Activity card is the written row. Appending a second "undone" row
+  // left that card saying HANDLED after the task was already deleted.
+  // Rewrite the Google Task row in place. Match the message id, the legacy
+  // id, the thread id, or the task id — a reload hash is not required.
+  const markGoogleTaskUndone = serialize(async function markGoogleTaskUndone(messageId, ref, threadId) {
+    const state = await get();
+    const log = (state.log || []).slice();
+    const ext = (ref && (ref.externalId || ref.taskId)) || '';
+    let hit = false;
+    for (let i = 0; i < log.length; i++) {
+      const e = log[i];
+      if (!e || e.kind !== 'written') continue;
+      const rowExt = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
+      const taskRow = e.connectorId === 'googleTask' || e.connectorId === 'googleTasks' || e.system === 'google/tasks';
+      if (!taskRow) continue;
+      if (ext && rowExt && rowExt !== ext) continue;
+      const idHit = messageId && (e.messageId === messageId || e.legacyMessageId === messageId);
+      const extHit = ext && rowExt === ext;
+      const threadHit = threadId && e.threadId && e.threadId === threadId && (!ext || !rowExt || rowExt === ext);
+      if (!idHit && !extHit && !threadHit) continue;
+      log[i] = Object.assign({}, e, {
+        kind: 'undone',
+        undone: true,
+        connectorId: e.connectorId || 'googleTask',
+        url: null,
+        ref: null,
+        where: null
+      });
+      hit = true;
+      break;
+    }
+    if (!hit && (messageId || ext || threadId)) {
+      log.unshift({
+        ts: Date.now(),
+        kind: 'undone',
+        undone: true,
+        label: 'Google Task removed.',
+        messageId: messageId || null,
+        threadId: threadId || null,
+        externalId: ext || null,
+        app: 'gmail',
+        connectorId: 'googleTask'
+      });
+      hit = true;
+    }
+    await set({ log: trimLog(log, new Set(state.resolvedMessageIds || [])) });
+    return { ok: true, hit: hit };
+  });
+
 
   function migrateMod() {
     if (typeof FlowOutlookStateMigrate !== 'undefined') return FlowOutlookStateMigrate;
@@ -1492,7 +1541,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

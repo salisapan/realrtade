@@ -39,13 +39,32 @@ const FlowReceipt = (() => {
 
   // succeeded / total: how many steps in this Do It actually wrote.
   // priorCloses: writeStats.total from BEFORE those writes are logged.
+  // requireProof: this Do It includes a writer that must be read back
+  // (Google Tasks in this slice). Handled only when every proof has
+  // fetchedBack true. Omit requireProof for writers that are not on
+  // this gate yet (Calendar, drafts, Drive).
   function confirmation(input) {
     input = input || {};
     const succeeded = count(input.succeeded);
     const total = count(input.total);
     const priorCloses = count(input.priorCloses);
-    const full = succeeded > 0 && succeeded === total;
     const handled = input.lang === 'he' ? STATUS_HANDLED_HE : STATUS_HANDLED;
+    if (input.requireProof) {
+      const proofs = Array.isArray(input.proofs) ? input.proofs : [];
+      const gate = typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+      const proved = !!(gate && proofs.length > 0 && proofs.every((p) => gate.isProof(p)));
+      if (!proved) {
+        const partial = succeeded > 0 && total > succeeded;
+        return {
+          full: false,
+          status: partial ? STATUS_PARTIAL : null,
+          earlyLine: null,
+          undoLabel: succeeded > 1 ? 'Undo all' : 'Undo',
+          verifyStatus: input.verifyStatus || (proofs.length ? 'verify_failed' : 'proof_pending')
+        };
+      }
+    }
+    const full = succeeded > 0 && succeeded === total;
     return {
       full,
       status: succeeded === 0 ? null : (full ? handled : STATUS_PARTIAL),

@@ -44,6 +44,13 @@
   let loopView = 'date';
 
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
+  try {
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area !== 'local' || !ch.log) return;
+      const panel = document.querySelector('.panel[data-panel="log"]');
+      if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
+    });
+  } catch (e) { /* panel is already showing the last render */ }
   wireTabs();
   wireSave();
   wireRecipe();
@@ -2257,9 +2264,42 @@
     host.replaceChildren();
     // "shown" entries are noise once the outcome is known; the log should read as
     // a record of what happened, not a stream of every evaluation.
-    const rows = (s.log || []).filter((e) => e.kind !== 'shown').slice(0, 40);
+    const rows = activityRows(s.log || []);
     empty.hidden = rows.length > 0;
     rows.forEach((e) => host.appendChild(logRow(e)));
+  }
+
+  // A Google Task undo used to append a second row and leave the written
+  // card saying HANDLED. Hide a written task once a newer undo names the
+  // same message or the same task id. In-place undo already flips the
+  // kind; this covers a row that is still written.
+  function activityRows(log) {
+    const list = Array.isArray(log) ? log : [];
+    const out = [];
+    for (let index = 0; index < list.length && out.length < 40; index++) {
+      const e = list[index];
+      if (!e || e.kind === 'shown') continue;
+      if (e.kind === 'written' && newerTaskUndo(list, index)) continue;
+      out.push(e);
+    }
+    return out;
+  }
+
+  function newerTaskUndo(log, index) {
+    const e = log[index];
+    if (!e || e.kind !== 'written') return false;
+    const task = e.connectorId === 'googleTask' || e.connectorId === 'googleTasks' || e.system === 'google/tasks';
+    if (!task) return false;
+    const ext = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId)) || '';
+    for (let i = 0; i < index; i++) {
+      const newer = log[i];
+      if (!newer || newer.kind !== 'undone') continue;
+      if (e.messageId && newer.messageId === e.messageId) return true;
+      if (e.threadId && newer.threadId && e.threadId === newer.threadId && (newer.connectorId === 'googleTask' || newer.connectorId === 'googleTasks')) return true;
+      const nextExt = newer.externalId || (newer.ref && (newer.ref.externalId || newer.ref.taskId)) || '';
+      if (ext && nextExt && ext === nextExt) return true;
+    }
+    return false;
   }
 
   function logRow(e) {
@@ -2302,6 +2342,8 @@
               await FlowStorage.markOutlookDraftUndone(e.messageId, e.ref);
             } else if (isOutlookCalendar && typeof FlowStorage.markOutlookCalendarUndone === 'function') {
               await FlowStorage.markOutlookCalendarUndone(e.messageId, e.ref);
+            } else if ((e.connectorId === 'googleTask' || e.connectorId === 'googleTasks') && typeof FlowStorage.markGoogleTaskUndone === 'function') {
+              await FlowStorage.markGoogleTaskUndone(e.messageId, e.ref, e.threadId);
             } else {
               await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId, connectorId: e.connectorId, ref: e.ref, app: e.app });
             }

@@ -570,13 +570,7 @@
   // missing attribute is not guessed at — personal close memory treats a
   // missing thread id as "not clear" unless the subject itself is specific.
   function threadIdFrom(message) {
-    let node = message;
-    while (node && node.getAttribute) {
-      const id = node.getAttribute('data-legacy-thread-id');
-      if (id) return id;
-      node = node.parentElement;
-    }
-    return null;
+    return gmailAttr(message, 'data-legacy-thread-id') || null;
   }
 
   // Prefer silence when this open message clearly continues a personal
@@ -661,6 +655,98 @@
     return intent || { type: null };
   }
 
+  // data-legacy-message-id and data-legacy-thread-id sit on the message
+  // (.adn), which is inside the listitem, not always on the listitem
+  // itself. The hash of the row text changes when Gmail rewrites
+  // "0 minutes ago". The legacy id and the thread id do not.
+  function gmailAttr(node, name) {
+    if (!node || !node.getAttribute) return '';
+    const own = node.getAttribute(name);
+    if (own) return own;
+    if (node.querySelector) {
+      try {
+        const child = node.querySelector('[' + name + ']');
+        const fromChild = child && child.getAttribute(name);
+        if (fromChild) return fromChild;
+      } catch (e) { /* attribute selector is a fixed name */ }
+    }
+    let parent = node.parentElement;
+    let hops = 0;
+    while (parent && hops < 8) {
+      const value = parent.getAttribute && parent.getAttribute(name);
+      if (value) return value;
+      parent = parent.parentElement;
+      hops++;
+    }
+    return '';
+  }
+
+  function stableMessageKey(message) {
+    const legacy = gmailAttr(message, 'data-legacy-message-id');
+    const threadId = gmailAttr(message, 'data-legacy-thread-id');
+    let hash = '';
+    try { hash = hashNode(message) || ''; } catch (e) { hash = ''; }
+    const messageIds = [];
+    if (legacy) messageIds.push(legacy);
+    if (hash) messageIds.push(hash);
+    if (threadId) messageIds.push('scan:' + threadId);
+    return {
+      messageId: legacy || hash,
+      legacy: legacy,
+      threadId: threadId,
+      messageIds: messageIds,
+      threadIds: threadId ? [threadId] : []
+    };
+  }
+
+  // Before own-email, before "which message to judge", before the terminal
+  // return. A proved Google Task is mounted again whenever this thread has
+  // the receipt and the chip is gone. Classification staying quiet must
+  // not leave the thread blank.
+  async function remountProvedTaskReceipts(messages) {
+    if (typeof FlowProofOfClose === 'undefined' || !FlowProofOfClose.taskReceiptFromLog) return false;
+    let settled = null;
+    let fallback = null;
+    for (let i = 0; i < messages.length; i++) {
+      const message = messages[i];
+      if (!message || !message.isConnected || message.querySelector('.flow-chip-host')) continue;
+      const ids = stableMessageKey(message);
+      if (!ids.messageIds.length && !ids.threadIds.length) continue;
+      if (!settled) {
+        try { settled = await FlowStorage.get(); }
+        catch (e) { return false; }
+      }
+      const taskRow = FlowProofOfClose.taskReceiptFromLog(settled.log, {
+        messageIds: ids.messageIds,
+        threadIds: ids.threadIds
+      });
+      const decision = FlowProofOfClose.scanReceiptDecision
+        ? FlowProofOfClose.scanReceiptDecision({
+          log: settled.log,
+          messageIds: ids.messageIds,
+          threadIds: ids.threadIds,
+          hasHost: false,
+          terminal: true
+        })
+        : (taskRow ? 'mount' : 'silent');
+      if (decision !== 'mount' || !taskRow) continue;
+      const direct = ids.messageIds.some((id) => {
+        const c = FlowProofOfClose.canonId ? FlowProofOfClose.canonId(id) : id;
+        if (!c) return false;
+        return c === (FlowProofOfClose.canonId ? FlowProofOfClose.canonId(taskRow.messageId) : taskRow.messageId)
+          || c === (FlowProofOfClose.canonId ? FlowProofOfClose.canonId(taskRow.legacyMessageId) : taskRow.legacyMessageId);
+      });
+      if (direct) {
+        mountProvedTaskReceipt(message, taskRow);
+        return true;
+      }
+      fallback = { message: message, taskRow: taskRow };
+    }
+    if (!fallback) return false;
+    mountProvedTaskReceipt(fallback.message, fallback.taskRow);
+    return true;
+  }
+
   async function scanReadingPane() {
     if (!watching) return;
     const main = document.querySelector('div[role="main"]');
@@ -668,6 +754,12 @@
 
     const messages = main.querySelectorAll('div[role="listitem"]');
     if (!messages.length) return;
+
+    try {
+      await remountProvedTaskReceipts(messages);
+    } catch (e) {
+      console.error('[Glance] failed to remount a handled task', e);
+    }
 
     // Only the newest message in the thread — this mirrors "an email arrived",
     // not "re-judge the entire history on every DOM mutation". But the newest
@@ -732,7 +824,8 @@
     const message = judgeAt >= 0 ? messages[judgeAt] : null;
     if (!message) return; // own mail to someone else, or no message we can tell apart from one
 
-    const legacyId = message.getAttribute('data-legacy-message-id');
+    const stable = stableMessageKey(message);
+    const legacyId = stable.legacy || null;
 
     // A stale Feature 3 hover card is otherwise left floating in
     // document.body: it's appended independent of the chip's own DOM
@@ -749,7 +842,7 @@
       sender: extractSender(message),
       subject: currentSubject(),
       legacyId,
-      messageId: legacyId || hashNode(message),
+      messageId: stable.messageId,
       threadUrl: threadUrl(legacyId)
     };
     // Only worth re-checking when the message actually being looked at
@@ -780,7 +873,7 @@
       chainHost.remove();
     } else if (message.querySelector('.flow-chip-host')) return;
 
-    const messageId = legacyId || hashNode(message);
+    const messageId = stable.messageId;
     if (!messageId) return;
 
     // A message can reach "seen" with no live chip in front of you two very
@@ -797,7 +890,37 @@
     if (openedThreadId && await FlowStorage.hasTerminalOutcome('scan:' + openedThreadId)) {
       await FlowStorage.markAlreadyClosed(messageId);
     }
-    if (await FlowStorage.hasTerminalOutcome(messageId)) return;
+    // A proved Google Task stays on the thread after Gmail rebuilds this
+    // node (reload, or inbox and back). Activity already has the row.
+    // Mount that receipt again when fetchedBack is true, or when the row
+    // is the 0.9.28 triple (system, externalId, verifiedAt) written only
+    // after a read-back. A newer undo or dismiss does not come back.
+    // Other writers still stop at the terminal check below.
+    const settled = await FlowStorage.get();
+    const taskQuery = { messageIds: stable.messageIds, threadIds: stable.threadIds };
+    const taskRow = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.taskReceiptFromLog)
+      ? FlowProofOfClose.taskReceiptFromLog(settled && settled.log, taskQuery)
+      : null;
+    const taskDecision = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.scanReceiptDecision)
+      ? FlowProofOfClose.scanReceiptDecision({
+        log: settled && settled.log,
+        messageIds: stable.messageIds,
+        threadIds: stable.threadIds,
+        hasHost: false,
+        terminal: !!(FlowStorage.hasTerminalOutcomeFrom && FlowStorage.hasTerminalOutcomeFrom(settled, messageId))
+      })
+      : (taskRow ? 'mount' : 'silent');
+    if (taskRow && taskDecision === 'mount') {
+      // One receipt for the thread. The pass above already mounted it when
+      // the legacy id or the thread id matched. Do not add a second banner
+      // on a different message in the same thread.
+      const already = main.querySelector('.flow-chip-host[data-glance-chain="task-proof"]');
+      if (!already && message.isConnected && !message.querySelector('.flow-chip-host')) {
+        mountProvedTaskReceipt(message, taskRow);
+      }
+      return;
+    }
+    if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) return;
 
     // ownMessageText (not a bare .innerText) both guards against Gmail
     // detaching or replacing this exact node between the synchronous work
@@ -1049,7 +1172,7 @@
     if (!process) return; // defensive only — every catalog entry has at least an anchor step
 
     injectChip(message, {
-      messageId, intent, process, sender, subject, attachment: chosenAttachment, attachments,
+      messageId, legacyMessageId: legacyId || null, intent, process, sender, subject, attachment: chosenAttachment, attachments,
       threadUrl: threadUrl(legacyId),
       threadId: threadId,
       // Snapshotted now, not re-read from the DOM at click time — by the
@@ -1750,6 +1873,8 @@
     if (response.reason === 'connector-not-live') return 'That action isn’t wired up yet.';
     if (response.reason === 'not-connected') return 'Connect Google in the Glance popup first.';
     if (response.reason === 'unclear') return response.error || 'Nothing was written.';
+    if (response.reason === 'verify_failed') return 'Not closed — Glance could not read that task back.';
+    if (response.reason === 'proof_pending') return 'Not closed — the task was not confirmed.';
     if (response.reason === 'no-matching-contact') return 'No matching contact for ' + (ctx.sender.email || 'this sender') + '.';
     if (response.skipped) return 'Skipped — an earlier step in this process didn’t complete.';
     return response.error || 'Couldn’t complete that action.';
@@ -2097,11 +2222,117 @@
   // — accepted-then-undone is a stronger "don't propose this" signal than a
   // pre-execution removal, since the user only learned they didn't want it
   // after seeing it actually happen.
+  function taskKind(r) {
+    const kind = r && r.action && r.action.kind;
+    return kind === 'googleTask' || kind === 'googleTasks';
+  }
+
+  // Google Tasks is Handled only after fetchedBack. Other writers in this
+  // slice are unchanged. If the proof module is missing, a task does not
+  // count as closed.
+  function stepHandled(r) {
+    if (typeof FlowProofOfClose !== 'undefined') return FlowProofOfClose.stepCountsAsHandled(r);
+    if (taskKind(r)) return false;
+    return !!(r && r.response && r.response.ok && !r.response.skipped);
+  }
+
+  // The Handled banner after Gmail tears the message node down. Same
+  // receipt as the Do It that just landed: status, written line, process
+  // name, Undo (deletes the task by externalId), and View.
+  function mountProvedTaskReceipt(messageNode, row) {
+    if (!messageNode || messageNode.querySelector('.flow-chip-host')) return;
+    const copy = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.remountCopy)
+      ? FlowProofOfClose.remountCopy(row)
+      : null;
+    if (!copy) return;
+
+    const host = el('div', 'flow-chip-host flow-chip-settled');
+    host.setAttribute('dir', 'ltr');
+    host.setAttribute('data-glance-chain', 'task-proof');
+    host.setAttribute('data-glance-message', row.messageId || '');
+
+    const done = el('div', 'flow-chip flow-chip-done');
+    done.setAttribute('dir', 'ltr');
+    done.setAttribute('role', 'status');
+    const icon = el('span', 'flow-chip-done-icon', '✓');
+    icon.setAttribute('aria-hidden', 'true');
+    done.appendChild(icon);
+    done.appendChild(el('span', 'flow-chip-handled', copy.status));
+    if (copy.writtenLine) done.appendChild(el('span', 'flow-chip-written', copy.writtenLine));
+    if (copy.processName || copy.closedLine) {
+      const detail = el('span', 'flow-chip-detail');
+      if (copy.processName) detail.appendChild(el('span', 'flow-chip-process-name', copy.processName));
+      if (copy.closedLine) detail.appendChild(el('span', 'flow-chip-label', copy.closedLine));
+      done.appendChild(detail);
+    }
+
+    const undo = el('button', 'flow-chip-undo', copy.undoHint);
+    undo.type = 'button';
+    const hint = el('span', 'flow-chip-undo-hint');
+    hint.hidden = true;
+    const actionsRow = el('span', 'flow-chip-actions');
+    actionsRow.appendChild(undo);
+    if (copy.url) {
+      const view = el('a', 'flow-chip-link', 'View');
+      view.href = copy.url;
+      view.target = '_blank';
+      view.rel = 'noopener';
+      actionsRow.appendChild(view);
+    }
+    undo.addEventListener('click', () => {
+      undo.textContent = 'Undoing…';
+      undo.disabled = true;
+      new Promise((resolve) => {
+        chrome.runtime.sendMessage({ type: 'flow:undo-action', connectorId: copy.connectorId, ref: copy.ref }, resolve);
+      }).then((result) => {
+        if (!(result && result.ok)) {
+          undo.textContent = copy.undoHint;
+          undo.disabled = false;
+          hint.hidden = false;
+          hint.textContent = 'Still there — the Google Task was not removed.';
+          hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+          return;
+        }
+        const messageId = row.messageId;
+        if (messageId && typeof FlowCloseMemory !== 'undefined') {
+          FlowCloseMemory.forgetMessage(messageId).catch(() => {});
+        }
+        if (messageId) {
+          FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: messageId, reason: 'undo' })
+            .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
+        }
+        done.replaceChildren(el('span', 'flow-chip-label', copy.undoneLine));
+        const mark = typeof FlowStorage.markGoogleTaskUndone === 'function'
+          ? FlowStorage.markGoogleTaskUndone(messageId, copy.ref, row.threadId)
+          : Promise.resolve({ hit: false });
+        mark.then((marked) => {
+          if (marked && marked.hit) return null;
+          return FlowStorage.appendLog({
+            kind: 'undone',
+            label: row.label || 'Google Task',
+            messageId: messageId,
+            threadId: row.threadId || null,
+            externalId: copy.externalId,
+            app: SOURCE_APP,
+            connectorId: copy.connectorId,
+            undone: true
+          });
+        }).catch((e) => console.error('[Glance] failed to record an undone task — the task itself was already removed', e));
+        chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state && state.domainId } });
+      });
+    });
+    done.appendChild(actionsRow);
+    done.appendChild(hint);
+    host.appendChild(done);
+    messageNode.insertBefore(host, messageNode.firstChild);
+  }
+
   async function showMultiActionReceipt(host, chip, ctx, results) {
-    const succeeded = results.filter((r) => r.response && r.response.ok);
+    const succeeded = results.filter(stepHandled);
 
     if (!succeeded.length) {
-      setChipState(chip, 'flow-chip-error', reasonMessage(results[0] && results[0].response, ctx));
+      const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
+      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
       return;
     }
 
@@ -2121,12 +2352,23 @@
     const he = /[\u0590-\u05FF]/.test(
       ((ctx && ctx.subject) || '') + ((ctx && ctx.bodyText) || '') + ((ctx && ctx.intent && ctx.intent.label) || '')
     );
+    const taskSteps = results.filter(taskKind);
     const copy = FlowReceipt.confirmation({
       succeeded: succeeded.length,
       total: results.length,
       priorCloses,
-      lang: he ? 'he' : 'en'
+      lang: he ? 'he' : 'en',
+      requireProof: taskSteps.length > 0,
+      proofs: taskSteps.length
+        ? succeeded.filter(taskKind).map((r) => r.response && r.response.proof)
+        : undefined,
+      verifyStatus: (taskSteps[0] && taskSteps[0].response && taskSteps[0].response.reason) || undefined
     });
+    if (!copy.status) {
+      const unverified = results.find((r) => r.response && (r.response.reason === 'verify_failed' || r.response.reason === 'proof_pending'));
+      setChipState(chip, 'flow-chip-error', reasonMessage((unverified && unverified.response) || (results[0] && results[0].response), ctx));
+      return;
+    }
 
     const done = el('div', 'flow-chip flow-chip-done');
     done.setAttribute('dir', 'ltr');
@@ -2204,7 +2446,23 @@
         if (result.ok) {
           const undone = (sole && sole.undoneLine) || FlowReceipt.undoneLine(wheres);
           done.replaceChildren(el('span', 'flow-chip-label', undone));
-          FlowStorage.appendLog({ kind: 'undone', label: ctx.intent.label, messageId: ctx.messageId, app: SOURCE_APP });
+          const taskSteps = succeeded.filter(taskKind);
+          const markTask = taskSteps.length && typeof FlowStorage.markGoogleTaskUndone === 'function'
+            ? Promise.all(taskSteps.map((r) => FlowStorage.markGoogleTaskUndone(ctx.messageId, r.response && r.response.ref, ctx.threadId)))
+            : Promise.resolve([]);
+          markTask.then((marked) => {
+            const covered = taskSteps.length > 0 && Array.isArray(marked) && marked.some((m) => m && (m.hit || m.ok));
+            if (taskSteps.length === succeeded.length && covered) return null;
+            return FlowStorage.appendLog({
+              kind: 'undone',
+              label: ctx.intent.label,
+              messageId: ctx.messageId,
+              threadId: ctx.threadId || null,
+              connectorId: taskSteps.length === succeeded.length ? 'googleTask' : undefined,
+              undone: true,
+              app: SOURCE_APP
+            });
+          }).catch((e) => console.error('[Glance] failed to record an undone task — the task itself was already removed', e));
           chrome.runtime.sendMessage({ type: 'flow:track', event: 'action_undone', params: { domain: state.domainId } });
         } else {
           // The button stays Undo. Replacing its label with the failure
@@ -2272,16 +2530,43 @@
       ? FlowStorage.recordMeeting({ id: ctx.messageId, title: ctx.intent.label, dateIso: meetingIso, threadUrl: window.location.href })
           .catch((e) => console.error('[Glance] failed to remember the meeting for its debrief', e))
       : null;
-    const bookkeeping = succeeded.map((r) =>
-      FlowStorage.appendLog({ kind: 'written', label: ctx.intent.label, messageId: ctx.messageId, where: r.response.where, url: r.response.url, ref: r.response.ref, connectorId: r.action.kind, app: SOURCE_APP })
-        .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e))
-    );
+    const closedLine = closedSummary(succeeded, ctx);
+    const bookkeeping = succeeded.map((r) => {
+      const proof = r.response && r.response.proof;
+      let proofFields = null;
+      if (typeof FlowProofOfClose !== 'undefined') {
+        proofFields = FlowProofOfClose.receiptLogFields
+          ? FlowProofOfClose.receiptLogFields(proof, {
+            writtenLine: r.response && r.response.written,
+            processName: ctx.process && ctx.process.name,
+            closedLine: closedLine,
+            status: copy.status
+          })
+          : (FlowProofOfClose.activityFields(proof) || null);
+      }
+      return FlowStorage.appendLog(Object.assign({
+        kind: 'written',
+        label: ctx.intent.label,
+        messageId: ctx.messageId,
+        legacyMessageId: ctx.legacyMessageId || null,
+        threadId: ctx.threadId || null,
+        where: r.response.where,
+        url: r.response.url,
+        ref: r.response.ref,
+        connectorId: r.action.kind,
+        app: SOURCE_APP
+      }, proofFields))
+        .catch((e) => console.error('[Glance] failed to record a completed write — the write itself already succeeded', e));
+    });
     if (meetingNote) bookkeeping.push(meetingNote);
     // Personal close memory: only a Trusted Do It whose every attempted
     // step actually wrote. A partial chain is not a closed matter. This
     // does not touch the receipt copy above, and it does not share a
     // storage key with close-quality metrics.
-    if (typeof FlowCloseMemory !== 'undefined' && ctx.intent && ctx.intent.personalClose && FlowCloseMemory.fullWriteOf(results)) {
+    const trustedClose = typeof FlowProofOfClose !== 'undefined'
+      ? FlowProofOfClose.shouldRecordTrustedClose(results)
+      : results.length > 0 && !results.some(taskKind) && results.every((r) => r && r.response && r.response.ok === true && !r.response.skipped);
+    if (typeof FlowCloseMemory !== 'undefined' && ctx.intent && ctx.intent.personalClose && FlowCloseMemory.fullWriteOf(results) && trustedClose) {
       bookkeeping.push(
         FlowCloseMemory.recordClose({
           personalClose: ctx.intent.personalClose,
@@ -2297,7 +2582,7 @@
     // success: every step the chip proposed actually wrote. Partials stay
     // out. This count does not follow the receipt string ("Handled." vs
     // "Partly handled."). Local only; not a flow:track event.
-    if (typeof FlowCloseQuality !== 'undefined' && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length)) {
+    if (typeof FlowCloseQuality !== 'undefined' && trustedClose && FlowCloseQuality.isFullWrite(ctx.process.steps.length, succeeded.length)) {
       bookkeeping.push(
         FlowStorage.recordCloseQuality({ kind: 'success', messageId: ctx.messageId })
           .catch((e) => console.error('[Glance] failed to record a full-close success', e))

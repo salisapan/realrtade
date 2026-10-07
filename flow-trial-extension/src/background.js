@@ -42,6 +42,7 @@ import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
 import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
+import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -1262,29 +1263,71 @@ async function googleTasksWrite(p) {
     try { detail = ((await res.json()).error || {}).message || ''; } catch (e) { /* body already consumed or not JSON */ }
     throw new Error('Google Tasks write failed (' + res.status + ')' + (detail ? ': ' + detail : ''));
   }
-  const task = await res.json();
-  return {
-    ok: true,
+  let task = null;
+  try { task = await res.json(); } catch (e) { task = null; }
+  const taskUrl = 'https://tasks.google.com/embed/list/' + encodeURIComponent(taskListId) + '?pli=1';
+  const written = taskWrittenLine(close.dueIso, close.amount);
+  const base = {
     where: 'Google Tasks',
     target: GLANCE_TASK_LIST_TITLE + ' list',
-    // What the receipt says was written. Built from the same due and amount
-    // that went into the request body, so the line cannot name a date or a
-    // figure the task does not have.
-    written: taskWrittenLine(close.dueIso, close.amount),
-    // The id actually written to, not the one this function started with —
-    // Undo has to delete from the list the task really landed in.
-    ref: { taskListId, taskId: task.id },
-    url: 'https://tasks.google.com/embed/list/' + encodeURIComponent(taskListId) + '?pli=1'
+    written: written,
+    url: taskUrl
   };
+  // Creating the task is not the close. Handled waits for a GET of that id.
+  const Proof = globalThis.FlowProofOfClose;
+  const pending = (Proof && Proof.REASON_PENDING) || 'proof_pending';
+  const failed = (Proof && Proof.REASON_FAILED) || 'verify_failed';
+  if (!task || typeof task.id !== 'string' || !task.id) {
+    return Object.assign({ ok: false, reason: pending, ref: null, proof: null }, base);
+  }
+  const ref = { taskListId: taskListId, taskId: task.id, externalId: task.id };
+  const fetched = await googleTasksFetchBack(taskListId, task.id);
+  if (!fetched.ok) {
+    return Object.assign({ ok: false, reason: failed, ref: ref, proof: null }, base);
+  }
+  const proof = Proof && Proof.buildProof({
+    system: Proof.SYSTEM_GOOGLE_TASKS,
+    externalId: task.id,
+    url: taskUrl,
+    fetchedBack: true,
+    verifiedAt: new Date().toISOString()
+  });
+  if (!proof) {
+    return Object.assign({ ok: false, reason: pending, ref: ref, proof: null }, base);
+  }
+  return Object.assign({ ok: true, ref: ref, proof: proof }, base);
+}
+
+// Read the task that was just created. fetchedBack is true only when this
+// GET returns that same id and the task is not deleted. A miss stays
+// verify_failed — the loop is not Handled.
+async function googleTasksFetchBack(taskListId, taskId) {
+  let res;
+  try {
+    res = await googleTasksAuthedFetch(
+      '/lists/' + encodeURIComponent(taskListId) + '/tasks/' + encodeURIComponent(taskId),
+      { method: 'GET' }
+    );
+  } catch (e) {
+    return { ok: false };
+  }
+  if (!res || !res.ok) return { ok: false };
+  let body = null;
+  try { body = await res.json(); } catch (e) { return { ok: false }; }
+  if (!body || body.id !== taskId || body.deleted) return { ok: false };
+  return { ok: true, task: body };
 }
 
 async function googleTasksUndo(ref) {
   const auth = await getGoogleTasksAuth();
-  if (!ref || !ref.taskId) return { ok: false };
+  if (!ref) return { ok: false };
+  // externalId is the id the proof fetched back. Older rows only have taskId.
+  const taskId = ref.externalId || ref.taskId;
+  if (!taskId) return { ok: false };
   const listId = ref.taskListId || (auth && auth.taskListId);
   if (!listId) return { ok: false };
   const res = await googleTasksAuthedFetch(
-    '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(ref.taskId),
+    '/lists/' + encodeURIComponent(listId) + '/tasks/' + encodeURIComponent(taskId),
     { method: 'DELETE' }
   );
   return { ok: res.ok || res.status === 404 };
