@@ -28,7 +28,8 @@ const REDIRECT = 'https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/';
   console.log('\n--- the sign-in address and the way back ---\n');
   {
     const u = new URL(A.authorizeUrl({ authority: CFG.AUTHORITY, clientId: CFG.CLIENT_ID, redirectUri: REDIRECT, scopes: CFG.SCOPES, challenge: 'CH', state: 'ST' }));
-    check('it goes to the Microsoft sign-in page with PKCE and the right scopes', u.origin + u.pathname === 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize' && u.searchParams.get('code_challenge_method') === 'S256' && u.searchParams.get('response_type') === 'code' && u.searchParams.get('scope') === 'offline_access User.Read Mail.Read Mail.ReadWrite', u.toString());
+    check('it goes to the Microsoft sign-in page with PKCE and the right scopes', u.origin + u.pathname === 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize' && u.searchParams.get('code_challenge_method') === 'S256' && u.searchParams.get('response_type') === 'code' && u.searchParams.get('scope') === 'offline_access User.Read Mail.Read Mail.ReadWrite Tasks.ReadWrite', u.toString());
+    check('Tasks.ReadWrite is on the default sign-in; Mail.Send is not', CFG.SCOPES.indexOf('Tasks.ReadWrite') !== -1 && !CFG.SCOPES.some((s) => /send/i.test(s)), CFG.SCOPES);
     check('Mail.ReadWrite is asked for drafts; Mail.Send is never asked', CFG.SCOPES.indexOf('Mail.ReadWrite') !== -1 && !CFG.SCOPES.some((s) => /send/i.test(s)), CFG.SCOPES);
     const mailOnly = C.scopesFor(C.defaultConnectIds());
     check('the default Connect screen asks only the mail scopes', mailOnly.join(' ') === C.SCOPES.join(' '), mailOnly);

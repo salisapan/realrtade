@@ -12,7 +12,8 @@
 // What Outlook cannot do yet, and therefore stays silent on (never a weaker substitute): a request that needs a file from
 // Drive (Gmail searches Drive first; the Outlook draft writer attaches nothing), and a fact ask that Gmail answers from one
 // Sheet cell (FlowFactReply.blocksInbox: no lookup happened, so no generic reply stands in for the fact), and a close with no
-// reply draft in it (a calendar event or a Task: Gmail writes those with the Google writers; Outlook's Do It is a draft).
+// reply draft and no task in it (a calendar event: Gmail writes that with the Google writer). A task-only close is a
+// Microsoft To Do task. A process that still has a draft stays a draft.
 const FlowIncomingJudge = (() => {
   const MIN_TEXT = 20;
 
@@ -80,19 +81,35 @@ const FlowIncomingJudge = (() => {
       executionMemory: i.executionMemory || null
     });
     if (!process || !process.steps || !process.steps.length) return { show: false, reason: 'no-process', intent };
-    // Outlook's Do It writes one thing: a reply draft. A close whose process has no draft step (a calendar event, a Task
-    // with no reply) is Gmail's Google writers' job; Outlook stays quiet rather than offering a reply in its place.
-    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process)) return { show: false, reason: 'no-draft-close', intent };
+    // Outlook's Do It writes a reply draft when the process has one. A task-only
+    // close writes Microsoft To Do. A calendar event with no draft and no task
+    // stays quiet rather than offering a reply in its place.
+    if ((i.surface || 'gmail') !== 'gmail' && !draftStepOf(process) && !taskOnlyProcess(process)) {
+      return { show: false, reason: 'no-draft-close', intent };
+    }
     return { show: true, intent, process: forSurface(process, i.surface || 'gmail') };
   }
 
+  function taskOnlyProcess(process) {
+    const steps = (process && process.steps) || [];
+    return steps.length > 0 && steps.every((s) => s && (s.kind === 'googleTask' || s.kind === 'googleTasks' || s.kind === 'outlookTask'));
+  }
+
   // The connector is the only difference: Outlook writes its reply draft through Graph instead of the Gmail API.
+  // A task-only process writes Microsoft To Do. A process that still has a draft keeps its task step unused.
   function forSurface(process, surface) {
     if (!process || surface !== 'outlook') return process;
+    const tasks = taskOnlyProcess(process);
     return Object.assign({}, process, {
-      steps: (process.steps || []).map((s) => (s && s.kind === 'gmailDraft')
-        ? Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') })
-        : s)
+      steps: (process.steps || []).map((s) => {
+        if (s && s.kind === 'gmailDraft') {
+          return Object.assign({}, s, { kind: 'outlookDraft', id: String(s.id || 'draft').replace(/^gmail/i, 'outlook') });
+        }
+        if (tasks && s && (s.kind === 'googleTask' || s.kind === 'googleTasks')) {
+          return Object.assign({}, s, { kind: 'outlookTask', id: 'outlookTask' });
+        }
+        return s;
+      })
     });
   }
 
@@ -118,7 +135,7 @@ const FlowIncomingJudge = (() => {
     return D.draftBodyText(draftPayload(process, ctx), null, null, null);
   }
 
-  return { MIN_TEXT, judge, forSurface, draftStepOf, draftPayload, draftText };
+  return { MIN_TEXT, judge, forSurface, draftStepOf, taskOnlyProcess, draftPayload, draftText };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIncomingJudge };

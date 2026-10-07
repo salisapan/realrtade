@@ -1,7 +1,8 @@
 // Sign in to Microsoft (OAuth 2.0 authorization code with PKCE) and keep the tokens fresh. Portable: no chrome.*, no DOM.
 // The browser pieces (the sign-in window, fetch, the clock, randomness, silent launch) are handed in, so this file is tested without a browser.
 //
-// What is asked of the person: Mail.Read, Mail.ReadWrite (drafts only, by code), User.Read and offline_access.
+// What is asked of the person: Mail.Read, Mail.ReadWrite (drafts only, by code), Tasks.ReadWrite
+// (one To Do task, read back, Undo deletes it), User.Read and offline_access.
 // Never Mail.Send. The tokens are kept only in this browser's extension storage. Nothing here talks to Glance's servers.
 //
 // SPA refresh tokens last 24h and do not slide (Microsoft). silentReauth renews with prompt=none before that window

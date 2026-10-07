@@ -24,6 +24,7 @@ const FlowReceipt = (() => {
   // destination is not.
   const PLACE_NOUN = {
     'Google Tasks': 'Google Task',
+    'Microsoft To Do': 'To Do task',
     'Gmail': 'Gmail draft',
     'Google Calendar': 'Calendar event',
     'Google Docs': 'Doc',

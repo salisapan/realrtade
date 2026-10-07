@@ -11,21 +11,23 @@
 // silentReauth) renews without a window before that window ends.
 //
 // Delegated Graph: Mail.Read, Mail.ReadWrite (drafts only, by code: createReply / PATCH / DELETE of
-// Glance's own draft on the person's Do It), User.Read, offline_access. Never Mail.Send. Glance
-// never sends on the person's behalf.
+// Glance's own draft on the person's Do It), Tasks.ReadWrite (one To Do task on a task-only Do It,
+// then a GET of that task; Undo deletes it), User.Read, offline_access. Never Mail.Send. Glance
+// never sends on the person's behalf. The Entra app must list Tasks.ReadWrite or consent fails
+// until the person signs in again.
 const FlowOutlookConfig = {
   CLIENT_ID: '22682454-808b-41e5-80fe-6abadc1d5595',
   AUTHORITY: 'https://login.microsoftonline.com/common',
   GRAPH: 'https://graph.microsoft.com/v1.0',
   // Default sign-in: mail only. scopesFor() adds a service's scopes only when
   // that box is checked on the one Connect screen. Never Mail.Send.
-  SCOPES: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite'],
+  SCOPES: ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite'],
   // One screen: Select all, then one checkbox per service. Mail is required.
   // Calendar asks Calendars.ReadWrite only when that box is checked. The Entra
   // app must list that delegated permission or consent for the box fails.
   // OneDrive search from a mail is not built; the box only grants Files.Read.
   CONNECT_SERVICES: [
-    { id: 'mail', label: 'Mail', detail: 'Read mail and write a reply draft. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite'], required: true },
+    { id: 'mail', label: 'Mail', detail: 'Read mail, write a reply draft, and add a To Do task. Never sends.', scopes: ['Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite'], required: true },
     // Write one event for a named file at a clock. Not added to the default
     // mail sign-in. Never Mail.Send, never Calendars.ReadWrite.Shared.
     { id: 'calendar', label: 'Calendar', detail: 'Place one named file on the calendar. Undo removes that event. Never invites anyone.', scopes: ['Calendars.ReadWrite'], required: false },
