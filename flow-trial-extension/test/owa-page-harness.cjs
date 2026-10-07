@@ -579,7 +579,7 @@ async function runPage(opts) {
     check('an AQQk id that Graph only accepts as an immutable id still drafts, and Undo keeps that header flag', immGets.length >= 1 && immDraft && immDraft.outlookIncomingId === PATH_GRAPH && immDraft.outlookImmutableId === true && immUndo && immUndo.outlookImmutableId === true, { prefer: immGets.length, immutable: immDraft && immDraft.outlookImmutableId, undo: immUndo && immUndo.outlookImmutableId });
   }
 
-  console.log('\n--- Family B file on the calendar (engineering gate, 0.9.25) ---\n');
+  console.log('\n--- Family B file on the calendar (engineering gate, 0.9.26) ---\n');
   {
     const GATE = 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.';
     const gateHtml = (h) => h
