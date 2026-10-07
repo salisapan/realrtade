@@ -57,7 +57,7 @@ async function runPage(opts) {
     outlookSync: { stateVersion: 3 }
   }, o.store || {});
   const sent = [];
-  const graphMsg = { id: MSG, conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: false, internetMessageId: '<pilot@mail.gmail.com>',
+  const graphMsg = { id: MSG, conversationId: o.listedConversationId || CONV, subject: o.listedSubject || 'Pilot proposal', isDraft: false, hasAttachments: false, internetMessageId: '<pilot@mail.gmail.com>',
     from: { emailAddress: o.graphFrom || { name: 'flow', address: 'ai.local.flow@gmail.com' } }, toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
     receivedDateTime: new Date(Date.now() - 5 * 60e3).toISOString(), webLink: 'https://outlook.live.com/owa/?ItemID=x', body: { contentType: 'text', content: o.mailBody || BODY } };
   function reply(msg) {
@@ -67,11 +67,26 @@ async function runPage(opts) {
       const u = String(msg.url);
       if (o.graphDown) return { ok: false, status: 0, error: 'network' };
       if (/\/me\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ mail: ME, displayName: 'Glance' }) };
-      if (/mailFolders\/inbox\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+      if (/mailFolders\/inbox\/messages/.test(u)) {
+        if (o.inboxLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+      }
       if (/mailFolders\/sentitems\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
-      if (/\/me\/messages\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+      if (/\/me\/messages\?/.test(u)) {
+        // Live Graph often answers the conversationId filter with an empty page (or refuses it).
+        // The inbox list above is the fallback the open page must use.
+        if (o.convFilterEmpty && /conversationId/.test(decodeURIComponent(u))) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
+        return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+      }
       return { ok: false, status: 404, body: '{}' };
     }
+    if (msg.type === 'flow:execute-action') {
+      const p = msg.payload || {};
+      if (p.driveFileId) return { ok: true, attachmentId: 'att-1', ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
+      return { ok: true, ref: 'draft-1', where: 'https://outlook.live.com/mail/0/drafts', url: 'https://outlook.live.com/mail/0/drafts' };
+    }
+    if (msg.type === 'flow:undo-action') return { ok: true, written: 'Reply draft removed. Not sent.' };
     if (msg.type === 'flow:search-drive') {
       const base = o.driveResult
         ? o.driveResult
@@ -113,6 +128,20 @@ async function runPage(opts) {
   if (typeof o.mutate === 'function') o.mutate(w.document);
   // Keep the page churning with the card up, to see whether the open message is judged again on every tick.
   if (o.afterMs) await new Promise((r) => setTimeout(r, o.afterMs));
+  if (o.clickDoIt) {
+    const btn = w.document.querySelector('.flow-chip-host .flow-chip');
+    if (btn) btn.click();
+    const until = Date.now() + 2500;
+    while (Date.now() < until && !sent.some((m) => m.type === 'flow:execute-action')) await new Promise((r) => setTimeout(r, 40));
+    await new Promise((r) => setTimeout(r, 200));
+    if (o.clickUndo) {
+      const undo = w.document.querySelector('.flow-chip-undo');
+      if (undo) undo.click();
+      const untilUndo = Date.now() + 2000;
+      while (Date.now() < untilUndo && !sent.some((m) => m.type === 'flow:undo-action')) await new Promise((r) => setTimeout(r, 40));
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  }
   clearInterval(ad);
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
@@ -396,6 +425,43 @@ async function runPage(opts) {
     const aliasWhy = reasonsOf(alias);
     check('mail from the same account stays silent, schedule card included', !alias.chip && !/Scheduling/.test((alias.doc && alias.doc.body && alias.doc.body.textContent) || ''), alias.chip && alias.chip.textContent);
     check('the page records own-sender or note-to-self', aliasWhy.page.indexOf('own-sender') >= 0 || aliasWhy.page.indexOf('note-to-self') >= 0 || aliasWhy.plan.indexOf('own-sender') >= 0 || aliasWhy.plan.indexOf('note-to-self') >= 0, aliasWhy);
+
+    // Live 0.9.19: itemId null, conversationId set, Drive fileCount 1, prepare chosen,
+    // conversationId $filter returned nothing, showFilePrepare returned false, final outlook:file-found-no-attach.
+    const convOnly = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000,
+      convFilterEmpty: true, listedConversationId: CONV + '==', listedSubject: 'Q4 pricing sheet - retest 3',
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const convLine = convOnly.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
+    let convPayload = null;
+    try { convPayload = JSON.parse(convLine.slice('Glance: file-trace '.length)); } catch (e) { convPayload = { parse: e.message, line: convLine }; }
+    const convWhy = reasonsOf(convOnly);
+    check('conversation id only, filter empty, inbox list has the mail: floating Do It', convOnly.chip && convOnly.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(convOnly.chip.textContent) && !/Scheduling/.test(convOnly.chip.textContent), convOnly.chip && convOnly.chip.textContent);
+    check('that card is not silenced as outlook:file-found-no-attach', convWhy.page.indexOf('outlook:file-found-no-attach') < 0 && convPayload && convPayload.final === 'prepare', { why: convWhy, payload: convPayload });
+    check('the trace names how the message id was resolved and that showFilePrepare showed', convPayload && convPayload.messageIdFrom === 'inbox-list' && convPayload.showFilePrepare === 'shown', convPayload);
+    check('the resolved id is the Graph message, not the conversation id', convOnly.chip && convOnly.chip.getAttribute('data-glance-message') === MSG, convOnly.chip && convOnly.chip.getAttribute('data-glance-message'));
+
+    const noId = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 5500,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const noIdLine = noId.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
+    let noIdPayload = null;
+    try { noIdPayload = JSON.parse(noIdLine.slice('Glance: file-trace '.length)); } catch (e) { noIdPayload = { parse: e.message, line: noIdLine }; }
+    const noIdWhy = reasonsOf(noId);
+    check('Drive hit with no Graph message id still floats Do It, not a blank or a schedule card', noId.chip && noId.chip.getAttribute('data-glance-chain') === 'prepare' && /Do It/.test(noId.chip.textContent) && !/Scheduling/.test((noId.doc && noId.doc.body && noId.doc.body.textContent) || ''), noId.chip && noId.chip.textContent);
+    check('a missing message id is logged and is not outlook:file-found-no-attach', noIdPayload && noIdPayload.showFilePrepare === 'shown-without-message-id' && noIdPayload.messageIdFrom === 'none' && noIdPayload.final === 'prepare' && noIdWhy.page.indexOf('outlook:file-found-no-attach') < 0, { why: noIdWhy, payload: noIdPayload });
+
+    const clicked = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000,
+      convFilterEmpty: true, listedConversationId: CONV + '==', listedSubject: 'Q4 pricing sheet - retest 3', clickDoIt: true, clickUndo: true
+    });
+    const drafted = clicked.sent.filter((m) => m.type === 'flow:execute-action');
+    const draft = drafted[0] && drafted[0].payload;
+    check('Do It writes one Outlook draft with the Drive file and does not send', drafted.length === 1 && draft && draft.connectorId === 'outlookDraft' && draft.driveFileId === file.id && draft.outlookIncomingId === MSG && !clicked.sent.some((m) => /\/(send|sendMail)/.test(String(m.type)) || m.type === 'flow:send'), { types: clicked.sent.map((m) => m.type), draft: draft && { connectorId: draft.connectorId, driveFileId: draft.driveFileId, outlookIncomingId: draft.outlookIncomingId } });
+    check('Undo deletes that draft', clicked.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookDraft' && m.ref === 'draft-1'), clicked.sent.filter((m) => m.type === 'flow:undo-action'));
   }
 
   console.log('\nTOTAL FAILURES:', failures);

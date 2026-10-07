@@ -20,7 +20,9 @@
 //   Outlook page console: localStorage.setItem('glance-outlook-file-trace', '1')
 // The next file-ask scan logs one "Glance: file-trace" line (what decideFromText decided, whether
 // resolveFileChain searched, the gate, the Drive query, flow:search-drive ok/status/error/fileCount,
-// the scopes on the Google token, and the final silence or show reason) and clears the arm.
+// the scopes on the Google token, showFilePrepare (shown / shown-without-message-id / no-mount / …),
+// messageIdFrom (url / conversation-filter / inbox-list / none), and the final silence or show reason)
+// and clears the arm.
 (() => {
   const VERSION = (() => { try { return chrome.runtime.getManifest().version; } catch (e) { return '?'; } })();
   try { console.info('Glance: outlook content start', VERSION, location.host); } catch (e) { /* no console */ }
@@ -251,19 +253,62 @@
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
   }
 
-  // The open message's Graph id when the address only carries its conversation: the newest message in it from someone else.
-  async function messageIdForConversation(convId, own) {
+  function ownAddressesOf(st) {
+    return ((st && st.outlookAuth && st.outlookAuth.ownAddresses) || [])
+      .concat(st && st.outlookAuth && st.outlookAuth.account && st.outlookAuth.account.address ? [st.outlookAuth.account.address] : [])
+      .map((a) => String(a || '').toLowerCase());
+  }
+
+  function newestOther(list, own) {
+    const rows = (list || []).filter((m) => {
+      const a = String((m && m.from && m.from.emailAddress && m.from.emailAddress.address) || '').toLowerCase();
+      return a && (own || []).indexOf(a) < 0;
+    });
+    rows.sort((a, b) => (Date.parse(b.receivedDateTime) || 0) - (Date.parse(a.receivedDateTime) || 0));
+    return rows[0] || null;
+  }
+
+  async function graphValues(path) {
+    const r = await send({ type: 'flow:outlook-fetch', url: 'https://graph.microsoft.com/v1.0' + path, init: { method: 'GET', headers: {} } });
+    if (!r || !r.ok) return null;
     try {
-      const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + String(convId).replace(/'/g, "''") + "'") + '&$select=id,receivedDateTime,from,subject,internetMessageId&$top=25';
-      const r = await send({ type: 'flow:outlook-fetch', url: 'https://graph.microsoft.com/v1.0' + q, init: { method: 'GET', headers: {} } });
-      if (!r || !r.ok) return null;
-      const list = (JSON.parse(r.body || '{}').value || []).filter((m) => {
-        const a = String((m.from && m.from.emailAddress && m.from.emailAddress.address) || '').toLowerCase();
-        return a && own.indexOf(a) < 0;
-      });
-      list.sort((a, b) => (Date.parse(b.receivedDateTime) || 0) - (Date.parse(a.receivedDateTime) || 0));
-      return list[0] || null;
+      const value = JSON.parse(r.body || '{}').value;
+      return Array.isArray(value) ? value : [];
     } catch (e) { return null; }
+  }
+
+  // The open message's Graph id when the address only carries its conversation.
+  // OWA's id and Graph's conversationId match up to alphabet and padding (canonId).
+  // A $filter on conversationId often comes back empty on the live mailbox (the
+  // filter is refused, or the spelling does not match). The recent inbox list is
+  // the same read the mailbox check already uses, matched here instead of on the server.
+  async function messageIdForConversation(convId, own) {
+    const raw = String(convId || '');
+    const want = FlowOwaParse.canonId(raw);
+    if (!want) return null;
+    try {
+      const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + raw.replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId&$top=25';
+      const fromFilter = newestOther(await graphValues(q), own);
+      if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter' };
+      const listPath = '/me/mailFolders/inbox/messages?$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc') + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+      const hits = (await graphValues(listPath) || []).filter((m) => m && FlowOwaParse.canonId(m.conversationId) === want);
+      const fromList = newestOther(hits, own);
+      if (fromList && fromList.id) return { id: fromList.id, how: 'inbox-list' };
+      return null;
+    } catch (e) { return null; }
+  }
+
+  async function ensureOutlookMessageId(ctx) {
+    const have = ctx && (ctx.outlookIncomingId || ctx.messageId);
+    if (have) return have;
+    if (!ctx || !ctx.conversationId) return null;
+    let own = [];
+    try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
+    const found = await messageIdForConversation(ctx.conversationId, own);
+    if (!found || !found.id) return null;
+    ctx.messageId = found.id;
+    ctx.outlookIncomingId = found.id;
+    return found.id;
   }
 
   function buildCtx(entry, pane, decided) {
@@ -322,6 +367,11 @@
 
   async function onDoIt(host, chip, ctx) {
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+    const resolvedId = await ensureOutlookMessageId(ctx);
+    if (!resolvedId) {
+      FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message');
+      return;
+    }
     const askText = ctx.bodyText || ctx.text || '';
     const subject = ctx.subject || '';
     let fromAddress = null;
@@ -580,19 +630,25 @@
     });
   }
 
+  // A Drive hit is a card. The address often has only a conversation id; a missing
+  // Graph message id used to return false here and the scan then called that
+  // outlook:file-found-no-attach and removed the card. The id is resolved when
+  // it can be, and Do It resolves it again before the draft. Nothing is sent.
   async function showFilePrepare(pane, chain, messageId) {
     const file = chain && chain.hit && chain.hit.file;
-    if (!file || !file.id || chain.hit.source !== 'drive' || !messageId) return false;
+    if (!file || !file.id) return { shown: false, why: 'no-file' };
+    if (chain.hit.source !== 'drive') return { shown: false, why: 'not-drive' };
     const mount = mountPoint();
-    if (!mount) return false;
+    if (!mount) return { shown: false, why: 'no-mount' };
     const he = chain.requirement && chain.requirement.lang === 'he';
     const line = he ? 'טיוטת תשובה עם הקובץ' : 'Draft reply with the file';
     const ctx = {
       app: 'outlook',
       doLabel: 'Do It',
-      messageId: messageId,
-      outlookIncomingId: messageId,
-      threadId: (pane && (pane.conversationId || pane.itemId)) || messageId,
+      messageId: messageId || null,
+      outlookIncomingId: messageId || null,
+      conversationId: (pane && pane.conversationId) || null,
+      threadId: (pane && (pane.conversationId || pane.itemId)) || messageId || null,
       subject: (pane && pane.subject) || '',
       bodyText: (pane && pane.text) || '',
       sender: { name: pane && pane.senderName, email: pane && pane.senderEmail },
@@ -622,15 +678,16 @@
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
-    if (!host) return false;
+    if (!host) return { shown: false, why: 'inject-failed' };
     host.setAttribute('data-glance-chain', 'prepare');
+    host.setAttribute('data-glance-message', messageId || '');
     lastOutcome = 'card';
-    lastKey = messageId + '|prepare';
-    dbg('decision', { shown: true, chain: 'prepare', fileId: file.id });
-    dbg('rendered', { messageId: messageId, chain: 'prepare' });
+    lastKey = (messageId || (pane && pane.conversationId) || 'open') + '|prepare';
+    dbg('decision', { shown: true, chain: 'prepare', fileId: file.id, messageId: messageId || null });
+    dbg('rendered', { messageId: messageId || null, chain: 'prepare' });
     await clearReason(pane);
     await forgetFileSilence(pane);
-    return true;
+    return { shown: true, why: messageId ? 'shown' : 'shown-without-message-id' };
   }
 
   async function showHoldingChain(pane, chain, messageId) {
@@ -709,9 +766,7 @@
 
   async function scan() {
     const st = await FlowStorage.get();
-    const own = ((st && st.outlookAuth && st.outlookAuth.ownAddresses) || [])
-      .concat(st && st.outlookAuth && st.outlookAuth.account && st.outlookAuth.account.address ? [st.outlookAuth.account.address] : [])
-      .map((a) => String(a || '').toLowerCase());
+    const own = ownAddressesOf(st);
     const pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own }));
     const ids = FlowOwaParse.urlIds(location.href);
     const earlyPlanned = plannedRow(st, pane);
@@ -777,13 +832,17 @@
           const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
           let ran = null;
           let finalReason = 'file-chain-not-run';
+          let prepareWhy = null;
+          let msgIdHow = null;
           try {
             ran = await resolveFileChain(askText, pageThreadFiles(), pane.conversationId || pane.itemId, tracing);
             const chain = ran && ran.chain;
             let msgId = pane.itemId || null;
+            msgIdHow = msgId ? 'url' : null;
             if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && pane.conversationId) {
               const found = await messageIdForConversation(pane.conversationId, own);
-              msgId = found ? found.id : null;
+              if (found && found.id) { msgId = found.id; msgIdHow = found.how; }
+              else msgIdHow = 'none';
             }
             if (chain && chain.move === 'needs-you') {
               const shown = await showHoldingChain(pane, chain, msgId);
@@ -795,9 +854,13 @@
               const file = chain.hit && chain.hit.file;
               if (file && file.id && chain.hit.source === 'drive') {
                 const shown = await showFilePrepare(pane, chain, msgId);
-                if (shown) { finalReason = 'prepare'; return; }
+                prepareWhy = shown.why;
+                if (shown.shown) { finalReason = 'prepare'; return; }
+                finalReason = shown.why === 'no-mount' ? 'page:no-mount' : (shown.why === 'inject-failed' ? 'page:inject-failed' : ('page:' + (shown.why || 'prepare')));
+              } else {
+                prepareWhy = !file || !file.id ? 'no-file' : 'not-drive';
+                finalReason = 'page:' + prepareWhy;
               }
-              finalReason = 'outlook:file-found-no-attach';
               dropStuckCard();
               await pageReason(finalReason, pane);
               return;
@@ -827,6 +890,8 @@
                   fileCount: searched.ok === true ? (typeof searched.fileCount === 'number' ? searched.fileCount : files.length) : 0
                 } : null,
                 scopes: (searched && searched.scopes) || null,
+                showFilePrepare: prepareWhy,
+                messageIdFrom: msgIdHow,
                 final: finalReason
               });
               disarmFileTrace();
