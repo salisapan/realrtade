@@ -52,6 +52,8 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | A new surface (an app) | `multi-platform.md`, the privacy page, the store text, in the same commit |
 | Anything decided, blocked or finished | `open-tasks.md` (and its "Last updated") |
 | Anything David or the owner should do about money | `revenue-routines.md` |
+| An owner lock on product scope (what Glance or Flow is, consent, send rules, holds) | `CLAUDE.md` "Owner product locks", `open-tasks.md` if it changes work, and one dated line in `vault/decisions.md` that links here |
+| Flow sales and outreach rules, CoS routines | `revenue-routines.md` §8-§9, and one dated line in `vault/decisions.md` |
 
 ## 3. Every document, one line
 
@@ -78,3 +80,7 @@ node scripts/ai-ladder/eval.cjs                                           # SKIP
 ```
 
 Nothing here can drive a real Gmail, a real provider, Stripe or Supabase: those checks are the owner's (`open-tasks.md` rows 34 and 35).
+
+## 5. The Obsidian vault (`docs/` is the vault)
+
+Open `docs/` as the vault in Obsidian, so these truth files show up there too. `docs/vault/` is only a view and a cache over them: `vault/Home.md` links here, and `vault/decisions.md` is a short dated log with one line per decision that links to the truth file. A vault note never holds a fact that is not in a truth file. Rule: `vault/when-to-write-to-vault.md`.

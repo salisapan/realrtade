@@ -12,6 +12,19 @@ extension for Gmail", "an AI email assistant" or "a smart inbox", and never desc
 **Every report keeps two parts apart.** *Product definition (vision-locked)*: the block above, unchanged by what the code does today. *Current implementation status (code reality)*: what ships in this
 commit, stated as status. "It is a Chrome extension on Gmail" belongs in the second part only. Any description of Glance starts: "Glance closes open loops. Gmail is where it starts today."
 
+## Owner product locks (2026-10-06 to 2026-10-08) — scope around the locked block
+
+Owner decisions, recorded here as the one source. The block above stays as written until the owner changes it in `docs/product-identity.md`. Build state and order: `docs/open-tasks.md` ("Glance release order").
+
+- **Glance** is the personal product: a floating Chrome extension that follows the person across every platform, plus the local computer layer (local documents). It is not a standalone website. Glance's own model runs on Glance cloud.
+- **Flow** is the org product. It is deployed on the customer's own server (EDGE) or on our cloud.
+- **ProofOfClose.** A task is closed only with `{system, externalId, fetchedBack, verifiedAt}`, plus remount and Undo (`docs/true-close.md` §7).
+- **One consent screen** (Instinct-style): Select all plus one checkbox per service. Google, and full Microsoft: Outlook, Calendar, OneDrive, To Do, Contacts, Teams, Word/Excel.
+- **Mail.Send** is approved with a preview and a one-click approve. It never auto-sends. Not built yet: it comes after the steps list, as that list's preview. Until it ships, the code never asks `Mail.Send`. The block's "never sends on your behalf" changes only with the owner's wording in `docs/product-identity.md`.
+- **Next after Mail.Send: intent on any site.** Example: a friend asks on WhatsApp Web for last week's restaurant. Glance finds it in connected sources and drafts the reply. The person approves the send.
+- **Attachment save** (owner, 2026-10-08): Glance offers to save an email's attached document to OneDrive (Outlook) or Drive (Gmail), even when the body does not ask. It is a suggestion the person approves, never automatic.
+- **On HOLD until the owner writes «מאשר»:** Morning (invoices) and Netlify deploy.
+
 ## Start here — the map of every document
 
 `docs/README.md` is the reading order and the update map: which document owns which topic, the code and tests behind it, and which files to update in the same commit when something changes

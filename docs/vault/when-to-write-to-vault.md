@@ -1,8 +1,10 @@
 ---
 tags: [process]
-updated: 2026-10-05
+updated: 2026-10-08
 ---
 # מתי כותבים ל־vault — when to write to the vault
+
+> **Rule (owner, 2026-10-08): one source of truth.** The truth files are canonical: `CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]] and the other `docs/*.md` topic docs. Every PR that changes a product fact or locks a decision updates the truth file **plus one line** in [[decisions]] that links to it. Vault notes never copy the content.
 
 **The vault is a context cache, not a source of truth.** It exists so a new chat (CoS, Grok, Claude Code, Sali) does not start from zero. Code and product truth stay in `CLAUDE.md` + `docs/` ([[README]] is the map). If the vault and a doc disagree, the doc wins and the vault is fixed.
 
