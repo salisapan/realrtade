@@ -267,14 +267,51 @@
     return rows[0] || null;
   }
 
-  async function graphJson(path) {
-    const r = await send({ type: 'flow:outlook-fetch', url: 'https://graph.microsoft.com/v1.0' + path, init: { method: 'GET', headers: {} } });
+  // Same session the mailbox check uses. The open-page reads used to send headers: {}
+  // and every 401 collapsed to "no message".
+  const GRAPH_IMMUTABLE = 'IdType="ImmutableId"';
+  let pageBearer = '';
+  let graphTrace = { attempts: [] };
+
+  async function outlookBearer(force) {
+    if (pageBearer && !force) return pageBearer;
+    const r = await send({ type: 'flow:outlook-session', force: Boolean(force) });
+    const t = r && r.ok && r.token && r.token.accessToken;
+    pageBearer = t ? String(t) : '';
+    return pageBearer;
+  }
+
+  async function graphCall(path, how, prefer) {
+    const headers = {};
+    let token = await outlookBearer(false);
+    if (token) headers.Authorization = 'Bearer ' + token;
+    if (prefer) headers.Prefer = prefer;
+    const once = () => send({ type: 'flow:outlook-fetch', url: 'https://graph.microsoft.com/v1.0' + path, init: { method: 'GET', headers: headers } });
+    let r = await once();
+    if (r && r.status === 401) {
+      token = await outlookBearer(true);
+      if (token) {
+        headers.Authorization = 'Bearer ' + token;
+        r = await once();
+      }
+    }
+    if (!graphTrace.attempts) graphTrace.attempts = [];
+    graphTrace.attempts.push({
+      how: how || 'graph',
+      status: r && typeof r.status === 'number' ? r.status : 0,
+      prefer: prefer ? 'immutable' : null
+    });
+    return r;
+  }
+
+  async function graphJson(path, how, prefer) {
+    const r = await graphCall(path, how, prefer);
     if (!r || !r.ok) return null;
     try { return JSON.parse(r.body || '{}'); } catch (e) { return null; }
   }
 
-  async function graphValues(path) {
-    const body = await graphJson(path);
+  async function graphValues(path, how, prefer) {
+    const body = await graphJson(path, how, prefer);
     if (!body) return null;
     return Array.isArray(body.value) ? body.value : [];
   }
@@ -294,9 +331,13 @@
   // id that is not a message returns no row, and the conversation fallbacks still run.
   async function messageIdFromPathRest(pathId) {
     const spells = idSpellings(pathId);
-    for (let i = 0; i < spells.length; i++) {
-      const msg = await graphJson('/me/messages/' + encodeURIComponent(spells[i]) + '?$select=id,conversationId,receivedDateTime,from,subject,internetMessageId');
-      if (msg && msg.id && !Array.isArray(msg.value)) return { id: msg.id, how: 'path-rest-id' };
+    const prefers = [null, GRAPH_IMMUTABLE];
+    const select = '?$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+    for (let p = 0; p < prefers.length; p++) {
+      for (let i = 0; i < spells.length; i++) {
+        const msg = await graphJson('/me/messages/' + encodeURIComponent(spells[i]) + select, 'path-rest-id', prefers[p]);
+        if (msg && msg.id && !Array.isArray(msg.value)) return { id: msg.id, how: 'path-rest-id', immutable: Boolean(prefers[p]) };
+      }
     }
     return null;
   }
@@ -312,16 +353,21 @@
     if (!want) return null;
     try {
       const spells = idSpellings(raw);
-      for (let i = 0; i < spells.length; i++) {
-        const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId&$top=25';
-        const fromFilter = newestOther(await graphValues(q), own);
-        if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter' };
+      const prefers = [null, GRAPH_IMMUTABLE];
+      for (let p = 0; p < prefers.length; p++) {
+        for (let i = 0; i < spells.length; i++) {
+          const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId&$top=25';
+          const fromFilter = newestOther(await graphValues(q, 'conversation-filter', prefers[p]), own);
+          if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter', immutable: Boolean(prefers[p]) };
+        }
       }
       const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
       const listPath = '/me/mailFolders/inbox/messages?$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc') + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
-      const hits = (await graphValues(listPath) || []).filter((m) => m && (FlowOwaParse.canonId(m.conversationId) === want || FlowOwaParse.canonId(m.id) === want));
-      const fromList = newestOther(hits, own);
-      if (fromList && fromList.id) return { id: fromList.id, how: 'inbox-list' };
+      for (let p = 0; p < prefers.length; p++) {
+        const hits = (await graphValues(listPath, 'inbox-list', prefers[p]) || []).filter((m) => m && (FlowOwaParse.canonId(m.conversationId) === want || FlowOwaParse.canonId(m.id) === want));
+        const fromList = newestOther(hits, own);
+        if (fromList && fromList.id) return { id: fromList.id, how: 'inbox-list', immutable: Boolean(prefers[p]) };
+      }
       return null;
     } catch (e) { return null; }
   }
@@ -347,7 +393,12 @@
     ctx.messageId = found.id;
     ctx.outlookIncomingId = found.id;
     ctx.messageIdFrom = found.how;
+    ctx.outlookImmutableId = found.immutable === true;
     return found.id;
+  }
+
+  function graphTraceSnapshot() {
+    return (graphTrace.attempts || []).slice(0, 12);
   }
 
   function buildCtx(entry, pane, decided) {
@@ -409,12 +460,17 @@
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
     let resolvedId = null;
     try {
+      if (!(ctx && (ctx.outlookIncomingId || ctx.messageId))) graphTrace = { attempts: [] };
       resolvedId = await ensureOutlookMessageId(ctx);
       if (traceArmed || localFileTrace()) {
         logFileTrace({
           phase: 'do-it',
           messageIdFrom: (resolvedId && ctx.messageIdFrom) || 'none',
-          resolved: Boolean(resolvedId)
+          resolved: Boolean(resolvedId),
+          pathId: ctx.pathId || null,
+          conversationId: ctx.conversationId || null,
+          itemId: ctx.itemId || null,
+          graph: graphTraceSnapshot()
         });
       }
     } finally {
@@ -440,6 +496,7 @@
     const payload = Object.assign(base, {
       outlookIncomingId: ctx.outlookIncomingId || ctx.messageId,
       messageId: ctx.messageId,
+      outlookImmutableId: ctx.outlookImmutableId === true,
       intent: ctx.intent,
       label: ctx.intent && ctx.intent.label,
       text: askText,
@@ -456,7 +513,7 @@
     // without that id is not a draft we keep, and the receipt never says attached.
     if (!r || !r.ok || (file && !r.attachmentId)) {
       if (r && r.ok && r.ref && file && !r.attachmentId) {
-        await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
+        await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, outlookImmutableId: ctx.outlookImmutableId === true });
       }
       if (file) {
         await pageReason('outlook:file-found-no-attach', {
@@ -496,7 +553,7 @@
       written: written,
       url: r.url || r.where,
       onUndo: async () => {
-        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref });
+        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: r.ref, outlookImmutableId: ctx.outlookImmutableId === true });
         if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
           await FlowStorage.markOutlookDraftUndone(ctx.messageId, r.ref);
         }
@@ -686,7 +743,7 @@
   // Graph message id used to return false here and the scan then called that
   // outlook:file-found-no-attach and removed the card. The id is resolved when
   // it can be, and Do It resolves it again before the draft. Nothing is sent.
-  async function showFilePrepare(pane, chain, messageId, messageIdFrom) {
+  async function showFilePrepare(pane, chain, messageId, messageIdFrom, immutable) {
     const file = chain && chain.hit && chain.hit.file;
     if (!file || !file.id) return { shown: false, why: 'no-file' };
     if (chain.hit.source !== 'drive') return { shown: false, why: 'not-drive' };
@@ -701,7 +758,9 @@
       outlookIncomingId: messageId || null,
       pathId: (pane && (pane.pathId || pane.conversationId || pane.itemId)) || null,
       conversationId: (pane && pane.conversationId) || null,
+      itemId: (pane && pane.itemId) || null,
       messageIdFrom: messageIdFrom || null,
+      outlookImmutableId: immutable === true,
       threadId: (pane && (pane.conversationId || pane.itemId)) || messageId || null,
       subject: (pane && pane.subject) || '',
       bodyText: (pane && pane.text) || '',
@@ -887,6 +946,7 @@
       const fileNow = (decided && (filePendingReason(decided.reason) || fileSilenceReason(decided.reason))) || (planned && fileSilenceReason(planned.reason));
       if (fileNow) {
           const tracing = traceArmed || localFileTrace();
+          graphTrace = { attempts: [] };
           const askText = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(pane.text || '') : (pane.text || '');
           let ran = null;
           let finalReason = 'file-chain-not-run';
@@ -896,10 +956,11 @@
             ran = await resolveFileChain(askText, pageThreadFiles(), pane.conversationId || pane.itemId, tracing);
             const chain = ran && ran.chain;
             let msgId = pane.itemId || null;
+            let msgImmutable = false;
             msgIdHow = msgId ? 'url' : null;
             if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && (pane.pathId || pane.conversationId)) {
               const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own);
-              if (found && found.id) { msgId = found.id; msgIdHow = found.how; }
+              if (found && found.id) { msgId = found.id; msgIdHow = found.how; msgImmutable = found.immutable === true; }
               else msgIdHow = 'none';
             }
             if (chain && chain.move === 'needs-you') {
@@ -911,7 +972,7 @@
             if (chain && chain.move === 'prepare') {
               const file = chain.hit && chain.hit.file;
               if (file && file.id && chain.hit.source === 'drive') {
-                const shown = await showFilePrepare(pane, chain, msgId, msgIdHow);
+                const shown = await showFilePrepare(pane, chain, msgId, msgIdHow, msgImmutable);
                 prepareWhy = shown.why;
                 if (shown.shown) { finalReason = 'prepare'; return; }
                 finalReason = shown.why === 'no-mount' ? 'page:no-mount' : (shown.why === 'inject-failed' ? 'page:inject-failed' : ('page:' + (shown.why || 'prepare')));
@@ -950,7 +1011,11 @@
                 scopes: (searched && searched.scopes) || null,
                 showFilePrepare: prepareWhy,
                 messageIdFrom: msgIdHow,
-                final: finalReason
+                final: finalReason,
+                pathId: pane.pathId || null,
+                conversationId: pane.conversationId || null,
+                itemId: pane.itemId || null,
+                graph: graphTraceSnapshot()
               });
               tracedSig = sig;
             }
