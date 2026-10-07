@@ -79,6 +79,22 @@ async function runPage(opts) {
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
       }
+      const directMsg = u.match(/\/me\/messages\/([^?]+)/);
+      if (directMsg) {
+        if (typeof o.pathRestMisses === 'number' && o.pathRestMisses > 0) {
+          o.pathRestMisses -= 1;
+          return { ok: false, status: 404, body: '{}' };
+        }
+        if (o.pathRestHit) {
+          const asked = decodeURIComponent(directMsg[1]);
+          const want = String(o.pathRestId || '');
+          const canon = want.replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '');
+          if (asked === want || (canon && asked === canon)) {
+            return { ok: true, status: 200, body: JSON.stringify(Object.assign({}, graphMsg, { id: o.pathRestGraphId || canon || graphMsg.id, conversationId: o.listedConversationId || CONV })) };
+          }
+        }
+        return { ok: false, status: 404, body: '{}' };
+      }
       return { ok: false, status: 404, body: '{}' };
     }
     if (msg.type === 'flow:execute-action') {
@@ -128,7 +144,10 @@ async function runPage(opts) {
   if (typeof o.mutate === 'function') o.mutate(w.document);
   // Keep the page churning with the card up, to see whether the open message is judged again on every tick.
   if (o.afterMs) await new Promise((r) => setTimeout(r, o.afterMs));
+  let chipMessage = null;
   if (o.clickDoIt) {
+    const hostBefore = w.document.querySelector('.flow-chip-host');
+    chipMessage = hostBefore && hostBefore.getAttribute('data-glance-message');
     const btn = w.document.querySelector('.flow-chip-host .flow-chip');
     if (btn) btn.click();
     const until = Date.now() + 2500;
@@ -145,7 +164,7 @@ async function runPage(opts) {
   clearInterval(ad);
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
-  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), doc: w.document };
+  const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), chipMessage, doc: w.document };
   w.close();
   return res;
 }
@@ -462,6 +481,44 @@ async function runPage(opts) {
     const draft = drafted[0] && drafted[0].payload;
     check('Do It writes one Outlook draft with the Drive file and does not send', drafted.length === 1 && draft && draft.connectorId === 'outlookDraft' && draft.driveFileId === file.id && draft.outlookIncomingId === MSG && !clicked.sent.some((m) => /\/(send|sendMail)/.test(String(m.type)) || m.type === 'flow:send'), { types: clicked.sent.map((m) => m.type), draft: draft && { connectorId: draft.connectorId, driveFileId: draft.driveFileId, outlookIncomingId: draft.outlookIncomingId } });
     check('Undo deletes that draft', clicked.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookDraft' && m.ref === 'draft-1'), clicked.sent.filter((m) => m.type === 'flow:undo-action'));
+
+    // Live 0.9.20: /inbox/id/<AQQk…/…> mounted the card, Do It said "Could not find that message".
+    // CoS: that path RestId is the Graph message id. GET it (canon spelling), keep the conversation fallbacks.
+    const PATH_REST = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEADOYVBZWJ53SZbHJB/BYaEW';
+    const PATH_GRAPH = PATH_REST.replace(/\//g, '_');
+    const pathHit = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH,
+      clickDoIt: true, clickUndo: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const pathLine = pathHit.logs.find((l) => l.indexOf('Glance: file-trace ') === 0) || '';
+    let pathPayload = null;
+    try { pathPayload = JSON.parse(pathLine.slice('Glance: file-trace '.length)); } catch (e) { pathPayload = { parse: e.message, line: pathLine }; }
+    const pathDrafts = pathHit.sent.filter((m) => m.type === 'flow:execute-action');
+    const pathDraft = pathDrafts[0] && pathDrafts[0].payload;
+    const pathGets = pathHit.sent.filter((m) => m.type === 'flow:outlook-fetch' && /\/me\/messages\/[^?]/.test(String(m.url)));
+    check('path /inbox/id/{restId} resolves by GET /me/messages/{canon id}', pathPayload && pathPayload.messageIdFrom === 'path-rest-id' && pathPayload.showFilePrepare === 'shown' && pathHit.chipMessage === PATH_GRAPH, { messageIdFrom: pathPayload && pathPayload.messageIdFrom, show: pathPayload && pathPayload.showFilePrepare, message: pathHit.chipMessage, gets: pathGets.map((m) => m.url) });
+    check('that Do It writes one draft with the Drive file on the Graph id and does not send', pathDrafts.length === 1 && pathDraft && pathDraft.connectorId === 'outlookDraft' && pathDraft.driveFileId === file.id && pathDraft.outlookIncomingId === PATH_GRAPH && !pathHit.sent.some((m) => m.type === 'flow:send'), { types: pathHit.sent.map((m) => m.type), id: pathDraft && pathDraft.outlookIncomingId });
+    check('Undo deletes the path-id draft', pathHit.sent.some((m) => m.type === 'flow:undo-action' && m.connectorId === 'outlookDraft' && m.ref === 'draft-1'));
+    check('Do It does not clear an armed file trace', pathHit.store.glanceOutlookFileTrace === 1, pathHit.store.glanceOutlookFileTrace);
+
+    // The card mounted with no id (show-time GETs missed). The click must still resolve the same path id.
+    const pathLate = await runPage({
+      htmlPatch: q4html, mailBody: Q4, driveFiles: [file], waitMs: 6000, urlId: PATH_REST,
+      convFilterEmpty: true, inboxLookupEmpty: true, convLookupEmpty: true,
+      pathRestHit: true, pathRestId: PATH_REST, pathRestGraphId: PATH_GRAPH, pathRestMisses: 2,
+      clickDoIt: true,
+      store: { glanceOutlookFileTrace: 1 }
+    });
+    const lateDrafts = pathLate.sent.filter((m) => m.type === 'flow:execute-action');
+    const lateDraft = lateDrafts[0] && lateDrafts[0].payload;
+    const lateDoIt = pathLate.logs.filter((l) => l.indexOf('Glance: file-trace ') === 0).map((l) => {
+      try { return JSON.parse(l.slice('Glance: file-trace '.length)); } catch (e) { return null; }
+    }).find((p) => p && p.phase === 'do-it');
+    check('a card that mounted without a message id still drafts on Do It from the path RestId', pathLate.chip && pathLate.chip.getAttribute('data-glance-message') === '' && lateDrafts.length === 1 && lateDraft && lateDraft.outlookIncomingId === PATH_GRAPH && lateDraft.driveFileId === file.id && lateDraft.connectorId === 'outlookDraft', { attr: pathLate.chip && pathLate.chip.getAttribute('data-glance-message'), id: lateDraft && lateDraft.outlookIncomingId, text: pathLate.chip && pathLate.chip.textContent });
+    check('the click trace names path-rest-id and the flag stays armed', lateDoIt && lateDoIt.messageIdFrom === 'path-rest-id' && lateDoIt.resolved === true && pathLate.store.glanceOutlookFileTrace === 1, { lateDoIt, flag: pathLate.store.glanceOutlookFileTrace });
   }
 
   console.log('\nTOTAL FAILURES:', failures);

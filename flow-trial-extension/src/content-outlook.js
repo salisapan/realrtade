@@ -15,14 +15,15 @@
 // stage with a "Glance:" prefix: start, injected, parsed, matched, judged, decision, rendered (or the reason it did not).
 // Without it the page logs one line ("Glance: outlook content start") and any error.
 //
-// One file-chain trace, hand-armed, not the always-on debug log. Arm a single run, then open the mail:
+// One file-chain trace, hand-armed, not the always-on debug log. Arm, then open the mail:
 //   Service worker console: chrome.storage.local.set({ glanceOutlookFileTrace: 1 })
 //   Outlook page console: localStorage.setItem('glance-outlook-file-trace', '1')
-// The next file-ask scan logs one "Glance: file-trace" line (what decideFromText decided, whether
-// resolveFileChain searched, the gate, the Drive query, flow:search-drive ok/status/error/fileCount,
-// the scopes on the Google token, showFilePrepare (shown / shown-without-message-id / no-mount / …),
-// messageIdFrom (url / conversation-filter / inbox-list / none), and the final silence or show reason)
-// and clears the arm.
+// While it stays 1, a file-ask scan logs one "Glance: file-trace" line per open message (what
+// decideFromText decided, whether resolveFileChain searched, the gate, the Drive query,
+// flow:search-drive ok/status/error/fileCount, the scopes on the Google token, showFilePrepare
+// (shown / shown-without-message-id / no-mount / …), messageIdFrom (url / path-rest-id /
+// conversation-filter / inbox-list / none), and the final silence or show reason). Do It logs
+// another line (phase do-it) and does not clear the flag. Set it back to 0 by hand.
 (() => {
   const VERSION = (() => { try { return chrome.runtime.getManifest().version; } catch (e) { return '?'; } })();
   try { console.info('Glance: outlook content start', VERSION, location.host); } catch (e) { /* no console */ }
@@ -58,6 +59,8 @@
   const senderMemory = Object.create(null);
   let debug = false;
   let traceArmed = false;
+  let tracedSig = '';
+  let doItInFlight = false;
   try { debug = window.localStorage && window.localStorage.getItem('glance-debug') === '1'; } catch (e) { /* storage blocked */ }
   try {
     chrome.storage.local.get({ glanceDebug: false, glanceOutlookFileTrace: 0 }, (r) => {
@@ -73,14 +76,10 @@
     catch (e) { return false; }
   }
 
-  function disarmFileTrace() {
-    traceArmed = false;
-    try { if (window.localStorage) window.localStorage.removeItem('glance-outlook-file-trace'); } catch (e) { /* storage blocked */ }
-    try { chrome.storage.local.set({ glanceOutlookFileTrace: 0 }); } catch (e) { /* no storage */ }
-  }
-
   function logFileTrace(payload) {
     try { console.info('Glance: file-trace', JSON.stringify(payload)); } catch (e) { /* console gone */ }
+    // The same line in the service worker console. The page console is a different window.
+    send({ type: 'flow:outlook-file-trace', payload: payload }).catch(() => {});
   }
 
   function hashText(t) {
@@ -268,13 +267,38 @@
     return rows[0] || null;
   }
 
-  async function graphValues(path) {
+  async function graphJson(path) {
     const r = await send({ type: 'flow:outlook-fetch', url: 'https://graph.microsoft.com/v1.0' + path, init: { method: 'GET', headers: {} } });
     if (!r || !r.ok) return null;
-    try {
-      const value = JSON.parse(r.body || '{}').value;
-      return Array.isArray(value) ? value : [];
-    } catch (e) { return null; }
+    try { return JSON.parse(r.body || '{}'); } catch (e) { return null; }
+  }
+
+  async function graphValues(path) {
+    const body = await graphJson(path);
+    if (!body) return null;
+    return Array.isArray(body.value) ? body.value : [];
+  }
+
+  // Spellings of one Exchange id: Graph REST (- and _) first, then the URL form (+ and /).
+  function idSpellings(id) {
+    const raw = String(id || '');
+    const canon = FlowOwaParse.canonId(raw);
+    const out = [];
+    if (canon) out.push(canon);
+    if (raw && raw !== canon) out.push(raw);
+    return out;
+  }
+
+  // The /inbox/id/<restId> segment is the Graph message id (EWS alphabet in the URL,
+  // REST alphabet on Graph). GET /me/messages/{id} with both spellings. A conversation
+  // id that is not a message returns no row, and the conversation fallbacks still run.
+  async function messageIdFromPathRest(pathId) {
+    const spells = idSpellings(pathId);
+    for (let i = 0; i < spells.length; i++) {
+      const msg = await graphJson('/me/messages/' + encodeURIComponent(spells[i]) + '?$select=id,conversationId,receivedDateTime,from,subject,internetMessageId');
+      if (msg && msg.id && !Array.isArray(msg.value)) return { id: msg.id, how: 'path-rest-id' };
+    }
+    return null;
   }
 
   // The open message's Graph id when the address only carries its conversation.
@@ -287,27 +311,42 @@
     const want = FlowOwaParse.canonId(raw);
     if (!want) return null;
     try {
-      const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + raw.replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId&$top=25';
-      const fromFilter = newestOther(await graphValues(q), own);
-      if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter' };
-      const listPath = '/me/mailFolders/inbox/messages?$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc') + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
-      const hits = (await graphValues(listPath) || []).filter((m) => m && FlowOwaParse.canonId(m.conversationId) === want);
+      const spells = idSpellings(raw);
+      for (let i = 0; i < spells.length; i++) {
+        const q = "/me/messages?$filter=" + encodeURIComponent("conversationId eq '" + spells[i].replace(/'/g, "''") + "'") + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId&$top=25';
+        const fromFilter = newestOther(await graphValues(q), own);
+        if (fromFilter && fromFilter.id) return { id: fromFilter.id, how: 'conversation-filter' };
+      }
+      const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+      const listPath = '/me/mailFolders/inbox/messages?$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc') + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+      const hits = (await graphValues(listPath) || []).filter((m) => m && (FlowOwaParse.canonId(m.conversationId) === want || FlowOwaParse.canonId(m.id) === want));
       const fromList = newestOther(hits, own);
       if (fromList && fromList.id) return { id: fromList.id, how: 'inbox-list' };
       return null;
     } catch (e) { return null; }
   }
 
+  // Path RestId first (GET /me/messages/{id}), then the conversation filter and the inbox list.
+  async function resolveOutlookMessageId(pathId, convId, own) {
+    const direct = await messageIdFromPathRest(pathId || convId);
+    if (direct && direct.id) return direct;
+    if (convId) return messageIdForConversation(convId, own);
+    return null;
+  }
+
   async function ensureOutlookMessageId(ctx) {
     const have = ctx && (ctx.outlookIncomingId || ctx.messageId);
     if (have) return have;
-    if (!ctx || !ctx.conversationId) return null;
+    const pathId = ctx && (ctx.pathId || ctx.conversationId);
+    const convId = ctx && ctx.conversationId;
+    if (!pathId && !convId) return null;
     let own = [];
     try { own = ownAddressesOf(await FlowStorage.get()); } catch (e) { own = []; }
-    const found = await messageIdForConversation(ctx.conversationId, own);
+    const found = await resolveOutlookMessageId(pathId, convId, own);
     if (!found || !found.id) return null;
     ctx.messageId = found.id;
     ctx.outlookIncomingId = found.id;
+    ctx.messageIdFrom = found.how;
     return found.id;
   }
 
@@ -366,8 +405,21 @@
   }
 
   async function onDoIt(host, chip, ctx) {
+    doItInFlight = true;
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
-    const resolvedId = await ensureOutlookMessageId(ctx);
+    let resolvedId = null;
+    try {
+      resolvedId = await ensureOutlookMessageId(ctx);
+      if (traceArmed || localFileTrace()) {
+        logFileTrace({
+          phase: 'do-it',
+          messageIdFrom: (resolvedId && ctx.messageIdFrom) || 'none',
+          resolved: Boolean(resolvedId)
+        });
+      }
+    } finally {
+      doItInFlight = false;
+    }
     if (!resolvedId) {
       FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message');
       return;
@@ -634,7 +686,7 @@
   // Graph message id used to return false here and the scan then called that
   // outlook:file-found-no-attach and removed the card. The id is resolved when
   // it can be, and Do It resolves it again before the draft. Nothing is sent.
-  async function showFilePrepare(pane, chain, messageId) {
+  async function showFilePrepare(pane, chain, messageId, messageIdFrom) {
     const file = chain && chain.hit && chain.hit.file;
     if (!file || !file.id) return { shown: false, why: 'no-file' };
     if (chain.hit.source !== 'drive') return { shown: false, why: 'not-drive' };
@@ -647,7 +699,9 @@
       doLabel: 'Do It',
       messageId: messageId || null,
       outlookIncomingId: messageId || null,
+      pathId: (pane && (pane.pathId || pane.conversationId || pane.itemId)) || null,
       conversationId: (pane && pane.conversationId) || null,
+      messageIdFrom: messageIdFrom || null,
       threadId: (pane && (pane.conversationId || pane.itemId)) || messageId || null,
       subject: (pane && pane.subject) || '',
       bodyText: (pane && pane.text) || '',
@@ -773,7 +827,11 @@
     const sig = pane
       ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text), (earlyPlanned && earlyPlanned.reason) || ''].join('|')
       : 'none|' + location.pathname;
-    if (sig === lastSig && !traceArmed && !localFileTrace() && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) return;
+    const armed = traceArmed || localFileTrace();
+    // A click rewrites the chip. That must not re-enter the file chain: re-entry was what
+    // set glanceOutlookFileTrace back to 0 on Do It. One trace per open message while armed.
+    if (doItInFlight && document.querySelector('.flow-chip-host')) return;
+    if (sig === lastSig && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) return;
     lastSig = sig;
     lastOutcome = '';
     if (!pane) {
@@ -839,8 +897,8 @@
             const chain = ran && ran.chain;
             let msgId = pane.itemId || null;
             msgIdHow = msgId ? 'url' : null;
-            if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && pane.conversationId) {
-              const found = await messageIdForConversation(pane.conversationId, own);
+            if (chain && (chain.move === 'needs-you' || chain.move === 'prepare') && !msgId && (pane.pathId || pane.conversationId)) {
+              const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own);
               if (found && found.id) { msgId = found.id; msgIdHow = found.how; }
               else msgIdHow = 'none';
             }
@@ -853,7 +911,7 @@
             if (chain && chain.move === 'prepare') {
               const file = chain.hit && chain.hit.file;
               if (file && file.id && chain.hit.source === 'drive') {
-                const shown = await showFilePrepare(pane, chain, msgId);
+                const shown = await showFilePrepare(pane, chain, msgId, msgIdHow);
                 prepareWhy = shown.why;
                 if (shown.shown) { finalReason = 'prepare'; return; }
                 finalReason = shown.why === 'no-mount' ? 'page:no-mount' : (shown.why === 'inject-failed' ? 'page:inject-failed' : ('page:' + (shown.why || 'prepare')));
@@ -894,7 +952,7 @@
                 messageIdFrom: msgIdHow,
                 final: finalReason
               });
-              disarmFileTrace();
+              tracedSig = sig;
             }
           }
           return;
@@ -910,10 +968,10 @@
       if (!entry || (entry.process && decided.process && entry.process.id !== decided.process.id)) {
         // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.
         let msgId = pane.itemId || null;
-        if (!msgId && pane.conversationId) {
-          const found = await messageIdForConversation(pane.conversationId, own);
+        if (!msgId && (pane.pathId || pane.conversationId)) {
+          const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, own);
           msgId = found ? found.id : null;
-          dbg('resolved', { conversationId: pane.conversationId, messageId: msgId });
+          dbg('resolved', { conversationId: pane.conversationId, pathId: pane.pathId || null, messageId: msgId });
         }
         if (!msgId) { await pageReason('page:no-message-id', pane); return; }
         entry = {
