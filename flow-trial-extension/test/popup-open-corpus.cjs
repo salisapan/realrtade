@@ -677,7 +677,7 @@ async function run() {
     // says what it reads, that it never sends, and that nothing goes to Glance.
     check('it says what it does, drafts only and only while open, in plain words', notes.some((t) => /last 14 days/.test(t) && /Never sends/.test(t) && /reply draft/.test(t) && /nothing is sent to Glance/.test(t)), notes);
     const buttons = find(host, 'ghost').map((b) => b.textContent);
-    check('and offers Turn on once a client id is set', buttons.includes('Turn on'), buttons);
+    check('and offers Connect once a client id is set', buttons.includes('Connect'), buttons);
     check('the From Outlook block stays hidden with nothing waiting', document.getElementById('outlookBlock').hidden === true);
   }
 
