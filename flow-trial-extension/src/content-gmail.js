@@ -2337,12 +2337,22 @@
     // which is correct: the user saw the whole process and kept none of it.
     if (!liveSteps.length) { onDismiss(host, ctx); return; }
     if (host.dataset.collectorOpen === '1') return;
-    if (ctx.intent && ctx.intent.googleClose && !ctx.intent.googleClose.copyAttachment && typeof FlowGoogleCloses !== 'undefined') {
+    // Only a template create (a Doc or Sheet) has a body to build. Family B
+    // (file-on-hold / file-on-task) has no template. artifactBody reports
+    // that as blank, and returning here used to leave the Hold it card
+    // exactly as it was: no Closing state, no activity row, no calendar write.
+    if (ctx.intent && ctx.intent.googleClose && typeof FlowGoogleCloses !== 'undefined' &&
+        typeof FlowGoogleCloses.needsArtifactBody === 'function' &&
+        FlowGoogleCloses.needsArtifactBody(ctx.intent.googleClose)) {
       const fills = readSlotFills(host);
       const built = FlowGoogleCloses.artifactBody(ctx.intent.googleClose, fills);
       if (!built || built.blank) {
         const empty = host.querySelector('.flow-chip-field-input');
-        if (empty) empty.focus();
+        if (empty) {
+          empty.focus();
+          return;
+        }
+        setChipState(chip, 'flow-chip-error', 'Nothing was written. A required field is still empty.');
         return;
       }
       ctx.slotFills = fills;

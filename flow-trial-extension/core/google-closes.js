@@ -480,8 +480,18 @@ const FlowGoogleCloses = (() => {
     return merged;
   }
 
+  // A Doc or Sheet built from a named template (Family I / create-missing).
+  // Family B places a file that already exists. It has no template and no
+  // body to fill. Treating it as a blank template aborts Do It before the
+  // calendar or task write.
+  function needsArtifactBody(close) {
+    if (!close || close.copyAttachment) return false;
+    if (close.personalClose === 'file-on-hold' || close.personalClose === 'file-on-task') return false;
+    return close.personalClose === 'create-missing' || close.kind === 'doc' || close.kind === 'sheet' || Boolean(close.templateName);
+  }
+
   function artifactBody(close, fills) {
-    if (!close || close.copyAttachment) return { blank: true };
+    if (!needsArtifactBody(close)) return { blank: true };
     if (!close.templateName) return { blank: true };
     const merged = mergedFills(close, fills);
     const missing = missingSlots(close.slots || [], merged);
@@ -589,6 +599,7 @@ const FlowGoogleCloses = (() => {
     chatLine: chatLine,
     parseSlotReply: parseSlotReply,
     acceptTurn: acceptTurn,
+    needsArtifactBody: needsArtifactBody,
     artifactBody: artifactBody,
     pickOneFile: pickOneFile,
     noteToSelf: noteToSelf,

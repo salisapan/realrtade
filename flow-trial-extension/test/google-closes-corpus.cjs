@@ -104,6 +104,7 @@ console.log('\n--- family I: clear artifact, no file, template ---\n');
     row.process.steps[1].dependsOn === 'doc' &&
     row.process.steps[1].params.shareLink === true &&
     !row.process.steps[1].params.requestedObjectTerm);
+  check('a quote create still needs a template body', FlowGoogleCloses.needsArtifactBody(row.intent.googleClose) === true);
   const body = FlowGoogleCloses.artifactBody(row.intent.googleClose, {});
   check('doc body contains the template, the logo, and the amount',
     body && body.blank === false && /Acme quote/.test(body.html) && /Acme/.test(body.html) && /\$3,900|3,900/.test(body.html),
@@ -325,6 +326,15 @@ console.log('\n--- Path A gate: named pdf on my calendar, file lives in Drive --
     row.process.steps[0].params.hour === 10 &&
     row.process.steps[0].params.minute === 0,
     row.process && row.process.steps && row.process.steps[0]);
+  // artifactBody is blank here on purpose: there is no template. Do It must
+  // not treat that blank as "stop". The 0.9.23 live gate clicked Do It and
+  // the card never left Hold it because it did.
+  check('file-on-hold does not need a template body',
+    row.intent && FlowGoogleCloses.needsArtifactBody(row.intent.googleClose) === false);
+  check('file-on-task does not need a template body',
+    FlowGoogleCloses.needsArtifactBody({ personalClose: 'file-on-task', copyAttachment: false, templateName: null, kind: null }) === false);
+  check('file-on-hold artifact body stays blank (not a Doc to create)',
+    row.intent && FlowGoogleCloses.artifactBody(row.intent.googleClose, {}).blank === true);
   check('Drive-only: no attachment is still the hold',
     row.intent && row.intent.personalClose === 'file-on-hold' && row.intent.googleClose.copyAttachment === false);
 
@@ -416,6 +426,16 @@ console.log('\n--- Path A gate with close-families loaded, same order as Gmail -
     heIntent && heIntent.personalClose === 'file-on-hold' && heIntent.googleClose &&
     heIntent.googleClose.fileTerm === 'glance-pricing-q4.pdf' && heIntent.quiet !== 'family',
     heIntent && { personal: heIntent.personalClose, quiet: heIntent.quiet, family: heIntent.closeFamily, g: heIntent.googleClose });
+}
+
+console.log('\n--- Do It must not treat a file-on-hold as a blank template ---\n');
+{
+  const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
+  const gate = gmail.indexOf('FlowGoogleCloses.needsArtifactBody(ctx.intent.googleClose)');
+  const body = gmail.indexOf('FlowGoogleCloses.artifactBody(ctx.intent.googleClose');
+  check('Do It asks needsArtifactBody before it builds a template', gate !== -1 && body !== -1 && gate < body);
+  check('the old unconditional googleClose body gate is gone',
+    !/googleClose && !ctx\.intent\.googleClose\.copyAttachment && typeof FlowGoogleCloses/.test(gmail));
 }
 
 console.log('\n' + (failures ? failures + ' FAILED' : 'All passed'));

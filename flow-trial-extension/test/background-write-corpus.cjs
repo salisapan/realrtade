@@ -1045,6 +1045,67 @@ async function run() {
     check('a Calendar API error is not a success', apiFail.ok === false && !apiFail.written, apiFail);
   }
 
+  console.log('\n--- background.js: file-on-hold puts the one Drive file on the event ---\n');
+  {
+    const file = { id: 'pdf1', name: 'glance-pricing-q4.pdf', mimeType: 'application/pdf' };
+    const one = load({
+      stored: CONNECTED,
+      routes: [
+        [/\/drive\/v3\/files\?/, { reply: res(200, { files: [file] }) }],
+        [/\/calendars\/primary\/events$/, { reply: res(200, { id: 'ev_hold', htmlLink: 'https://calendar.google.com/event?eid=hold' }) }]
+      ]
+    });
+    const out = await attempt(one.fn('googleCalendarWrite')({
+      threadUrl: 'https://mail.google.com/mail/u/0/#inbox/thread1',
+      params: {
+        title: 'glance-pricing-q4.pdf',
+        dateIso: '2026-10-08',
+        hour: 10,
+        minute: 0,
+        requireTime: true,
+        fileTerm: 'glance-pricing-q4.pdf',
+        quote: 'Put the glance-pricing-q4.pdf file on my calendar tomorrow (Oct 8, 2026) at 10:00.'
+      }
+    }));
+    const postAt = one.bodies.findIndex((b) => b && b.summary);
+    const posted = postAt >= 0 ? one.bodies[postAt] : null;
+    check('one Drive file becomes a calendar event', out.ok === true && out.ref && out.ref.eventId === 'ev_hold', out);
+    check('the event is 8 Oct 2026 at 10:00',
+      posted && posted.start && posted.start.dateTime === '2026-10-08T10:00:00', posted);
+    check('the description carries the Drive link',
+      posted && posted.description.indexOf('File: glance-pricing-q4.pdf') !== -1 &&
+      posted.description.indexOf('https://drive.google.com/file/d/pdf1/view') !== -1,
+      posted && posted.description);
+    check('a missing file is a failure and does not create an event', await (async () => {
+      const none = load({
+        stored: CONNECTED,
+        routes: [
+          [/\/drive\/v3\/files\?/, { reply: res(200, { files: [] }) }],
+          [/\/calendars\/primary\/events$/, { reply: res(200, { id: 'should_not' }) }]
+        ]
+      });
+      const missed = await attempt(none.fn('googleCalendarWrite')({
+        params: { title: 'Hold', dateIso: '2026-10-08', hour: 10, minute: 0, requireTime: true, fileTerm: 'glance-pricing-q4.pdf' }
+      }));
+      return missed.ok === false && missed.reason === 'unclear' && /No single file/.test(missed.error || '') &&
+        !none.calls.some((c) => c.indexOf('POST /calendars/primary/events') === 0);
+    })());
+    check('two Drive files are a failure and do not create an event', await (async () => {
+      const many = load({
+        stored: CONNECTED,
+        routes: [
+          [/\/drive\/v3\/files\?/, { reply: res(200, { files: [file, { id: 'pdf2', name: 'copy-glance-pricing-q4.pdf', mimeType: 'application/pdf' }] }) }],
+          [/\/calendars\/primary\/events$/, { reply: res(200, { id: 'should_not' }) }]
+        ]
+      });
+      const both = await attempt(many.fn('googleCalendarWrite')({
+        params: { title: 'Hold', dateIso: '2026-10-08', hour: 10, minute: 0, requireTime: true, fileTerm: 'glance-pricing-q4.pdf' }
+      }));
+      return both.ok === false && both.reason === 'unclear' &&
+        !many.calls.some((c) => c.indexOf('POST /calendars/primary/events') === 0);
+    })());
+  }
+
   console.log('\n--- background.js: a named cancel deletes one event, and a named move patches it ---\n');
   {
     const start = { dateTime: '2026-09-18T15:00:00+00:00', timeZone: 'UTC' };
