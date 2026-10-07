@@ -6,6 +6,7 @@ updated: 2026-10-08
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-08 · #108 E2E rebased on 0.9.40 · Claude · CLAUDE.md "Testing and the live Gate", [[open-tasks]] row 56
 - 2026-10-08 · 0.9.40 = #106 normalize/recall + #110 rule fixes + outlookPageDiag default, on top of 0.9.39 · Claude · `CLAUDE.md` "Product facts and release order", [[open-tasks]] row 51
 - 2026-10-08 · 0.9.39 Gate: Outlook commitment Do It was a reply draft and OneDrive save stayed outlook:attachments-unread; panel task-only Do It now writes Microsoft To Do after read-back, and the mailbox check reads the attachment list before it plans. Google token fallback did not change the Microsoft grant. Live Gate passed on 2026-10-08 on cd524a30. · Claude · [[open-tasks]] rows 47, 49, 50
 - 2026-10-08 · 0.9.39 · Connect Google falls back to launchWebAuthFlow when Chrome sign-in is off (port of 0.7.5); Gate pending · Claude · [[open-tasks]] row 50

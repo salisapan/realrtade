@@ -77,6 +77,7 @@ Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the 
 cd flow-trial-extension
 for t in test/*-corpus.cjs; do node $t || echo "FAILED $t"; done          # 66 corpora, no network
 node test/follow-gmail-harness.cjs && node test/whatsapp-harness.cjs      # real content scripts in Chromium (takes ~10 minutes; SKIPPED without Playwright)
+npx playwright test                                                # headless unpacked-extension suite (CI: .github/workflows/glance-e2e.yml; live Gate stays, open-tasks row 56)
 cd ../flow-landing/netlify/functions/glance-assist
 for t in ladder model-router scrub-e2e style-hints; do node $t.test.cjs; done
 cd ../../../.. && python3 scripts/verify_trial_install.py                  # both packaging profiles, size guard, download handler

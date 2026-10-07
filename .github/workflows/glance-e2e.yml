@@ -1,0 +1,45 @@
+name: Glance headless E2E
+
+on:
+  pull_request:
+    branches:
+      - claude/install-uiux-pro-max-skill-a4agox
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: e2e (${{ matrix.tz }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        tz: [UTC, Asia/Jerusalem]
+    env:
+      TZ: ${{ matrix.tz }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: flow-trial-extension/package-lock.json
+      - name: Install dependencies
+        working-directory: flow-trial-extension
+        run: npm ci
+      - name: Install Chromium
+        working-directory: flow-trial-extension
+        run: npx playwright install --with-deps chromium
+      - name: Run the headless suite
+        working-directory: flow-trial-extension
+        run: xvfb-run -a npx playwright test
+      - name: Upload the Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: glance-e2e-${{ matrix.tz }}
+          path: |
+            flow-trial-extension/e2e-report/
+            flow-trial-extension/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
