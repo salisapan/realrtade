@@ -2280,6 +2280,43 @@
       actionsRow.appendChild(view);
     }
     undo.addEventListener('click', () => {
+      if (copy.connectorId === 'computerClose') {
+        undo.textContent = 'Undoing…';
+        undo.disabled = true;
+        const messageId = row.messageId;
+        const mark = typeof FlowStorage.markComputerUndone === 'function'
+          ? FlowStorage.markComputerUndone(messageId, copy.ref, row.threadId)
+          : Promise.resolve({ hit: false, stayedHandled: true });
+        mark.then((marked) => {
+          if (!marked || !marked.hit || marked.stayedHandled !== false) {
+            undo.textContent = copy.undoHint;
+            undo.disabled = false;
+            hint.hidden = false;
+            hint.textContent = 'Undo unavailable.';
+            hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
+            return;
+          }
+          if (messageId && typeof FlowCloseMemory !== 'undefined') {
+            FlowCloseMemory.forgetMessage(messageId).catch(() => {});
+          }
+          if (messageId) {
+            FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: messageId, reason: 'undo' })
+              .catch((e) => console.error('[Glance] failed to record an undo as a false-Do-It', e));
+          }
+          const Proof = typeof FlowProofOfClose !== 'undefined' ? FlowProofOfClose : null;
+          const line = marked.available && marked.inverseVerified
+            ? (Proof ? Proof.COMPUTER_UNDONE_LINE : copy.undoneLine)
+            : (marked.available
+              ? (Proof ? Proof.COMPUTER_ACTIVITY_CLEARED : 'Undone — Activity no longer says Handled.')
+              : (Proof ? Proof.COMPUTER_UNDO_UNAVAILABLE : 'Undo unavailable.'));
+          done.replaceChildren(el('span', 'flow-chip-label', line));
+        }).catch((e) => {
+          console.error('[Glance] failed to record an undone page step', e);
+          undo.textContent = copy.undoHint;
+          undo.disabled = false;
+        });
+        return;
+      }
       undo.textContent = 'Undoing…';
       undo.disabled = true;
       new Promise((resolve) => {
