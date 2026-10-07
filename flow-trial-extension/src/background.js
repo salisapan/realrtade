@@ -41,6 +41,7 @@ import './hybrid-sw.js';        // classic script: sets globalThis.FlowHybridSW
 import '../core/draft-reply.js';  // classic: sets globalThis.FlowDraftReply
 import '../core/outlook-config.js';  // classic: sets globalThis.FlowOutlookConfig
 import '../core/outlook-auth.js';    // classic: sets globalThis.FlowOutlookAuth
+import '../core/outlook-calendar.js'; // classic: sets globalThis.FlowOutlookCalendar
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -189,7 +190,7 @@ const SURFACES = {
     label: 'Outlook on the web',
     origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
     extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
-      'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
+      'core/outlook-calendar.js', 'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
     css: ['src/chip.css']
   }
 };
@@ -3179,7 +3180,8 @@ async function outlookFetch(url, init) {
 // The Outlook-on-the-web page runs the same planner as the panel (src/outlook.js). Its session comes from here
 // (flow:outlook-session: one renewal at a time, from this worker, with this extension's origin on the token request), and
 // its Graph reads go through here (flow:outlook-fetch) so the page never makes a cross-origin call of its own. Reads only:
-// Graph GETs under /me. Every write stays in flow:execute-action (outlookDraftWrite), which refuses anything that sends.
+// Graph GETs under /me. Writes stay in flow:execute-action: outlookDraftWrite (a draft, never a send)
+// and outlookCalendarWrite (one event, only when the token has Calendars.ReadWrite).
 const OUTLOOK_PROXY_GET = /^https:\/\/graph\.microsoft\.com\/v1\.0\/me([?\/(]|$)/;
 async function outlookProxyFetch(msg, sender) {
   if (!sender || sender.id !== chrome.runtime.id) return { ok: false, status: 0, error: 'foreign-sender' };
@@ -3352,6 +3354,75 @@ async function outlookDeleteDraft(draftId, prefer) {
   const headers = prefer || {};
   try { await outlookFetch(delUrl, { method: 'DELETE', headers: headers }); } catch (e) { /* already gone */ }
 }
+// One calendar event for a Family B file-on-hold. The Calendar checkbox asks
+// for Calendars.ReadWrite. A token that only has Calendars.Read stays quiet.
+// The body never includes attendees, so the write does not invite anyone.
+async function outlookCalendarWrite(p) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  if (!Cal || typeof Cal.eventBody !== 'function') return { ok: false, reason: 'not-configured' };
+  const session = await outlookSession({});
+  if (!session || !session.ok || !session.token) return { ok: false, reason: 'not-connected' };
+  if (!Cal.hasWriteScope(session.token.grantedScopes)) {
+    return { ok: false, reason: 'calendar-write-not-granted' };
+  }
+  const params = (p && p.params) || {};
+  const body = Cal.eventBody({
+    dateIso: params.dateIso,
+    hour: params.hour,
+    minute: params.minute,
+    timeZone: localTimeZone(),
+    fileName: params.fileName || params.fileTerm,
+    fileTerm: params.fileTerm,
+    fileUrl: params.fileUrl,
+    quote: params.quote
+  });
+  if (!body) return { ok: false, reason: 'unclear', error: 'No single file and time for this event.' };
+  // Graph fields posted as-is: subject, body.contentType Text, body.content
+  // (quote, "File: name", https link), start, end, showAs busy, attendees [].
+  // A non-empty attendees list or isOnlineMeeting would invite someone.
+  const invited = Array.isArray(body.attendees) ? body.attendees.length : (body.attendees ? 1 : 0);
+  if (invited > 0 || body.isOnlineMeeting) return { ok: false, reason: 'refused' };
+  const url = OUTLOOK_GRAPH + '/me/events';
+  outlookAssertNotSend(url);
+  const res = await outlookFetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (res.notConnected) return { ok: false, reason: 'not-connected' };
+  if (res.status === 401) return { ok: false, reason: 'not-connected' };
+  if (res.status === 403) return { ok: false, reason: 'calendar-write-not-granted' };
+  if (!res.ok) return { ok: false, reason: 'http-' + res.status };
+  let event = null;
+  try { event = await res.json(); } catch (e) { event = null; }
+  if (!event || typeof event.id !== 'string' || !event.id) {
+    return { ok: false, reason: 'error', error: 'Calendar did not confirm the event.' };
+  }
+  const summary = body.subject;
+  const when = Cal.whenLabel(params.dateIso, params.hour, params.minute);
+  return {
+    ok: true,
+    where: 'Outlook Calendar',
+    target: 'your calendar',
+    written: 'Calendar · ' + summary + (when ? ' · ' + when : ''),
+    ref: { eventId: event.id },
+    url: event.webLink || null
+  };
+}
+
+async function outlookCalendarUndo(ref) {
+  const Cal = globalThis.FlowOutlookCalendar;
+  const id = ref && typeof ref === 'object' ? ref.eventId : ref;
+  const req = Cal && Cal.undoRequest(id);
+  if (!req || req.method !== 'DELETE' || !/^\/me\/events\/[^/]+$/.test(req.path)) return { ok: false };
+  const url = OUTLOOK_GRAPH + req.path;
+  outlookAssertNotSend(url);
+  const del = await outlookFetch(url, { method: 'DELETE' });
+  if (del.notConnected) return { ok: false, reason: 'not-connected' };
+  if (del.ok || del.status === 204 || del.status === 404) return { ok: true, written: 'Calendar event removed.' };
+  return { ok: false, reason: 'http-' + (del.status || 0) };
+}
+
 async function outlookDraftUndo(ref, hint) {
   if (!ref) return { ok: false };
   const prefer = hint && hint.outlookImmutableId === true ? { Prefer: 'IdType="ImmutableId"' } : {};
@@ -3375,14 +3446,14 @@ const WRITERS = {
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
-  outlookDraft: outlookDraftWrite
+  outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
-  outlookDraft: outlookDraftUndo
+  outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo
 };
 
 async function connectorStatus() {

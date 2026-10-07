@@ -2279,7 +2279,8 @@
       const acts = el('div', 'log-acts');
       let undoNote = null;
       if (e.url) {
-        const a = el('a', 'ghost sm', e.connectorId === 'outlookDraft' ? 'Open draft' : 'View');
+        const link = e.connectorId === 'outlookCalendar' ? 'Open event' : (e.connectorId === 'outlookDraft' ? 'Open draft' : 'View');
+        const a = el('a', 'ghost sm', link);
         a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
         acts.appendChild(a);
       }
@@ -2295,9 +2296,12 @@
           u.disabled = true;
           const r = await send({ type: 'flow:undo-action', connectorId: e.connectorId, ref: e.ref });
           if (r && r.ok) {
-            const isOutlookDraft = e.connectorId === 'outlookDraft' || e.app === 'outlook';
+            const isOutlookDraft = e.connectorId === 'outlookDraft';
+            const isOutlookCalendar = e.connectorId === 'outlookCalendar';
             if (isOutlookDraft && typeof FlowStorage.markOutlookDraftUndone === 'function') {
               await FlowStorage.markOutlookDraftUndone(e.messageId, e.ref);
+            } else if (isOutlookCalendar && typeof FlowStorage.markOutlookCalendarUndone === 'function') {
+              await FlowStorage.markOutlookCalendarUndone(e.messageId, e.ref);
             } else {
               await FlowStorage.appendLog({ kind: 'undone', label: e.label, messageId: e.messageId, connectorId: e.connectorId, ref: e.ref, app: e.app });
             }
@@ -2306,6 +2310,8 @@
               if (isOutlookDraft) {
                 // Prepared draft undo is not a false close.
                 await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId, draftOnly: true });
+              } else if (isOutlookCalendar) {
+                await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId });
               } else {
                 await FlowStorage.recordCloseQuality({ kind: 'falseDoIt', messageId: e.messageId, reason: 'undo' });
                 await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: e.messageId });
