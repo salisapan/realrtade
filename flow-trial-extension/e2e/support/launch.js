@@ -84,6 +84,11 @@ function installE2EHooks() {
   function empty(status) {
     return new Response(null, { status: status });
   }
+  function graphFilterValue(search) {
+    const m = String(search || '').match(/(?:^|[?&])(?:\$|%24)filter=([^&]*)/i);
+    if (!m) return '';
+    try { return decodeURIComponent(m[1]); } catch (err) { return m[1]; }
+  }
 
   const origFetch = globalThis.fetch.bind(globalThis);
   globalThis.fetch = function glanceE2EFetch(input, init) {
@@ -225,7 +230,10 @@ function installE2EHooks() {
       if (path.indexOf('/me/mailFolders/sentitems/messages') >= 0) {
         return Promise.resolve(json(200, { value: scenario.sent || [] }));
       }
-      if (path.indexOf('/me/messages') >= 0 && parsed.search.indexOf('conversationId') >= 0) {
+      // conversationId in $select is not a conversation lookup. Only a $filter
+      // on conversationId is. A mailbox subject query selects conversationId
+      // and must fall through to the subject filter below.
+      if (path.indexOf('/me/messages') >= 0 && /conversationId/i.test(graphFilterValue(parsed.search))) {
         return Promise.resolve(json(200, { value: scenario.conversation || [] }));
       }
       if (path.indexOf('/me/mailboxSettings') >= 0) {
