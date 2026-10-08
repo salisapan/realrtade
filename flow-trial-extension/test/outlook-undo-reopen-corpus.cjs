@@ -86,9 +86,10 @@ async function main() {
 
   assert.strictEqual(await FlowStorage.hasTerminalOutcome('graph-AAA'), false, 'a draft write without fetchedBack is not a close');
   assert.strictEqual(FlowStorage.verifyGateFrom(await FlowStorage.get(), 'graph-AAA'), 'verifying', 'the read-back window holds the card');
+  const verifyingPending = await FlowStorage.getPending();
   assert.ok(
-    !(await FlowStorage.getPending()).some((e) => e.messageId === 'graph-AAA'),
-    'pending stays empty while the write is verifying'
+    verifyingPending.some((e) => e.messageId === 'graph-AAA' && e.verifying === true),
+    'the open list keeps the row while the write is verifying'
   );
   assert.strictEqual((await FlowStorage.getActiveOutlookReceipts()).length, 1, 'the draft receipt stays on the panel');
 

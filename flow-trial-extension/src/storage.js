@@ -595,9 +595,9 @@ const FlowStorage = (() => {
     const open = [];
     // Newest first (how the log is stored). A proved write or a dismissal
     // closes a message. A written row without fetchedBack does not: while
-    // the read-back is still in the window the ask stays off this list
-    // (the page says Verifying…), and a failed or timed-out read-back
-    // lists the shown row again. An id already sitting in
+    // the read-back is still in the window the shown row stays on this list
+    // marked verifying (the page says Verifying…), and a failed or timed-out
+    // read-back lists that row with Do It again. An id already sitting in
     // resolvedMessageIds must not hide that row.
     // Taking the first entry of any kind used to close it too, which meant
     // a Do It whose writes all FAILED — a 'clicked' row with no 'written'
@@ -627,7 +627,13 @@ const FlowStorage = (() => {
         resolved.add(entry.messageId);
         continue;
       }
-      if (verifying.has(entry.messageId)) continue;
+      if (verifying.has(entry.messageId)) {
+        if (entry.kind !== 'shown' || !entry.process) continue;
+        if (listed.has(entry.messageId)) continue;
+        listed.add(entry.messageId);
+        open.push(Object.assign({}, entry, { verifying: true }));
+        continue;
+      }
       if (!reopened.has(entry.messageId) && !unproved.has(entry.messageId) && resolved.has(entry.messageId)) continue;
       if (entry.kind !== 'shown' || !entry.process) continue;
       if (listed.has(entry.messageId)) continue;
@@ -640,6 +646,36 @@ const FlowStorage = (() => {
   async function getPending(now) {
     return getPendingFrom(await get(), now);
   }
+
+  // A step the person typed stays on the shown loop, marked added, so Loops
+  // draws it under Added after the card is gone.
+  const mergeAddedSteps = serialize(async function mergeAddedSteps(messageId, steps) {
+    if (!messageId) return { ok: false };
+    const added = (steps || []).filter((s) => s && s.added === true);
+    const state = await get();
+    function merge(row) {
+      if (!row || !row.process || String(row.messageId || '') !== String(messageId)) return row;
+      const base = (row.process.steps || []).filter((s) => s && s.added !== true);
+      return Object.assign({}, row, {
+        process: Object.assign({}, row.process, { steps: base.concat(added) })
+      });
+    }
+    let hit = false;
+    const log = (state.log || []).map((row) => {
+      if (!row || row.kind !== 'shown') return row;
+      const next = merge(row);
+      if (next !== row) hit = true;
+      return next;
+    });
+    const scan = (state.stillOpenScan || []).map((row) => {
+      const next = merge(row);
+      if (next !== row) hit = true;
+      return next;
+    });
+    if (!hit) return { ok: true, changed: false };
+    await set({ log: log, stillOpenScan: scan });
+    return { ok: true, changed: true };
+  });
 
   // A decision already recorded under a different id for the same matter
   // (the inbox scan's scan:<threadId> id, once the real message is open).
@@ -690,8 +726,11 @@ const FlowStorage = (() => {
     const scan = [];
     for (const raw of (state && state.stillOpenScan) || []) {
       const c = FlowStillOpen.fromLogEntry(raw);
-      if (!c.messageId || verifyingIds.has(c.messageId)) continue;
-      if (resolved.has(c.messageId) && !reopenedIds.has(c.messageId) && !unprovedIds.has(c.messageId)) continue;
+      if (!c.messageId) continue;
+      if (verifyingIds.has(c.messageId)) {
+        if (seenMsg.has(c.messageId)) continue;
+        c.verifying = true;
+      } else if (resolved.has(c.messageId) && !reopenedIds.has(c.messageId) && !unprovedIds.has(c.messageId)) continue;
       if (seenMsg.has(c.messageId)) continue;
       const key = FlowStillOpen.promiseKey(c);
       if (key && seenKey.has(key)) continue;
@@ -1763,7 +1802,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };

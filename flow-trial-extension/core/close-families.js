@@ -893,10 +893,16 @@ const FlowCloseFamilies = (() => {
   // completed act, or a status question. The bare handoff regex cannot
   // see "don't" or "maybe" in front of "could you", and a chip there is a
   // wrong close. A past day on the thing being asked for is not this.
+  function parkingPermitAsk(text) {
+    const t = String(text || '');
+    return /\bparking permits?\b/i.test(t) && /\b(?:please|can you|could you|would you|send|need|renew|attach|forward)\b/i.test(t);
+  }
+
   function askBlocked(text) {
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
     text = stripQuotedAsks(text);
-    if (NOISE_EN.test(text) || NOISE_HE.test(text)) return true;
+    // A parking-permit ask is the work. An unsubscribe footer does not make it noise.
+    if ((NOISE_EN.test(text) || NOISE_HE.test(text)) && !parkingPermitAsk(text)) return true;
     const cue = /\b(?:can you|could you|would you|please|kindly|send|forward|chase|nudge)\b/i;
     let saw = false;
     let open = false;

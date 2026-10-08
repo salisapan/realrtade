@@ -141,8 +141,14 @@ const FlowStepKit = (() => {
 
   function rowsHTML(rows) {
     let html = '';
+    let suggestedHead = false;
     let addedHead = false;
     (rows || []).forEach(function (a) {
+      const suggested = a && !a.added && (a.suggested || a.tag === 'Suggested');
+      if (suggested && !suggestedHead) {
+        suggestedHead = true;
+        html += '<li class="act-section" data-glance-section="suggested"><span class="acts-label">Suggested</span></li>';
+      }
       if (a && a.added && !addedHead) {
         addedHead = true;
         html += '<li class="act-section" data-glance-section="added"><span class="acts-label">Added</span></li>';

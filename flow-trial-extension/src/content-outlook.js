@@ -2399,29 +2399,80 @@
     return null;
   }
 
-  async function recentInbox() {
-    const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-    const select = '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
-    const order = '$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc');
-    const filteredPath = '/me/mailFolders/inbox/messages?' + order + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + select;
-    const plainPath = '/me/mailFolders/inbox/messages?' + order + select;
-    const filtered = await graphCall(filteredPath, 'suggest-inbox', null);
-    lastGraphStatus = graphStatus(filtered) || lastGraphStatus;
-    if (filtered && filtered.ok) {
-      try {
-        const body = JSON.parse(filtered.body || '{}');
-        if (Array.isArray(body.value)) return body.value;
-      } catch (e) { /* plain list next */ }
+  // Whole mailbox, not one inbox page. Above this the set is incomplete
+  // and the file stays unresolved. A page is 50. Exactly 200 with no
+  // nextLink is complete. A nextLink still waiting, or a page that would
+  // pass 200, is unresolved. nextLink is followed only on graph.microsoft.com.
+  const MAILBOX_MATCH_CEILING = 200;
+  const MAILBOX_PAGE = 50;
+  let cachedTimeFormat = null;
+
+  function odataQuote(value) {
+    return String(value || '').replace(/'/g, "''");
+  }
+
+  function graphNextPath(next) {
+    let u;
+    try { u = new URL(String(next || '')); } catch (e) { return null; }
+    if (u.protocol !== 'https:' || u.hostname !== 'graph.microsoft.com') return null;
+    let p = u.pathname || '';
+    if (p.indexOf('/v1.0') === 0) p = p.slice('/v1.0'.length);
+    if (p.indexOf('/me/') !== 0) return null;
+    return p + u.search;
+  }
+
+  function isConversationId(id) {
+    return /^A[AQ]Qk/i.test(String(id || ''));
+  }
+
+  async function mailboxTimeFormat() {
+    if (cachedTimeFormat != null) return cachedTimeFormat;
+    const r = await graphCall('/me/mailboxSettings?$select=timeFormat', 'suggest-time', null);
+    if (!r || !r.ok) { cachedTimeFormat = ''; return ''; }
+    try {
+      const body = JSON.parse(r.body || '{}');
+      cachedTimeFormat = String(body.timeFormat || '');
+    } catch (e) { cachedTimeFormat = ''; }
+    return cachedTimeFormat;
+  }
+
+  function pageHourCycle() {
+    try {
+      const lang = document.documentElement && document.documentElement.lang;
+      const opt = new Intl.DateTimeFormat(lang || undefined, { hour: 'numeric' }).resolvedOptions();
+      return (opt && opt.hourCycle) || '';
+    } catch (e) { return ''; }
+  }
+
+  // from AND subject, every page, until nextLink ends or the ceiling.
+  // A failed query is not replaced with one inbox page.
+  async function mailboxBySubject(pane) {
+    const from = String((pane && pane.senderEmail) || '').trim();
+    const subject = String((pane && pane.subject) || '').trim();
+    if (!from || !subject) return { error: 'missing' };
+    const filter = "from/emailAddress/address eq '" + odataQuote(from) + "' and subject eq '" + odataQuote(subject) + "'";
+    const select = 'id,conversationId,receivedDateTime,from,subject,internetMessageId';
+    let path = '/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=' + MAILBOX_PAGE + '&$select=' + encodeURIComponent(select);
+    const all = [];
+    let pages = 0;
+    while (path && pages < 8) {
+      pages++;
+      const r = await graphCall(path, 'suggest-mailbox', null);
+      lastGraphStatus = graphStatus(r) || lastGraphStatus;
+      if (!r || !r.ok) return { error: 'graph', status: graphStatus(r) || 0 };
+      let body = null;
+      try { body = JSON.parse(r.body || '{}'); } catch (e) { return { error: 'graph', status: 0 }; }
+      const rows = body && Array.isArray(body.value) ? body.value : [];
+      if (all.length + rows.length > MAILBOX_MATCH_CEILING) return { error: 'ceiling' };
+      for (let i = 0; i < rows.length; i++) all.push(rows[i]);
+      const next = body && body['@odata.nextLink'];
+      if (!next) return { rows: all };
+      if (all.length >= MAILBOX_MATCH_CEILING) return { error: 'ceiling' };
+      const parsed = graphNextPath(next);
+      if (!parsed) return { error: 'nextlink' };
+      path = parsed;
     }
-    const plain = await graphCall(plainPath, 'suggest-inbox-plain', null);
-    lastGraphStatus = graphStatus(plain) || lastGraphStatus;
-    if (plain && plain.ok) {
-      try {
-        const body = JSON.parse(plain.body || '{}');
-        if (Array.isArray(body.value)) return body.value;
-      } catch (e) { return null; }
-    }
-    return null;
+    return { error: 'ceiling' };
   }
 
   function suggestFail(reason, detail) {
@@ -2442,60 +2493,79 @@
   }
 
   // A message id in the address is that message. A conversation address links
-  // only through uniqueGraphMessage. Subject and "newest" are not a link.
+  // only through uniqueGraphMessage, against the whole mailbox. Subject and
+  // "newest" are not a link. A failed attachment read stays unknown.
   // Each miss names the stage: no id, Graph status, no candidate, unresolved, empty list.
   async function suggestFiles(pane) {
     const id = pane.itemId || null;
     const wantConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.conversationId) : '';
     const wantNet = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.internetMessageId) : '';
-    if (!id && !wantConv && !wantNet) return suggestFail('suggest:no-message-id');
-    if (id) {
+    if (!id && !wantConv && !wantNet && !(pane && pane.subject)) return suggestFail('suggest:no-message-id');
+    if (id && !isConversationId(id)) {
       const direct = await attachmentListFor(id);
-      if (Array.isArray(direct)) return direct;
-      if (!wantConv && !wantNet) {
+      if (Array.isArray(direct)) return { files: direct, messageId: id };
+      if (!wantConv && !wantNet && !(pane && pane.subject && pane.senderEmail)) {
         const st = lastGraphStatus;
         if (st && st !== 200) return suggestFail('suggest:graph-' + st);
         return suggestFail('suggest:attachments-unread');
       }
     }
     if (typeof FlowOwaParse === 'undefined' || typeof FlowOwaParse.uniqueGraphMessage !== 'function') return suggestFail('suggest:unresolved');
-    const list = await recentInbox();
-    if (!Array.isArray(list)) {
-      const st = lastGraphStatus;
+    if (!pane || !pane.senderEmail || !pane.subject) {
+      return suggestFail('suggest:unresolved', 'missing-sender-or-subject');
+    }
+    const found = await mailboxBySubject(pane);
+    if (!found || found.error === 'ceiling') return suggestFail('suggest:unresolved', 'ceiling=' + MAILBOX_MATCH_CEILING);
+    if (found.error === 'nextlink') return suggestFail('suggest:unresolved', 'nextlink-offhost');
+    if (found.error === 'missing') return suggestFail('suggest:unresolved', 'missing-sender-or-subject');
+    if (found.error || !Array.isArray(found.rows)) {
+      const st = found.status || lastGraphStatus;
       return suggestFail(st ? ('suggest:graph-' + st) : 'suggest:graph-0');
     }
+    const list = found.rows;
     const hits = [];
     for (let i = 0; i < list.length; i++) {
       const m = list[i];
-      if (!m || !m.id) continue;
+      if (!m || !m.id || isConversationId(m.id)) continue;
       const convOk = wantConv && FlowOwaParse.canonId(m.conversationId) === wantConv;
       const netOk = wantNet && FlowOwaParse.canonId(m.internetMessageId) === wantNet;
       if (convOk || netOk || sameSubjectRow(pane, m)) hits.push(m);
     }
-    if (!hits.length) return suggestFail('suggest:no-candidate', 'inbox=' + list.length + ' subject=' + String((pane && pane.subject) || '').slice(0, 80));
-    const shortlist = hits.slice(0, 8);
+    if (!hits.length) return suggestFail('suggest:no-candidate', 'mailbox=' + list.length + ' subject=' + String(pane.subject || '').slice(0, 80));
     const enriched = [];
     let unreadStatus = 0;
     let anyRead = false;
-    for (let i = 0; i < shortlist.length; i++) {
-      const rows = await attachmentListFor(shortlist[i].id);
+    let anyUnread = false;
+    for (let i = 0; i < hits.length; i++) {
+      const rows = await attachmentListFor(hits[i].id);
       if (!Array.isArray(rows)) {
         unreadStatus = lastGraphStatus || unreadStatus;
+        anyUnread = true;
+        enriched.push(Object.assign({}, hits[i], { attachmentsUnread: true, attachments: [] }));
         continue;
       }
       anyRead = true;
-      enriched.push(Object.assign({}, shortlist[i], { attachments: rows }));
+      enriched.push(Object.assign({}, hits[i], { attachments: rows }));
     }
     if (!anyRead) {
       if (unreadStatus && unreadStatus !== 200) return suggestFail('suggest:graph-' + unreadStatus);
       return suggestFail('suggest:attachments-unread');
     }
-    const linked = FlowOwaParse.uniqueGraphMessage(pane, enriched);
-    if (!linked || !linked.message) return suggestFail((linked && linked.reason) || 'suggest:unresolved', (linked && linked.detail) || ('candidates=' + enriched.length));
+    const clockPane = Object.assign({}, pane, {
+      timeFormat: pane.timeFormat || await mailboxTimeFormat(),
+      hourCycle: pane.hourCycle || pageHourCycle(),
+      pageHour24: pane.pageHour24 === true || (typeof FlowOwaParse.pageProves24h === 'function' && FlowOwaParse.pageProves24h(document))
+    });
+    const linked = FlowOwaParse.uniqueGraphMessage(clockPane, enriched);
+    if (!linked || !linked.message) {
+      const why = (linked && linked.detail) || '';
+      if (anyUnread && /attachments-unknown/.test(why)) return suggestFail('suggest:unresolved', why || 'attachments-unknown');
+      return suggestFail((linked && linked.reason) || 'suggest:unresolved', why || ('candidates=' + enriched.length));
+    }
     const files = linked.message.attachments;
-    if (!Array.isArray(files)) return suggestFail('suggest:attachments-unread');
+    if (!Array.isArray(files) || linked.message.attachmentsUnread) return suggestFail('suggest:attachments-unread');
     if (!files.length) return suggestFail('suggest:attachments-empty');
-    return files;
+    return { files: files, messageId: linked.message.id };
   }
 
   // A mail that already has a card keeps suggest:other-card in the local log.
@@ -2571,6 +2641,7 @@
       process: process,
       intent: { label: rowCopy, lang: he ? 'he' : 'en' },
       messageId: (pane && (pane.itemId || pane.conversationId)) || '',
+      graphMessageId: (pane && pane.graphMessageId) || '',
       itemId: pane && pane.itemId,
       pathId: pane && pane.pathId,
       conversationId: pane && pane.conversationId,
@@ -2607,7 +2678,8 @@
           connectorId: 'attachmentSave',
           params: step.params || {},
           messageId: ctx.messageId,
-          outlookIncomingId: ctx.messageId,
+          graphMessageId: ctx.graphMessageId || '',
+          outlookIncomingId: ctx.graphMessageId || ctx.itemId || ctx.messageId,
           label: 'Save the file?',
           subject: ctx.subject || '',
           text: ctx.bodyText || ''
@@ -2697,12 +2769,16 @@
     const showed = Boolean(sameChip);
     const messageId = pane.itemId || pane.conversationId || pane.pathId || '';
     let files = null;
+    let graphMessageId = '';
     let stageReason = '';
     let read = null;
     try {
       read = await suggestFiles(pane);
       if (read && read.unresolved) stageReason = read.reason || 'suggest:unresolved';
-      else files = read;
+      else if (read && Array.isArray(read.files)) {
+        files = read.files;
+        graphMessageId = read.messageId || '';
+      } else files = read;
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
       await appendSuggestLog({ messageId: messageId, reason: stageReason, surface: 'outlook' });
@@ -2765,7 +2841,7 @@
       fileCount: decision.fileCount, target: decision.target
     });
     if (decision.step && decision.eligible) {
-      const host = paintSuggestCard(pane, decision, files);
+      const host = paintSuggestCard(Object.assign({}, pane, { graphMessageId: graphMessageId }), decision, files);
       if (host) {
         lastOutcome = 'card';
         await clearReason(pane);
@@ -2807,8 +2883,11 @@
     const open = await FlowStorage.getStillOpen();
     if (!open || !open.length) return null;
     const ids = messageIdsOf(pane);
+    const clean = (typeof FlowOwaParse.stripReadingChrome === 'function')
+      ? FlowOwaParse.stripReadingChrome(pane.text)
+      : pane.text;
     const probe = {
-      text: pane.text,
+      text: clean,
       subject: pane.subject,
       sender: { email: pane.senderEmail, name: pane.senderName },
       threadId: pane.conversationId || '',
@@ -2823,6 +2902,9 @@
       if (ids.some((id) => rowIds.indexOf(String(id)) >= 0)) return row;
       const rowKey = FlowStillOpen.promiseKey(row);
       if (key && rowKey && rowKey === key) return row;
+      const rowText = String(row.text || '');
+      const live = String(clean || '');
+      if (live.length >= 24 && rowText.length >= 24 && (live.indexOf(rowText) >= 0 || rowText.indexOf(live) >= 0)) return row;
     }
     return null;
   }

@@ -1,7 +1,7 @@
 {
   "name": "glance-e2e",
   "private": true,
-  "version": "0.9.46",
+  "version": "0.9.47",
   "description": "Headless regression package for the Glance extension. Not shipped in the install zip.",
   "scripts": {
     "e2e": "playwright test"

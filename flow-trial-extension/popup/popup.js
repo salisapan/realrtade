@@ -95,7 +95,7 @@
   wirePro();
   wireLoopView();
   renderConnectors();
-  renderStatusPill();
+  await renderStatusPill();
   await renderLog();
   await renderOpen();
   await renderWaiting();
@@ -248,7 +248,7 @@
     status = await send({ type: 'flow:connector-status' });
     state = await FlowStorage.get();
     renderConnectors();
-    renderStatusPill();
+    await renderStatusPill();
     renderSetupDone();
   }
 
@@ -267,13 +267,29 @@
     }
   }
 
-  function renderStatusPill() {
+  async function renderStatusPill() {
     const pill = document.getElementById('statusPill');
-    const live = Object.keys(status || {}).filter((k) => status[k].connected);
-    if (!live.length) { pill.textContent = 'Not connected'; pill.className = 'ver'; return; }
-    const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
-    pill.textContent = (conn ? conn.label : live[0]) + ' connected';
-    pill.className = 'ver on';
+    if (!pill) return;
+    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
+    if (live.length) {
+      const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
+      pill.textContent = (conn ? conn.label : live[0]) + ' connected';
+      pill.className = 'ver on';
+      return;
+    }
+    let outlookOn = false;
+    try {
+      const o = outlook();
+      const st = o && typeof o.status === 'function' ? await o.status() : null;
+      outlookOn = Boolean(st && st.connected && !st.needsSignIn);
+    } catch (e) { outlookOn = false; }
+    if (outlookOn) {
+      pill.textContent = 'Outlook connected';
+      pill.className = 'ver on';
+      return;
+    }
+    pill.textContent = 'Not connected';
+    pill.className = 'ver';
   }
 
   /* ---------------------------------------------------------- connectors */
@@ -782,7 +798,12 @@
       intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
       lang: entry.intent && entry.intent.lang,
       surface: entry.app || 'gmail',
-      onDoIt: function () { closeStillOpenFromPopup(entry); }
+      onDoIt: function () { closeStillOpenFromPopup(entry); },
+      onChange: function (next) {
+        if (!entry.messageId || typeof FlowStorage.mergeAddedSteps !== 'function' || typeof FlowStepList.liveStepsFrom !== 'function') return;
+        const picked = FlowStepList.liveStepsFrom(next, entry.app || 'gmail');
+        FlowStorage.mergeAddedSteps(entry.messageId, picked).catch(function () {});
+      }
     });
   }
 
@@ -810,6 +831,12 @@
       if (ag.label) item.appendChild(el('span', 'log-age ' + ag.level, ag.label));
     }
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
+
+    if (entry.verifying) {
+      const he = /[\u0590-\u05FF]/.test(String(entry.text || '') + String(entry.subject || ''));
+      item.appendChild(el('span', 'log-where', he ? 'מאמת' : 'Verifying…'));
+      return item;
+    }
 
     const kit = mountPanelSteps(item, entry);
     const acts = el('div', 'log-acts');

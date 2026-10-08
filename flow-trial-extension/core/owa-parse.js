@@ -258,10 +258,31 @@ const FlowOwaParse = (() => {
     return Boolean(convOk || netOk);
   }
 
-  // One subject (+ sender, when both sides have it) is that mail, even when
-  // the clock or the size could not be read. Several mails with that subject
-  // are split by the minute and the attachment. A file that does not match
-  // is never the one saved. detail is what was compared, not file content.
+  // One subject and sender is not enough. That mail links only when the
+  // query already covered the mailbox and one confirming signal holds: the
+  // open conversation or internet id, or a filename visible on the page that
+  // is on that message. An empty chip with no id stays unresolved. A failed
+  // attachment read is unknown, not an empty list. Several mails are split
+  // by the minute and the attachment, after an unmarked 1–11 hour is settled.
+  // A file that does not match is never the one saved.
+  function proved24h(pane) {
+    if (!pane) return false;
+    if (pane.timeFormat === 'HH:mm') return true;
+    const cycle = String(pane.hourCycle || '');
+    if (cycle === 'h23' || cycle === 'h24') return true;
+    return pane.pageHour24 === true;
+  }
+
+  function altMinuteOf(pane, minute) {
+    if (!pane) return '';
+    if (pane.clockAlt) return minuteKey(pane.clockAlt) || '';
+    if (!minute || !pane.receivedDateTime) return '';
+    const d = new Date(pane.receivedDateTime);
+    if (isNaN(d.getTime())) return '';
+    d.setHours(d.getHours() + 12);
+    return minuteKey(d.toISOString()) || '';
+  }
+
   function uniqueGraphMessage(pane, messages) {
     const list = (messages || []).filter(Boolean);
     const minute = minuteKey(pane && (pane.receivedDateTime || pane.date)) || '';
@@ -270,19 +291,47 @@ const FlowOwaParse = (() => {
       if (!message) return { message: null, reason: 'suggest:unresolved', detail: detail };
       return { message: message, reason: null, detail: detail };
     }
+    function confirmOne(one, why) {
+      if (!one) return pack(null, why || 'no-hit');
+      if (one.attachmentsUnread) return pack(null, 'attachments-unknown');
+      const rel = fileRelation(pane && pane.attachments, one.attachments || one.files);
+      if (rel === 'no') return pack(null, (why || 'subject-unique') + ' file-disagree');
+      if (idHit(pane, one) || rel === 'yes') return pack(one, why || 'subject-unique');
+      return pack(null, (why || 'subject-unique') + ' unconfirmed');
+    }
     const sub = subjectKey(pane && pane.subject);
     const bySubject = sub ? list.filter((m) => sameSubject(pane, m)) : [];
-    if (bySubject.length === 1) {
-      const rel = fileRelation(pane && pane.attachments, bySubject[0].attachments || bySubject[0].files);
-      if (rel === 'no') return pack(null, 'subject-unique file-disagree');
-      return pack(bySubject[0], 'subject-unique');
-    }
+    if (bySubject.length === 1) return confirmOne(bySubject[0], 'subject-unique');
     let pool = bySubject.length ? bySubject : list.filter((m) => idHit(pane, m));
     if (!pool.length) return pack(null, 'no-hit');
+    const unread = pool.filter((m) => m.attachmentsUnread);
+    if (unread.length) {
+      const idMatched = pool.filter((m) => idHit(pane, m) && !m.attachmentsUnread);
+      if (idMatched.length === 1) pool = idMatched;
+      else return pack(null, 'attachments-unknown');
+    }
     // A clock was on the page and did not parse (a one-digit hour with no
     // AM/PM). Several mails stay unresolved. The file must not guess.
     if (pane && pane.clockUnread && pool.length > 1) return pack(null, 'clock-unread');
-    if (minute) {
+    // "10:05" with no marker is 10:05 only when 22:05 is not also a candidate,
+    // or when the mailbox is known to be 24-hour. The file must not pick the hour.
+    if (pane && pane.clockAmbiguous && minute) {
+      const alt = altMinuteOf(pane, minute);
+      const hasLit = pool.some((m) => minuteKey(m.receivedDateTime) === minute);
+      const hasAlt = Boolean(alt) && pool.some((m) => minuteKey(m.receivedDateTime) === alt);
+      if (hasLit && hasAlt && !proved24h(pane)) return pack(null, 'hour-ambiguous');
+      if (proved24h(pane)) {
+        const timed = pool.filter((m) => minuteKey(m.receivedDateTime) === minute);
+        if (!timed.length) return pack(null, 'minute-miss');
+        pool = timed;
+      } else if (hasLit && !hasAlt) {
+        pool = pool.filter((m) => minuteKey(m.receivedDateTime) === minute);
+      } else if (!hasLit && hasAlt) {
+        pool = pool.filter((m) => minuteKey(m.receivedDateTime) === alt);
+      } else if (!hasLit && !hasAlt) {
+        return pack(null, 'minute-miss');
+      }
+    } else if (minute) {
       const timed = pool.filter((m) => minuteKey(m.receivedDateTime) === minute);
       if (!timed.length) return pack(null, 'minute-miss');
       pool = timed;
@@ -517,6 +566,7 @@ const FlowOwaParse = (() => {
     if (!subject && !body) return null;
     const ids = urlIds(href || (typeof location !== 'undefined' ? location.href : ''));
     const whoTo = recipientsOf(container, bodyRoot, opts);
+    const when = receivedInfo(container, bodyRoot);
     return {
       itemId: ids.itemId,
       conversationId: ids.conversationId,
@@ -525,13 +575,29 @@ const FlowOwaParse = (() => {
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
       senderName: senderName.slice(0, 80),
-      text: body,
+      text: stripReadingChrome(body),
       to: whoTo.to,
       cc: whoTo.cc,
-      receivedDateTime: receivedInfo(container, bodyRoot).iso,
-      clockUnread: receivedInfo(container, bodyRoot).unread,
+      receivedDateTime: when.iso,
+      clockUnread: when.unread,
+      clockAmbiguous: when.ambiguous === true,
+      clockAlt: when.alt || '',
+      pageHour24: pageProves24h(d),
+      hourCycle: hourCycleOf(d),
       attachments: attachmentsOf(container, bodyRoot)
     };
+  }
+
+  // OWA's "this message is in English" line is chrome, not the commitment.
+  function stripReadingChrome(text) {
+    return String(text || '')
+      .replace(/הודעה זו נמצאת ב[-\u05BE\s]*אנגלית\.?/g, ' ')
+      .replace(/this message is in english\.?/gi, ' ')
+      .replace(/^\s*תרגם(?:\s+הודעה)?\s*$/gim, ' ')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim();
   }
 
   function emailsIn(text) {
@@ -568,7 +634,10 @@ const FlowOwaParse = (() => {
       if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
       const t = textOf(n).replace(/\s+/g, ' ').trim();
       if (!t || t.length > 400) continue;
-      let bucket = /^\s*(to|אל)\b/i.test(t) ? to : (/^\s*(cc|עותק)\b/i.test(t) ? cc : null);
+      // \b is ASCII-only, so "אל sali sapan" in one text node is not a To line
+      // under (to|אל)\b. Hebrew keeps an explicit boundary. English keeps \b.
+      let bucket = (/^\s*to\b/i.test(t) || /^\s*אל(?:\s|:|$)/.test(t)) ? to
+        : ((/^\s*cc\b/i.test(t) || /^\s*עותק(?:\s|:|$)/.test(t)) ? cc : null);
       let target = n;
       if (!bucket && /^(to|אל|cc|עותק)$/i.test(t)) {
         bucket = /^(to|אל)$/i.test(t) ? to : cc;
@@ -604,8 +673,10 @@ const FlowOwaParse = (() => {
   }
 
   // A meridian wins: 12 AM is 00, 12 PM is 12, and any other PM hour adds 12.
-  // With no marker, a two-digit hour 00–23 is the 24-hour clock OWA prints
-  // (14:01, 12:53, 00:46, 03:05). A one-digit hour with no marker is not guessed.
+  // With no marker, a two-digit hour is read as that number (03:05 stays 03,
+  // 14:01 stays 14, 00 and 12 are unambiguous). Whether 10:05 also means 22:05
+  // is decided later, only when both hours are in the candidate pool.
+  // A one-digit hour with no marker is not guessed.
   function hourOnClock(hourText, meridian) {
     const token = String(hourText == null ? '' : hourText);
     if (!/^\d{1,2}$/.test(token)) return null;
@@ -649,6 +720,53 @@ const FlowOwaParse = (() => {
     return d.toISOString();
   }
 
+  // The literal clock, plus the other half of an unmarked 1–11 hour.
+  // 00, 12, 13–23, and any AM/PM or Hebrew meridian are not ambiguous.
+  // A one-digit hour with no marker is unread, not a guess.
+  function clockPair(text) {
+    const raw = String(text || '');
+    const iso = clockToIso(raw);
+    const meridian = meridianOf(raw.replace(BIDI_RE, ' '));
+    const time = raw.replace(BIDI_RE, ' ').match(/(\d{1,2}):(\d{2})/);
+    if (!iso) {
+      return { iso: '', altIso: '', ambiguous: false, unread: Boolean(time) };
+    }
+    if (!time || meridian) return { iso: iso, altIso: '', ambiguous: false, unread: false };
+    const token = time[1];
+    const hour = +token;
+    if (token.length < 2 || hour < 1 || hour > 11) {
+      return { iso: iso, altIso: '', ambiguous: false, unread: false };
+    }
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return { iso: iso, altIso: '', ambiguous: false, unread: false };
+    d.setHours(d.getHours() + 12);
+    return { iso: iso, altIso: d.toISOString(), ambiguous: true, unread: false };
+  }
+
+  // Another unmarked hour of 13–23, or 00, means this page is a 24-hour clock.
+  function pageProves24h(doc) {
+    const d = doc || (typeof document !== 'undefined' ? document : null);
+    if (!d) return false;
+    let text = '';
+    if (d.body && (d.body.innerText || d.body.textContent)) text = d.body.innerText || d.body.textContent;
+    else if (typeof d.textContent === 'string') text = d.textContent;
+    const re = /(?:^|[^\d])(\d{2}):(\d{2})(?!\d)/g;
+    let m;
+    while ((m = re.exec(String(text || '')))) {
+      const hour = +m[1];
+      if (hour === 0 || (hour >= 13 && hour <= 23)) return true;
+    }
+    return false;
+  }
+
+  function hourCycleOf(doc) {
+    try {
+      const lang = doc && doc.documentElement && doc.documentElement.getAttribute && doc.documentElement.getAttribute('lang');
+      const opt = new Intl.DateTimeFormat(lang || undefined, { hour: 'numeric' }).resolvedOptions();
+      return (opt && opt.hourCycle) || '';
+    } catch (e) { return ''; }
+  }
+
   function headerTextNodes(container, bodyRoot) {
     const nodes = container.querySelectorAll('time, div, span, p');
     const out = [];
@@ -664,30 +782,31 @@ const FlowOwaParse = (() => {
   }
 
   function receivedInfo(container, bodyRoot) {
-    const none = { iso: '', unread: false };
+    const none = { iso: '', unread: false, ambiguous: false, alt: '' };
     if (!container || !container.querySelector) return none;
     const marked = container.querySelector('[data-received]');
     if (marked && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(marked))) {
       const raw = marked.getAttribute('data-received') || '';
-      if (minuteKey(raw)) return { iso: raw, unread: false };
+      if (minuteKey(raw)) return { iso: raw, unread: false, ambiguous: false, alt: '' };
     }
     const timed = container.querySelector('time[datetime]');
     if (timed && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(timed))) {
       const raw = timed.getAttribute('datetime') || '';
-      if (minuteKey(raw)) return { iso: raw, unread: false };
+      if (minuteKey(raw)) return { iso: raw, unread: false, ambiguous: false, alt: '' };
     }
     const bits = [];
     let sawClock = false;
     const nodes = headerTextNodes(container, bodyRoot);
     for (let i = 0; i < nodes.length; i++) {
       if (/\d{1,2}:\d{2}/.test(nodes[i].text)) sawClock = true;
-      const iso = clockToIso(nodes[i].text);
-      if (iso) return { iso: iso, unread: false };
+      const pair = clockPair(nodes[i].text);
+      if (pair.iso) return { iso: pair.iso, unread: false, ambiguous: pair.ambiguous, alt: pair.altIso || '' };
       if (sawClock || /\d{1,2}[./]\d{1,2}[./]\d{4}/.test(nodes[i].text)) bits.push(nodes[i].text);
     }
-    const joined = clockToIso(bits.join(' '));
+    const joined = clockPair(bits.join(' '));
     if (/\d{1,2}:\d{2}/.test(bits.join(' '))) sawClock = true;
-    return { iso: joined || '', unread: Boolean(sawClock && !joined) };
+    if (joined.iso) return { iso: joined.iso, unread: false, ambiguous: joined.ambiguous, alt: joined.altIso || '' };
+    return { iso: '', unread: Boolean(sawClock), ambiguous: false, alt: '' };
   }
 
   function receivedOf(container, bodyRoot) {
@@ -744,7 +863,7 @@ const FlowOwaParse = (() => {
     return out;
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, clockToIso, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

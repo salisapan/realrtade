@@ -900,7 +900,10 @@ async function run() {
     await FlowStorage.appendLog({ kind: 'written', messageId: 'vm' });
     check('a write with no fetchedBack is verifying', FlowStorage.verifyGateFrom(await FlowStorage.get(), 'vm') === 'verifying');
     check('verifying is not terminal', (await FlowStorage.hasTerminalOutcome('vm')) === false);
-    check('verifying holds the loop off the open list', (await FlowStorage.getPending()).length === 0);
+    const verifyingRows = await FlowStorage.getPending();
+    check('verifying stays on the open list',
+      verifyingRows.length === 1 && verifyingRows[0].messageId === 'vm' && verifyingRows[0].verifying === true,
+      verifyingRows.map((e) => ({ id: e.messageId, verifying: e.verifying })));
 
     store = {};
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'vt', process: proc });

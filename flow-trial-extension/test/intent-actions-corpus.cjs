@@ -1344,5 +1344,15 @@ console.log('\n--- the receipt names the writes that actually landed, and nothin
     JSON.stringify(FlowActions.receiptWrittenLines([{ response: { ok: true } }])) === '[]');
 }
 
+console.log('\n--- a parking-permit ask is not a newsletter ---\n');
+{
+  const ask = 'Can you send the parking permit for the visitor bay tomorrow?\n\nUnsubscribe | View in browser';
+  const intent = classify(ask);
+  check('a parking-permit ask is not quiet:noise', intent && intent.quiet !== 'noise' && intent.type != null, intent);
+  const news = 'Our weekly newsletter is here. Limited-time offer inside.\n\nUnsubscribe | View in browser';
+  const quiet = classify(news);
+  check('a newsletter with unsubscribe stays quiet:noise', quiet && quiet.quiet === 'noise', quiet);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

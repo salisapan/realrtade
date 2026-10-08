@@ -65,9 +65,11 @@ function outlookHtml(opts) {
       ? ('<div class="cc"><span>עותק</span> <span title="' + esc(ccList[0]) + '">' + esc(o.ccName || ccList[0]) + '</span></div>')
       : ('<div class="cc">Cc: ' + ccList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>'))
     : '';
-  const toLine = o.hebrewTo
-    ? ('<div class="to"><span>אל</span> <span title="' + esc(toList[0] || '') + '">' + esc(o.toName || 'sali sapan') + '</span></div>')
-    : ('<div class="to">To: ' + toList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>');
+  const toLine = o.hebrewToInline
+    ? ('<div class="to">אל <span title="' + esc(toList[0] || '') + '">' + esc(o.toName || 'sali sapan') + '</span></div>')
+    : (o.hebrewTo
+      ? ('<div class="to"><span>אל</span> <span title="' + esc(toList[0] || '') + '">' + esc(o.toName || 'sali sapan') + '</span></div>')
+      : ('<div class="to">To: ' + toList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>'));
   return '<!doctype html><html lang="en"><head><title>Mail - Glance - Outlook</title></head><body>' +
     '<div id="app"><div role="main">' +
     unread +
@@ -80,7 +82,7 @@ function outlookHtml(opts) {
     ccLine +
     fileRows +
     '</div>' +
-    '<div role="document">' + esc(body).replace(/\n/g, '<br>') + '</div>' +
+    '<div role="document">' + (o.translateBanner ? '<p>הודעה זו נמצאת ב-אנגלית</p>' : '') + esc(body).replace(/\n/g, '<br>') + '</div>' +
     '</div></div></div></body></html>';
 }
 

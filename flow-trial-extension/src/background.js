@@ -4050,13 +4050,20 @@ async function attachmentSaveWrite(p) {
   const files = params.files || [];
   const target = params.target === 'drive' ? 'drive' : 'onedrive';
   const messageId = (p && (p.messageId || p.outlookIncomingId)) || params.messageId || null;
+  // AQQK/AQQk is a conversation id. Attachment bytes are on the Graph message.
+  function graphBytesId(id) {
+    const s = String(id || '');
+    if (!s || /^A[AQ]Qk/i.test(s)) return '';
+    return s;
+  }
+  const bytesId = graphBytesId(p && p.graphMessageId) || graphBytesId(params.graphMessageId) || graphBytesId(messageId);
   const out = await Save.saveAttachments(files, target, {
     writeOne: async (file) => {
       let b64 = file && (file.base64 || file.contentBytes);
       let name = file && file.name;
       let contentType = file && file.contentType;
-      if (!b64 && target === 'onedrive' && messageId && file && file.id) {
-        const got = await outlookAttachmentBytes(messageId, file.id);
+      if (!b64 && target === 'onedrive' && bytesId && file && file.id) {
+        const got = await outlookAttachmentBytes(bytesId, file.id);
         if (got) {
           b64 = got.base64;
           name = name || got.name;

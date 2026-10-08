@@ -87,8 +87,29 @@ const onlyNorth = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com' },
   [msg('m-nw', 'AQQkNw', '', [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
 );
-check('one subject links even when the clock was not read',
-  onlyNorth.message && onlyNorth.message.id === 'm-nw', onlyNorth);
+check('one subject with an empty chip and no id stays unresolved',
+  !onlyNorth.message && onlyNorth.reason === 'suggest:unresolved' && /unconfirmed/.test(onlyNorth.detail || ''), onlyNorth);
+
+const namedNorth = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
+  [msg('m-nw', 'AQQkNw', '', [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
+);
+check('one subject links when the visible filename is on that message',
+  namedNorth.message && namedNorth.message.id === 'm-nw', namedNorth);
+
+const idNorth = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', conversationId: 'AQQkNw' },
+  [msg('m-nw', 'AQQkNw', '', [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
+);
+check('one subject links when the conversation id is on that message',
+  idNorth.message && idNorth.message.id === 'm-nw', idNorth);
+
+const unreadNorth = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
+  [Object.assign(msg('m-nw', 'AQQkNw', '', [], 'Northwind agreement - signed PDF'), { attachmentsUnread: true })]
+);
+check('a failed attachment read stays unresolved',
+  !unreadNorth.message && /attachments-unknown/.test(unreadNorth.detail || ''), unreadNorth);
 
 const wrongOnly = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', attachments: [file('other.pdf', 3072)] },
@@ -130,9 +151,56 @@ check('Hebrew אחה"צ is PM and לפנה"צ is AM',
   FlowOwaParse.clockToIso('08/10/2026 3:05 לפנה"צ') === morning);
 check('both meridians are not a time', FlowOwaParse.clockToIso('08/10/2026 3:05 AM PM') === '');
 
+const ten = '2026-10-08T10:05:00.000Z';
+const twentyTwo = '2026-10-08T22:05:00.000Z';
+const pairTen = FlowOwaParse.clockPair('08/10/2026 10:05');
+check('an unmarked 10:05 is ambiguous and names the other hour',
+  pairTen.ambiguous === true && pairTen.iso && pairTen.altIso && pairTen.iso !== pairTen.altIso, pairTen);
+check('14:01, 00:46, 12:53, and 3:05 PM are not an ambiguous hour',
+  FlowOwaParse.clockPair('08/10/2026 14:01').ambiguous === false &&
+  FlowOwaParse.clockPair('08/10/2026 00:46').ambiguous === false &&
+  FlowOwaParse.clockPair('08/10/2026 12:53').ambiguous === false &&
+  FlowOwaParse.clockPair('08/10/2026 3:05 PM').ambiguous === false);
+check('a page with 14:01 proves a 24-hour clock, and 03:50 PM does not',
+  FlowOwaParse.pageProves24h({ body: { textContent: 'ה 08/10/2026 14:01' } }) === true &&
+  FlowOwaParse.pageProves24h({ body: { textContent: 'Last checked 03:50 PM' } }) === false);
+
+function hourPane(extra) {
+  return Object.assign({
+    subject: 'Northwind agreement - signed PDF',
+    senderEmail: 'flow@x.com',
+    receivedDateTime: ten,
+    clockAmbiguous: true,
+    clockAlt: twentyTwo,
+    attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
+  }, extra || {});
+}
+const m10 = msg('m-10', 'c10', ten, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF');
+const m22 = msg('m-22', 'c22', twentyTwo, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF');
+const bothHours = FlowOwaParse.uniqueGraphMessage(hourPane(), [m10, m22]);
+check('10:05 and 22:05 both present stay unresolved without a 24-hour proof',
+  !bothHours.message && /hour-ambiguous/.test(bothHours.detail || ''), bothHours);
+const onlyTen = FlowOwaParse.uniqueGraphMessage(hourPane(), [m10]);
+check('only 10:05 present may link that file', onlyTen.message && onlyTen.message.id === 'm-10', onlyTen);
+const onlyTwentyTwo = FlowOwaParse.uniqueGraphMessage(hourPane(), [m22]);
+check('only 22:05 present may link that hour', onlyTwentyTwo.message && onlyTwentyTwo.message.id === 'm-22', onlyTwentyTwo);
+const provedFormat = FlowOwaParse.uniqueGraphMessage(hourPane({ timeFormat: 'HH:mm' }), [m22, m10]);
+check('mailboxSettings HH:mm links the literal 10:05', provedFormat.message && provedFormat.message.id === 'm-10', provedFormat);
+const provedCycle = FlowOwaParse.uniqueGraphMessage(hourPane({ hourCycle: 'h23' }), [m22, m10]);
+check('hourCycle h23 links the literal 10:05', provedCycle.message && provedCycle.message.id === 'm-10', provedCycle);
+const provedPage = FlowOwaParse.uniqueGraphMessage(hourPane({ pageHour24: true }), [m22, m10]);
+check('another hour of 13 or more on the page links the literal 10:05', provedPage.message && provedPage.message.id === 'm-10', provedPage);
+const late = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', receivedDateTime: '2026-10-08T14:01:00.000Z', attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
+  [msg('m-14', 'c14', '2026-10-08T14:01:00.000Z', [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
+);
+check('an unmarked hour of 14 links that mail', late.message && late.message.id === 'm-14', late);
+
 const outlookSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
 check('newest-by-subject is not a file link',
-  outlookSrc.indexOf('function messageBySubject') < 0 && outlookSrc.indexOf('inbox-subject') < 0 && outlookSrc.indexOf('uniqueGraphMessage') > 0);
+  outlookSrc.indexOf('function messageBySubject') < 0 && outlookSrc.indexOf('inbox-subject') < 0 && outlookSrc.indexOf('function recentInbox') < 0 && outlookSrc.indexOf('uniqueGraphMessage') > 0);
+check('the mailbox match stops at 200', /MAILBOX_MATCH_CEILING\s*=\s*200/.test(outlookSrc));
+check('a failed attachment read is kept', outlookSrc.indexOf('attachmentsUnread') > 0);
 
 const one = FlowOwaParse.uniqueGraphMessage(
   pane('AQQkGlanceE2ENorthwindConv', '2026-10-08T14:01:00.000Z', [file('northwind-agreement-signed.pdf', 3072)]),

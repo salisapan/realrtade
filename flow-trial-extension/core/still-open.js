@@ -271,7 +271,8 @@ const FlowStillOpen = (() => {
       ts: entry.ts || 0,
       app: entry.app || 'gmail',
       intent: intent,
-      process: entry.process || null
+      process: entry.process || null,
+      verifying: entry.verifying === true
     };
   }
 

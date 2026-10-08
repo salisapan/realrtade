@@ -303,6 +303,10 @@ const FlowStepListView = (() => {
           e.preventDefault();
           e.stopPropagation();
           root.setAttribute('data-glance-approve', 'held');
+          const failed = list.filter(function (r) { return r && r.state === 'failed' && r.checked !== false; })[0];
+          if (!failed) return;
+          if (approve.disabled) return;
+          if (o.onRetry) o.onRetry(failed);
         });
       }
     }

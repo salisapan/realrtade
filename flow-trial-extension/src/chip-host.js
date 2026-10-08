@@ -66,6 +66,9 @@ const FlowChipHost = (() => {
           const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
           liveSteps.length = 0;
           picked.forEach(function (step) { liveSteps.push(step); });
+          if (ctx.messageId && typeof FlowStorage !== 'undefined' && typeof FlowStorage.mergeAddedSteps === 'function') {
+            FlowStorage.mergeAddedSteps(ctx.messageId, picked).catch(function () {});
+          }
         },
         onRetry: function () {
           const button = host.querySelector('button.flow-chip') || host.querySelector('.do-halo');
@@ -118,6 +121,9 @@ const FlowChipHost = (() => {
           const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
           liveSteps.length = 0;
           picked.forEach((step) => liveSteps.push(step));
+          if (ctx.messageId && typeof FlowStorage !== 'undefined' && typeof FlowStorage.mergeAddedSteps === 'function') {
+            FlowStorage.mergeAddedSteps(ctx.messageId, picked).catch(() => {});
+          }
         },
         onRetry: () => {
           if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);

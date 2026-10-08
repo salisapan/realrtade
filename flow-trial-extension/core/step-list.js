@@ -164,16 +164,16 @@ const FlowStepList = (() => {
     if (!row || row.manual) return null;
     const outlook = surface === 'outlook';
     if (row.kind === 'task') {
-      return { kind: outlook ? 'outlookTask' : 'googleTask', id: row.id, label: row.copy, params: { title: row.copy } };
+      return { kind: outlook ? 'outlookTask' : 'googleTask', id: row.id, label: row.copy, params: { title: row.copy }, added: true };
     }
     if (row.kind === 'draft') {
-      return { kind: outlook ? 'outlookDraft' : 'gmailDraft', id: row.id, label: row.copy, params: { what: row.copy } };
+      return { kind: outlook ? 'outlookDraft' : 'gmailDraft', id: row.id, label: row.copy, params: { what: row.copy }, added: true };
     }
     if (row.kind === 'calendar') {
-      return { kind: outlook ? 'outlookCalendar' : 'calendar', id: row.id, label: row.copy, params: {} };
+      return { kind: outlook ? 'outlookCalendar' : 'calendar', id: row.id, label: row.copy, params: {}, added: true };
     }
     if (row.kind === 'save') {
-      return { kind: 'attachmentSave', id: row.id, label: row.copy, params: { files: [] } };
+      return { kind: 'attachmentSave', id: row.id, label: row.copy, params: { files: [] }, added: true };
     }
     return null;
   }

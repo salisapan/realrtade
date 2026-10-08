@@ -152,6 +152,9 @@ function installE2EHooks() {
       const att = path.match(/\/me\/messages\/([^/]+)\/attachments$/);
       if (att && method === 'GET') {
         const id = att[1];
+        if (scenario.attachmentFailIds && scenario.attachmentFailIds.indexOf(id) >= 0) {
+          return Promise.resolve(json(500, { error: { message: 'unread' } }));
+        }
         const list = (scenario.attachments && scenario.attachments[id]) || [];
         return Promise.resolve(json(200, { value: list }));
       }
@@ -224,6 +227,48 @@ function installE2EHooks() {
       }
       if (path.indexOf('/me/messages') >= 0 && parsed.search.indexOf('conversationId') >= 0) {
         return Promise.resolve(json(200, { value: scenario.conversation || [] }));
+      }
+      if (path.indexOf('/me/mailboxSettings') >= 0) {
+        return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt' }));
+      }
+      if (path.indexOf('/me/messages') >= 0 && (parsed.search.indexOf('$filter=') >= 0 || parsed.search.indexOf('%24filter') >= 0 || parsed.search.indexOf('$skip=') >= 0 || parsed.search.indexOf('$skiptoken') >= 0)) {
+        if (scenario.mailboxOverflow) {
+          const filler = [];
+          for (let i = 0; i < 200; i++) {
+            filler.push({ id: 'overflow-' + i, subject: 'overflow', conversationId: 'c-overflow', from: { emailAddress: { address: 'a@b.com' } }, receivedDateTime: '2026-10-08T10:00:00.000Z' });
+          }
+          return Promise.resolve(json(200, {
+            value: filler,
+            '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skiptoken=more'
+          }));
+        }
+        if (scenario.badNextLink) {
+          return Promise.resolve(json(200, {
+            value: (scenario.inbox || []).slice(0, 1),
+            '@odata.nextLink': 'https://evil.example/me/messages?$skiptoken=x'
+          }));
+        }
+        const search = decodeURIComponent(parsed.search || '');
+        const matched = (scenario.mailbox || scenario.inbox || []).filter((m) => {
+          if (!m) return false;
+          const sub = String(m.subject || '');
+          const from = String((m.from && m.from.emailAddress && m.from.emailAddress.address) || '');
+          if (sub && search.indexOf(sub) < 0 && search.indexOf(sub.replace(/'/g, "''")) < 0) return false;
+          if (from && search.toLowerCase().indexOf(from.toLowerCase()) < 0) return false;
+          return true;
+        });
+        let top = 50;
+        let skip = 0;
+        const topM = search.match(/\$top=(\d+)/);
+        const skipM = search.match(/\$skip=(\d+)/);
+        if (topM) top = +topM[1];
+        if (skipM) skip = +skipM[1];
+        const slice = matched.slice(skip, skip + top);
+        const body = { value: slice };
+        if (skip + top < matched.length) {
+          body['@odata.nextLink'] = 'https://graph.microsoft.com/v1.0/me/messages?$top=' + top + '&$skip=' + (skip + top) + '&$filter=' + encodeURIComponent('kept');
+        }
+        return Promise.resolve(json(200, body));
       }
       const msg = path.match(/\/me\/messages\/([^/]+)$/);
       if (msg) {
