@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { loadBatch, readJson, writeJsonl, HERE } = require('./lib.cjs');
+const { loadBatches, readJson, writeJsonl, HERE } = require('./lib.cjs');
 const { ingest, GOLD } = require('./ingest-answers.cjs');
 const { scoreRows } = require('./score-owner-gold.cjs');
 const { heldout, applyOverrides, fit, SHIPPED_V2, DEFAULT_FEAT } = require('./retrain-dry-run.cjs');
@@ -83,6 +83,19 @@ function renderPreview(rep) {
   return md;
 }
 
+function batchPaths(o, answers) {
+  if (o.batch) {
+    return String(o.batch).split(',').map((s) => s.trim()).filter(Boolean).map((s) => (path.isAbsolute(s) ? s : path.join(HERE, s)));
+  }
+  if (Array.isArray(answers.batches) && answers.batches.length) {
+    return answers.batches.map((b) => {
+      const name = String(b).endsWith('.json') ? String(b) : String(b) + '.json';
+      return path.isAbsolute(name) ? name : path.join(HERE, path.basename(name));
+    });
+  }
+  return [path.join(HERE, 'batch-001.json')];
+}
+
 function run(argv) {
   const o = argmap(argv);
   if (!o.answers) throw new Error('pass --answers');
@@ -91,13 +104,17 @@ function run(argv) {
   if (answers.provisional === true && !o.preview) {
     throw new Error('this answers file is provisional; pass --preview. It will not be written to owner-gold.jsonl');
   }
-  const batch = loadBatch(o.batch || path.join(HERE, 'batch-001.json'));
+  const files = batchPaths(o, answers);
+  const batch = loadBatches(files);
+  const onlyBatch1 = files.length === 1 && path.basename(files[0]) === 'batch-001.json';
   const result = ingest({ answers, batch, preview });
   const goldBefore = fs.existsSync(GOLD) ? fs.readFileSync(GOLD, 'utf8') : '';
   if (preview) {
-    const rowsPath = path.join(HERE, 'preview', 'provisional-rows.jsonl');
-    writeJsonl(rowsPath, result.rows);
-    writeJsonl(path.join(HERE, 'preview', 'excluded-unsure.jsonl'), result.excluded);
+    const tag = files.map((f) => path.basename(f, '.json')).join('+');
+    const rowsName = onlyBatch1 ? 'provisional-rows.jsonl' : tag + '-provisional-rows.jsonl';
+    const exclName = onlyBatch1 ? 'excluded-unsure.jsonl' : tag + '-excluded-unsure.jsonl';
+    writeJsonl(path.join(HERE, 'preview', rowsName), result.rows);
+    writeJsonl(path.join(HERE, 'preview', exclName), result.excluded);
     if (fs.readFileSync(GOLD, 'utf8') !== goldBefore) throw new Error('preview must not change owner-gold.jsonl');
   } else {
     const prev = fs.readFileSync(GOLD, 'utf8').trim();
@@ -106,7 +123,7 @@ function run(argv) {
     for (const r of result.rows) map.set(r.id, r);
     writeJsonl(GOLD, [...map.values()]);
   }
-  const score = scoreRows(result.rows);
+  const score = scoreRows(result.rows, { batch });
   const h = heldout(SHIPPED_V2, result.rows);
   let fitText = 'Refit skipped.';
   let fitSummary = null;
@@ -147,13 +164,21 @@ function run(argv) {
     cases: score.cases
   };
   if (preview) {
-    fs.writeFileSync(path.join(HERE, 'preview', 'score.json'), JSON.stringify(scoreOut, null, 1));
-    fs.writeFileSync(path.join(HERE, 'dry-run', 'heldout-before-after.json'), JSON.stringify({ banner, n: h.n, overridden: h.overridden, v2Veto: h.v2Veto, v2Alone: h.v2Alone }, null, 1));
-    if (fitSummary) fs.writeFileSync(path.join(HERE, 'dry-run', 'fit-summary.json'), JSON.stringify(Object.assign({ banner }, fitSummary), null, 1));
-    const md = renderPreview(report);
-    fs.mkdirSync(path.dirname(PREVIEW_DOC), { recursive: true });
-    fs.writeFileSync(PREVIEW_DOC, md);
-    console.log('wrote ' + PREVIEW_DOC);
+    const tag = files.map((f) => path.basename(f, '.json')).join('+');
+    fs.writeFileSync(path.join(HERE, 'preview', tag + '-score.json'), JSON.stringify(scoreOut, null, 1));
+    fs.writeFileSync(path.join(HERE, 'dry-run', tag + '-heldout-before-after.json'), JSON.stringify({ banner, n: h.n, overridden: h.overridden, v2Veto: h.v2Veto, v2Alone: h.v2Alone }, null, 1));
+    if (fitSummary) fs.writeFileSync(path.join(HERE, 'dry-run', tag + '-fit-summary.json'), JSON.stringify(Object.assign({ banner }, fitSummary), null, 1));
+    if (onlyBatch1) {
+      fs.writeFileSync(path.join(HERE, 'preview', 'score.json'), JSON.stringify(scoreOut, null, 1));
+      fs.writeFileSync(path.join(HERE, 'dry-run', 'heldout-before-after.json'), JSON.stringify({ banner, n: h.n, overridden: h.overridden, v2Veto: h.v2Veto, v2Alone: h.v2Alone }, null, 1));
+      if (fitSummary) fs.writeFileSync(path.join(HERE, 'dry-run', 'fit-summary.json'), JSON.stringify(Object.assign({ banner }, fitSummary), null, 1));
+      const md = renderPreview(report);
+      fs.mkdirSync(path.dirname(PREVIEW_DOC), { recursive: true });
+      fs.writeFileSync(PREVIEW_DOC, md);
+      console.log('wrote ' + PREVIEW_DOC);
+    } else {
+      console.log('preview kept off ' + PREVIEW_DOC + ' (batch is ' + tag + ')');
+    }
   } else {
     const out = o.report || path.join(HERE, 'dry-run', 'latest-report.json');
     fs.mkdirSync(path.dirname(out), { recursive: true });

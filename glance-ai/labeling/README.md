@@ -9,6 +9,8 @@
 
 Batch-001 is the first sheet: `batch-001.md` (Hebrew), `batch-001.json` (machine form, `ownerAnswer` still null), and `batch-001-cos-prefill.md` (chief of staff proposal, not confirmed). The machine answers for that proposal are `batch-001-cos-prefill.answers.json`. Items 8 and 17 stay unsure. Item 17's note says the close is a save to OneDrive.
 
+Batch-002 is the second sheet, 20 synthetic cases chosen where the systems disagree: `batch-002.md`, `batch-002.json`, `batch-002.selection.json`, and an empty `batch-002.answers.json`. Nothing in batch-002 is prefilled and nothing is owner-verified. `apply-owner-answers.cjs` accepts `--batch batch-002.json`, or a comma-separated `--batch batch-001.json,batch-002.json`. A combined answers file must key each row by `id`, because item 1 exists in both sheets. `labeledBy` is `sali` only for an owner-verified row. ❓ stays out of the headline. A preview of batch-002 does not overwrite `docs/glance-ai/owner-gold-preview-2026-10-08.md`.
+
 Answers file shape:
 
 ```json

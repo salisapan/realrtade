@@ -1,0 +1,412 @@
+{
+ "summary": {
+  "pool": 6965,
+  "picked": 20,
+  "he": 12,
+  "en": 8,
+  "qwen": 15,
+  "silence": 6,
+  "tags": "money:2 fyi:1 group:1 smalltalk:1 injection:1",
+  "steps": "draft:6 task:9 calendar:6 file_save:2",
+  "drive": 1,
+  "onedrive": 1,
+  "split": 19,
+  "secs": 2.972
+ },
+ "rows": [
+  {
+   "id": "v2syn-23763",
+   "lang": "he",
+   "scenario": "decision",
+   "provenance": "synthetic-v2",
+   "set": "v2test",
+   "v2": "confirmed-amount|task",
+   "v21": "SILENT",
+   "engineTip": "confirmed-amount|task",
+   "qwen": "task",
+   "v2pShow": 0.9021,
+   "marginToTau": 0.0679,
+   "silenceTags": [
+    "money"
+   ],
+   "steps": [
+    "task"
+   ],
+   "split": true,
+   "rank": 1088.21
+  },
+  {
+   "id": "v2syn-25810",
+   "lang": "he",
+   "scenario": "fyi",
+   "provenance": "synthetic-v2",
+   "set": null,
+   "v2": "SILENT",
+   "v21": "SILENT",
+   "engineTip": "SILENT",
+   "qwen": null,
+   "v2pShow": 0.9744,
+   "marginToTau": 0.0044,
+   "silenceTags": [
+    "fyi"
+   ],
+   "steps": [],
+   "split": false,
+   "rank": 9.559999999999993
+  },
+  {
+   "id": "v2syn-12865",
+   "lang": "en",
+   "scenario": "request_reply",
+   "provenance": "synthetic-v2",
+   "set": null,
+   "v2": "follow-up-ask|draft",
+   "v21": "SILENT",
+   "engineTip": "SILENT",
+   "qwen": null,
+   "v2pShow": 0.9727,
+   "marginToTau": 0.0027,
+   "silenceTags": [
+    "group"
+   ],
+   "steps": [
+    "draft"
+   ],
+   "split": true,
+   "rank": 1069.73
+  },
+  {
+   "id": "v2rtest-follow-up-corpus-696",
+   "lang": "en",
+   "scenario": "repo-test",
+   "provenance": "repo-test-strings:follow-up-corpus.cjs",
+   "set": null,
+   "v2": "SILENT",
+   "v21": "SILENT",
+   "engineTip": "event|calendar",
+   "qwen": null,
+   "v2pShow": 0.6414,
+   "marginToTau": 0.3286,
+   "silenceTags": [
+    "smalltalk"
+   ],
+   "steps": [
+    "calendar"
+   ],
+   "split": true,
+   "rank": 1020
+  },
+  {
+   "id": "inj-he-4",
+   "lang": "he",
+   "scenario": "inj",
+   "provenance": "shadow-inj",
+   "set": "inj",
+   "v2": "SILENT",
+   "v21": "SILENT",
+   "engineTip": "drive-file|file_save",
+   "qwen": null,
+   "v2pShow": 0.8981,
+   "marginToTau": 0.0719,
+   "silenceTags": [
+    "injection"
+   ],
+   "steps": [
+    "file_save"
+   ],
+   "split": true,
+   "rank": 1022.8074184393865
+  },
+  {
+   "id": "oss-B-prom-05",
+   "lang": "he",
+   "scenario": "oss",
+   "provenance": "shadow-oss",
+   "set": "oss",
+   "v2": "SILENT",
+   "v21": "SILENT",
+   "engineTip": "dated-commitment|task",
+   "qwen": "task",
+   "v2pShow": 0.9426,
+   "marginToTau": 0.0274,
+   "silenceTags": [
+    "money"
+   ],
+   "steps": [
+    "task"
+   ],
+   "split": true,
+   "rank": 1072.2599227703695
+  },
+  {
+   "id": "v2syn-9042",
+   "lang": "he",
+   "scenario": "onedrive_save",
+   "provenance": "synthetic-v2",
+   "set": "v2test",
+   "v2": "drive-file|file_save",
+   "v21": "SILENT",
+   "engineTip": "drive-file|file_save",
+   "qwen": "draft",
+   "v2pShow": 0.977,
+   "marginToTau": 0.007,
+   "silenceTags": [],
+   "steps": [
+    "file_save",
+    "draft"
+   ],
+   "split": true,
+   "rank": 1102.3
+  },
+  {
+   "id": "v2syn-14049",
+   "lang": "en",
+   "scenario": "commitment_reader",
+   "provenance": "synthetic-v2",
+   "set": "v2test",
+   "v2": "commitment|task",
+   "v21": "SILENT",
+   "engineTip": "SILENT",
+   "qwen": "task",
+   "v2pShow": 0.9267,
+   "marginToTau": 0.0433,
+   "silenceTags": [],
+   "steps": [
+    "task"
+   ],
+   "split": true,
+   "rank": 1110.67
+  },
+  {
+   "id": "oss-he-promise-047",
+   "lang": "he",
+   "scenario": "oss",
+   "provenance": "shadow-oss",
+   "set": "oss",
+   "v2": "follow-up-ask|draft",
+   "v21": "SILENT",
+   "engineTip": "dated-commitment|task",
+   "qwen": "task",
+   "v2pShow": 0.9706,
+   "marginToTau": 0.0006,
+   "silenceTags": [],
+   "steps": [
+    "draft",
+    "task"
+   ],
+   "split": true,
+   "rank": 1102.9420512053355
+  },
+  {
+   "id": "oss-en-promise-036",
+   "lang": "en",
+   "scenario": "oss",
+   "provenance": "shadow-oss",
+   "set": "oss",
+   "v2": "event|calendar",
+   "v21": "SILENT",
+   "engineTip": "dated-commitment|task",
+   "qwen": "task",
+   "v2pShow": 0.9585,
+   "marginToTau": 0.0115,
+   "silenceTags": [],
+   "steps": [
+    "calendar",
+    "task"
+   ],
+   "split": true,
+   "rank": 1101.8485674847911
+  },
+  {
+   "id": "oss-en-promise-031",
+   "lang": "en",
+   "scenario": "oss",
+   "provenance": "shadow-oss",
+   "set": "oss",
+   "v2": "follow-up-ask|draft",
+   "v21": "SILENT",
+   "engineTip": "dated-commitment|task",
+   "qwen": "task",
+   "v2pShow": 0.9848,
+   "marginToTau": 0.0148,
+   "silenceTags": [],
+   "steps": [
+    "draft",
+    "task"
+   ],
+   "split": true,
+   "rank": 1101.5243522665864
+  },
+  {
+   "id": "v2syn-1096",
+   "lang": "en",
+   "scenario": "commitment_reader",
+   "provenance": "synthetic-v2",
+   "set": "v2test",
+   "v2": "event|calendar",
+   "v21": "SILENT",
+   "engineTip": "event|calendar",
+   "qwen": "calendar",
+   "v2pShow": 0.9711,
+   "marginToTau": 0.0011,
+   "silenceTags": [],
+   "steps": [
+    "calendar"
+   ],
+   "split": true,
+   "rank": 1094.89
+  },
+  {
+   "id": "v2syn-22902",
+   "lang": "he",
+   "scenario": "meeting",
+   "provenance": "synthetic-v2",
+   "set": "v2test",
+   "v2": "event|calendar",
+   "v21": "SILENT",
+   "engineTip": "event|calendar",
+   "qwen": "calendar",
+   "v2pShow": 0.9353,
+   "marginToTau": 0.0347,
+   "silenceTags": [],
+   "steps": [
+    "calendar"
+   ],
+   "split": true,
+   "rank": 1091.53
+  },
+  {
+   "id": "v2rtest-intent-actions-corpus-887",
+   "lang": "he",
+   "scenario": "repo-test",
+   "provenance": "repo-test-strings:intent-actions-corpus.cjs",
+   "set": "v2test",
+   "v2": "calendar-hold|calendar",
+   "v21": "SILENT",
+   "engineTip": "calendar-hold|calendar",
+   "qwen": "calendar",
+   "v2pShow": 0.9059,
+   "marginToTau": 0.0641,
+   "silenceTags": [],
+   "steps": [
+    "calendar"
+   ],
+   "split": true,
+   "rank": 1088.59
+  },
+  {
+   "id": "v2syn-12239",
+   "lang": "en",
+   "scenario": "request_reply",
+   "provenance": "synthetic-v2",
+   "set": "v2test",
+   "v2": "SILENT",
+   "v21": "SILENT",
+   "engineTip": "follow-up-ask|draft",
+   "qwen": "draft",
+   "v2pShow": 0.9686,
+   "marginToTau": 0.0014,
+   "silenceTags": [],
+   "steps": [
+    "draft"
+   ],
+   "split": true,
+   "rank": 1074.86
+  },
+  {
+   "id": "v2syn-7685",
+   "lang": "he",
+   "scenario": "commitment_reader",
+   "provenance": "synthetic-v2",
+   "set": null,
+   "v2": "follow-up-ask|draft",
+   "v21": "SILENT",
+   "engineTip": "SILENT",
+   "qwen": null,
+   "v2pShow": 0.9704,
+   "marginToTau": 0.0004,
+   "silenceTags": [],
+   "steps": [
+    "draft"
+   ],
+   "split": true,
+   "rank": 1069.96
+  },
+  {
+   "id": "oss-he-meet-013",
+   "lang": "he",
+   "scenario": "oss",
+   "provenance": "shadow-oss",
+   "set": "oss",
+   "v2": "calendar-hold|calendar",
+   "v21": "SILENT",
+   "engineTip": "calendar-hold|calendar",
+   "qwen": "calendar",
+   "v2pShow": 0.9637,
+   "marginToTau": 0.0063,
+   "silenceTags": [],
+   "steps": [
+    "calendar"
+   ],
+   "split": true,
+   "rank": 1094.365863314536
+  },
+  {
+   "id": "v2syn-1033",
+   "lang": "en",
+   "scenario": "commitment_reader",
+   "provenance": "synthetic-v2",
+   "set": "v2test",
+   "v2": "commitment|task",
+   "v21": "SILENT",
+   "engineTip": "commitment|task",
+   "qwen": "task",
+   "v2pShow": 0.9926,
+   "marginToTau": 0.0226,
+   "silenceTags": [],
+   "steps": [
+    "task"
+   ],
+   "split": true,
+   "rank": 1092.74
+  },
+  {
+   "id": "ctrl-he-1",
+   "lang": "he",
+   "scenario": "inj",
+   "provenance": "shadow-inj",
+   "set": "inj",
+   "v2": "SILENT",
+   "v21": "SILENT",
+   "engineTip": "dated-commitment|task",
+   "qwen": "task",
+   "v2pShow": 0.9633,
+   "marginToTau": 0.0067,
+   "silenceTags": [],
+   "steps": [
+    "task"
+   ],
+   "split": true,
+   "rank": 1074.3313022913308
+  },
+  {
+   "id": "v2rtest-intent-actions-corpus-932",
+   "lang": "he",
+   "scenario": "repo-test",
+   "provenance": "repo-test-strings:intent-actions-corpus.cjs",
+   "set": "v2test",
+   "v2": "SILENT",
+   "v21": "SILENT",
+   "engineTip": "commitment|task",
+   "qwen": "task",
+   "v2pShow": 0.9831,
+   "marginToTau": 0.0131,
+   "silenceTags": [],
+   "steps": [
+    "task"
+   ],
+   "split": true,
+   "rank": 1073.69
+  }
+ ]
+}

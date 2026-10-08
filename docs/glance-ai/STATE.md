@@ -105,11 +105,19 @@ Shipped v2 held-out, n=6982, with those 17 provisional labels overriding the mac
 
 The CPU refit (`v2-owner-dryrun`, sklearn 1.9.1, tau 0.97) matched that after figure: strict wrong-Do-It 1.3% (74/5720). Train and val override hits were 0, test hits 17, so no training row changed. The before/after table is the effect of the new labels on the shipped decisions. The dry-run is not a candidate.
 
+## Batch-002 and the gate audit, 2026-10-08
+
+Owner-verified labels are still 0. Batch-002 is 20 synthetic cases ready for the owner, with an empty answers file. The gate audit below is on the chief of staff's provisional silences for batch-001 items 10, 11, 12, 13, 14, and 16. Every figure in this section is provisional / not owner-verified, or it is a machine-reference count on the shipped held-out. The write-up is `docs/glance-ai/batch-002-and-gate-audit-2026-10-08.md`.
+
+Batch-002 mix, 20/20: Hebrew 12/20, English 8/20. Cached gated Qwen on 15/20. Silence-candidate tags 6/20 (money 2, FYI 1, group 1, small talk 1, injection 1). Show/silent splits 19/20. The one agreed silence is the FYI row, the nearest all-silent case to tau 0.97. Drive save 1/20, OneDrive save 1/20. Draft, task, calendar, and file_save all appear.
+
+No silence rule was adopted. On the v2 held-out (n=6982, strict, machine reference) the shipped v2+veto stays 1.4% (82/5727) wrong-Do-It and 50.8% (637/1255) missed close. A group-address silence was measured and rejected: missed close would rise by 6.614 points, to 57.4% (720/1255). The other four lab post-filters stay unwired. Gated Qwen strict wrong-Do-It stays 0 on every spec set. Suggest-save is untouched, so the prototype adds 0 chips.
+
 ## Next stages
 
 1. Keep v2 as the default shadow candidate. Keep v2.1 in shadow. Do not promote either on these reports alone.
 2. Log the real attachment list (size, inline, contentId, kind) so suggest-save can be scored on real files instead of the unread gate.
-3. The owner answers batch-001, then runs the command above. Collect at least 200 owner-verified labels. Until then missed-close and wrong-Do-It stay machine-reference numbers.
+3. The owner answers batch-001 and batch-002. Both sheets are in git. Answers are still empty on batch-002, and batch-001 is still the chief of staff's unconfirmed proposal. Collect at least 200 owner-verified labels. Until then missed-close and wrong-Do-It stay machine-reference numbers. Owner-verified today: 0.
 4. Unpark GPU only after those labels and an owner spend approval. The SFT train split is regenerated from the generators; it is not in git. The val split is `glance-ai/eval-data/sft-v2-val.jsonl`.
 5. CPU regression for this tree is `bash glance-ai/run-cpu-checks.sh`. It now starts with the owner-label ingest and score tests. A silence-only change must leave wrong-Do-It at 0 on the gated table and must not add a chip on `eval-data/suggest-save-v22.jsonl`.
 
