@@ -74,6 +74,11 @@
   let timer = null;
   let lastPaneKey = '';
   let suggestNote = null;
+  // One epoch per open mail. A scan that started on the previous mail, and a
+  // click on that mail's card, must not land on the mail that is open now.
+  let mailEpoch = 0;
+  let openMailToken = '';
+  let renderEpoch = 0;
   let scanning = false;
   let again = false;
   let lastKey = '';
@@ -136,6 +141,7 @@
 
   // Every open message ends in a card or in a reason the panel shows under "Why not shown" (never neither).
   async function pageReason(reason, pane, extra) {
+    if (!renderLive()) return;
     lastOutcome = 'reason';
     lastLoggedReason = reason;
     dbg('decision', { shown: false, reason, subject: pane && pane.subject });
@@ -646,6 +652,7 @@
   }
 
   async function onDoIt(host, chip, ctx, liveSteps) {
+    if (ignoreStaleClick(host)) return;
     doItInFlight = true;
     try {
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
@@ -829,6 +836,76 @@
     return kept;
   }
 
+  // URL id plus the subject heading. The body can change before a scan
+  // finishes; the previous card has to leave in that same turn.
+  function openMailTokenNow() {
+    let href = '';
+    let root = null;
+    try { href = location.href; } catch (e) { href = ''; }
+    try { root = document.querySelector('#ReadingPaneContainerId'); } catch (e) { return ''; }
+    const ids = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.urlIds) ? (FlowOwaParse.urlIds(href) || {}) : {};
+    const heading = root && root.querySelector('[role="heading"]');
+    const subject = heading ? String(heading.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 180) : '';
+    return [ids.itemId || '', ids.conversationId || '', ids.raw || '', subject].join('|');
+  }
+
+  function clearOpenCards() {
+    const scope = readingScope(null);
+    if (scope && scope.querySelectorAll) scope.querySelectorAll('.flow-chip-host').forEach((el) => el.remove());
+    lastKey = '';
+  }
+
+  function bumpMailEpoch(why, keepCard) {
+    mailEpoch += 1;
+    if (!keepCard) {
+      clearOpenCards();
+      lastOutcome = '';
+    }
+    lastSig = '';
+    try { console.info('Glance: stale card cleared', why || '', String(mailEpoch)); } catch (e) { /* console gone */ }
+    return mailEpoch;
+  }
+
+  function noteOpenMail() {
+    const token = openMailTokenNow();
+    if (!token || token === '|||') return mailEpoch;
+    if (!openMailToken) { openMailToken = token; return mailEpoch; }
+    if (token === openMailToken) return mailEpoch;
+    openMailToken = token;
+    return bumpMailEpoch('open-mail');
+  }
+
+  function armRender() {
+    noteOpenMail();
+    renderEpoch = mailEpoch;
+    return renderEpoch;
+  }
+
+  function renderLive() {
+    return renderEpoch === mailEpoch;
+  }
+
+  // The card records the open mail it was painted for. A Graph message id
+  // and the conversation id are the same mail, so the click compares that
+  // token, not the two spellings. A card with no token still runs.
+  function ignoreStaleClick(host) {
+    const bound = host && host.getAttribute && host.getAttribute('data-glance-open');
+    if (!bound) return false;
+    const now = openMailTokenNow();
+    if (!now || now === '|||' || bound === now) return false;
+    try { console.info('Glance: stale card click ignored', bound); } catch (e) { /* console gone */ }
+    return true;
+  }
+
+  function injectCard(mount, ctx, handlers) {
+    noteOpenMail();
+    if (!renderLive()) return null;
+    const host = FlowChipHost.inject(mount, ctx, handlers);
+    const token = openMailTokenNow();
+    if (host && token && token !== '|||') host.setAttribute('data-glance-open', token);
+    return host;
+  }
+
   // The subject header stays on screen when the open message changes.
   // A receipt belongs to the message that wrote it.
   function clearForeignHosts(pane) {
@@ -845,6 +922,8 @@
   }
 
   function paintOutlookTodoReceipt(mount, row) {
+    noteOpenMail();
+    if (!renderLive()) return null;
     const copy = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.remountCopy)
       ? FlowProofOfClose.remountCopy(row)
       : null;
@@ -910,6 +989,9 @@
           hint.className = 'flow-chip-undo-hint flow-chip-undo-failed';
           return;
         }
+        // A scan that already read the Handled log must not paint it again
+        // after Undo. The Undone line stays on this mail.
+        bumpMailEpoch('undo', true);
         const messageId = row.messageId;
         const threadKey = row.threadId || row.outlookConversationId;
         if ((copy.connectorId === 'onedriveFile' || copy.connectorId === 'attachmentSave') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
@@ -975,6 +1057,8 @@
   }
 
   function paintUndoneStatus(mount, pane, line) {
+    noteOpenMail();
+    if (!renderLive()) return null;
     const ids = messageIdsOf(pane);
     const existing = stripDuplicateUndoHosts(mount);
     if (existing && existing.getAttribute('data-glance-undone') === '1' && hostMatches(existing, ids)) {
@@ -1027,7 +1111,7 @@
     }
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
-    const host = FlowChipHost.inject(mount, {
+    const host = injectCard(mount, {
       process: { name: 'Reply', steps: [] },
       intent: { label: draft.label || 'Reply draft ready' },
       messageId: draft.messageId
@@ -1560,7 +1644,7 @@
     };
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
-    const host = FlowChipHost.inject(mount, ctx, {
+    const host = injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
@@ -1602,7 +1686,7 @@
     };
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
-    const host = FlowChipHost.inject(mount, ctx, {
+    const host = injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onHoldingDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
@@ -1749,7 +1833,7 @@
     if (!mount) return;
     const old = mount.querySelector('.flow-chip-host');
     if (old) old.remove();
-    const host = FlowChipHost.inject(mount, {
+    const host = injectCard(mount, {
       app: 'outlook',
       doLabel: 'Do It',
       messageId: messageId,
@@ -1891,7 +1975,7 @@
       return;
     }
     if (old) old.remove();
-    const host = FlowChipHost.inject(mount, ctx, {
+    const host = injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onCalendarDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
@@ -1989,7 +2073,9 @@
   }
 
   async function scan() {
+    armRender();
     const st = await FlowStorage.get();
+    if (!renderLive()) return;
     const own = ownAddressesOf(st);
     let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
     const ids = FlowOwaParse.urlIds(location.href);
@@ -2306,7 +2392,7 @@
       const mount = mountPoint();
       if (!mount) { await pageReason('page:no-mount', pane); return; }
       if (mount.querySelector('.flow-chip-host')) { lastOutcome = 'card'; return; }
-      const host = FlowChipHost.inject(mount, {
+      const host = injectCard(mount, {
         process: { name: 'Reply', steps: [{ kind: 'outlookDraft' }] },
         intent: { label: entry.label || 'Reply draft ready' },
         messageId: entry.messageId
@@ -2393,7 +2479,7 @@
     if (old) old.remove();
     lastKey = key;
 
-    const host = FlowChipHost.inject(mount, ctx, {
+    const host = injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
@@ -2437,6 +2523,7 @@
   // OWA never stops changing the page (ads, presence, "x min ago"). A debounce that restarts on every change never fires
   // there, which is how 0.9.14 stayed silent: so this is a throttle. One scan at a time; a change during a scan runs one more.
   function schedule() {
+    noteOpenMail();
     if (timer) return;
     timer = setTimeout(runScan, SCAN_EVERY_MS);
   }
@@ -2839,7 +2926,7 @@
       fileCard: true,
       suggestOnly: true
     };
-    return FlowChipHost.inject(mount, ctx, {
+    return injectCard(mount, ctx, {
       onDoIt: (host, chip, c) => onSuggestDoIt(host, chip, c),
       onDismiss: async (host) => {
         try { host.remove(); } catch (e) { /* already gone */ }
@@ -2864,6 +2951,7 @@
   }
 
   async function onSuggestDoIt(host, chip, ctx) {
+    if (ignoreStaleClick(host)) return;
     doItInFlight = true;
     try {
       FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
@@ -3183,7 +3271,7 @@
     if (existing) existing.remove();
     const ctx = buildCtx(loop, pane, { intent: loop.intent, process: loop.process });
     if (!ctx || !ctx.messageId) return false;
-    const host = FlowChipHost.inject(mount, ctx, {
+    const host = injectCard(mount, ctx, {
       onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
       onDismiss: (h, c) => { onDismiss(h, c); }
     });
@@ -3199,6 +3287,7 @@
   // A stored Undo line stays only when this mail has no card and no open loop.
   // A promise mail gets its Do It; a silent mail keeps the confirmation.
   async function paintStoredUndoneIfQuiet() {
+    armRender();
     let pane = null;
     try {
       const st = await FlowStorage.get();

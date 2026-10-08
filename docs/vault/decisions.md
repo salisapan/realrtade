@@ -6,6 +6,7 @@ updated: 2026-10-08
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-08 · 0.9.55: a card from the previous mail is cleared when the open mail changes, and a late result or a click from that mail does not run. Gate: not run live · Claude · [[open-tasks]]
 - 2026-10-08 · 0.9.54: a To block that also contains Cc no longer copies the Cc address into To, so a Cc-only ask does not offer a reply draft; Q3 Hi with the reader in To still drafts. Gate: not run live · Claude · [[open-tasks]]
 - 2026-10-08 · 0.9.53: the open message is the body, not the subject line; a CONV_ tail that matches the address confirms that conversation; a tail that names another conversation stays silent, including the file; a confirmed conversation that differs blocks the file even when the name matches. Gate: not run live · Claude · [[open-tasks]]
 - 2026-10-08 · 0.9.52: a filename on the open mail links that file when the conversation id is another mail; a clock or an internet id that disagrees still blocks; an open Outlook page on the previous stamp reloads so the greeting strip is this package; the open mail shows the Loops card when the subject and the promise match; two ids of one mail are one Do It; a no-reply ask in Loops names the work and the date; Handled sits under Added. Gate: not run live · Claude · [[open-tasks]]
