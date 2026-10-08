@@ -170,7 +170,7 @@ console.log('\n--- page wiring ---\n');
     js.indexOf('core/commitment-title.js') >= 0 && js.indexOf('core/display-copy.js') >= 0 &&
     js.indexOf('core/step-list.js') >= 0 && js.indexOf('src/step-list-view.js') >= 0 &&
     js.indexOf('core/onedrive-file.js') >= 0 && js.indexOf('src/step-kit.js') >= 0);
-  check('the extension version is 0.9.53', manifest.version === '0.9.53');
+  check('the extension version is 0.9.54', manifest.version === '0.9.54');
   check('permissions are unchanged', JSON.stringify(manifest.permissions) === JSON.stringify([
     'storage', 'identity', 'sidePanel', 'alarms', 'notifications', 'scripting', 'contextMenus', 'offscreen'
   ]));

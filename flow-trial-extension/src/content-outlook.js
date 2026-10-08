@@ -2545,7 +2545,13 @@
   async function hydratePane(pane) {
     if (!pane) return pane;
     const needSender = !pane.senderEmail;
-    const needAudience = !(pane.to && pane.to.length) && !(pane.cc && pane.cc.length);
+    // DOM already listed someone. Graph still wins when the same address is
+    // in both lists: a To block that also contains Cc used to copy the Cc
+    // address into To, and the draft then disagreed with Why not shown.
+    const toList = (pane.to || []).map((e) => String(e || '').toLowerCase());
+    const ccList = (pane.cc || []).map((e) => String(e || '').toLowerCase());
+    const audienceOverlaps = ccList.some((e) => toList.indexOf(e) >= 0);
+    const needAudience = (!(toList.length) && !(ccList.length)) || audienceOverlaps;
     const mailKey = [pane.subject || '', ((pane.attachments || []).map((a) => a && (a.name || a.filename)).filter(Boolean).join(',')), String(pane.text || '').slice(0, 48)].join('|');
     if (hydratePane.mailKey && hydratePane.mailKey !== mailKey) {
       Object.keys(hydrateCache).forEach((k) => { delete hydrateCache[k]; });
@@ -2597,8 +2603,12 @@
     if (picked) {
       if (!pane.subject && picked.subject) patch.subject = String(picked.subject);
       if (needAudience) {
-        patch.to = (picked.toRecipients || []).map(graphAddress).filter(Boolean);
-        patch.cc = (picked.ccRecipients || []).map(graphAddress).filter(Boolean);
+        const gto = (picked.toRecipients || []).map(graphAddress).filter(Boolean);
+        const gcc = (picked.ccRecipients || []).map(graphAddress).filter(Boolean);
+        if (gto.length || gcc.length) {
+          patch.to = gto;
+          patch.cc = gcc;
+        }
       }
       if (needSender && !patch.senderEmail) {
         const one = graphAddress(picked.from);

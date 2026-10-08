@@ -73,6 +73,22 @@
    ]
   },
   {
+   "id": "gate054-office-move",
+   "from": "ai.local.flow@gmail.com",
+   "fromName": "flow",
+   "to": [
+    "ai.local.flow@gmail.com"
+   ],
+   "cc": [
+    "glance.salisapan@outlook.com"
+   ],
+   "subject": "Office move - can you confirm the date?",
+   "body": "Hi,\nCan you reply and confirm whether the office move is still on for October 20?\nThanks,\nFlow",
+   "gate": "quiet:hedge",
+   "expected": "no Reply & Track draft. A parent To block must not copy the Cc address into To. Why not shown stays quiet:hedge.",
+   "note": "Gate 0.9.53 check 8. DOM recipientsOf put the Cc address in pane.to, so the mail card offered a draft while Graph recipients stayed quiet:hedge."
+  },
+  {
    "id": "gate049-passport-035",
    "gmailId": "1a117eb1f0b7f60a",
    "from": "ai.local.flow@gmail.com",

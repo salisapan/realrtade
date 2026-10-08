@@ -374,6 +374,31 @@ function lum(rgb) {
     ccJudged.reason === 'quiet:hedge',
     { to: ccPane && ccPane.to, cc: ccPane && ccPane.cc, reason: ccJudged && ccJudged.reason });
 
+  const office = fixture('gate054-office-move');
+  const officePane = await readPane(page, paneHtml({
+    subject: office.subject,
+    body: office.body.replace(/\n/g, '<br>'),
+    header: '<div class="envelope"><div class="to">אל: <span title="' + office.from + '">flow</span></div>' +
+      '<div class="cc">עותק: <span title="' + ME + '">Glance</span></div></div>'
+  }), 'https://outlook.live.com/mail/0/inbox/');
+  const officeJudged = await page.evaluate((input) => window.__eng.judge.judge(input), {
+    text: office.body,
+    subject: office.subject,
+    sender: { name: 'flow', email: office.from },
+    surface: 'outlook',
+    to: officePane.to,
+    cc: officePane.cc,
+    ownAddresses: [ME],
+    userName: 'Sali',
+    inbound: true
+  });
+  const officeKinds = ((officeJudged && officeJudged.process && officeJudged.process.steps) || []).map((s) => s.kind);
+  check('Office move Cc nested under To stays quiet:hedge with no draft',
+    officePane && officePane.to.indexOf(office.from) >= 0 && officePane.to.indexOf(ME) < 0 &&
+    officePane.cc.indexOf(ME) >= 0 && officeJudged && officeJudged.show !== true &&
+    officeJudged.reason === 'quiet:hedge' && officeKinds.indexOf('outlookDraft') < 0,
+    { to: officePane && officePane.to, cc: officePane && officePane.cc, reason: officeJudged && officeJudged.reason, kinds: officeKinds });
+
   const headerOnly = await readPane(page, paneHtml({
     subject: q3.subject,
     body: 'Hi',

@@ -902,6 +902,54 @@ const FlowOwaParse = (() => {
       if (/^\s*cc\b/i.test(t) || /^\s*עותק(?:\s|:|$)/.test(t)) return 'cc';
       return '';
     }
+    function recipientKind(n) {
+      if (!n || (n.nodeType && n.nodeType !== 1)) return '';
+      const t = textOf(n).replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 400) return '';
+      const aria = n.getAttribute ? String(n.getAttribute('aria-label') || '') : '';
+      const title = n.getAttribute ? String(n.getAttribute('title') || '') : '';
+      return lineKind(t) || lineKind(aria) || lineKind(title);
+    }
+    function hasRecipientDescendant(n) {
+      if (!n.querySelectorAll) return false;
+      const kids = n.querySelectorAll('div, p, li, span, button');
+      for (let i = 0; i < kids.length; i++) {
+        if (recipientKind(kids[i])) return true;
+      }
+      return false;
+    }
+    // A parent that starts with To also contains the Cc line. textOf and a
+    // title scan of that parent put the Cc address in To. The nested line
+    // is scanned on its own. Chips that sit on this line, outside that
+    // nested line, stay here.
+    function harvestOutsideNested(node, bucket) {
+      function ownBits(n) {
+        const bits = [];
+        if (n.getAttribute) bits.push(n.getAttribute('title') || '', n.getAttribute('aria-label') || '');
+        const kids = n.childNodes;
+        let direct = '';
+        if (kids) {
+          for (let i = 0; i < kids.length; i++) {
+            if (kids[i].nodeType === 3) direct += kids[i].nodeValue || '';
+          }
+        }
+        if (direct) bits.push(direct);
+        else if (!n.children || !n.children.length) bits.push(textOf(n));
+        return bits;
+      }
+      function walk(n) {
+        if (!n) return;
+        const bits = ownBits(n);
+        emailsIn(bits.join(' ')).forEach((e) => push(bucket, e));
+        if (userName && userName.indexOf(' ') >= 0 && own.length && bits.join(' ').toLowerCase().indexOf(userName) >= 0) push(bucket, own[0]);
+        if (!n.children) return;
+        for (let i = 0; i < n.children.length; i++) {
+          if (recipientKind(n.children[i])) continue;
+          walk(n.children[i]);
+        }
+      }
+      walk(node);
+    }
     let rawToLine = '';
     const nodes = container.querySelectorAll('div, p, li, span, button');
     const prose = innerMessage(bodyRoot);
@@ -924,8 +972,11 @@ const FlowOwaParse = (() => {
       if (!kind) continue;
       const bucket = kind === 'to' ? to : cc;
       const before = bucket.length;
-      harvest(n, bucket);
-      if (bucket.length === before) harvest(n.nextElementSibling, bucket);
+      if (hasRecipientDescendant(n)) harvestOutsideNested(n, bucket);
+      else {
+        harvest(n, bucket);
+        if (bucket.length === before) harvest(n.nextElementSibling, bucket);
+      }
       if (kind === 'to' && !rawToLine) {
         rawToLine = plainLine((textOf(n) + ' ' + textOf(n.nextElementSibling))).replace(/\s+/g, ' ').trim().slice(0, 180);
       }
@@ -946,8 +997,9 @@ const FlowOwaParse = (() => {
         const href = n.getAttribute ? String(n.getAttribute('href') || '') : '';
         const blob = plainLine([textOf(n), aria, title, href].join(' ')).replace(/\s+/g, ' ').trim();
         if (!blob || lineKind(blob) === 'cc') continue;
+        if (hasRecipientDescendant(n)) continue;
         if (/^(?:from\b|מאת)(?:\s|:|$)/i.test(blob)) continue;
-        const found = emailsIn(blob).filter((e) => own.indexOf(e) >= 0 && e !== from);
+        const found = emailsIn(blob).filter((e) => own.indexOf(e) >= 0 && e !== from && cc.indexOf(e) < 0);
         if (!found.length) continue;
         push(to, found[0]);
         if (!rawToLine) rawToLine = blob.slice(0, 180);
