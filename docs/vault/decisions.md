@@ -5,6 +5,8 @@ tags: [decisions]
 
 One line per decision: `date · decision · who · where it is written in docs/`. Full status stays in [[open-tasks]]; this is the fast index for a new chat.
 
+- 2026-10-08 (Sali 11:47): Flow Edge (company's own servers) and Masked secure cloud are AVAILABLE; org customer chooses. 'Local' = company servers, never user device.
+- 2026-10-08 — home page copy: English roadmap labels read "on the roadmap" (no Hebrew on EN pages); removed internal "Own revenue / entry wedge" phrasing from Glance block and waitlist; approved by Sali via CoS; not deployed (Netlify HOLD until Sali מאשר).
 - 2026-10-06 · Owner approved merge of CEO launch PR #91 (`cursor/ceo-launch-execute-5a1c`) to `main`; Netlify deploy still requires a separate OK · Sali · [[open-tasks]] row 1
 - 2026-10-06 · Supabase flow-ai ACTIVE; licenses + ai_usage migrations applied; no Netlify deploy without owner OK · Claude · [[open-tasks]] rows 1–2, 10, 30, 34
 - 2026-10-05 · Claude ↔ CoS realtime wake is comments on permanent draft PR #77 (branch `cos/bridge-live-inbox`; never merge, never close; no webhook secret, no Telegram). File drop on main stays the durable archive · Claude · [[vault/bridge/README]], [[open-tasks]] row 41
