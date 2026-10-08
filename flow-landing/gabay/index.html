@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex">
 <title>תאום פגישה לעובד חדש — סוכנות גבאי</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +26,7 @@ window.onerror=function(m,s,l,c){var e=document.getElementById("boot-error");e.s
 </script>
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useRef } = React;
-const LOGO = "../logo-header.png";
+const LOGO = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALEAAABOCAMAAABYMwc7AAADAFBMVEUAAAD+/v63t7fHx8eoqKjX19eYmJjl5eWHh4d4eHh/f3/7+/tpaWnn5+eqqqrm5ua4uLjX19fGxsa+vr5YWFjZ2dnHx8fn5+fY2Nj4+Pjk5OTW1tbZ2dnn5+fJycnZ2dno6OjLy8va2trm5ua4uLipqan39/fKysrz8/P09PTx8fHLy8vz8/NHR0fKyspVVVWoqKibm5u6urqZmZmpqamKioq+vr4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA9K/LmAAABAHRSTlMABf38/fv9+v7+Ai7+UQPQ0K/LBP7QtDRvTGyRUrJRCBCOM4+20HFvrpH0Bc7+KgOv050FkdN6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAolaJ/AAAEIpJREFUeNrVW4tW28gS1Dw1siRLNpYtv7DBYCAh2ezuvff/P+1W9Uh+gAls9pzNZnaTEIzlUk91dXWPkiQ/slTyiy2l8sXsl4Kt1NQZ9etAVlg21D8XsVIDrPj7gIiG8mvIPw6rQytvmJpZMviZgP/Kjwn6m59LCnz45uvX2+12e3v7FV/czmbzcrUquWbdwjfjj66aqqqMNQ125OcBnjdmrLW1VseFr0wzappR1a2matbNiJTITbNbV9ZrN0r+/HkR1tbtZ+1y1DhDwMY4Y207X3d40zQF6HVaJptk5nb5vjI+c+OfRmSV7HxmzXq+HBsbislkUmTBG2PHuyoFdO1S5/DLpK0gbuZ7ALbp9CciHukQrNPehyxgZQCcTTy4OqpS3ERg2J0zbomfnZlmPtKZdenPjPHU6WDDZBIsgGGRGiErvDa6eX4kaVONv5iHZJvkWqfOahDln0aMJOqkdQBxrTQAe4PtB2NBAOSeB0GsMwbSsHaaOWmWyedkhi8NiFI1/zziYSewRPxoCdjoGGMnkLUvvoRmXTVN41z1qXJQh6vkFoAzs9/984hjmDvEeh0mka1GlMIhqN4TcmHH0zEibVz1DMSD5JZc+bSf/+OIIa2tG+f8UCJuwFpsPELrQ/Cy+KfNJvg+/5Z53ESbXKnSQ6vT9PHxI4jVlXrjL399DZMbfO5YRcRGF0AGyAG/x6X7YhL/8NCPe6WgbrgzvDNNf0iP6VT+RtWwto6IR8ZmGRFbu8znWHm3ZuV8zko9z+f3dspinuQeOgh1/pBWlIuD+8CmLhbq7yiaMn4SZpEVI03EQovyzXfMFTZGqRIhNpqi8l3EyJGBunHpVPWIsakuV8vlDzoolWycvs/lzUSss0AmGFcON/SZ0WX2ZnOoBnmz3Ayl+dAWiAH5OzVPDQcSVGTFwUUPk5WuYfnckiL1I4hnpmLQesRW/I92JQTsUprCKK0YY1SQABFEqbmMWKnPqtchtfrjj1MXnauktcHMk81QqcuNwsGHv3pto0qXJ726ETF8hH4LMbskayksRJx5LTXkEuKIdluuzXiuTiW0v057Z6eXLbl6z63fpItDBRkBrJEwv4U4UaXcIPZGZ5lBLbzAY6lJ5WrUpClYZtxo1JZ4z0HUCD6fj/1udb3Kk1exxFu5ytnrl5K8LG+creeHGDO8pLF5A/Hh1smmwOKdVqPxi5c/J8ls2aTi96wNXgpos1DHoA2SEqpeiHtpz2GBDKNYblMaLvXypdSkPsAy8FM6xEw89zbivs2Do7fFBBGu1ueIoZMzfua4ZjvgjOkF3bRJf82hWjpsUabN4/JF1wWKm2r9+PS0XyzN+WBhqGYaDYf/EuAeSuIAYgqb1e/EuEesbcgIeXzKOCRly9oeFQeRSjt7AreC0jrs0rE1sNZYfpTensEaqCnqEu3Act6054iTG228LXAlY4WbjLFnlGmEPoLYwJtSj0+ihO9PU+N9Z6VSWYLZ2n2tS7k59lzYx1j2XZsMz6/romdEMo3UeYxrgxtnmoU71ekxAwPEH4yx8UGfIx4mpXEWNr8Hm6afPn0S0MbfP2ob6wYkamyeLboBF3R1ToqVcfEmIQJOnSQ1S4D2jp1FFsq+gjDgoAXe8AHEZBBDeUS8AWDjC97G8/Pzpx4zv3K4EQ9OT+MPq1Y/rhHj9VS72ZmgLUGK6unpCV0PFeuUby11Aa0cyNRdBYgJQtMufAgxjAUK9QExDJ02AYAJMz0uCbMzgQbALNVWiZyP9877eq/d4vhRLFHIjDR9yuePKKe7E8Qwaja47MsEHd24r58jemH6eSBWG3VpHdQNiMEqZ206Pt4FGBYBR/qauOI3Yv/ozUKuomq9e8S7a2PWR1iDZMufxv/rx/0TflfqhWcrJgV85TK+RRAb9nGarEi+r8dA7NBpZzqtI9kQu1r7DjBzzdTT0XK5nNbsEOQGoBjw17MNbUFrdYUCU2CnjmyltknikVhztPCzQ1oO2af5yZcJ7XpXpskKxC1ohmVZLl6vtl115RZpAFYE7LTrY7xBBfeF7QBrOy17t1ZOqcxOMPuMQySqBdI+pbslW4dHbXOSdJRYt39Oj/pGhocvnEf4w3BSsYKAbhqfuj6hIYpExRg1vFjbI56bACWHOLoO8WCODiWYDrBmjRsMsQYbOFSQTeTDwI1EGOoOBtt4A4Fc9zGm9+WS0Y6waXTy0lgXk4wC5RcdWTivwHXphcxz3FfukEv35R6Y3Rp9aYMSRcM1BCvASVtA3+okqvkdEOuuYOhc9b4MAb1S89pHPmMPHWigrkALr1NsqnbNYWCa3ArcbvbAj89PUj2gQUq1Dz0pBDGUjW7IClbeKZtU6s0ackP7blQ+l1INtwmEBYyO7BHsnIeHiJZA23myVafmUUggbEbVSdknJtgS7mjKcqWOLZy4GuTe004ArDrGkOGhCM4GG+6OgR/ZUEAkpbkzsfU3TswR4rGfz/fVJzMf65bFNkfqZxMWC0H8W3IDXutuZNCq7flA5CpBJyuIGeSRdCY1BzlM9fRQ9rDz1jTwUPi8O7DQQN96xCNYL22KYP2B3EScZQWoouMAQCYAAAwHEIpJmC5h501ea3QPw+RWE3DAzdXc0iG0JwQTiVSrV5b5KvkjBhlM1u6WEtwG3CGIbMBWdSykjw0+ldUYt0KT1mmTgifIYPhQ29UpYtQUn4q8aFiolFnrpfPzyFIy36rZAn2pSq41AMtLtXSqJYQixB3V18nwdc+OVpavGu4Eysh2O0cOAVbQaQcL3EZUAdbpsTWpFoLMOsQr8IW8M/5ODU4mhcYUGb1FoMNonoEYPMFlNQkPw6Bt3m310k4mAEzEwtUbT8RaMOXqQmehaiJ20huOVc5v0AmJm4qyy513zEynF3daWOnIeZG9GwcUME6pf0jOEKfOU/FIBGn50Ghb3y9iV38Szm9qbCmN1E0mwlU+Roz5VyAeXxraD5IHxgwbbrELALxNHuje2KKly9jXKMcySibmD2JZIASjeDGFe6GphFaoE40mYlj8okBWWs6CtP3v7/Vh3d/f16VcQEomb5lBjYhxdxzLkP/LZHipUt52iEEvM4cJgH5YFllsSyOFO1k5MQno7lXuJYtBji0/jRaLrYZz/l6dzY/xLdR+2LmlytuHts0v97X8NFK8RxylQ3w8EC+Six1yziDhxjiSXkRvAcCOtUW6Y1Y1GU8be6PyWoIMo0X/JgzHxXEL/uZonGTCYmm0swyC+r1jJvhgQpMTE1MnXWvtYudhLp+iDtS9TMLgOq2mHRokSxhswqCNUbHgOfG76IlubJxUihQOk6XjeQCsoZ8fd5B2DlUFegPZKdX26vQU7yXua6ufxdpwBKbYWiONdY/40shlg9SLAzzwuFUDNWBdR45TQUa8gRK2Q0sc8HEl+xg4D+e2sXpDTaks96c0VuMwQcaz5zFlMvyuPV6ho2Xe2w5xKe5FaHE5xmIMtPSRrtKS70pBybyIHgr3Vi3JVVgSe5d8TlTshYzEnzTWkuZ+qs5GcFmoKmQcLMr3HT1ZwakGe73IitL2kPV3EPOOAkvUdfyRKXOBwUxLmTfRVWDfrimX/7Fxhp0ipdTIUF8DyLw4hnKYrKwPzRNU17/X54G3XjeoScz+WjKPmm36Cdjl/ZGjQmwiVHAV5ayVqsvyDX3LqfpCrZxO6UGuiDWOwzOUg8xpmUgdD26QxgFdhHlzinUSsHufQrx5zagVwmCB7C5rBUtwhIxiJA3cEG4o6+YE4xykkBvWMlVkDKTmsdtTpYm7Y1HwTi9ahwJ1iwMB+16f95uaFh0torop210fdeoNPZ6JX8EGVl3CAxVyXLhkzCJvWJZhR30ro0jERHwnG8ERESP1fDi99lDV2C94ZtDFv8Nj7ExbFLTpQDwVxHWcqLCyVhcnlpQC4U2zDrFuoc8CKi/DSbfMZUgBwD6PG3Djdcy9pWrkvJlF7RTXMLkORYa+x2TO23cQf1ar7It1lkFmzRsk//P00SmJ4WYXINM0EAH1MKt7xDtqKc+A3IhbAEyhGzXjDpmT/K/JxfLijrKDme+4iTeghjo6sncQXyW3YRKwYyj94xhB30gvR6dTXpixKiXtBZvTSXiQQadSm5yKHGiUm11E7MNU9XBkQoX47+JsROvsmzpHfM9xS2bogt6dV8wCCMS+UN/FebK1ldAC8apk8vjiFlvXZSYQ590cYaO+Fb3AicVFyfXdmYm0YchDIy5OehNbPKB1OF13HN4VUJHsfcQ5VArKjctN4yHKnd+ZyGSdLl7mnvgyIxMM1NX745Mwu6IgdW1secAo33uzIS0/gjxes4ygkTOVD+VZOUWVxgYVRPyRGFu0KyKZgnjItiiNoGAfc3V1PqLtpsIgesiyG45vIuK55wBChEzcoA110r+WQwbx3d1TtW5kAIWMPcsQIpYDxw/EmPOO0DVY8VRBqfuCg+eOF/nhSSL8iZq7k5ccO7DCHwfzG9QGyCwZG48LQYp+fzY5OkFatvGYD54g+tnN+d5xUsiRg1z03Rijz0Nry2TqECcLJK1x/dig7NroIZvUfJ2SxGy9LD/34GU26C2Mt7HNiQ/PHIQGfQ4Qp0w5vLmqUB/nrxFL6gVw+QOIUW8cedDHGHqu4+hHKLvL+0/OF2xINRtBWMtw2kRsVenF+XZnXKapZ8ezyhx+MK2k8LjqsS5+f3EGKN0/6sqHEWdsAIh4Ezd4z2b6ADlNq105m5W7SlpdRphFLISTtARhck4ne8RoOepjF3cFIqNBfmxqRlhn2fS1xvNhCsY4+xhissK5cUTMg5Wsm/x0YT4dcupo2kJ2d37uwTcF3SFGm31y1jZQUzmu5xSNswZfvjjMlhhnRVF8SCtuLWeraMSquhNXlupManWP2fSPaUg6Tjw78/uztlWp7ZyZJz4UDXGqH45HqdHDehE+pED2u7qE2MfHg/TqA4h9kIeIdL7t5OgK2a3jgU2H03Vfg4gFuoVQnJVZOfujxpgOMaQ536qTOinP+VDACrxGo//qySZkBnfbfgSxZfnCTh4HdzKD0HG+dlzrZwIOXyQ/8pcFHC1cVsSGlPvwLfl8epDwzT5WtPKc+vqHi4i9bE54H/FXBoXzF+2/9kMousSpl26nksGiSz+lT3savDApoN91/uppEJrkSWbiedQkK09PHVH2vHl6cnJs4GFR1UsHOfKgMTgBgq7eqyDX8owZCp+1J0MrXJLnK0YSj3x+nIvDKSY8b3m4eNKsfpeTAuzYl4lXL71AMA1VHkSu88GF/ZlI3r1fQYA4iwsMuz0//c6nNrb0rlnv549ODgNQTf/IkwsnzbjUQ8ZOhIMMFJfBi9FXFmdSsATtK39F/yU13vJxCKXec0JBmOzDt5fFPpmP6W2m6ycArpBN8Ex2mlOuLp8b190TPv7+RRgHUIv4iveXnnPmyf61rPLdB0xQkFbt8qEd84kd9fJkWuU3cTgRNcBOVzKre7NpXPUfe2H4tPoeJPWXn0RGuzm6xBk+ndM+TMfj8c1DK+V6oH7oqef3IA2+9/zIeYh3Cz6MM1Qoo+2F4evw4iN1bz/C9ubHqo9CevdpnYUM+4bJf4JxDxeaZ9QTyd3B1ZX6N/3LAE4svb9Jhsm/fx2O1PLl9a/1D0J+vX91g2wdqn/Xvv9S4ft3o/g/UMzbeNXMuXMAAAAASUVORK5CYII=";
 
 const C = {
   agency: "סוכנות גבאי",
@@ -115,13 +115,13 @@ const TRAIL = [
 
 const CSS = `
 *{box-sizing:border-box}
-html,body{margin:0;background:#ebe8e2;color:#1c1917}
+html,body{margin:0;background:#ebe8e2;color:#1c1917;overflow-x:clip}
 button{font-family:inherit}
 .app{min-height:100vh;font-family:Assistant,Heebo,Arial,sans-serif;font-size:15.5px;line-height:1.45}
-.top{background:#f7f6f3;border-bottom:1px solid #d4d0c8;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top{background:#f7f6f3;border-bottom:1px solid #d4d0c8;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
 .brand{display:flex;align-items:center;gap:8px;font-family:Heebo,Assistant,sans-serif;font-weight:700;font-size:15px}
-.brand img{height:26px;background:#fff;border:1px solid #d4d0c8;padding:3px 6px}
-.case{color:#5c574e;font-size:13.5px}
+.brand img{height:26px;width:auto;max-width:96px;background:#fff;border:1px solid #d4d0c8;padding:3px 6px;object-fit:contain}
+.case{color:#5c574e;font-size:13.5px;min-width:0}
 .rail{display:flex;gap:0;overflow:auto;background:#f7f6f3;border-bottom:1px solid #d4d0c8;padding:0 8px}
 .rail button{appearance:none;background:transparent;border:0;border-bottom:2px solid transparent;color:#5c574e;font-weight:600;font-size:13.5px;padding:10px 12px;min-height:40px;white-space:nowrap;cursor:pointer}
 .rail button.on{color:#1f4e79;border-bottom-color:#1f4e79}
@@ -134,7 +134,7 @@ button{font-family:inherit}
 .desk{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;align-items:start}
 .desk.solo{grid-template-columns:minmax(0,1fr)}
 @media(max-width:900px){.desk,.desk.solo{grid-template-columns:1fr}}
-.win{background:#fff;border:1px solid #cfcabe;color:#1c1917}
+.win{background:#fff;border:1px solid #cfcabe;color:#1c1917;min-width:0;max-width:100%}
 .tb{display:flex;justify-content:space-between;gap:8px;align-items:baseline;background:#f3f1ec;border-bottom:1px solid #d4d0c8;padding:7px 10px;font-size:13.5px}
 .tb b{font-family:Heebo,Assistant,sans-serif;font-weight:700}
 .tb span,.menu span{color:#5c574e}
@@ -145,10 +145,12 @@ button{font-family:inherit}
 .mast em{font-style:normal;color:#1f4e79;font-weight:700}
 .form{display:grid;grid-template-columns:128px 1fr;border:1px solid #d4d0c8;margin:8px 0}
 @media(min-width:720px){.form.wide{grid-template-columns:128px 1fr 128px 1fr}}
-.form div{padding:6px 8px;border-bottom:1px solid #e4e0d8;font-size:14px}
+.form div{padding:6px 8px;border-bottom:1px solid #e4e0d8;font-size:14px;min-width:0;overflow-wrap:anywhere}
 .form .lab{background:#f3f1ec;color:#3f3a33;font-weight:600}
 .num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+.tbl{overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0}
+.tbl table{min-width:520px;margin:0}
 th{text-align:right;font-weight:700;background:#f3f1ec;border:1px solid #d4d0c8;padding:6px 8px}
 td{border:1px solid #e4e0d8;padding:6px 8px;vertical-align:top}
 tr.hot td{background:#f7f5f0}
@@ -162,11 +164,16 @@ tr.miss td{background:#f8f1f1;color:#6e2424}
 .fine{color:#5c574e;font-size:13px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:800px){.two{grid-template-columns:1fr}.form.wide{grid-template-columns:128px 1fr}}
-.wait{position:fixed;inset-inline:0;bottom:0;z-index:5;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin:0;padding:10px 20px;background:#f7f6f3;border-top:1px solid #cfcabe}
+.wait{position:fixed;inset-inline:0;bottom:0;z-index:20;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:#f7f6f3;border-top:1px solid #cfcabe}
 .wait p{margin:0;font-weight:600;color:#1c1917;font-size:14.5px;flex:1;min-width:200px}
 .acts{display:flex;gap:8px;align-items:center}
-.doit{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 18px;border:1px solid #1f4e79;background:#1f4e79;color:#fff;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
-.ghost{min-height:40px;padding:8px 12px;border:1px solid #cfcabe;background:#fff;color:#1c1917;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
+.doit{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 18px;border:1px solid #1f4e79;background:#1f4e79;color:#fff;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
+.ghost{min-height:44px;padding:8px 12px;border:1px solid #cfcabe;background:#fff;color:#1c1917;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
+@media(max-width:520px){
+  .wait{flex-direction:column;align-items:stretch}
+  .acts{width:100%}
+  .doit,.ghost{flex:1}
+}
 .doit:focus-visible,.ghost:focus-visible,.rail button:focus-visible{outline:3px solid #1f4e79;outline-offset:2px}
 .dossier{background:#f7f6f3;border:1px solid #d4d0c8;padding:10px 12px;position:sticky;top:8px}
 .dossier h2{font-family:Heebo,Assistant,sans-serif;font-size:14px;margin:0 0 8px}
@@ -183,7 +190,7 @@ tr.miss td{background:#f8f1f1;color:#6e2424}
 .wa .bar{font-size:13px;font-weight:700;margin-bottom:8px}
 .bub{background:#d9fdd3;border:1px solid #b7e2b0;padding:8px 10px;max-width:460px;margin-inline-start:auto;font-size:14.5px}
 .bub time{display:block;text-align:left;color:#3f3a33;font-size:12px;margin-top:4px}
-.cal{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.cal{display:grid;grid-template-columns:repeat(5,minmax(68px,1fr));gap:6px;min-width:420px}
 .cal div{border:1px solid #e4e0d8;padding:6px;min-height:64px;font-size:13px;background:#fff}
 .cal .h{min-height:0;background:#f3f1ec;font-weight:700;border-color:#d4d0c8}
 .old{color:#6e2424;text-decoration:line-through}
@@ -335,14 +342,14 @@ function App() {
         <article className="msg">
           <div className="mh"><b>מייל · רשימה בקובץ</b><span className="num">08.10.2026 09:31</span></div>
           <div className="mb">נושא: עובדים חדשים לנובמבר. מצורף רשימת-עובדים.xlsx.</div>
-          <table>
+          <div className="tbl"><table>
             <thead><tr><th>שם</th><th>ת״ז</th><th>תחילה</th><th>סוכן</th><th>משפחה בהודעה</th></tr></thead>
             <tbody>
               <tr className="hot"><td>{C.who}</td><td className="num">{C.id}</td><td>{C.start}</td><td>{C.agent}</td><td>{C.spouse}, {C.child}</td></tr>
               <tr><td>{C.q2}</td><td className="num">{C.q2id}</td><td>{C.q2start}</td><td>{C.agent}</td><td>לא פורט</td></tr>
               <tr><td>{C.q3}</td><td className="num">{C.q3id}</td><td>{C.q3start}</td><td>{C.agent}</td><td>לא פורט</td></tr>
             </tbody>
-          </table>
+          </table></div>
         </article>
         <Wait next={next} back={back}>לאשר את הקליטה ולפתוח את אורי מלכה. ליה ותומר לא נפתחים.</Wait>
       </Win>
@@ -368,13 +375,13 @@ function App() {
           ["ילד", C.child + " · יליד " + C.childBorn],
           ["מסמך שהגיע", "צילום ת״ז בלבד"],
         ]} />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>מסמך</th><th>מקור</th><th>תאריך</th><th>סטטוס בתיק</th></tr></thead>
           <tbody>
             <tr className="hot"><td>{C.who}.jpg</td><td>הודעת נייד של המעסיק</td><td className="num">08.10.2026</td><td>ממתין לתיוק</td></tr>
             <tr className="miss"><td>טפסים חתומים מהמעסיק</td><td>—</td><td>—</td><td>לא התקבלו. החתימות ייצאו מפוליוויז</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <Wait next={next} back={back}>לשמור את הכרטיס בעתיד ולתייק את צילום הת״ז.</Wait>
       </Win>
     );
@@ -385,7 +392,7 @@ function App() {
     body = (
       <Win sys="עתיד · ממשק שדר" sub={"יעד: אלמגור · אצווה 2026-10-08-014 · לקוח " + C.atid} menu={["ממשקים", "שדר לאלמגור", "יומן שידורים"]}>
         <Mast sys="עתיד" what={"הלקוח " + C.atid + " שמור. השדר מרכיב רק מה שכבר בתיק. אלמגור עדיין בלי הרשומה."} wait="אישור השידור. השידור פותח את הלקוח באלמגור" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>#</th><th>מה עובר</th><th>ערך</th><th>בשידור</th></tr></thead>
           <tbody>
             <tr><td>1</td><td>פרטי לקוח</td><td>{C.who} · <span className="num">{C.id}</span> · {C.emp}</td><td>מוכן</td></tr>
@@ -396,7 +403,7 @@ function App() {
             <tr><td>6</td><td>העתקי פוליסות</td><td>—</td><td>אין בתיק. אחרי סריקה</td></tr>
             <tr><td>7</td><td>קבצי מסלקה, טרום ייעוץ</td><td>—</td><td>אין בתיק. אחרי הזמנה מאלמגור</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <p className="fine">אקסל הר הביטוח, הפוליסות וקבצי הטרום ייעוץ ייכנסו לשדר אחר, כשיהיו בתיק. השדר הזה לא ממציא אותם.</p>
         <Wait next={next} back={back}>לשדר לאלמגור ולפתוח את הלקוח שם.</Wait>
       </Win>
@@ -416,7 +423,7 @@ function App() {
             ["מה נחתם", "מסלקה, הר הביטוח, העתקי פוליסות"],
             ["ייפוי כוח", "מצורף לאותו לינק"],
           ]} />
-          <table>
+          <div className="tbl"><table>
             <thead><tr><th>מסמך בלינק</th><th>סטטוס</th></tr></thead>
             <tbody>
               <tr><td>הרשאה למסלקה</td><td>בטיוטה</td></tr>
@@ -424,7 +431,7 @@ function App() {
               <tr><td>הרשאה להעתקי פוליסות</td><td>בטיוטה</td></tr>
               <tr><td>ייפוי כוח</td><td>באותו לינק</td></tr>
             </tbody>
-          </table>
+          </table></div>
           <p className="fine">פוליוויז אוספת את הר הביטוח, את הפוליסות ואת המסלקה, ומפיקה דוח לתיק. השיחה נשארת אצל {C.coord}.</p>
           <Wait next={next} back={back}>לשלוח את הלינק מפוליוויז, אחרי ההסבר לעובד.</Wait>
         </Win>
@@ -442,14 +449,14 @@ function App() {
     body = (
       <Win sys="פוליוויז" sub={C.pw + " · יומן מעקב"} menu={["בקשות", "מעקב", "הודעות"]}>
         <Mast sys="פוליוויז" what="עברו שלושה ימים. אורי פתח את הלינק ולא השלים תאריך לידה ופרטי בת הזוג לאימות. שלוש ההרשאות לא נחתמו. חוזרים לאותו תיק, לא פותחים מסלול חדש." wait="שליחת התזכורת" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>תאריך</th><th>פעולה</th><th>תוצאה</th></tr></thead>
           <tbody>
             <tr><td className="num">08.10.2026 10:05</td><td>לינק נשלח</td><td>נמסר</td></tr>
             <tr><td className="num">11.10.2026 10:05</td><td>שיחה יוצאת, {C.coord}</td><td>לא ענה</td></tr>
             <tr className="hot"><td className="num">11.10.2026 10:20</td><td>טיוטת הודעה</td><td>לא נשלחה</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <div className="quote">שלום {C.first}, הלינק לחתימה עדיין פתוח באמצע. בלי הפרטים ובלי שלוש ההרשאות אי אפשר להוציא את הר הביטוח, את העתקי הפוליסות ואת המסלקה, ואי אפשר לקבוע פגישה עם {C.agent}.</div>
         <Wait next={next} back={back}>לשלוח את התזכורת.</Wait>
       </Win>
@@ -461,14 +468,14 @@ function App() {
     body = (
       <Win sys="עתיד" sub={C.atid + " · מסמכי לקוח"} menu={["מסמכים", "חתימות"]}>
         <Mast sys="עתיד" what="חזרו שתי הרשאות חתומות מפוליוויז. השלישית, העתקי פוליסות, לא נחתמה. צילום הת״ז כבר בתיק מהפתיחה." wait="תיוק שתי ההרשאות שחזרו" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>מסמך</th><th>מקור</th><th>נחתם</th><th>בתיק עתיד</th></tr></thead>
           <tbody>
             <tr className="hot"><td>הרשאה למסלקה</td><td className="num">{C.pw}</td><td className="num">13.10.2026</td><td>ממתין לתיוק</td></tr>
             <tr className="hot"><td>הרשאה להר הביטוח</td><td className="num">{C.pw}</td><td className="num">13.10.2026</td><td>ממתין לתיוק</td></tr>
             <tr className="miss"><td>הרשאה להעתקי פוליסות</td><td className="num">{C.pw}</td><td>—</td><td>לא נחתמה. בלי זה אין סריקה</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <Wait next={next} back={back}>לתייק את שתי ההרשאות. את השלישית לא ממציאים.</Wait>
       </Win>
     );
@@ -479,14 +486,14 @@ function App() {
     body = (
       <Win sys="פוליוויז" sub={C.pw + " · מסמך חסר"} menu={["בקשות", "מעקב"]}>
         <Mast sys="פוליוויז" what="בתיק שתי הרשאות. חסרה הרשאה להעתקי פוליסות. הפגישה נשארת סגורה." wait="שליחת תזכורת על המסמך החסר" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>הרשאה</th><th>מצב</th></tr></thead>
           <tbody>
             <tr><td>מסלקה</td><td>חתומה, בתיק עתיד</td></tr>
             <tr><td>הר הביטוח</td><td>חתומה, בתיק עתיד</td></tr>
             <tr className="miss"><td>העתקי פוליסות</td><td>חסרה</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <div className="quote">שלום {C.first}, נשארה חתימה אחת: הרשאה להעתקי פוליסות. שתי האחרות כבר אצלנו. ברגע שזו תיחתם נוכל להמשיך לפגישה עם {C.agent}.</div>
         <p className="fine">טיוטה מ־14.10.2026 09:10. לא נשלחה.</p>
         <Wait next={next} back={back}>לשלוח את התזכורת.</Wait>
@@ -499,7 +506,7 @@ function App() {
     body = (
       <Win sys="עתיד" sub={C.atid + " · הר הביטוח"} menu={["מסמכים", "הר הביטוח"]}>
         <Mast sys="עתיד" what={"הרשאת העתקי הפוליסות נחתמה ב־15.10.2026. בעקבות הרשאת הר הביטוח חזר הקובץ «הר הביטוח — " + C.who + ".xlsx»."} wait="תיוק ההרשאה ותיוק האקסל" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>מבטח</th><th>סוג</th><th>פוליסה</th><th>סכום בדוח</th><th>סטטוס</th></tr></thead>
           <tbody>
             {POL.map(function (p) {
@@ -507,7 +514,7 @@ function App() {
             })}
             <tr><td>כלל</td><td>ביטוח מנהלים ישן</td><td className="num">90331127</td><td>צבירה 6,200 ש״ח</td><td>לא פעיל. לא נסרק לזימון</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <Wait next={next} back={back}>לתייק את ההרשאה השלישית ואת האקסל.</Wait>
       </Win>
     );
@@ -518,14 +525,14 @@ function App() {
     body = (
       <Win sys="שדר · סריקות" sub={"אצווה " + C.scan + " · 15.10.2026 11:18"} menu={["סריקה", "שמות קבצים", "לשידור"]}>
         <Mast sys="שדר" what="ההעתקים הגיעו כסריקות, לא כקובץ שירד לבד. השם המוצע לכל קובץ: חברת הביטוח ומספר הפוליסה, כדי שיואב יזהה אותו בזימון." wait="אישור השמות והכנסה לשדר" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>סריקה גולמית</th><th>מה זוהה</th><th>שם אחרי אישור</th></tr></thead>
           <tbody>
             {POL.map(function (p) {
               return <tr key={p.num}><td className="num">{p.raw}</td><td>{p.ins} · {p.kind} · <span className="num">{p.num}</span></td><td><b>{p.file}</b></td></tr>;
             })}
           </tbody>
-        </table>
+        </table></div>
         <p className="fine">כלל 90331127 לא פעילה ולא נכנסת לאצווה.</p>
         <Wait next={next} back={back}>לאשר את השמות ולסרוק לשדר.</Wait>
       </Win>
@@ -537,7 +544,7 @@ function App() {
     body = (
       <Win sys="עתיד · ממשק שדר" sub={"השלמה · לקוח אלמגור " + C.alg + " כבר קיים"} menu={["ממשקים", "שדר לאלמגור"]}>
         <Mast sys="עתיד" what="השדר השני מעביר את מה שלא היה בפתיחה: אקסל הר הביטוח ושלושת העתקי הפוליסות בשם שאושר." wait="אישור השידור" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>פריט</th><th>בשדר הזה</th></tr></thead>
           <tbody>
             <tr><td>פרטי לקוח, בת זוג, ילד</td><td>כבר הועברו ב־08.10, אצווה 2026-10-08-014</td></tr>
@@ -546,7 +553,7 @@ function App() {
             <tr><td>העתקי פוליסות</td><td>{POL.map(function (p) { return p.file; }).join(" · ")}</td></tr>
             <tr><td>קבצי מסלקה</td><td>לא בשדר. יוזמנו מאלמגור</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <Wait next={next} back={back}>לשדר את הקבצים לאלמגור.</Wait>
       </Win>
     );
@@ -581,21 +588,21 @@ function App() {
     body = (
       <Win sys="אלמגור" sub={C.alg + " · " + C.who} menu={["לקוח", "משפחה", "תוכניות", "מסמכים"]}>
         <Mast sys="אלמגור" what={"הזמנה " + C.ms + " חזרה ב־16.10.2026 08:40. התוכניות נפתחו מהקובץ. קבצי טרום הייעוץ בתיק. אין כאן שליחה."} wait="אין שליחה במסך הזה. האישור הבא הוא קביעת המועד" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>תוכנית שנפתחה</th><th>מקור</th><th>צבירה</th></tr></thead>
           <tbody>
             <tr><td>פנסיה מקיפה · מנורה · <span className="num">77190214</span></td><td>קובץ מסלקה</td><td>18,400 ש״ח</td></tr>
             <tr><td>ביטוח מנהלים קודם · כלל · <span className="num">90331127</span></td><td>קובץ מסלקה</td><td>6,200 ש״ח</td></tr>
           </tbody>
-        </table>
-        <table>
+        </table></div>
+        <div className="tbl"><table>
           <thead><tr><th>קובץ שחזר</th><th>סוג</th><th>בתיק</th></tr></thead>
           <tbody>
             <tr><td className="num">MS-551902_314552191.pdf</td><td>קובץ מסלקה</td><td>נקלט</td></tr>
             <tr><td>טרום ייעוץ — פנסיה מקיפה.pdf</td><td>טרום ייעוץ</td><td>בתיק</td></tr>
             <tr><td>טרום ייעוץ — ביטוח מנהלים.pdf</td><td>טרום ייעוץ</td><td>בתיק</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <p className="fine">{C.q2}, ת״ז <span className="num">{C.q2id}</span>, לא פתוחה באלמגור. קובץ מסלקה על הת״ז שלה היה פותח גם את הלקוח וגם את התוכניות. אצל {C.who} הלקוח כבר היה קיים, אז נפתחו התוכניות בלבד.</p>
         <p className="fine">התיק מלא: צילום ת״ז, שלוש הרשאות, אקסל הר הביטוח, שלוש פוליסות בשם שאושר, תוכניות, וקבצי טרום ייעוץ.</p>
         <Wait next={next} back={back}>להמשיך לתיאום מול הלקוח.</Wait>
@@ -608,10 +615,10 @@ function App() {
     body = (
       <Win sys={"יומן " + C.agent} sub="נובמבר 2026 · בקשת דחייה" menu={["יומן", "פגישות", "זמינות"]}>
         <Mast sys={"יומן " + C.agent} what={C.coord + " חזרה אל " + C.who + " לקבוע. הוא ענה ב־19.10.2026: «שלישי בבוקר לא מסתדר. אפשר חמישי?» המועד הישן ירד. הזימון עדיין לא נשלח."} wait="אישור המועד החלופי" />
-        <div className="cal">
+        <div className="tbl"><div className="cal">
           <div className="h">א׳ 8.11</div><div className="h">ב׳ 9.11</div><div className="h">ג׳ 10.11</div><div className="h">ד׳ 11.11</div><div className="h">ה׳ 12.11</div>
           <div>חסום</div><div>14:00 תפוס</div><div><span className="old">09:00 הוצע ובוטל</span></div><div>פנוי אחה״צ</div><div className="neu">10:30 פנוי</div>
-        </div>
+        </div></div>
         <Field wide rows={[
           ["מועד חדש", C.slot],
           ["מקום", C.room],
@@ -636,7 +643,7 @@ function App() {
           ["מתי", C.slot],
           ["איפה", C.room],
         ]} />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>קובץ מצורף</th><th>מה הסוכן רואה</th></tr></thead>
           <tbody>
             <tr><td>הראל 44821093.pdf</td><td>פוליסת בריאות</td></tr>
@@ -646,7 +653,7 @@ function App() {
             <tr><td>הר הביטוח — {C.who}.xlsx</td><td>אקסל הר הביטוח</td></tr>
             <tr><td>טרום ייעוץ — פנסיה מקיפה.pdf</td><td>טרום ייעוץ</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <Wait next={next} back={back}>לשלוח את הזימון למייל של אורי.</Wait>
       </Win>
     );
@@ -674,21 +681,21 @@ function App() {
     body = (
       <Win sys="יומן הטיפול" sub={C.who + " · " + C.atid + " · " + C.alg}>
         <Mast sys="התיק" what="כל השליחות, החתימות והזימון יצאו רק אחרי אישור של שירה. המערכות שמופיעות כאן לא מחוברות באמת." wait="אין פעולה פתוחה" />
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>מתי</th><th>מערכת</th><th>מה אושר</th></tr></thead>
           <tbody>
             {TRAIL.map(function (t, i) { return <tr key={i}><td className="num">{t[0]}</td><td>{t[1]}</td><td>{t[2]}</td></tr>; })}
           </tbody>
-        </table>
+        </table></div>
         <h2 style={{ fontFamily: "Heebo, Assistant, sans-serif", fontSize: 16 }}>הערכת זמן, לא מדידה</h2>
-        <table>
+        <div className="tbl"><table>
           <thead><tr><th>שורה</th><th>זמן</th><th>מה זה</th></tr></thead>
           <tbody>
             <tr><td>טיפול ידני משוער לעובד אחד, כולל שלושת הסבבים</td><td>כ־50 דק׳</td><td>המחשה</td></tr>
             <tr><td>זמן המתאמת בהדגמה: האישורים, לא המעבר בין המערכות</td><td>כ־12 דק׳</td><td>המחשה</td></tr>
             <tr><td>ההפרש לעובד</td><td>כ־38 דק׳</td><td>המחשה. לא נמדד בסוכנות גבאי ולא הבטחה</td></tr>
           </tbody>
-        </table>
+        </table></div>
         <p className="fine">פריסה: Flow Edge על שרתי הסוכנות, או ענן מוסווה. שתיהן זמינות. אין כאן SSO, אין יומן ביקורת, ואין חיבור אמיתי לעתיד, לאלמגור, לפוליוויז, ליומן או לוואטסאפ.</p>
         <div className="wait">
           <p>אין פעולה פתוחה בתיק.</p>
