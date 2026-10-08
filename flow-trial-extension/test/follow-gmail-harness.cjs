@@ -171,7 +171,7 @@ const ASK = 'Please confirm the final figure by Monday so I can book the vendor.
   const others = [1, 2, 3].map((i) => Object.assign({}, baseWatch, { id: 'x' + i, threadId: 'x' + i }));
   t = await open(browser, 'cap', [msg(theirs, 'Can you send the numbers?'), msg(mine, ASK)], { watches: others });
   s = await t.state();
-  check('a free account at 3 follow-ups sees the Pro card, not another offer', /3 of 3 open loops/.test(s.card || '') && /See Glance Pro/.test(s.card || '') && !/Stay on it/.test(s.card || ''), s.card);
+  check('a free account at 3 follow-ups sees the cap, not a Pro offer', /3 of 3 open loops/.test(s.card || '') && !/Glance Pro/.test(s.card || '') && !/Stay on it/.test(s.card || ''), s.card);
   await t.ctx.close();
   t = await open(browser, 'cap-pro', [msg(theirs, 'Can you send the numbers?'), msg(mine, ASK)], { watches: others, pro: true });
   s = await t.state();

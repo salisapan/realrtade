@@ -31,7 +31,13 @@ const FlowEntitlements = (() => {
   const PRO_NUDGE_LEVEL = 3;
   const NUDGE_MIN_CLOSES = 5;
   const NUDGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
-  const PRICING_URL = 'https://theflow-ai.com/pricing.html#glance-pro';
+  // Same last switch as the server's PRO_PUBLIC. Off in this store build: no Pro card, no price,
+  // no checkout or pricing link is drawn. The licence gate on paid model calls stays. Flip this
+  // only when the owner turns the paid store on (docs/monetization.md, open-tasks row 11).
+  const PRO_PUBLIC = false;
+  // ?from=glance tells the pricing page (waitlist source, analytics, checkout metadata) that the visit came from inside
+  // the extension. src/follow.js swaps it for from=cap on the "3 of 3" card only. Unused while PRO_PUBLIC is false.
+  const PRICING_URL = 'https://theflow-ai.com/pricing.html?from=glance#glance-pro';
 
   const KEY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const KEY_RE = new RegExp('^GLNC(-[' + KEY_ALPHABET + ']{5}){4}$');
@@ -121,9 +127,10 @@ const FlowEntitlements = (() => {
 
   return {
     FREE_WATCH_CAP, FREE_NUDGE_LEVEL, PRO_NUDGE_LEVEL, watchGate, nudgeGate,
-    OFFLINE_GRACE_MS, RECHECK_AFTER_MS, NUDGE_MIN_CLOSES, NUDGE_COOLDOWN_MS, PRICING_URL,
+    OFFLINE_GRACE_MS, RECHECK_AFTER_MS, NUDGE_MIN_CLOSES, NUDGE_COOLDOWN_MS, PRICING_URL, PRO_PUBLIC,
     normalizeKey, isActive, needsRecheck, recordFromVerification, describe, shouldNudge
   };
 })();
 
+if (typeof globalThis !== 'undefined') globalThis.FlowEntitlements = FlowEntitlements;
 if (typeof module !== 'undefined') module.exports = { FlowEntitlements };

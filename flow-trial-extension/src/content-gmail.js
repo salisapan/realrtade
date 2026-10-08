@@ -294,7 +294,11 @@
   const PRO_REQUIRED_MESSAGE = 'Draft-It and attachment summaries are part of Glance Pro. Open the Glance panel to start a free trial or enter a key.';
 
   function aiErrorMessage(response, fallback) {
-    if (response && response.code === 'pro_required') return PRO_REQUIRED_MESSAGE;
+    if (response && response.code === 'pro_required') {
+      return (typeof FlowEntitlements !== 'undefined' && FlowEntitlements.PRO_PUBLIC === true)
+        ? PRO_REQUIRED_MESSAGE
+        : 'Draft-It and attachment summaries are not in this version.';
+    }
     return (response && response.error) || fallback;
   }
 

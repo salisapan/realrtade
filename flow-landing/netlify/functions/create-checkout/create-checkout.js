@@ -5,8 +5,10 @@
 //        Stripe setting is present, so the "Start free trial" button can never
 //        appear before it can actually take payment. The prices come from
 //        Stripe itself, so the number shown is the number charged.
-//   POST { interval:'month'|'year', email? } -> { url }
-//        Creates a Stripe Checkout session and returns its hosted URL.
+//   POST { interval:'month'|'year', email?, source? } -> { url }
+//        Creates a Stripe Checkout session and returns its hosted URL. `source`
+//        (whitelisted: SOURCES) lands in metadata[source] on the session and
+//        the subscription, so the first payments can be traced to the extension.
 //
 // Settings (Netlify environment):
 //   STRIPE_SECRET_KEY, STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_YEARLY,
@@ -23,6 +25,13 @@ const LOG_PREFIX = '[create-checkout]';
 const SITE_URL = 'https://theflow-ai.com';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+// Where the buyer came from (pricing.html sends it from ?from=). Missing = the plain pricing page;
+// anything not on this list is stored as 'other' so free text never reaches Stripe metadata.
+const SOURCES = ['pricing-pro', 'pricing-pro-glance', 'pricing-pro-cap'];
+function checkoutSource(value) {
+  if (value === undefined || value === null || value === '') return 'pricing-pro';
+  return SOURCES.indexOf(value) >= 0 ? value : 'other';
+}
 
 const RATE = new Map();
 const RATE_WINDOW_MS = 10 * 60 * 1000;
@@ -118,6 +127,8 @@ exports.handler = async function (event) {
   if (!interval) return reply(400, { error: 'Choose monthly or yearly.' });
   const email = String(body.email || '').trim().toLowerCase();
   if (email && (!EMAIL_RE.test(email) || email.length > 254)) return reply(400, { error: 'Enter a valid email address.' });
+  const source = checkoutSource(body.source);
+  const from = source === 'pricing-pro-glance' ? 'glance' : source === 'pricing-pro-cap' ? 'cap' : '';
 
   try {
     const form = {
@@ -125,9 +136,11 @@ exports.handler = async function (event) {
       'line_items[0][price]': interval === 'year' ? cfg.priceYear : cfg.priceMonth,
       'line_items[0][quantity]': '1',
       success_url: SITE_URL + '/pro-welcome.html?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: SITE_URL + '/pricing.html#glance-pro',
+      cancel_url: SITE_URL + '/pricing.html' + (from ? '?from=' + from : '') + '#glance-pro',
       'metadata[product]': 'glance-pro',
+      'metadata[source]': source,
       'subscription_data[metadata][product]': 'glance-pro',
+      'subscription_data[metadata][source]': source,
     };
     if (email) form.customer_email = email;
     if (cfg.trialDays > 0) form['subscription_data[trial_period_days]'] = String(cfg.trialDays);
