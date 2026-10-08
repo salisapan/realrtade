@@ -53,6 +53,7 @@ import '../core/proof-of-close.js'; // classic: sets globalThis.FlowProofOfClose
 import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitmentTitle
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
+import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -4010,6 +4011,42 @@ async function outlookFileUndo(ref) {
   return { ok: false, reason: 'http-' + ((del && del.status) || 0) };
 }
 
+// The attachmentSave step's writer. The page does not call it in 0.9.38.
+// Bytes have to be on the file. A multi-file step does not fetch "the one file".
+async function attachmentSaveWrite(p) {
+  const Save = globalThis.FlowSuggestSave;
+  if (!Save || typeof Save.saveAttachments !== 'function') return { ok: false, reason: 'not-configured' };
+  const params = (p && p.params) || {};
+  const files = params.files || [];
+  const target = params.target === 'drive' ? 'drive' : 'onedrive';
+  const out = await Save.saveAttachments(files, target, {
+    writeOne: async (file) => {
+      const b64 = file && (file.base64 || file.contentBytes);
+      if (!b64) return { ok: false, reason: 'no-bytes' };
+      if (target !== 'onedrive') return { ok: false, reason: 'no-bytes' };
+      const written = await outlookFileWrite({
+        fileName: file.name,
+        attachment: { filename: file.name, mimeType: file.contentType, base64: b64 }
+      });
+      const proof = written && written.proof && written.proof.fetchedBack === true ? written.proof : null;
+      const ref = written && written.ref ? Object.assign({ created: written.ref.created !== false }, written.ref) : null;
+      return { ok: !!proof, proof: proof, ref: ref, reason: (written && written.reason) || (proof ? null : 'verify_failed') };
+    }
+  });
+  return Object.assign({ ok: !!(out && out.handled), written: out && (out.line || (out.handled ? 'Saved.' : null)) }, out);
+}
+
+async function attachmentSaveUndo(ref) {
+  const Save = globalThis.FlowSuggestSave;
+  const list = Array.isArray(ref) ? ref : (ref && Array.isArray(ref.undo) ? ref.undo : (ref ? [ref] : []));
+  if (!Save || typeof Save.undoSaved !== 'function') return { ok: false };
+  const out = await Save.undoSaved(list, {
+    undoOne: (one) => outlookFileUndo(one)
+  });
+  const wanted = list.filter((r) => r && r.created !== false).length;
+  return { ok: out.deleted === wanted && wanted > 0, written: 'Undone.', deleted: out.deleted };
+}
+
 const WRITERS = {
   hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
@@ -4017,7 +4054,8 @@ const WRITERS = {
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
   outlookDraft: outlookDraftWrite, outlookCalendar: outlookCalendarWrite,
   outlookTask: outlookTaskWrite, microsoftTodo: outlookTaskWrite,
-  onedriveFile: outlookFileWrite
+  onedriveFile: outlookFileWrite,
+  attachmentSave: attachmentSaveWrite
 };
 const UNDOERS = {
   hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
@@ -4026,7 +4064,8 @@ const UNDOERS = {
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
   outlookDraft: outlookDraftUndo, outlookCalendar: outlookCalendarUndo,
   outlookTask: outlookTaskUndo, microsoftTodo: outlookTaskUndo,
-  onedriveFile: outlookFileUndo
+  onedriveFile: outlookFileUndo,
+  attachmentSave: attachmentSaveUndo
 };
 
 async function connectorStatus() {

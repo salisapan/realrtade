@@ -152,6 +152,16 @@ check('"passed it to accounting" on a payment is not paid', outcome('העברת�
 check('"much appreciated" is an acknowledgement', outcome('Much appreciated!', replyW) === 'ack');
 check('"thanks for sending" is an acknowledgement', outcome('Thanks for sending this over.', replyW) === 'ack');
 check('a refusal is still an answer (it closes the loop as declined, you know where you stand)', outcome('Unfortunately we decided not to go ahead with the vendor.', replyW) === 'declined');
+check('rm-101 not-my-job plus contact-them closes as declined, not as done', outcome('שלום, נושא זה אינו בטיפולי ולא בסמכותי. אנא פנה אל מנהל האגף למערכות מידע ב[ORG]. תודה, [NAME]', replyW) === 'declined');
+check('rm-102 retirement closes as declined, not as done', outcome('אתם לא מעודכנים😊. פרשתי לפני כחצי שנה. תוכלו למצוא את פרטי המחליפה שלי באתר [ORG] תחת הנהלה', replyW) === 'declined');
+check('rm-103 a suggestion to talk does not close the loop', outcome('[NAME] שלום, כדאי שנדבר על הנושא. בברכה [NAME]', replyW) === 'ack');
+check('rm-104 לא הבנתי is not a bare no', outcome('שלום, לא הבנתי אם מדובר על מערכת לניהול קריאות? יודעת לנהל מלאי וחלפים? תודה [NAME]', replyW) !== 'declined');
+check('rm-111 Hebrew absence is an auto-reply', outcome('שלום, לרגל חופשה אעדר מהמשרד עד ליום [DATE] למקרים דחופים יש לפנות ל[NAME] [EMAIL]', replyW) === 'auto');
+check('rm-113 Hebrew absence is an auto-reply', outcome('שלום, בתקופה הקרובה אעדר מ[ORG]. לסיוע ותמיכה ניתן לפנות במייל [EMAIL]', replyW) === 'auto');
+check('rm-114 a recipient bounce is not an answer', outcome('Message blocked. Your message to [EMAIL] has been blocked. The response from the remote server was: 550 5.4.1 Recipient address rejected: Access denied.', replyW) === 'auto');
+check('a bare לא still declines', outcome('לא', replyW) === 'declined');
+check('לא תודה still declines', outcome('לא תודה', replyW) === 'declined');
+check('please direct this to accounting declines', outcome('Please direct this to our accounting department.', replyW) === 'declined');
 console.log('  payment:');
 check('"payment sent" closes a payment loop as paid', outcome('Payment sent today, confirmation attached.', payW) === 'paid');
 check('"I paid yesterday" is paid', outcome('I paid yesterday, should reach you shortly.', payW) === 'paid');

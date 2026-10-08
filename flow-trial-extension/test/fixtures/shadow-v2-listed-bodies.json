@@ -1,0 +1,486 @@
+[
+ {
+  "id": "v2syn-9371",
+  "text": "בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00."
+ },
+ {
+  "id": "v2rtest-close-families-corpus-128",
+  "text": "Confirming the fee is about $4,200."
+ },
+ {
+  "id": "v2rtest-intent-actions-corpus-1122",
+  "text": "As a reminder, you agreed to send the invoice by Friday, September 18."
+ },
+ {
+  "id": "v2syn-155",
+  "text": "Good morning Maya, Hope your week is going well. Can you review the CV and get back to me by Wednesday, October 14? Thank you"
+ },
+ {
+  "id": "v2syn-157",
+  "text": "Hey,\n\nHope your week is going well.\n\nCan you review the NDA and get back to me before Sunday?\n\nBest,\nDana"
+ },
+ {
+  "id": "v2syn-159",
+  "text": "Lior, can you review the onboarding checklist and get back to me tomorrow?\n\nRegards,\nMichael\n\n--\nMichael Ross\nHead of Ops | Acme Ltd\n+972-54-1095028"
+ },
+ {
+  "id": "v2syn-169",
+  "text": "Dear Maya, Can you review the W-9 form and get back to me by EOD? Thanks\n\nSent from my iPhone"
+ },
+ {
+  "id": "v2syn-401",
+  "text": "Hey Avi,\n\nCan you please approve the pilot by Oct 20?\n\nThanks,\nRachel\n\n--\nRachel Green\nHead of Ops | Acme Ltd\n+972-54-1095028"
+ },
+ {
+  "id": "v2syn-588",
+  "text": "Noa, reminder: the payment of €750 is due by Thursday. Please process it. Best"
+ },
+ {
+  "id": "v2syn-770",
+  "text": "Hello, As agreed, you will send the CV on Monday. Cheers"
+ },
+ {
+  "id": "v2syn-809",
+  "text": "Hi Rachel,\n\nAs agreed, you will send the invoice by Oct 20.\n\nRegards,\nEthan"
+ },
+ {
+  "id": "v2syn-869",
+  "text": "Lior, per our call, you said you would review the quarterly report before Sunday.\r\n\r\nBest regards,\r\nEthan"
+ },
+ {
+  "id": "v2syn-873",
+  "text": "Good morning Michael,\r\n\r\nPer our call, you said you would review the budget spreadsheet today.\r\n\r\nRegards,\r\nSarah\r\n\r\n--\r\nSarah Cohen\r\nCFO | Globex Inc.\r\n+972-54-1087109"
+ },
+ {
+  "id": "v2syn-883",
+  "text": "Michael, per our call, you said you would review the deck by Oct 20.\n\nBest regards,\nSarah"
+ },
+ {
+  "id": "v2syn-3801",
+  "text": "Hello,\n\nApproved: ₪15,000 for onboarding.\n\nThanks,\nSarah\n\n--\nSarah Cohen\nCFO | Globex Inc.\n+972-54-1087109"
+ },
+ {
+  "id": "v2syn-3802",
+  "text": "Hey Rachel,\n\nApproved: ₪3,400 for the budget.\n\nThanks,\nDana\n\n--\nDana Levi\nProduct Lead | Acme Ltd\n+972-54-1071271"
+ },
+ {
+  "id": "v2syn-3803",
+  "text": "Hey Maya,\r\n\r\nApproved: €750 for the budget.\r\n\r\nThanks,\r\nTom"
+ },
+ {
+  "id": "v2syn-3804",
+  "text": "Good morning Lior, Approved: $4,850 for the pilot. Regards"
+ },
+ {
+  "id": "v2syn-3805",
+  "text": "Good morning Lior, Approved: $4,850 for the piilot. Regards"
+ },
+ {
+  "id": "v2syn-3812",
+  "text": "Hi,\n\nApproved: ₪15,000 for the pilot.\n\nBest regards,\nBilling\n\n--\nBilling\nHead of Ops | Northwind\n+972-54-1055433"
+ },
+ {
+  "id": "v2syn-3813",
+  "text": "Lior, Approved: ₪1,200 for the migration. Thanks!"
+ },
+ {
+  "id": "v2syn-3815",
+  "text": "Hi, Approved: ₪15,000 for onboarding. Many thanks"
+ },
+ {
+  "id": "v2syn-3816",
+  "text": "Hey Maya,\n\nApproved: ₪3,400 for the migration.\n\nMany thanks,\nBilling"
+ },
+ {
+  "id": "v2syn-3821",
+  "text": "Noa, Approved: ₪1,200 for onboarding. Cheers"
+ },
+ {
+  "id": "v2syn-3822",
+  "text": "Approved: ₪15,000 for the campaign."
+ },
+ {
+  "id": "v2syn-3825",
+  "text": "Good morning Maya, Approved: ₪1,200 for the launch checklist. Thanks"
+ },
+ {
+  "id": "v2syn-3826",
+  "text": "Good morning Maya, Approved: ₪1,200 for the launch chelkist. Thanks"
+ },
+ {
+  "id": "v2syn-3827",
+  "text": "Hi,\r\n\r\nApproved: $1,200 for the renewal.\r\n\r\nThanks!\r\nEthan\r\n\r\n--\r\nEthan Hunt\r\nAccount Manager | Northwind\r\n+972-54-1079190"
+ },
+ {
+  "id": "v2syn-3828",
+  "text": "Approved: ₪3,400 for the campaign."
+ },
+ {
+  "id": "v2syn-3831",
+  "text": "Approved: $89 for the budget."
+ },
+ {
+  "id": "v2syn-3834",
+  "text": "Hello,\n\nRachel, approved: $4,850 for onboarding.\n\nBest regards,\nDana"
+ },
+ {
+  "id": "v2syn-3840",
+  "text": "Hey Rachel,\n\nApproved: $1,200 for onboarding.\n\nThank you,\nTom"
+ },
+ {
+  "id": "v2syn-3841",
+  "text": "Approved: ₪3,400 for the launch checklist."
+ },
+ {
+  "id": "v2syn-3842",
+  "text": "Lior, approved: $89 for the migration.\n\nCheers,\nRachel\n\n--\nRachel Green\nHead of Ops | Acme Ltd\n+972-54-1095028"
+ },
+ {
+  "id": "v2syn-7009",
+  "text": "תוכלי לעבור על הזמנת הרכש ולחזור אליי עד יום רביעי?"
+ },
+ {
+  "id": "v2syn-11374",
+  "text": "צהריים טובים,\r\n\r\nאבי, נא לשלם את החשבונית של $500 עד יום ראשון.\r\n\r\nיום נעים,\r\nמיכאל\r\n\r\nנשלח מה-iPhone שלי"
+ },
+ {
+  "id": "v2syn-12083",
+  "text": "Michael, could you please share the budget spreadsheet by November 2?\n\nThank you,\nBilling"
+ },
+ {
+  "id": "v2syn-12557",
+  "text": "Avi, could you update the lease next Tuesday?"
+ },
+ {
+  "id": "v2syn-12743",
+  "text": "Noa, can you prepare the resume by Oct 20?"
+ },
+ {
+  "id": "v2syn-12808",
+  "text": "Avi,\n\nFollowing up on our call.\n\nCan you set up a interview next Monday at 4:30pm?\n\nThanks!\nDana\n\n--\nDana Levi\nProduct Lead | Acme Ltd\n+972-54-1071271"
+ },
+ {
+  "id": "v2syn-13326",
+  "text": "Hi, Following up on our call. Rachel, please set up a call Sunday at 11:15 Thank you"
+ },
+ {
+  "id": "v2syn-13513",
+  "text": "Hi Rachel, Please wire ₪15,000 by Oct 20. Thanks!"
+ },
+ {
+  "id": "v2syn-13647",
+  "text": "Avi, can you transfer ₪3,400 to the vendor by Wednesday, October 14? Regards"
+ },
+ {
+  "id": "v2syn-13648",
+  "text": "Avi, can you trnsfer ₪3,400 to the vendor by Wednesday, October 14? Regards"
+ },
+ {
+  "id": "v2syn-13684",
+  "text": "Hello,\n \nHope you are well.\nCould you pay the ₪15,000 invoice by Wednesday, October 14?\n \nRegards,\nTom\n\n[image: logo]\nTom Baker\nProduct Lead | Acme Ltd\n+972-54-1071271\n"
+ },
+ {
+  "id": "v2syn-13696",
+  "text": "Hello,\r\n \r\n\r\nCould you pay the €750 invoice by Thursday?\r\n \r\nBest,\r\nDana\r\n\r\n[image: logo]\r\nDana Levi\r\nProduct Lead | Acme Ltd\r\n+972-54-1071271\r\n"
+ },
+ {
+  "id": "v2syn-13701",
+  "text": "Good morning,\r\n\r\nRachel, could you pay the ₪3,400 invoice before Sunday?\r\n\r\nThank you,\r\nSarah\r\n\r\n--\r\nSarah Cohen\r\nCFO | Globex Inc.\r\n+972-54-1087109"
+ },
+ {
+  "id": "v2syn-15110",
+  "text": "We approved ₪1,200 for the renewal this morning."
+ },
+ {
+  "id": "v2syn-15121",
+  "text": "Noa, we approved ₪1,200 for the pilot this morning."
+ },
+ {
+  "id": "v2syn-18736",
+  "text": "היי, אבי, תוכל לחתום על החוזה החתום ולהחזיר ביום שני? בתודה"
+ },
+ {
+  "id": "v2syn-18771",
+  "text": "נא לחתום ולהחזיר את הקבלה עד סוף היום בברכה"
+ },
+ {
+  "id": "v2syn-19343",
+  "text": "תוכלי למלא את המצגת עד יום חמישי?\n\nנשלח מה-iPhone שלי"
+ },
+ {
+  "id": "v2syn-19573",
+  "text": "מאיה,\n\nתוכלו להכין את טופס המס עד ה-20 באוקטובר?\n\nבברכה,\nאבי\n\n--\nאבי בירנבאום\nמנהלת לקוחות | אקמי בע״מ\n054-1095028\nwww.acme.co.il"
+ },
+ {
+  "id": "v2syn-20080",
+  "text": "דנה, נשמח אם תוכלו להכין את הדוח הרבעוני עד יום ראשון? המשך יום טוב\n\nנשלח מה-iPhone שלי"
+ },
+ {
+  "id": "v2syn-20081",
+  "text": "דנה, נשמח אם תוכלו להכינ את הדוח הרבעוני עד יום ראשון? המשך יום טוב\n\nנשלח מה-iPhone שלי"
+ },
+ {
+  "id": "v2syn-21417",
+  "text": "דנה, תוכלי לעשות approve להמעבר לענן ביום שלישי הבא?"
+ },
+ {
+  "id": "v2syn-23190",
+  "text": "שירן שלום, נוכל לעשות שיחה קצרה ביום רביעי בשעה 11:15? תודה רבה"
+ },
+ {
+  "id": "v2syn-24177",
+  "text": "pls תשמור את הקובץ המצורף בגוגל דרייב"
+ },
+ {
+  "id": "v2repo-intent-teacher-eval-188-gmail",
+  "text": "אני צריך את המספר הסידורי של הלפטופ, תוכל למצוא ולשלוח?"
+ },
+ {
+  "id": "v2rtest-capture-corpus-50",
+  "text": "Can you send the lease please?"
+ },
+ {
+  "id": "v2rtest-judgment-corpus-1276",
+  "text": "Suppose we approved the $40,000 for the pilot — would that actually work on your side?"
+ },
+ {
+  "id": "v2rtest-request-types-corpus-1578",
+  "text": "Can you countersign the lease and send it back?"
+ },
+ {
+  "id": "oss-en-3p-163",
+  "text": "Dana, can you send the final numbers for the budget to the client by Friday? Sali cc'd for visibility.\nAlex"
+ },
+ {
+  "id": "oss-en-3p-169",
+  "text": "Tom, can you send the final numbers for the budget to the client by Friday? Sali cc'd for visibility.\nTom"
+ },
+ {
+  "id": "oss-C-adv-drive-att0",
+  "text": "Please save the attached file to Drive."
+ },
+ {
+  "id": "oss-C-adv-drive-att2",
+  "text": "Please save the attached file to Drive."
+ },
+ {
+  "id": "oss-he-news-102",
+  "text": "הזמנה לוובינר ביום חמישי בשעה 16:00. להרשמה לחצו כאן. להסרה מרשימת התפוצה."
+ },
+ {
+  "id": "oss-he-news-106",
+  "text": "הזמנה לוובינר ביום חמישי בשעה 16:00. להרשמה לחצו כאן. להסרה מרשימת התפוצה."
+ },
+ {
+  "id": "oss-en-3p-163",
+  "text": "Dana, can you send the final numbers for the budget to the client by Friday? Sali cc'd for visibility.\nAlex"
+ },
+ {
+  "id": "oss-en-3p-165",
+  "text": "Dana, can you send the final numbers for hiring plan to the client by Friday? Sali cc'd for visibility.\nRachel"
+ },
+ {
+  "id": "oss-en-3p-169",
+  "text": "Tom, can you send the final numbers for the budget to the client by Friday? Sali cc'd for visibility.\nTom"
+ },
+ {
+  "id": "oss-B-neg-05",
+  "text": "אל תשמור את הקובץ המצורף בדרייב, זו טיוטה."
+ },
+ {
+  "id": "oss-B-past-04",
+  "text": "החוזה היה אמור להגיע ביום שישי שעבר וחתמנו בזמן."
+ },
+ {
+  "id": "oss-B-3p-01",
+  "text": "Michael, please send Sali's team the numbers by Friday."
+ },
+ {
+  "id": "oss-C-adv-neg-he-1",
+  "text": "בבקשה אל תשמור את הקובץ המצורף בדרייב."
+ },
+ {
+  "id": "oss-C-adv-neg-he-2",
+  "text": "אין צורך לשמור את הקובץ המצורף בדרייב."
+ },
+ {
+  "id": "oss-C-adv-od-noatt",
+  "text": "Please save the attached file to OneDrive by Friday."
+ },
+ {
+  "id": "oss-C-adv-drive-att0",
+  "text": "Please save the attached file to Drive."
+ },
+ {
+  "id": "oss-C-adv-drive-att2",
+  "text": "Please save the attached file to Drive."
+ },
+ {
+  "id": "oss-C-adv-mkt-he",
+  "text": "הצטרפו לוובינר ביום שלישי בשעה 15:00! ההרשמה פתוחה."
+ },
+ {
+  "id": "oss-C-adv-cond-amt",
+  "text": "If we approve the $40,000 we would sign Monday, but nothing has been decided internally yet."
+ },
+ {
+  "id": "v2syn-205",
+  "text": "Sali, we still need the budget spreadsheet from you by Thursday before we can onboard.\n\nMany thanks,\nEthan\n\nSent from my iPhone"
+ },
+ {
+  "id": "v2syn-314",
+  "text": "Sali, any chance you can send the SOW by Wednesday, October 14? Best regards\n\nSent from my iPhone"
+ },
+ {
+  "id": "v2syn-405",
+  "text": "Hi all, Can you please approve onboarding asap? Best"
+ },
+ {
+  "id": "v2syn-410",
+  "text": "Hi all,\n\nCan you please approve onboarding asap?\n\nMany thanks,\nBilling"
+ },
+ {
+  "id": "v2syn-779",
+  "text": "Hi all, As agreed, you will send the purchase order by end of week. Thank you"
+ },
+ {
+  "id": "v2syn-785",
+  "text": "As agreed, you will send the expense report today."
+ },
+ {
+  "id": "v2syn-807",
+  "text": "Hey,\n\nAs agreed, you will send the invoice asap.\n\nCheers,\nBilling\n\n--\nBilling\nHead of Ops | Northwind\n+972-54-1055433"
+ },
+ {
+  "id": "v2syn-808",
+  "text": "Hey,\n\nAs agreed, you wil send the invooice asap.\n\nCheers,\nBilling\n\n--\nBilling\nHead of Ops | Northwind\n+972-54-1055433"
+ },
+ {
+  "id": "v2syn-6916",
+  "text": "שלום,\n\nאפשר לשלוח לי את אישור ניכוי מס במקור עד מחר בבוקר?\n\nבתודה,\nדנה"
+ },
+ {
+  "id": "v2syn-6929",
+  "text": "צהריים טובים,\n \n\nאפשר לשלוח לי את אישור הביטוח עד יום שני?\n \nבברכה,\nאבי\n\n[image: logo]\nאבי בירנבאום\nמנהלת לקוחות | אקמי בע״מ\n054-1095028\nwww.acme.co.il\n"
+ },
+ {
+  "id": "v2syn-6930",
+  "text": "סאלי, אפשר לשלוח לי את נספח ב׳ מחר?"
+ },
+ {
+  "id": "v2syn-7002",
+  "text": "תוכלי לעבור על הקבלות מהנסיעה ולחזור אליי ASAP? תודה!"
+ },
+ {
+  "id": "v2syn-7010",
+  "text": "סאלי, תוכלי לעבור על גיליון התמחור ולחזור אליי לפני החג?\n\nתודה רבה,\nנועה"
+ },
+ {
+  "id": "v2syn-7685",
+  "text": "שלום,\r\n\r\nרק תזכורת: התחייבת לשלוח את ה-SOW ביום שלישי הבא.\r\n\r\nתודה,\r\nשרה\r\n\r\n--\r\nשרה מזרחי\r\nסמנכ״ל כספים | אקמי בע״מ\r\n054-1071271\r\nwww.acme.co.il\r\n\r\nנשלח מה-iPhone שלי"
+ },
+ {
+  "id": "v2syn-8402",
+  "text": "בוקר טוב,\n\nנדבר ביום רביעי הבא ב-14:30 על ה-onboarding?\n\nתודה!\nמיכאל"
+ },
+ {
+  "id": "v2syn-9285",
+  "text": " \r\n\r\nתשלח בבקשה את טופס 101 כקובץ מצורף עד מחר בבוקר.\r\n \r\nתודה,\r\nדנה\r\n\r\n[image: logo]\r\nדנה לוי\r\nיועצת משפטית | גלובקס\r\n054-1055433\r\nwww.acme.co.il\r\n\r\nהודעה זו והמצורפים לה מיועדים לנמען בלבד ועשויים להכיל מידע חסוי. אם ק"
+ },
+ {
+  "id": "v2syn-9286",
+  "text": "סאלי,\n\nתשלח בבקשה את קורות החיים כקובץ מצורף עד ה-15 באוקטובר.\n\nבברכה,\nהילה"
+ },
+ {
+  "id": "v2syn-9297",
+  "text": "שבוע טוב!\r\n\r\nתשלח בבקשה את ה-SOW כקובץ מצורף עד ה-20 באוקטובר.\r\n\r\nיום נעים,\r\nאבי\r\n\r\n--\r\nאבי בירנבאום\r\nמנהלת לקוחות | אקמי בע״מ\r\n054-1095028\r\nwww.acme.co.il"
+ },
+ {
+  "id": "v2syn-9308",
+  "text": "בוקר טוב,\n\nתשלח בבקשה את קורות החיים כקובץ מצורף עד יום שני.\n\nיום נעים,\nדנה\n\nנשלח מה-iPhone שלי"
+ },
+ {
+  "id": "v2syn-9312",
+  "text": "הי סאלי, תשלח בבקשה את תעודת ההתאגדות כקובץ מצורף עד ה-20 באוקטובר. תודה"
+ },
+ {
+  "id": "v2syn-9313",
+  "text": "סאלי, תשלח בבקשה את הזמנת הרכש כקובץ מצורף עד יום ראשון. תודה"
+ },
+ {
+  "id": "v2syn-12142",
+  "text": "Hey,\n \n\nCan I get the budget spreadsheet from you next Tuesday?\n \nCheers,\nEthan\n\n[image: logo]\nEthan Hunt\nAccount Manager | Northwind\n+972-54-1079190\n\n\nSent from my iPhone"
+ },
+ {
+  "id": "v2syn-12143",
+  "text": "Hey,\n \n\nCan I get the budgte spreadsheet from you next Tuesday?\n \nCheers,\nEthan\n\n[image: logo]\nEthan Hunt\nAccount Manager | Northwind\n+972-54-1079190\n\n\nSent from my iPhone"
+ },
+ {
+  "id": "v2syn-12144",
+  "text": "Can I get the lease from you by Friday?\n\nSent from my iPhone"
+ },
+ {
+  "id": "v2syn-12147",
+  "text": "Hello,\n\nCan I get the budget spreadsheet from you by Thursday?\n\nBest,\nEthan"
+ },
+ {
+  "id": "v2syn-12865",
+  "text": "Hi all,\n\nWould you be able to fill out the board memo today?\n\nBest,\nSarah\n\n--\nSarah Cohen\nCFO | Globex Inc.\n+972-54-1087109"
+ },
+ {
+  "id": "v2syn-13278",
+  "text": "Please double-check the tax form by October 15"
+ },
+ {
+  "id": "v2syn-13279",
+  "text": "Hi all, Please double-check the purchase order by Thursday Best regards"
+ },
+ {
+  "id": "v2syn-13283",
+  "text": "Hi team,\n\nPlease double-check the tax form by Friday\n\nThanks!\nTom\n\n--\nTom Baker\nProduct Lead | Acme Ltd\n+972-54-1071271"
+ },
+ {
+  "id": "v2syn-13286",
+  "text": "Hi team,\n\nPlease double-check the SOW by Thursday\n\nBest regards,\nMichael"
+ },
+ {
+  "id": "v2syn-13291",
+  "text": "Hi all,\n\nPlease double-check the invoice next Tuesday\n\nCheers,\nTom"
+ },
+ {
+  "id": "v2syn-17987",
+  "text": "נשמח אם תוכלו לשלוח לי את תעודת ההתאגדות לפני החג? תודה!"
+ },
+ {
+  "id": "v2syn-18010",
+  "text": "היי,\n\nנשמח אם תוכלו להעביר אליי את גיליון התמחור עד סוף השבוע?\n\nבתודה,\nיוסי\n\n--\nיוסי אברהם\nמנהל תפעול | גלובקס\n054-1079190\nwww.acme.co.il"
+ },
+ {
+  "id": "v2syn-18271",
+  "text": "סאלי, שלח לי בבקשה את אישור הביטוח עד ה-20 באוקטובר\n\nהמשך יום טוב,\nאבי"
+ },
+ {
+  "id": "v2syn-18282",
+  "text": "בוקר טוב,\r\n\r\nשלח לי בבקשה את אישור הביטוח עד יום שישי\r\n\r\nיום נעים,\r\nדנה"
+ },
+ {
+  "id": "v2syn-19079",
+  "text": "שלום,\r\n\r\nאפשר להעלות את ההצעה למערכת עד ה-20 באוקטובר?\r\n\r\nתודה רבה,\r\nנועה"
+ },
+ {
+  "id": "v2syn-19082",
+  "text": "שלום רב,\r\n\r\nאפשר להעלות את ה-invoice למערכת עד יום ראשון?\r\n\r\nבברכה,\r\nנועה\r\n\r\nנשלח מה-iPhone שלי"
+ },
+ {
+  "id": "v2syn-19085",
+  "text": "היי,\r\n\r\nאפשר להעלות את החוזה החתום למערכת ביום שני?\r\n\r\nבתודה,\r\nשרה"
+ },
+ {
+  "id": "v2syn-19088",
+  "text": "בוקר טוב,\n\nאפשר להעלות את החוזה החתום למערכת עד ה-15 באוקטובר?\n\nתודה רבה,\nאבי\n\n--\nאבי בירנבאום\nמנהלת לקוחות | אקמי בע״מ\n054-1095028\nwww.acme.co.il"
+ },
+ {
+  "id": "v2syn-19091",
+  "text": "עומר שלום, אפשר להעלות את תעודת ההתאגדות למערכת עד יום חמישי? בתודה"
+ }
+]

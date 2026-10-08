@@ -71,6 +71,10 @@ const FlowGoogleCloses = (() => {
     const t = String(text || '');
     return SAVE_EN.test(t) || SAVE_HE.test(t);
   }
+
+  function refusesSave(text) {
+    return SAVE_NO.test(String(text || ''));
+  }
   const COMMENT_EN = /\b(?:comment|add a comment|leave a note)\b[^.!?\n]{0,40}\b(?:on|in)\s+(?:the\s+)?(?:doc|document|google doc)\b/i;
   const COMMENT_HE = /(?:תגיב|תוסיף\s+הערה|הערה)[^\n]{0,30}(?:במסמך|בדוק|במסמך\s+גוגל)/;
   const HEDGE = /\b(?:maybe|might|perhaps|possibly)\b|(?:^|\s)(?:אולי|ייתכן)/i;
@@ -615,6 +619,8 @@ const FlowGoogleCloses = (() => {
   return {
     consider: consider,
     needsOneAttachment: needsOneAttachment,
+    refusesSave: refusesSave,
+    refusesSave: refusesSave,
     detailMode: detailMode,
     cardPlan: cardPlan,
     chatLine: chatLine,

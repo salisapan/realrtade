@@ -345,7 +345,10 @@
     if (!threadId) return false;
     const subject = ((row.querySelector('span.bog') || {}).textContent || '').trim();
     const snippet = ((row.querySelector('span.y2') || {}).textContent || '').replace(/^\s*-\s*/, '').trim();
-    const text = [subject, snippet].filter(Boolean).join('\n');
+    const rawText = [subject, snippet].filter(Boolean).join('\n');
+    const text = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
+      ? FlowIncomingJudge.prepareForJudge(rawText)
+      : rawText;
     if (text.length < 12) return false;
     const emailEl = row.querySelector('[email]');
     const nameEl = row.querySelector('.yP, .zF');
@@ -528,8 +531,11 @@
         if (idx >= 0) cut = full.slice(0, idx).trim();
       }
     }
-    if (body) return cut;
-    return stripGmailReadingChrome(cut);
+    const plain = body ? cut : stripGmailReadingChrome(cut);
+    if (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function') {
+      return FlowIncomingJudge.prepareForJudge(plain);
+    }
+    return plain;
   }
 
   // Gmail renders any recipient who is the signed-in account as the literal
@@ -643,14 +649,17 @@
   // already matches before the chip can claim "didn't find it". The
   // check is one name lookup, not a picker and not a Drive browser.
   async function classifyForChip(text, base) {
+    const prepared = (typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.prepareForJudge === 'function')
+      ? FlowIncomingJudge.prepareForJudge(text)
+      : text;
     const template = await readCompanyTemplate();
     const ctx = Object.assign({}, base, { companyTemplate: template });
-    let intent = FlowIntent.classify(text, ctx);
+    let intent = FlowIntent.classify(prepared, ctx);
     if (intent && intent.googleWait && intent.googleWait.fileTerm) {
       const usingGoogle = state.onboarded && state.connectorId === 'googleTasks';
       if (!usingGoogle) await ensureGoogleAutoConnect();
       const match = await driveFindOne(intent.googleWait.fileTerm);
-      intent = FlowIntent.classify(text, Object.assign({}, ctx, { fileMatch: match }));
+      intent = FlowIntent.classify(prepared, Object.assign({}, ctx, { fileMatch: match }));
     }
     return intent || { type: null };
   }
@@ -871,9 +880,13 @@
       const last = Number(chainHost.getAttribute('data-checked-at') || 0);
       if (Date.now() - last < 60000) return;
       chainHost.remove();
-    } else if (message.querySelector('.flow-chip-host')) return;
+    } else if (message.querySelector('.flow-chip-host')) {
+      void noteSuggestShown(currentContext && currentContext.messageId);
+      return;
+    }
 
     const messageId = stable.messageId;
+    openSuggest = null;
     if (!messageId) return;
 
     // A message can reach "seen" with no live chip in front of you two very
@@ -987,6 +1000,18 @@
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
+    openSuggest = {
+      messageId: messageId,
+      text: text,
+      inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase(),
+      attachments: attachments.map((meta) => ({
+        id: meta.url || meta.filename,
+        name: meta.filename,
+        filename: meta.filename,
+        contentType: meta.mimeType || '',
+        size: Number(meta.size)
+      }))
+    };
     let chosenAttachment = attachment;
     let intent = await classifyForChip(text, {
       senderEmail: sender.email,
@@ -1174,7 +1199,7 @@
       executionMemory,
       attachFile
     });
-    if (!process) return; // defensive only — every catalog entry has at least an anchor step
+    if (!process) { void flushSuggest(false); return; }
 
     injectChip(message, {
       messageId, legacyMessageId: legacyId || null, intent, process, sender, subject, attachment: chosenAttachment, attachments,
@@ -1474,6 +1499,7 @@
   // chip: that one stays "Do It". Nothing is sent, and the receipt does not
   // say the loop is handled.
   function injectNeedsYou(messageNode, ctx) {
+    void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
     const chain = ctx.chain || {};
     const card = chain.card || {};
@@ -1759,6 +1785,7 @@
   }
 
   function injectChip(messageNode, ctx) {
+    void flushSuggest(true);
     if (messageNode.querySelector('.flow-chip-host')) return;
 
     const host = el('div', 'flow-chip-host');
@@ -2058,7 +2085,56 @@
 
   // A reason code and a message id. recordSilence drops anything else.
   // detail is local only. A family trace logs clock tokens, never the body.
+  let openSuggest = null;
+
+  async function appendSuggestLog(entry) {
+    if (!entry || typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return;
+    const bag = await FlowStorage.get();
+    const log = Array.isArray(bag.suggestLog) ? bag.suggestLog.slice() : [];
+    const key = String(entry.messageId || '') + '|' + String(entry.reason || '');
+    if (log[0] && log[0].key === key) return;
+    log.unshift({
+      key: key, at: Date.now(), messageId: entry.messageId || null, reason: entry.reason,
+      fileCount: entry.fileCount || 0, target: entry.target || null, surface: 'gmail'
+    });
+    await FlowStorage.set({ suggestLog: log.slice(0, 40) });
+  }
+
+  function noteSuggestShown(messageId) {
+    if (!messageId) return;
+    void appendSuggestLog({ messageId: messageId, reason: 'suggest:other-card', surface: 'gmail' });
+  }
+
+  async function flushSuggest(showedCard) {
+    const ctx = openSuggest;
+    openSuggest = null;
+    if (!ctx || typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return;
+    if (showedCard) {
+      await appendSuggestLog({ messageId: ctx.messageId, reason: 'suggest:other-card', surface: 'gmail' });
+      return;
+    }
+    let bag = {};
+    try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
+    const decision = FlowSuggestSave.suggestSave({
+      surface: 'gmail',
+      inbound: ctx.inbound !== false,
+      text: ctx.text || '',
+      body: ctx.text || '',
+      messageId: ctx.messageId,
+      attachments: ctx.attachments,
+      consent: null,
+      otherCard: false,
+      dismissals: bag.suggestDismissals || {},
+      log: bag.log || []
+    });
+    await appendSuggestLog({
+      messageId: ctx.messageId, reason: decision.reason, surface: 'gmail',
+      fileCount: decision.fileCount, target: decision.target
+    });
+  }
+
   function recordSilence(messageId, reason, detail) {
+    void flushSuggest(false);
     if (!messageId || !reason || typeof FlowStorage.recordSilence !== 'function') return;
     FlowStorage.recordSilence({ messageId: messageId, reason: reason })
       .catch((e) => console.error('[Glance] failed to record a silence decision', e));

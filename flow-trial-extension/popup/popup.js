@@ -1016,7 +1016,8 @@
         diags.slice(0, 20).forEach((d) => {
           const sub = (d.subject || '(no subject)').slice(0, 80);
           const who2 = d.counterpart ? (' · ' + d.counterpart) : '';
-          list.appendChild(el('div', 'wait-note', d.reason + ' — “' + sub + '”' + who2));
+          const files = (d.fileCount && d.target) ? (' · ' + d.fileCount + ' ' + d.target) : '';
+          list.appendChild(el('div', 'wait-note', d.reason + ' — “' + sub + '”' + who2 + files));
         });
         details.appendChild(list);
         row.appendChild(details);

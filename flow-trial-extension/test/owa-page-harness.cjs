@@ -73,7 +73,8 @@ async function runPage(opts) {
       if (/\/me\?/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ mail: ME, displayName: 'Glance' }) };
       if (/mailFolders\/inbox\/messages/.test(u)) {
         if (o.inboxLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
-        return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+        const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
+        return { ok: true, status: 200, body: JSON.stringify({ value }) };
       }
       if (/mailFolders\/sentitems\/messages/.test(u)) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
       if (/\/me\/messages\?/.test(u)) {
@@ -81,7 +82,8 @@ async function runPage(opts) {
         // The inbox list above is the fallback the open page must use.
         if (o.convFilterEmpty && /conversationId/.test(decodeURIComponent(u))) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
         if (o.convLookupEmpty) return { ok: true, status: 200, body: JSON.stringify({ value: [] }) };
-        return { ok: true, status: 200, body: JSON.stringify({ value: o.emptyInbox ? [] : [graphMsg] }) };
+        const value = Array.isArray(o.threadMessages) ? o.threadMessages : (o.emptyInbox ? [] : [graphMsg]);
+        return { ok: true, status: 200, body: JSON.stringify({ value }) };
       }
       // Attachments are not the message. A conversation id on this path is a 400.
       // Handle it before the message GET, which would otherwise swallow "/attachments".
@@ -208,6 +210,7 @@ async function runPage(opts) {
     await new Promise((r) => setTimeout(r, 150));
   }
   clearInterval(ad);
+  if (typeof o.beforeClose === 'function') await o.beforeClose({ window: w, document: w.document, store, ctx, sent });
   let parsed = null;
   try { parsed = vm.runInContext('FlowOwaParse.readPane(document, location.href, { own: [' + JSON.stringify(ME) + '] })', ctx); } catch (e) { parsed = { error: e.message }; }
   const res = { files, throws, logs, logsAtCard, parsed, store, sent, chip: w.document.querySelector('.flow-chip-host'), chipMessage, doc: w.document };
@@ -805,6 +808,99 @@ async function runPage(opts) {
     check('an attached message is not a file, so the card stays off',
       !itemOnly.chip && fileIncoming(itemOnly.store).length === 0,
       { text: itemOnly.chip && itemOnly.chip.textContent, incoming: fileIncoming(itemOnly.store).length, why: (itemOnly.store.outlookPageDiag || []).map((d) => d.reason) });
+  }
+
+  console.log('\n--- Gate 0.9.38: the newest message is not the open sender ---\n');
+  {
+    const older = new Date(Date.now() - 60 * 60e3).toISOString();
+    const newer = new Date(Date.now() - 5 * 60e3).toISOString();
+    const threadMessages = [
+      {
+        id: 'M-open', conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: false,
+        from: { emailAddress: { name: 'flow', address: 'ai.local.flow@gmail.com' } },
+        toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+        receivedDateTime: older, body: { contentType: 'text', content: BODY }
+      },
+      {
+        id: 'M-other', conversationId: CONV, subject: 'Pilot proposal', isDraft: false, hasAttachments: true,
+        from: { emailAddress: { name: 'Noa', address: 'noa@acme.com' } },
+        toRecipients: [{ emailAddress: { name: 'Glance', address: ME } }],
+        receivedDateTime: newer,
+        body: { contentType: 'text', content: 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks' }
+      }
+    ];
+    const mixed = await runPage({ threadMessages, waitMs: 4500, urlId: CONV, listedConversationId: CONV, store: { glanceDebug: true } });
+    const why = (mixed.store.outlookPageDiag || []).map((d) => d.reason);
+    const shownId = mixed.chip && mixed.chip.getAttribute('data-glance-message');
+    check('two messages, newest from someone else: no card for that message',
+      !mixed.chip && shownId !== 'M-other' && why.indexOf('page:sender-mismatch') >= 0,
+      { text: mixed.chip && mixed.chip.textContent, id: shownId, why, logs: mixed.logs.filter((l) => /sender-mismatch|resolved|decision/.test(l)) });
+  }
+
+  console.log('\n--- Gate 0.9.38: one receipt, on its own message ---\n');
+  {
+    const OTHER = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEABHUtuqMLBpTbOTHER';
+    const proof = {
+      kind: 'written', system: 'microsoft/onedrive', connectorId: 'onedriveFile',
+      messageId: CONV, threadId: CONV, outlookConversationId: CONV,
+      externalId: 'FILE1', fetchedBack: true, verifiedAt: '2026-10-07T12:00:00.000Z',
+      url: 'https://example.com/file',
+      ref: { fileId: 'FILE1', itemId: 'FILE1', externalId: 'FILE1', created: true },
+      writtenLine: 'OneDrive · Q3-report.pdf'
+    };
+    const undone = await runPage({
+      store: { log: [proof], glanceDebug: true },
+      clickUndo: true,
+      waitMs: 4500,
+      beforeClose: async ({ window: w, document: doc, ctx }) => {
+        const hosts = doc.querySelectorAll('.flow-chip-host');
+        const text = Array.from(hosts).map((h) => h.textContent).join(' ');
+        check('Undo on A leaves the Undone line on A', hosts.length === 1 && /Undone/.test(text), { n: hosts.length, text: text.slice(0, 180) });
+        w.history.pushState({}, '', 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(OTHER));
+        const title = doc.querySelector('[title="Pilot proposal"]');
+        if (title) { title.setAttribute('title', 'Other mail'); title.textContent = 'Other mail'; }
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1500));
+        const onB = Array.from(doc.querySelectorAll('.flow-chip-host')).map((h) => h.textContent).join(' ');
+        check('open B shows no Undone banner from A', !/Undone/.test(onB), { text: onB.slice(0, 180) });
+        w.history.pushState({}, '', 'https://outlook.live.com/mail/0/inbox/id/' + encodeURIComponent(CONV));
+        if (title) { title.setAttribute('title', 'Pilot proposal'); title.textContent = 'Pilot proposal'; }
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1500));
+        const back = Array.from(doc.querySelectorAll('.flow-chip-host'));
+        const backText = back.map((h) => h.textContent).join(' ');
+        check('reopen A shows Undone on A only', back.length === 1 && /Undone/.test(backText) && back[0].querySelectorAll('.flow-chip-undo').length === 0, { n: back.length, text: backText.slice(0, 180) });
+      }
+    });
+    const twice = await runPage({
+      store: { log: [Object.assign({}, proof)] },
+      waitMs: 4500,
+      beforeClose: async ({ document: doc, ctx }) => {
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1200));
+        vm.runInContext('if (globalThis.__glanceOutlookPage) __glanceOutlookPage.rescan()', ctx);
+        await new Promise((r) => setTimeout(r, 1200));
+        const hosts = doc.querySelectorAll('.flow-chip-host[data-glance-chain="task-proof"]');
+        const undos = doc.querySelectorAll('.flow-chip-undo');
+        check('remount A twice keeps one receipt and one Undo', hosts.length === 1 && undos.length === 1, { hosts: hosts.length, undos: undos.length });
+      }
+    });
+    const shownWhy = await runPage({
+      store: {
+        outlookSync: {
+          stateVersion: 3,
+          diagnostics: [{ reason: 'outlook:attachments-unread', conversationId: CONV, subject: 'Pilot proposal' }]
+        }
+      },
+      waitMs: 4500
+    });
+    const left = ((shownWhy.store.outlookSync && shownWhy.store.outlookSync.diagnostics) || []).filter((d) => d && d.reason === 'outlook:attachments-unread' && d.conversationId === CONV);
+    const pageLeft = (shownWhy.store.outlookPageDiag || []).filter((d) => d && /attachments-unread/.test(String(d.reason || '')) && (d.conversationId === CONV || String(d.key || '').indexOf(CONV) >= 0));
+    check('a mail with a card is not listed under Why not shown for attachments-unread',
+      Boolean(shownWhy.chip) && left.length === 0 && pageLeft.length === 0,
+      { chip: Boolean(shownWhy.chip), left: left.length, pageLeft: pageLeft.map((d) => d.reason) });
+    void undone;
+    void twice;
   }
 
   console.log('\nTOTAL FAILURES:', failures);

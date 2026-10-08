@@ -59,8 +59,24 @@ const FlowGraphMail = (() => {
     return meSet.has(channel.normalizeEmail(email));
   }
 
+  function prepare(text) {
+    const judge = sibling(typeof FlowIncomingJudge !== 'undefined' ? FlowIncomingJudge : null, './incoming-judge.js', 'FlowIncomingJudge');
+    if (judge && typeof judge.prepareForJudge === 'function') return judge.prepareForJudge(text);
+    return String(text == null ? '' : text);
+  }
+
+  // Graph bodyPreview is the first 255 characters. A preview that long is a cut.
+  // A shorter preview is the whole mail. The full body wins whenever it is present.
+  function truncatedPreviewOnly(msg) {
+    if (!msg) return false;
+    const content = msg.body && msg.body.content != null ? String(msg.body.content) : '';
+    if (content.trim()) return false;
+    return String(msg.bodyPreview || '').length >= 255;
+  }
+
   // msg: a Graph message resource (may carry _folder from the runner). me: string | Set | array.
   // direction 'out' if the message came from sentitems OR its from-address is in meSet; otherwise 'in'.
+  // The full body is the sentence. bodyPreview is only the fallback when that body is empty.
   function toUtterance(msg, me) {
     if (!msg || msg.isDraft) return null;
     const fa = msg.from && msg.from.emailAddress;
@@ -74,7 +90,7 @@ const FlowGraphMail = (() => {
       ? (String(msg.body && msg.body.contentType).toLowerCase() === 'html' ? htmlToText(content) : content)
       : String(msg.bodyPreview || '');
     const ts = Date.parse(msg.sentDateTime || msg.receivedDateTime || '');
-    return channel.utterance({ channel: 'outlook', thread: msg.conversationId, id: msg.id, ts: Number.isFinite(ts) ? ts : null, direction: own ? 'out' : 'in', from: own ? Object.assign({}, from, { name: from.name }) : from, text: ownText(raw) });
+    return channel.utterance({ channel: 'outlook', thread: msg.conversationId, id: msg.id, ts: Number.isFinite(ts) ? ts : null, direction: own ? 'out' : 'in', from: own ? Object.assign({}, from, { name: from.name }) : from, text: ownText(prepare(raw)) });
   }
 
   // The other person of a conversation: everyone but addresses in meSet. A conversation whose parties are all in meSet (note to self) yields null.
@@ -189,7 +205,7 @@ const FlowGraphMail = (() => {
     return list[0] || channel.normalizeEmail(p.userPrincipalName) || null;
   }
 
-  return { htmlToText, ownText, toUtterance, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, notOwn, pickPrimary, isOpaqueMailbox, isHumanMailbox };
+  return { htmlToText, ownText, toUtterance, truncatedPreviewOnly, counterpartOf, meSetOf, ownAddressesFrom, isOwn, learnOwnFromMessages, notOwn, pickPrimary, isOpaqueMailbox, isHumanMailbox };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowGraphMail };

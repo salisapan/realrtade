@@ -49,7 +49,7 @@ function background(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.39', content_scripts: [{ js: [] }] }),
+        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.40', content_scripts: [{ js: [] }] }),
         onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} },
         lastError: null, getURL: (s) => s, id: 'ext'
       },
@@ -333,8 +333,9 @@ console.log('\n--- one Undo after reload ---\n');
     body.indexOf('doItInFlight = true') >= 0 && body.indexOf('onOutlookTodoDoIt') < body.lastIndexOf('doItInFlight = false') &&
     body.indexOf('onOnedriveDoIt') < body.lastIndexOf('doItInFlight = false'));
   const remount = page.slice(page.indexOf('async function remountProvedTodoReceipt'), page.indexOf('async function onOutlookTodoDoIt'));
-  check('reload drops the in-body Undo and keeps one host outside the message',
-    page.indexOf('function stripDuplicateUndoHosts') > 0 && remount.indexOf('stripDuplicateUndoHosts(mount)') > 0);
+  check('reload keeps one receipt for this message',
+    page.indexOf('function stripDuplicateUndoHosts') > 0 && remount.indexOf('stripDuplicateUndoHosts(mount)') > 0 &&
+    page.indexOf('glanceUndoneBanners') > 0);
   const undoClick = page.slice(page.indexOf("undo.addEventListener('click'"), page.indexOf('done.appendChild(actionsRow)'));
   check('a successful Undo leaves the Undone line on this message',
     undoClick.indexOf('data-glance-undone') > 0 &&
