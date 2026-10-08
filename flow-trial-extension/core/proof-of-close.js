@@ -284,10 +284,14 @@ const FlowProofOfClose = (() => {
   }
 
   function fileNameAgrees(saved, shown) {
+    const rawShown = String(shown || '').trim();
+    const truncated = /^[\u2026\u2025]/.test(rawShown) || /^\.{2,}/.test(rawShown) || /[\u2026\u2025]$/.test(rawShown) || /\.{2,}$/.test(rawShown);
     const left = String(saved || '').toLowerCase().replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '').trim();
-    const right = String(shown || '').toLowerCase().replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '').trim();
+    const right = rawShown.toLowerCase().replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '').trim();
     if (!left || !right) return false;
     if (left === right) return true;
+    // A chip cuts the name with an ellipsis. A shorter full name is a different file.
+    if (!truncated) return false;
     const short = left.length <= right.length ? left : right;
     const long = left.length <= right.length ? right : left;
     if (short.length < 12) return false;

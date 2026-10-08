@@ -344,6 +344,13 @@ console.log('\n--- Microsoft To Do ---\n');
     FlowProofOfClose.taskReceiptFromLog([storedFile], alphaFile) === storedFile);
   check('a file receipt remounts on the conversation when the open file name agrees',
     FlowProofOfClose.taskReceiptFromLog([storedFile], convFile) === storedFile);
+  const otherName = {
+    kind: 'written', messageId: 'AQMkOther', threadId: conv, outlookConversationId: conv,
+    connectorId: 'onedriveFile', system: 'microsoft/onedrive', externalId: 'drive_2',
+    verifiedAt: VERIFIED, fetchedBack: true, writtenLine: 'Saved agreement-signed.pdf to OneDrive'
+  };
+  check('a shorter full filename does not remount the longer file',
+    FlowProofOfClose.taskReceiptFromLog([otherName], { messageIds: [conv], threadIds: [conv], fileNames: ['northwind-agreement-signed.pdf'] }) === null);
   check('terminal with no chip mounts the To Do receipt',
     FlowProofOfClose.scanReceiptDecision({
       log: [storedTodo], messageIds: ['AAMkNEW'], threadIds: [conv], hasHost: false, terminal: true

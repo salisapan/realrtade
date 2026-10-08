@@ -191,8 +191,20 @@ function bodyNode(text) {
 check('a list-row or header clock of 13–23 proves 24-hour time',
   FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [chromeNode('ה 08/10/2026 14:01')]; } }) === true &&
   FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [chromeNode('08/10/2026 16:40')]; } }) === true);
-check('a body clock, Last checked, and a page with no list query do not prove 24-hour time',
+function classBody(text, className) {
+  const body = {
+    className: className,
+    parentElement: null,
+    parentNode: null,
+    getAttribute: function (name) { return name === 'class' ? className : null; },
+    querySelector: function () { return null; }
+  };
+  return chromeNode(text, body);
+}
+check('a body clock, a sentence, Last checked, and a page with no list query do not prove 24-hour time',
   FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [bodyNode('Meet at 15:00')]; } }) === false &&
+  FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [classBody('15:00', 'allowTextSelection')]; } }) === false &&
+  FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [chromeNode('Please arrive by 15:00')]; } }) === false &&
   FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [chromeNode('Last checked 03:50 PM')]; } }) === false &&
   FlowOwaParse.pageProves24h({ body: { textContent: 'ה 08/10/2026 14:01' } }) === false);
 
@@ -278,6 +290,9 @@ const onlyMid = FlowOwaParse.uniqueGraphMessage(noonPane(), [mMid]);
 check('only 00:05 present may link that hour', onlyMid.message && onlyMid.message.id === 'm-mid', onlyMid);
 const noonProved = FlowOwaParse.uniqueGraphMessage(noonPane({ pageHour24: true }), [mMid, mNoon]);
 check('a proved 24-hour page links the literal noon', noonProved.message && noonProved.message.id === 'm-noon', noonProved);
+const noonOnlyAlt = FlowOwaParse.uniqueGraphMessage(noonPane({ pageHour24: true, conversationId: 'c-mid' }), [mMid]);
+check('a proved 24-hour page does not link midnight when the clock was noon',
+  !noonOnlyAlt.message && /conflict-clock/.test(noonOnlyAlt.detail || ''), noonOnlyAlt);
 
 const outlookSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
 check('newest-by-subject is not a file link',

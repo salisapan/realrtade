@@ -304,11 +304,12 @@ const FlowOwaParse = (() => {
 
   // A parsed clock conflicts when the candidate minute is neither the literal
   // minute nor the other half of an ambiguous hour. No clock on either side
-  // is not a conflict.
+  // is not a conflict. A proved 24-hour page keeps the literal hour only:
+  // the other half is a conflict, even when it is the only row of that subject.
   function clockConflict(pane, m, minute) {
     const got = minuteKey(m && m.receivedDateTime);
     if (!minute || !got || got === minute) return '';
-    if (pane && pane.clockAmbiguous) {
+    if (pane && pane.clockAmbiguous && !proved24h(pane)) {
       const alt = altMinuteOf(pane, minute);
       if (alt && got === alt) return '';
     }
@@ -797,14 +798,29 @@ const FlowOwaParse = (() => {
   // Another unmarked hour of 13–23, or 00, on an OWA list-row time or the
   // reading-pane header clock means this page is a 24-hour clock. A time
   // inside the email body is the message, not the chrome.
+  function attrOf(n, name) {
+    if (!n || typeof n.getAttribute !== 'function') return '';
+    return String(n.getAttribute(name) || '');
+  }
+
+  function classOf(n) {
+    if (!n || n.className == null) return '';
+    return typeof n.className === 'string' ? n.className : '';
+  }
+
   function inMessageBody(n) {
     let p = n;
     while (p) {
-      const role = p.getAttribute && p.getAttribute('role');
-      const section = p.getAttribute && p.getAttribute('data-app-section');
-      const cls = (p.className && typeof p.className === 'string') ? p.className : '';
-      if (role === 'document' || section === 'MessageBody') return true;
-      if (cls.indexOf('UniqueMessageBody') >= 0 || /(^|\s)AllowTextSelection(\s|$)/.test(cls)) return true;
+      const role = attrOf(p, 'role');
+      const section = attrOf(p, 'data-app-section');
+      const aria = attrOf(p, 'aria-label');
+      const id = attrOf(p, 'id');
+      const testid = attrOf(p, 'data-testid');
+      const cls = classOf(p).toLowerCase();
+      if (role === 'document' || section === 'MessageBody' || testid === 'message-body') return true;
+      if (id.indexOf('UniqueMessageBody') === 0) return true;
+      if (cls.indexOf('uniquemessagebody') >= 0 || cls.indexOf('allowtextselection') >= 0 || cls.indexOf('messagebody') >= 0 || cls.indexOf('readingpanecontents') >= 0) return true;
+      if (aria === 'Message body' || aria === 'גוף ההודעה' || aria.indexOf('Message body') >= 0) return true;
       p = p.parentElement || p.parentNode || null;
       if (p && p.nodeType === 9) break;
     }
@@ -814,7 +830,7 @@ const FlowOwaParse = (() => {
   function wrapsMessageBody(n) {
     if (!n || typeof n.querySelector !== 'function') return false;
     try {
-      return Boolean(n.querySelector('[role="document"], [data-app-section="MessageBody"], [class*="UniqueMessageBody"], .AllowTextSelection'));
+      return Boolean(n.querySelector('[role="document"], [data-app-section="MessageBody"], [data-testid="message-body"], [class*="UniqueMessageBody"], [class*="allowTextSelection"], [class*="AllowTextSelection"], [id^="UniqueMessageBody"], [aria-label="Message body"], [aria-label="גוף ההודעה"]'));
     } catch (e) { return false; }
   }
 
@@ -827,6 +843,23 @@ const FlowOwaParse = (() => {
       if (hour === 0 || (hour >= 13 && hour <= 23)) return true;
     }
     return false;
+  }
+
+  // A list-row time or a header clock, not a sentence that happens to
+  // contain one. "15:00" and "ה 08/10/2026 14:01" count. "Please arrive
+  // by 15:00" does not.
+  function isClockStamp(text) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!t || t.length > 80 || !textProves24h(t)) return false;
+    const rest = t
+      .replace(/\d{1,2}[./]\d{1,2}[./]\d{2,4}/g, ' ')
+      .replace(/\d{1,2}:\d{2}/g, ' ')
+      .replace(/\b(?:AM|PM)\b/ig, ' ')
+      .replace(/[א-ת"'׳״]/g, ' ')
+      .replace(/\b(?:mon|tue|wed|thu|fri|sat|sun|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/ig, ' ')
+      .replace(/[^A-Za-z]+/g, ' ')
+      .trim();
+    return rest.length === 0;
   }
 
   function pageProves24h(doc) {
@@ -848,12 +881,21 @@ const FlowOwaParse = (() => {
     ].join(', ');
     let nodes = [];
     try { nodes = d.querySelectorAll(sel) || []; } catch (e) { return false; }
+    function consider(n) {
+      if (!n || inMessageBody(n) || wrapsMessageBody(n)) return false;
+      if (isClockStamp(textOf(n))) return true;
+      if (typeof n.querySelectorAll !== 'function') return false;
+      let kids = [];
+      try { kids = n.querySelectorAll('time, span, div'); } catch (e) { return false; }
+      for (let k = 0; k < kids.length; k++) {
+        const c = kids[k];
+        if (!c || inMessageBody(c) || wrapsMessageBody(c)) continue;
+        if (isClockStamp(textOf(c))) return true;
+      }
+      return false;
+    }
     for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      if (!n || inMessageBody(n) || wrapsMessageBody(n)) continue;
-      const t = textOf(n);
-      if (!t || t.length > 400) continue;
-      if (textProves24h(t)) return true;
+      if (consider(nodes[i])) return true;
     }
     return false;
   }
