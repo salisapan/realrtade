@@ -299,6 +299,7 @@
       ? FlowIncomingJudge.prepareForJudge(pane.text || '')
       : (pane.text || '');
     const own = (typeof FlowGraphMail !== 'undefined' && FlowGraphMail.ownText) ? FlowGraphMail.ownText(prepared) : prepared;
+    const from = String(pane.senderEmail || '').toLowerCase();
     // A save-shaped sentence is the only one that asks how many files are
     // on the message. Every other sentence stays at zero, as before.
     // The address often carries only a conversation id. Counting files on that
@@ -329,10 +330,22 @@
       now: new Date(), threadUrl: location.href,
       hasThreadAttachment: attachmentCount === 1,
       attachmentCount: attachmentCount,
-      surface: 'outlook'
+      surface: 'outlook',
+      to: pane.to || null,
+      cc: pane.cc || null,
+      ownAddresses: ownAddresses || null,
+      userName: pane.userName || null,
+      inbound: from ? (ownAddresses || []).indexOf(from) < 0 : true
     });
     dbg('judged', { show: Boolean(r && r.show), reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, from: 'open text' });
     return r && r.show ? { intent: r.intent, process: r.process } : { none: true, reason: (r && r.reason) || 'intent-null' };
+  }
+
+  function userNameOf(st) {
+    const auth = st && st.outlookAuth;
+    const account = auth && auth.account;
+    const profile = auth && auth.profile;
+    return String((account && (account.name || account.displayName)) || (profile && profile.displayName) || '').trim();
   }
 
   function ownAddressesOf(st) {
@@ -2065,6 +2078,7 @@
       return;
     }
     if (!receiptOnly) {
+      pane.userName = userNameOf(st);
       decided = await decideFromText(pane, own, entry);
       if (decided && decided.reason === 'third-party') {
         dropStuckCard();
@@ -2338,22 +2352,43 @@
     return null;
   }
 
+  async function recentInbox() {
+    const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
+    const select = '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+    const order = '$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc');
+    const filteredPath = '/me/mailFolders/inbox/messages?' + order + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + select;
+    const plainPath = '/me/mailFolders/inbox/messages?' + order + select;
+    let list = await graphValues(filteredPath, 'suggest-inbox', null);
+    if (!Array.isArray(list)) list = await graphValues(plainPath, 'suggest-inbox-plain', null);
+    return Array.isArray(list) ? list : [];
+  }
+
+  // A message id in the address is that message. A conversation address links
+  // only through uniqueGraphMessage. Subject and "newest" are not a link.
   async function suggestFiles(pane) {
-    let id = pane.itemId || null;
-    let rows = id ? await attachmentListFor(id) : null;
-    if (!Array.isArray(rows)) {
-      const st = await FlowStorage.get();
-      const found = await resolveOutlookMessageId(
-        pane.pathId || pane.conversationId || pane.itemId,
-        pane.conversationId || pane.itemId,
-        ownAddressesOf(st),
-        pane.senderEmail,
-        pane.subject
-      );
-      if (!found || found.unread || !found.id) return null;
-      rows = await attachmentListFor(found.id);
+    const id = pane.itemId || null;
+    if (id) {
+      const direct = await attachmentListFor(id);
+      if (Array.isArray(direct)) return direct;
     }
-    return Array.isArray(rows) ? rows : null;
+    if (typeof FlowOwaParse === 'undefined' || typeof FlowOwaParse.uniqueGraphMessage !== 'function') return { unresolved: true };
+    const wantConv = FlowOwaParse.canonId(pane.conversationId);
+    const wantNet = FlowOwaParse.canonId(pane.internetMessageId);
+    if (!wantConv && !wantNet) return { unresolved: true };
+    const list = await recentInbox();
+    const enriched = [];
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i];
+      if (!m || !m.id) continue;
+      const convOk = wantConv && FlowOwaParse.canonId(m.conversationId) === wantConv;
+      const netOk = wantNet && FlowOwaParse.canonId(m.internetMessageId) === wantNet;
+      if (!convOk && !netOk) continue;
+      const rows = await attachmentListFor(m.id);
+      enriched.push(Object.assign({}, m, { attachments: Array.isArray(rows) ? rows : [] }));
+    }
+    const linked = FlowOwaParse.uniqueGraphMessage(pane, enriched);
+    if (!linked || !linked.message) return { unresolved: true };
+    return Array.isArray(linked.message.attachments) ? linked.message.attachments : { unresolved: true };
   }
 
   // A mail that already has a card keeps suggest:other-card in the local log.
@@ -2543,7 +2578,17 @@
     const showed = lastOutcome === 'card' || Boolean(document.querySelector('#ReadingPaneContainerId .flow-chip-host'));
     const messageId = pane.itemId || pane.conversationId || pane.pathId || '';
     let files = null;
-    try { files = await suggestFiles(pane); } catch (e) { files = null; }
+    let unresolved = false;
+    try {
+      const read = await suggestFiles(pane);
+      if (read && read.unresolved) unresolved = true;
+      else files = read;
+    } catch (e) { files = null; }
+    if (unresolved && !showed) {
+      await appendSuggestLog({ messageId: messageId, reason: 'suggest:unresolved', surface: 'outlook' });
+      await pageReason('suggest:unresolved', pane);
+      return;
+    }
     let bag = {};
     try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
     // FlowOnedriveFile is on this page (manifest content script, copied onto

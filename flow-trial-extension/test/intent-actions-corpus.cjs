@@ -1300,10 +1300,15 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     notThat.personalClose === 'calendar-hold', notThat.personalClose);
 
   const Q3 = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
-  const q3open = classify(Q3);
-  check('Q3 reply-and-confirm still drafts when audience fields are absent',
+  const q3open = classify(Q3, { to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
+  check('Q3 reply-and-confirm drafts when the user is in To',
     q3open.type === FlowIntent.TYPES.REQUEST && q3open.personalClose === 'follow-up-ask',
     { type: q3open.type, quiet: q3open.quiet });
+  const q3missing = classify(Q3);
+  const q3empty = classify(Q3, { to: [], cc: [] });
+  check('a reply ask with no To or Cc stays quiet',
+    !q3missing.type && q3missing.quiet === 'hedge' && !q3empty.type && q3empty.quiet === 'hedge',
+    { missing: q3missing.quiet, empty: q3empty.quiet });
   const silentReply = [
     ['automatic reply', 'Automatic reply: Can you reply and confirm whether the Q3 summary will include the October numbers?', {}],
     ['cc-only named addressee', 'Dana, can you reply and confirm whether the Q3 summary will include the October numbers?', {

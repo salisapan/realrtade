@@ -10,6 +10,8 @@ const CONV = 'AQQkGlanceE2ENorthwindConv';
 const MSG = 'AQMkGlanceE2ENorthwindMsg';
 const SKIP_CONV = 'AQQkGlanceE2ENorthwindSkipConv';
 const SKIP_MSG = 'AQMkGlanceE2ENorthwindSkipMsg';
+const WHEN = '2026-10-08T14:01:00.000Z';
+const WHEN_SKIP = '2026-10-08T13:46:00.000Z';
 
 function pdf(size) {
   return [{
@@ -21,12 +23,12 @@ function pdf(size) {
   }];
 }
 
-function inboxRow(id, conversationId, subject) {
+function inboxRow(id, conversationId, subject, when) {
   return {
     id: id,
     conversationId: conversationId,
     subject: subject,
-    receivedDateTime: new Date().toISOString(),
+    receivedDateTime: when,
     from: { emailAddress: { name: 'flow', address: S.SENDER } },
     hasAttachments: true
   };
@@ -88,8 +90,8 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
   await glance.setScenario({
     inboxFilterFails: true,
     inbox: [
-      inboxRow(MSG, CONV, 'Northwind agreement - signed PDF'),
-      inboxRow(SKIP_MSG, SKIP_CONV, 'Northwind agreement - small PDF')
+      inboxRow(MSG, CONV, 'Northwind agreement - signed PDF', WHEN),
+      inboxRow(SKIP_MSG, SKIP_CONV, 'Northwind agreement - small PDF', WHEN_SKIP)
     ],
     sent: [],
     messages: {},
@@ -104,7 +106,9 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
     id: CONV,
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
-    body: NORTHWIND
+    body: NORTHWIND,
+    received: WHEN,
+    attachments: pdf(3072)
   });
   await expect(page.locator('#ReadingPaneContainerId .flow-chip-process-name')).toHaveText('Save the file?');
 
@@ -112,7 +116,9 @@ test('a conversation id with a real PDF shows Save the file?, and a small PDF is
     id: SKIP_CONV,
     subject: 'Northwind agreement - small PDF',
     senderEmail: S.SENDER,
-    body: NORTHWIND
+    body: NORTHWIND,
+    received: WHEN_SKIP,
+    attachments: pdf(800)
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
   await expect(skipPane.getByText('northwind-agreement-signed.pdf · skipped · small-doc')).toBeVisible();

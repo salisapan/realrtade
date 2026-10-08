@@ -219,7 +219,7 @@ console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
 
   const Q3_SUBJECT = 'Gate A 0.9.41 - quick question on the Q3 summary';
   const Q3_BODY = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
-  const q3 = FlowIntent.classify(Q3_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', subject: Q3_SUBJECT, now: new Date(NOW2) });
+  const q3 = FlowIntent.classify(Q3_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', subject: Q3_SUBJECT, now: new Date(NOW2), to: [OUT], ownAddresses: [OUT] });
   check('Q3 reply-and-confirm is a request', q3.type === 'request' && FlowIntent.shouldShowChip(q3), { type: q3.type, quiet: q3.quiet, label: q3.label });
   const q3Plan = FlowActions.planFor(q3, { threadUrl: 'https://outlook.office.com/mail/id/q3', hasThreadAttachment: false });
   check('Q3 reply-and-confirm plans a reply draft', q3Plan && (q3Plan.steps || []).some((s) => s.kind === 'outlookDraft' || s.kind === 'gmailDraft'), q3Plan && q3Plan.steps);

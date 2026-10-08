@@ -42,6 +42,32 @@ const FlowCommitmentTitle = (() => {
     return String(value == null ? '' : value).replace(/[\u200B\u200C\u200D\uFEFF\u2060]/g, '').replace(/\s+/g, ' ').trim();
   }
 
+  // One spelling for every key path. Maqaf becomes a space, then niqqud and
+  // cantillation (U+0591–U+05C7) drop. The letters that remain are the word.
+  function prepareText(value) {
+    return clean(value).replace(/\u05BE/g, ' ').replace(/[\u0591-\u05C7]/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  const HE_INF = {
+    'אשלח': 'לשלוח', 'נשלח': 'לשלוח',
+    'אעביר': 'להעביר', 'נעביר': 'להעביר',
+    'אשלם': 'לשלם', 'נשלם': 'לשלם',
+    'אגיש': 'להגיש', 'נגיש': 'להגיש',
+    'אכין': 'להכין', 'נכין': 'להכין',
+    'אחזיר': 'להחזיר', 'נחזיר': 'להחזיר'
+  };
+
+  // The key text. "אני אשלח את החוזה" and "לשלוח את החוזה" are the same
+  // commitment. Pointing and maqaf are already gone.
+  function keyText(value) {
+    let t = prepareText(value);
+    if (!t) return '';
+    const verb = 'אשלח|נשלח|אעביר|נעביר|אשלם|נשלם|אגיש|נגיש|אכין|נכין|אחזיר|נחזיר';
+    t = t.replace(new RegExp('^(?:אני|אנחנו)\\s+(' + verb + ')(?=\\s|$)'), function (_m, v) { return HE_INF[v] || _m; });
+    t = t.replace(new RegExp('^(' + verb + ')(?=\\s|$)'), function (_m, v) { return HE_INF[v] || _m; });
+    return t.toLowerCase().replace(/[^a-z0-9\u0590-\u05ff]+/gi, ' ').replace(/\s+/g, ' ').trim();
+  }
+
   // Split before whitespace is collapsed. A subject glued on with a newline
   // is its own sentence, and it is not the commitment.
   function sentences(text) {
@@ -125,7 +151,7 @@ const FlowCommitmentTitle = (() => {
   }
 
   function titleFromBody(text) {
-    const sentence = firingSentence(text);
+    const sentence = firingSentence(prepareText(text));
     if (!sentence) return '';
     if (/[\u0590-\u05FF]/.test(sentence)) return hebrewSpan(sentence);
     return englishSpan(sentence);
@@ -142,7 +168,7 @@ const FlowCommitmentTitle = (() => {
     return titleFromBody(body.trim() ? body : what);
   }
 
-  return { titleFromBody: titleFromBody, fromPayload: fromPayload, MAX: MAX };
+  return { titleFromBody: titleFromBody, fromPayload: fromPayload, prepareText: prepareText, keyText: keyText, MAX: MAX };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCommitmentTitle };

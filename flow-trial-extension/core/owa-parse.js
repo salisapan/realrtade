@@ -103,19 +103,66 @@ const FlowOwaParse = (() => {
     const from = pane.senderEmail || pane.from ? normEmail(pane.senderEmail || pane.from) : '';
     const paneDay = dayKey(pane.receivedDateTime || pane.date || pane.ts);
     if (!sub) return null; // a sender alone is not enough: the same person may have several asks open
+    const hits = [];
     for (const e of list) {
       const esub = norm(stripPrefix(e.subject));
       const efrom = normEmail((e.sender && e.sender.email) || (e.base && e.base.counterpart && e.base.counterpart.email) || e.from);
-      if (!esub || (sub !== esub && esub.indexOf(sub) < 0 && sub.indexOf(esub) < 0)) continue;
+      if (!esub || esub !== sub) continue;
       if (from && efrom && from !== efrom) continue;
       // No address on the page (OWA keeps it in a hover card): the display name has to agree instead.
       const pname = norm(pane.senderName), ename = norm((e.sender && e.sender.name) || (e.base && e.base.counterpart && e.base.counterpart.name));
       if (!from && pname && ename && pname !== ename) continue;
       const eDay = dayKey(e.receivedDateTime || e.date || e.ts);
       if (paneDay && eDay && paneDay !== eDay) continue;
-      return { entry: e, how: from ? 'subject and sender' : (pname && ename ? 'subject and sender name' : 'subject') };
+      hits.push(e);
     }
-    return null;
+    if (hits.length !== 1) return null;
+    const pname = norm(pane.senderName);
+    const ename = norm((hits[0].sender && hits[0].sender.name) || (hits[0].base && hits[0].base.counterpart && hits[0].base.counterpart.name));
+    return { entry: hits[0], how: from ? 'subject and sender' : (pname && ename ? 'subject and sender name' : 'subject') };
+  }
+
+  // UTC minute. A page clock and a Graph receivedDateTime match on this, or not at all.
+  function minuteKey(v) {
+    if (v == null || v === '') return '';
+    const d = (v instanceof Date) ? v : new Date(v);
+    if (isNaN(d.getTime())) return '';
+    return d.toISOString().slice(0, 16);
+  }
+
+  function attachmentSig(list) {
+    const rows = [];
+    (list || []).forEach((a) => {
+      if (!a) return;
+      const name = norm(a.name || a.filename || '');
+      const size = typeof a.size === 'number' ? a.size : Number(a.size);
+      if (!name || !isFinite(size)) return;
+      rows.push(name + '|' + size);
+    });
+    rows.sort();
+    return rows.join('\n');
+  }
+
+  // A pane links to a Graph message only when exactly one candidate has the
+  // same conversation or internet message id, the same minute, and the same
+  // attachment names and sizes. Anything else is suggest:unresolved.
+  function uniqueGraphMessage(pane, messages) {
+    const list = (messages || []).filter(Boolean);
+    const paneConv = canonId(pane && pane.conversationId);
+    const paneNet = canonId(pane && pane.internetMessageId);
+    const paneMinute = minuteKey(pane && (pane.receivedDateTime || pane.date));
+    const paneFiles = attachmentSig(pane && pane.attachments);
+    if ((!paneConv && !paneNet) || !paneMinute || !paneFiles) return { message: null, reason: 'suggest:unresolved' };
+    const hits = list.filter((m) => {
+      const convOk = paneConv && canonId(m.conversationId) === paneConv;
+      const netOk = paneNet && canonId(m.internetMessageId) === paneNet;
+      if (!convOk && !netOk) return false;
+      if (minuteKey(m.receivedDateTime) !== paneMinute) return false;
+      if (attachmentSig(m.attachments || m.files) !== paneFiles) return false;
+      return true;
+    });
+    if (hits.length !== 1) return { message: null, reason: 'suggest:unresolved' };
+    return { message: hits[0], reason: null };
   }
 
   function matchEntry(pane, entries) {
@@ -322,6 +369,7 @@ const FlowOwaParse = (() => {
     const body = textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
     if (!subject && !body) return null;
     const ids = urlIds(href || (typeof location !== 'undefined' ? location.href : ''));
+    const whoTo = recipientsOf(container, bodyRoot);
     return {
       itemId: ids.itemId,
       conversationId: ids.conversationId,
@@ -330,11 +378,61 @@ const FlowOwaParse = (() => {
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
       senderName: senderName.slice(0, 80),
-      text: body
+      text: body,
+      to: whoTo.to,
+      cc: whoTo.cc,
+      receivedDateTime: receivedOf(container, bodyRoot),
+      attachments: attachmentsOf(container, bodyRoot)
     };
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
+  function emailsIn(text) {
+    return String(text || '').toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [];
+  }
+
+  function recipientsOf(container, bodyRoot) {
+    const to = [];
+    const cc = [];
+    if (!container || !container.querySelectorAll) return { to: to, cc: cc };
+    const nodes = container.querySelectorAll('div, p, li, span');
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
+      const t = textOf(n);
+      if (!t || t.length > 400) continue;
+      const bucket = /^\s*(to|אל)\b/i.test(t) ? to : (/^\s*(cc|עותק)\b/i.test(t) ? cc : null);
+      if (!bucket) continue;
+      emailsIn(t).forEach((e) => { if (bucket.indexOf(e) < 0) bucket.push(e); });
+    }
+    return { to: to, cc: cc };
+  }
+
+  function receivedOf(container, bodyRoot) {
+    if (!container || !container.querySelector) return '';
+    const marked = container.querySelector('[data-received]');
+    if (marked && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(marked))) {
+      const raw = marked.getAttribute('data-received') || '';
+      if (minuteKey(raw)) return raw;
+    }
+    return '';
+  }
+
+  function attachmentsOf(container, bodyRoot) {
+    if (!container || !container.querySelectorAll) return [];
+    const nodes = container.querySelectorAll('[data-name][data-size]');
+    const out = [];
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
+      const name = String(n.getAttribute('data-name') || '').trim();
+      const size = Number(n.getAttribute('data-size'));
+      if (!name || !isFinite(size)) continue;
+      out.push({ name: name, size: size });
+    }
+    return out;
+  }
+
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

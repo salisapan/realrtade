@@ -122,7 +122,9 @@ const FlowStillOpen = (() => {
 
   function freshIntent(text, item, now) {
     if (!text || typeof FlowIntent === 'undefined' || !FlowIntent.classify) return null;
-    return FlowIntent.classify(text, {
+    const prepared = (typeof FlowCommitmentTitle !== 'undefined' && typeof FlowCommitmentTitle.prepareText === 'function')
+      ? FlowCommitmentTitle.prepareText(text) : text;
+    return FlowIntent.classify(prepared, {
       now: clockOf(now),
       senderEmail: item && item.sender && item.sender.email
     });
@@ -297,15 +299,17 @@ const FlowStillOpen = (() => {
   // the same thread stays its own loop. The key is never empty when a
   // commitment title exists, including when the mail names no due date.
   function commitmentDedupeKey(item) {
+    const intent = (item && item.intent) || {};
+    const entities = intent.entities || {};
+    const raw = (item && item.text) || entities.what || intent.label || '';
     let title = '';
     if (typeof FlowCommitmentTitle !== 'undefined' && item && item.text && typeof FlowCommitmentTitle.titleFromBody === 'function') {
       title = normPiece(FlowCommitmentTitle.titleFromBody(item.text));
     }
-    if (!title) {
-      const intent = (item && item.intent) || {};
-      const entities = intent.entities || {};
-      title = normPiece(entities.what || intent.label || '');
+    if (!title && typeof FlowCommitmentTitle !== 'undefined' && typeof FlowCommitmentTitle.keyText === 'function') {
+      title = normPiece(String(FlowCommitmentTitle.keyText(raw) || '').replace(/\s+עד(?:\s|$).*$/, ''));
     }
+    if (!title) title = normPiece(entities.what || intent.label || '');
     if (!title) return '';
     const due = dueIsoOf(item);
     const who = senderKeyOf(item);

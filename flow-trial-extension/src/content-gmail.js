@@ -436,6 +436,37 @@
     return { email: el.getAttribute('email'), name: el.getAttribute('name') || el.textContent.trim() };
   }
 
+  // To and Cc as the open message shows them. A line that starts with To or
+  // Cc (or אל / עותק) is that list. The sender's address is not a recipient.
+  function audienceOf(messageNode) {
+    const to = [];
+    const cc = [];
+    let userName = '';
+    if (!messageNode || !messageNode.querySelectorAll) return { to: to, cc: cc, userName: userName };
+    const blocks = messageNode.querySelectorAll('div, p, li');
+    for (let i = 0; i < blocks.length; i++) {
+      const n = blocks[i];
+      const t = String(n.innerText || '').trim();
+      if (!t || t.length > 400) continue;
+      const bucket = /^(to|אל)\b/i.test(t) ? to : (/^(cc|עותק)\b/i.test(t) ? cc : null);
+      if (!bucket) continue;
+      const marked = n.querySelectorAll('[email]');
+      for (let j = 0; j < marked.length; j++) {
+        const email = String(marked[j].getAttribute('email') || '').trim().toLowerCase();
+        if (email && bucket.indexOf(email) < 0) bucket.push(email);
+      }
+      const found = t.toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [];
+      found.forEach((email) => { if (bucket.indexOf(email) < 0) bucket.push(email); });
+    }
+    const mine = messageNode.querySelectorAll('[email]');
+    for (let i = 0; i < mine.length; i++) {
+      if (String(mine[i].textContent || '').trim() !== 'me') continue;
+      const name = String(mine[i].getAttribute('name') || '').trim();
+      if (name && name.toLowerCase() !== 'me') userName = name;
+    }
+    return { to: to, cc: cc, userName: userName };
+  }
+
   // Every [email] on the message, sender first. Same order extractSender
   // uses for the first one. Passed to FlowGoogleCloses.messageToJudge.
   function addressesOn(messageNode) {
@@ -1000,6 +1031,7 @@
     // a Drive / Doc / Sheet close.
     const attachments = allRealAttachments(message);
     const attachment = attachments[0] || null;
+    const audience = audienceOf(message);
     openSuggest = {
       messageId: messageId,
       text: text,
@@ -1021,7 +1053,12 @@
       calibrationByType: state.calibrationByType,
       attachmentCount: attachments.length,
       messageId: messageId,
-      debug: debug
+      debug: debug,
+      to: audience.to,
+      cc: audience.cc,
+      ownAddresses: ownEmail ? [ownEmail] : [],
+      userName: audience.userName || null,
+      inbound: String((sender && sender.email) || '').toLowerCase() !== String(ownEmail || '').toLowerCase()
     });
     // Reply-with-facts. Only when Google is already connected, so the chip
     // appears after one Sheet cell or Doc paragraph actually matched.

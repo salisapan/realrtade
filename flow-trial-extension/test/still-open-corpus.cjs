@@ -474,6 +474,35 @@ console.log('\n--- one promise is one Do It ---\n');
     sender: { email: 'dana@example.com' },
     intent: { entities: { what: 'אני־אשלח את החוזה' }, facts: {} }
   };
+  const infinitive = candidate('אני אשלח את החוזה עד יום חמישי', 'he-inf');
+  const pointedMail = candidate('אני אשלח את החוזה עד יום חמישי', 'he-pointed');
+  pointedMail.text = 'אֲנִי אֶשְׁלַח אֶת־הַחוֹזֶה עד יום חמישי';
+  const bare = {
+    messageId: 'he-bare',
+    sender: { email: 'dana@example.com' },
+    text: 'לשלוח את החוזה',
+    intent: infinitive.intent,
+    process: infinitive.process
+  };
+  const conjugated = {
+    messageId: 'he-conj',
+    sender: { email: 'dana@example.com' },
+    text: 'אני אשלח את החוזה',
+    intent: infinitive.intent,
+    process: infinitive.process
+  };
+  check('לשלוח את החוזה and אני אשלח את החוזה are one key',
+    Boolean(FlowStillOpen.promiseKey(bare)) && FlowStillOpen.promiseKey(bare) === FlowStillOpen.promiseKey(conjugated),
+    { bare: FlowStillOpen.promiseKey(bare), conjugated: FlowStillOpen.promiseKey(conjugated) });
+  const heLoops = FlowStillOpen.select([infinitive, pointedMail], NOW);
+  check('the pointed promise and the plain promise are one loop', heLoops.length === 1, ids(heLoops));
+  const heProof = {
+    kind: 'written', undone: false, connectorId: 'outlookTask', fetchedBack: true,
+    messageId: 'he-bare', text: 'לשלוח את החוזה', intent: infinitive.intent, sender: bare.sender
+  };
+  check('one Do It: a proof for לשלוח את החוזה hides אני אשלח את החוזה',
+    FlowStillOpen.select([infinitive, pointedMail], NOW, [heProof]).length === 0 &&
+    FlowStillOpen.activeProofFor([heProof], conjugated));
   check('niqqud and maqaf normalize to the same promise key',
     Boolean(FlowStillOpen.promiseKey(plainHe)) &&
     FlowStillOpen.promiseKey(pointed) === FlowStillOpen.promiseKey(plainHe) &&

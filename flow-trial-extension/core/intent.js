@@ -368,8 +368,7 @@ const FlowIntent = (() => {
     return /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(senderEmail || ''));
   }
   // A reply draft is offered only for an inbound ask addressed to the user.
-  // Missing audience fields stay allowed: the live Q3 mail has no To/Cc on
-  // the classify call. Positive evidence is what stays quiet.
+  // No To and no Cc is not that ask: the page did not show who it was for.
   function replyDraftAllowed(text, ctx) {
     const c = ctx || {};
     if (c.autoReply === true || c.noteToSelf === true || c.senderIsUser === true) return false;
@@ -380,6 +379,7 @@ const FlowIntent = (() => {
     if (autoReplyMail(text, sender)) return false;
     const to = addressList(c.to || c.toRecipients);
     const cc = addressList(c.cc || c.ccRecipients);
+    if (!to.length && !cc.length) return false;
     if (own.length && (to.length || cc.length) && !to.some((a) => own.indexOf(a) !== -1)) return false;
     const named = String(text || '').match(/^\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40}),/);
     const userName = String(c.userName || '').trim().toLowerCase();
