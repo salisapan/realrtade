@@ -60,6 +60,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | A product fact or the release order | the truth file that owns it (`CLAUDE.md`, `open-tasks.md`, and the topic doc) and one dated line in `vault/decisions.md`, in the same change |
 | Anything David or the owner should do about money | `revenue-routines.md` |
 | An owner lock on product scope (what Glance or Flow is, consent, send rules, holds) | `CLAUDE.md` "Owner product locks", `open-tasks.md` if it changes work, and one dated line in `vault/decisions.md` that links here |
+| Who the person is, and whether group or Cc mail is offered or quiet | `docs/glance-ai/user-context-v0.md`, `CLAUDE.md` "Owner product locks", one line in `vault/decisions.md`. Product quiets (cc-only, addressed-to-other, the #118 no-To/Cc hedge) stay until the contrast-pair shadow test |
 | Flow sales and outreach rules, CoS routines | `revenue-routines.md` §8-§9, and one dated line in `vault/decisions.md` |
 
 ## 3. Every document, one line
@@ -72,7 +73,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 `monetization.md` how Glance earns · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
 `product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
 **`true-close.md` when a loop is closed, what was found and fixed** · `computer-proof-gate.md` CoS checklist for the own-computer ProofOfClose wedge (one allowlisted page, DOM re-read; live driver not wired; local-file gate later) · `when-recognition-fails.md` the steps when a sentence is not recognised ·
-`docs/glance-ai/STATE.md` Glance model lab: candidates, headline metrics, gated Qwen table, blockers, owner-label path (still 0/200), next stages. The preview write-up is `docs/glance-ai/owner-gold-preview-2026-10-08.md`. · `docs/glance-ai/holistic-close-map.md` personal close catalog, coverage on this tip, three slices after the steps list, five scenario Gates. · `docs/glance-ai/paid-readiness-bar.md` the worth-paying bar, today's scorecard, and the yaml a routine reads before any charge. · `vault/decisions.md` one dated line when a product fact or the release order changes.
+`docs/glance-ai/STATE.md` Glance model lab: candidates, headline metrics, gated Qwen table, blockers, owner-label path (still 0/200), next stages. The preview write-up is `docs/glance-ai/owner-gold-preview-2026-10-08.md`. · `docs/glance-ai/user-context-v0.md` UserContext v0: per-user profile, relevance of a mail to that person, and the offer or quiet lock. Not built. · `docs/glance-ai/holistic-close-map.md` personal close catalog, coverage on this tip, three slices after the steps list, five scenario Gates. · `docs/glance-ai/paid-readiness-bar.md` the worth-paying bar, today's scorecard, and the yaml a routine reads before any charge. · `vault/decisions.md` one dated line when a product fact or the release order changes.
 Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the numbers cited in the documents come from them.
 
 ## 4. Run everything (what "the tests pass" means)

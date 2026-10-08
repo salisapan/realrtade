@@ -65,8 +65,8 @@ The strict gate treats a save proposal as unread (`suggest:attachments-unread`) 
 ## Blocked
 
 - **Real attachment list.** `shadow-combined-cases.jsonl` has a count, and OSS rows have names. It does not have size, inline, contentId, or kind. Until the shadow log carries the real list, every LLM save proposal stays silent under the strict gate. `tables.md` records 164 of 796 cases declaring attachments and 0 carrying the real list.
-- **Owner labels.** At least 200 owner-verified labels are required before a candidate can be promoted or before GPU fine-tuning starts. Today that count is 0. The reports above are not owner-verified. Batch-001 is in git and is waiting for the owner's answers. The chief of staff preview below is provisional / not owner-verified and is not part of this count.
-- **GPU.** Parked 2026-10-08. Cap $30. Do not rent a machine and do not run `glance-ai/oss/finetune/gpu_run.sh run` until the labels exist and the owner approves the spend. `glance-ai/oss/finetune/GPU-RUNBOOK.md`. llama.cpp is not vendored.
+- **Owner labels.** At least 200 owner-verified labels are required before a candidate can be promoted or before GPU fine-tuning starts. Today that count is 0. The reports above are not owner-verified. Batch-001 is in git and is waiting for the owner's answers. The chief of staff preview below is provisional / not owner-verified and is not part of this count. Labels that depend on who the person is (item 8 and the same group, Cc, addressed-to-other, and FYI shape) are context-dependent and are not part of that 200 (`docs/glance-ai/user-context-v0.md`).
+- **GPU.** Parked 2026-10-08. Cap $30. Do not rent a machine and do not run `glance-ai/oss/finetune/gpu_run.sh run` until the labels exist and the owner approves the spend. `glance-ai/oss/finetune/GPU-RUNBOOK.md`. llama.cpp is not vendored. The 2026-10-08 UserContext lock adds three prerequisites before that training is useful: the UserContext v0 schema, a shadow event log, and contrast pairs (`docs/glance-ai/user-context-v0.md`). A GPU is still not the critical path.
 
 ## Owner-label path
 
