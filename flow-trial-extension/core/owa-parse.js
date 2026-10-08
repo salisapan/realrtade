@@ -354,11 +354,16 @@ const FlowOwaParse = (() => {
     function confirmOne(one, why) {
       if (!one) return pack(null, why || 'no-hit');
       if (one.attachmentsUnread) return pack(null, 'attachments-unknown');
-      const conflict = idConflict(pane, one) || clockConflict(pane, one, minute);
-      if (conflict) return pack(null, (why || 'subject-unique') + ' conflict-' + conflict);
       const rel = fileRelation(pane && pane.attachments, one.attachments || one.files);
+      // A clock or an internet id still outweighs the filename. A conversation
+      // id that is not this message does not hide the only file the chip names.
+      const clock = clockConflict(pane, one, minute);
+      if (clock) return pack(null, (why || 'subject-unique') + ' conflict-' + clock);
+      const idWhy = idConflict(pane, one);
+      if (rel === 'yes' && idWhy !== 'internet') return pack(one, why || 'subject-unique');
+      if (idWhy) return pack(null, (why || 'subject-unique') + ' conflict-' + idWhy);
       if (rel === 'no') return pack(null, (why || 'subject-unique') + ' file-disagree');
-      if (idHit(pane, one) || rel === 'yes') return pack(one, why || 'subject-unique');
+      if (idHit(pane, one)) return pack(one, why || 'subject-unique');
       return pack(null, (why || 'subject-unique') + ' unconfirmed');
     }
     const sub = subjectKey(pane && pane.subject);
@@ -407,7 +412,13 @@ const FlowOwaParse = (() => {
     let agreedId = pool.filter((m) => !idConflict(pane, m));
     if (pool.length && !agreedId.length) {
       const seen = idEvidence(pane, list);
-      if (seen.convReal || seen.netReal) return pack(null, 'id-conflict');
+      if (seen.convReal || seen.netReal) {
+        // The id names a different row. The file on this chip still links
+        // when exactly one message in this minute carries it.
+        const byFile = pool.filter((m) => fileRelation(pane && pane.attachments, m.attachments || m.files) === 'yes');
+        if (byFile.length === 1) return pack(byFile[0], 'time-file');
+        return pack(null, 'id-conflict');
+      }
       agreedId = pool;
     }
     pool = agreedId;

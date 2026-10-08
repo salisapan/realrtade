@@ -182,6 +182,44 @@ function lum(rgb) {
       { show: group && group.show, reason: group && group.reason, kinds: groupKinds });
   }
 
+  const linked = await page.evaluate(() => {
+    const parse = window.__eng.parse;
+    function file(name, size) {
+      return { name: name, size: size, contentType: 'application/pdf', isInline: false };
+    }
+    function msg(id, conv, when, files, subject) {
+      return {
+        id: id, conversationId: conv, receivedDateTime: when, subject: subject,
+        from: { emailAddress: { address: 'ai.local.flow@gmail.com', name: 'flow' } },
+        attachments: files
+      };
+    }
+    const nwWhen = '2026-10-08T14:01:00.000Z';
+    const north = parse.uniqueGraphMessage(
+      { subject: 'Northwind agreement - signed PDF', senderEmail: 'ai.local.flow@gmail.com', conversationId: 'AQQkStale', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: nwWhen, attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
+      [msg('m-nw', 'AQQkNw', nwWhen, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
+    );
+    const twinAt = '2026-10-08T11:37:50.000Z';
+    const alpha = parse.uniqueGraphMessage(
+      { subject: 'Q3 fund statement', conversationId: 'AQQkOld', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: twinAt, attachments: [{ name: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }] },
+      [
+        msg('m-old', 'AQQkOld', '2026-10-01T14:37:00.000Z', [file('statement-q3-old.pdf', 1000)], 'Q3 fund statement'),
+        msg('m-alpha', 'AQQkAlpha', twinAt, [file('statement-q3-alpha.pdf', 3072)], 'Q3 fund statement'),
+        msg('m-beta', 'AQQkBeta', '2026-10-08T11:37:59.000Z', [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement')
+      ]
+    );
+    return {
+      northId: north && north.message && north.message.id,
+      northDetail: north && north.detail,
+      alphaId: alpha && alpha.message && alpha.message.id,
+      alphaDetail: alpha && alpha.detail
+    };
+  });
+  check('Chromium links the Northwind chip when the conversation id is another mail',
+    linked && linked.northId === 'm-nw', linked);
+  check('Chromium links statement-q3-alpha.pdf when an older id is on the open mail',
+    linked && linked.alphaId === 'm-alpha' && /time-file/.test(linked.alphaDetail || ''), linked);
+
   const ccPane = await readPane(page, paneHtml({
     subject: q3.subject,
     body: q3.body.replace(/\n/g, '<br>'),
@@ -326,7 +364,7 @@ function lum(rgb) {
   }
 
   const suggested = await headingPage('suggested', 'Do It');
-  const handled = await headingPage('suggested', 'Handled');
+  const handled = await headingPage('added', 'Handled');
   const added = await headingPage('added', 'Added step');
   function headingOk(info, word) {
     return info && info.text === word && info.display !== 'none' && info.visibility !== 'hidden' &&
@@ -334,7 +372,7 @@ function lum(rgb) {
       info.width > 8 && info.height > 4 && lum(info.color) > 0.5 && info.innerHeading == null;
   }
   check('a one-card Do It list shows a visible Suggested heading', headingOk(suggested, 'Suggested'), suggested);
-  check('a one-card Handled list with no step list shows a visible Suggested heading', headingOk(handled, 'Suggested'), handled);
+  check('a one-card Handled list with no step list shows a visible Added heading', headingOk(handled, 'Added'), handled);
   check('a one-card Added list with no step list shows a visible Added heading', headingOk(added, 'Added'), added);
   check('the heading ink stays the popup light color under a light OS theme',
     suggested && /E9EDF6/i.test(suggested.ink) && lum(suggested.color) > 0.5 && lum(added.color) > 0.5,

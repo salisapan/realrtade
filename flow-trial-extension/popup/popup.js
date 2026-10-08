@@ -1285,10 +1285,13 @@
       const chk = el('button', 'ghost sm', st.needsSignIn ? 'Sign in again' : 'Check now');
       chk.type = 'button';
       chk.addEventListener('click', async () => {
-        chk.disabled = true;
-        const r = st.needsSignIn ? await o.connect() : await o.sync({ force: true });
-        if (!r.ok) { chk.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
-        await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
+        beginRender();
+        try {
+          chk.disabled = true;
+          const r = st.needsSignIn ? await o.connect() : await o.sync({ force: true });
+          if (!r.ok) { chk.disabled = false; note.hidden = false; note.textContent = OUTLOOK_ERRORS[r.error] || ('Could not check (' + r.error + ').'); return; }
+          await renderSurfaces(); await renderOutlookCards(); await renderWaiting(); if (typeof renderOpen === "function") await renderOpen();
+        } finally { endRender(); }
       });
       const off = el('button', 'ghost sm', 'Turn off');
       off.type = 'button';
@@ -2288,8 +2291,6 @@
     empty.hidden = total > 0;
     // Suggested and Added are list headings, including a single Do It and a
     // Handled row that has no step list. The chip alone is not the heading.
-    let suggestedHead = false;
-    let addedHead = false;
     function loopsHeading(which) {
       const row = el('div', 'loops-section act-section');
       row.setAttribute('data-glance-section', which);
@@ -2300,19 +2301,28 @@
       const steps = entry && entry.process && entry.process.steps;
       return Array.isArray(steps) && steps.some((s) => s && s.added === true);
     }
+    // Handled is Added. A draft that is still waiting, and a Do It, stay Suggested.
+    function handledRow(entry) {
+      if (!entry || entry.connectorId === 'outlookDraft') return false;
+      if (entry.fetchedBack === true || (entry.proof && entry.proof.fetchedBack === true)) return true;
+      const id = entry.connectorId || '';
+      return id === 'outlookTask' || id === 'microsoftTodo' || id === 'attachmentSave' || id === 'onedriveFile' || id === 'googleTask' || id === 'googleTasks';
+    }
+    const suggested = [];
+    const added = [];
     function place(entry, node) {
-      if (hasAdded(entry)) {
-        if (!addedHead) { host.appendChild(loopsHeading('added')); addedHead = true; }
-      } else if (!suggestedHead) {
-        host.appendChild(loopsHeading('suggested'));
-        suggestedHead = true;
-      }
-      host.appendChild(node);
+      if (hasAdded(entry) || handledRow(entry)) added.push(node);
+      else suggested.push(node);
     }
     receipts.forEach((entry) => place(entry, outlookReceiptRow(entry)));
     openOnly.forEach((entry) => place(entry, openRow(entry)));
-    if ((receipts.length || openOnly.length) && !suggestedHead && !addedHead) {
-      host.insertBefore(loopsHeading('suggested'), host.firstChild);
+    if (suggested.length) {
+      host.appendChild(loopsHeading('suggested'));
+      suggested.forEach((node) => host.appendChild(node));
+    }
+    if (added.length) {
+      host.appendChild(loopsHeading('added'));
+      added.forEach((node) => host.appendChild(node));
     }
     } finally { endRender(); }
   }

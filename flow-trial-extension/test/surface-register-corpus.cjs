@@ -33,13 +33,13 @@ function load(opts) {
             const tab = (o.tabs || []).find((t) => t.id === d.target.tabId);
             const src = String(d.func);
             if (/rescan/.test(src)) { log.push('rescan ' + d.target.tabId); return [{ result: null }]; }
-            return [{ result: { globals: Boolean(tab && tab.globals), alive: Boolean(tab && tab.alive) } }];
+            return [{ result: { globals: Boolean(tab && tab.globals), alive: Boolean(tab && tab.alive), stamp: (tab && tab.stamp) || '' } }];
           }
           log.push('inject ' + d.target.tabId + ' ' + d.files.length + ' files'); return [{}];
         },
         insertCSS: async (d) => { log.push('css ' + d.target.tabId); }
       },
-      tabs: { query: async (q) => (o.tabs || []).filter((t) => (q.url || []).some((p) => t.url.indexOf(p.replace('/*', '')) === 0)), sendMessage: () => {} },
+      tabs: { query: async (q) => (o.tabs || []).filter((t) => (q.url || []).some((p) => t.url.indexOf(p.replace('/*', '')) === 0)), sendMessage: () => {}, reload: async (id) => { log.push('reload ' + id); } },
       windows: { create: () => {}, onRemoved: { addListener() {} } },
       alarms: { create: () => {}, onAlarm: { addListener() {} } },
       contextMenus: { create: () => {}, removeAll: (cb) => cb && cb(), onClicked: { addListener() {} } }
@@ -84,8 +84,36 @@ function load(opts) {
     await env.settle();
     check('an open Outlook tab with no Glance gets the CSS and every script', env.log.indexOf('css 1') >= 0 && env.log.some((l) => /^inject 1 \d+ files/.test(l)), env.log);
     check('a tab with a live copy is asked to look again, not injected twice', env.log.indexOf('rescan 2') >= 0 && !env.log.some((l) => /^inject 2/.test(l)), env.log);
-    check('a tab with an old copy cut off by an update is left alone, with a hint to reload it', !env.log.some((l) => /^inject 3/.test(l)) && env.log.some((l) => /old copy; reload/.test(l)), env.log);
+    check('a tab with an old copy cut off by an update is reloaded', !env.log.some((l) => /^inject 3/.test(l)) && env.log.some((l) => /old copy; reload/.test(l)) && env.log.indexOf('reload 3') >= 0, env.log);
     check('other sites are never touched', !env.log.some((l) => / 4( |$)/.test(l)), env.log);
+  }
+
+  console.log('\n--- a new package reloads a page still on the previous stamp ---\n');
+  {
+    const stampSrc = require('fs').readFileSync(require('path').join(__dirname, '..', 'core', 'build-stamp.js'), 'utf8');
+    const stamp = (stampSrc.match(/STAMP = '([^']+)'/) || [])[1];
+    const env = load({ tabs: [
+      { id: 2, url: 'https://outlook.live.com/mail/', globals: true, alive: true, stamp: stamp },
+      { id: 8, url: 'https://outlook.office.com/mail/', globals: true, alive: true, stamp: '0.9.40' }
+    ] });
+    await env.settle();
+    check('an open Outlook page on the previous stamp is reloaded, not rescanned',
+      env.log.indexOf('reload 8') >= 0 && env.log.indexOf('rescan 8') < 0, env.log);
+    check('a page already on this stamp is asked to look again',
+      env.log.indexOf('rescan 2') >= 0 && env.log.indexOf('reload 2') < 0, env.log);
+    const bg = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'background.js'), 'utf8');
+    check('registration compares the build stamp, not only the file list',
+      bg.indexOf('glanceSurfaceStamp') > 0 && bg.indexOf('remembered[id] === stamp') > 0);
+    const outlook = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+    check('the live page matches a Loops row by subject and promise', outlook.indexOf('sameSubjectPromise') > 0);
+    const intent = require('fs').readFileSync(require('path').join(__dirname, '..', 'core', 'intent.js'), 'utf8');
+    const manifest = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'manifest.json'), 'utf8'));
+    const pageScripts = ((manifest.content_scripts || [])[0] || {}).js || [];
+    check('the Outlook script list loads the greeting strip',
+      pageScripts.indexOf('core/intent.js') >= 0 &&
+      bg.indexOf("filter((f) => GMAIL_ONLY_SCRIPTS.indexOf(f) < 0)") > 0 &&
+      bg.indexOf("'core/intent.js'") < 0 &&
+      intent.indexOf('function openingAddressee') > 0);
   }
 
   console.log('\nTOTAL FAILURES:', failures);

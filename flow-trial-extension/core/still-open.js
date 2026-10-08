@@ -296,10 +296,9 @@ const FlowStillOpen = (() => {
     return String((sender && (sender.email || sender.address)) || '').toLowerCase();
   }
 
-  // Same promise, same day, same person: one Do It. A second commitment in
-  // the same thread stays its own loop. The key is never empty when a
-  // commitment title exists, including when the mail names no due date.
-  function commitmentDedupeKey(item) {
+  // The words of the promise, without the day or the person. Two ids of one
+  // mail share this. Two closes in one thread do not.
+  function promiseTitle(item) {
     const intent = (item && item.intent) || {};
     const entities = intent.entities || {};
     const raw = (item && item.text) || entities.what || intent.label || '';
@@ -311,6 +310,14 @@ const FlowStillOpen = (() => {
       title = normPiece(String(FlowCommitmentTitle.keyText(raw) || '').replace(/\s+עד(?:\s|$).*$/, ''));
     }
     if (!title) title = normPiece(entities.what || intent.label || '');
+    return title;
+  }
+
+  // Same promise, same day, same person: one Do It. A second commitment in
+  // the same thread stays its own loop. The key is never empty when a
+  // commitment title exists, including when the mail names no due date.
+  function commitmentDedupeKey(item) {
+    const title = promiseTitle(item);
     if (!title) return '';
     const due = dueIsoOf(item);
     const who = senderKeyOf(item);
@@ -389,7 +396,77 @@ const FlowStillOpen = (() => {
       if (ad == null && bd != null) return 1;
       return (a.item.ts || 0) - (b.item.ts || 0);
     });
-    return ranked.slice(0, CAP).map((row) => row.item);
+    // One mail stored under two ids (a scan id and the open id) is one Do It.
+    // A different subject stays its own card.
+    const kept = [];
+    ranked.forEach((row) => {
+      const sig = cardSig(row.item);
+      const prev = kept.find((k) => sameCard(cardSig(k.item), sig));
+      if (!prev) kept.push(row);
+    });
+    return kept.slice(0, CAP).map((row) => row.item);
+  }
+
+  function cardKind(item) {
+    const intent = (item && item.intent) || {};
+    if (intent.personalClose) return String(intent.personalClose);
+    if (intent.type === 'commitment') return 'dated-commitment';
+    return '';
+  }
+
+  function cardSig(item) {
+    const intent = (item && item.intent) || {};
+    let title = '';
+    if (intent.noReplyDraft && intent.label) title = normPiece(intent.label);
+    else title = promiseTitle(item);
+    return {
+      title: title,
+      due: dueIsoOf(item),
+      subject: normPiece(item && item.subject),
+      who: senderKeyOf(item),
+      kind: cardKind(item)
+    };
+  }
+
+  function titlesSame(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const short = a.length <= b.length ? a : b;
+    const long = a.length <= b.length ? b : a;
+    return long.indexOf(short + ' by ') === 0;
+  }
+
+  // One mail stored twice (a scan id and the open id, one of them missing
+  // the sender) is one card. A confirmed amount and a dated promise on the
+  // same subject stay two. A missing due is not the other row's due.
+  function sameCard(a, b) {
+    if (!a || !b || !a.title) return false;
+    if (a.kind && b.kind && a.kind !== b.kind) return false;
+    if (!titlesSame(a.title, b.title)) return false;
+    if (a.due !== b.due) return false;
+    if (a.who && b.who && a.who !== b.who) return false;
+    if (a.subject && b.subject && a.subject !== b.subject) return false;
+    return true;
+  }
+
+  // The open mail and the Loops row are one card when the subject and the
+  // promise agree, even if Outlook used another id for the row. The pane
+  // often has the body and no stored date; the title is the match.
+  function sameSubjectPromise(row, pane) {
+    if (!row || !pane) return false;
+    const left = normPiece(row.subject);
+    const right = normPiece(pane.subject);
+    if (!left || !right || left !== right) return false;
+    const a = promiseTitle(row);
+    const b = promiseTitle(pane);
+    if (!a || a !== b) return false;
+    const dueA = dueIsoOf(row);
+    const dueB = dueIsoOf(pane);
+    if (dueA && dueB && dueA !== dueB) return false;
+    const whoA = senderKeyOf(row);
+    const whoB = senderKeyOf(pane);
+    if (whoA && whoB && whoA !== whoB) return false;
+    return true;
   }
 
   function humanDate(iso, now) {
@@ -413,6 +490,11 @@ const FlowStillOpen = (() => {
     if (kind === 'dated-commitment') {
       if (he) return when ? 'התחייבת עד ' + when : 'התחייבות עם תאריך עדיין פתוחה';
       return when ? 'You promised this by ' + when : 'A dated promise is still open';
+    }
+    // "No need to reply" already named the work. The line is that title.
+    if (item.intent && item.intent.noReplyDraft) {
+      const named = String(item.intent.label || '').replace(/\s+/g, ' ').trim();
+      if (named) return named;
     }
     if (kind === 'follow-up-ask') return he ? 'עדיין חייבים תשובה' : 'A reply is still owed';
     if (kind === 'confirmed-amount') return he ? 'סכום שסוכם עדיין פתוח' : 'A confirmed amount is still open';
@@ -580,6 +662,7 @@ const FlowStillOpen = (() => {
     fromLogEntry: fromLogEntry,
     select: select,
     promiseKey: commitmentDedupeKey,
+    sameSubjectPromise: sameSubjectPromise,
     activeProofFor: activeProofFor,
     whyLine: whyLine,
     notificationText: notificationText,

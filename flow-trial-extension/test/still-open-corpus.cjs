@@ -515,5 +515,40 @@ console.log('\n--- one promise is one Do It ---\n');
     { plain: FlowStillOpen.promiseKey(plainHe), pointed: FlowStillOpen.promiseKey(pointed), maqaf: FlowStillOpen.promiseKey(maqaf) });
 }
 
+console.log('\n--- still open: one Do It after Undo, and a no-reply ask keeps its title ---\n');
+{
+  const parkText = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
+  const park = candidate(parkText, 'park-a');
+  park.subject = 'Parking permit - please renew by Sunday';
+  const parkAgain = candidate(parkText, 'park-b');
+  parkAgain.subject = park.subject;
+  parkAgain.sender = {};
+  // October 11 is six weeks after the corpus morning. The Gate clock is
+  // the week of the permit, which is when this ask clears the bar.
+  const parkNow = new Date(2026, 9, 8, 9, 0, 0).getTime();
+  const loops = FlowStillOpen.select([park, parkAgain], parkNow);
+  check('a parking ask stored under two ids is one Do It', loops.length === 1, loops.map((r) => r.messageId));
+  check('the parking Loops title is the work and the date',
+    FlowStillOpen.whyLine(park, NOW) === 'Renew the parking permit by Oct 11',
+    FlowStillOpen.whyLine(park, NOW));
+  const other = candidate("I'll send Dana the numbers by Thursday.", 'p35');
+  other.subject = 'Gate 0.9.35 To Do title';
+  const sibling = candidate("I'll send Dana the numbers by Thursday.", 'p34');
+  sibling.subject = 'Gate 0.9.34 To Do title';
+  const both = FlowStillOpen.select([other, sibling], NOW);
+  check('the same promise on two subjects is one Loops card',
+    both.length === 1 && both[0].subject === 'Gate 0.9.35 To Do title', both.map((r) => r.subject));
+  const again = Object.assign({}, other, { messageId: 'p35-scan', sender: {} });
+  check('passport 0.9.35 under two ids is one Do It',
+    FlowStillOpen.select([other, again], NOW).length === 1);
+  check('the open mail matches that row by subject and promise',
+    FlowStillOpen.sameSubjectPromise(other, {
+      text: other.text, subject: other.subject, sender: other.sender
+    }) === true &&
+    FlowStillOpen.sameSubjectPromise(other, {
+      text: sibling.text, subject: sibling.subject, sender: sibling.sender
+    }) === false);
+}
+
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);

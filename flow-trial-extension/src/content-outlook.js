@@ -3085,6 +3085,18 @@
       const rowIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
       if (ids.some((id) => rowIds.some((rid) => sameExchangeId(id, rid)))) return row;
     }
+    const paneRow = {
+      text: (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.stripReadingChrome === 'function')
+        ? FlowOwaParse.stripReadingChrome(pane.text) : pane.text,
+      subject: pane.subject,
+      sender: { email: pane.senderEmail, name: pane.senderName },
+      threadId: pane.conversationId || '',
+      outlookConversationId: pane.conversationId || ''
+    };
+    for (let j = 0; j < open.length; j++) {
+      const row = open[j];
+      if (row && FlowStillOpen.sameSubjectPromise(row, paneRow)) return row;
+    }
     return null;
   }
 

@@ -231,22 +231,31 @@ async function registerSurfaceNow(id) {
   if (!granted) return { ok: false, reason: 'no-permission' };
   const css = (def.css && def.css.length) ? def.css : ['src/follow.css'];
   const script = { id: 'flow-' + id, matches: def.origins, js: surfaceScripts(id), css: css, runAt: 'document_idle', persistAcrossSessions: true };
+  const stamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || chrome.runtime.getManifest().version || '';
+  let remembered = {};
+  try { remembered = (await chrome.storage.local.get({ glanceSurfaceStamp: {} })).glanceSurfaceStamp || {}; } catch (e) { remembered = {}; }
   let current = null;
   try { current = ((await chrome.scripting.getRegisteredContentScripts({ ids: [script.id] })) || [])[0] || null; } catch (e) { current = null; }
-  const same = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
+  const listSame = current && JSON.stringify(current.js || []) === JSON.stringify(script.js) && JSON.stringify(current.css || []) === JSON.stringify(script.css)
     && JSON.stringify((current.matches || []).slice().sort()) === JSON.stringify(script.matches.slice().sort());
+  // The file list can stay the same across a package. The previous registration
+  // would keep injecting the old greeting path. A new stamp registers again.
+  const same = listSame && remembered[id] === stamp;
   if (!same) {
     if (current) { try { await chrome.scripting.unregisterContentScripts({ ids: [script.id] }); } catch (e) { /* not registered */ } }
     await chrome.scripting.registerContentScripts([script]);
-    console.info('Glance: ' + id + ' surface registered', chrome.runtime.getManifest().version, script.js.length + ' files');
+    remembered[id] = stamp;
+    try { await chrome.storage.local.set({ glanceSurfaceStamp: remembered }); } catch (e) { /* the page still got this registration */ }
+    console.info('Glance: ' + id + ' surface registered', stamp, script.js.length + ' files');
   }
-  const injected = await injectSurfaceIntoOpenTabs(id, script);
+  const injected = await injectSurfaceIntoOpenTabs(id, script, stamp);
   return { ok: true, registered: !same, injected };
 }
 
 // Pages that were already open when the scripts were (re)registered: inject once, unless a live copy is already there.
-async function injectSurfaceIntoOpenTabs(id, script) {
+async function injectSurfaceIntoOpenTabs(id, script, stamp) {
   if (!chrome.tabs || !chrome.tabs.query || !chrome.scripting.executeScript) return 0;
+  const want = stamp || ((typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '');
   let tabs = [];
   try { tabs = await chrome.tabs.query({ url: script.matches }); } catch (e) { return 0; }
   let n = 0;
@@ -256,17 +265,25 @@ async function injectSurfaceIntoOpenTabs(id, script) {
       const probe = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => {
         let alive = false;
         try { alive = Boolean(chrome.runtime && chrome.runtime.id); } catch (e) { alive = false; }
-        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive };
+        const pageStamp = (typeof FlowBuild !== 'undefined' && FlowBuild.STAMP) || '';
+        return { globals: typeof FlowChipHost !== 'undefined' || typeof FlowStorage !== 'undefined', alive, stamp: pageStamp };
       } });
       const seen = (probe && probe[0] && probe[0].result) || {};
+      if (seen.globals && want && seen.stamp && seen.stamp !== want && chrome.tabs.reload) {
+        // The open page is an older package. Rescan would keep its greeting path.
+        console.warn('Glance: reloading an open ' + id + ' tab still on ' + seen.stamp);
+        try { await chrome.tabs.reload(tab.id); } catch (e) { /* the next navigation picks up the new scripts */ }
+        continue;
+      }
       if (seen.globals && !seen.alive) {
         // A copy from before an update, cut off from the extension: its declarations block a second copy. Only a reload
         // of that tab clears it.
         console.warn('Glance: an open ' + id + ' tab runs an old copy; reload that tab once');
+        if (chrome.tabs.reload) { try { await chrome.tabs.reload(tab.id); } catch (e) { /* left for the person */ } }
         continue;
       }
       if (seen.globals) {
-        // A copy from this or an earlier load is there: ask it to look again rather than declaring everything twice.
+        // A copy from this package is there: ask it to look again rather than declaring everything twice.
         await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => { try { if (globalThis.__glanceOutlookPage) globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* orphaned copy */ } } });
         continue;
       }

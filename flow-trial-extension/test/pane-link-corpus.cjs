@@ -360,8 +360,21 @@ const realBeat = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Q3 fund statement', conversationId: 'AQQkAlpha', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: betaWhen, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
   [alphaOther, betaOther]
 );
-check('a conversation id that is the other row still beats the beta filename',
-  !realBeat.message && /id-conflict/.test(realBeat.detail || '') && /kind=conversation/.test(realBeat.detail || '') && /source=open-mail/.test(realBeat.detail || ''), realBeat);
+check('the beta chip still links when the conversation id is the alpha row',
+  realBeat.message && realBeat.message.id === 'm-beta' && /time-file/.test(realBeat.detail || ''), realBeat);
+const noChip = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', conversationId: 'AQQkAlpha', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: betaWhen },
+  [alphaOther, betaOther]
+);
+check('no chip and the other conversation id stays unresolved',
+  !noChip.message && /id-conflict/.test(noChip.detail || ''), noChip);
+const nwWhen = '2026-10-08T14:01:00.000Z';
+const northSave = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', conversationId: 'AQQkStale', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: nwWhen, attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
+  [msg('m-nw', 'AQQkNw', nwWhen, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
+);
+check('Northwind links the chip when the conversation id is another mail',
+  northSave.message && northSave.message.id === 'm-nw', northSave);
 
 const twinAt = '2026-10-08T11:37:50.000Z';
 const twinBt = '2026-10-08T11:37:59.000Z';
@@ -379,6 +392,13 @@ const staleAlpha = FlowOwaParse.uniqueGraphMessage(
 );
 check('a stale url conversation id is not a conflict against beta.pdf',
   staleAlpha.message && staleAlpha.message.id === 'm-beta' && !/id-conflict/.test(staleAlpha.detail || ''), staleAlpha);
+const oldQ3 = msg('m-old', 'AQQkOld', '2026-10-01T14:37:00.000Z', [file('statement-q3-old.pdf', 1000)], 'Q3 fund statement');
+const alphaSave = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', conversationId: 'AQQkOld', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: twinAt, attachments: [{ name: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }] },
+  [oldQ3, twinAlpha, twinBeta]
+);
+check('alpha links statement-q3-alpha.pdf when an older id is on the open mail',
+  alphaSave.message && alphaSave.message.id === 'm-alpha' && /time-file/.test(alphaSave.detail || ''), alphaSave);
 
 const receiptLeak = FlowOwaParse.matchEntryHow(
   { subject: 'Q3 fund statement', senderEmail: 'dana@acme.com' },

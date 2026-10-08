@@ -170,7 +170,8 @@ function load(stored, opts) {
     [SRC, 'receipt-copy.js'],
     [CORE, 'lang-normalize.js'], [CORE, 'request-types.js'], [CORE, 'intent-model-weights.js'], [CORE, 'intent-model.js'], [CORE, 'intent-pipeline.js'], [CORE, 'reply-meaning.js'], [CORE, 'story.js'], [CORE, 'recognition-stats.js'], [CORE, 'file-attach.js'], [CORE, 'file-path.js'], [CORE, 'person-model.js'], [CORE, 'outcome-labels.js'], [CORE, 'follow-up.js'], [CORE, 'expiry.js'], [CORE, 'meeting-debrief.js'], [CORE, 'local-lm.js'], [CORE, 'local-lm-audit.js'], [CORE, 'local-lm-server.js'], [CORE, 'hybrid-status.js'], [CORE, 'recurrence.js'], [CORE, 'entitlements.js'],
     [CORE, 'proof-of-close.js'],
-    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'incoming-judge.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js']
+    [CORE, 'outside-signals.js'], [CORE, 'channel.js'], [CORE, 'identity-graph.js'], [CORE, 'cross-channel.js'], [CORE, 'capture.js'], [CORE, 'graph-mail.js'], [CORE, 'outlook-config.js'], [CORE, 'outlook-auth.js'], [CORE, 'incoming-judge.js'], [CORE, 'outlook-sync.js'], [SRC, 'outlook.js'], [CORE, 'privacyShield.js'], [CORE, 'learning-ledger.js'], [CORE, 'active-question.js'],
+    [CORE, 'display-copy.js']
   ];
   for (const [dir, f] of loadOrder) {
     vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), sandbox, { filename: f });
@@ -884,6 +885,29 @@ async function run() {
       catch (e) { /* a refused Graph call must not become a To Do write */ }
     }
     for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0));
+    const handledStored = {
+      log: [{
+        kind: 'written', app: 'outlook', messageId: 'handled-park', ts: Date.now(),
+        connectorId: 'outlookTask', fetchedBack: true, system: 'microsoft/todo',
+        label: 'Renew the parking permit by Oct 11',
+        actionTitle: 'Renew the parking permit by Oct 11'
+      }, Object.assign({}, base, {
+        messageId: 'still-park',
+        subject: 'Parking permit - please renew by Sunday',
+        text: 'Please renew the parking permit by Sunday, October 11.',
+        intent: Object.assign({}, base.intent, { label: 'Renew the parking permit by Oct 11', personalClose: 'follow-up-ask', type: 'request', noReplyDraft: true }),
+        process: { id: 'log-it', name: 'Log It', steps: [{ kind: 'outlookTask', id: 'outlookTask', params: { title: 'Renew the parking permit by Oct 11' } }] }
+      })]
+    };
+    const handled = load(handledStored, {});
+    vm.runInContext(fs.readFileSync(path.join(POPUP, 'popup.js'), 'utf8'), handled.sandbox, { filename: 'popup.js' });
+    for (let i = 0; i < 12; i++) await new Promise((r) => setTimeout(r, 0));
+    const heads = find(handled.document.getElementById('open-list'), 'loops-section').map((n) => n.getAttribute('data-glance-section'));
+    check('Loops shows Added for a Handled row and Suggested for the open Do It',
+      heads.indexOf('added') >= 0 && heads.indexOf('suggested') >= 0, heads);
+    const doIts = find(handled.document.getElementById('open-list'), 'primary');
+    check('that open parking row is one Do It', doIts.length === 1, doIts.length);
+
     check('a reply ask still does not write Microsoft To Do',
       !(draftOpts.executes || []).some((p) => p && (p.connectorId === 'outlookTask' || p.connectorId === 'onedriveFile')),
       draftOpts.executes);
