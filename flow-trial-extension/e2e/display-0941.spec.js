@@ -94,7 +94,7 @@ test('Clear close memory drops the handled card and already-handled rows', async
   }).toBe(false);
   await expect(popup.locator('#open-list .log-kind').filter({ hasText: 'Handled' })).toHaveCount(0);
   await expect(page.locator('#ReadingPaneContainerId [data-glance-chain="task-proof"]')).toHaveCount(0);
-  await popup.locator('button[data-tab="surfaces"]').click();
+  await popup.locator('button[data-tab="setup"]').click();
   const why = popup.locator('#surface-list').getByText(/Why not shown/);
   if (await why.count()) {
     await why.click();

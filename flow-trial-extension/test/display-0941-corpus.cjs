@@ -158,6 +158,7 @@ console.log('\n--- page wiring ---\n');
   check('Handled replaces the open card', outlook.indexOf('host.replaceChildren(done)') > 0 && outlook.indexOf("querySelectorAll('.flow-chip-host')") > 0);
   check('the page loads FlowOnedriveFile and reads Files.ReadWrite itself', outlook.indexOf('FlowOnedriveFile.hasWriteScope') > 0 && outlook.indexOf("type: 'flow:onedrive-grant'") < 0);
   check('the page syncs a panel proof', outlook.indexOf("msg.type === 'flow:proof-sync'") > 0);
+  check('an active draft receipt stays up on a later scan', outlook.indexOf('function keepActiveDraftReceipt') > 0 && outlook.indexOf('page:draft-receipt') > 0);
   check('the worker can read attachment bytes and the page does not ask it for a grant', bg.indexOf('function outlookAttachmentBytes') > 0 && bg.indexOf("msg.type === 'flow:onedrive-grant'") < 0);
   check('Activity uses the row title', popup.indexOf('FlowDisplay.activityTitle') > 0);
   check('Clear close memory re-renders the panel', /function wireClearCloseMemory\(\)[\s\S]{0,1200}renderSurfaces\(/.test(popup));

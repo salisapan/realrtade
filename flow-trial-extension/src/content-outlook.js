@@ -922,6 +922,59 @@
     return host;
   }
 
+  function paneIdList(pane) {
+    return [pane && pane.itemId, pane && pane.pathId, pane && pane.conversationId].filter(Boolean).map(String);
+  }
+
+  function draftMatchesPane(row, pane) {
+    if (!row || row.connectorId !== 'outlookDraft') return false;
+    const want = paneIdList(pane);
+    const ids = [row.messageId, row.outlookIncomingId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
+    return want.some((id) => ids.indexOf(id) !== -1);
+  }
+
+  // The open page already showed Draft ready. Keep that receipt, with Undo,
+  // until the draft is undone. A reload mounts the same receipt from the log.
+  async function keepActiveDraftReceipt(pane) {
+    if (!pane || typeof FlowStorage.getActiveOutlookReceipts !== 'function') return false;
+    const receipts = await FlowStorage.getActiveOutlookReceipts();
+    const draft = (receipts || []).filter((r) => draftMatchesPane(r, pane)).pop();
+    if (!draft) return false;
+    const mount = mountPoint();
+    if (!mount) return false;
+    const settled = mount.querySelector('.flow-chip-host.flow-chip-settled');
+    if (settled && settled.querySelector('.flow-chip-undo')) {
+      lastOutcome = 'card';
+      return true;
+    }
+    const old = mount.querySelector('.flow-chip-host');
+    if (old) old.remove();
+    const host = FlowChipHost.inject(mount, {
+      process: { name: 'Reply', steps: [] },
+      intent: { label: draft.label || 'Reply draft ready' },
+      messageId: draft.messageId
+    }, { onDoIt: () => {}, onDismiss: (h) => h.remove() });
+    if (!host) return false;
+    lastOutcome = 'card';
+    FlowChipHost.showDraftReceipt(host, {
+      written: draft.writtenLine || draft.label || 'Reply draft ready in Outlook Drafts. Not sent.',
+      url: draft.url || draft.where,
+      onUndo: async () => {
+        const u = await send({ type: 'flow:undo-action', connectorId: 'outlookDraft', ref: draft.ref });
+        if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+          await FlowStorage.markOutlookDraftUndone(draft.messageId, draft.ref);
+        }
+        await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: draft.messageId, draftOnly: true });
+        lastKey = '';
+        lastSig = '';
+        try { host.remove(); } catch (e) { /* already gone */ }
+        schedule();
+        return { ok: true, written: (u && u.written) || 'Reply draft removed. Not sent.', reopen: true };
+      }
+    });
+    return true;
+  }
+
   // Handled after a reload or a return to this thread. The match is the
   // Outlook item id, the path id, or the conversation id. A hash of the
   // pane text is not an id.
@@ -1846,6 +1899,18 @@
       glanceError('todo receipt', e);
       await pageReason('page:scan-error', pane);
       return;
+    }
+
+    // A draft that is still in Drafts stays the receipt. A later scan (the
+    // planned reason changed, another message was undone) must not put Do It
+    // back on top of it. Undo is what removes it.
+    try {
+      if (await keepActiveDraftReceipt(pane)) {
+        dbg('decision', { shown: true, reason: 'page:draft-receipt', subject: pane.subject });
+        return;
+      }
+    } catch (e) {
+      glanceError('draft receipt', e);
     }
 
     // A file placed on the calendar is judged before note-to-self. The gate
