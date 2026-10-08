@@ -226,6 +226,9 @@ const FlowStorage = (() => {
     // the store API for Not now and Undo. No button writes it in 0.9.38.
     suggestLog: [],
     suggestDismissals: {},
+    // src/content-outlook.js writes this directly. The panel's Why not shown
+    // list reads it through get(); a key absent from DEFAULTS never arrives.
+    outlookPageDiag: [],
     outlookPending: { offers: [], asks: [], incoming: [] },
     outlookMigrateVersion: 0,
     // core/active-question.js: the one question waiting for an answer, plus the rationing counters. Local.

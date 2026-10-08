@@ -41,6 +41,8 @@ the same turn, and refresh the "Last updated" date. Link the ClickUp task when o
 
 A change that moves a product fact or the release order updates the truth file that owns it (`CLAUDE.md`, `docs/open-tasks.md`, or the topic document) in the same change, and adds one short, plain, dated line to `docs/vault/decisions.md`: what shipped or changed, the version, and the Gate result when there is one.
 
+Current package is **0.9.40**, on top of 0.9.39 (PR #104, merged @`87f2056f`). This build is #106 normalize/recall (invisible formatting once before the decision, a narrow phone-signature strip, the resolver sender check, a truncated body preview, three display bugs, and the suggest-save engine with no UI) plus the #110 on-device reply rule fixes and the `outlookPageDiag: []` storage default. 0.9.39 stays intact: a task-only Outlook close writes Microsoft To Do, the mailbox check reads the attachment list, and Connect Google falls back when browser sign-in is off. The steps-list UI is still open (`docs/open-tasks.md` row 52). Gate for this package: not run live.
+
 ## Product architecture — read before touching pricing, positioning, or feature scope
 
 Flow Trial (Free + Pro) and Flow (the core product) are **two separate
