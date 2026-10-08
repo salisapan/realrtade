@@ -62,6 +62,7 @@ function load(stored, opts) {
       if (!byId.has(id)) { const n = makeNode('div'); n.id = id; byId.set(id, n); }
       return byId.get(id);
     },
+    querySelector: () => null,
     querySelectorAll: () => [],
     createElement: (t) => makeNode(t),
     createTextNode: (t) => { const n = makeNode('#text'); n.textContent = String(t); return n; }

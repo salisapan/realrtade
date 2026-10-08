@@ -13,7 +13,7 @@ const vm = require('vm');
 const CORE = path.join(__dirname, '..', 'core');
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'fact-reply.js', 'close-families.js', 'intent.js', 'actions.js', 'still-open.js']) {
+for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'fact-reply.js', 'close-families.js', 'intent.js', 'actions.js', 'commitment-title.js', 'still-open.js']) {
   vm.runInContext(fs.readFileSync(path.join(CORE, file), 'utf8'), sandbox, { filename: file });
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
@@ -254,15 +254,15 @@ console.log('\n--- still open metrics: shown, Do It, undo, false-close ---\n');
   check('the same card shown again does not double-count', shownAgain.recorded === null && shownAgain.state.shown === 1);
 
   const did = FlowStillOpen.applyMetric(shownAgain.state, { kind: 'doIt', messageId: 'm1', ts: 3 });
-  check('Do It counts once per message', did.recorded && did.state.doIt === 1, did.state);
+  check('Do It counts a verified close', did.recorded && did.state.doIt === 1, did.state);
   const didAgain = FlowStillOpen.applyMetric(did.state, { kind: 'doIt', messageId: 'm1', ts: 4 });
-  check('a second Do It on the same message is not a second close', didAgain.state.doIt === 1);
+  check('a second Do It on the same message counts again', didAgain.state.doIt === 2);
 
   const undone = FlowStillOpen.applyMetric(didAgain.state, { kind: 'undo', messageId: 'm1', ts: 5 });
   check('undo counts as undo and as a false-close',
     undone.state.undo === 1 && undone.state.falseClose === 1 && undone.recorded && undone.recorded.reason === 'undo', undone.state);
   const undoneAgain = FlowStillOpen.applyMetric(undone.state, { kind: 'undo', messageId: 'm1', ts: 6 });
-  check('a repeated undo does not inflate either counter', undoneAgain.state.undo === 1 && undoneAgain.state.falseClose === 1);
+  check('a repeated undo counts again and false-close stays once', undoneAgain.state.undo === 2 && undoneAgain.state.falseClose === 1);
 
   const dismissed = FlowStillOpen.applyMetric(shownAgain.state, { kind: 'falseClose', messageId: 'm2', reason: 'dismiss', ts: 7 });
   check('dismissing a card is a false-close', dismissed.state.falseClose === 1 && dismissed.recorded.reason === 'dismiss', dismissed.state);
@@ -275,12 +275,12 @@ console.log('\n--- still open metrics: shown, Do It, undo, false-close ---\n');
 
   const line = FlowStillOpen.activityLine(undone.state);
   check('the activity line names the four hooks',
-    line.indexOf('shown 1') !== -1 && line.indexOf('Do It 1') !== -1 && line.indexOf('undo 1') !== -1 && line.indexOf('false-close 1') !== -1,
+    line.indexOf('shown 1') !== -1 && line.indexOf('Do It 2') !== -1 && line.indexOf('undo 1') !== -1 && line.indexOf('false-close 1') !== -1,
     line);
   check('a fresh install has no activity line', FlowStillOpen.activityLine(FlowStillOpen.emptyMetrics()) === '');
 }
 
-console.log('\n--- still open: same thread collapses to one card ---\n');
+console.log('\n--- still open: two commitments in one thread stay two cards ---\n');
 {
   const shared = {
     threadId: 'same',
@@ -306,7 +306,7 @@ console.log('\n--- still open: same thread collapses to one card ---\n');
     })
   });
   const picked = FlowStillOpen.select([a, b], NOW);
-  check('two closes in one thread become one card', picked.length === 1, ids(picked));
+  check('two commitments in one thread stay two cards', picked.length === 2, ids(picked));
   check('the higher-ranked close is the one kept', picked[0].messageId === 'b', ids(picked));
 }
 
@@ -418,6 +418,101 @@ console.log('\n--- still open: trust-finish silence (A–J) stays off the mornin
       ids(beside).indexOf(row.messageId) !== -1 && beside.length === 1,
       ids(beside));
   });
+}
+
+console.log('\n--- one promise is one Do It ---\n');
+{
+  const older = candidate('I will send you the signed contract by Friday, September 18.', 'older');
+  const newer = candidate('I will send you the signed contract by Friday, September 18.', 'newer');
+  newer.threadId = 't-newer';
+  newer.ts = NOW + 1000;
+  const picked = FlowStillOpen.select([older, newer], NOW);
+  check('two mails with the same promise are one loop', picked.length === 1, ids(picked));
+  check('the promise key matches across those mails',
+    Boolean(FlowStillOpen.promiseKey(older)) && FlowStillOpen.promiseKey(older) === FlowStillOpen.promiseKey(newer),
+    { older: FlowStillOpen.promiseKey(older), newer: FlowStillOpen.promiseKey(newer) });
+  const other = candidate('I will send the passport scan by Monday, September 21.', 'passport');
+  check('a different promise stays its own loop', FlowStillOpen.select([older, other], NOW).length === 2, ids(FlowStillOpen.select([older, other], NOW)));
+  const proof = {
+    kind: 'written', undone: false, connectorId: 'outlookTask', fetchedBack: true,
+    messageId: 'newer', text: newer.text, intent: newer.intent, sender: newer.sender, threadId: newer.threadId
+  };
+  check('a live task hides every Do It for that promise', FlowStillOpen.select([older, newer], NOW, [proof]).length === 0);
+  const undone = Object.assign({}, proof, { kind: 'undone', undone: true, fetchedBack: false });
+  const after = FlowStillOpen.select([older, newer], NOW, [undone]);
+  check('after Undo the same promise is one Do It again', after.length === 1, ids(after));
+
+  const contract = candidate('I will send you the signed contract by Friday, September 18.', 'contract-thread');
+  const passport = candidate('I will send the passport scan by Monday, September 21.', 'passport-thread');
+  contract.threadId = 'shared-thread';
+  passport.threadId = 'shared-thread';
+  const both = FlowStillOpen.select([contract, passport], NOW);
+  check('contract and passport in one thread stay two rows', both.length === 2, ids(both));
+
+  const noDue = {
+    messageId: 'nodue',
+    threadId: 't-nodue',
+    sender: { email: 'dana@example.com' },
+    intent: { entities: { what: 'send the signed contract' }, facts: {}, label: 'send the signed contract' }
+  };
+  const noDueKey = FlowStillOpen.promiseKey(noDue);
+  check('a promise with no due date still has a key', Boolean(noDueKey), noDueKey);
+  const noDueTwin = Object.assign({}, noDue, { messageId: 'nodue-2', threadId: 't-other' });
+  check('the same no-due promise keeps one key across threads', FlowStillOpen.promiseKey(noDueTwin) === noDueKey);
+  const pointed = {
+    messageId: 'pointed',
+    sender: { email: 'dana@example.com' },
+    intent: { entities: { what: 'אֲנִי אֶשְׁלַח אֶת הַחוֹזֶה' }, facts: {} }
+  };
+  const plainHe = {
+    messageId: 'plain-he',
+    sender: { email: 'dana@example.com' },
+    intent: { entities: { what: 'אני אשלח את החוזה' }, facts: {} }
+  };
+  const maqaf = {
+    messageId: 'maqaf',
+    sender: { email: 'dana@example.com' },
+    intent: { entities: { what: 'אני־אשלח את החוזה' }, facts: {} }
+  };
+  const infinitive = candidate('אני אשלח את החוזה עד יום חמישי', 'he-inf');
+  const pointedMail = candidate('אני אשלח את החוזה עד יום חמישי', 'he-pointed');
+  pointedMail.text = 'אֲנִי אֶשְׁלַח אֶת־הַחוֹזֶה עד יום חמישי';
+  const bare = {
+    messageId: 'he-bare',
+    sender: { email: 'dana@example.com' },
+    text: 'לשלוח את החוזה',
+    intent: infinitive.intent,
+    process: infinitive.process
+  };
+  const conjugated = {
+    messageId: 'he-conj',
+    sender: { email: 'dana@example.com' },
+    text: 'אני אשלח את החוזה',
+    intent: infinitive.intent,
+    process: infinitive.process
+  };
+  check('לשלוח את החוזה and אני אשלח את החוזה are one key',
+    Boolean(FlowStillOpen.promiseKey(bare)) && FlowStillOpen.promiseKey(bare) === FlowStillOpen.promiseKey(conjugated),
+    { bare: FlowStillOpen.promiseKey(bare), conjugated: FlowStillOpen.promiseKey(conjugated) });
+  const heLoops = FlowStillOpen.select([infinitive, pointedMail], NOW);
+  check('the pointed promise and the plain promise are one loop', heLoops.length === 1, ids(heLoops));
+  const heProof = {
+    kind: 'written', undone: false, connectorId: 'outlookTask', fetchedBack: true,
+    messageId: 'he-bare', text: 'לשלוח את החוזה', intent: infinitive.intent, sender: bare.sender
+  };
+  check('one Do It: a proof for לשלוח את החוזה hides אני אשלח את החוזה',
+    FlowStillOpen.select([infinitive, pointedMail], NOW, [heProof]).length === 0 &&
+    FlowStillOpen.activeProofFor([heProof], conjugated));
+  check('undo without outlookReopen clears a fetched-back proof',
+    FlowStillOpen.activeProofFor([
+      { kind: 'undone', messageId: 'he-conj' },
+      heProof
+    ], conjugated) === null);
+  check('niqqud and maqaf normalize to the same promise key',
+    Boolean(FlowStillOpen.promiseKey(plainHe)) &&
+    FlowStillOpen.promiseKey(pointed) === FlowStillOpen.promiseKey(plainHe) &&
+    FlowStillOpen.promiseKey(maqaf) === FlowStillOpen.promiseKey(plainHe),
+    { plain: FlowStillOpen.promiseKey(plainHe), pointed: FlowStillOpen.promiseKey(pointed), maqaf: FlowStillOpen.promiseKey(maqaf) });
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -472,7 +472,14 @@ const FlowJudgment = (() => {
     const marketing = MARKETING.test(text);
     const solicitation = SOLICITATION.test(text);
     const calendarNoise = CALENDAR_NOISE.test(text);
-    const noise = automated || calendarNoise || PITCH_VETO.test(text) || MARKETING_VETO.test(text);
+    // A parking-permit ask is the work, even when a mailing footer is on the
+    // same message. A newsletter with no such ask stays noise.
+    const heard = [facts && facts.subject, text].filter(Boolean).join('\n');
+    const parkingAsk = /\bparking permits?\b/i.test(heard) && /\b(?:please|can you|could you|would you|send|need|renew|attach|forward)\b/i.test(heard);
+    const footerMark = /\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b/i.test(text);
+    const automatedNoise = automated && !(parkingAsk && footerMark);
+    const marketingNoise = MARKETING_VETO.test(text) && !parkingAsk;
+    const noise = automatedNoise || calendarNoise || PITCH_VETO.test(text) || marketingNoise;
     if (automated) add('automated', -60, 'The sender looks automated');
     if (marketing) add('marketing', -45, 'Reads like a mailing list, not a person');
     if (solicitation) add('solicitation', -55, 'Reads like a cold pitch, not your work');

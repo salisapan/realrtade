@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Glance",
   "short_name": "Glance",
-  "version": "0.9.40",
+  "version": "0.9.47",
   "description": "Glance stays on what you are waiting on until it is closed, and closes what is asked of you in one click. Judgment on your device.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0oW6F6XmCie6fLFo3kGjzO7lmgMxNkc2p3CrezAS4qV8VB39agewLKiV4+uJYmA9PMQ2whv0aUXGRhGIue/lIv9RVAGF4lRtiAgvjTTug/GijDYFP89iacyUEVU18S5JhCZ+CZ8s1v/BdvPv6udW8W9zLXV/M7ch2awGjO3UoyLPkUgTqyAIA71da+wX++5kSK2TThOhF9+EL9C9rDOuZEc4d86PHxYhOHiQU4+vE7CxzJd99CrQ0+REL6d2BjR+TMNECqldQNqeAtmaR+iNFj0OFDV6D4JbPwK8AUCDT2S0risK9CzRCkdiYT+cFh2QfNJrMMIuqcgsJV3fsF/UbQIDAQAB",
   "icons": {
@@ -37,6 +37,7 @@
         "core/source-text.js",
         "core/google-closes.js",
         "core/suggest-save.js",
+        "core/onedrive-file.js",
         "core/build-stamp.js",
         "core/fact-reply.js",
         "core/close-families.js",
@@ -95,11 +96,18 @@
         "src/brief.js",
         "src/weekly.js",
         "core/proof-of-close.js",
+        "core/commitment-title.js",
+        "core/display-copy.js",
+        "core/step-list.js",
+        "design/step-states-v1/glyphs.js",
+        "src/step-kit.js",
+        "src/step-list-view.js",
         "src/receipt-copy.js",
         "src/follow.js",
         "src/content-gmail.js"
       ],
       "css": [
+        "design/step-states-v1/scoped.css",
         "src/chip.css",
         "src/sidebar.css",
         "src/brief.css",
@@ -139,6 +147,22 @@
       "https://www.googleapis.com/auth/drive.file"
     ]
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "design/step-states-v1/do-it.png",
+        "design/step-states-v1/do-it-dark.png",
+        "design/step-states-v1/living/key-idle-512.png",
+        "design/step-states-v1/living/key-done-512.png"
+      ],
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*"
+      ]
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },

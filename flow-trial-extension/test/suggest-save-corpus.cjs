@@ -117,6 +117,15 @@ console.log('\n--- rows 1-22 ---\n');
 
   check('15 an unread list is not guessed', S.suggestSave(mail({ attachments: null })).reason === 'suggest:attachments-unread');
 
+  const smallPdf = S.suggestSave(mail({
+    attachments: [file({ name: 'northwind-agreement-signed.pdf', size: 800 })]
+  }));
+  check('a too-small pdf is a named skipped row',
+    smallPdf.eligible === false && smallPdf.reason === 'suggest:no-files' &&
+    smallPdf.step === null && Array.isArray(smallPdf.skipped) && smallPdf.skipped.length === 1 &&
+    S.skippedLabel(smallPdf.skipped[0]) === 'northwind-agreement-signed.pdf · skipped · small-doc',
+    smallPdf);
+
   check('16 an attached message is not a file', S.suggestSave(mail({
     attachments: [{ id: 'm', name: 'Forwarded', size: 20 * KB, '@odata.type': '#microsoft.graph.itemAttachment' }]
   })).reason === 'suggest:no-files');
@@ -163,8 +172,29 @@ console.log('\n--- rows 1-22 ---\n');
   const oracleRow = JSON.parse(fs.readFileSync(path.join(__dirname, 'oracle/suggest-save/corpus-22.json'), 'utf8'))[0];
   const decided = S.decide(oracleRow.input);
   const named = S.suggestSave(oracleRow.input);
-  check('the step names the file; engine decide chip stays Save file to',
-    decided.reason === 'suggest:show' && decided.chip && decided.chip.en === 'Save file to OneDrive?' &&
+  const skipped = S.decide({
+    surface: 'outlook', direction: 'inbound', consent: true, attachmentsRead: true,
+    messageId: 'M-skip', text: 'Hi, attached is the Q3 report. Thanks', subject: 'Q3',
+    judgment: {},
+    attachments: [
+      { id: 'keep', name: 'board.pdf', size: 240 * KB, contentType: 'application/pdf', isInline: false },
+      { id: 'skip', name: 'contract.pdf', size: 2200, contentType: 'application/pdf', isInline: true }
+    ]
+  });
+  const skippedRow = (skipped.excluded || []).find((f) => f && f.id === 'skip');
+  check('an excluded file keeps its name and size',
+    skipped.suggest === true && skippedRow && skippedRow.name === 'contract.pdf' && skippedRow.size === 2200 && skippedRow.why === 'inline',
+    skippedRow);
+  check('the skipped row names the file', S.skippedLabel(skippedRow) === 'contract.pdf · skipped · inline', S.skippedLabel(skippedRow));
+  check('a file with no name is File skipped, never an id',
+    S.skippedLabel({ id: 'AAMkVeryLongAttachmentId1234567890', why: 'type' }) === 'File skipped · type');
+  check("Please don't save the attachment to OneDrive stays quiet", S.suggestSave(mail({
+    text: "Please don't save the attachment to OneDrive"
+  })).reason === 'suggest:negated');
+
+  check('the step and decide().chip both name the file',
+    decided.reason === 'suggest:show' && decided.chip && decided.chip.en === 'Save Q3-report.pdf to OneDrive?' &&
+    decided.chip.he === 'לשמור את Q3-report.pdf ב-OneDrive?' &&
     named.reason === 'suggest:eligible-hidden' && named.step.copy.en === 'Save Q3-report.pdf to OneDrive?' &&
     named.step.copy.he === 'לשמור את Q3-report.pdf ב-OneDrive?');
 }
@@ -200,12 +230,13 @@ console.log('\n--- nothing is drawn ---\n');
 {
   const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
   const outlook = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
-  check('no Save / Not now chip in the pages',
+  check('no Not now chip in the pages',
     gmail.indexOf('Not now') < 0 && outlook.indexOf('Not now') < 0 &&
     gmail.indexOf('flow-suggest') < 0 && outlook.indexOf('flow-suggest') < 0);
-  check('the page records the decision and does not send it',
+  check('the page records other-card and draws attachmentSave from step.copy',
     outlook.indexOf('recordSuggestNote') > 0 && outlook.indexOf("reason: 'suggest:other-card'") > 0 &&
-    outlook.indexOf('attachmentSave') < 0);
+    outlook.indexOf('attachmentSave') > 0 && outlook.indexOf('Save the file?') > 0 &&
+    outlook.indexOf('Mail.Send') < 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

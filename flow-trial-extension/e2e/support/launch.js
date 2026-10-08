@@ -69,6 +69,9 @@ function installE2EHooks() {
   e2e.scenario = e2e.scenario || { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
   e2e.googleTasks = e2e.googleTasks || {};
   e2e.todoTasks = e2e.todoTasks || {};
+  e2e.drafts = e2e.drafts || {};
+  e2e.driveItems = e2e.driveItems || {};
+  e2e.driveByName = e2e.driveByName || {};
   e2e.seq = e2e.seq || 1;
   globalThis.__glanceE2e = e2e;
 
@@ -80,6 +83,11 @@ function installE2EHooks() {
   }
   function empty(status) {
     return new Response(null, { status: status });
+  }
+  function graphFilterValue(search) {
+    const m = String(search || '').match(/(?:^|[?&])(?:\$|%24)filter=([^&]*)/i);
+    if (!m) return '';
+    try { return decodeURIComponent(m[1]); } catch (err) { return m[1]; }
   }
 
   const origFetch = globalThis.fetch.bind(globalThis);
@@ -132,11 +140,66 @@ function installE2EHooks() {
     }
 
     if (host === 'graph.microsoft.com') {
+      const attItem = path.match(/\/me\/messages\/([^/]+)\/attachments\/([^/]+)$/);
+      if (attItem) {
+        const messageId = attItem[1];
+        const attachmentId = attItem[2];
+        const list = (scenario.attachments && scenario.attachments[messageId]) || [];
+        const row = list.find((a) => a && a.id === attachmentId) || { id: attachmentId, name: 'file.bin' };
+        return Promise.resolve(json(200, {
+          id: attachmentId,
+          name: row.name || 'file.bin',
+          contentType: row.contentType || 'application/octet-stream',
+          size: row.size || 3,
+          contentBytes: 'ZTJlLXBkZg=='
+        }));
+      }
       const att = path.match(/\/me\/messages\/([^/]+)\/attachments$/);
-      if (att) {
+      if (att && method === 'GET') {
         const id = att[1];
+        if (scenario.attachmentFailIds && scenario.attachmentFailIds.indexOf(id) >= 0) {
+          return Promise.resolve(json(500, { error: { message: 'unread' } }));
+        }
         const list = (scenario.attachments && scenario.attachments[id]) || [];
         return Promise.resolve(json(200, { value: list }));
+      }
+      if (att && method === 'POST') {
+        return Promise.resolve(json(201, { id: 'e2e-att-' + (e2e.seq++) }));
+      }
+      const driveContent = path.match(/\/me\/drive\/root:\/(.+):\/content$/);
+      if (driveContent && scenario.driveUnauthorized) {
+        return Promise.resolve(json(401, { error: { code: 'InvalidAuthenticationToken' } }));
+      }
+      if (driveContent && method === 'PUT') {
+        const name = driveContent[1];
+        const id = 'e2e-file-' + (e2e.seq++);
+        const item = { id: id, name: name, webUrl: 'https://onedrive.live.com/file/' + id };
+        e2e.driveItems[id] = item;
+        e2e.driveByName[name] = item;
+        return Promise.resolve(json(201, item));
+      }
+      const driveRoot = path.match(/\/me\/drive\/root:\/(.+)$/);
+      if (driveRoot && method === 'GET') {
+        const item = e2e.driveByName[driveRoot[1]];
+        return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
+      }
+      const driveItem = path.match(/\/me\/drive\/items\/([^/]+)$/);
+      if (driveItem) {
+        const id = driveItem[1];
+        if (method === 'DELETE') {
+          const gone = e2e.driveItems[id];
+          if (gone && gone.name) delete e2e.driveByName[gone.name];
+          delete e2e.driveItems[id];
+          return Promise.resolve(empty(204));
+        }
+        const item = e2e.driveItems[id];
+        return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
+      }
+      const createdReply = path.match(/\/me\/messages\/([^/]+)\/createReply$/);
+      if (createdReply && method === 'POST') {
+        const id = 'e2e-draft-' + (e2e.seq++);
+        e2e.drafts[id] = { id: id, isDraft: true };
+        return Promise.resolve(json(201, e2e.drafts[id]));
       }
       const todoOne = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks\/([^/]+)$/);
       const todoCol = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks$/);
@@ -145,6 +208,9 @@ function installE2EHooks() {
         if (method === 'DELETE') {
           delete e2e.todoTasks[id];
           return Promise.resolve(empty(204));
+        }
+        if (method === 'GET' && scenario.todoVerifyFail) {
+          return Promise.resolve(json(404, { error: { message: 'verify-fail' } }));
         }
         const task = e2e.todoTasks[id];
         return Promise.resolve(task ? json(200, task) : json(404, { error: { message: 'missing' } }));
@@ -158,17 +224,74 @@ function installE2EHooks() {
         return Promise.resolve(json(200, { value: [{ id: 'todo-list', wellknownListName: 'defaultList', displayName: 'Tasks' }] }));
       }
       if (path.indexOf('/me/mailFolders/inbox/messages') >= 0) {
+        const search = parsed.search || '';
+        if (scenario.inboxFilterFails && /\$orderby=/.test(search) && /\$filter=/.test(search)) {
+          return Promise.resolve(json(400, { error: { code: 'ErrorInvalidUrlQueryFilter', message: 'restriction or sort order too complex' } }));
+        }
         return Promise.resolve(json(200, { value: scenario.inbox || [] }));
       }
       if (path.indexOf('/me/mailFolders/sentitems/messages') >= 0) {
         return Promise.resolve(json(200, { value: scenario.sent || [] }));
       }
-      if (path.indexOf('/me/messages') >= 0 && parsed.search.indexOf('conversationId') >= 0) {
+      // conversationId in $select is not a conversation lookup. Only a $filter
+      // on conversationId is. A mailbox subject query selects conversationId
+      // and must fall through to the subject filter below.
+      if (path.indexOf('/me/messages') >= 0 && /conversationId/i.test(graphFilterValue(parsed.search))) {
         return Promise.resolve(json(200, { value: scenario.conversation || [] }));
+      }
+      if (path.indexOf('/me/mailboxSettings') >= 0) {
+        return Promise.resolve(json(200, scenario.mailboxSettings || { timeFormat: 'h:mm tt' }));
+      }
+      if (path.indexOf('/me/messages') >= 0 && (parsed.search.indexOf('$filter=') >= 0 || parsed.search.indexOf('%24filter') >= 0 || parsed.search.indexOf('$skip=') >= 0 || parsed.search.indexOf('$skiptoken') >= 0)) {
+        if (scenario.mailboxOverflow) {
+          const filler = [];
+          for (let i = 0; i < 200; i++) {
+            filler.push({ id: 'overflow-' + i, subject: 'overflow', conversationId: 'c-overflow', from: { emailAddress: { address: 'a@b.com' } }, receivedDateTime: '2026-10-08T10:00:00.000Z' });
+          }
+          return Promise.resolve(json(200, {
+            value: filler,
+            '@odata.nextLink': 'https://graph.microsoft.com/v1.0/me/messages?$skiptoken=more'
+          }));
+        }
+        if (scenario.badNextLink) {
+          return Promise.resolve(json(200, {
+            value: (scenario.inbox || []).slice(0, 1),
+            '@odata.nextLink': 'https://evil.example/me/messages?$skiptoken=x'
+          }));
+        }
+        const search = decodeURIComponent(parsed.search || '');
+        const matched = (scenario.mailbox || scenario.inbox || []).filter((m) => {
+          if (!m) return false;
+          const sub = String(m.subject || '');
+          const from = String((m.from && m.from.emailAddress && m.from.emailAddress.address) || '');
+          if (sub && search.indexOf(sub) < 0 && search.indexOf(sub.replace(/'/g, "''")) < 0) return false;
+          if (from && search.toLowerCase().indexOf(from.toLowerCase()) < 0) return false;
+          return true;
+        });
+        let top = 50;
+        let skip = 0;
+        const topM = search.match(/\$top=(\d+)/);
+        const skipM = search.match(/\$skip=(\d+)/);
+        if (topM) top = +topM[1];
+        if (skipM) skip = +skipM[1];
+        const slice = matched.slice(skip, skip + top);
+        const body = { value: slice };
+        if (skip + top < matched.length) {
+          body['@odata.nextLink'] = 'https://graph.microsoft.com/v1.0/me/messages?$top=' + top + '&$skip=' + (skip + top) + '&$filter=' + encodeURIComponent('kept');
+        }
+        return Promise.resolve(json(200, body));
       }
       const msg = path.match(/\/me\/messages\/([^/]+)$/);
       if (msg) {
         const id = msg[1];
+        if (e2e.drafts[id]) {
+          if (method === 'DELETE') {
+            delete e2e.drafts[id];
+            return Promise.resolve(empty(204));
+          }
+          if (method === 'PATCH') return Promise.resolve(json(200, e2e.drafts[id]));
+          return Promise.resolve(json(200, e2e.drafts[id]));
+        }
         const row = scenario.messages && Object.prototype.hasOwnProperty.call(scenario.messages, id) ? scenario.messages[id] : null;
         if (row && row.id) return Promise.resolve(json(200, row));
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
@@ -369,6 +492,9 @@ async function boot() {
       e.scenario = { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
       e.googleTasks = {};
       e.todoTasks = {};
+      e.drafts = {};
+      e.driveItems = {};
+      e.driveByName = {};
       e.seq = 1;
     });
     for (const p of context.pages()) {

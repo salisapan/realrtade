@@ -26,11 +26,6 @@ async function openSuggest(glance, body, id, authOpts, attachments) {
   });
 }
 
-// The page adapter asks FlowOnedriveFile.hasWriteScope. That module is loaded
-// by the service worker only, so on the page consent stays null and the
-// adapter records suggest:no-consent before bulk or eligible. The engine
-// contract is asserted in the content-script world with consent passed in.
-// Loading the module into the page would change the shipped reason.
 async function engineReasons(glance, page) {
   return glance.evaluateWorker(async (bodies) => {
     const tabs = await chrome.tabs.query({ url: 'https://outlook.live.com/*' });
@@ -68,48 +63,52 @@ async function engineReasons(glance, page) {
   }, { url: page.url(), suggest: S.SUGGEST_BODY, bulk: S.BULK_BODY });
 }
 
-async function pageQuiet(glance, page) {
-  await expect.poll(async () => {
-    const bag = await glance.storage();
-    const log = bag.suggestLog || [];
-    const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
-    const save = await page.getByText(/Save .+ to (OneDrive|Drive)/).count();
-    return {
-      chips,
-      save,
-      reason: log.map((row) => row && row.reason).filter(Boolean).join(',')
-    };
-  }).toEqual({ chips: 0, save: 0, reason: 'suggest:no-consent' });
+async function pageNote(glance, page) {
+  const bag = await glance.storage();
+  const log = bag.suggestLog || [];
+  const chips = await page.locator('#ReadingPaneContainerId .flow-chip-host').count();
+  const title = await page.locator('#ReadingPaneContainerId .flow-chip-process-name').allTextContents();
+  return {
+    chips: chips,
+    title: title.join('|'),
+    reason: log.map((row) => row && row.reason).filter(Boolean).join(',')
+  };
 }
 
-test('eligible mail logs suggest:eligible-hidden and draws no card', async ({ glance }) => {
+test('a file that was not asked for shows Save the file? when OneDrive is granted', async ({ glance }) => {
   const page = await openSuggest(glance, S.SUGGEST_BODY, S.MSG_SILENT, {}, PDF);
-  await pageQuiet(glance, page);
+  await expect.poll(async () => pageNote(glance, page)).toEqual({
+    chips: 1,
+    title: 'Save the file?',
+    reason: 'suggest:eligible-hidden'
+  });
   const engine = await engineReasons(glance, page);
   expect(engine).toEqual({
     eligible: 'suggest:eligible-hidden',
     bulk: 'suggest:bulk',
     noConsent: 'suggest:no-consent'
   });
-  const popup = await glance.openPopup();
-  const why = popup.getByText(/Why not shown/);
-  await expect(why).toBeVisible();
-  await why.click();
-  await expect(popup.getByText('suggest:no-consent')).toBeVisible();
-  await expect(popup.getByText('suggest:eligible-hidden')).toHaveCount(0);
 });
 
 test('bulk mail logs suggest:bulk and draws no card', async ({ glance }) => {
   const page = await openSuggest(glance, S.BULK_BODY, S.MSG_B, {}, []);
-  await pageQuiet(glance, page);
+  await expect.poll(async () => pageNote(glance, page)).toEqual({
+    chips: 0,
+    title: '',
+    reason: 'suggest:bulk'
+  });
   const engine = await engineReasons(glance, page);
   expect(engine.bulk).toBe('suggest:bulk');
   expect(engine.eligible).toBe('suggest:eligible-hidden');
 });
 
-test('missing Files.ReadWrite logs suggest:no-consent', async ({ glance }) => {
+test('missing Files.ReadWrite logs suggest:no-consent and draws no card', async ({ glance }) => {
   const page = await openSuggest(glance, S.SUGGEST_BODY, S.MSG_A, { files: false }, PDF);
-  await pageQuiet(glance, page);
+  await expect.poll(async () => pageNote(glance, page)).toEqual({
+    chips: 0,
+    title: '',
+    reason: 'suggest:no-consent'
+  });
   const engine = await engineReasons(glance, page);
   expect(engine.noConsent).toBe('suggest:no-consent');
 });

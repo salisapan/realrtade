@@ -42,6 +42,41 @@
   let proOffer = { enabled: false, trialDays: 0 };
   // Same trap again: renderWaiting() runs before a later `let` would initialise.
   let loopView = 'date';
+  let whyNotShownAll = false;
+  let whyDetailsOpen = false;
+  const tabScroll = { setup: 0, open: 0, log: 0 };
+  let scrollLock = false;
+  let renderDepth = 0;
+  function panelScroller() { return document.querySelector('main'); }
+  function activeTabId() {
+    const tab = document.querySelector('.tab[aria-selected="true"]');
+    return (tab && tab.dataset.tab) || 'setup';
+  }
+  function rememberScroll() {
+    if (scrollLock) return;
+    const scroller = panelScroller();
+    if (!scroller) return;
+    tabScroll[activeTabId()] = scroller.scrollTop;
+  }
+  function restoreScroll() {
+    const scroller = panelScroller();
+    if (!scroller) return;
+    const y = tabScroll[activeTabId()] || 0;
+    scrollLock = true;
+    scroller.scrollTop = y;
+    scrollLock = false;
+  }
+  function beginRender() {
+    if (renderDepth === 0) {
+      rememberScroll();
+      scrollLock = true;
+    }
+    renderDepth += 1;
+  }
+  function endRender() {
+    renderDepth = Math.max(0, renderDepth - 1);
+    if (renderDepth === 0) restoreScroll();
+  }
 
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   try {
@@ -49,15 +84,18 @@
       if (area !== 'local' || !ch.log) return;
       const panel = document.querySelector('.panel[data-panel="log"]');
       if (panel && panel.classList.contains('active')) renderLog().catch(() => {});
+      renderOpen().catch(() => {});
     });
   } catch (e) { /* panel is already showing the last render */ }
+  const scroller = panelScroller();
+  if (scroller) scroller.addEventListener('scroll', rememberScroll, { passive: true });
   wireTabs();
   wireSave();
   wireRecipe();
   wirePro();
   wireLoopView();
   renderConnectors();
-  renderStatusPill();
+  await renderStatusPill();
   await renderLog();
   await renderOpen();
   await renderWaiting();
@@ -210,7 +248,7 @@
     status = await send({ type: 'flow:connector-status' });
     state = await FlowStorage.get();
     renderConnectors();
-    renderStatusPill();
+    await renderStatusPill();
     renderSetupDone();
   }
 
@@ -229,13 +267,29 @@
     }
   }
 
-  function renderStatusPill() {
+  async function renderStatusPill() {
     const pill = document.getElementById('statusPill');
-    const live = Object.keys(status || {}).filter((k) => status[k].connected);
-    if (!live.length) { pill.textContent = 'Not connected'; pill.className = 'ver'; return; }
-    const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
-    pill.textContent = (conn ? conn.label : live[0]) + ' connected';
-    pill.className = 'ver on';
+    if (!pill) return;
+    const live = Object.keys(status || {}).filter((k) => status[k] && status[k].connected);
+    if (live.length) {
+      const conn = FLOW_CONNECTORS.find((c) => c.id === live[0]);
+      pill.textContent = (conn ? conn.label : live[0]) + ' connected';
+      pill.className = 'ver on';
+      return;
+    }
+    let outlookOn = false;
+    try {
+      const o = outlook();
+      const st = o && typeof o.status === 'function' ? await o.status() : null;
+      outlookOn = Boolean(st && st.connected && !st.needsSignIn);
+    } catch (e) { outlookOn = false; }
+    if (outlookOn) {
+      pill.textContent = 'Outlook connected';
+      pill.className = 'ver on';
+      return;
+    }
+    pill.textContent = 'Not connected';
+    pill.className = 'ver';
   }
 
   /* ---------------------------------------------------------- connectors */
@@ -479,10 +533,14 @@
   function wireTabs() {
     document.querySelectorAll('.tab').forEach((tab) => {
       tab.addEventListener('click', async () => {
+        rememberScroll();
         document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
         document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === tab.dataset.tab));
+        scrollLock = true;
         if (tab.dataset.tab === 'log') await renderLog();
         if (tab.dataset.tab === 'open') await renderOpen();
+        scrollLock = false;
+        restoreScroll();
       });
     });
   }
@@ -514,9 +572,22 @@
   }
 
   async function closeOutlookProofFromPopup(entry, route) {
+    if (route && route.connectorId === 'outlookTask' && typeof FlowStillOpen !== 'undefined' && typeof FlowStillOpen.activeProofFor === 'function') {
+      const bag = await FlowStorage.get();
+      const live = FlowStillOpen.activeProofFor(bag && bag.log, entry);
+      if (live) {
+        await renderOpen();
+        return;
+      }
+    }
     const step = route.step || {};
     const params = step.params || {};
-    const label = (entry.intent && entry.intent.label) || params.title || (route.connectorId === 'onedriveFile' ? 'File' : 'Task');
+    const label = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
+      ? FlowDisplay.activityTitle({
+        connectorId: route.connectorId, process: entry.process, intent: entry.intent,
+        text: entry.text, subject: entry.subject, params: params
+      })
+      : ((entry.intent && entry.intent.label) || params.title || (route.connectorId === 'onedriveFile' ? 'File' : 'Task'));
     const payload = {
       connectorId: route.connectorId,
       params: params,
@@ -550,10 +621,21 @@
         status: 'Handled.'
       })
       : null;
+    const provedTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
+      ? FlowDisplay.activityTitle({
+        connectorId: route.connectorId, process: entry.process, intent: entry.intent,
+        text: entry.text, subject: entry.subject, params: params, writtenLine: r.written, label: label
+      })
+      : (label || r.written);
     await FlowStorage.appendLog(Object.assign({
       kind: 'written',
-      label: (entry.intent && entry.intent.label) || r.written,
+      label: provedTitle,
+      actionTitle: provedTitle,
       messageId: entry.messageId,
+      itemId: entry.itemId || null,
+      pathId: entry.pathId || null,
+      threadId: entry.threadId || entry.outlookConversationId || null,
+      outlookConversationId: entry.outlookConversationId || null,
       app: 'outlook',
       connectorId: route.connectorId,
       ref: r.ref,
@@ -582,6 +664,19 @@
     }
     await renderOpen();
     await renderOutlookCards();
+    await notifyOutlookProof();
+  }
+
+  async function notifyOutlookProof() {
+    if (typeof chrome === 'undefined' || !chrome.tabs || typeof chrome.tabs.query !== 'function') return;
+    let tabs = [];
+    try {
+      tabs = await chrome.tabs.query({ url: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'] });
+    } catch (e) { return; }
+    for (const tab of tabs || []) {
+      if (!tab || !tab.id || !chrome.tabs.sendMessage) continue;
+      try { await chrome.tabs.sendMessage(tab.id, { type: 'flow:proof-sync' }); } catch (err) { /* tab has no listener */ }
+    }
   }
 
   async function closeStillOpenFromPopup(entry) {
@@ -688,6 +783,30 @@
     }
   }
 
+  function mountPanelSteps(item, entry) {
+    if (typeof FlowStepList === 'undefined' || typeof FlowStepListView === 'undefined' || typeof FlowStepKit === 'undefined') return null;
+    const steps = entry && entry.process && entry.process.steps;
+    if (!steps || !steps.length) return null;
+    const rows = FlowStepList.rowsFor(entry.process, {
+      surface: entry.app || 'gmail',
+      lang: entry.intent && entry.intent.lang
+    });
+    if (!rows.length) return null;
+    const host = el('div', 'glance-panel-steps');
+    item.appendChild(host);
+    return FlowStepListView.mount(host, rows, {
+      intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
+      lang: entry.intent && entry.intent.lang,
+      surface: entry.app || 'gmail',
+      onDoIt: function () { closeStillOpenFromPopup(entry); },
+      onChange: function (next) {
+        if (!entry.messageId || typeof FlowStorage.mergeAddedSteps !== 'function' || typeof FlowStepList.liveStepsFrom !== 'function') return;
+        const picked = FlowStepList.liveStepsFrom(next, entry.app || 'gmail');
+        FlowStorage.mergeAddedSteps(entry.messageId, picked).catch(function () {});
+      }
+    });
+  }
+
   function openRow(entry) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
@@ -713,20 +832,29 @@
     }
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
 
+    if (entry.verifying) {
+      const he = /[\u0590-\u05FF]/.test(String(entry.text || '') + String(entry.subject || ''));
+      item.appendChild(el('span', 'log-where', he ? 'מאמת' : 'Verifying…'));
+      return item;
+    }
+
+    const kit = mountPanelSteps(item, entry);
     const acts = el('div', 'log-acts');
-    const doIt = el('button', 'primary sm');
-    doIt.type = 'button';
-    doIt.appendChild(el('span', 'shell'));
-    doIt.appendChild(el('span', 'ring'));
-    doIt.appendChild(el('span', 'shine'));
-    doIt.appendChild(el('span', 'btn-label', 'Do It'));
-    doIt.addEventListener('click', async () => {
-      doIt.disabled = true;
-      const label = doIt.querySelector('.btn-label');
-      if (label) label.textContent = 'Closing…';
-      await closeStillOpenFromPopup(entry);
-    });
-    acts.appendChild(doIt);
+    if (!kit) {
+      const doIt = el('button', 'primary sm');
+      doIt.type = 'button';
+      doIt.appendChild(el('span', 'shell'));
+      doIt.appendChild(el('span', 'ring'));
+      doIt.appendChild(el('span', 'shine'));
+      doIt.appendChild(el('span', 'btn-label', 'Do It'));
+      doIt.addEventListener('click', async () => {
+        doIt.disabled = true;
+        const label = doIt.querySelector('.btn-label');
+        if (label) label.textContent = 'Closing…';
+        await closeStillOpenFromPopup(entry);
+      });
+      acts.appendChild(doIt);
+    }
     if (entry.threadUrl || entry.url) {
       const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? 'Open draft' : 'View');
       view.href = entry.url || entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';
@@ -1008,18 +1136,63 @@
       if (diags.length) {
         const details = document.createElement('details');
         details.className = 'wait-note';
+        const cap = whyNotShownAll ? diags.length : Math.min(20, diags.length);
+        const shown = diags.slice(0, cap);
         const sum = document.createElement('summary');
-        sum.textContent = 'Why not shown (' + diags.length + ')';
+        sum.textContent = (typeof FlowDisplay !== 'undefined' && FlowDisplay.whyNotShownHeader)
+          ? FlowDisplay.whyNotShownHeader(diags.length, shown.length)
+          : ('Why not shown (' + shown.length + ')');
         details.appendChild(sum);
+        if (whyDetailsOpen) details.open = true;
+        const holdOpen = () => { rememberScroll(); scrollLock = true; };
+        sum.addEventListener('pointerdown', holdOpen);
+        sum.addEventListener('mousedown', holdOpen);
+        sum.addEventListener('click', holdOpen, true);
+        details.addEventListener('toggle', () => {
+          whyDetailsOpen = details.open;
+          const scroller = panelScroller();
+          const y = tabScroll[activeTabId()] || 0;
+          scrollLock = true;
+          let left = 4;
+          const pin = () => {
+            if (scroller) scroller.scrollTop = y;
+            if (left > 0) { left -= 1; requestAnimationFrame(pin); }
+            else scrollLock = false;
+          };
+          pin();
+        });
         const list = el('div', 'wait-note');
         // Safe local-only readout: subject + reason code, no body text.
-        diags.slice(0, 20).forEach((d) => {
-          const sub = (d.subject || '(no subject)').slice(0, 80);
+        shown.forEach((d) => {
+          const sub = (typeof FlowDisplay !== 'undefined' && FlowDisplay.diagSubject)
+            ? FlowDisplay.diagSubject(d.subject)
+            : ((d.subject && String(d.subject).indexOf('/mail/') !== 0) ? String(d.subject).slice(0, 80) : 'Untitled message');
           const who2 = d.counterpart ? (' · ' + d.counterpart) : '';
           const files = (d.fileCount && d.target) ? (' · ' + d.fileCount + ' ' + d.target) : '';
-          list.appendChild(el('div', 'wait-note', d.reason + ' — “' + sub + '”' + who2 + files));
+          const detail = d.detail ? (' (' + String(d.detail).slice(0, 160) + ')') : '';
+          list.appendChild(el('div', 'wait-note', d.reason + detail + ' — “' + sub + '”' + who2 + files));
         });
         details.appendChild(list);
+        if (diags.length > shown.length) {
+          const more = el('button', 'ghost sm', 'Show all');
+          more.type = 'button';
+          more.addEventListener('click', () => {
+            rememberScroll();
+            whyNotShownAll = true;
+            whyDetailsOpen = true;
+            scrollLock = true;
+            renderSurfaces().then(() => {
+              const scroller = panelScroller();
+              const y = tabScroll[activeTabId()] || 0;
+              if (scroller) scroller.scrollTop = y;
+              requestAnimationFrame(() => {
+                if (scroller) scroller.scrollTop = y;
+                requestAnimationFrame(() => { scrollLock = false; });
+              });
+            }).catch(() => { scrollLock = false; });
+          });
+          details.appendChild(more);
+        }
         row.appendChild(details);
       }
       if (st.fromAliasHint) row.appendChild(el('div', 'wait-note', st.fromAliasHint));
@@ -1971,17 +2144,38 @@
     }
   }
 
+  async function reopenOutlookTask(entry) {
+    if (!entry || !entry.messageId || !entry.process || typeof FlowStorage.upsertStillOpenScan !== 'function') return;
+    await FlowStorage.upsertStillOpenScan({
+      messageId: entry.messageId,
+      threadId: entry.threadId || entry.outlookConversationId || null,
+      outlookConversationId: entry.outlookConversationId || null,
+      threadUrl: entry.threadUrl || null,
+      app: entry.app || 'outlook',
+      ts: Date.now(),
+      sender: entry.sender || null,
+      subject: entry.subject || '',
+      text: entry.text || '',
+      intent: entry.intent || null,
+      process: entry.process
+    });
+  }
+
   function outlookReceiptRow(entry) {
+    const proof = entry && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave' || entry.fetchedBack === true) && entry.connectorId !== 'outlookDraft';
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    top.appendChild(el('span', 'log-label', entry.label || 'Reply draft ready in Outlook Drafts. Not sent.'));
-    top.appendChild(el('span', 'log-kind written', 'Draft'));
+    const title = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
+      ? FlowDisplay.activityTitle(entry)
+      : (entry.actionTitle || entry.label || (proof ? 'Handled.' : 'Reply draft ready in Outlook Drafts. Not sent.'));
+    top.appendChild(el('span', 'log-label', proof ? title : (entry.label || 'Reply draft ready in Outlook Drafts. Not sent.')));
+    top.appendChild(el('span', 'log-kind written', proof ? 'Handled' : 'Draft'));
     item.appendChild(top);
     item.appendChild(el('span', 'log-where', 'From Outlook'));
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
     const acts = el('div', 'log-acts');
     if (entry.url || entry.where) {
-      const a = el('a', 'ghost sm', 'Open draft');
+      const a = el('a', 'ghost sm', proof ? 'View' : 'Open draft');
       a.href = entry.url || entry.where; a.target = '_blank'; a.rel = 'noopener';
       acts.appendChild(a);
     }
@@ -1994,15 +2188,24 @@
       note.hidden = true;
       let r = { ok: false };
       try {
-        const o = outlook();
-        if (o && entry.ref) r = await o.undoReplyDraft(entry.ref);
-        else if (!entry.ref) r = { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
-        else r = { ok: false, error: 'not-connected' };
+        if (proof) {
+          r = await send({ type: 'flow:undo-action', connectorId: entry.connectorId, ref: entry.ref });
+        } else {
+          const o = outlook();
+          if (o && entry.ref) r = await o.undoReplyDraft(entry.ref);
+          else if (!entry.ref) r = { ok: true, alreadyGone: true, written: 'Draft was already gone. Nothing left to undo.' };
+          else r = { ok: false, error: 'not-connected' };
+        }
       } catch (err) {
         r = { ok: false, error: String(err && err.message || err) };
       }
       // Always drop the local receipt — stale cards after Graph delete are the bug.
-      if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
+      if (proof && (entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave' || entry.system === 'microsoft/onedrive') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
+        await FlowStorage.markOnedriveFileUndone(entry.messageId, entry.ref, entry.threadId);
+      } else if (proof && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
+        await FlowStorage.markMicrosoftTodoUndone(entry.messageId, entry.ref, entry.threadId);
+        await reopenOutlookTask(entry);
+      } else if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
         await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
       } else {
         await FlowStorage.appendLog({
@@ -2023,6 +2226,7 @@
       await renderOpen();
       await renderOutlookCards();
       await renderLog();
+      await notifyOutlookProof();
     });
     acts.appendChild(u);
     item.appendChild(acts);
@@ -2047,16 +2251,28 @@
     catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   }
 
-  async function renderOpen() {
-    await ensureOutlookMigrated();
-    await reconcileOutlookReceiptsSafe();
+  // Loops and "Still open — shown N" read this same list. Receipts stay
+  // in the list; a promise key already collapsed the open rows inside
+  // getStillOpen.
+  async function visibleLoops() {
     const pending = await FlowStorage.getStillOpen();
     const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
       ? await FlowStorage.getActiveOutlookReceipts()
       : [];
-    // Dedup: if a receipt exists for a messageId, skip the still-open card.
     const receiptIds = new Set(receipts.map((r) => r.messageId).filter(Boolean));
     const openOnly = pending.filter((e) => !receiptIds.has(e.messageId));
+    return { openOnly: openOnly, receipts: receipts };
+  }
+
+  async function renderOpen() {
+    beginRender();
+    let loops;
+    try {
+    await ensureOutlookMigrated();
+    await reconcileOutlookReceiptsSafe();
+    loops = await visibleLoops();
+    const openOnly = loops.openOnly;
+    const receipts = loops.receipts;
     const total = openOnly.length + receipts.length;
     chrome.runtime.sendMessage({ type: 'flow:pending-count', count: total });
     for (const item of openOnly) {
@@ -2070,6 +2286,7 @@
     empty.hidden = total > 0;
     receipts.forEach((entry) => host.appendChild(outlookReceiptRow(entry)));
     openOnly.forEach((entry) => host.appendChild(openRow(entry)));
+    } finally { endRender(); }
   }
 
   function when(ts) {
@@ -2326,6 +2543,7 @@
       await renderOpen();
       await renderOutlookCards();
       await renderLog();
+      await renderSurfaces();
       setTimeout(() => { btn.disabled = false; btn.textContent = original; }, 2000);
     });
   }
@@ -2350,23 +2568,30 @@
     node.hidden = false;
   }
 
-  function renderStillOpenQuality(s) {
+  async function renderStillOpenQuality(s) {
     const node = document.getElementById('stillOpenQuality');
     if (!node) return;
     if (typeof FlowStillOpen === 'undefined') { node.hidden = true; return; }
-    const line = FlowStillOpen.activityLine(s.stillOpenMetrics || FlowStillOpen.emptyMetrics());
+    const loops = await visibleLoops();
+    const metrics = Object.assign({}, s.stillOpenMetrics || FlowStillOpen.emptyMetrics(), {
+      shown: loops.openOnly.length + loops.receipts.length
+    });
+    const line = FlowStillOpen.activityLine(metrics);
+    if (!line && !metrics.shown && !metrics.doIt && !metrics.undo && !metrics.falseClose) { node.hidden = true; return; }
     if (!line) { node.hidden = true; return; }
     node.textContent = line;
     node.hidden = false;
   }
 
   async function renderLog() {
+    beginRender();
+    try {
     await ensureOutlookMigrated();
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderCloseQuality(s);
     renderQuiet(s);
-    renderStillOpenQuality(s);
+    await renderStillOpenQuality(s);
     await renderLearned();
     await renderLedger();
     renderSensitivity(s);
@@ -2380,6 +2605,7 @@
     const rows = activityRows(s.log || []);
     empty.hidden = rows.length > 0;
     rows.forEach((e) => host.appendChild(logRow(e)));
+    } finally { endRender(); }
   }
 
   // A Google Task undo used to append a second row and leave the written
@@ -2411,6 +2637,7 @@
     const task = e.connectorId === 'googleTask' || e.connectorId === 'googleTasks' || e.system === 'google/tasks'
       || e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo'
       || e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive'
+      || e.connectorId === 'outlookDraft' || e.connectorId === 'attachmentSave'
       || isComputerActivityRow(e);
     if (!task) return false;
     const ext = e.externalId || (e.ref && (e.ref.externalId || e.ref.taskId || e.ref.fileId || e.ref.itemId)) || '';
@@ -2433,11 +2660,13 @@
   function logRow(e) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
-    top.appendChild(el('span', 'log-label', e.label || '-'));
+    const rowTitle = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle) ? FlowDisplay.activityTitle(e) : (e.actionTitle || e.label || '-');
+    top.appendChild(el('span', 'log-label', rowTitle));
     // The stored kind stays 'written' - counters and CSS key off it. The
     // badge a person reads should say what the chip just said.
     const KIND_LABEL = { written: 'Handled', undone: 'Undone', clicked: 'Clicked', dismissed: 'Dismissed' };
-    top.appendChild(el('span', 'log-kind ' + e.kind, KIND_LABEL[e.kind] || e.kind));
+    const draftWrite = e.kind === 'written' && e.connectorId === 'outlookDraft';
+    top.appendChild(el('span', 'log-kind ' + e.kind, draftWrite ? 'Draft' : (KIND_LABEL[e.kind] || e.kind)));
     item.appendChild(top);
 
     if (e.where) item.appendChild(el('span', 'log-where', 'Written to ' + e.where));
@@ -2496,6 +2725,7 @@
               await FlowStorage.markGoogleTaskUndone(e.messageId, e.ref, e.threadId);
             } else if ((e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo') && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
               await FlowStorage.markMicrosoftTodoUndone(e.messageId, e.ref, e.threadId);
+              await reopenOutlookTask(e);
             } else if ((e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
               await FlowStorage.markOnedriveFileUndone(e.messageId, e.ref, e.threadId);
             } else {

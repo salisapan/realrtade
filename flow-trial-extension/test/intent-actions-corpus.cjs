@@ -1298,6 +1298,28 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   const notThat = classify('I will send you the signed contract by Friday, September 18 at 3pm.', { calibrationByType: heavyEvent });
   check('event-dismissal history does not suppress a timed commitment',
     notThat.personalClose === 'calendar-hold', notThat.personalClose);
+
+  const Q3 = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
+  const q3open = classify(Q3, { to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
+  check('Q3 reply-and-confirm drafts when the user is in To',
+    q3open.type === FlowIntent.TYPES.REQUEST && q3open.personalClose === 'follow-up-ask',
+    { type: q3open.type, quiet: q3open.quiet });
+  const q3missing = classify(Q3);
+  const q3empty = classify(Q3, { to: [], cc: [] });
+  check('a reply ask with no To or Cc stays quiet',
+    !q3missing.type && q3missing.quiet === 'hedge' && !q3empty.type && q3empty.quiet === 'hedge',
+    { missing: q3missing.quiet, empty: q3empty.quiet });
+  const silentReply = [
+    ['automatic reply', 'Automatic reply: Can you reply and confirm whether the Q3 summary will include the October numbers?', {}],
+    ['cc-only named addressee', 'Dana, can you reply and confirm whether the Q3 summary will include the October numbers?', {
+      to: ['dana@meridian.com'], cc: ['me@glance.test'], ownAddresses: ['me@glance.test'], userName: 'Sali'
+    }],
+    ['note to self', Q3, { noteToSelf: true, senderEmail: 'me@glance.test', ownAddresses: ['me@glance.test'] }]
+  ];
+  silentReply.forEach(([label, text, extra]) => {
+    const intent = classify(text, extra);
+    check('reply draft stays silent: ' + label, !intent.type && intent.quiet === 'hedge', { type: intent.type, quiet: intent.quiet });
+  });
 }
 
 console.log('\n--- the receipt names the writes that actually landed, and nothing that failed ---\n');
@@ -1320,6 +1342,18 @@ console.log('\n--- the receipt names the writes that actually landed, and nothin
     lines);
   check('a close with no written field stays quiet',
     JSON.stringify(FlowActions.receiptWrittenLines([{ response: { ok: true } }])) === '[]');
+}
+
+console.log('\n--- a parking-permit ask is not a newsletter ---\n');
+{
+  const ask = 'Can you send the parking permit for the visitor bay tomorrow?\n\nUnsubscribe | View in browser';
+  const intent = classify(ask);
+  check('a parking-permit ask is not quiet:noise', intent && intent.quiet !== 'noise' && intent.type != null, intent);
+  const news = 'Our weekly newsletter is here. Limited-time offer inside.\n\nUnsubscribe | View in browser';
+  const quiet = classify(news);
+  check('a newsletter with unsubscribe stays quiet:noise', quiet && quiet.quiet === 'noise', quiet);
+  const subjectAsk = classify('Unsubscribe | View in browser', { subject: 'Parking permit - please renew by Sunday', now: new Date('2026-10-08T12:00:00Z') });
+  check('a parking-permit subject is not quiet:noise', subjectAsk && subjectAsk.quiet !== 'noise' && subjectAsk.type != null, subjectAsk);
 }
 
 console.log('\nTOTAL FAILURES:', failures);
