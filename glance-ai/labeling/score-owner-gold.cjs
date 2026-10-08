@@ -23,19 +23,23 @@ function loadMap(p) {
 }
 
 function sheetCases(batch, sheetMd) {
-  const sheet = parseSheet(sheetMd);
+  const sheet = parseSheet(sheetMd || '');
   return batch.map((item) => {
     const h = sheet.get(item.id) || {};
-    const surface = h.surface || item.surface || 'gmail';
-    const direction = h.direction || 'inbound';
-    const email = direction === 'self' || direction === 'outbound' ? OWN[surface] || OWN.gmail : '';
+    const surface = item.surface || h.surface || 'gmail';
+    const direction = item.direction || h.direction || 'inbound';
+    const ownEmail = direction === 'self' || direction === 'outbound' ? OWN[surface] || OWN.gmail : '';
+    const from = item.from && (item.from.name || item.from.email)
+      ? { name: item.from.name || h.fromName || '', email: item.from.email || ownEmail }
+      : { name: h.fromName || '', email: ownEmail || '' };
     return {
       item, id: item.id, lang: item.lang, surface, direction,
-      attachmentCount: h.attachmentCount || 0,
-      from: { name: h.fromName || '', email },
-      to: h.to || [], cc: h.cc || [],
+      attachmentCount: item.attachmentCount != null ? item.attachmentCount : (h.attachmentCount || 0),
+      from,
+      to: Array.isArray(item.to) && item.to.length ? item.to : (h.to || []),
+      cc: Array.isArray(item.cc) && item.cc.length ? item.cc : (h.cc || []),
       subject: item.subject || '', body: item.body || '',
-      engine35: item.engine35, v2batch: item.v2
+      engine35: item.engine35, engineTip: item.engineTip || null, v2batch: item.v2
     };
   });
 }
@@ -86,7 +90,15 @@ function goldY(row) {
 function scoreRows(goldRows, opt) {
   opt = opt || {};
   const batch = opt.batch || loadBatch(path.join(HERE, 'batch-001.json'));
-  const sheetMd = opt.sheetMd != null ? opt.sheetMd : fs.readFileSync(path.join(HERE, 'batch-001.md'), 'utf8');
+  let sheetMd = opt.sheetMd;
+  if (sheetMd == null) {
+    const names = [...new Set(batch.map((r) => r.batchName).filter(Boolean))];
+    if (!names.length) names.push('batch-001');
+    sheetMd = names.map((n) => {
+      const p = path.join(HERE, n + '.md');
+      return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : '';
+    }).join('\n');
+  }
   const cases = sheetCases(batch, sheetMd);
   const byId = new Map(cases.map((c) => [c.id, c]));
   const v2 = opt.v2 || loadMap(V2_PREDS);

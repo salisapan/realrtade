@@ -1,6 +1,6 @@
 # Paid-readiness bar — Glance (personal)
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 This page is Glance only. Flow, the org product, is separate. The chief of staff decides when Glance is worth paying for by reading the yaml block below. A feeling does not flip it. `overall` is `green` only when every criterion is `green`. Until then `charge` stays `false`.
 

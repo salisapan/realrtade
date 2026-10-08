@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { readJsonl, loadBatch, validateRow, readJson, HERE } = require('./lib.cjs');
+const { readJsonl, loadBatch, loadBatches, validateRow, readJson, HERE } = require('./lib.cjs');
 const { ingest, GOLD } = require('./ingest-answers.cjs');
 
 const tiny = [
@@ -104,4 +104,81 @@ for (const line of readJsonl(path.join(HERE, 'gold-template.jsonl'))) assert.dee
 
 const goldBefore = fs.readFileSync(GOLD, 'utf8');
 assert.strictEqual(goldBefore.trim(), '');
+
+const b2 = loadBatch(path.join(HERE, 'batch-002.json'));
+assert.strictEqual(b2.length, 20);
+assert.ok(b2.every((r) => r.batchName === 'batch-002'));
+assert.ok(b2.every((r) => r.ownerAnswer == null && r.reference && r.reference.ownerVerified === false));
+assert.strictEqual(new Set(b2.map((r) => r.id)).size, 20);
+const b1ids = new Set(batch.map((r) => r.id));
+assert.ok(b2.every((r) => !b1ids.has(r.id)));
+const empty = readJson(path.join(HERE, 'batch-002.answers.json'));
+assert.strictEqual(empty.labeledBy, '');
+assert.ok(empty.answers.every((a) => a.mark == null));
+
+function markFor(r) {
+  if (r.v2 && r.v2 !== 'SILENT') return '✅';
+  if ((r.engineTip || r.engine35) && (r.engineTip || r.engine35) !== 'SILENT') return '⚙️';
+  return '🤫';
+}
+const fake = answers('cos:not-sali', { provisional: true }, b2.map((r) => ({
+  item: r.item, id: r.id, mark: r.item === 1 ? '❓' : markFor(r), note: r.item === 1 ? 'skip' : ''
+})));
+const b2in = ingest({ batch: b2, answers: fake, preview: true });
+assert.strictEqual(b2in.ownerVerifiedCount, 0);
+assert.strictEqual(b2in.excluded.length, 1);
+assert.strictEqual(b2in.excluded[0].id, b2[0].id);
+assert.ok(b2in.rows.every((r) => r.ownerVerified === false));
+assert.ok(b2in.rows.every((r) => r.labeledBy === 'cos:not-sali'));
+assert.ok(b2in.rows.every((r) => r.notes.indexOf('batch-002 item') >= 0));
+assert.ok(b2in.rows.every((r) => r.importedFrom.indexOf('labeling/batch-002.json#item-') === 0));
+assert.ok(!b2in.rows.some((r) => r.id === b2[0].id));
+for (const row of b2in.rows) assert.deepStrictEqual(validateRow(row), [], row.id);
+
+const both = loadBatches([path.join(HERE, 'batch-001.json'), path.join(HERE, 'batch-002.json')]);
+assert.strictEqual(both.length, 39);
+let amb = false;
+try {
+  ingest({
+    batch: both,
+    answers: answers('cos:not-sali', null, [{ item: 1, mark: '🤫' }])
+  });
+} catch (e) { amb = e.code === 'AMBIGUOUS'; }
+assert.strictEqual(amb, true, 'item 1 without an id must fail when both batches are loaded');
+
+const combined = ingest({
+  batch: both,
+  preview: true,
+  answers: answers('cos:not-sali', { provisional: true }, both.map((r) => ({
+    id: r.id,
+    mark: (r.id === 'v2syn-405' || r.id === b2[0].id) ? '❓' : markFor(r)
+  })))
+});
+assert.strictEqual(combined.ownerVerifiedCount, 0);
+assert.ok(combined.rows.every((r) => r.ownerVerified === false));
+assert.strictEqual(combined.excluded.length, 2);
+assert.ok(combined.excluded.some((e) => e.id === 'v2syn-405'));
+assert.ok(combined.excluded.some((e) => e.id === b2[0].id));
+assert.ok(combined.rows.some((r) => r.importedFrom.indexOf('batch-001.json') >= 0));
+assert.ok(combined.rows.some((r) => r.importedFrom.indexOf('batch-002.json') >= 0));
+assert.strictEqual(fs.readFileSync(GOLD, 'utf8'), goldBefore);
+
+const { PREVIEW_DOC, run } = require('./apply-owner-answers.cjs');
+const previewBefore = fs.readFileSync(PREVIEW_DOC, 'utf8');
+const provBefore = fs.readFileSync(path.join(HERE, 'preview', 'provisional-rows.jsonl'), 'utf8');
+const exclBefore = fs.readFileSync(path.join(HERE, 'preview', 'excluded-unsure.jsonl'), 'utf8');
+const fakePath = path.join(dir, 'batch-002-fake.answers.json');
+fs.writeFileSync(fakePath, JSON.stringify(fake));
+const ran = run(['node', 'apply', '--answers', fakePath, '--batch', 'batch-002.json', '--preview', '--no-fit']);
+assert.strictEqual(ran.score.ownerVerified, 0);
+assert.strictEqual(ran.excluded.length, 1);
+assert.strictEqual(fs.readFileSync(PREVIEW_DOC, 'utf8'), previewBefore);
+assert.strictEqual(fs.readFileSync(path.join(HERE, 'preview', 'provisional-rows.jsonl'), 'utf8'), provBefore);
+assert.strictEqual(fs.readFileSync(path.join(HERE, 'preview', 'excluded-unsure.jsonl'), 'utf8'), exclBefore);
+assert.strictEqual(fs.readFileSync(GOLD, 'utf8'), goldBefore);
+fs.rmSync(path.join(HERE, 'preview', 'batch-002-score.json'), { force: true });
+fs.rmSync(path.join(HERE, 'preview', 'batch-002-provisional-rows.jsonl'), { force: true });
+fs.rmSync(path.join(HERE, 'preview', 'batch-002-excluded-unsure.jsonl'), { force: true });
+fs.rmSync(path.join(HERE, 'dry-run', 'batch-002-heldout-before-after.json'), { force: true });
+
 console.log('ingest tests passed');
