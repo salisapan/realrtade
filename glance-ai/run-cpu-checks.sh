@@ -17,6 +17,9 @@ HARVEST="$(mktemp -d)"
 cleanup() { rm -rf "$ENG35" "$HARVEST"; }
 trap cleanup EXIT
 
+echo "== owner-label ingest and score"
+node labeling/test-ingest.cjs
+node labeling/test-score.cjs
 echo "== Hebrew currency veto"
 node oss/veto/test-hebrew-amount.cjs
 echo "== suggest-save corpus (JS, then Python parity)"

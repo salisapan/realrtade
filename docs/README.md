@@ -37,7 +37,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | Community (cross-user) learning (**dormant**) | `community-learning.md` | `core/community.js` | `community-corpus` |
 | Packaging, the Chrome Web Store, setup | `flow-trial-extension/docs/SETUP.md`, `chrome-web-store-submission.md`, `hybrid-execution-architecture.md` §0c | `scripts/package_trial_extension.py` (lite/full), `scripts/verify_trial_install.py` | `verify_trial_install.py` |
 | Open work, blockers, decisions | `open-tasks.md` | - | - |
-| Glance's own model lab (offline; v2 default, v2.1 in shadow). Flow is not this lab | `docs/glance-ai/STATE.md` | `glance-ai/README.md` | `glance-ai/oss/veto/test-hebrew-amount.cjs`, `glance-ai/model/suggest-save/test-corpus.cjs`, `glance-ai/model/suggest-save/check_dataset.py` |
+| Glance's own model lab (offline; v2 default, v2.1 in shadow). Flow is not this lab | `docs/glance-ai/STATE.md` | `glance-ai/README.md`, `glance-ai/labeling/README.md` | `glance-ai/oss/veto/test-hebrew-amount.cjs`, `glance-ai/model/suggest-save/test-corpus.cjs`, `glance-ai/model/suggest-save/check_dataset.py`, `glance-ai/labeling/test-ingest.cjs`, `glance-ai/labeling/test-score.cjs` |
 
 ## 2. When X changes, update these in the SAME commit
 
@@ -52,6 +52,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 | A new multi-step document class | `core/resolution.js` `CLASSES`, `resolution-paths.md`, `true-close.md` §4, corpus + harness |
 | A new surface (an app) | `multi-platform.md`, the privacy page, the store text, in the same commit |
 | Anything decided, blocked or finished | `open-tasks.md` (and its "Last updated") |
+| Owner labels for the Glance model lab | `docs/glance-ai/STATE.md`, `glance-ai/labeling/README.md`, `open-tasks.md` |
 | Anything David or the owner should do about money | `revenue-routines.md` |
 | An owner lock on product scope (what Glance or Flow is, consent, send rules, holds) | `CLAUDE.md` "Owner product locks", `open-tasks.md` if it changes work, and one dated line in `vault/decisions.md` that links here |
 | Flow sales and outreach rules, CoS routines | `revenue-routines.md` §8-§9, and one dated line in `vault/decisions.md` |
@@ -66,7 +67,7 @@ Any description of Glance starts from the sentence above, and any report keeps t
 `monetization.md` how Glance earns · `multi-platform.md` loops beyond email · `open-loops.md` the open-loop model · `open-tasks.md` status · `product-architecture.md` Flow and the Glance split ·
 `product-identity.md` AI is the engine, closure is the product · `reply-model.md` closing on understanding · `resolution-paths.md` more than one step · `revenue-routines.md` Hebrew routines for David ·
 **`true-close.md` when a loop is closed, what was found and fixed** · `computer-proof-gate.md` CoS checklist for the own-computer ProofOfClose wedge (one allowlisted page, DOM re-read; live driver not wired; local-file gate later) · `when-recognition-fails.md` the steps when a sentence is not recognised ·
-`docs/glance-ai/STATE.md` Glance model lab: candidates, headline metrics, gated Qwen table, blockers, next stages.
+`docs/glance-ai/STATE.md` Glance model lab: candidates, headline metrics, gated Qwen table, blockers, owner-label path (still 0/200), next stages. The preview write-up is `docs/glance-ai/owner-gold-preview-2026-10-08.md`.
 Data files (`*.json`): measurement outputs of the scripts under `scripts/`; the numbers cited in the documents come from them.
 
 ## 4. Run everything (what "the tests pass" means)

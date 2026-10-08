@@ -1,0 +1,129 @@
+{
+ "banner": "provisional / not owner-verified",
+ "n": 6982,
+ "overridden": 17,
+ "v2Veto": {
+  "before": {
+   "n": 6982,
+   "wrongDoIt": "1.4% (82/5727)",
+   "missed": "50.8% (637/1255)",
+   "wrongAction": "2.9% (37/1255)",
+   "heWrongDoIt": "2.1% (62/3016)",
+   "enWrongDoIt": "0.7% (20/2711)",
+   "heMissed": "47.1% (227/482)",
+   "enMissed": "53.0% (410/773)",
+   "raw": {
+    "n": 6982,
+    "silent": 5727,
+    "show": 1255,
+    "wdi": 82,
+    "miss": 637,
+    "wact": 37,
+    "he": {
+     "silent": 3016,
+     "show": 482,
+     "wdi": 62,
+     "miss": 227
+    },
+    "en": {
+     "silent": 2711,
+     "show": 773,
+     "wdi": 20,
+     "miss": 410
+    }
+   }
+  },
+  "after": {
+   "n": 6982,
+   "wrongDoIt": "1.3% (74/5720)",
+   "missed": "50.4% (636/1262)",
+   "wrongAction": "2.8% (35/1262)",
+   "heWrongDoIt": "1.9% (56/3011)",
+   "enWrongDoIt": "0.7% (18/2709)",
+   "heMissed": "46.4% (226/487)",
+   "enMissed": "52.9% (410/775)",
+   "raw": {
+    "n": 6982,
+    "silent": 5720,
+    "show": 1262,
+    "wdi": 74,
+    "miss": 636,
+    "wact": 35,
+    "he": {
+     "silent": 3011,
+     "show": 487,
+     "wdi": 56,
+     "miss": 226
+    },
+    "en": {
+     "silent": 2709,
+     "show": 775,
+     "wdi": 18,
+     "miss": 410
+    }
+   }
+  }
+ },
+ "v2Alone": {
+  "before": {
+   "n": 6982,
+   "wrongDoIt": "11.2% (642/5727)",
+   "missed": "47.0% (590/1255)",
+   "wrongAction": "3.0% (38/1255)",
+   "heWrongDoIt": "10.4% (315/3016)",
+   "enWrongDoIt": "12.1% (327/2711)",
+   "heMissed": "42.5% (205/482)",
+   "enMissed": "49.8% (385/773)",
+   "raw": {
+    "n": 6982,
+    "silent": 5727,
+    "show": 1255,
+    "wdi": 642,
+    "miss": 590,
+    "wact": 38,
+    "he": {
+     "silent": 3016,
+     "show": 482,
+     "wdi": 315,
+     "miss": 205
+    },
+    "en": {
+     "silent": 2711,
+     "show": 773,
+     "wdi": 327,
+     "miss": 385
+    }
+   }
+  },
+  "after": {
+   "n": 6982,
+   "wrongDoIt": "11.1% (634/5720)",
+   "missed": "46.7% (589/1262)",
+   "wrongAction": "2.9% (36/1262)",
+   "heWrongDoIt": "10.3% (309/3011)",
+   "enWrongDoIt": "12.0% (325/2709)",
+   "heMissed": "41.9% (204/487)",
+   "enMissed": "49.7% (385/775)",
+   "raw": {
+    "n": 6982,
+    "silent": 5720,
+    "show": 1262,
+    "wdi": 634,
+    "miss": 589,
+    "wact": 36,
+    "he": {
+     "silent": 3011,
+     "show": 487,
+     "wdi": 309,
+     "miss": 204
+    },
+    "en": {
+     "silent": 2709,
+     "show": 775,
+     "wdi": 325,
+     "miss": 385
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,27 @@
+{
+ "banner": "provisional / not owner-verified",
+ "status": 0,
+ "hits": {
+  "train": 0,
+  "val": 0,
+  "test": 17
+ },
+ "reportPath": "glance-ai/labeling/dry-run/artifacts/v2-owner-dryrun.report.json",
+ "strict": {
+  "wrongDoIt": 74,
+  "wrongDoItRate": 0.012937062937062937,
+  "missedRate": 0.5039619651347068,
+  "missedRate_he": 0.46406570841889117
+ },
+ "tau": 0.97,
+ "test": {
+  "n": 6197,
+  "wrongDoIt": 3,
+  "wrongDoItRate": 0.0006079027355623101,
+  "missed": 636,
+  "missedRate": 0.5039619651347068,
+  "wrongAction": 35,
+  "unsureRows": 785,
+  "refSilent": 4935
+ }
+}

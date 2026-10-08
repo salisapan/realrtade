@@ -65,16 +65,53 @@ The strict gate treats a save proposal as unread (`suggest:attachments-unread`) 
 ## Blocked
 
 - **Real attachment list.** `shadow-combined-cases.jsonl` has a count, and OSS rows have names. It does not have size, inline, contentId, or kind. Until the shadow log carries the real list, every LLM save proposal stays silent under the strict gate. `tables.md` records 164 of 796 cases declaring attachments and 0 carrying the real list.
-- **Owner labels.** At least 200 owner-verified labels are required before a candidate can be promoted or before GPU fine-tuning starts. Today that count is 0. The reports above are not owner-verified.
+- **Owner labels.** At least 200 owner-verified labels are required before a candidate can be promoted or before GPU fine-tuning starts. Today that count is 0. The reports above are not owner-verified. Batch-001 is in git and is waiting for the owner's answers. The chief of staff preview below is provisional / not owner-verified and is not part of this count.
 - **GPU.** Parked 2026-10-08. Cap $30. Do not rent a machine and do not run `glance-ai/oss/finetune/gpu_run.sh run` until the labels exist and the owner approves the spend. `glance-ai/oss/finetune/GPU-RUNBOOK.md`. llama.cpp is not vendored.
+
+## Owner-label path
+
+Batch-001 is 19 synthetic cases (`v2syn-*` and two repo-test ids) under `glance-ai/labeling/`. The mail text is generated, not customer mail. `owner-gold.jsonl` is the single owner-gold file and it has no labels yet. Owner-verified means `labeledBy` is `sali`. Any other name is stored and scored with `ownerVerified` false. The ingest refuses a file that asks for `ownerVerified: true` under another name. A ❓ mark stays out of the headline.
+
+When the owner's answers file is in, this is the command:
+
+```sh
+node glance-ai/labeling/apply-owner-answers.cjs --answers path/to/answers.json
+```
+
+It writes schema-valid rows, scores v2 alone, v2+veto, v2.1+veto, the engine on the tip, and gated Qwen propose-only where the existing cache covers the case, then rescores the shipped v2 held-out predictions. If `model/train/features-v2/train.jsonl` is on the machine it also refits v2 on CPU into `glance-ai/labeling/dry-run/`. That dry-run does not replace `model/artifacts/v2.gate.weights.json`.
+
+The chief of staff proposed answers are `glance-ai/labeling/batch-001-cos-prefill.answers.json`. The owner has not confirmed them. Items 8 and 17 are ❓. Item 17's note says the close is a save to OneDrive, not a task and not silence. The preview command is the same script with `--preview`. The write-up is `docs/glance-ai/owner-gold-preview-2026-10-08.md`. Every number in that file, and every number in the two tables below, is **provisional / not owner-verified**.
+
+Scored provisional rows: 17. Unsure, left out: 2 (item 8 `v2syn-405`, item 17 `v2syn-24392`). Owner-verified: 0.
+
+| system | n | wrong-Do-It | missed close | wrong action | Hebrew wrong-Do-It | English wrong-Do-It | Hebrew missed | English missed |
+|---|---|---|---|---|---|---|---|---|
+| v2 alone | 17 | 42.9% (3/7) | 0.0% (0/10) | 0.0% (0/10) | 33.3% (2/6) | 100.0% (1/1) | 0.0% (0/6) | 0.0% (0/4) |
+| v2+veto | 17 | 28.6% (2/7) | 0.0% (0/10) | 0.0% (0/10) | 16.7% (1/6) | 100.0% (1/1) | 0.0% (0/6) | 0.0% (0/4) |
+| v2.1+veto | 17 | 0.0% (0/7) | 40.0% (4/10) | 0.0% (0/10) | 0.0% (0/6) | 0.0% (0/1) | 33.3% (2/6) | 50.0% (2/4) |
+| engine tip | 17 | 57.1% (4/7) | 80.0% (8/10) | 10.0% (1/10) | 66.7% (4/6) | 0.0% (0/1) | 100.0% (6/6) | 50.0% (2/4) |
+| gated Qwen propose-only | 5 | 33.3% (1/3) | 50.0% (1/2) | 0.0% (0/2) | 50.0% (1/2) | 0.0% (0/1) | — (0/0) | 50.0% (1/2) |
+
+Gated Qwen on this preview covers 5 of the 17 scored cases. Not covered: `v2syn-20323`, `v2syn-20284`, `v2syn-20987`, `v2syn-17987`, `v2syn-19085`, `v2syn-21422`, `v2syn-12147`, `v2syn-6931`, `v2syn-7013`, `v2syn-10482`, `v2syn-25034`, `v2syn-797`. The 33.3% (1/3) wrong-Do-It is on that tiny covered slice. It is not the strict-set table above, where gated Qwen wrong-Do-It stays 0.
+
+Shipped v2 held-out, n=6982, with those 17 provisional labels overriding the machine reference (weights untouched):
+
+| | n | wrong-Do-It | missed close | wrong action | Hebrew wrong-Do-It | English wrong-Do-It | Hebrew missed | English missed |
+|---|---|---|---|---|---|---|---|---|
+| v2+veto before | 6982 | 1.4% (82/5727) | 50.8% (637/1255) | 2.9% (37/1255) | 2.1% (62/3016) | 0.7% (20/2711) | 47.1% (227/482) | 53.0% (410/773) |
+| v2+veto after | 6982 | 1.3% (74/5720) | 50.4% (636/1262) | 2.8% (35/1262) | 1.9% (56/3011) | 0.7% (18/2709) | 46.4% (226/487) | 52.9% (410/775) |
+| v2 alone before | 6982 | 11.2% (642/5727) | 47.0% (590/1255) | 3.0% (38/1255) | 10.4% (315/3016) | 12.1% (327/2711) | 42.5% (205/482) | 49.8% (385/773) |
+| v2 alone after | 6982 | 11.1% (634/5720) | 46.7% (589/1262) | 2.9% (36/1262) | 10.3% (309/3011) | 12.0% (325/2709) | 41.9% (204/487) | 49.7% (385/775) |
+
+The CPU refit (`v2-owner-dryrun`, sklearn 1.9.1, tau 0.97) matched that after figure: strict wrong-Do-It 1.3% (74/5720). Train and val override hits were 0, test hits 17, so no training row changed. The before/after table is the effect of the new labels on the shipped decisions. The dry-run is not a candidate.
 
 ## Next stages
 
 1. Keep v2 as the default shadow candidate. Keep v2.1 in shadow. Do not promote either on these reports alone.
 2. Log the real attachment list (size, inline, contentId, kind) so suggest-save can be scored on real files instead of the unread gate.
-3. Collect at least 200 owner-verified labels. Until then missed-close and wrong-Do-It stay machine-reference numbers.
+3. The owner answers batch-001, then runs the command above. Collect at least 200 owner-verified labels. Until then missed-close and wrong-Do-It stay machine-reference numbers.
 4. Unpark GPU only after those labels and an owner spend approval. The SFT train split is regenerated from the generators; it is not in git. The val split is `glance-ai/eval-data/sft-v2-val.jsonl`.
-5. CPU regression for this tree is `bash glance-ai/run-cpu-checks.sh`. A silence-only change must leave wrong-Do-It at 0 on the gated table and must not add a chip on `eval-data/suggest-save-v22.jsonl`.
+5. CPU regression for this tree is `bash glance-ai/run-cpu-checks.sh`. It now starts with the owner-label ingest and score tests. A silence-only change must leave wrong-Do-It at 0 on the gated table and must not add a chip on `eval-data/suggest-save-v22.jsonl`.
 
 ## CPU re-run
 
@@ -87,3 +124,4 @@ Filled in by the commit that added this tree. See the pull request for the comma
 - Norm-flip (`shadow/norm-flips-v21.cjs`), 25,848 non-typo synthetic rows. Engine 0.9.35: raw 767, minimal 482 left (288 removed, 3 new), clean 482 left (288 removed, 3 new), full stripper 0 left (767 removed, 0 new). Tip: raw 422, minimal 159 left (266 removed, 3 new), clean the same as minimal, full stripper 0 left (422 removed, 0 new).
 - Shadow package on `eval-data/v2-heldout-test.jsonl` (6,982 rows): feature parity 6,982/6,982 for v2 and v2.1, JS dense parity 6,982/6,982 for both, logging 16/16, size 734,810 bytes (budget 871,000). Python decision parity against the checked-in sklearn preds: v2 6,977/6,982 (0.99928), v2.1 6,976/6,982 (0.99914).
 - Gated Qwen re-score: pass bar true, wrong-Do-It 0 on every strict spec set (table above).
+- Re-run on this commit: `bash glance-ai/run-cpu-checks.sh` exited 0. Owner-label ingest and score tests passed. Suggest-save new chips 0. Gated Qwen wrong-Do-It stayed 0 on every strict spec set. The shadow package creates its gitignored `test/out` and `bench/out` directories before it writes, so a fresh tree can run the check.

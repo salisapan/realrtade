@@ -2,6 +2,7 @@
 # Shadow drop-in package: pack weights, parity (JS==Python), logging tests, perf, size. ~1.5 min. Node only.
 set -euo pipefail
 cd "$(dirname "$0")"
+mkdir -p test/out bench/out
 [ -d test/node_modules/fake-indexeddb ] || (cd test && npm install --no-audit --no-fund >/dev/null)
 node tools/pack-glw.cjs > test/out/pack.json
 node test/parity.test.cjs
