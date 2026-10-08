@@ -952,7 +952,7 @@ const FlowCloseFamilies = (() => {
     return { surface: 'doit', slots: [] };
   }
 
-  return { assess, askBlocked, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE };
+  return { assess, askBlocked, parkingPermitAsk, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseFamilies };

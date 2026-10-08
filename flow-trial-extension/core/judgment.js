@@ -474,7 +474,8 @@ const FlowJudgment = (() => {
     const calendarNoise = CALENDAR_NOISE.test(text);
     // A parking-permit ask is the work, even when a mailing footer is on the
     // same message. A newsletter with no such ask stays noise.
-    const parkingAsk = /\bparking permits?\b/i.test(text) && /\b(?:please|can you|could you|would you|send|need|renew|attach|forward)\b/i.test(text);
+    const heard = [facts && facts.subject, text].filter(Boolean).join('\n');
+    const parkingAsk = /\bparking permits?\b/i.test(heard) && /\b(?:please|can you|could you|would you|send|need|renew|attach|forward)\b/i.test(heard);
     const footerMark = /\bunsubscribe\b|\bview (this )?in browser\b|\bmanage (your )?preferences\b/i.test(text);
     const automatedNoise = automated && !(parkingAsk && footerMark);
     const marketingNoise = MARKETING_VETO.test(text) && !parkingAsk;

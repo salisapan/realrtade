@@ -168,3 +168,50 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
     return (bag.outlookPageDiag || []).some((d) => d && d.reason === 'suggest:unresolved' && /hour-ambiguous/.test(String(d.detail || '')));
   }).toBe(true);
 });
+
+test('a To label and a name on the next node still offers the Q3 draft', async ({ glance }) => {
+  test.setTimeout(60000);
+  await glance.seedOutlook();
+  const page = await glance.openOutlook({
+    id: 'AQMkGlanceE2EToSibling',
+    subject: Q3_SUBJECT,
+    senderEmail: S.SENDER,
+    body: Q3_BODY,
+    toLabelSibling: true,
+    to: [S.ME]
+  });
+  await expect(page.locator('#ReadingPaneContainerId button.flow-chip')).toHaveCount(1);
+});
+
+test('a OneDrive save with no file permission says reconnect and does not offer Approve close', async ({ glance }) => {
+  test.setTimeout(90000);
+  const conv = 'AQQKGlanceE2ESaveOff';
+  const msg = 'AQMkGlanceE2ESaveOff';
+  const when = localIso(2026, 10, 8, 14, 1);
+  await glance.seedOutlook();
+  await glance.setScenario({
+    inboxFilterFails: true,
+    driveUnauthorized: true,
+    inbox: [inboxRow(msg, conv, 'Northwind agreement - signed PDF', when)],
+    sent: [],
+    messages: {},
+    attachments: { [msg]: pdf('att-nw', 'northwind-agreement-signed.pdf', 3072) },
+    conversation: [],
+    mailboxSettings: { timeFormat: 'HH:mm' }
+  });
+  const page = await glance.openOutlook({
+    live: true,
+    id: conv,
+    subject: 'Northwind agreement - signed PDF',
+    senderEmail: S.SENDER,
+    body: NORTHWIND,
+    receivedLabel: '08/10/2026 14:01',
+    attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
+  });
+  const pane = page.locator('#ReadingPaneContainerId');
+  await expect(pane.getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
+  await pane.locator('button.flow-chip').click();
+  await expect(pane.getByText('Reconnect Outlook to allow OneDrive')).toBeVisible();
+  await expect(pane.getByText("Couldn't confirm")).toHaveCount(0);
+  await expect(pane.getByText('Approve close')).toHaveCount(0);
+});

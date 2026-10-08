@@ -628,6 +628,13 @@ const FlowOwaParse = (() => {
       emailsIn(bits.join(' ')).forEach((e) => push(bucket, e));
       if (userName && userName.indexOf(' ') >= 0 && own.length && bits.join(' ').toLowerCase().indexOf(userName) >= 0) push(bucket, own[0]);
     }
+    function lineKind(raw) {
+      const t = String(raw || '').replace(/\s+/g, ' ').trim();
+      if (!t || t.length > 400) return '';
+      if (/^\s*to\b/i.test(t) || /^\s*אל(?:\s|:|$)/.test(t)) return 'to';
+      if (/^\s*cc\b/i.test(t) || /^\s*עותק(?:\s|:|$)/.test(t)) return 'cc';
+      return '';
+    }
     const nodes = container.querySelectorAll('div, p, li, span, button');
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
@@ -636,16 +643,17 @@ const FlowOwaParse = (() => {
       if (!t || t.length > 400) continue;
       // \b is ASCII-only, so "אל sali sapan" in one text node is not a To line
       // under (to|אל)\b. Hebrew keeps an explicit boundary. English keeps \b.
-      let bucket = (/^\s*to\b/i.test(t) || /^\s*אל(?:\s|:|$)/.test(t)) ? to
-        : ((/^\s*cc\b/i.test(t) || /^\s*עותק(?:\s|:|$)/.test(t)) ? cc : null);
-      let target = n;
-      if (!bucket && /^(to|אל|cc|עותק)$/i.test(t)) {
-        bucket = /^(to|אל)$/i.test(t) ? to : cc;
-        target = n.nextElementSibling || n;
-      }
-      if (!bucket) continue;
-      harvest(target, bucket);
-      if (target !== n) harvest(n, bucket);
+      // A persona whose visible text is only "sali sapan" still counts when
+      // its aria-label or title starts with To or Cc. "To:" as its own node
+      // has the address on the next node.
+      const aria = n.getAttribute ? String(n.getAttribute('aria-label') || '') : '';
+      const title = n.getAttribute ? String(n.getAttribute('title') || '') : '';
+      const kind = lineKind(t) || lineKind(aria) || lineKind(title);
+      if (!kind) continue;
+      const bucket = kind === 'to' ? to : cc;
+      const before = bucket.length;
+      harvest(n, bucket);
+      if (bucket.length === before) harvest(n.nextElementSibling, bucket);
     }
     return { to: to, cc: cc };
   }

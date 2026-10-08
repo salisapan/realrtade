@@ -49,6 +49,7 @@ test('the Loops tab shows Suggested and Added on a loop that has steps', async (
   await popup.locator('button[data-tab="open"]').click();
   const list = popup.locator('#open-list');
   await expect(list.locator('.act-tag', { hasText: 'Suggested' })).toHaveCount(2);
+  await expect(list.locator('[data-glance-section="suggested"]')).toHaveText('Suggested');
   await expect(list.locator('.act-tag', { hasText: 'Added' })).toHaveCount(1);
   await expect(list.locator('[data-glance-section="added"]')).toHaveText('Added');
   const addedStep = list.locator('li.act-added');

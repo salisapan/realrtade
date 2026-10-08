@@ -1352,6 +1352,8 @@ console.log('\n--- a parking-permit ask is not a newsletter ---\n');
   const news = 'Our weekly newsletter is here. Limited-time offer inside.\n\nUnsubscribe | View in browser';
   const quiet = classify(news);
   check('a newsletter with unsubscribe stays quiet:noise', quiet && quiet.quiet === 'noise', quiet);
+  const subjectAsk = classify('Unsubscribe | View in browser', { subject: 'Parking permit - please renew by Sunday', now: new Date('2026-10-08T12:00:00Z') });
+  check('a parking-permit subject is not quiet:noise', subjectAsk && subjectAsk.quiet !== 'noise' && subjectAsk.type != null, subjectAsk);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

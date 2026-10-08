@@ -450,6 +450,14 @@ const FlowIntent = (() => {
     if (typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.stripQuotedAsks) {
       text = FlowCloseFamilies.stripQuotedAsks(text);
     }
+    // The live parking mail puts the ask in the subject. The body can be a
+    // footer. Judge the subject with the body when the subject is that ask.
+    if (typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.parkingPermitAsk === 'function') {
+      const sub = String(ctx.subject || '');
+      if (sub && FlowCloseFamilies.parkingPermitAsk(sub) && !FlowCloseFamilies.parkingPermitAsk(text)) {
+        text = sub + '\n' + text;
+      }
+    }
 
     const domain = FLOW_DOMAINS[0]; // no domain picker in the MVP — see connectors.js/popup.js
     const facts = FlowExtract.extract(text, { senderEmail: ctx.senderEmail, now: ctx.now });
@@ -978,6 +986,19 @@ const FlowIntent = (() => {
     //        an object is present.
     // A past date is not an anchor. "Please send the receipt" still chips
     // when it names the receipt; the old due date is not what made it real.
+    // A parking-permit renew is the work, including when the ask is the
+    // subject and the body is a mailing footer. A newsletter with no such
+    // ask still falls through as noise.
+    const parkingAsk = typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.parkingPermitAsk === 'function' && FlowCloseFamilies.parkingPermitAsk(text);
+    if (parkingAsk && !infoOrNoise) {
+      return finish(TYPES.REQUEST, 'medium', {
+        who, amount,
+        what: 'Renew the parking permit',
+        when: humanWhen(facts.date, facts.time),
+        dateIso: facts.date && facts.date.iso
+      }, 'follow-up-ask');
+    }
+
     const requestEvidence = s.flags.handoff && ((hasResolvedDate && !isPast) || hasConcreteRequestObject);
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);

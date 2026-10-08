@@ -167,6 +167,9 @@ function installE2EHooks() {
         return Promise.resolve(json(201, { id: 'e2e-att-' + (e2e.seq++) }));
       }
       const driveContent = path.match(/\/me\/drive\/root:\/(.+):\/content$/);
+      if (driveContent && scenario.driveUnauthorized) {
+        return Promise.resolve(json(401, { error: { code: 'InvalidAuthenticationToken' } }));
+      }
       if (driveContent && method === 'PUT') {
         const name = driveContent[1];
         const id = 'e2e-file-' + (e2e.seq++);

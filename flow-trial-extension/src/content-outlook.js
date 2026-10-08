@@ -2665,6 +2665,16 @@
     });
   }
 
+  function saveFailReason(r) {
+    if (!r) return '';
+    if (r.reason) return String(r.reason);
+    const rows = r.results || [];
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i] && rows[i].reason) return String(rows[i].reason);
+    }
+    return '';
+  }
+
   async function onSuggestDoIt(host, chip, ctx) {
     doItInFlight = true;
     try {
@@ -2690,6 +2700,13 @@
         ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: proof })
         : false;
       if (!proved) {
+        const why = saveFailReason(r);
+        if (why === 'not-connected' || why === 'files-not-granted') {
+          const line = why === 'files-not-granted' ? 'Reconnect Outlook to allow OneDrive' : 'Outlook is not connected';
+          if (host && host.__glanceSteps) host.__glanceSteps.setAll('offline', line);
+          FlowChipHost.setChipState(chip, 'flow-chip-error', line);
+          return;
+        }
         if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
         FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.line || r.written)) || "Couldn't confirm");
         return;
@@ -2899,7 +2916,7 @@
       const row = open[i];
       if (!row || !row.process) continue;
       const rowIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
-      if (ids.some((id) => rowIds.indexOf(String(id)) >= 0)) return row;
+      if (ids.some((id) => rowIds.some((rid) => sameExchangeId(id, rid)))) return row;
       const rowKey = FlowStillOpen.promiseKey(row);
       if (key && rowKey && rowKey === key) return row;
       const rowText = String(row.text || '');

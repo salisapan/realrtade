@@ -115,6 +115,10 @@ const FlowStepListView = (() => {
       base.expanded = row.expanded === true;
       return base;
     }
+    if (row.state === 'offline') {
+      base.out = row.offlineLine || 'Outlook is not connected';
+      return base;
+    }
     if (failed) {
       base.out = 'Couldn’t confirm · <em class="ss-retry">Retry</em>';
       return base;
@@ -345,10 +349,12 @@ const FlowStepListView = (() => {
         draw();
         emit();
       },
-      setAll: function (state) {
+      setAll: function (state, line) {
         list = list.map(function (row) {
           if (!row || row.manual || row.role === 'close' || row.checked === false) return row;
-          return Object.assign({}, row, { state: state });
+          const next = Object.assign({}, row, { state: state });
+          if (line) next.offlineLine = line;
+          return next;
         });
         pushState(state);
         draw();
