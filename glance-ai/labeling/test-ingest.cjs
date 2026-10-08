@@ -85,9 +85,14 @@ assert.strictEqual(fs.existsSync(out), false);
 const batch = loadBatch(path.join(HERE, 'batch-001.json'));
 const prefill = readJson(path.join(HERE, 'batch-001-cos-prefill.answers.json'));
 const preview = ingest({ batch, answers: prefill, preview: true });
-assert.strictEqual(preview.rows.length, 17);
-assert.strictEqual(preview.excluded.length, 2);
-assert.deepStrictEqual(preview.excluded.map((e) => e.item).sort((a, b) => a - b), [8, 17]);
+assert.strictEqual(preview.rows.length, 13);
+assert.strictEqual(preview.binaryCount, 13);
+assert.strictEqual(preview.excluded.length, 6);
+assert.strictEqual(preview.contextDependentCount, 5);
+assert.deepStrictEqual(preview.excluded.map((e) => e.item).sort((a, b) => a - b), [8, 12, 13, 14, 15, 17]);
+assert.deepStrictEqual(preview.excluded.filter((e) => e.reason === 'context-dependent').map((e) => e.item).sort((a, b) => a - b), [8, 12, 13, 14, 15]);
+assert.ok(preview.excluded.filter((e) => e.reason === 'context-dependent').every((e) => e.depends_on));
+assert.strictEqual(preview.excluded.find((e) => e.item === 17).reason, 'unsure');
 assert.strictEqual(preview.ownerVerifiedCount, 0);
 assert.ok(preview.excluded.find((e) => e.item === 17).note.indexOf('OneDrive') >= 0 || preview.excluded.find((e) => e.item === 17).note.indexOf('One Drive') >= 0);
 const first = preview.rows.find((r) => r.id === 'v2syn-20323');
@@ -98,9 +103,26 @@ const silent = preview.rows.find((r) => r.id === 'v2syn-9371');
 assert.strictEqual(silent.ownerLabel, 'SILENT');
 assert.strictEqual(silent.wrongDoIt, true);
 for (const row of preview.rows) assert.deepStrictEqual(validateRow(row), [], row.id);
-assert.ok(!preview.rows.some((r) => r.id === 'v2syn-405' || r.id === 'v2syn-24392'));
+assert.ok(!preview.rows.some((r) => r.id === 'v2syn-405' || r.id === 'v2syn-24392' || r.id === 'v2syn-6931' || r.id === 'v2syn-7013' || r.id === 'v2syn-9674' || r.id === 'v2syn-10482'));
 
 for (const line of readJsonl(path.join(HERE, 'gold-template.jsonl'))) assert.deepStrictEqual(validateRow(line), [], line.id);
+
+const saliCtx = ingest({
+  batch: [{ id: 'v2syn-405', item: 8, lang: 'en', surface: 'gmail', subject: 'Q', body: 'Hi all, please approve onboarding.', v2: 'follow-up-ask|draft', engine35: 'SILENT', answerType: 'context-dependent', depends_on: 'user_is_approver_for', reference: { label: 'SILENT' } }],
+  answers: answers('sali', null, [{ id: 'v2syn-405', mark: '✅', note: 'still not binary' }])
+});
+assert.strictEqual(saliCtx.rows.length, 0);
+assert.strictEqual(saliCtx.ownerVerifiedCount, 0);
+assert.strictEqual(saliCtx.excluded[0].reason, 'context-dependent');
+assert.strictEqual(saliCtx.excluded[0].depends_on, 'user_is_approver_for');
+let missingDepends = false;
+try {
+  ingest({
+    batch: [{ id: 'x', item: 1, lang: 'en', surface: 'gmail', subject: 'Q', body: 'Hi', v2: 'SILENT', engine35: 'SILENT', answerType: 'context-dependent' }],
+    answers: answers('cos:david', null, [{ item: 1, mark: 'context-dependent' }])
+  });
+} catch (e) { missingDepends = e.code === 'DEPENDS'; }
+assert.strictEqual(missingDepends, true);
 
 const goldBefore = fs.readFileSync(GOLD, 'utf8');
 assert.strictEqual(goldBefore.trim(), '');
@@ -126,13 +148,16 @@ const fake = answers('cos:not-sali', { provisional: true }, b2.map((r) => ({
 })));
 const b2in = ingest({ batch: b2, answers: fake, preview: true });
 assert.strictEqual(b2in.ownerVerifiedCount, 0);
-assert.strictEqual(b2in.excluded.length, 1);
-assert.strictEqual(b2in.excluded[0].id, b2[0].id);
+assert.strictEqual(b2in.excluded.length, 3);
+assert.strictEqual(b2in.rows.length, 17);
+assert.ok(b2in.excluded.some((e) => e.id === b2[0].id && e.reason === 'unsure'));
+assert.ok(b2in.excluded.some((e) => e.id === 'v2syn-25810' && e.depends_on === 'work_style.files'));
+assert.ok(b2in.excluded.some((e) => e.id === 'v2syn-12865' && e.depends_on === 'user_is_approver_for'));
 assert.ok(b2in.rows.every((r) => r.ownerVerified === false));
 assert.ok(b2in.rows.every((r) => r.labeledBy === 'cos:not-sali'));
 assert.ok(b2in.rows.every((r) => r.notes.indexOf('batch-002 item') >= 0));
 assert.ok(b2in.rows.every((r) => r.importedFrom.indexOf('labeling/batch-002.json#item-') === 0));
-assert.ok(!b2in.rows.some((r) => r.id === b2[0].id));
+assert.ok(!b2in.rows.some((r) => r.id === b2[0].id || r.id === 'v2syn-25810' || r.id === 'v2syn-12865'));
 for (const row of b2in.rows) assert.deepStrictEqual(validateRow(row), [], row.id);
 
 const both = loadBatches([path.join(HERE, 'batch-001.json'), path.join(HERE, 'batch-002.json')]);
@@ -156,7 +181,9 @@ const combined = ingest({
 });
 assert.strictEqual(combined.ownerVerifiedCount, 0);
 assert.ok(combined.rows.every((r) => r.ownerVerified === false));
-assert.strictEqual(combined.excluded.length, 2);
+assert.strictEqual(combined.rows.length, 31);
+assert.strictEqual(combined.excluded.length, 8);
+assert.strictEqual(combined.contextDependentCount, 7);
 assert.ok(combined.excluded.some((e) => e.id === 'v2syn-405'));
 assert.ok(combined.excluded.some((e) => e.id === b2[0].id));
 assert.ok(combined.rows.some((r) => r.importedFrom.indexOf('batch-001.json') >= 0));
@@ -171,7 +198,8 @@ const fakePath = path.join(dir, 'batch-002-fake.answers.json');
 fs.writeFileSync(fakePath, JSON.stringify(fake));
 const ran = run(['node', 'apply', '--answers', fakePath, '--batch', 'batch-002.json', '--preview', '--no-fit']);
 assert.strictEqual(ran.score.ownerVerified, 0);
-assert.strictEqual(ran.excluded.length, 1);
+assert.strictEqual(ran.excluded.length, 3);
+assert.ok(ran.excluded.some((e) => e.reason === 'context-dependent'));
 assert.strictEqual(fs.readFileSync(PREVIEW_DOC, 'utf8'), previewBefore);
 assert.strictEqual(fs.readFileSync(path.join(HERE, 'preview', 'provisional-rows.jsonl'), 'utf8'), provBefore);
 assert.strictEqual(fs.readFileSync(path.join(HERE, 'preview', 'excluded-unsure.jsonl'), 'utf8'), exclBefore);

@@ -173,7 +173,9 @@
    "unsureReason": "engine-recall-gap"
   },
   "why": "המנוע שתק, המודל רוצה להציע פעולה.",
-  "ownerAnswer": null
+  "ownerAnswer": null,
+  "answerType": "context-dependent",
+  "depends_on": "user_is_approver_for"
  },
  {
   "id": "v2rtest-intent-actions-corpus-1122",
@@ -259,7 +261,9 @@
    "unsure": false
   },
   "why": "אתה רק ב-Cc ואף אחד לא פנה אליך בשם. המנוע מציג פעולה, הכלל החדש משתיק.",
-  "ownerAnswer": null
+  "ownerAnswer": null,
+  "answerType": "context-dependent",
+  "depends_on": "cc_reply_rate"
  },
  {
   "id": "v2syn-7013",
@@ -282,7 +286,9 @@
    "unsure": false
   },
   "why": "המייל פונה בשם לאדם אחר (ואתה ב-To). המנוע מציג פעולה, הכלל החדש משתיק.",
-  "ownerAnswer": null
+  "ownerAnswer": null,
+  "answerType": "context-dependent",
+  "depends_on": "covers_addressee"
  },
  {
   "id": "v2syn-9674",
@@ -303,7 +309,9 @@
    "unsure": false
   },
   "why": "פנייה לקבוצה (\"היי לכולם\" / \"צוות\"). כרגע מוצגת פעולה.",
-  "ownerAnswer": null
+  "ownerAnswer": null,
+  "answerType": "context-dependent",
+  "depends_on": "role_matches_topic"
  },
  {
   "id": "v2syn-10482",
@@ -326,7 +334,9 @@
    "unsure": false
   },
   "why": "כתוב במפורש שלא נדרשת פעולה. המנוע 0.9.35 עדיין מציע פעולה; הכלל החדש משתיק.",
-  "ownerAnswer": null
+  "ownerAnswer": null,
+  "answerType": "context-dependent",
+  "depends_on": "work_style.files"
  },
  {
   "id": "v2syn-25034",

@@ -70,7 +70,21 @@ The strict gate treats a save proposal as unread (`suggest:attachments-unread`) 
 
 ## Owner-label path
 
-Batch-001 is 19 synthetic cases (`v2syn-*` and two repo-test ids) under `glance-ai/labeling/`. The mail text is generated, not customer mail. `owner-gold.jsonl` is the single owner-gold file and it has no labels yet. Owner-verified means `labeledBy` is `sali`. Any other name is stored and scored with `ownerVerified` false. The ingest refuses a file that asks for `ownerVerified: true` under another name. A ❓ mark stays out of the headline.
+Batch-001 is 19 synthetic cases (`v2syn-*` and two repo-test ids) under `glance-ai/labeling/`. The mail text is generated, not customer mail. `owner-gold.jsonl` is the single owner-gold file and it has no labels yet. Owner-verified means `labeledBy` is `sali`. Any other name is stored and scored with `ownerVerified` false. The ingest refuses a file that asks for `ownerVerified: true` under another name. A ❓ mark stays out of the headline. So does `answerType: context-dependent`. Those rows are not binary labels and do not count toward the 200. Each one carries `depends_on`. The ingest refuses a context-dependent row that has no `depends_on`. A ✅ or 🤫 on that row is stored as excluded, not as gold, and it cannot set `ownerVerified`.
+
+There is no blanket "Hi all" silence rule (Sali, 2026-10-08). Relevance comes from the per-user profile. The framework is `docs/glance-ai/user-context-v0.md`. Re-tagged, and out of the binary count:
+
+| batch | item | id | depends_on |
+|---|---|---|---|
+| batch-001 | 8 | `v2syn-405` | `user_is_approver_for` |
+| batch-001 | 12 | `v2syn-6931` | `cc_reply_rate` |
+| batch-001 | 13 | `v2syn-7013` | `covers_addressee` |
+| batch-001 | 14 | `v2syn-9674` | `role_matches_topic` |
+| batch-001 | 15 | `v2syn-10482` | `work_style.files` |
+| batch-002 | 2 | `v2syn-25810` | `work_style.files` |
+| batch-002 | 3 | `v2syn-12865` | `user_is_approver_for` |
+
+The map is `glance-ai/labeling/context-tags.cjs`. Owner-verified is still 0.
 
 When the owner's answers file is in, this is the command:
 
@@ -80,9 +94,9 @@ node glance-ai/labeling/apply-owner-answers.cjs --answers path/to/answers.json
 
 It writes schema-valid rows, scores v2 alone, v2+veto, v2.1+veto, the engine on the tip, and gated Qwen propose-only where the existing cache covers the case, then rescores the shipped v2 held-out predictions. If `model/train/features-v2/train.jsonl` is on the machine it also refits v2 on CPU into `glance-ai/labeling/dry-run/`. That dry-run does not replace `model/artifacts/v2.gate.weights.json`.
 
-The chief of staff proposed answers are `glance-ai/labeling/batch-001-cos-prefill.answers.json`. The owner has not confirmed them. Items 8 and 17 are ❓. Item 17's note says the close is a save to OneDrive, not a task and not silence. The preview command is the same script with `--preview`. The write-up is `docs/glance-ai/owner-gold-preview-2026-10-08.md`. Every number in that file, and every number in the two tables below, is **provisional / not owner-verified**.
+The chief of staff proposed answers are `glance-ai/labeling/batch-001-cos-prefill.answers.json`. The owner has not confirmed them. Item 17 is still ❓. Its note says the close is a save to OneDrive, not a task and not silence. Items 8, 12, 13, 14, and 15 are context-dependent in that file, not binary marks. The preview command is the same script with `--preview`. The write-up `docs/glance-ai/owner-gold-preview-2026-10-08.md` is the score from before this re-tag. Every number in that file, and every number in the two tables below, is **provisional / not owner-verified**.
 
-Scored provisional rows: 17. Unsure, left out: 2 (item 8 `v2syn-405`, item 17 `v2syn-24392`). Owner-verified: 0.
+Scored provisional rows in that write-up: 17. That count included items 12–15 as silence and left out item 8 and item 17 as unsure. A fresh ingest of the same file now scores 13 binary rows. Context-dependent, left out of the 200: the seven ids in the table above. Unsure, still left out: item 17 `v2syn-24392`. Owner-verified: 0.
 
 | system | n | wrong-Do-It | missed close | wrong action | Hebrew wrong-Do-It | English wrong-Do-It | Hebrew missed | English missed |
 |---|---|---|---|---|---|---|---|---|
@@ -109,9 +123,22 @@ The CPU refit (`v2-owner-dryrun`, sklearn 1.9.1, tau 0.97) matched that after fi
 
 Owner-verified labels are still 0. Batch-002 is 20 synthetic cases ready for the owner, with an empty answers file. The gate audit below is on the chief of staff's provisional silences for batch-001 items 10, 11, 12, 13, 14, and 16. Every figure in this section is provisional / not owner-verified, or it is a machine-reference count on the shipped held-out. The write-up is `docs/glance-ai/batch-002-and-gate-audit-2026-10-08.md`.
 
-Batch-002 mix, 20/20: Hebrew 12/20, English 8/20. Cached gated Qwen on 15/20. Silence-candidate tags 6/20 (money 2, FYI 1, group 1, small talk 1, injection 1). Show/silent splits 19/20. The one agreed silence is the FYI row, the nearest all-silent case to tau 0.97. Drive save 1/20, OneDrive save 1/20. Draft, task, calendar, and file_save all appear.
+Batch-002 mix, 20/20: Hebrew 12/20, English 8/20. Cached gated Qwen on 15/20. Silence-candidate tags 6/20 (money 2, FYI 1, group 1, small talk 1, injection 1). Show/silent splits 19/20. The sheet picked the FYI row as the nearest all-silent case to tau 0.97. Item 2 (that FYI) and item 3 (the group ask) are context-dependent as of the user-context lock. They are not binary labels. Drive save 1/20, OneDrive save 1/20. Draft, task, calendar, and file_save all appear.
 
 No silence rule was adopted. On the v2 held-out (n=6982, strict, machine reference) the shipped v2+veto stays 1.4% (82/5727) wrong-Do-It and 50.8% (637/1255) missed close. A group-address silence was measured and rejected: missed close would rise by 6.614 points, to 57.4% (720/1255). The other four lab post-filters stay unwired. Gated Qwen strict wrong-Do-It stays 0 on every spec set. Suggest-save is untouched, so the prototype adds 0 chips. `bash glance-ai/run-cpu-checks.sh` on this change exited 0: owner-label tests passed, suggest-save new chips 0 (8191/8191 equal), gated Qwen pass bar true.
+
+## User context v0 (lab)
+
+Sali, 2026-10-08: every offer or silence uses the per-user profile. If the mail is relevant, Glance offers when there is an explicit intent span and the close is feasible. If it is not relevant, Glance stays silent. There is no blanket "Hi all" silence rule. No profile signal falls back to today's decision. Instinct onboarding (role and department) fills the profile on day one. The spec is `docs/glance-ai/user-context-v0.md`. Nothing here is wired into the extension.
+
+Contrast set `glance-ai/labeling/contrast-v0.jsonl`: 40 synthetic pairs, 20 Hebrew and 20 English, `labeledBy` `synthetic-contrast`, owner-verified 0. Eight of the pairs are group asks, and each of those has an offer as the correct side for the approver. Pair accuracy is both sides right. The same answer on both sides fails the pair.
+
+| | pair accuracy | wrong Do It | missed close | missed close on relevant |
+|---|---|---|---|---|
+| v2 without profile features | 0.0% (0/40) | 15.0% (6/40) | 85.0% (34/40) | 85.0% (34/40) |
+| v2 plus profile features | 100.0% (40/40) | 0.0% (0/40) | 0.0% (0/40) | 0.0% (0/40) |
+
+Empty profile on the shipped v2 held-out (`pred`, n=6982): 0 flips. Empty profile on the 40 contrast emails against live v2: 0 flips. Gated Qwen with a profile summary was not run. Qwen3.5-4B is not vendored, and 80 CPU prompts are not a cheap check. The report is `glance-ai/profile/out/contrast-report.json`.
 
 ## Next stages
 

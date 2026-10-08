@@ -472,6 +472,8 @@ function run(argv) {
     reference: { ownerVerified: false },
     ownerAnswer: null
   }));
+  const { stampRow } = require('./context-tags.cjs');
+  json.forEach(stampRow);
   fs.writeFileSync(path.join(HERE, 'batch-002.json'), JSON.stringify(json, null, 1) + '\n');
   fs.writeFileSync(path.join(HERE, 'batch-002.md'), renderMd(picked));
   const answers = {

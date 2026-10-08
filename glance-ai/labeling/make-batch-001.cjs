@@ -45,5 +45,7 @@ picks.forEach(({ p, r, why, question }, i) => {
 });
 md += `\n</div>\n`;
 fs.writeFileSync(path.join(__dirname, 'batch-001.md'), md);
-fs.writeFileSync(path.join(__dirname, 'batch-001.json'), JSON.stringify(picks.map(({ p, r, why }) => ({ id: r.id, templateId: r.templateId, lang: r.lang, surface: r.surface, subject: r.subject, body: r.body, engine35: p['engine-0.9.35'], v2: p['v2+veto'], v2pShow: p.v2pShow, reference: r.reference, why, ownerAnswer: null })), null, 1));
+const { stampRow } = require('./context-tags.cjs');
+const batch1Json = picks.map(({ p, r, why }) => stampRow({ id: r.id, templateId: r.templateId, lang: r.lang, surface: r.surface, subject: r.subject, body: r.body, engine35: p['engine-0.9.35'], v2: p['v2+veto'], v2pShow: p.v2pShow, reference: r.reference, why, ownerAnswer: null }));
+fs.writeFileSync(path.join(__dirname, 'batch-001.json'), JSON.stringify(batch1Json, null, 1));
 console.log('batch-001:', picks.length, 'items', picks.map((x) => x.r.lang).join(''));
