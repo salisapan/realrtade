@@ -16,7 +16,7 @@ This page is Glance only. Flow, the org product, is separate. This is an analysi
 
 ## Product definition (vision-locked)
 
-Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Gmail is the current primary entry surface. Execution happens in the place a close really finishes. Glance stays silent when it is uncertain, never sends on its own, treats a draft as unfinished, and counts a loop closed only on real completion or a deliberate release.
+Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Glance's entry point is any surface the user is on. Execution happens in the place a close really finishes. Glance stays silent when it is uncertain, never sends on its own, treats a draft as unfinished, and counts a loop closed only on real completion or a deliberate release.
 
 Owner locks around that block (`CLAUDE.md`, 2026-10-06 to 2026-10-08):
 

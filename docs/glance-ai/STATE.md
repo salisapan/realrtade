@@ -1,10 +1,10 @@
 # Glance model lab — state
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 ## Product definition
 
-Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Gmail is the current primary entry surface. Flow, the enterprise product, is separate. This page is Glance only. Flow is a separate product.
+Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Glance's entry point is any surface the user is on. Flow, the enterprise product, is separate. This page is Glance only. Flow is a separate product.
 
 ## Implementation status
 

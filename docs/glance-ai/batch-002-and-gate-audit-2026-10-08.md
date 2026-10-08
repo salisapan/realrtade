@@ -1,6 +1,6 @@
 # Batch-002 and the gate audit, 2026-10-08
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 **Owner-verified labels: 0.** Batch-002 has no answers. The six batch-001 calls below are the chief of staff's proposal. They are provisional / not owner-verified. Machine-reference counts on the shipped held-out are labeled as such.
 
