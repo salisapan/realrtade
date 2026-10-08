@@ -23,13 +23,62 @@ const FlowStepListView = (() => {
     return { tool: 'you', app: 'You' };
   }
 
+  function skippedLine(file) {
+    if (typeof FlowSuggestSave !== 'undefined' && typeof FlowSuggestSave.skippedLabel === 'function') {
+      return FlowSuggestSave.skippedLabel(file);
+    }
+    const why = (file && (file.why || file.reason)) || 'not saved';
+    const name = file && String(file.name || '').trim();
+    const id = file && String(file.id == null ? '' : file.id);
+    if (name && name !== id) return name + ' · skipped · ' + why;
+    return 'File skipped · ' + why;
+  }
+
+  function oneFile(file, skipped) {
+    const id = String(file.id == null ? '' : file.id);
+    const rawName = String(file.name || '').trim();
+    const why = file.why || file.reason || '';
+    const unnamed = !rawName || rawName === id || rawName.indexOf('File skipped') === 0;
+    const isSkipped = skipped === true || file.skipped === true || unnamed;
+    let shown = file.label;
+    if (!shown) {
+      if (isSkipped) shown = skippedLine(file);
+      else if (typeof FlowSuggestSave !== 'undefined' && FlowSuggestSave.fileLabel) shown = FlowSuggestSave.fileLabel(file) || rawName;
+      else shown = rawName;
+    }
+    if (!shown || shown === id) shown = skippedLine(file);
+    return {
+      n: shown,
+      name: isSkipped ? '' : rawName,
+      id: file.id,
+      size: file.size,
+      why: why,
+      on: !isSkipped && file.on !== false,
+      skipped: isSkipped
+    };
+  }
+
   function filesOf(row) {
     const params = row && row.step && row.step.params;
     if (!params) return [];
     const catalog = Array.isArray(params.catalog) && params.catalog.length ? params.catalog : (params.files || []);
-    return catalog.filter(function (f) { return f && f.name; }).map(function (f) {
-      return { n: f.name, name: f.name, id: f.id, size: f.size, on: f.on !== false };
+    const seen = {};
+    const out = [];
+    catalog.forEach(function (f) {
+      if (!f) return;
+      const id = String(f.id == null ? '' : f.id);
+      if (id && seen[id]) return;
+      if (id) seen[id] = 1;
+      out.push(oneFile(f));
     });
+    (Array.isArray(params.excluded) ? params.excluded : []).forEach(function (f) {
+      if (!f) return;
+      const id = String(f.id == null ? '' : f.id);
+      if (id && seen[id]) return;
+      if (id) seen[id] = 1;
+      out.push(oneFile(f, true));
+    });
+    return out;
   }
 
   function fileOnly(rows) {
@@ -180,15 +229,17 @@ const FlowStepListView = (() => {
           const id = li && li.getAttribute('data-step-id');
           list = list.map(function (r) {
             if (!r || r.id !== id) return r;
-            const files = filesOf(r).map(function (f) { return { id: f.id, name: f.name, size: f.size, on: f.on }; });
+            const files = filesOf(r).map(function (f) {
+              return { id: f.id, name: f.name, size: f.size, why: f.why, on: f.on, skipped: f.skipped, label: f.skipped ? f.n : '' };
+            });
             let expanded = r.expanded === true;
             if (pill.hasAttribute('data-more')) expanded = true;
             else if (pill.hasAttribute('data-less')) expanded = false;
             else {
               const idx = Number(pill.getAttribute('data-f'));
-              if (files[idx]) files[idx].on = !files[idx].on;
+              if (files[idx] && !files[idx].skipped) files[idx].on = !files[idx].on;
             }
-            const selected = files.filter(function (f) { return f.on; });
+            const selected = files.filter(function (f) { return f.on && !f.skipped; });
             const step = r.step ? Object.assign({}, r.step, { params: Object.assign({}, r.step.params, { files: selected, catalog: files }) }) : r.step;
             return Object.assign({}, r, { expanded: expanded, checked: selected.length > 0, step: step });
           });

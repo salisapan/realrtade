@@ -13,7 +13,7 @@ const vm = require('vm');
 const CORE = path.join(__dirname, '..', 'core');
 const sandbox = { module: undefined, console };
 vm.createContext(sandbox);
-for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'fact-reply.js', 'close-families.js', 'intent.js', 'actions.js', 'still-open.js']) {
+for (const file of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'fact-reply.js', 'close-families.js', 'intent.js', 'actions.js', 'commitment-title.js', 'still-open.js']) {
   vm.runInContext(fs.readFileSync(path.join(CORE, file), 'utf8'), sandbox, { filename: file });
 }
 const FlowIntent = vm.runInContext('FlowIntent', sandbox);
@@ -418,6 +418,29 @@ console.log('\n--- still open: trust-finish silence (A–J) stays off the mornin
       ids(beside).indexOf(row.messageId) !== -1 && beside.length === 1,
       ids(beside));
   });
+}
+
+console.log('\n--- one promise is one Do It ---\n');
+{
+  const older = candidate('I will send you the signed contract by Friday, September 18.', 'older');
+  const newer = candidate('I will send you the signed contract by Friday, September 18.', 'newer');
+  newer.threadId = 't-newer';
+  newer.ts = NOW + 1000;
+  const picked = FlowStillOpen.select([older, newer], NOW);
+  check('two mails with the same promise are one loop', picked.length === 1, ids(picked));
+  check('the promise key matches across those mails',
+    Boolean(FlowStillOpen.promiseKey(older)) && FlowStillOpen.promiseKey(older) === FlowStillOpen.promiseKey(newer),
+    { older: FlowStillOpen.promiseKey(older), newer: FlowStillOpen.promiseKey(newer) });
+  const other = candidate('I will send the passport scan by Monday, September 21.', 'passport');
+  check('a different promise stays its own loop', FlowStillOpen.select([older, other], NOW).length === 2, ids(FlowStillOpen.select([older, other], NOW)));
+  const proof = {
+    kind: 'written', undone: false, connectorId: 'outlookTask', fetchedBack: true,
+    messageId: 'newer', text: newer.text, intent: newer.intent, sender: newer.sender, threadId: newer.threadId
+  };
+  check('a live task hides every Do It for that promise', FlowStillOpen.select([older, newer], NOW, [proof]).length === 0);
+  const undone = Object.assign({}, proof, { kind: 'undone', undone: true, fetchedBack: false });
+  const after = FlowStillOpen.select([older, newer], NOW, [undone]);
+  check('after Undo the same promise is one Do It again', after.length === 1, ids(after));
 }
 
 console.log('\nTOTAL FAILURES:', failures);

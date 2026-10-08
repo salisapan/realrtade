@@ -338,6 +338,15 @@ const FlowIntent = (() => {
   // "בבקשה תשלח" names the work and stays a request. תאשר also covers
   // תאשרי and תאשרו. The frames stay specific so "התאשר" (it was approved)
   // is not read as an ask.
+  // "Can you reply and confirm whether …" is a reply ask. "confirm whether"
+  // without a reply verb still does not record a decision.
+  function explicitReplyAsk(text) {
+    const raw = String(text || '');
+    if (/\b(?:can|could|would|will)\s+you\s+(?:please\s+)?reply\b/i.test(raw)) return true;
+    if (/\b(?:please|kindly)\s+reply\b/i.test(raw)) return true;
+    if (/\breply and confirm\b/i.test(raw)) return true;
+    return false;
+  }
   function readerDecisionAsk(text) {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
@@ -930,7 +939,7 @@ const FlowIntent = (() => {
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
-    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text)) {
+    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text) && !explicitReplyAsk(text)) {
       quietHint = quietHint || 'hedge';
     } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk) {
       return finish(TYPES.REQUEST, 'medium', {

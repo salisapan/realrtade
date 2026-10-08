@@ -163,6 +163,26 @@ console.log('\n--- rows 1-22 ---\n');
   const oracleRow = JSON.parse(fs.readFileSync(path.join(__dirname, 'oracle/suggest-save/corpus-22.json'), 'utf8'))[0];
   const decided = S.decide(oracleRow.input);
   const named = S.suggestSave(oracleRow.input);
+  const skipped = S.decide({
+    surface: 'outlook', direction: 'inbound', consent: true, attachmentsRead: true,
+    messageId: 'M-skip', text: 'Hi, attached is the Q3 report. Thanks', subject: 'Q3',
+    judgment: {},
+    attachments: [
+      { id: 'keep', name: 'board.pdf', size: 240 * KB, contentType: 'application/pdf', isInline: false },
+      { id: 'skip', name: 'contract.pdf', size: 2200, contentType: 'application/pdf', isInline: true }
+    ]
+  });
+  const skippedRow = (skipped.excluded || []).find((f) => f && f.id === 'skip');
+  check('an excluded file keeps its name and size',
+    skipped.suggest === true && skippedRow && skippedRow.name === 'contract.pdf' && skippedRow.size === 2200 && skippedRow.why === 'inline',
+    skippedRow);
+  check('the skipped row names the file', S.skippedLabel(skippedRow) === 'contract.pdf · skipped · inline', S.skippedLabel(skippedRow));
+  check('a file with no name is File skipped, never an id',
+    S.skippedLabel({ id: 'AAMkVeryLongAttachmentId1234567890', why: 'type' }) === 'File skipped · type');
+  check("Please don't save the attachment to OneDrive stays quiet", S.suggestSave(mail({
+    text: "Please don't save the attachment to OneDrive"
+  })).reason === 'suggest:negated');
+
   check('the step and decide().chip both name the file',
     decided.reason === 'suggest:show' && decided.chip && decided.chip.en === 'Save Q3-report.pdf to OneDrive?' &&
     decided.chip.he === 'לשמור את Q3-report.pdf ב-OneDrive?' &&

@@ -273,18 +273,85 @@ const FlowStillOpen = (() => {
     };
   }
 
-  function select(candidates, now) {
+  function normPiece(value) {
+    return String(value || '').toLowerCase().replace(/[^a-z0-9\u0590-\u05ff]+/gi, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function dueIsoOf(item) {
+    const date = item && item.intent && item.intent.facts && item.intent.facts.date;
+    return date && date.iso ? String(date.iso) : '';
+  }
+
+  function senderKeyOf(item) {
+    const sender = item && item.sender;
+    return String((sender && (sender.email || sender.address)) || '').toLowerCase();
+  }
+
+  // Same promise, same day, same person: one Do It. A second mail in the
+  // thread, or another mail from that sender, does not open a second task.
+  function commitmentDedupeKey(item) {
+    let title = '';
+    if (typeof FlowCommitmentTitle !== 'undefined' && item && item.text && typeof FlowCommitmentTitle.titleFromBody === 'function') {
+      title = normPiece(FlowCommitmentTitle.titleFromBody(item.text));
+    }
+    if (!title) {
+      const intent = (item && item.intent) || {};
+      const entities = intent.entities || {};
+      title = normPiece(entities.what || intent.label || '');
+    }
+    const due = dueIsoOf(item);
+    if (!title || !due) return '';
+    const who = senderKeyOf(item);
+    if (who) return title + '\n' + due + '\n' + who;
+    const thread = String((item && (item.threadId || item.outlookConversationId)) || '');
+    if (thread) return title + '\n' + due + '\nthread:' + thread;
+    return '';
+  }
+
+  function todoProofRow(row) {
+    if (!row || row.kind !== 'written' || row.undone === true) return false;
+    const todo = row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo' || row.system === 'microsoft/todo'
+      || row.connectorId === 'googleTask' || row.connectorId === 'googleTasks';
+    if (!todo) return false;
+    return row.fetchedBack === true || (row.proof && row.proof.fetchedBack === true);
+  }
+
+  // A fetched-back task for this promise is already the close. Undo clears
+  // that row, and then one Do It may create the task again.
+  function activeProofFor(log, item) {
+    const key = commitmentDedupeKey(item);
+    if (!key) return null;
+    const rows = Array.isArray(log) ? log : [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!todoProofRow(row)) continue;
+      if (commitmentDedupeKey(row) === key) return row;
+    }
+    return null;
+  }
+
+  function select(candidates, now, log) {
     const best = new Map();
     const list = Array.isArray(candidates) ? candidates : [];
     for (const raw of list) {
       if (!raw || !raw.messageId || !raw.process || !raw.process.steps || !raw.process.steps.length) continue;
+      if (activeProofFor(log, raw)) continue;
       const score = scoreOf(raw, now);
       if (!score) continue;
       const key = raw.threadId || raw.messageId;
       const prev = best.get(key);
       if (!prev || score > prev.score) best.set(key, { item: raw, score: score });
     }
-    const ranked = Array.from(best.values());
+    const merged = new Map();
+    best.forEach((row) => {
+      const commit = commitmentDedupeKey(row.item);
+      const key = commit || ('id:' + row.item.messageId);
+      const prev = merged.get(key);
+      if (!prev || row.score > prev.score || (row.score === prev.score && (row.item.ts || 0) > (prev.item.ts || 0))) {
+        merged.set(key, row);
+      }
+    });
+    const ranked = Array.from(merged.values());
     ranked.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const ad = deadlineMs(a.item);
@@ -484,6 +551,8 @@ const FlowStillOpen = (() => {
     scoreOf: scoreOf,
     fromLogEntry: fromLogEntry,
     select: select,
+    promiseKey: commitmentDedupeKey,
+    activeProofFor: activeProofFor,
     whyLine: whyLine,
     notificationText: notificationText,
     emptyMetrics: emptyMetrics,

@@ -121,6 +121,9 @@ const FlowStepList = (() => {
           role: 'suggested'
         });
       }
+      if (row.step && row.step.added) {
+        return Object.assign({}, row, { added: true, suggested: false, role: 'added' });
+      }
       return row;
     });
     return base.concat(dormantRows(process, o.memory));

@@ -635,7 +635,8 @@ const FlowStorage = (() => {
   // backlog is not a stand-in for Still Open.
   async function getStillOpen(now) {
     if (typeof FlowStillOpen === 'undefined') return [];
-    return FlowStillOpen.select(candidatesFromState(await get()), now || Date.now());
+    const state = await get();
+    return FlowStillOpen.select(candidatesFromState(state), now || Date.now(), state.log);
   }
 
   // Weekly summary's "still open" count. Hosts that have not loaded
@@ -644,7 +645,7 @@ const FlowStorage = (() => {
   // always loads the module, and then this number matches the Brief.
   function stillOpenCountFrom(state, now) {
     if (typeof FlowStillOpen === 'undefined') return getPendingFrom(state).length;
-    return FlowStillOpen.select(candidatesFromState(state), now || Date.now()).length;
+    return FlowStillOpen.select(candidatesFromState(state), now || Date.now(), state && state.log).length;
   }
 
   const upsertStillOpenScan = serialize(async function upsertStillOpenScan(candidate) {

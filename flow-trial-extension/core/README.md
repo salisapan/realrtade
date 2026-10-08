@@ -116,7 +116,7 @@ it, not touching the module.
 | `resolution.js` | Resolution paths: finishing an intention that takes more than one step (define "done", find what exists, verify the precondition, prepare or ask, close ONLY on a real delivery). Receipts and transfer proofs, and the documents the person sends (contract, quote, proposal, signed copy). `docs/resolution-paths.md`, `docs/true-close.md`. Never sends, issues or signs. |
 | `story.js` | One story, many messages — portable, no chrome.*, no DOM, no network. |
 | `step-list.js` | The checklist on a card: Queued, Preparing, Verifying, Verified, Couldn't confirm · Retry. Added and Manual steps. Handled still requires ProofOfClose `fetchedBack`. `mailSendPreview` is data for a later stream and does not send. |
-| `suggest-save.js` | Which attached files could be saved, and the `attachmentSave` step the steps list draws. Rules and reason codes: suggest-save spec §1–§9. 0.9.41 draws one card titled `Save the file?` when the page has no other card and the worker says Files.ReadWrite is granted. The reason code stays `suggest:eligible-hidden`. Mail.Send is not this step. |
+| `suggest-save.js` | Which attached files could be saved, and the `attachmentSave` step the steps list draws. Rules and reason codes: suggest-save spec §1–§9. 0.9.41 draws one card titled `Save the file?` when the page has no other card and the worker says Files.ReadWrite is granted. The reason code stays `suggest:eligible-hidden`. 0.9.42 keeps an excluded file's name and size, and the row reads `name · skipped · why`. Mail.Send is not this step. |
 | `style-profile.js` | How YOU write, as counts. Portable: no chrome.*, no DOM, no network, no model. |
 
 Notably absent: **storage.js stays in `src/`.** It is Glance's own choice of

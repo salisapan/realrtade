@@ -516,6 +516,14 @@
   }
 
   async function closeOutlookProofFromPopup(entry, route) {
+    if (route && route.connectorId === 'outlookTask' && typeof FlowStillOpen !== 'undefined' && typeof FlowStillOpen.activeProofFor === 'function') {
+      const bag = await FlowStorage.get();
+      const live = FlowStillOpen.activeProofFor(bag && bag.log, entry);
+      if (live) {
+        await renderOpen();
+        return;
+      }
+    }
     const step = route.step || {};
     const params = step.params || {};
     const label = (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle)
@@ -719,6 +727,25 @@
     }
   }
 
+  function mountPanelSteps(item, entry) {
+    if (typeof FlowStepList === 'undefined' || typeof FlowStepListView === 'undefined' || typeof FlowStepKit === 'undefined') return null;
+    const steps = entry && entry.process && entry.process.steps;
+    if (!steps || !steps.length) return null;
+    const rows = FlowStepList.rowsFor(entry.process, {
+      surface: entry.app || 'gmail',
+      lang: entry.intent && entry.intent.lang
+    });
+    if (!rows.length) return null;
+    const host = el('div', 'glance-panel-steps');
+    item.appendChild(host);
+    return FlowStepListView.mount(host, rows, {
+      intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
+      lang: entry.intent && entry.intent.lang,
+      surface: entry.app || 'gmail',
+      onDoIt: function () { closeStillOpenFromPopup(entry); }
+    });
+  }
+
   function openRow(entry) {
     const item = el('div', 'log-item');
     const top = el('div', 'log-top');
@@ -744,20 +771,23 @@
     }
     if (entry.ts) item.appendChild(el('span', 'when', when(entry.ts)));
 
+    const kit = mountPanelSteps(item, entry);
     const acts = el('div', 'log-acts');
-    const doIt = el('button', 'primary sm');
-    doIt.type = 'button';
-    doIt.appendChild(el('span', 'shell'));
-    doIt.appendChild(el('span', 'ring'));
-    doIt.appendChild(el('span', 'shine'));
-    doIt.appendChild(el('span', 'btn-label', 'Do It'));
-    doIt.addEventListener('click', async () => {
-      doIt.disabled = true;
-      const label = doIt.querySelector('.btn-label');
-      if (label) label.textContent = 'Closing…';
-      await closeStillOpenFromPopup(entry);
-    });
-    acts.appendChild(doIt);
+    if (!kit) {
+      const doIt = el('button', 'primary sm');
+      doIt.type = 'button';
+      doIt.appendChild(el('span', 'shell'));
+      doIt.appendChild(el('span', 'ring'));
+      doIt.appendChild(el('span', 'shine'));
+      doIt.appendChild(el('span', 'btn-label', 'Do It'));
+      doIt.addEventListener('click', async () => {
+        doIt.disabled = true;
+        const label = doIt.querySelector('.btn-label');
+        if (label) label.textContent = 'Closing…';
+        await closeStillOpenFromPopup(entry);
+      });
+      acts.appendChild(doIt);
+    }
     if (entry.threadUrl || entry.url) {
       const view = el('a', 'ghost sm', (entry.outlookReceipt || entry.connectorId === 'outlookDraft') ? 'Open draft' : 'View');
       view.href = entry.url || entry.threadUrl; view.target = '_blank'; view.rel = 'noopener';

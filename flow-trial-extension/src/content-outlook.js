@@ -1017,9 +1017,35 @@
     return Boolean(paintOutlookTodoReceipt(mount, row));
   }
 
+  function promiseItem(ctx, pane) {
+    const body = (ctx && (ctx.bodyText || ctx.text)) || (pane && pane.text) || '';
+    const sender = (ctx && ctx.sender) || (pane ? { name: pane.senderName, email: pane.senderEmail } : null);
+    return {
+      text: body,
+      intent: ctx && ctx.intent,
+      sender: sender,
+      threadId: (ctx && (ctx.threadId || ctx.outlookConversationId || ctx.conversationId)) || (pane && pane.conversationId) || '',
+      outlookConversationId: (ctx && (ctx.outlookConversationId || ctx.conversationId)) || (pane && pane.conversationId) || '',
+      messageId: ctx && ctx.messageId
+    };
+  }
+
+  async function livePromiseProof(item) {
+    if (typeof FlowStillOpen === 'undefined' || typeof FlowStillOpen.activeProofFor !== 'function') return null;
+    if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return null;
+    let bag = null;
+    try { bag = await FlowStorage.get(); } catch (e) { return null; }
+    return FlowStillOpen.activeProofFor((bag && bag.log) || [], item);
+  }
+
   async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
     const params = (taskStep && taskStep.params) || {};
     const he = ctx.intent && ctx.intent.lang === 'he';
+    const live = await livePromiseProof(promiseItem(ctx));
+    if (live) {
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
+      return;
+    }
     if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
     const r = await send({
       type: 'flow:execute-action',
@@ -2144,6 +2170,11 @@
     // Same still-open rule as the popup: draft-only undo (outlookReopen) is NOT
     // terminal, so Do It must be eligible again after Undo.
     if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) { await pageReason('page:already-handled', pane); return; }
+    const livePromise = await livePromiseProof(promiseItem(ctx, pane));
+    if (livePromise && livePromise.messageId && livePromise.messageId !== ctx.messageId) {
+      await pageReason('page:same-promise', pane);
+      return;
+    }
 
     const key = ctx.messageId + '|' + (ctx.intent && ctx.intent.label);
     const mount = mountPoint();
@@ -2230,16 +2261,49 @@
   // A mail that already has a card keeps suggest:other-card in the local log.
   // No other card, and a step the engine named, is one suggestion card.
   // The title is Save the file? The row text is step.copy. Dismiss is the ×.
-  function catalogFiles(raw, eligible) {
+  function catalogFiles(raw, eligible, excluded) {
     const chosen = {};
     (eligible || []).forEach((f) => { if (f && f.id) chosen[f.id] = 1; });
-    const source = Array.isArray(raw) && raw.length ? raw : (eligible || []);
-    return source.filter((a) => a && a.name).map((a) => ({
-      id: a.id,
-      name: a.name,
-      size: a.size,
-      on: !Array.isArray(raw) || !raw.length ? true : chosen[a.id] === 1
-    }));
+    const skip = {};
+    (excluded || []).forEach((f) => { if (f && f.id) skip[f.id] = f; });
+    const full = Array.isArray(raw) && raw.length;
+    const source = full ? raw : (eligible || []).concat(excluded || []);
+    const seen = {};
+    const out = [];
+    source.forEach((a) => {
+      if (!a || seen[a.id]) return;
+      if (a.id) seen[a.id] = 1;
+      const ex = a.id && skip[a.id];
+      const rawName = String((ex && ex.name) || a.name || '').trim();
+      const id = String(a.id == null ? '' : a.id);
+      const named = Boolean(rawName) && rawName !== id;
+      const why = (ex && (ex.why || ex.reason)) || a.why || a.reason || '';
+      const skipped = Boolean(ex) || !named;
+      if (!named && !skipped) return;
+      const file = {
+        id: a.id,
+        name: named ? rawName : '',
+        size: ex && ex.size != null ? ex.size : a.size,
+        why: why || (skipped ? 'not saved' : '')
+      };
+      const label = skipped
+        ? ((typeof FlowSuggestSave !== 'undefined' && typeof FlowSuggestSave.skippedLabel === 'function')
+          ? FlowSuggestSave.skippedLabel(file)
+          : (named ? (rawName + ' · skipped · ' + file.why) : ('File skipped · ' + file.why)))
+        : ((typeof FlowSuggestSave !== 'undefined' && typeof FlowSuggestSave.fileLabel === 'function')
+          ? (FlowSuggestSave.fileLabel(file) || rawName)
+          : rawName);
+      out.push({
+        id: a.id,
+        name: named ? rawName : '',
+        label: label,
+        size: file.size,
+        why: file.why,
+        on: !skipped && (!full || chosen[a.id] === 1),
+        skipped: skipped
+      });
+    });
+    return out;
   }
 
   function paintSuggestCard(pane, decision, rawFiles) {
@@ -2259,7 +2323,7 @@
         label: rowCopy,
         copy: copy,
         params: Object.assign({}, step.params || { files: decision.files || [] }, {
-          catalog: catalogFiles(rawFiles, (step.params && step.params.files) || decision.files || [])
+          catalog: catalogFiles(rawFiles, (step.params && step.params.files) || decision.files || [], (step.params && step.params.excluded) || [])
         })
       }]
     };
@@ -2424,7 +2488,7 @@
           role: 'suggested',
           step: Object.assign({}, step, {
             params: Object.assign({}, step.params, {
-              catalog: catalogFiles(files, (step.params && step.params.files) || [])
+              catalog: catalogFiles(files, (step.params && step.params.files) || [], (step.params && step.params.excluded) || [])
             })
           })
         });

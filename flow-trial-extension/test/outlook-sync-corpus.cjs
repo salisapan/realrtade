@@ -216,6 +216,15 @@ console.log('\n--- live 0.9.2 silence: confirm by Wednesday whether ---\n');
   check('classify alone: request chip for confirm-by-Wednesday-whether', bare.type === 'request' && FlowIntent.shouldShowChip(bare), { type: bare.type, quiet: bare.quiet, label: bare.label });
   const hedgeStill = FlowIntent.classify('Can you confirm whether the proposal at $3,900 still works?', { senderEmail: 'x@y.com', senderName: 'X', now: new Date(NOW2) });
   check('bare confirm-whether (no "confirm by") still quiet hedge', !hedgeStill.type && hedgeStill.quiet === 'hedge', hedgeStill);
+
+  const Q3_SUBJECT = 'Gate A 0.9.41 - quick question on the Q3 summary';
+  const Q3_BODY = 'Can you reply and confirm whether the Q3 summary will include the October numbers?';
+  const q3 = FlowIntent.classify(Q3_BODY, { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', subject: Q3_SUBJECT, now: new Date(NOW2) });
+  check('Q3 reply-and-confirm is a request', q3.type === 'request' && FlowIntent.shouldShowChip(q3), { type: q3.type, quiet: q3.quiet, label: q3.label });
+  const q3Plan = FlowActions.planFor(q3, { threadUrl: 'https://outlook.office.com/mail/id/q3', hasThreadAttachment: false });
+  check('Q3 reply-and-confirm plans a reply draft', q3Plan && (q3Plan.steps || []).some((s) => s.kind === 'outlookDraft' || s.kind === 'gmailDraft'), q3Plan && q3Plan.steps);
+  const dontSave = FlowIntent.classify("Please don't save the attachment to OneDrive", { senderEmail: 'ai.local.flow@gmail.com', senderName: 'flow', now: new Date(NOW2) });
+  check("Please don't save the attachment to OneDrive stays quiet", !dontSave.type, dontSave);
 }
 
 console.log('\n--- learn own addresses from inbox recipients ---\n');

@@ -112,8 +112,8 @@
     var cids = cidSet(inp.bodyCids), files = [], excluded = [], big = [];
     inp.attachments.forEach(function (a) {
       var why = excludeWhy(a, cids);
-      if (why) { excluded.push({ id: a.id, why: why }); return; }
-      if (typeof inp.uploadLimitBytes === 'number' && a.size > inp.uploadLimitBytes) { big.push(a); excluded.push({ id: a.id, why: 'too-large' }); return; }
+      if (why) { excluded.push({ id: a.id, name: a.name, size: a.size, why: why }); return; }
+      if (typeof inp.uploadLimitBytes === 'number' && a.size > inp.uploadLimitBytes) { big.push(a); excluded.push({ id: a.id, name: a.name, size: a.size, why: 'too-large' }); return; }
       files.push({ id: a.id, name: a.name, size: a.size });
     });
     if (!files.length && !big.length) return quiet('suggest:no-files', { excluded: excluded });
