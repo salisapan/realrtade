@@ -288,7 +288,9 @@ def collect(profile: str = "full") -> dict[str, Path]:
     return files
 
 
-def write_zip(files: dict[str, Path], out: Path) -> int:
+def write_zip(files: dict[str, Path], out: Path, replacements: dict[str, bytes] | None = None) -> int:
+    """Write the install zip. `replacements` overrides bytes for named entries (the store build swaps the manifest)."""
+    replacements = replacements or {}
     out.parent.mkdir(parents=True, exist_ok=True)
     tmp = out.with_suffix(".zip.partial")
     if tmp.exists():
@@ -300,7 +302,7 @@ def write_zip(files: dict[str, Path], out: Path) -> int:
             info = zipfile.ZipInfo(filename=rel, date_time=info_date)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
-            archive.writestr(info, files[rel].read_bytes())
+            archive.writestr(info, replacements[rel] if rel in replacements else files[rel].read_bytes())
     os.replace(tmp, out)
     return out.stat().st_size
 
