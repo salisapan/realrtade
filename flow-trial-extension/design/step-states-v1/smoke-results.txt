@@ -1,0 +1,22 @@
+F1 chip: + Glance can close this in 3 steps · Morning · Gmail · Calendar · +1 suggested
+F1 check suggested → + Glance can close this in 4 steps · Morning · Gmail · Calendar · Drive
+F1b chip: + Glance can close this in 4 steps · Morning · Gmail · Calendar · Drive
+F6 chip: + Glance יכול לסגור את זה ב-3 צעדים · +1 מוצע
+F6 check suggested → + Glance יכול לסגור את זה ב-4 צעדים
+F3 collapsed: {"txt":"Save 2 of 5 attachments","pills":4,"chip":"Save 2 of 5 attachments to Drive?"}
+F3 pill toggle → Save 3 of 5 attachments · Save 3 of 5 attachments to Drive?
+F3 +2 → expanded (6 pills incl. Less)
+F4 Enter "remind me to call Noa Thursday" → To Do row, + Glance can close this in 4 steps · Morning · Gmail · Calendar · To Do
+F4 Enter "print the contract" → Manual row, not counted (+ Glance can close this in 4 steps · Morning · Gmail · Calendar · To Do)
+F4b Enter resolves the typed demo phrase
+F2 Do It → settled | OneDrive · /Clients/Noa/contract.pdf · Saved ✓
+F2 Undo → propose
+F5 Approve disabled after explicit step fails
+F5b suggested fails → Approve enabled · tag Suggested
+F5b receipt lines: Morning · INV-4821 · ₪12,400 + VAT · Issued | Gmail · Reply sent to Noa · invoice attached | Calendar · Payment check set · Oct 21 | Loop closed · Noa has INV-4821 · check set for Oct 21
+palette: no red/green/amber computed colors
+Light/Dark toggle works
+no horizontal scroll / no clipped text at 390px (390 <= 390)
+no horizontal scroll / no clipped text at 768px (768 <= 768)
+no horizontal scroll / no clipped text at 1440px (1440 <= 1440)
+no console errors

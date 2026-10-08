@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Glance · Step states v1 — spec sheet</title>
+<link rel="stylesheet" href="corner.css">
+<link rel="stylesheet" href="corner-v19.css">
+<link rel="stylesheet" href="corner-v20.css">
+<link rel="stylesheet" href="step-states.css">
+<script>
+(function(){try{var t=localStorage.getItem('glance.corner.theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();
+</script>
+</head>
+<body class="ss">
+
+<header class="ss-top">
+  <div class="ss-top-in">
+    <div class="ss-title">
+      <span class="ss-kicker">Glance · spec sheet</span>
+      <h1>Step states <span>v1</span></h1>
+    </div>
+    <button type="button" class="theme-toggle" id="btn-theme" aria-label="Switch to dark theme" title="Theme">
+      <span class="theme-ico" aria-hidden="true">◐</span>
+      <span class="theme-label" id="theme-label">Dark</span>
+    </button>
+  </div>
+</header>
+
+<main class="ss-sheet">
+
+  <section class="ss-frame" id="F1">
+    <div class="ss-lbl"><b>F1</b><span>Suggested step in a normal list · invoice from Noa, contract.pdf attached</span></div>
+    <div class="ss-card" data-card="f1"></div>
+  </section>
+
+  <section class="ss-frame" id="F1b">
+    <div class="ss-lbl"><b>F1b</b><span>Suggested step checked · counts as 4 · Drive joins the tools · tag stays</span></div>
+    <div class="ss-card" data-card="f1b"></div>
+  </section>
+
+  <section class="ss-frame" id="F2">
+    <div class="ss-lbl"><b>F2</b><span>Attachment-only email · the chip is the question · one step, pre-checked</span></div>
+    <div class="ss-sub">Chip</div>
+    <div class="ss-card" data-card="f2chip"></div>
+    <div class="ss-sub">Opened</div>
+    <div class="ss-card" data-card="f2"></div>
+  </section>
+
+  <section class="ss-frame" id="F2-done">
+    <div class="ss-lbl"><b>F2</b><span>After Do It · one compact result line + Undo</span></div>
+    <div class="ss-card" data-card="f2done"></div>
+  </section>
+
+  <section class="ss-frame" id="F3">
+    <div class="ss-lbl"><b>F3</b><span>Multiple attachments · one row · file pills, 3 visible then +2</span></div>
+    <div class="ss-card" data-card="f3"></div>
+  </section>
+
+  <section class="ss-frame" id="F3-expanded">
+    <div class="ss-lbl"><b>F3</b><span>Expanded · all 5 files · budget.xlsx added → count reads 3 of 5</span></div>
+    <div class="ss-card" data-card="f3x"></div>
+  </section>
+
+  <section class="ss-frame ss-wide" id="F4">
+    <div class="ss-lbl"><b>F4</b><span>Add a step · list bottom, four states · Enter resolves the typed text</span></div>
+    <div class="ss-quad">
+      <div class="ss-q"><div class="ss-sub">a · Affordance</div><div class="ss-card" data-card="f4a"></div></div>
+      <div class="ss-q"><div class="ss-sub">b · Typing</div><div class="ss-card" data-card="f4b"></div></div>
+      <div class="ss-q"><div class="ss-sub">c · Resolved to a supported action · counted</div><div class="ss-card" data-card="f4c"></div></div>
+      <div class="ss-q"><div class="ss-sub">d · Unsupported · manual, not counted</div><div class="ss-card" data-card="f4d"></div>
+        <div class="ss-sub ss-sub-later">d · Receipt after Approve</div><div class="ss-card" data-card="f4d-receipt"></div></div>
+    </div>
+  </section>
+
+  <section class="ss-frame" id="F5">
+    <div class="ss-lbl"><b>F5</b><span>ProofOfClose · one step through every state</span></div>
+    <div class="ss-card" data-card="f5"></div>
+  </section>
+
+  <section class="ss-frame" id="F5b">
+    <div class="ss-lbl"><b>F5b</b><span>Suggested step fails · Approve stays enabled · left out of the receipt</span></div>
+    <div class="ss-sub">Prepared</div>
+    <div class="ss-card" data-card="f5b"></div>
+    <div class="ss-sub">After Approve</div>
+    <div class="ss-card" data-card="f5b-done"></div>
+  </section>
+
+  <section class="ss-frame" id="F6">
+    <div class="ss-lbl"><b>F6</b><span>Hebrew · RTL version of F1 · tool names and IDs stay LTR</span></div>
+    <div class="ss-card" data-card="f6"></div>
+  </section>
+
+</main>
+
+<footer class="ss-foot">Glance · step states v1 · design mock · palette #0071e3 + grays</footer>
+
+<script src="glyphs.js"></script>
+<script src="theme.js"></script>
+<script src="step-states.js"></script>
+</body>
+</html>

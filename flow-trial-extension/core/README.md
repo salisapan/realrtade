@@ -65,6 +65,7 @@ it, not touching the module.
 | `channel.js` | What a conversation partner and a message look like, whatever app they were in. |
 | `classification-metrics.js` | Turns the durable local counters `storage.js` keeps into the one signal for "own code first, a model last": the share of messages decided locally, by the remote fallback, or not at all. |
 | `commitment-title.js` | Task title for Google Tasks and Microsoft To Do. The verb and object come from the same sentence that fired the dated commitment or the sender promise. Openers, the date phrase, and a sender prefix stay off the title. A zero-width mark inside a word is not part of the title. No clean span keeps the chip label. Subject is not a title. No model. No network. |
+| `display-copy.js` | What a person reads on a card, in Activity, and under Why not shown. Each row is titled from that row. A file card is `Save the file?`. A raw message id or a mailbox route is not a subject. |
 | `build-stamp.js` | One build stamp, loaded by the service worker and by the page. The panel compares the two and says Reload Glance when the running worker is still a previous registration. This is not `chrome.runtime.getManifest`. |
 | `community-key.js` | The public key slot for community learning (empty = no delta can ever be applied; the safe default). Community learning is DORMANT (`docs/community-learning.md`). |
 | `community.js` | Community learning, client side — portable, no chrome.*, no DOM, no network. |
@@ -114,7 +115,8 @@ it, not touching the module.
 | `request-types.js` | Request and promise recognition — portable, no chrome.*, no DOM, no network, and no model. |
 | `resolution.js` | Resolution paths: finishing an intention that takes more than one step (define "done", find what exists, verify the precondition, prepare or ask, close ONLY on a real delivery). Receipts and transfer proofs, and the documents the person sends (contract, quote, proposal, signed copy). `docs/resolution-paths.md`, `docs/true-close.md`. Never sends, issues or signs. |
 | `story.js` | One story, many messages — portable, no chrome.*, no DOM, no network. |
-| `suggest-save.js` | Which attached files could be saved, and the `attachmentSave` step a later steps list can append. Rules and reason codes: suggest-save spec §1–§9. 0.9.38 records the decision and does not draw it. The steps-list UI is 0.9.40, before Mail.Send. |
+| `step-list.js` | The checklist on a card: Queued, Preparing, Verifying, Verified, Couldn't confirm · Retry. Added and Manual steps. Handled still requires ProofOfClose `fetchedBack`. `mailSendPreview` is data for a later stream and does not send. |
+| `suggest-save.js` | Which attached files could be saved, and the `attachmentSave` step the steps list draws. Rules and reason codes: suggest-save spec §1–§9. 0.9.41 draws one card titled `Save the file?` when the page has no other card and the worker says Files.ReadWrite is granted. The reason code stays `suggest:eligible-hidden`. Mail.Send is not this step. |
 | `style-profile.js` | How YOU write, as counts. Portable: no chrome.*, no DOM, no network, no model. |
 
 Notably absent: **storage.js stays in `src/`.** It is Glance's own choice of

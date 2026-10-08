@@ -69,6 +69,9 @@ function installE2EHooks() {
   e2e.scenario = e2e.scenario || { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
   e2e.googleTasks = e2e.googleTasks || {};
   e2e.todoTasks = e2e.todoTasks || {};
+  e2e.drafts = e2e.drafts || {};
+  e2e.driveItems = e2e.driveItems || {};
+  e2e.driveByName = e2e.driveByName || {};
   e2e.seq = e2e.seq || 1;
   globalThis.__glanceE2e = e2e;
 
@@ -132,11 +135,60 @@ function installE2EHooks() {
     }
 
     if (host === 'graph.microsoft.com') {
+      const attItem = path.match(/\/me\/messages\/([^/]+)\/attachments\/([^/]+)$/);
+      if (attItem) {
+        const messageId = attItem[1];
+        const attachmentId = attItem[2];
+        const list = (scenario.attachments && scenario.attachments[messageId]) || [];
+        const row = list.find((a) => a && a.id === attachmentId) || { id: attachmentId, name: 'file.bin' };
+        return Promise.resolve(json(200, {
+          id: attachmentId,
+          name: row.name || 'file.bin',
+          contentType: row.contentType || 'application/octet-stream',
+          size: row.size || 3,
+          contentBytes: 'ZTJlLXBkZg=='
+        }));
+      }
       const att = path.match(/\/me\/messages\/([^/]+)\/attachments$/);
-      if (att) {
+      if (att && method === 'GET') {
         const id = att[1];
         const list = (scenario.attachments && scenario.attachments[id]) || [];
         return Promise.resolve(json(200, { value: list }));
+      }
+      if (att && method === 'POST') {
+        return Promise.resolve(json(201, { id: 'e2e-att-' + (e2e.seq++) }));
+      }
+      const driveContent = path.match(/\/me\/drive\/root:\/(.+):\/content$/);
+      if (driveContent && method === 'PUT') {
+        const name = driveContent[1];
+        const id = 'e2e-file-' + (e2e.seq++);
+        const item = { id: id, name: name, webUrl: 'https://onedrive.live.com/file/' + id };
+        e2e.driveItems[id] = item;
+        e2e.driveByName[name] = item;
+        return Promise.resolve(json(201, item));
+      }
+      const driveRoot = path.match(/\/me\/drive\/root:\/(.+)$/);
+      if (driveRoot && method === 'GET') {
+        const item = e2e.driveByName[driveRoot[1]];
+        return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
+      }
+      const driveItem = path.match(/\/me\/drive\/items\/([^/]+)$/);
+      if (driveItem) {
+        const id = driveItem[1];
+        if (method === 'DELETE') {
+          const gone = e2e.driveItems[id];
+          if (gone && gone.name) delete e2e.driveByName[gone.name];
+          delete e2e.driveItems[id];
+          return Promise.resolve(empty(204));
+        }
+        const item = e2e.driveItems[id];
+        return Promise.resolve(item ? json(200, item) : json(404, { error: { code: 'itemNotFound' } }));
+      }
+      const createdReply = path.match(/\/me\/messages\/([^/]+)\/createReply$/);
+      if (createdReply && method === 'POST') {
+        const id = 'e2e-draft-' + (e2e.seq++);
+        e2e.drafts[id] = { id: id, isDraft: true };
+        return Promise.resolve(json(201, e2e.drafts[id]));
       }
       const todoOne = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks\/([^/]+)$/);
       const todoCol = path.match(/\/me\/todo\/lists\/([^/]+)\/tasks$/);
@@ -145,6 +197,9 @@ function installE2EHooks() {
         if (method === 'DELETE') {
           delete e2e.todoTasks[id];
           return Promise.resolve(empty(204));
+        }
+        if (method === 'GET' && scenario.todoVerifyFail) {
+          return Promise.resolve(json(404, { error: { message: 'verify-fail' } }));
         }
         const task = e2e.todoTasks[id];
         return Promise.resolve(task ? json(200, task) : json(404, { error: { message: 'missing' } }));
@@ -169,6 +224,14 @@ function installE2EHooks() {
       const msg = path.match(/\/me\/messages\/([^/]+)$/);
       if (msg) {
         const id = msg[1];
+        if (e2e.drafts[id]) {
+          if (method === 'DELETE') {
+            delete e2e.drafts[id];
+            return Promise.resolve(empty(204));
+          }
+          if (method === 'PATCH') return Promise.resolve(json(200, e2e.drafts[id]));
+          return Promise.resolve(json(200, e2e.drafts[id]));
+        }
         const row = scenario.messages && Object.prototype.hasOwnProperty.call(scenario.messages, id) ? scenario.messages[id] : null;
         if (row && row.id) return Promise.resolve(json(200, row));
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
@@ -369,6 +432,9 @@ async function boot() {
       e.scenario = { inbox: [], sent: [], messages: {}, attachments: {}, conversation: [] };
       e.googleTasks = {};
       e.todoTasks = {};
+      e.drafts = {};
+      e.driveItems = {};
+      e.driveByName = {};
       e.seq = 1;
     });
     for (const p of context.pages()) {

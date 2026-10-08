@@ -28,6 +28,11 @@ const FlowChipHost = (() => {
   }
 
   function setChipState(chip, cls, text) {
+    if (chip && chip.classList && (chip.classList.contains('do-halo') || (chip.closest && chip.closest('.flow-step-card')))) {
+      chip.setAttribute('data-glance-chip-state', cls || '');
+      if (text) chip.setAttribute('data-glance-chip-label', text);
+      return;
+    }
     chip.className = 'flow-chip ' + cls;
     chip.replaceChildren(el('span', 'flow-chip-label', text));
   }
@@ -40,12 +45,44 @@ const FlowChipHost = (() => {
 
     const host = el('div', 'flow-chip-host');
     host.setAttribute('dir', 'ltr');
-    host.appendChild(el('span', 'flow-chip-process-name', ctx.process.name || 'Reply'));
+    const face = (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace)
+      ? FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || ctx.text || '', fileCard: ctx.fileCard === true })
+      : { title: ctx.process.name || 'Reply', sentence: null, fileCard: false };
+    const kitReady = typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && typeof FlowStepKit !== 'undefined' && (ctx.process.steps || []).length;
+    if (kitReady) {
+      const liveSteps = (ctx.process.steps || []).slice();
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
+      host.__glanceSteps = FlowStepListView.mount(host, rows, {
+        intent: face.title || ctx.process.name || 'Reply',
+        lang: ctx.intent && ctx.intent.lang,
+        fileCard: face.fileCard === true || ctx.fileCard === true,
+        surface: ctx.app || 'outlook',
+        onDoIt: function (button) { if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps); },
+        onDismiss: function () {
+          if (handlers && handlers.onDismiss) handlers.onDismiss(host, ctx);
+          else host.remove();
+        },
+        onChange: function (next) {
+          const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
+          liveSteps.length = 0;
+          picked.forEach(function (step) { liveSteps.push(step); });
+        },
+        onRetry: function () {
+          const button = host.querySelector('button.flow-chip') || host.querySelector('.do-halo');
+          if (handlers && handlers.onDoIt) handlers.onDoIt(host, button, ctx, liveSteps);
+        }
+      });
+      if (mountNode.firstChild) mountNode.insertBefore(host, mountNode.firstChild);
+      else mountNode.appendChild(host);
+      return host;
+    }
+    host.appendChild(el('span', 'flow-chip-process-name', face.title || ctx.process.name || 'Reply'));
 
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
-    textEl.appendChild(document.createTextNode(' ' + closingSentence(ctx.process, ctx.intent)));
+    const sentence = face.fileCard ? '' : (face.sentence != null ? face.sentence : closingSentence(ctx.process, ctx.intent));
+    if (sentence) textEl.appendChild(document.createTextNode(' ' + sentence));
     host.appendChild(textEl);
 
     const liveSteps = (ctx.process.steps || []).slice();
@@ -73,6 +110,21 @@ const FlowChipHost = (() => {
     });
     mainRow.appendChild(chip);
     host.appendChild(mainRow);
+
+    if (typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined' && (ctx.process.steps || []).length) {
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: ctx.app, lang: ctx.intent && ctx.intent.lang });
+      const view = FlowStepListView.mount(host, rows, {
+        onChange: (next) => {
+          const picked = FlowStepList.liveStepsFrom(next, ctx.app || 'outlook');
+          liveSteps.length = 0;
+          picked.forEach((step) => liveSteps.push(step));
+        },
+        onRetry: () => {
+          if (handlers && handlers.onDoIt) handlers.onDoIt(host, chip, ctx, liveSteps);
+        }
+      });
+      host.__glanceSteps = view;
+    }
 
     if (mountNode.firstChild) mountNode.insertBefore(host, mountNode.firstChild);
     else mountNode.appendChild(host);

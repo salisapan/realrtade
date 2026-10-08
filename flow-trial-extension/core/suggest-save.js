@@ -2,10 +2,9 @@
 // decide(input) follows the suggest-save spec §1–§7 and §9 reason codes, in the
 // reference oracle's check order. suggestSave is the page adapter: a shown
 // decision is logged as suggest:eligible-hidden. The step's copy follows
-// spec §9 and names the file. 0.9.38 does not render the step. The steps-list
-// UI is 0.9.40, before Mail.Send.
-// The reference oracle's one-file chip still says "Save file to …". Spec §9
-// wins for the stored copy only. That wording is not part of parity.
+// spec §9 and names the file. decide().chip uses that same sentence.
+// 0.9.41 draws the step on the checklist. The card title is "Save the file?".
+// Mail.Send is not this step.
 const FlowSuggestSave = (() => {
   const KIND = 'attachmentSave';
   // SAVE_NO exactly as in core/google-closes.js. NEG_SAVE is the v2 product-rule
@@ -67,14 +66,14 @@ const FlowSuggestSave = (() => {
   }
 
   function chip(files, surface) {
+    const copy = specCopy(files, surface);
     const tgt = surface === 'outlook' ? 'OneDrive' : 'Drive';
-    const n = files.length;
     return {
-      count: n,
+      count: files.length,
       target: tgt,
-      names: files.map((f) => f.name),
-      en: n === 1 ? 'Save file to ' + tgt + '?' : 'Save ' + n + ' files to ' + tgt + '?',
-      he: n === 1 ? 'לשמור את הקובץ ב-' + tgt + '?' : 'לשמור ' + n + ' קבצים ב-' + tgt + '?'
+      names: copy.names,
+      en: copy.en,
+      he: copy.he
     };
   }
 

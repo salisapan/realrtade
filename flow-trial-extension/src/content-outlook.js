@@ -123,12 +123,14 @@
       const list = (Array.isArray(bag[PAGE_DIAG_KEY]) ? bag[PAGE_DIAG_KEY] : []).filter((d) => d && d.key !== key);
       list.unshift(Object.assign({
         key, reason, at: Date.now(), source: 'page',
-        subject: String((pane && pane.subject) || '').slice(0, 120),
+        subject: (typeof FlowDisplay !== 'undefined' && FlowDisplay.sanitizeStoredSubject)
+          ? FlowDisplay.sanitizeStoredSubject(pane && pane.subject)
+          : String((pane && pane.subject) || '').slice(0, 120),
         counterpart: (pane && pane.senderEmail) || null,
         conversationId: (pane && pane.conversationId) || null,
         messageId: (pane && (pane.itemId || pane.pathId)) || null
       }, extra || {}));
-      await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 20) }, resolve));
+      await new Promise((resolve) => chrome.storage.local.set({ [PAGE_DIAG_KEY]: list.slice(0, 40) }, resolve));
       lastReasonKey = key;
       lastReasonStored = true;
     } catch (e) {
@@ -561,10 +563,24 @@
     return candidates.map((a) => String(a || '').trim().toLowerCase()).find(Boolean) || null;
   }
 
-  async function onDoIt(host, chip, ctx) {
+  function faceTitle(ctx) {
+    if (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace && ctx && ctx.process) {
+      const face = FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || ctx.text || '' });
+      if (face && face.title) return face.title;
+    }
+    return (ctx && ctx.process && ctx.process.name) || '';
+  }
+
+  function actionTitle(entry) {
+    if (typeof FlowDisplay !== 'undefined' && FlowDisplay.activityTitle) return FlowDisplay.activityTitle(entry);
+    return (entry && (entry.writtenLine || entry.label)) || '';
+  }
+
+  async function onDoIt(host, chip, ctx, liveSteps) {
     doItInFlight = true;
     try {
     FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+    if (host && host.__glanceSteps) host.__glanceSteps.setAll('preparing');
     let resolvedId = null;
     try {
       if (!(ctx && (ctx.outlookIncomingId || ctx.messageId))) graphTrace = { attempts: [] };
@@ -587,7 +603,12 @@
       FlowChipHost.setChipState(chip, 'flow-chip-error', 'Could not find that message');
       return;
     }
-    const steps = (ctx.process && ctx.process.steps) || [];
+    const fromList = Array.isArray(liveSteps);
+    const steps = fromList ? liveSteps : ((ctx.process && ctx.process.steps) || []);
+    if (fromList && !steps.length) {
+      if (host) host.remove();
+      return;
+    }
     const fileStep = steps.find((s) => s && s.kind === 'onedriveFile');
     if (fileStep) {
       await onOnedriveDoIt(host, chip, ctx, fileStep);
@@ -760,11 +781,24 @@
       : null;
     if (!mount || !copy) return null;
     const ids = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
-    const already = stripDuplicateUndoHosts(mount);
-    if (already && already.classList.contains('flow-chip-settled') && (!ids.length || hostMatches(already, ids))) return already;
-    if (already) already.remove();
+    const scope = (typeof readingScope === 'function' && readingScope(mount)) || mount;
+    const hosts = scope.querySelectorAll ? Array.prototype.slice.call(scope.querySelectorAll('.flow-chip-host')) : [];
+    let host = hosts.filter((h) => h.getAttribute('data-glance-undone') !== '1').pop() || null;
+    if (host && host.classList.contains('flow-chip-settled') && host.getAttribute('data-glance-chain') === 'task-proof' && (!ids.length || hostMatches(host, ids))) {
+      hosts.forEach((other) => { if (other !== host) other.remove(); });
+      return host;
+    }
     const el = FlowChipHost.el;
-    const host = el('div', 'flow-chip-host flow-chip-settled');
+    if (!host) {
+      host = el('div', 'flow-chip-host');
+      if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
+      else mount.appendChild(host);
+    }
+    const manuals = host.__glanceSteps && host.__glanceSteps.manualCount ? host.__glanceSteps.manualCount() : 0;
+    const stateTrail = host.querySelector && host.querySelector('.flow-step-list')
+      ? host.querySelector('.flow-step-list').getAttribute('data-glance-states')
+      : '';
+    host.className = 'flow-chip-host flow-chip-settled';
     host.setAttribute('dir', 'ltr');
     host.setAttribute('data-glance-chain', 'task-proof');
     host.setAttribute('data-glance-message', ids.join('|'));
@@ -809,7 +843,7 @@
         }
         const messageId = row.messageId;
         const threadKey = row.threadId || row.outlookConversationId;
-        if (copy.connectorId === 'onedriveFile' && typeof FlowStorage.markOnedriveFileUndone === 'function') {
+        if ((copy.connectorId === 'onedriveFile' || copy.connectorId === 'attachmentSave') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
           await FlowStorage.markOnedriveFileUndone(messageId, copy.ref, threadKey);
         } else if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
           await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey);
@@ -826,10 +860,14 @@
     });
     done.appendChild(actionsRow);
     done.appendChild(hint);
-    host.appendChild(done);
-    if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
-    else mount.appendChild(host);
-    stripDuplicateUndoHosts(mount);
+    if (manuals) done.appendChild(el('span', 'flow-chip-label', manuals + (manuals === 1 ? ' manual step left for you' : ' manual steps left for you')));
+    host.replaceChildren(done);
+    if (stateTrail) host.setAttribute('data-glance-states', stateTrail);
+    if (scope.querySelectorAll) {
+      Array.prototype.slice.call(scope.querySelectorAll('.flow-chip-host')).forEach((other) => {
+        if (other !== host) other.remove();
+      });
+    }
     lastOutcome = 'card';
     lastKey = (row.messageId || 'open') + '|task-proof';
     return host;
@@ -929,6 +967,7 @@
   async function onOutlookTodoDoIt(host, chip, ctx, taskStep) {
     const params = (taskStep && taskStep.params) || {};
     const he = ctx.intent && ctx.intent.lang === 'he';
+    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
     const r = await send({
       type: 'flow:execute-action',
       payload: {
@@ -948,25 +987,32 @@
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = (r && r.reason === 'tasks-not-granted')
         ? 'Reconnect Outlook to allow To Do'
         : ((r && (r.error || r.reason)) || 'Could not confirm the task');
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
       return;
     }
+    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
     const status = he ? 'טופל.' : 'Handled.';
     const fields = FlowProofOfClose.receiptLogFields
       ? FlowProofOfClose.receiptLogFields(r.proof, {
         writtenLine: r.written,
-        processName: ctx.process && ctx.process.name,
+        processName: faceTitle(ctx),
         closedLine: ctx.process && ctx.process.closedLine,
         status: status
       })
       : null;
     const threadId = ctx.threadId || ctx.conversationId || null;
+    const taskTitle = actionTitle({
+      connectorId: 'outlookTask', process: ctx.process, intent: ctx.intent, text: ctx.bodyText,
+      writtenLine: r.written, subject: ctx.subject, params: params
+    });
     await FlowStorage.appendLog(Object.assign({
       kind: 'written',
-      label: (ctx.intent && ctx.intent.label) || r.written,
+      label: taskTitle,
+      actionTitle: taskTitle,
       messageId: ctx.messageId,
       itemId: ctx.itemId || null,
       pathId: ctx.pathId || null,
@@ -1002,7 +1048,7 @@
       verifiedAt: r.proof && r.proof.verifiedAt,
       fetchedBack: true,
       writtenLine: r.written,
-      processName: ctx.process && ctx.process.name,
+      processName: faceTitle(ctx),
       closedLine: ctx.process && ctx.process.closedLine,
       receiptStatus: status
     }, fields || {});
@@ -1012,6 +1058,7 @@
   async function onOnedriveDoIt(host, chip, ctx, fileStep) {
     const params = (fileStep && fileStep.params) || {};
     const he = ctx.intent && ctx.intent.lang === 'he';
+    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
     const r = await send({
       type: 'flow:execute-action',
       payload: {
@@ -1033,25 +1080,32 @@
       ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
       : false;
     if (!proved) {
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
       const why = (r && r.reason === 'files-not-granted')
         ? 'Reconnect Outlook to allow OneDrive'
         : ((r && (r.error || r.reason)) || 'Could not confirm the file');
       FlowChipHost.setChipState(chip, 'flow-chip-error', why);
       return;
     }
+    if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
     const status = he ? 'טופל.' : 'Handled.';
     const fields = FlowProofOfClose.receiptLogFields
       ? FlowProofOfClose.receiptLogFields(r.proof, {
         writtenLine: r.written,
-        processName: ctx.process && ctx.process.name,
+        processName: faceTitle(ctx),
         closedLine: ctx.process && ctx.process.closedLine,
         status: status
       })
       : null;
     const threadId = ctx.threadId || ctx.conversationId || null;
+    const fileTitle = actionTitle({
+      connectorId: 'onedriveFile', process: ctx.process, intent: ctx.intent, text: ctx.bodyText,
+      writtenLine: r.written, subject: ctx.subject, params: params
+    });
     await FlowStorage.appendLog(Object.assign({
       kind: 'written',
-      label: (ctx.intent && ctx.intent.label) || r.written,
+      label: fileTitle,
+      actionTitle: fileTitle,
       messageId: ctx.messageId,
       itemId: ctx.itemId || null,
       pathId: ctx.pathId || null,
@@ -1087,7 +1141,7 @@
       verifiedAt: r.proof && r.proof.verifiedAt,
       fetchedBack: true,
       writtenLine: r.written,
-      processName: ctx.process && ctx.process.name,
+      processName: faceTitle(ctx),
       closedLine: ctx.process && ctx.process.closedLine,
       receiptStatus: status
     }, fields || {});
@@ -2108,28 +2162,169 @@
     return graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,contentType,size,isInline,contentId', 'suggest-list');
   }
 
-  // The suggestion is not a chip. A visible card keeps suggest:other-card in
-  // the local log only. No card records the suggest reason in Why not shown
-  // and in that same log.
+  // A mail that already has a card keeps suggest:other-card in the local log.
+  // No other card, and a step the engine named, is one suggestion card.
+  // The title is Save the file? The row text is step.copy. Dismiss is the ×.
+  function catalogFiles(raw, eligible) {
+    const chosen = {};
+    (eligible || []).forEach((f) => { if (f && f.id) chosen[f.id] = 1; });
+    const source = Array.isArray(raw) && raw.length ? raw : (eligible || []);
+    return source.filter((a) => a && a.name).map((a) => ({
+      id: a.id,
+      name: a.name,
+      size: a.size,
+      on: !Array.isArray(raw) || !raw.length ? true : chosen[a.id] === 1
+    }));
+  }
+
+  function paintSuggestCard(pane, decision, rawFiles) {
+    const mount = mountPoint();
+    const step = decision && decision.step;
+    if (!mount || !step || typeof FlowChipHost === 'undefined') return null;
+    const copy = step.copy || {};
+    const he = /[\u0590-\u05FF]/.test(String(pane && pane.text || ''));
+    const rowCopy = he ? (copy.he || copy.en || '') : (copy.en || copy.he || '');
+    const process = {
+      id: 'suggest-save',
+      name: 'Save the file?',
+      closingLine: '',
+      steps: [{
+        kind: 'attachmentSave',
+        id: 'attachmentSave',
+        label: rowCopy,
+        copy: copy,
+        params: Object.assign({}, step.params || { files: decision.files || [] }, {
+          catalog: catalogFiles(rawFiles, (step.params && step.params.files) || decision.files || [])
+        })
+      }]
+    };
+    const ctx = {
+      process: process,
+      intent: { label: rowCopy, lang: he ? 'he' : 'en' },
+      messageId: (pane && (pane.itemId || pane.conversationId)) || '',
+      itemId: pane && pane.itemId,
+      pathId: pane && pane.pathId,
+      conversationId: pane && pane.conversationId,
+      bodyText: (pane && pane.text) || '',
+      subject: (pane && pane.subject) || '',
+      app: 'outlook',
+      fileCard: true,
+      suggestOnly: true
+    };
+    return FlowChipHost.inject(mount, ctx, {
+      onDoIt: (host, chip, c) => onSuggestDoIt(host, chip, c),
+      onDismiss: async (host) => {
+        try { host.remove(); } catch (e) { /* already gone */ }
+        const id = ctx.messageId;
+        if (!id || typeof FlowStorage === 'undefined') return;
+        const bag = await FlowStorage.get();
+        const map = Object.assign({}, bag.suggestDismissals || {});
+        map[id] = { at: Date.now() };
+        await FlowStorage.set({ suggestDismissals: map });
+      }
+    });
+  }
+
+  async function onSuggestDoIt(host, chip, ctx) {
+    doItInFlight = true;
+    try {
+      FlowChipHost.setChipState(chip, 'flow-chip-pending', 'Closing…');
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('preparing');
+      const step = (ctx.process.steps || [])[0] || {};
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('verifying');
+      const r = await send({
+        type: 'flow:execute-action',
+        payload: {
+          connectorId: 'attachmentSave',
+          params: step.params || {},
+          messageId: ctx.messageId,
+          outlookIncomingId: ctx.messageId,
+          label: 'Save the file?',
+          subject: ctx.subject || '',
+          text: ctx.bodyText || ''
+        }
+      });
+      const proof = (r && r.proof) || null;
+      const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+        ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: proof })
+        : false;
+      if (!proved) {
+        if (host && host.__glanceSteps) host.__glanceSteps.setAll('failed');
+        FlowChipHost.setChipState(chip, 'flow-chip-error', (r && (r.line || r.written)) || "Couldn't confirm");
+        return;
+      }
+      if (host && host.__glanceSteps) host.__glanceSteps.setAll('verified');
+      const title = actionTitle({
+        connectorId: 'attachmentSave', process: ctx.process, intent: ctx.intent, text: ctx.bodyText,
+        writtenLine: r.written, subject: ctx.subject, params: step.params
+      });
+      const fields = FlowProofOfClose.receiptLogFields
+        ? FlowProofOfClose.receiptLogFields(proof, {
+          writtenLine: r.written || title,
+          processName: 'Save the file?',
+          closedLine: '',
+          status: 'Handled.'
+        })
+        : null;
+      await FlowStorage.appendLog(Object.assign({
+        kind: 'written',
+        label: title,
+        actionTitle: title,
+        messageId: ctx.messageId,
+        itemId: ctx.itemId || null,
+        pathId: ctx.pathId || null,
+        threadId: ctx.conversationId || null,
+        outlookConversationId: ctx.conversationId || null,
+        outlookIncomingId: ctx.messageId,
+        app: 'outlook',
+        connectorId: 'attachmentSave',
+        ref: r.ref,
+        where: 'OneDrive',
+        url: r.url || null,
+        subject: ctx.subject,
+        text: ctx.bodyText,
+        system: 'microsoft/onedrive'
+      }, fields || {}));
+      const mount = host.parentElement || mountPoint();
+      if (mount) {
+        paintOutlookTodoReceipt(mount, Object.assign({
+          kind: 'written',
+          messageId: ctx.messageId,
+          itemId: ctx.itemId || null,
+          pathId: ctx.pathId || null,
+          threadId: ctx.conversationId || null,
+          outlookConversationId: ctx.conversationId || null,
+          connectorId: 'attachmentSave',
+          ref: r.ref,
+          url: r.url || null,
+          system: 'microsoft/onedrive',
+          fetchedBack: true,
+          writtenLine: r.written || title,
+          processName: 'Save the file?',
+          receiptStatus: 'Handled.'
+        }, fields || {}));
+      }
+    } finally {
+      doItInFlight = false;
+    }
+  }
+
   async function recordSuggestNote() {
     const pane = suggestNote;
     suggestNote = null;
     if (!pane || typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return;
     const showed = lastOutcome === 'card' || Boolean(document.querySelector('#ReadingPaneContainerId .flow-chip-host'));
     const messageId = pane.itemId || pane.conversationId || pane.pathId || '';
-    if (showed) {
-      await clearReason(pane);
-      await appendSuggestLog({ messageId: messageId, reason: 'suggest:other-card', surface: 'outlook' });
-      return;
-    }
     let files = null;
     try { files = await suggestFiles(pane); } catch (e) { files = null; }
     let bag = {};
     try { bag = await FlowStorage.get(); } catch (e) { bag = {}; }
-    const token = bag.outlookAuth && bag.outlookAuth.token;
-    const scopes = token && (token.scopes || token.scope);
+    // FlowOnedriveFile is on this page (manifest content script, copied onto
+    // Outlook). Files.ReadWrite is read from the stored token. Unknown scopes
+    // stay null so the suggestion fails closed. No new scope.
     const consent = (typeof FlowOnedriveFile !== 'undefined' && typeof FlowOnedriveFile.hasWriteScope === 'function')
-      ? FlowOnedriveFile.hasWriteScope(scopes) : null;
+      ? FlowOnedriveFile.hasWriteScope(calendarScopes(bag))
+      : null;
     const own = ownAddressesOf(bag);
     const from = String(pane.senderEmail || '').toLowerCase();
     const decision = FlowSuggestSave.suggestSave({
@@ -2145,10 +2340,46 @@
       dismissals: bag.suggestDismissals || {},
       log: bag.log || []
     });
+    if (showed) {
+      const existing = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+      if (existing && existing.__glanceSteps && existing.__glanceSteps.addSuggested && decision.step && decision.eligible) {
+        const step = decision.step;
+        const copy = step.copy || {};
+        existing.__glanceSteps.addSuggested({
+          id: 'attachmentSave',
+          kind: 'attachmentSave',
+          copy: copy.en || copy.he || '',
+          rawCopy: copy,
+          state: 'queued',
+          checked: false,
+          suggested: true,
+          manual: false,
+          added: false,
+          counted: true,
+          role: 'suggested',
+          step: Object.assign({}, step, {
+            params: Object.assign({}, step.params, {
+              catalog: catalogFiles(files, (step.params && step.params.files) || [])
+            })
+          })
+        });
+      }
+      await clearReason(pane);
+      await appendSuggestLog({ messageId: messageId, reason: 'suggest:other-card', surface: 'outlook' });
+      return;
+    }
     await appendSuggestLog({
       messageId: messageId, reason: decision.reason, surface: 'outlook',
       fileCount: decision.fileCount, target: decision.target
     });
+    if (decision.step && decision.eligible) {
+      const host = paintSuggestCard(pane, decision, files);
+      if (host) {
+        lastOutcome = 'card';
+        await clearReason(pane);
+        return;
+      }
+    }
     await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
   }
 
@@ -2179,6 +2410,11 @@
   setInterval(() => { if (location.href !== lastHref) { lastHref = location.href; lastKey = ''; lastSig = ''; schedule(); } }, 1000);
   globalThis.__glanceOutlookPage = { rescan: () => { lastKey = ''; lastSig = ''; schedule(); } };
   // A check from the panel (or another Outlook tab) lands here at once.
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === 'flow:proof-sync') { lastSig = ''; schedule(); }
+    });
+  } catch (e) { /* messaging unavailable */ }
   try {
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area === 'local' && changes.glanceDebug) debug = Boolean(changes.glanceDebug.newValue);

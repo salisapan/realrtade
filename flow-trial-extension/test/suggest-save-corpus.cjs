@@ -163,8 +163,9 @@ console.log('\n--- rows 1-22 ---\n');
   const oracleRow = JSON.parse(fs.readFileSync(path.join(__dirname, 'oracle/suggest-save/corpus-22.json'), 'utf8'))[0];
   const decided = S.decide(oracleRow.input);
   const named = S.suggestSave(oracleRow.input);
-  check('the step names the file; engine decide chip stays Save file to',
-    decided.reason === 'suggest:show' && decided.chip && decided.chip.en === 'Save file to OneDrive?' &&
+  check('the step and decide().chip both name the file',
+    decided.reason === 'suggest:show' && decided.chip && decided.chip.en === 'Save Q3-report.pdf to OneDrive?' &&
+    decided.chip.he === 'לשמור את Q3-report.pdf ב-OneDrive?' &&
     named.reason === 'suggest:eligible-hidden' && named.step.copy.en === 'Save Q3-report.pdf to OneDrive?' &&
     named.step.copy.he === 'לשמור את Q3-report.pdf ב-OneDrive?');
 }
@@ -200,12 +201,13 @@ console.log('\n--- nothing is drawn ---\n');
 {
   const gmail = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-gmail.js'), 'utf8');
   const outlook = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
-  check('no Save / Not now chip in the pages',
+  check('no Not now chip in the pages',
     gmail.indexOf('Not now') < 0 && outlook.indexOf('Not now') < 0 &&
     gmail.indexOf('flow-suggest') < 0 && outlook.indexOf('flow-suggest') < 0);
-  check('the page records the decision and does not send it',
+  check('the page records other-card and draws attachmentSave from step.copy',
     outlook.indexOf('recordSuggestNote') > 0 && outlook.indexOf("reason: 'suggest:other-card'") > 0 &&
-    outlook.indexOf('attachmentSave') < 0);
+    outlook.indexOf('attachmentSave') > 0 && outlook.indexOf('Save the file?') > 0 &&
+    outlook.indexOf('Mail.Send') < 0);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

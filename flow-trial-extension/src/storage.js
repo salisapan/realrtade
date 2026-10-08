@@ -1291,9 +1291,11 @@ const FlowStorage = (() => {
     }
     const out = [];
     const seen = new Set();
+    const panelReceipt = (typeof FlowDisplay !== 'undefined' && FlowDisplay.isPanelReceipt)
+      ? FlowDisplay.isPanelReceipt
+      : function (e) { return e && e.kind === 'written' && e.connectorId === 'outlookDraft' && e.messageId && !e.undone && e.outlookReceipt !== false && !e.outlookSent; };
     for (const e of log) {
-      if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) continue;
-      if (e.undone || e.outlookSent || e.outlookReceipt === false) continue;
+      if (!panelReceipt(e)) continue;
       const wts = e.ts || 0;
       if (e.ref && undoByRef[e.messageId + '|' + e.ref] != null && undoByRef[e.messageId + '|' + e.ref] >= wts) continue;
       if (undoTsByMsg[e.messageId] != null && undoTsByMsg[e.messageId] >= wts) continue;
@@ -1593,14 +1595,21 @@ const FlowStorage = (() => {
     const state = await get();
     const log0 = state.log || [];
     const dropIds = new Set();
+    const dropRow = (typeof FlowDisplay !== 'undefined' && FlowDisplay.dropOutlookLoopRow)
+      ? FlowDisplay.dropOutlookLoopRow
+      : function (e) { return e && e.app === 'outlook'; };
+    const dropDiag = (typeof FlowDisplay !== 'undefined' && FlowDisplay.dropAlreadyHandledDiag)
+      ? FlowDisplay.dropAlreadyHandledDiag
+      : function (d) { return d && d.reason === 'page:already-handled'; };
     const log = [];
     for (const e of log0) {
       if (!e) continue;
-      if (e.connectorId === 'outlookDraft' || (e.app === 'outlook' && (e.outlookReceipt || e.kind === 'written' || e.kind === 'undone' || e.kind === 'shown'))) {
+      if (dropRow(e)) {
         if (e.messageId) dropIds.add(e.messageId);
-        // Keep non-draft outlook rows? Drop draft written/undone receipts; keep shown so asks can return after migrate reopen.
-        if (e.kind === 'written' && (e.connectorId === 'outlookDraft' || e.connectorId === 'outlookCalendar')) continue;
-        if (e.kind === 'undone' && (e.connectorId === 'outlookDraft' || e.outlookReopen || dropIds.has(e.messageId))) continue;
+        if (e.itemId) dropIds.add(e.itemId);
+        if (e.pathId) dropIds.add(e.pathId);
+        if (e.outlookConversationId) dropIds.add(e.outlookConversationId);
+        continue;
       }
       log.push(e);
     }
@@ -1614,12 +1623,25 @@ const FlowStorage = (() => {
       so = scrub.stillOpenMetrics || so;
     }
     const resolved = (state.resolvedMessageIds || []).filter((id) => !dropIds.has(id));
+    const scan = (state.stillOpenScan || []).filter((row) => {
+      if (!row) return false;
+      if (row.app === 'outlook') return false;
+      if (row.messageId && dropIds.has(row.messageId)) return false;
+      return true;
+    });
+    const pageDiag = (state.outlookPageDiag || []).filter((d) => d && !dropDiag(d));
+    const sync = state.outlookSync && typeof state.outlookSync === 'object' ? Object.assign({}, state.outlookSync) : {};
+    if (Array.isArray(sync.diagnostics)) sync.diagnostics = sync.diagnostics.filter((d) => d && !dropDiag(d));
     await set({
       log: trimLog(log, new Set(resolved)),
       resolvedMessageIds: resolved,
       outlookPending: { offers: [], asks: [], incoming: [] },
       closeQuality: cq,
-      stillOpenMetrics: so
+      stillOpenMetrics: so,
+      stillOpenScan: scan,
+      outlookPageDiag: pageDiag,
+      outlookSync: sync,
+      glanceUndoneBanners: {}
     });
     return { ok: true, dropped: dropIds.size };
   });

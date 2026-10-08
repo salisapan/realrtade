@@ -273,6 +273,8 @@ Before any new slice. Proves the steps list and the three live proofs in one ses
 
 Pass bar: three cards, two Handled proofs, one draft that stays a draft, both Undos clean. Nothing is sent.
 
+0.9.41 draws this sitting. The headless mirror is `flow-trial-extension/e2e/scenario-a.spec.js` (mocked Graph). A typed step is the Added tag; a planned reply stays a draft row and the receipt says Draft ready. The live Gate is not run.
+
 ### Scenario B — The receipt leaves
 
 Slice 3, end to end. The Hebrew receipt mail in that slice's Gate, plus the payment check from `core/resolution.js`: if no file exists and nothing confirms the ₪3,850, the card asks whether it was paid and does not draft a receipt. Glance does not issue one.
@@ -296,7 +298,7 @@ Pass bar for E: the contract closes only on the sent file; the invoice produces 
 | Block | What is true on this tip | What to do first |
 |---|---|---|
 | Consent is narrower than the lock | Google scopes in `manifest.json` are Tasks, `calendar.events`, `gmail.compose`, `drive.readonly`, `drive.file`. No Gmail search of other threads, no Sheets, Docs, Slides, or Contacts scopes. Microsoft Connect can ask Calendar, OneDrive, Contacts, Teams, and To Do. The Entra app is missing delegated permissions those boxes need (rows 44 and 45). Default sign-in is mail read and draft write | Add the delegated permissions the checkboxes already request, on the Entra app, before any new Microsoft Gate. Add a Google scope only in the same commit as the privacy page and the store text |
-| The store build | Unpacked manifest is 0.9.40. New hosts are optional today: WhatsApp Web, Graph, the three Outlook hosts, localhost. A send scope or a new site is a store review and a privacy-page change together | Ship 0.9.41 as unpacked and Gate it (scenario A) before a store upload. Do not add hosts for the catalog "none" rows in that upload |
+| The store build | Unpacked manifest is 0.9.41 (steps list, `Save the file?`, the display fixes). New hosts are optional today: WhatsApp Web, Graph, the three Outlook hosts, localhost. A send scope or a new site is a store review and a privacy-page change together. The live scenario A Gate is not run | Run the live scenario A Gate before a store upload. Do not add hosts for the catalog "none" rows in that upload |
 | `Mail.Send` | Approved as a preview and one click. Not built. The identity block still says Glance never sends, until the owner changes that wording in `docs/product-identity.md` | Build it as the preview on the steps list (row 53). Change the locked wording in the same commit. No other send path |
 | The computer driver | Row 48 is a scaffold. The live page driver is not wired. Local files are a later gate | Wire the one allowlisted page and run that Gate before any local PDF or government page |
 | Model quality | v2 with the veto still misses about half of closes on machine labels, and wrong-Do-It is about 1.4% on that set (`docs/glance-ai/STATE.md`). Owner-verified labels are 0 of 200. Gated Qwen is offline and propose-only. A wrong send is worse than a miss | Keep silence when the on-device rules are unsure. Do not let a model close or send. Collect the 200 owner labels before a new close type depends on a model |

@@ -203,7 +203,7 @@ const SURFACES = {
     origins: ['https://outlook.live.com/*', 'https://outlook.office.com/*', 'https://outlook.office365.com/*'],
     extra: ['core/owa-parse.js', 'core/draft-reply.js', 'core/graph-mail.js', 'core/outlook-config.js', 'core/outlook-auth.js',
       'core/outlook-calendar.js', 'core/outlook-sync.js', 'src/outlook.js', 'src/chip-host.js', 'src/content-outlook.js'],
-    css: ['src/chip.css']
+    css: ['design/step-states-v1/scoped.css', 'src/chip.css']
   }
 };
 // The Gmail-only pieces (chip, sidebar, brief, weekly) are not needed in another app: the follow-up engine and its card are.
@@ -4031,27 +4031,60 @@ async function outlookFileUndo(ref) {
 
 // The attachmentSave step's writer. The page does not call it in 0.9.38.
 // Bytes have to be on the file. A multi-file step does not fetch "the one file".
+async function outlookAttachmentBytes(messageId, attachmentId) {
+  const Files = globalThis.FlowOnedriveFile;
+  if (!Files || !messageId || !attachmentId) return null;
+  const itemUrl = OUTLOOK_GRAPH + Files.attachmentItemPath(messageId, attachmentId);
+  outlookAssertNotSend(itemUrl);
+  const res = await outlookFetch(itemUrl, { method: 'GET' });
+  if (!res || !res.ok) return null;
+  const body = await outlookReadJson(res);
+  if (!body || !body.contentBytes) return null;
+  return { base64: body.contentBytes, name: body.name || '', contentType: body.contentType || 'application/octet-stream' };
+}
+
 async function attachmentSaveWrite(p) {
   const Save = globalThis.FlowSuggestSave;
   if (!Save || typeof Save.saveAttachments !== 'function') return { ok: false, reason: 'not-configured' };
   const params = (p && p.params) || {};
   const files = params.files || [];
   const target = params.target === 'drive' ? 'drive' : 'onedrive';
+  const messageId = (p && (p.messageId || p.outlookIncomingId)) || params.messageId || null;
   const out = await Save.saveAttachments(files, target, {
     writeOne: async (file) => {
-      const b64 = file && (file.base64 || file.contentBytes);
+      let b64 = file && (file.base64 || file.contentBytes);
+      let name = file && file.name;
+      let contentType = file && file.contentType;
+      if (!b64 && target === 'onedrive' && messageId && file && file.id) {
+        const got = await outlookAttachmentBytes(messageId, file.id);
+        if (got) {
+          b64 = got.base64;
+          name = name || got.name;
+          contentType = contentType || got.contentType;
+        }
+      }
       if (!b64) return { ok: false, reason: 'no-bytes' };
       if (target !== 'onedrive') return { ok: false, reason: 'no-bytes' };
       const written = await outlookFileWrite({
-        fileName: file.name,
-        attachment: { filename: file.name, mimeType: file.contentType, base64: b64 }
+        fileName: name,
+        attachment: { filename: name, mimeType: contentType, base64: b64 }
       });
       const proof = written && written.proof && written.proof.fetchedBack === true ? written.proof : null;
       const ref = written && written.ref ? Object.assign({ created: written.ref.created !== false }, written.ref) : null;
       return { ok: !!proof, proof: proof, ref: ref, reason: (written && written.reason) || (proof ? null : 'verify_failed') };
     }
   });
-  return Object.assign({ ok: !!(out && out.handled), written: out && (out.line || (out.handled ? 'Saved.' : null)) }, out);
+  const oneName = files.length === 1 && files[0] && files[0].name;
+  const writtenLine = (out && out.handled && oneName)
+    ? ('Saved ' + oneName + ' to OneDrive')
+    : (out && (out.line || (out.handled ? 'Saved.' : null)));
+  const proof = out && out.handled && out.proofs && out.proofs[0] ? out.proofs[0] : null;
+  return Object.assign({
+    ok: !!(out && out.handled),
+    written: writtenLine,
+    proof: proof,
+    ref: out ? { undo: out.undo || [], created: true } : null
+  }, out);
 }
 
 async function attachmentSaveUndo(ref) {

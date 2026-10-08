@@ -1209,7 +1209,9 @@
       // time "Do It" is clicked the chip's own ctx has no live node
       // reference to this message, and Gmail may have long since rebuilt or
       // removed it anyway.
-      bodyText: text
+      bodyText: text,
+      executionMemory: executionMemory,
+      app: 'gmail'
     });
     // Re-injecting after Gmail rebuilds the node is now expected behaviour,
     // not a rare edge case — logging 'shown' again every time would fill the
@@ -1794,7 +1796,10 @@
     // The process name as its own small, quiet label — "this is one named
     // thing Glance is closing," stated before the sentence explains what
     // that means, not left for the user to infer from a pile of pills.
-    host.appendChild(el('span', 'flow-chip-process-name', ctx.process.name));
+    const face = (typeof FlowDisplay !== 'undefined' && FlowDisplay.cardFace)
+      ? FlowDisplay.cardFace(ctx.process, ctx.intent, { bodyText: ctx.bodyText || '' })
+      : { title: ctx.process.name, sentence: null, fileCard: false };
+    host.appendChild(el('span', 'flow-chip-process-name', face.title || ctx.process.name));
 
     // loop mark + gradient "Glance" + the rest of the sentence as its own
     // text node — three children in that DOM order, mark first, right
@@ -1804,7 +1809,8 @@
     const textEl = el('p', 'flow-chip-text');
     textEl.appendChild(loopMark());
     textEl.appendChild(el('span', 'flow-chip-brand', 'Glance'));
-    textEl.appendChild(document.createTextNode(' ' + closingSentence(ctx.process, ctx.intent)));
+    const sentence = face.fileCard ? '' : (face.sentence != null ? face.sentence : closingSentence(ctx.process, ctx.intent));
+    if (sentence) textEl.appendChild(document.createTextNode(' ' + sentence));
     if (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang === 'he') textEl.setAttribute('dir', 'auto');
     host.appendChild(textEl);
 
@@ -1815,9 +1821,10 @@
     // which steps were kept vs. stripped off.
     const liveSteps = ctx.process.steps.slice();
     const multi = ctx.process.steps.length > 1;
+    const stepsReady = typeof FlowStepList !== 'undefined' && typeof FlowStepListView !== 'undefined';
 
     let pillRow = null;
-    if (multi) {
+    if (!stepsReady && multi) {
       pillRow = el('div', 'flow-chip-actions-row');
       pillRow.setAttribute('dir', 'ltr');
       pillRow.inert = true; // collapsed and non-interactive until the toggle opens it
@@ -1857,7 +1864,7 @@
     const mainRow = el('div', 'flow-chip-main-row');
     mainRow.setAttribute('dir', 'ltr');
 
-    if (multi) {
+    if (multi && pillRow) {
       const stepCount = ctx.process.steps.length;
       const toggle = el('button', 'flow-chip-more-toggle', stepCount + ' steps');
       toggle.type = 'button';
@@ -1890,12 +1897,53 @@
 
     host.appendChild(mainRow);
     if (pillRow) host.appendChild(pillRow);
+    if (stepsReady && typeof FlowStepKit !== 'undefined') {
+      host.replaceChildren();
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
+      host.__glanceSteps = FlowStepListView.mount(host, rows, {
+        intent: face.title || ctx.process.name,
+        lang: (ctx.intent && ctx.intent.lang) || (ctx.intent && ctx.intent.googleClose && ctx.intent.googleClose.lang),
+        surface: 'gmail',
+        onDoIt: (button) => onDoIt(host, button, ctx, liveSteps),
+        onDismiss: () => onDismiss(host, ctx),
+        onChange: (next) => {
+          const picked = FlowStepList.liveStepsFrom(next, 'gmail');
+          liveSteps.length = 0;
+          picked.forEach((step) => liveSteps.push(step));
+        },
+        onRetry: () => onDoIt(host, host.querySelector('button.flow-chip') || host.querySelector('.do-halo'), ctx, liveSteps)
+      });
+      const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
+      if (draft) host.appendChild(buildAttachChooser(draft, ctx));
+      mountGoogleDetail(host, ctx);
+      messageNode.insertBefore(host, messageNode.firstChild);
+      return;
+    }
+    if (stepsReady) {
+      const rows = FlowStepList.rowsFor(ctx.process, { memory: ctx.executionMemory, surface: 'gmail', lang: ctx.intent && ctx.intent.lang });
+      const view = FlowStepListView.mount(host, rows, {
+        onChange: (next) => {
+          const picked = FlowStepList.liveStepsFrom(next, 'gmail');
+          liveSteps.length = 0;
+          picked.forEach((step) => liveSteps.push(step));
+        },
+        onRetry: () => onDoIt(host, chip, ctx, liveSteps)
+      });
+      host.__glanceSteps = view;
+      const draft = ctx.process.steps.find((step) => step.kind === 'gmailDraft' && step.params && step.params.includeAttachment && !step.params.driveFileId);
+      if (draft) host.appendChild(buildAttachChooser(draft, ctx));
+    }
     mountGoogleDetail(host, ctx);
 
     messageNode.insertBefore(host, messageNode.firstChild);
   }
 
   function setChipState(chip, cls, text) {
+    if (chip && chip.classList && (chip.classList.contains('do-halo') || (chip.closest && chip.closest('.flow-step-card')))) {
+      chip.setAttribute('data-glance-chip-state', cls || '');
+      if (text) chip.setAttribute('data-glance-chip-label', text);
+      return;
+    }
     chip.className = 'flow-chip ' + cls;
     chip.replaceChildren(el('span', 'flow-chip-label', text));
   }
@@ -2774,6 +2822,7 @@
     }
 
     setChipState(chip, 'flow-chip-pending', 'Closing…');
+    if (host.__glanceSteps) host.__glanceSteps.setAll('preparing');
     FlowStorage.appendLog({ kind: 'clicked', label: ctx.intent.label, messageId: ctx.messageId, score: ctx.intent.signals.score, app: SOURCE_APP });
     FlowStorage.calibrate('click', ctx.intent.type);
     chrome.runtime.sendMessage({ type: 'flow:track', event: 'chip_clicked', params: { domain: state.domainId } });
@@ -2797,6 +2846,11 @@
     // user needs mid-flight, and the counter added nothing but arithmetic.
     const doneVerbs = [];
     function onStepDone(result) {
+      if (host.__glanceSteps && result && result.action) {
+        const proved = result.response && result.response.proof && result.response.proof.fetchedBack === true;
+        const next = (result.response && result.response.ok) ? (proved ? 'verified' : 'verifying') : 'failed';
+        host.__glanceSteps.setRow(result.action.id, next);
+      }
       if (result.response && result.response.ok) {
         doneVerbs.push(STEP_DONE_VERB[result.action.kind] || 'completed one step');
       }
