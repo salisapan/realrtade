@@ -27,7 +27,6 @@ window.onerror=function(m,s,l,c){var e=document.getElementById("boot-error");e.s
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useRef } = React;
 const LOGO = "../logo-header.png";
-const DOIT = "do-it-inline.png";
 
 const C = {
   agency: "סוכנות גבאי",
@@ -166,10 +165,8 @@ tr.miss td{background:#f8f1f1;color:#6e2424}
 .wait{position:fixed;inset-inline:0;bottom:0;z-index:5;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin:0;padding:10px 20px;background:#f7f6f3;border-top:1px solid #cfcabe}
 .wait p{margin:0;font-weight:600;color:#1c1917;font-size:14.5px;flex:1;min-width:200px}
 .acts{display:flex;gap:8px;align-items:center}
-.doit{display:inline-flex;align-items:center;justify-content:center;min-height:40px;min-width:96px;padding:8px 14px;border:1px solid #1f4e79;background:#fff;cursor:pointer}
-.doit img{height:16px;width:auto;display:block}
-.inl{height:1em;width:auto;vertical-align:-.15em}
-.ghost{min-height:40px;padding:8px 12px;border:1px solid #cfcabe;background:#fff;color:#1c1917;font-weight:600;cursor:pointer}
+.doit{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 18px;border:1px solid #1f4e79;background:#1f4e79;color:#fff;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
+.ghost{min-height:40px;padding:8px 12px;border:1px solid #cfcabe;background:#fff;color:#1c1917;font-weight:700;font-size:15px;cursor:pointer;white-space:nowrap}
 .doit:focus-visible,.ghost:focus-visible,.rail button:focus-visible{outline:3px solid #1f4e79;outline-offset:2px}
 .dossier{background:#f7f6f3;border:1px solid #d4d0c8;padding:10px 12px;position:sticky;top:8px}
 .dossier h2{font-family:Heebo,Assistant,sans-serif;font-size:14px;margin:0 0 8px}
@@ -201,12 +198,9 @@ tr.miss td{background:#f8f1f1;color:#6e2424}
 
 function DoIt(props) {
   return (
-    <button type="button" className="doit" onClick={props.onClick} aria-label="Do It">
-      <img src={DOIT} alt="" />
-    </button>
+    <button type="button" className="doit" onClick={props.onClick}>אישור</button>
   );
 }
-function Word() { return <img className="inl" src={DOIT} alt="Do It" />; }
 function Win(props) {
   return (
     <section className="win" aria-label={props.sys}>
@@ -315,7 +309,7 @@ function App() {
         <li>הזמנת המסלקה מאלמגור בלבד. הקבצים פותחים את התוכניות, ואם הלקוח חסר — גם אותו. נוספים קבצי טרום ייעוץ.</li>
         <li>כשהתיק מלא: זימון מיומן הסוכן אל מייל הלקוח, עם הקבצים בשמם. תזכורת בוואטסאפ יום לפני, או X זמן לפני.</li>
       </ol>
-      <p>Flow מכין את הרשומה ועוצר לפני כל שליחה, חתימה וזימון. {C.coord} מאשרת עם <Word />. בלי האישור הרשומה נשארת טיוטה.</p>
+      <p>Flow מכין את הרשומה ועוצר לפני כל שליחה, חתימה וזימון. {C.coord} מאשרת בכפתור אישור שבתחתית המסך. בלי האישור הרשומה נשארת טיוטה.</p>
       <div className="wait"><p>פתיחת תיק אורי מלכה.</p><DoIt onClick={function () { go(1); }} /></div>
       <p className="fine">פריסה אפשרית: Flow Edge על שרתי הסוכנות, או ענן מוסווה. שתיהן זמינות. אין במסך הזה SSO ואין יומן ביקורת. הזמנים ביומן הטיפול הם המחשה, לא מדידה. השמות בדויים, ואין בתיק מספר טלפון.</p>
     </article>
@@ -350,7 +344,7 @@ function App() {
             </tbody>
           </table>
         </article>
-        <Wait next={next} back={back}>לאשר את הקליטה ולפתוח את אורי מלכה. ליה ותומר לא נפתחים. <Word /></Wait>
+        <Wait next={next} back={back}>לאשר את הקליטה ולפתוח את אורי מלכה. ליה ותומר לא נפתחים.</Wait>
       </Win>
     );
   }
@@ -381,7 +375,7 @@ function App() {
             <tr className="miss"><td>טפסים חתומים מהמעסיק</td><td>—</td><td>—</td><td>לא התקבלו. החתימות ייצאו מפוליוויז</td></tr>
           </tbody>
         </table>
-        <Wait next={next} back={back}>לשמור את הכרטיס בעתיד ולתייק את צילום הת״ז. <Word /></Wait>
+        <Wait next={next} back={back}>לשמור את הכרטיס בעתיד ולתייק את צילום הת״ז.</Wait>
       </Win>
     );
   }
@@ -404,7 +398,7 @@ function App() {
           </tbody>
         </table>
         <p className="fine">אקסל הר הביטוח, הפוליסות וקבצי הטרום ייעוץ ייכנסו לשדר אחר, כשיהיו בתיק. השדר הזה לא ממציא אותם.</p>
-        <Wait next={next} back={back}>לשדר לאלמגור ולפתוח את הלקוח שם. <Word /></Wait>
+        <Wait next={next} back={back}>לשדר לאלמגור ולפתוח את הלקוח שם.</Wait>
       </Win>
     );
   }
@@ -432,7 +426,7 @@ function App() {
             </tbody>
           </table>
           <p className="fine">פוליוויז אוספת את הר הביטוח, את הפוליסות ואת המסלקה, ומפיקה דוח לתיק. השיחה נשארת אצל {C.coord}.</p>
-          <Wait next={next} back={back}>לשלוח את הלינק מפוליוויז, אחרי ההסבר לעובד. <Word /></Wait>
+          <Wait next={next} back={back}>לשלוח את הלינק מפוליוויז, אחרי ההסבר לעובד.</Wait>
         </Win>
         <Win sys="עתיד" sub={C.atid + " · ממשקים"} menu={["ממשקים"]}>
           <p className="mast"><b>עתיד.</b> באלמגור הלקוח <span className="num">{C.alg}</span> כבר פתוח, עם {C.spouse} ועם {C.child}, וצילום הת״ז עבר בשדר.</p>
@@ -457,7 +451,7 @@ function App() {
           </tbody>
         </table>
         <div className="quote">שלום {C.first}, הלינק לחתימה עדיין פתוח באמצע. בלי הפרטים ובלי שלוש ההרשאות אי אפשר להוציא את הר הביטוח, את העתקי הפוליסות ואת המסלקה, ואי אפשר לקבוע פגישה עם {C.agent}.</div>
-        <Wait next={next} back={back}>לשלוח את התזכורת. <Word /></Wait>
+        <Wait next={next} back={back}>לשלוח את התזכורת.</Wait>
       </Win>
     );
   }
@@ -475,7 +469,7 @@ function App() {
             <tr className="miss"><td>הרשאה להעתקי פוליסות</td><td className="num">{C.pw}</td><td>—</td><td>לא נחתמה. בלי זה אין סריקה</td></tr>
           </tbody>
         </table>
-        <Wait next={next} back={back}>לתייק את שתי ההרשאות. את השלישית לא ממציאים. <Word /></Wait>
+        <Wait next={next} back={back}>לתייק את שתי ההרשאות. את השלישית לא ממציאים.</Wait>
       </Win>
     );
   }
@@ -495,7 +489,7 @@ function App() {
         </table>
         <div className="quote">שלום {C.first}, נשארה חתימה אחת: הרשאה להעתקי פוליסות. שתי האחרות כבר אצלנו. ברגע שזו תיחתם נוכל להמשיך לפגישה עם {C.agent}.</div>
         <p className="fine">טיוטה מ־14.10.2026 09:10. לא נשלחה.</p>
-        <Wait next={next} back={back}>לשלוח את התזכורת. <Word /></Wait>
+        <Wait next={next} back={back}>לשלוח את התזכורת.</Wait>
       </Win>
     );
   }
@@ -514,7 +508,7 @@ function App() {
             <tr><td>כלל</td><td>ביטוח מנהלים ישן</td><td className="num">90331127</td><td>צבירה 6,200 ש״ח</td><td>לא פעיל. לא נסרק לזימון</td></tr>
           </tbody>
         </table>
-        <Wait next={next} back={back}>לתייק את ההרשאה השלישית ואת האקסל. <Word /></Wait>
+        <Wait next={next} back={back}>לתייק את ההרשאה השלישית ואת האקסל.</Wait>
       </Win>
     );
   }
@@ -533,7 +527,7 @@ function App() {
           </tbody>
         </table>
         <p className="fine">כלל 90331127 לא פעילה ולא נכנסת לאצווה.</p>
-        <Wait next={next} back={back}>לאשר את השמות ולסרוק לשדר. <Word /></Wait>
+        <Wait next={next} back={back}>לאשר את השמות ולסרוק לשדר.</Wait>
       </Win>
     );
   }
@@ -553,7 +547,7 @@ function App() {
             <tr><td>קבצי מסלקה</td><td>לא בשדר. יוזמנו מאלמגור</td></tr>
           </tbody>
         </table>
-        <Wait next={next} back={back}>לשדר את הקבצים לאלמגור. <Word /></Wait>
+        <Wait next={next} back={back}>לשדר את הקבצים לאלמגור.</Wait>
       </Win>
     );
   }
@@ -572,7 +566,7 @@ function App() {
             ["סטטוס", "מוכנה. לא שודרה"],
           ]} />
           <p className="fine">אחרי השידור הקבצים עולים ללקוח. אם הלקוח לא היה קיים, אותם קבצים היו פותחים גם אותו.</p>
-          <Wait next={next} back={back}>להזמין את המסלקה מאלמגור. <Word /></Wait>
+          <Wait next={next} back={back}>להזמין את המסלקה מאלמגור.</Wait>
         </Win>
         <Win sys="עתיד" sub={C.atid + " · ממשקים"} menu={["ממשקים"]}>
           <div className="lock"><span>הזמנת מסלקה מתוך עתיד</span><b>חסום</b></div>
@@ -604,7 +598,7 @@ function App() {
         </table>
         <p className="fine">{C.q2}, ת״ז <span className="num">{C.q2id}</span>, לא פתוחה באלמגור. קובץ מסלקה על הת״ז שלה היה פותח גם את הלקוח וגם את התוכניות. אצל {C.who} הלקוח כבר היה קיים, אז נפתחו התוכניות בלבד.</p>
         <p className="fine">התיק מלא: צילום ת״ז, שלוש הרשאות, אקסל הר הביטוח, שלוש פוליסות בשם שאושר, תוכניות, וקבצי טרום ייעוץ.</p>
-        <Wait next={next} back={back}>להמשיך לתיאום מול הלקוח. <Word /></Wait>
+        <Wait next={next} back={back}>להמשיך לתיאום מול הלקוח.</Wait>
       </Win>
     );
   }
@@ -624,7 +618,7 @@ function App() {
           ["סוג", "פגישת קליטה — הסדר פנסיוני"],
           ["סוכן", C.agent],
         ]} />
-        <Wait next={next} back={back}>לאשר את חמישי 12.11 ב־10:30. עדיין אין זימון שנשלח. <Word /></Wait>
+        <Wait next={next} back={back}>לאשר את חמישי 12.11 ב־10:30. עדיין אין זימון שנשלח.</Wait>
       </Win>
     );
   }
@@ -653,7 +647,7 @@ function App() {
             <tr><td>טרום ייעוץ — פנסיה מקיפה.pdf</td><td>טרום ייעוץ</td></tr>
           </tbody>
         </table>
-        <Wait next={next} back={back}>לשלוח את הזימון למייל של אורי. <Word /></Wait>
+        <Wait next={next} back={back}>לשלוח את הזימון למייל של אורי.</Wait>
       </Win>
     );
   }
@@ -671,7 +665,7 @@ function App() {
           </div>
         </div>
         <p className="fine">אין בתיק מספר טלפון. המועד, המקום וסוג הפגישה כתובים בהודעה.</p>
-        <Wait next={next} back={back}>לאשר את התזכורת ל־11.11 ב־16:00. <Word /></Wait>
+        <Wait next={next} back={back}>לאשר את התזכורת ל־11.11 ב־16:00.</Wait>
       </Win>
     );
   }
