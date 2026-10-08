@@ -1,0 +1,415 @@
+[
+ {
+  "id": "v2syn-20323",
+  "templateId": "v2:he:request_reply:154",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "שאלה קצרה",
+  "body": "בוקר טוב,\n\nיש מצב לחזור אליי עם ה-SOW עד מחר בבוקר?\n\nתודה רבה,\nאבי",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9989,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק (לא זיהה בקשה), המודל החדש רוצה להציע פעולה. זו ההכרעה החשובה ביותר לשיפור בעברית.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-20284",
+  "templateId": "v2:he:request_reply:152",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "שאלה קצרה",
+  "body": "יש מצב להעלות את טופס 101 למערכת מחר?",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9988,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק (לא זיהה בקשה), המודל החדש רוצה להציע פעולה. זו ההכרעה החשובה ביותר לשיפור בעברית.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-20987",
+  "templateId": "v2:he:request_reply:193",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "הועבר: הדוח הרבעוני",
+  "body": "סאלי שלום,\r\n\r\nאשמח אם תכיני את ה-PO עד סוף היום\r\n\r\nבתודה,\r\nאבי",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9952,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק (לא זיהה בקשה), המודל החדש רוצה להציע פעולה. זו ההכרעה החשובה ביותר לשיפור בעברית.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-17987",
+  "templateId": "v2:he:request_reply:18",
+  "lang": "he",
+  "surface": "outlook",
+  "subject": "שאלה קצרה",
+  "body": "נשמח אם תוכלו לשלוח לי את תעודת ההתאגדות לפני החג? תודה!",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9943,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק (לא זיהה בקשה), המודל החדש רוצה להציע פעולה. זו ההכרעה החשובה ביותר לשיפור בעברית.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-19085",
+  "templateId": "v2:he:request_reply:82",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "Re: שאלה קצרה",
+  "body": "היי,\r\n\r\nאפשר להעלות את החוזה החתום למערכת ביום שני?\r\n\r\nבתודה,\r\nשרה",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9938,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק (לא זיהה בקשה), המודל החדש רוצה להציע פעולה. זו ההכרעה החשובה ביותר לשיפור בעברית.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-21422",
+  "templateId": "v2:he:request_reply:218",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "שאלה קצרה",
+  "body": "‏סאלי, תוכלי לעשות approve לקליטת העובד החדש עד ה-15.10?",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9929,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק (לא זיהה בקשה), המודל החדש רוצה להציע פעולה. זו ההכרעה החשובה ביותר לשיפור בעברית.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-12147",
+  "templateId": "v2:en:request_reply:16",
+  "lang": "en",
+  "surface": "gmail",
+  "subject": "Re: Quick question",
+  "body": "Hello,\n\nCan I get the budget spreadsheet from you by Thursday?\n\nBest,\nEthan",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9975,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק, המודל רוצה להציע פעולה.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-405",
+  "templateId": "en:request_reply:23",
+  "lang": "en",
+  "surface": "gmail",
+  "subject": "Re: Quick question",
+  "body": "Hi all, Can you please approve onboarding asap? Best",
+  "engine35": "SILENT",
+  "v2": "follow-up-ask|draft",
+  "v2pShow": 0.9964,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": true,
+   "unsureReason": "engine-recall-gap"
+  },
+  "why": "המנוע שתק, המודל רוצה להציע פעולה.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2rtest-intent-actions-corpus-1122",
+  "templateId": "rtest:df516b515c",
+  "lang": "en",
+  "surface": "outlook",
+  "subject": "",
+  "body": "As a reminder, you agreed to send the invoice by Friday, September 18.",
+  "engine35": "SILENT",
+  "v2": "commitment|task",
+  "v2pShow": 0.9586,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "לפי התווית הנוכחית צריך לשתוק, אבל המודל הציע פעולה (נספר אצלנו כ\"Do It שגוי\").",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-9371",
+  "templateId": "he:file_place:1",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "סדר יום",
+  "body": "בבקשה לצרף את טופס 101 לזימון של הדמו ביום שני בשעה 9:00.",
+  "engine35": "SILENT",
+  "v2": "calendar-hold|calendar",
+  "v2pShow": 0.9102,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "לפי התווית הנוכחית צריך לשתוק, אבל המודל הציע פעולה (נספר אצלנו כ\"Do It שגוי\").",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2rtest-close-families-corpus-128",
+  "templateId": "rtest:96dc5eaee8",
+  "lang": "en",
+  "surface": "gmail",
+  "subject": "",
+  "body": "Confirming the fee is about $4,200.",
+  "engine35": "SILENT",
+  "v2": "confirmed-amount|task",
+  "v2pShow": 0.8883,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "לפי התווית הנוכחית צריך לשתוק, אבל המודל הציע פעולה (נספר אצלנו כ\"Do It שגוי\").",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-6931",
+  "templateId": "he:request_reply:0",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "אישור ניכוי מס במקור",
+  "body": "שלום רב,\r\n\r\nאפשר לשלוח לי את ה-PO עד יום שני?\r\n\r\nתודה!\r\nשרה\r\n\r\n--\r\nשרה מזרחי\r\nסמנכ״ל כספים | אקמי בע״מ\r\n054-1071271\r\nwww.acme.co.il",
+  "engine35": "follow-up-ask|draft",
+  "v2": "SILENT",
+  "v2pShow": 0.9496,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "rule-corrected",
+   "ruleCorrected": [
+    "cc-only"
+   ],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "אתה רק ב-Cc ואף אחד לא פנה אליך בשם. המנוע מציג פעולה, הכלל החדש משתיק.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-7013",
+  "templateId": "he:request_reply:5",
+  "lang": "he",
+  "surface": "outlook",
+  "subject": "השב: הקבלות מהנסיעה",
+  "body": "היי מאיה,\n\nתוכלי לעבור על הדוח הרבעוני ולחזור אליי השבוע?\n\nהמשך יום טוב,\nנועה\n\n--\nנועה פרץ\nמנהלת לקוחות | נורת׳ווינד\n054-1063352\nwww.acme.co.il",
+  "engine35": "follow-up-ask|draft",
+  "v2": "SILENT",
+  "v2pShow": 0.9713,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "rule-corrected",
+   "ruleCorrected": [
+    "addressed-to-other"
+   ],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "המייל פונה בשם לאדם אחר (ואתה ב-To). המנוע מציג פעולה, הכלל החדש משתיק.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-9674",
+  "templateId": "he:decision:3",
+  "lang": "he",
+  "surface": "outlook",
+  "subject": "אושר",
+  "body": "היי לכולם,\n\nאישרנו ₪89 עבור הקמפיין.\n\nיום נעים,\nהילה\n\n--\nהילה שמש\nמנהלת לקוחות | נורת׳ווינד\n054-1063352\nwww.acme.co.il",
+  "engine35": "confirmed-amount|task",
+  "v2": "SILENT",
+  "v2pShow": 0.4812,
+  "reference": {
+   "label": "confirmed-amount|task",
+   "show": true,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "פנייה לקבוצה (\"היי לכולם\" / \"צוות\"). כרגע מוצגת פעולה.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-10482",
+  "templateId": "he:fyi:3",
+  "lang": "he",
+  "surface": "outlook",
+  "subject": "לידיעתך",
+  "body": "שלום, מצורף ה-deck לתיעוד, לא נדרשת פעולה. תודה רבה",
+  "engine35": "follow-up-ask|draft",
+  "v2": "SILENT",
+  "v2pShow": 0.8324,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "rule-corrected",
+   "ruleCorrected": [
+    "no-action-fyi"
+   ],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "כתוב במפורש שלא נדרשת פעולה. המנוע 0.9.35 עדיין מציע פעולה; הכלל החדש משתיק.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-25034",
+  "templateId": "v2:he:hedge:3",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "מחשבות",
+  "body": "‏צהריים טובים,\n\n‏אולי כדאי לשמור את המצורף בדרייב\n\n‏בתודה,\n‏שרה",
+  "engine35": "drive-file|file_save",
+  "v2": "SILENT",
+  "v2pShow": 0.0697,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "על אותו טקסט בלי עיצוב המנוע שותק; עם סימני עיצוב בלתי נראים (כיווניות RTL / רווח קשיח / חתימת iPhone) הוא מציג פעולה.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-24392",
+  "templateId": "v2:he:onedrive_save:4",
+  "lang": "he",
+  "surface": "gmail",
+  "subject": "תגובה: גיליון התמחור מצורף",
+  "body": "תשמור את הקובץ המצורף ב-One Drive עד יום ראשון בברכה\n\nנשלח מה-iPhone שלי",
+  "engine35": "dated-commitment|task",
+  "v2": "SILENT",
+  "v2pShow": 0.8706,
+  "reference": {
+   "label": "SILENT",
+   "show": false,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "על אותו טקסט בלי עיצוב המנוע שותק; עם סימני עיצוב בלתי נראים (כיווניות RTL / רווח קשיח / חתימת iPhone) הוא מציג פעולה.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-797",
+  "templateId": "en:commitment_reader:1",
+  "lang": "en",
+  "surface": "gmail",
+  "subject": "Next steps",
+  "body": "As agreed, you will send the expense report by October 15.\n\nBest,\nSali\n\n--\nSali Sapan\nAccount Manager | Northwind\n+972-54-1079190",
+  "engine35": "dated-commitment|task",
+  "v2": "commitment|task",
+  "v2pShow": 0.9976,
+  "reference": {
+   "label": "dated-commitment|task",
+   "show": true,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "המנוע והמודל מסכימים שצריך פעולה, אבל לא על איזו.",
+  "ownerAnswer": null
+ },
+ {
+  "id": "v2syn-12806",
+  "templateId": "v2:en:request_reply:54",
+  "lang": "en",
+  "surface": "gmail",
+  "subject": "Re: onboarding",
+  "body": "Hi all,\r\n \r\n\r\nCan you set up a interview Sunday at 11:15?\r\n \r\nRegards,\r\nMichael\r\n\r\n[image: logo]\r\nMichael Ross\r\nHead of Ops | Acme Ltd\r\n+972-54-1095028\r\n\r\nCONFIDENTIALITY NOTICE: This e-mail and any attachments are confidential and intended solely for the addressee. If you have received it in error, please notify the sender and delete it.",
+  "engine35": "event|calendar",
+  "v2": "event|calendar",
+  "v2pShow": 0.9865,
+  "reference": {
+   "label": "calendar-hold|calendar",
+   "show": true,
+   "source": "engine-0.9.35",
+   "ruleCorrected": [],
+   "ownerVerified": false,
+   "unsure": false
+  },
+  "why": "המנוע והמודל מסכימים שצריך פעולה, אבל לא על איזו.",
+  "ownerAnswer": null
+ }
+]

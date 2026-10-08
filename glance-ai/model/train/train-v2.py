@@ -10,9 +10,14 @@ from scipy.sparse import csr_matrix
 from sklearn.linear_model import LogisticRegression
 ap = argparse.ArgumentParser(); ap.add_argument('--feat', default='features-v2'); ap.add_argument('--tag', default='v2'); ap.add_argument('--rows', default='all'); ap.add_argument('--no-export', action='store_true')
 ap.add_argument('--target', type=float, default=0.0029); ap.add_argument('--strict', dest='mask_unsure', action='store_false'); ap.add_argument('--gate-on-all', dest='gate_unvetoed', action='store_false'); ap.add_argument('--no-oof', dest='oof', action='store_false'); ap.add_argument('--extra', default=None, help='npz with dense extra features per set (e5 experiment)')
+ap.add_argument('--out', default=None, help='artifact directory (default: model/artifacts). Refuses a path that is the shipped artifacts directory, so a dry-run cannot overwrite v2 weights.')
 A = ap.parse_args()
 HERE = os.path.dirname(os.path.abspath(__file__)); FEAT = os.path.join(HERE, A.feat)
-ART = os.path.join(HERE, '..', 'artifacts'); os.makedirs(ART, exist_ok=True)
+_default_art = os.path.abspath(os.path.join(HERE, '..', 'artifacts'))
+ART = os.path.abspath(A.out) if A.out else _default_art
+if A.out and os.path.abspath(ART) == _default_art:
+    raise SystemExit('refusing --out that is the shipped artifacts directory; pass a different directory')
+os.makedirs(ART, exist_ok=True)
 DIM = json.load(open(os.path.join(FEAT, 'meta.json')))['dim']
 def load(name, keep=None):
     rows = [json.loads(l) for l in open(os.path.join(FEAT, name + '.jsonl')) if l.strip()]

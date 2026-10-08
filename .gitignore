@@ -53,6 +53,9 @@ glance-ai/**/*.pt
 glance-ai/**/*.bin
 glance-ai/model/dataset/out/
 glance-ai/model/dataset/out-*/
+glance-ai/model/train/features-v2/
+glance-ai/labeling/dry-run/work/
+glance-ai/labeling/dry-run/artifacts/
 glance-ai/model/train/*.npz
 glance-ai/oss/finetune/data/
 glance-ai/oss/finetune/tools/
