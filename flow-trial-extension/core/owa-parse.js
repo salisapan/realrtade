@@ -117,6 +117,9 @@ const FlowOwaParse = (() => {
       hits.push(e);
     }
     if (hits.length !== 1) return null;
+    // A receipt belongs to the message that wrote it. Subject and sender
+    // are not that message when two mails share them.
+    if (hits[0].outlookReceipt && !hits[0].process) return null;
     const pname = norm(pane.senderName);
     const ename = norm((hits[0].sender && hits[0].sender.name) || (hits[0].base && hits[0].base.counterpart && hits[0].base.counterpart.name));
     return { entry: hits[0], how: from ? 'subject and sender' : (pname && ename ? 'subject and sender name' : 'subject') };
@@ -261,10 +264,13 @@ const FlowOwaParse = (() => {
   // One subject and sender is not enough. That mail links only when the
   // query already covered the mailbox and one confirming signal holds: the
   // open conversation or internet id, or a filename visible on the page that
-  // is on that message. An empty chip with no id stays unresolved. A failed
-  // attachment read is unknown, not an empty list. Several mails are split
-  // by the minute and the attachment, after an unmarked 1–11 hour is settled.
-  // A file that does not match is never the one saved.
+  // is on that message. A filename corroborates only when nothing conflicts.
+  // A conversation id, an internet message id, or a parsed clock that does
+  // not match the candidate stays unresolved, even when the filename matches.
+  // An empty chip with no id stays unresolved. A failed attachment read is
+  // unknown, not an empty list. Several mails are split by the minute and
+  // the attachment, after an unmarked 1–12 hour is settled. A file that
+  // does not match is never the one saved.
   function proved24h(pane) {
     if (!pane) return false;
     if (pane.timeFormat === 'HH:mm') return true;
@@ -279,8 +285,34 @@ const FlowOwaParse = (() => {
     if (!minute || !pane.receivedDateTime) return '';
     const d = new Date(pane.receivedDateTime);
     if (isNaN(d.getTime())) return '';
-    d.setHours(d.getHours() + 12);
+    // Unmarked 12 is noon or midnight. Every other ambiguous hour is +12.
+    if (d.getHours() === 12) d.setHours(0);
+    else d.setHours(d.getHours() + 12);
     return minuteKey(d.toISOString()) || '';
+  }
+
+  // A missing id is not a conflict. Both sides have to carry it, and differ.
+  function idConflict(pane, m) {
+    const paneConv = canonId(pane && pane.conversationId);
+    const msgConv = canonId(m && m.conversationId);
+    if (paneConv && msgConv && paneConv !== msgConv) return 'conversation';
+    const paneNet = canonId(pane && pane.internetMessageId);
+    const msgNet = canonId(m && m.internetMessageId);
+    if (paneNet && msgNet && paneNet !== msgNet) return 'internet';
+    return '';
+  }
+
+  // A parsed clock conflicts when the candidate minute is neither the literal
+  // minute nor the other half of an ambiguous hour. No clock on either side
+  // is not a conflict.
+  function clockConflict(pane, m, minute) {
+    const got = minuteKey(m && m.receivedDateTime);
+    if (!minute || !got || got === minute) return '';
+    if (pane && pane.clockAmbiguous) {
+      const alt = altMinuteOf(pane, minute);
+      if (alt && got === alt) return '';
+    }
+    return 'clock';
   }
 
   function uniqueGraphMessage(pane, messages) {
@@ -294,6 +326,8 @@ const FlowOwaParse = (() => {
     function confirmOne(one, why) {
       if (!one) return pack(null, why || 'no-hit');
       if (one.attachmentsUnread) return pack(null, 'attachments-unknown');
+      const conflict = idConflict(pane, one) || clockConflict(pane, one, minute);
+      if (conflict) return pack(null, (why || 'subject-unique') + ' conflict-' + conflict);
       const rel = fileRelation(pane && pane.attachments, one.attachments || one.files);
       if (rel === 'no') return pack(null, (why || 'subject-unique') + ' file-disagree');
       if (idHit(pane, one) || rel === 'yes') return pack(one, why || 'subject-unique');
@@ -314,7 +348,8 @@ const FlowOwaParse = (() => {
     // AM/PM). Several mails stay unresolved. The file must not guess.
     if (pane && pane.clockUnread && pool.length > 1) return pack(null, 'clock-unread');
     // "10:05" with no marker is 10:05 only when 22:05 is not also a candidate,
-    // or when the mailbox is known to be 24-hour. The file must not pick the hour.
+    // or when the mailbox is known to be 24-hour. Unmarked "12:05" is the
+    // same choice against "00:05". The file must not pick the hour.
     if (pane && pane.clockAmbiguous && minute) {
       const alt = altMinuteOf(pane, minute);
       const hasLit = pool.some((m) => minuteKey(m.receivedDateTime) === minute);
@@ -336,6 +371,11 @@ const FlowOwaParse = (() => {
       if (!timed.length) return pack(null, 'minute-miss');
       pool = timed;
     }
+    // The hour gate has already kept both halves of an ambiguous clock.
+    // An id that disagrees is still a conflict, and it outweighs a filename.
+    const agreedId = pool.filter((m) => !idConflict(pane, m));
+    if (pool.length && !agreedId.length) return pack(null, 'id-conflict');
+    pool = agreedId;
     if (fileRows(pane && pane.attachments).length) {
       const agreed = pool.filter((m) => fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
       if (agreed.length === 1) return pack(agreed[0], 'time-file');
@@ -682,9 +722,10 @@ const FlowOwaParse = (() => {
 
   // A meridian wins: 12 AM is 00, 12 PM is 12, and any other PM hour adds 12.
   // With no marker, a two-digit hour is read as that number (03:05 stays 03,
-  // 14:01 stays 14, 00 and 12 are unambiguous). Whether 10:05 also means 22:05
-  // is decided later, only when both hours are in the candidate pool.
-  // A one-digit hour with no marker is not guessed.
+  // 14:01 stays 14, 12 stays noon). Whether 10:05 also means 22:05, and
+  // whether unmarked 12 also means midnight, is decided later, only when
+  // both candidates are in the pool. A one-digit hour with no marker is
+  // not guessed.
   function hourOnClock(hourText, meridian) {
     const token = String(hourText == null ? '' : hourText);
     if (!/^\d{1,2}$/.test(token)) return null;
@@ -729,7 +770,8 @@ const FlowOwaParse = (() => {
   }
 
   // The literal clock, plus the other half of an unmarked 1–11 hour.
-  // 00, 12, 13–23, and any AM/PM or Hebrew meridian are not ambiguous.
+  // Unmarked 12 is noon or midnight (00 the same local day, not +12).
+  // 00, 13–23, and any AM/PM or Hebrew meridian are not ambiguous.
   // A one-digit hour with no marker is unread, not a guess.
   function clockPair(text) {
     const raw = String(text || '');
@@ -742,27 +784,76 @@ const FlowOwaParse = (() => {
     if (!time || meridian) return { iso: iso, altIso: '', ambiguous: false, unread: false };
     const token = time[1];
     const hour = +token;
-    if (token.length < 2 || hour < 1 || hour > 11) {
+    if (token.length < 2 || hour < 1 || hour > 12) {
       return { iso: iso, altIso: '', ambiguous: false, unread: false };
     }
     const d = new Date(iso);
     if (isNaN(d.getTime())) return { iso: iso, altIso: '', ambiguous: false, unread: false };
-    d.setHours(d.getHours() + 12);
+    if (hour === 12) d.setHours(0);
+    else d.setHours(d.getHours() + 12);
     return { iso: iso, altIso: d.toISOString(), ambiguous: true, unread: false };
   }
 
-  // Another unmarked hour of 13–23, or 00, means this page is a 24-hour clock.
-  function pageProves24h(doc) {
-    const d = doc || (typeof document !== 'undefined' ? document : null);
-    if (!d) return false;
-    let text = '';
-    if (d.body && (d.body.innerText || d.body.textContent)) text = d.body.innerText || d.body.textContent;
-    else if (typeof d.textContent === 'string') text = d.textContent;
+  // Another unmarked hour of 13–23, or 00, on an OWA list-row time or the
+  // reading-pane header clock means this page is a 24-hour clock. A time
+  // inside the email body is the message, not the chrome.
+  function inMessageBody(n) {
+    let p = n;
+    while (p) {
+      const role = p.getAttribute && p.getAttribute('role');
+      const section = p.getAttribute && p.getAttribute('data-app-section');
+      const cls = (p.className && typeof p.className === 'string') ? p.className : '';
+      if (role === 'document' || section === 'MessageBody') return true;
+      if (cls.indexOf('UniqueMessageBody') >= 0 || /(^|\s)AllowTextSelection(\s|$)/.test(cls)) return true;
+      p = p.parentElement || p.parentNode || null;
+      if (p && p.nodeType === 9) break;
+    }
+    return false;
+  }
+
+  function wrapsMessageBody(n) {
+    if (!n || typeof n.querySelector !== 'function') return false;
+    try {
+      return Boolean(n.querySelector('[role="document"], [data-app-section="MessageBody"], [class*="UniqueMessageBody"], .AllowTextSelection'));
+    } catch (e) { return false; }
+  }
+
+  function textProves24h(text) {
     const re = /(?:^|[^\d])(\d{2}):(\d{2})(?!\d)/g;
     let m;
-    while ((m = re.exec(String(text || '')))) {
+    const raw = String(text || '');
+    while ((m = re.exec(raw))) {
       const hour = +m[1];
       if (hour === 0 || (hour >= 13 && hour <= 23)) return true;
+    }
+    return false;
+  }
+
+  function pageProves24h(doc) {
+    const d = doc || (typeof document !== 'undefined' ? document : null);
+    if (!d || typeof d.querySelectorAll !== 'function') return false;
+    const sel = [
+      '[role="list"] [role="option"]',
+      '[role="list"] [role="row"]',
+      '[role="list"] [role="listitem"]',
+      '[role="listbox"] [role="option"]',
+      '[role="listbox"] [role="row"]',
+      '[role="listbox"] [role="listitem"]',
+      '[role="grid"] [role="row"]',
+      '[role="grid"] [role="gridcell"]',
+      '#ReadingPaneContainerId time',
+      '#ReadingPaneContainerId div',
+      '#ReadingPaneContainerId span',
+      '#ReadingPaneContainerId p'
+    ].join(', ');
+    let nodes = [];
+    try { nodes = d.querySelectorAll(sel) || []; } catch (e) { return false; }
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (!n || inMessageBody(n) || wrapsMessageBody(n)) continue;
+      const t = textOf(n);
+      if (!t || t.length > 400) continue;
+      if (textProves24h(t)) return true;
     }
     return false;
   }

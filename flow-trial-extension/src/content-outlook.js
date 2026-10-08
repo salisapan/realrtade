@@ -282,7 +282,8 @@
     if (typeof FlowStorage.getActiveOutlookReceipts === 'function') {
       const receipts = await FlowStorage.getActiveOutlookReceipts();
       (receipts || []).forEach((e) => {
-        if (e && !out.some((x) => x.messageId === e.messageId && x.outlookReceipt)) {
+        if (!e || e.connectorId !== 'outlookDraft') return;
+        if (!out.some((x) => x.messageId === e.messageId && x.outlookReceipt)) {
           out.push(Object.assign({}, e, { outlookReceipt: true }));
         }
       });
@@ -1023,9 +1024,11 @@
     try { bag = await FlowStorage.get(); } catch (e) { return false; }
     const log = (bag && bag.log) || [];
     const todoLog = log.filter((e) => outlookProofRow(e));
+    const fileNames = (pane.attachments || []).map((a) => a && (a.name || a.filename)).filter(Boolean);
     const row = FlowProofOfClose.taskReceiptFromLog(todoLog, {
       messageIds: [pane.itemId, pane.pathId, pane.conversationId],
-      threadIds: [pane.conversationId]
+      threadIds: [pane.conversationId],
+      fileNames: fileNames
     });
     const existing = stripDuplicateUndoHosts(mount);
     // An Undo line is not a close. data-glance-undone stays on the click,
@@ -1981,6 +1984,13 @@
     dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, chars: (pane.text || '').length });
     // Outlook must be connected (token present); otherwise no card, and the reason says why.
     if (!st || !st.outlookAuth || !st.outlookAuth.token) { dropStuckCard(); await pageReason('page:not-connected', pane); return; }
+    try {
+      const filled = await hydratePane(pane);
+      if (filled) {
+        pane = filled;
+        if (suggestNote) suggestNote = pane;
+      }
+    } catch (e) { glanceError('pane hydrate', e); }
 
     // A proved To Do task is mounted before a quiet return. The ids are the
     // Outlook item, the path, and the conversation — not a hash of the text.
@@ -2228,8 +2238,9 @@
       dbg('judged', { show: true, type: entry.intent && entry.intent.type, label: entry.intent && entry.intent.label, from: 'mailbox check' });
     }
 
-    // Receipt-only entry: show settled receipt if draft still active.
-    if (entry.outlookReceipt && entry.ref && !entry.process) {
+    // A draft receipt stays on the message that wrote it. A file save is
+    // not this card: that one says Handled, and only on its own file.
+    if (entry.outlookReceipt && entry.ref && !entry.process && entry.connectorId === 'outlookDraft') {
       const mount = mountPoint();
       if (!mount) { await pageReason('page:no-mount', pane); return; }
       if (mount.querySelector('.flow-chip-host')) { lastOutcome = 'card'; return; }
@@ -2444,13 +2455,97 @@
     } catch (e) { return ''; }
   }
 
-  // from AND subject, every page, until nextLink ends or the ceiling.
+  const hydrateCache = Object.create(null);
+
+  function graphAddress(node) {
+    return String(node && node.emailAddress && node.emailAddress.address || '').trim().toLowerCase();
+  }
+
+  function minuteOf(value) {
+    return (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.minuteKey) ? (FlowOwaParse.minuteKey(value) || '') : '';
+  }
+
+  // The reading pane often shows a name and hides the address until hover.
+  // Graph already has the sender and the To/Cc lines. Fill only what the
+  // page did not. Several messages in one conversation stay unresolved
+  // unless the open clock or the subject picks one.
+  async function hydratePane(pane) {
+    if (!pane) return pane;
+    const needSender = !pane.senderEmail;
+    const needAudience = !(pane.to && pane.to.length) && !(pane.cc && pane.cc.length);
+    if (!needSender && !needAudience && pane.subject) return pane;
+    const conv = String(pane.conversationId || '').trim();
+    const item = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId) : '';
+    if (!conv && !item) return pane;
+    const key = item + '|' + conv + '|' + (pane.receivedDateTime || '') + '|' + (pane.subject || '');
+    if (hydrateCache[key]) return Object.assign(pane, hydrateCache[key]);
+    const select = 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,conversationId';
+    let rows = [];
+    if (item) {
+      const one = await graphJson('/me/messages/' + encodeURIComponent(item) + '?$select=' + encodeURIComponent(select), 'pane-hydrate', null);
+      if (one && one.id) rows = [one];
+    } else {
+      const filter = "conversationId eq '" + odataQuote(conv) + "'";
+      const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate', null);
+      rows = body && Array.isArray(body.value) ? body.value : [];
+    }
+    if (!rows.length) return pane;
+    const minute = minuteOf(pane.receivedDateTime);
+    const alt = minuteOf(pane.clockAlt);
+    let picked = rows.length === 1 ? rows[0] : null;
+    if (!picked && minute) {
+      const timed = rows.filter((r) => {
+        const k = minuteOf(r.receivedDateTime);
+        return k && (k === minute || (alt && k === alt));
+      });
+      if (timed.length === 1) picked = timed[0];
+    }
+    if (!picked && pane.subject) {
+      const want = String(pane.subject).trim().toLowerCase();
+      const named = rows.filter((r) => String(r.subject || '').trim().toLowerCase() === want);
+      if (named.length === 1) picked = named[0];
+    }
+    const patch = {};
+    const froms = rows.map((r) => graphAddress(r.from)).filter(Boolean);
+    if (needSender && froms.length && froms.every((e) => e === froms[0])) {
+      patch.senderEmail = froms[0];
+      const name = rows[0] && rows[0].from && rows[0].from.emailAddress && rows[0].from.emailAddress.name;
+      if (!pane.senderName && name) patch.senderName = String(name).slice(0, 80);
+    }
+    if (picked) {
+      if (!pane.subject && picked.subject) patch.subject = String(picked.subject);
+      if (needAudience) {
+        patch.to = (picked.toRecipients || []).map(graphAddress).filter(Boolean);
+        patch.cc = (picked.ccRecipients || []).map(graphAddress).filter(Boolean);
+      }
+      if (needSender && !patch.senderEmail) {
+        const one = graphAddress(picked.from);
+        if (one) patch.senderEmail = one;
+      }
+    }
+    hydrateCache[key] = patch;
+    return Object.assign(pane, patch);
+  }
+
+  function subjectFilter(subject) {
+    const raw = String(subject || '').trim();
+    const stem = raw.replace(/[\u2026\u2025.]{1,3}$/, '').trim();
+    if (stem && stem !== raw && stem.length >= 12) return "startswith(subject,'" + odataQuote(stem) + "')";
+    return "subject eq '" + odataQuote(raw) + "'";
+  }
+
+  // from AND subject when the page has both. A hover card often hides the
+  // address: the conversation id, then the subject, still names the set.
   // A failed query is not replaced with one inbox page.
   async function mailboxBySubject(pane) {
     const from = String((pane && pane.senderEmail) || '').trim();
     const subject = String((pane && pane.subject) || '').trim();
-    if (!from || !subject) return { error: 'missing' };
-    const filter = "from/emailAddress/address eq '" + odataQuote(from) + "' and subject eq '" + odataQuote(subject) + "'";
+    const conv = String((pane && pane.conversationId) || '').trim();
+    let filter = '';
+    if (from && subject) filter = "from/emailAddress/address eq '" + odataQuote(from) + "' and " + subjectFilter(subject);
+    else if (conv) filter = "conversationId eq '" + odataQuote(conv) + "'";
+    else if (subject) filter = subjectFilter(subject);
+    else return { error: 'missing' };
     const select = 'id,conversationId,receivedDateTime,from,subject,internetMessageId';
     let path = '/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=' + MAILBOX_PAGE + '&$select=' + encodeURIComponent(select);
     const all = [];
@@ -2511,7 +2606,7 @@
       }
     }
     if (typeof FlowOwaParse === 'undefined' || typeof FlowOwaParse.uniqueGraphMessage !== 'function') return suggestFail('suggest:unresolved');
-    if (!pane || !pane.senderEmail || !pane.subject) {
+    if (!pane || (!pane.subject && !wantConv && !wantNet)) {
       return suggestFail('suggest:unresolved', 'missing-sender-or-subject');
     }
     const found = await mailboxBySubject(pane);
@@ -2790,7 +2885,7 @@
     let stageReason = '';
     let read = null;
     try {
-      read = await suggestFiles(pane);
+      read = await suggestFiles(await hydratePane(pane));
       if (read && read.unresolved) stageReason = read.reason || 'suggest:unresolved';
       else if (read && Array.isArray(read.files)) {
         files = read.files;
@@ -2917,6 +3012,11 @@
       if (!row || !row.process) continue;
       const rowIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
       if (ids.some((id) => rowIds.some((rid) => sameExchangeId(id, rid)))) return row;
+      const steps = (row.process && row.process.steps) || [];
+      const taskRow = steps.some((s) => s && (s.kind === 'outlookTask' || s.kind === 'microsoftTodo' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+      const paneSub = String(pane.subject || '').replace(/^\s*((re|fw|fwd|השב|העבר|תשובה)\s*:\s*)+/i, '').trim().toLowerCase();
+      const rowSub = String(row.subject || '').replace(/^\s*((re|fw|fwd|השב|העבר|תשובה)\s*:\s*)+/i, '').trim().toLowerCase();
+      if (taskRow && paneSub && rowSub && paneSub === rowSub) return row;
       const rowKey = FlowStillOpen.promiseKey(row);
       if (key && rowKey && rowKey === key) return row;
       const rowText = String(row.text || '');

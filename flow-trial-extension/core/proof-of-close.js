@@ -261,13 +261,37 @@ const FlowProofOfClose = (() => {
       return { messageIds: messageIds, threadIds: threadIds };
     }
     const query = messageIdOrQuery || {};
+    const names = Array.isArray(query.fileNames) ? query.fileNames.map((n) => clean(n)).filter(Boolean) : [];
     const mids = query.messageIds != null ? query.messageIds : query.messageId;
     const midList = Array.isArray(mids) ? mids : (mids != null && mids !== '' ? [mids] : []);
     for (let i = 0; i < midList.length; i++) addCanon(messageIds, midList[i]);
     const tids = query.threadIds != null ? query.threadIds : query.threadId;
     const tidList = Array.isArray(tids) ? tids : (tids != null && tids !== '' ? [tids] : []);
     for (let j = 0; j < tidList.length; j++) addCanon(threadIds, tidList[j]);
-    return { messageIds: messageIds, threadIds: threadIds };
+    return { messageIds: messageIds, threadIds: threadIds, fileNames: names };
+  }
+
+  function isFileReceiptRow(entry) {
+    if (!entry) return false;
+    if (entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave') return true;
+    return clean(entry.system) === SYSTEM_MICROSOFT_ONEDRIVE;
+  }
+
+  function savedFileName(entry) {
+    const written = String((entry && (entry.writtenLine || entry.label)) || '');
+    const marked = written.match(/Saved (.+?) to OneDrive/i) || written.match(/^OneDrive · (.+)$/);
+    return marked && marked[1] ? marked[1].trim() : '';
+  }
+
+  function fileNameAgrees(saved, shown) {
+    const left = String(saved || '').toLowerCase().replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '').trim();
+    const right = String(shown || '').toLowerCase().replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '').trim();
+    if (!left || !right) return false;
+    if (left === right) return true;
+    const short = left.length <= right.length ? left : right;
+    const long = left.length <= right.length ? right : left;
+    if (short.length < 12) return false;
+    return long.endsWith(short) || long.startsWith(short);
   }
 
   function rowMessageIds(entry) {
@@ -280,14 +304,26 @@ const FlowProofOfClose = (() => {
     return ids;
   }
 
-  function rowMatches(entry, messageIds, threadIds) {
+  function rowMatches(entry, messageIds, threadIds, fileNames) {
+    const fileRow = isFileReceiptRow(entry);
     const ids = rowMessageIds(entry);
     for (let i = 0; i < ids.length; i++) {
-      if (messageIds.has(ids[i])) return true;
-      if (ids[i].indexOf('scan:') === 0 && threadIds.has(ids[i].slice(5))) return true;
+      if (ids[i].indexOf('scan:') === 0 && threadIds.has(ids[i].slice(5))) {
+        if (!fileRow) return true;
+        continue;
+      }
+      // A conversation id passed as a message id is the thread, not this file.
+      if (messageIds.has(ids[i]) && !(fileRow && threadIds.has(ids[i]))) return true;
     }
     const thread = canonId(entry.threadId) || canonId(entry.outlookConversationId);
-    if (thread && threadIds.has(thread)) return true;
+    if (!(thread && threadIds.has(thread))) return false;
+    if (!fileRow) return true;
+    const saved = savedFileName(entry);
+    const names = fileNames || [];
+    if (!saved || !names.length) return false;
+    for (let n = 0; n < names.length; n++) {
+      if (fileNameAgrees(saved, names[n])) return true;
+    }
     return false;
   }
 
@@ -301,7 +337,7 @@ const FlowProofOfClose = (() => {
     const rows = Array.isArray(log) ? log : [];
     for (let i = 0; i < rows.length; i++) {
       const entry = rows[i];
-      if (!entry || !rowMatches(entry, found.messageIds, found.threadIds)) continue;
+      if (!entry || !rowMatches(entry, found.messageIds, found.threadIds, found.fileNames)) continue;
       if (entry.kind === 'undone' || entry.kind === 'dismissed') {
         const sameMessage = rowMessageIds(entry).some((id) => found.messageIds.has(id));
         const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry) || isOnedriveConnector(entry) || isComputerRow(entry)

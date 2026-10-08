@@ -1344,16 +1344,18 @@ console.log('\n--- the receipt names the writes that actually landed, and nothin
     JSON.stringify(FlowActions.receiptWrittenLines([{ response: { ok: true } }])) === '[]');
 }
 
-console.log('\n--- a parking-permit ask is not a newsletter ---\n');
+console.log('\n--- a clean parking-permit renew is a request, and a mass-mail footer stays quiet ---\n');
 {
   const ask = 'Can you send the parking permit for the visitor bay tomorrow?\n\nUnsubscribe | View in browser';
   const intent = classify(ask);
-  check('a parking-permit ask is not quiet:noise', intent && intent.quiet !== 'noise' && intent.type != null, intent);
+  check('a parking-permit ask with unsubscribe stays quiet:noise', intent && intent.quiet === 'noise' && intent.type == null, intent);
   const news = 'Our weekly newsletter is here. Limited-time offer inside.\n\nUnsubscribe | View in browser';
   const quiet = classify(news);
   check('a newsletter with unsubscribe stays quiet:noise', quiet && quiet.quiet === 'noise', quiet);
   const subjectAsk = classify('Unsubscribe | View in browser', { subject: 'Parking permit - please renew by Sunday', now: new Date('2026-10-08T12:00:00Z') });
-  check('a parking-permit subject is not quiet:noise', subjectAsk && subjectAsk.quiet !== 'noise' && subjectAsk.type != null, subjectAsk);
+  check('a parking subject above a mass-mail footer stays quiet:noise', subjectAsk && subjectAsk.quiet === 'noise' && subjectAsk.type == null, subjectAsk);
+  const clean = classify('Parking permit - please renew by Sunday', { now: new Date('2026-10-08T12:00:00Z') });
+  check('a clean parking-permit renew is a request', clean && clean.type === FlowIntent.TYPES.REQUEST && clean.quiet !== 'noise', clean);
 }
 
 console.log('\nTOTAL FAILURES:', failures);

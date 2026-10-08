@@ -156,14 +156,45 @@ const twentyTwo = '2026-10-08T22:05:00.000Z';
 const pairTen = FlowOwaParse.clockPair('08/10/2026 10:05');
 check('an unmarked 10:05 is ambiguous and names the other hour',
   pairTen.ambiguous === true && pairTen.iso && pairTen.altIso && pairTen.iso !== pairTen.altIso, pairTen);
-check('14:01, 00:46, 12:53, and 3:05 PM are not an ambiguous hour',
+check('14:01, 00:46, and 3:05 PM are not an ambiguous hour',
   FlowOwaParse.clockPair('08/10/2026 14:01').ambiguous === false &&
   FlowOwaParse.clockPair('08/10/2026 00:46').ambiguous === false &&
-  FlowOwaParse.clockPair('08/10/2026 12:53').ambiguous === false &&
   FlowOwaParse.clockPair('08/10/2026 3:05 PM').ambiguous === false);
-check('a page with 14:01 proves a 24-hour clock, and 03:50 PM does not',
-  FlowOwaParse.pageProves24h({ body: { textContent: 'ה 08/10/2026 14:01' } }) === true &&
-  FlowOwaParse.pageProves24h({ body: { textContent: 'Last checked 03:50 PM' } }) === false);
+const noonPair = FlowOwaParse.clockPair('08/10/2026 12:53');
+check('an unmarked 12:53 is noon or midnight the same local day',
+  noonPair.ambiguous === true &&
+  new Date(noonPair.iso).getHours() === 12 &&
+  new Date(noonPair.altIso).getHours() === 0 &&
+  new Date(noonPair.iso).toDateString() === new Date(noonPair.altIso).toDateString(),
+  noonPair);
+function chromeNode(text, parent) {
+  return {
+    textContent: text,
+    innerText: text,
+    className: '',
+    parentElement: parent || null,
+    parentNode: parent || null,
+    getAttribute: function () { return null; },
+    querySelector: function () { return null; }
+  };
+}
+function bodyNode(text) {
+  const body = {
+    className: '',
+    parentElement: null,
+    parentNode: null,
+    getAttribute: function (name) { return name === 'role' ? 'document' : null; },
+    querySelector: function () { return null; }
+  };
+  return chromeNode(text, body);
+}
+check('a list-row or header clock of 13–23 proves 24-hour time',
+  FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [chromeNode('ה 08/10/2026 14:01')]; } }) === true &&
+  FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [chromeNode('08/10/2026 16:40')]; } }) === true);
+check('a body clock, Last checked, and a page with no list query do not prove 24-hour time',
+  FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [bodyNode('Meet at 15:00')]; } }) === false &&
+  FlowOwaParse.pageProves24h({ querySelectorAll: function () { return [chromeNode('Last checked 03:50 PM')]; } }) === false &&
+  FlowOwaParse.pageProves24h({ body: { textContent: 'ה 08/10/2026 14:01' } }) === false);
 
 function hourPane(extra) {
   return Object.assign({
@@ -196,11 +227,69 @@ const late = FlowOwaParse.uniqueGraphMessage(
 );
 check('an unmarked hour of 14 links that mail', late.message && late.message.id === 'm-14', late);
 
+const tenLocal = FlowOwaParse.clockToIso('08/10/2026 10:05');
+const fifteenLocal = FlowOwaParse.clockToIso('08/10/2026 15:05');
+const chip = [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }];
+const nwFile = [file('northwind-agreement-signed.pdf', 3072)];
+const conflict = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', receivedDateTime: tenLocal, conversationId: 'AQQkPane', attachments: chip },
+  [msg('m-late', 'AQQkOther', fifteenLocal, nwFile, 'Northwind agreement - signed PDF')]
+);
+check('10:05 with a matching filename stays unresolved when the Graph mail is 15:05 in another conversation',
+  !conflict.message && conflict.reason === 'suggest:unresolved' && /conflict/.test(conflict.detail || ''), conflict);
+const netConflict = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', receivedDateTime: tenLocal, conversationId: 'AQQkSame', internetMessageId: '<pane@mail.test>', attachments: chip },
+  [msg('m-net', 'AQQkSame', tenLocal, nwFile, 'Northwind agreement - signed PDF')]
+);
+check('a different internet id stays unresolved even when the filename matches',
+  !netConflict.message && /conflict-internet/.test(netConflict.detail || ''), netConflict);
+const clockOnly = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', receivedDateTime: tenLocal, conversationId: 'AQQkSame', attachments: chip },
+  [msg('m-clock', 'AQQkSame', fifteenLocal, nwFile, 'Northwind agreement - signed PDF')]
+);
+check('a clock that is neither hour stays unresolved even when the filename matches',
+  !clockOnly.message && /conflict-clock/.test(clockOnly.detail || ''), clockOnly);
+const agreed = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', receivedDateTime: tenLocal, conversationId: 'AQQkSame', attachments: chip },
+  [msg('m-same', 'AQQkSame', tenLocal, nwFile, 'Northwind agreement - signed PDF')]
+);
+check('a matching filename and conversation id at the same minute still links',
+  agreed.message && agreed.message.id === 'm-same', agreed);
+
+const noon = FlowOwaParse.clockPair('08/10/2026 12:05');
+function noonPane(extra) {
+  return Object.assign({
+    subject: 'Northwind agreement - signed PDF',
+    senderEmail: 'flow@x.com',
+    receivedDateTime: noon.iso,
+    clockAmbiguous: true,
+    clockAlt: noon.altIso,
+    attachments: chip
+  }, extra || {});
+}
+const mNoon = msg('m-noon', 'c-noon', noon.iso, nwFile, 'Northwind agreement - signed PDF');
+const mMid = msg('m-mid', 'c-mid', noon.altIso, nwFile, 'Northwind agreement - signed PDF');
+const bothNoon = FlowOwaParse.uniqueGraphMessage(noonPane(), [mNoon, mMid]);
+check('12:05 and 00:05 both present stay unresolved',
+  !bothNoon.message && /hour-ambiguous/.test(bothNoon.detail || ''), bothNoon);
+const onlyNoon = FlowOwaParse.uniqueGraphMessage(noonPane(), [mNoon]);
+check('only 12:05 present may link that file', onlyNoon.message && onlyNoon.message.id === 'm-noon', onlyNoon);
+const onlyMid = FlowOwaParse.uniqueGraphMessage(noonPane(), [mMid]);
+check('only 00:05 present may link that hour', onlyMid.message && onlyMid.message.id === 'm-mid', onlyMid);
+const noonProved = FlowOwaParse.uniqueGraphMessage(noonPane({ pageHour24: true }), [mMid, mNoon]);
+check('a proved 24-hour page links the literal noon', noonProved.message && noonProved.message.id === 'm-noon', noonProved);
+
 const outlookSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
 check('newest-by-subject is not a file link',
   outlookSrc.indexOf('function messageBySubject') < 0 && outlookSrc.indexOf('inbox-subject') < 0 && outlookSrc.indexOf('function recentInbox') < 0 && outlookSrc.indexOf('uniqueGraphMessage') > 0);
 check('the mailbox match stops at 200', /MAILBOX_MATCH_CEILING\s*=\s*200/.test(outlookSrc));
 check('a failed attachment read is kept', outlookSrc.indexOf('attachmentsUnread') > 0);
+check('a file save is not injected as a draft receipt',
+  /connectorId !== 'outlookDraft'/.test(outlookSrc) && /entry\.connectorId === 'outlookDraft'/.test(outlookSrc));
+check('a missing sender still queries when the subject or conversation is on the page',
+  outlookSrc.indexOf('function hydratePane') > 0 && /!pane\.subject && !wantConv && !wantNet/.test(outlookSrc));
+check('an undone task with the same subject reopens Do It',
+  /taskRow && paneSub && rowSub && paneSub === rowSub/.test(outlookSrc));
 
 const one = FlowOwaParse.uniqueGraphMessage(
   pane('AQQkGlanceE2ENorthwindConv', '2026-10-08T14:01:00.000Z', [file('northwind-agreement-signed.pdf', 3072)]),
@@ -243,6 +332,12 @@ const exact = FlowOwaParse.matchEntryHow(
   [{ messageId: 'graph-AAA', subject: 'Pilot proposal', sender: { email: 'ai.local.flow@gmail.com' }, receivedDateTime: '2026-10-05T09:55:00Z' }]
 );
 check('one exact subject and sender still matches', exact && exact.entry && exact.entry.messageId === 'graph-AAA', exact);
+
+const receiptLeak = FlowOwaParse.matchEntryHow(
+  { subject: 'Q3 fund statement', senderEmail: 'dana@acme.com' },
+  [{ messageId: 'alpha', subject: 'Q3 fund statement', sender: { email: 'dana@acme.com' }, outlookReceipt: true, connectorId: 'onedriveFile' }]
+);
+check('a file receipt does not match a sibling by subject', !receiptLeak);
 
 console.log('\nTOTAL FAILURES:', failures);
 process.exit(failures ? 1 : 0);
