@@ -1,6 +1,6 @@
 # User context v0
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 ## Owner lock — 2026-10-08, about 18:02 Israel
 
@@ -14,7 +14,7 @@ On group or broadcast mail, relevance decides. When the mail is relevant to this
 
 ## Product definition (vision-locked)
 
-Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Gmail is the current primary entry surface. Glance stays silent when it is uncertain, never sends on its own, treats a draft as unfinished, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
+Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. A user's intent, wherever the user is (the floating extension on any site, plus the user's own computer), is closed end to end and proven. Glance stays silent when it is uncertain, never sends on its own, treats a draft as unfinished, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
 
 The profile does not change that block. `unknown` is the uncertainty the block already keeps quiet. A `relevant` mail with an explicit intent span and a possible close is not uncertainty, and Glance offers it.
 
