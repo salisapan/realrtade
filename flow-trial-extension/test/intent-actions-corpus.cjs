@@ -1354,8 +1354,32 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
   check('a newsletter with unsubscribe stays quiet:noise', quiet && quiet.quiet === 'noise', quiet);
   const subjectAsk = classify('Unsubscribe | View in browser', { subject: 'Parking permit - please renew by Sunday', now: new Date('2026-10-08T12:00:00Z') });
   check('a parking subject above a mass-mail footer stays quiet:noise', subjectAsk && subjectAsk.quiet === 'noise' && subjectAsk.type == null, subjectAsk);
-  const clean = classify('Parking permit - please renew by Sunday', { now: new Date('2026-10-08T12:00:00Z') });
-  check('a clean parking-permit renew is a request', clean && clean.type === FlowIntent.TYPES.REQUEST && clean.quiet !== 'noise', clean);
+  const clean = classify('Parking permit - please renew by Sunday', { now: new Date('2026-10-08T12:00:00Z'), senderEmail: 'dana@city.gov' });
+  check('a clean parking-permit renew from a person is a request', clean && clean.type === FlowIntent.TYPES.REQUEST && clean.quiet !== 'noise', clean);
+  const park = 'Parking permit - please renew by Sunday';
+  const when = new Date('2026-10-08T12:00:00Z');
+  [
+    'You are receiving this email because you signed up.',
+    "You're receiving this message from the city list.",
+    'You received this email because you are on the list.'
+  ].forEach((footer) => {
+    const intent = classify(park + '\n\n' + footer, { now: when, senderEmail: 'dana@city.gov' });
+    check('a parking ask with a mailing footer stays quiet: ' + footer.slice(0, 28), intent && intent.quiet === 'noise' && intent.type == null, intent);
+  });
+  [
+    'קיבלת מייל זה כי נרשמת לעדכונים.',
+    'להסרה מרשימת התפוצה לחצו כאן.',
+    'הנך רשום לרשימת התפוצה של העירייה.'
+  ].forEach((footer) => {
+    const intent = classify(park + '\n\n' + footer, { now: when, senderEmail: 'dana@city.gov' });
+    check('a parking ask with a Hebrew list line stays quiet: ' + footer.slice(0, 16), intent && intent.quiet === 'noise' && intent.type == null, intent);
+  });
+  ['newsletter@lists.example', 'news@lists.example', 'marketing@lists.example', 'mailer@lists.example'].forEach((email) => {
+    const intent = classify(park, { now: when, senderEmail: email });
+    check('an automated list sender stays quiet: ' + email, intent && intent.quiet === 'noise' && intent.type == null, intent);
+  });
+  const paper = classify(park, { now: when, senderEmail: 'newspaper@city.gov' });
+  check('a newspaper address is not a list sender', paper && paper.type === FlowIntent.TYPES.REQUEST && paper.quiet !== 'noise', paper);
 }
 
 console.log('\nTOTAL FAILURES:', failures);
