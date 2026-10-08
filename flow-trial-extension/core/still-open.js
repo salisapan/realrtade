@@ -329,16 +329,35 @@ const FlowStillOpen = (() => {
     return row.fetchedBack === true || (row.proof && row.proof.fetchedBack === true);
   }
 
+  function matterIds(row) {
+    if (!row) return [];
+    return [row.messageId, row.itemId, row.pathId, row.outlookIncomingId].filter(Boolean).map(String);
+  }
+
+  // Same promise key, or the same Outlook item. A newer undone row wins
+  // even when an older fetched-back write is still in the log, and even
+  // when that undone row has no outlookReopen flag.
+  function sameMatter(row, item, key) {
+    if (!row) return false;
+    if (key && commitmentDedupeKey(row) === key) return true;
+    const want = matterIds(item);
+    const have = matterIds(row);
+    for (let i = 0; i < want.length; i++) {
+      if (have.indexOf(want[i]) !== -1) return true;
+    }
+    return false;
+  }
+
   // A fetched-back task for this promise is already the close. Undo clears
   // that row, and then one Do It may create the task again.
   function activeProofFor(log, item) {
     const key = commitmentDedupeKey(item);
-    if (!key) return null;
     const rows = Array.isArray(log) ? log : [];
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      if (!todoProofRow(row)) continue;
-      if (commitmentDedupeKey(row) === key) return row;
+      if (!sameMatter(row, item, key)) continue;
+      if (row.kind === 'undone') return null;
+      if (todoProofRow(row)) return row;
     }
     return null;
   }

@@ -41,19 +41,31 @@ function outlookHtml(opts) {
   const toList = Array.isArray(o.to) ? o.to : [ME];
   const ccList = Array.isArray(o.cc) ? o.cc : [];
   const files = Array.isArray(o.attachments) ? o.attachments : [];
-  const received = o.received ? '<div class="received" data-received="' + esc(o.received) + '"></div>' : '';
+  const received = o.received && !o.live ? '<div class="received" data-received="' + esc(o.received) + '"></div>' : '';
+  const clock = o.live && o.receivedLabel
+    ? ('<div class="date">' + esc(o.receivedLabel) + '</div>')
+    : '';
   const fileRows = files.map((f) => {
     const name = f && (f.name || f.filename) || '';
     const size = f && f.size != null ? f.size : '';
+    if (o.live) {
+      const label = (f && (f.sizeLabel || f.sizeText)) || '';
+      return '<div role="group" aria-label="Attachments"><div role="option" class="attachmentChip"><span>' + esc(name) + '</span><span>' + esc(label) + '</span></div></div>';
+    }
     return '<div class="attachment" data-name="' + esc(name) + '" data-size="' + esc(size) + '">' + esc(name) + '</div>';
   }).join('');
+  const unread = o.unread
+    ? '<div role="list"><div role="listitem" class="unread" aria-label="לא נקרא">לא נקרא</div></div>'
+    : '';
   const ccLine = ccList.length ? ('<div class="cc">Cc: ' + ccList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>') : '';
   return '<!doctype html><html lang="en"><head><title>Mail - Glance - Outlook</title></head><body>' +
     '<div id="app"><div role="main">' +
+    unread +
     '<div id="ReadingPaneContainerId">' +
     '<div role="heading" aria-level="2"><span title="' + esc(subject) + '">' + esc(subject) + '</span></div>' +
     '<div class="hdr"><span title="' + esc(title) + '">' + esc(senderName) + '</span>' +
     received +
+    clock +
     '<div class="to">To: ' + toList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>' +
     ccLine +
     fileRows +

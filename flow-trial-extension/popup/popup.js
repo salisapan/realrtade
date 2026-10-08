@@ -43,6 +43,39 @@
   // Same trap again: renderWaiting() runs before a later `let` would initialise.
   let loopView = 'date';
   let whyNotShownAll = false;
+  const tabScroll = { setup: 0, open: 0, log: 0 };
+  let scrollLock = false;
+  let renderDepth = 0;
+  function panelScroller() { return document.querySelector('main'); }
+  function activeTabId() {
+    const tab = document.querySelector('.tab[aria-selected="true"]');
+    return (tab && tab.dataset.tab) || 'setup';
+  }
+  function rememberScroll() {
+    if (scrollLock) return;
+    const scroller = panelScroller();
+    if (!scroller) return;
+    tabScroll[activeTabId()] = scroller.scrollTop;
+  }
+  function restoreScroll() {
+    const scroller = panelScroller();
+    if (!scroller) return;
+    const y = tabScroll[activeTabId()] || 0;
+    scrollLock = true;
+    scroller.scrollTop = y;
+    scrollLock = false;
+  }
+  function beginRender() {
+    if (renderDepth === 0) {
+      rememberScroll();
+      scrollLock = true;
+    }
+    renderDepth += 1;
+  }
+  function endRender() {
+    renderDepth = Math.max(0, renderDepth - 1);
+    if (renderDepth === 0) restoreScroll();
+  }
 
   try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.captureNow) renderCapture().catch(() => {}); }); } catch (e) { /* optional */ }
   try {
@@ -53,6 +86,8 @@
       renderOpen().catch(() => {});
     });
   } catch (e) { /* panel is already showing the last render */ }
+  const scroller = panelScroller();
+  if (scroller) scroller.addEventListener('scroll', rememberScroll, { passive: true });
   wireTabs();
   wireSave();
   wireRecipe();
@@ -481,10 +516,14 @@
   function wireTabs() {
     document.querySelectorAll('.tab').forEach((tab) => {
       tab.addEventListener('click', async () => {
+        rememberScroll();
         document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t === tab)));
         document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.dataset.panel === tab.dataset.tab));
+        scrollLock = true;
         if (tab.dataset.tab === 'log') await renderLog();
         if (tab.dataset.tab === 'open') await renderOpen();
+        scrollLock = false;
+        restoreScroll();
       });
     });
   }
@@ -2151,16 +2190,28 @@
     catch (e) { return { ok: false, error: String(e && e.message || e) }; }
   }
 
-  async function renderOpen() {
-    await ensureOutlookMigrated();
-    await reconcileOutlookReceiptsSafe();
+  // Loops and "Still open — shown N" read this same list. Receipts stay
+  // in the list; a promise key already collapsed the open rows inside
+  // getStillOpen.
+  async function visibleLoops() {
     const pending = await FlowStorage.getStillOpen();
     const receipts = (typeof FlowStorage.getActiveOutlookReceipts === 'function')
       ? await FlowStorage.getActiveOutlookReceipts()
       : [];
-    // Dedup: if a receipt exists for a messageId, skip the still-open card.
     const receiptIds = new Set(receipts.map((r) => r.messageId).filter(Boolean));
     const openOnly = pending.filter((e) => !receiptIds.has(e.messageId));
+    return { openOnly: openOnly, receipts: receipts };
+  }
+
+  async function renderOpen() {
+    beginRender();
+    let loops;
+    try {
+    await ensureOutlookMigrated();
+    await reconcileOutlookReceiptsSafe();
+    loops = await visibleLoops();
+    const openOnly = loops.openOnly;
+    const receipts = loops.receipts;
     const total = openOnly.length + receipts.length;
     chrome.runtime.sendMessage({ type: 'flow:pending-count', count: total });
     for (const item of openOnly) {
@@ -2174,6 +2225,7 @@
     empty.hidden = total > 0;
     receipts.forEach((entry) => host.appendChild(outlookReceiptRow(entry)));
     openOnly.forEach((entry) => host.appendChild(openRow(entry)));
+    } finally { endRender(); }
   }
 
   function when(ts) {
@@ -2455,23 +2507,30 @@
     node.hidden = false;
   }
 
-  function renderStillOpenQuality(s) {
+  async function renderStillOpenQuality(s) {
     const node = document.getElementById('stillOpenQuality');
     if (!node) return;
     if (typeof FlowStillOpen === 'undefined') { node.hidden = true; return; }
-    const line = FlowStillOpen.activityLine(s.stillOpenMetrics || FlowStillOpen.emptyMetrics());
+    const loops = await visibleLoops();
+    const metrics = Object.assign({}, s.stillOpenMetrics || FlowStillOpen.emptyMetrics(), {
+      shown: loops.openOnly.length + loops.receipts.length
+    });
+    const line = FlowStillOpen.activityLine(metrics);
+    if (!line && !metrics.shown && !metrics.doIt && !metrics.undo && !metrics.falseClose) { node.hidden = true; return; }
     if (!line) { node.hidden = true; return; }
     node.textContent = line;
     node.hidden = false;
   }
 
   async function renderLog() {
+    beginRender();
+    try {
     await ensureOutlookMigrated();
     const s = await FlowStorage.get();
     renderWeekStat(s);
     renderCloseQuality(s);
     renderQuiet(s);
-    renderStillOpenQuality(s);
+    await renderStillOpenQuality(s);
     await renderLearned();
     await renderLedger();
     renderSensitivity(s);
@@ -2485,6 +2544,7 @@
     const rows = activityRows(s.log || []);
     empty.hidden = rows.length > 0;
     rows.forEach((e) => host.appendChild(logRow(e)));
+    } finally { endRender(); }
   }
 
   // A Google Task undo used to append a second row and leave the written

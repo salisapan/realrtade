@@ -326,14 +326,14 @@ async function run() {
   console.log('\n--- storage.js: an undone write stays closed ---\n');
   store = {};
   {
-    // Undo reverses the record in Google; it does not reopen the proposal —
-    // the user saw the whole thing happen and chose to keep none of it.
+    // Undo returns the loop to open. A dismissal stays closed. An older
+    // UNDONE row, with or without outlookReopen, must not keep Do It hidden.
     await FlowStorage.appendLog({ kind: 'shown', messageId: 'UND', label: 'x', process: proc });
     await FlowStorage.appendLog({ kind: 'written', messageId: 'UND', label: 'x', where: 'Google Tasks' });
     await FlowStorage.appendLog({ kind: 'undone', messageId: 'UND', label: 'x' });
-    check('undo is terminal', await FlowStorage.hasTerminalOutcome('UND'));
-    check('an undone process is not re-listed as waiting to be closed',
-      !(await FlowStorage.getPending()).some((e) => e.messageId === 'UND'));
+    check('undo reopens the loop', (await FlowStorage.hasTerminalOutcome('UND')) === false);
+    check('an undone process is listed again as waiting to be closed',
+      (await FlowStorage.getPending()).some((e) => e.messageId === 'UND'));
   }
 
   console.log('\n--- storage.js: installs that predate the durable keys ---\n');

@@ -618,6 +618,16 @@
   async function personalCloseSaysSilence(intent, threadId, subject) {
     if (!intent || !intent.personalClose || typeof FlowCloseMemory === 'undefined') return false;
     try {
+      if (typeof FlowStorage !== 'undefined' && typeof FlowStorage.get === 'function') {
+        const bag = await FlowStorage.get();
+        const log = (bag && bag.log) || [];
+        for (let i = 0; i < log.length; i++) {
+          const row = log[i];
+          if (!row || row.kind !== 'undone') continue;
+          if (threadId && (row.threadId === threadId || row.outlookConversationId === threadId || row.messageId === threadId)) return false;
+          if (subject && row.subject && String(row.subject).toLowerCase() === String(subject).toLowerCase()) return false;
+        }
+      }
       const recalled = await FlowCloseMemory.recall({
         personalClose: intent.personalClose,
         threadId: threadId,

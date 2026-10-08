@@ -2,7 +2,7 @@
 // The panel compares the two. A worker that is still the previous registration
 // does not match, and the panel says so. This is not chrome.runtime.getManifest.
 const FlowBuild = (() => {
-  const STAMP = '0.9.44';
+  const STAMP = '0.9.45';
   return { STAMP: STAMP };
 })();
 

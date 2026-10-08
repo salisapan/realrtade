@@ -110,13 +110,13 @@ async function main() {
   const receipts = await FlowStorage.getActiveOutlookReceipts();
   assert.strictEqual(receipts.length, 0, 'no active receipt after undo');
 
-  // Regular (non-reopen) undo stays terminal — Gmail / trusted-close path.
+  // An older undone row has no outlookReopen flag. It still reopens.
   store = {};
   await FlowStorage.appendLog({ kind: 'shown', messageId: 'g1', label: 'x', process: proc });
   await FlowStorage.appendLog({ kind: 'written', messageId: 'g1', label: 'x', where: 'Google Tasks' });
   await FlowStorage.appendLog({ kind: 'undone', messageId: 'g1', label: 'x' });
-  assert.strictEqual(await FlowStorage.hasTerminalOutcome('g1'), true, 'plain undone stays terminal');
-  assert.ok(!(await FlowStorage.getPending()).some((e) => e.messageId === 'g1'));
+  assert.strictEqual(await FlowStorage.hasTerminalOutcome('g1'), false, 'plain undone reopens');
+  assert.ok((await FlowStorage.getPending()).some((e) => e.messageId === 'g1'));
 
   // appendLog fallback with outlookReopen must not permanently hide either surface
   store = {};

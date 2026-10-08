@@ -83,6 +83,20 @@ const one = FlowOwaParse.uniqueGraphMessage(
 check('one real PDF that matches the pane is that message',
   one.message && one.message.id === 'AQMkGlanceE2ENorthwindMsg', one);
 
+const labeled = FlowOwaParse.uniqueGraphMessage(
+  { conversationId: 'AQQkSept', receivedDateTime: SEPT, attachments: [{ name: 'invoice-sept.pdf', sizeLabel: '3 KB' }] },
+  [msg('m-sept', 'AQQkSept', SEPT, [file('invoice-sept.pdf', 3072)], 'Invoice'), oct]
+);
+check('a page that shows 3 KB links to the 3072-byte file',
+  labeled.message && labeled.message.id === 'm-sept', labeled);
+
+const labelMiss = FlowOwaParse.uniqueGraphMessage(
+  { conversationId: 'AQQkSept', receivedDateTime: SEPT, attachments: [{ name: 'invoice-sept.pdf', sizeLabel: '9 KB' }] },
+  [sept]
+);
+check('a displayed size that is not the file stays unresolved',
+  !labelMiss.message && labelMiss.reason === 'suggest:unresolved');
+
 const subHit = FlowOwaParse.matchEntryHow(
   { subject: 'Invoice', senderEmail: 'dana@acme.com', receivedDateTime: SEPT },
   [{ messageId: 'long', subject: 'Invoice October details', sender: { email: 'dana@acme.com' }, receivedDateTime: OCT }]

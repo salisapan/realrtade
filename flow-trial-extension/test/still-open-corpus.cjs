@@ -503,6 +503,11 @@ console.log('\n--- one promise is one Do It ---\n');
   check('one Do It: a proof for לשלוח את החוזה hides אני אשלח את החוזה',
     FlowStillOpen.select([infinitive, pointedMail], NOW, [heProof]).length === 0 &&
     FlowStillOpen.activeProofFor([heProof], conjugated));
+  check('undo without outlookReopen clears a fetched-back proof',
+    FlowStillOpen.activeProofFor([
+      { kind: 'undone', messageId: 'he-conj' },
+      heProof
+    ], conjugated) === null);
   check('niqqud and maqaf normalize to the same promise key',
     Boolean(FlowStillOpen.promiseKey(plainHe)) &&
     FlowStillOpen.promiseKey(pointed) === FlowStillOpen.promiseKey(plainHe) &&

@@ -143,22 +143,81 @@ const FlowOwaParse = (() => {
     return rows.join('\n');
   }
 
+  // Outlook prints "3 KB", not the byte count. Round and ceil both count,
+  // because the live chip and Graph disagree on which one they use.
+  function shownSizeLabels(bytes) {
+    const out = [];
+    if (typeof bytes !== 'number' || !isFinite(bytes) || bytes < 0) return out;
+    if (bytes < 1024) { out.push(bytes + ' B'); return out; }
+    if (bytes < 1024 * 1024) {
+      const kb = bytes / 1024;
+      out.push(Math.max(1, Math.round(kb)) + ' KB');
+      out.push(Math.max(1, Math.ceil(kb - 1e-9)) + ' KB');
+      return out;
+    }
+    const mb = bytes / (1024 * 1024);
+    if (mb < 1024) {
+      const rounded = Math.round(mb * 10) / 10;
+      const text = (rounded % 1 === 0 ? String(Math.round(rounded)) : String(rounded)) + ' MB';
+      out.push(text);
+      out.push(Math.max(1, Math.ceil(mb - 1e-9)) + ' MB');
+      return out;
+    }
+    const gb = mb / 1024;
+    const rounded = Math.round(gb * 10) / 10;
+    out.push((rounded % 1 === 0 ? String(Math.round(rounded)) : String(rounded)) + ' GB');
+    return out;
+  }
+
+  function fileRows(list) {
+    const rows = [];
+    (list || []).forEach((a) => {
+      if (!a) return;
+      const name = norm(a.name || a.filename || '');
+      if (!name) return;
+      let size = null;
+      if (typeof a.size === 'number' && isFinite(a.size)) size = a.size;
+      else if (a.size != null && a.size !== '' && isFinite(Number(a.size))) size = Number(a.size);
+      rows.push({ name: name, size: size, label: norm(a.sizeLabel || a.sizeText || '').replace(/\s+/g, '') });
+    });
+    rows.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : (a.size || 0) - (b.size || 0)));
+    return rows;
+  }
+
+  function filesAgree(paneList, graphList) {
+    const pane = fileRows(paneList);
+    const graph = fileRows(graphList);
+    if (!pane.length || pane.length !== graph.length) return false;
+    for (let i = 0; i < pane.length; i++) {
+      if (pane[i].name !== graph[i].name) return false;
+      if (pane[i].size != null) {
+        if (pane[i].size !== graph[i].size) return false;
+        continue;
+      }
+      if (!pane[i].label || graph[i].size == null) return false;
+      const forms = shownSizeLabels(graph[i].size).map((s) => norm(s).replace(/\s+/g, ''));
+      if (forms.indexOf(pane[i].label) < 0) return false;
+    }
+    return true;
+  }
+
   // A pane links to a Graph message only when exactly one candidate has the
   // same conversation or internet message id, the same minute, and the same
-  // attachment names and sizes. Anything else is suggest:unresolved.
+  // attachment names and sizes. A page that shows "3 KB" matches the byte
+  // count that displays as that label. Anything else is suggest:unresolved.
   function uniqueGraphMessage(pane, messages) {
     const list = (messages || []).filter(Boolean);
     const paneConv = canonId(pane && pane.conversationId);
     const paneNet = canonId(pane && pane.internetMessageId);
     const paneMinute = minuteKey(pane && (pane.receivedDateTime || pane.date));
-    const paneFiles = attachmentSig(pane && pane.attachments);
-    if ((!paneConv && !paneNet) || !paneMinute || !paneFiles) return { message: null, reason: 'suggest:unresolved' };
+    const paneHasFiles = fileRows(pane && pane.attachments).length > 0;
+    if ((!paneConv && !paneNet) || !paneMinute || !paneHasFiles) return { message: null, reason: 'suggest:unresolved' };
     const hits = list.filter((m) => {
       const convOk = paneConv && canonId(m.conversationId) === paneConv;
       const netOk = paneNet && canonId(m.internetMessageId) === paneNet;
       if (!convOk && !netOk) return false;
       if (minuteKey(m.receivedDateTime) !== paneMinute) return false;
-      if (attachmentSig(m.attachments || m.files) !== paneFiles) return false;
+      if (!filesAgree(pane.attachments, m.attachments || m.files)) return false;
       return true;
     });
     if (hits.length !== 1) return { message: null, reason: 'suggest:unresolved' };
@@ -407,6 +466,41 @@ const FlowOwaParse = (() => {
     return { to: to, cc: cc };
   }
 
+  // Day/month, the order the Hebrew mailbox prints (08/10/2026 is 8 October).
+  // A time[datetime] or data-received value is used as-is when it has a minute.
+  function clockToIso(text) {
+    const t = String(text || '').replace(BIDI_RE, ' ').replace(/\s+/g, ' ').trim();
+    const iso = t.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (iso) {
+      const d = new Date(+iso[1], +iso[2] - 1, +iso[3], +iso[4], +iso[5], 0, 0);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    }
+    const date = t.match(/(\d{1,2})[./](\d{1,2})[./](\d{4})/);
+    const time = t.match(/(\d{1,2}):(\d{2})/);
+    if (!date || !time) return '';
+    let day = +date[1];
+    let month = +date[2];
+    const year = +date[3];
+    if (day <= 12 && month > 12) { const swap = day; day = month; month = swap; }
+    const d = new Date(year, month - 1, day, +time[1], +time[2], 0, 0);
+    if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return '';
+    return d.toISOString();
+  }
+
+  function headerTextNodes(container, bodyRoot) {
+    const nodes = container.querySelectorAll('time, div, span, p');
+    const out = [];
+    for (let i = 0; i < nodes.length && out.length < 40; i++) {
+      const n = nodes[i];
+      if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
+      if (inList(n)) continue;
+      const t = textOf(n);
+      if (!t || t.length > 80) continue;
+      out.push({ node: n, text: t });
+    }
+    return out;
+  }
+
   function receivedOf(container, bodyRoot) {
     if (!container || !container.querySelector) return '';
     const marked = container.querySelector('[data-received]');
@@ -414,20 +508,57 @@ const FlowOwaParse = (() => {
       const raw = marked.getAttribute('data-received') || '';
       if (minuteKey(raw)) return raw;
     }
-    return '';
+    const timed = container.querySelector('time[datetime]');
+    if (timed && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(timed))) {
+      const raw = timed.getAttribute('datetime') || '';
+      if (minuteKey(raw)) return raw;
+    }
+    const bits = [];
+    const nodes = headerTextNodes(container, bodyRoot);
+    for (let i = 0; i < nodes.length; i++) {
+      const iso = clockToIso(nodes[i].text);
+      if (iso) return iso;
+      if (/\d{1,2}:\d{2}/.test(nodes[i].text) || /\d{1,2}[./]\d{1,2}[./]\d{4}/.test(nodes[i].text)) bits.push(nodes[i].text);
+    }
+    return clockToIso(bits.join(' '));
   }
+
+  const FILE_NAME_RE = /([^\s\\/:"<>|]+\.(?:pdf|docx?|xlsx?|pptx?|csv|txt|rtf|png|jpe?g|heic|zip))/i;
+  const SIZE_LABEL_RE = /(\d+(?:[.,]\d+)?)\s*(B|KB|MB|GB)\b/i;
 
   function attachmentsOf(container, bodyRoot) {
     if (!container || !container.querySelectorAll) return [];
-    const nodes = container.querySelectorAll('[data-name][data-size]');
-    const out = [];
-    for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
+    const marked = container.querySelectorAll('[data-name][data-size]');
+    const exact = [];
+    for (let i = 0; i < marked.length; i++) {
+      const n = marked[i];
       if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
+      if (inList(n)) continue;
       const name = String(n.getAttribute('data-name') || '').trim();
       const size = Number(n.getAttribute('data-size'));
       if (!name || !isFinite(size)) continue;
-      out.push({ name: name, size: size });
+      exact.push({ name: name, size: size });
+    }
+    if (exact.length) return exact;
+    const nodes = container.querySelectorAll('[role="option"], button, a, div, span');
+    const out = [];
+    const seen = {};
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
+      if (inList(n)) continue;
+      const blob = ((n.getAttribute && (n.getAttribute('aria-label') || '')) + ' ' + textOf(n)).replace(/\s+/g, ' ').trim();
+      if (!blob || blob.length > 180) continue;
+      const nameM = blob.match(FILE_NAME_RE);
+      const sizeM = blob.match(SIZE_LABEL_RE);
+      if (!nameM || !sizeM) continue;
+      if (n.querySelector && n.querySelector('[role="option"], .attachmentChip')) continue;
+      const name = nameM[1];
+      const label = sizeM[1].replace(',', '.') + ' ' + sizeM[2].toUpperCase();
+      const key = norm(name) + '|' + norm(label).replace(/\s+/g, '');
+      if (seen[key]) continue;
+      seen[key] = 1;
+      out.push({ name: name, sizeLabel: label });
     }
     return out;
   }

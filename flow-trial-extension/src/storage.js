@@ -334,7 +334,7 @@ const FlowStorage = (() => {
     // A draft-only Outlook undo (outlookReopen) is not a trusted close: the ask
     // must be eligible again for the popup Still Open list AND the in-page card.
     // Clear any durable resolve from the prior write; do not count a close.
-    const reopenUndone = row.kind === 'undone' && row.outlookReopen;
+    const reopenUndone = isReopenUndone(row);
     if (reopenUndone && row.messageId) {
       if (resolved.has(row.messageId)) {
         patch.resolvedMessageIds = (state.resolvedMessageIds || []).filter((id) => id !== row.messageId);
@@ -456,8 +456,11 @@ const FlowStorage = (() => {
   // again after Gmail rebuilds its node.
   // Draft-only Outlook undo: the loop is still owed. Same rule getPendingFrom
   // uses for Still Open / popup Do It — the in-page card must agree.
+  // Undo returns the loop to open. A dismissed chip stays closed. An older
+  // UNDONE row without outlookReopen is the same reopen: close memory must
+  // not keep the Do It hidden.
   function isReopenUndone(entry) {
-    return !!(entry && entry.kind === 'undone' && entry.outlookReopen);
+    return !!(entry && entry.kind === 'undone');
   }
 
   // Pure over a fetched state so corpora and content scripts share one definition
@@ -568,15 +571,16 @@ const FlowStorage = (() => {
     // written twin must not close them (appendLog fallback leaves written in place).
     const reopened = new Set();
     for (const entry of state.log) {
-      if (!entry.messageId || resolved.has(entry.messageId)) continue;
-      // A prepared Outlook draft that was undone is not a trusted close: the ask
-      // may reappear in Loops (outlookReopen). Do not treat that undone as terminal.
+      if (!entry || !entry.messageId) continue;
+      // Newest row wins. An undone row reopens even when an older write left
+      // the id in resolvedMessageIds.
+      if (isReopenUndone(entry)) {
+        reopened.add(entry.messageId);
+        continue;
+      }
+      if (reopened.has(entry.messageId) && entry.kind === 'written') continue;
+      if (!reopened.has(entry.messageId) && resolved.has(entry.messageId)) continue;
       if (TERMINAL_KINDS.has(entry.kind)) {
-        if (isReopenUndone(entry)) {
-          reopened.add(entry.messageId);
-          continue;
-        }
-        if (reopened.has(entry.messageId) && entry.kind === 'written') continue;
         resolved.add(entry.messageId); continue;
       }
       if (entry.kind !== 'shown' || !entry.process) continue;
@@ -614,13 +618,19 @@ const FlowStorage = (() => {
   // getPending; scan rows are filtered here because they are not log entries.
   function candidatesFromState(state) {
     const resolved = new Set((state && state.resolvedMessageIds) || []);
+    const reopenedIds = new Set();
+    for (const entry of (state && state.log) || []) {
+      if (!entry || !entry.messageId || reopenedIds.has(entry.messageId) || resolved.has('seen:' + entry.messageId)) continue;
+      if (isReopenUndone(entry)) reopenedIds.add(entry.messageId);
+      else if (TERMINAL_KINDS.has(entry.kind)) resolved.add('seen:' + entry.messageId);
+    }
     const pending = getPendingFrom(state).map((entry) => FlowStillOpen.fromLogEntry(entry));
     const seenMsg = new Set(pending.map((c) => c.messageId).filter(Boolean));
     const seenKey = new Set(pending.map((c) => FlowStillOpen.promiseKey(c)).filter(Boolean));
     const scan = [];
     for (const raw of (state && state.stillOpenScan) || []) {
       const c = FlowStillOpen.fromLogEntry(raw);
-      if (!c.messageId || resolved.has(c.messageId)) continue;
+      if (!c.messageId || (resolved.has(c.messageId) && !reopenedIds.has(c.messageId))) continue;
       if (seenMsg.has(c.messageId)) continue;
       const key = FlowStillOpen.promiseKey(c);
       if (key && seenKey.has(key)) continue;

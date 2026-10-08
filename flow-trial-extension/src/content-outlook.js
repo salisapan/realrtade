@@ -422,6 +422,10 @@
     return Array.isArray(body.value) ? body.value : [];
   }
 
+  function graphStatus(r) {
+    return r && typeof r.status === 'number' ? r.status : 0;
+  }
+
   // Spellings of one Exchange id: Graph REST (- and _) first, then the URL form (+ and /).
   function idSpellings(id) {
     const raw = String(id || '');
@@ -1041,21 +1045,13 @@
       threadIds: [pane.conversationId]
     });
     const existing = stripDuplicateUndoHosts(mount);
-    // Undo already replaced the receipt with its confirmation. The written
-    // row is gone, so a scan would otherwise delete that line. Keep it while
-    // this is still the same message. A different message drops it.
+    // An Undo line is not a close. data-glance-undone stays on the click,
+    // then this scan drops it so exactly one Do It can return, including
+    // after reload and for a banner stored by an earlier version.
     if (existing && existing.getAttribute('data-glance-undone') === '1') {
-      const marked = String(existing.getAttribute('data-glance-message') || '').split('|').filter(Boolean);
-      const ids = [pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
-      if (marked.length && ids.some((id) => marked.indexOf(id) !== -1)) {
-        lastOutcome = 'card';
-        return true;
-      }
       existing.remove();
     }
     if (!outlookProofRow(row)) {
-      const banner = await undoneBannerFor(pane);
-      if (banner && banner.line) return Boolean(paintUndoneStatus(mount, pane, banner.line));
       if (existing && existing.isConnected) existing.remove();
       return false;
     }
@@ -1950,8 +1946,11 @@
     const pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own }));
     const ids = FlowOwaParse.urlIds(location.href);
     const earlyPlanned = plannedRow(st, pane);
+    const fileSig = pane && Array.isArray(pane.attachments)
+      ? pane.attachments.map((a) => (a && a.name || '') + ':' + (a && a.size != null ? a.size : (a && a.sizeLabel || ''))).join(',')
+      : '';
     const sig = pane
-      ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text), (earlyPlanned && earlyPlanned.reason) || ''].join('|')
+      ? [pane.conversationId || pane.itemId || '', pane.subject, pane.senderName, hashText(pane.text), pane.receivedDateTime || '', fileSig, (earlyPlanned && earlyPlanned.reason) || ''].join('|')
       : 'none|' + location.pathname;
     const armed = traceArmed || localFileTrace();
     // A click rewrites the chip. That must not re-enter the file chain: re-entry was what
@@ -1970,6 +1969,17 @@
     lastSig = sig;
     lastOutcome = '';
     suggestNote = (pane && (pane.conversationId || pane.itemId || (pane.text && String(pane.text).trim()))) ? pane : null;
+    if (!suggestNote && ids && ids.kind) {
+      suggestNote = {
+        itemId: ids.itemId || null,
+        conversationId: ids.conversationId || null,
+        pathId: ids.raw || null,
+        subject: ids.raw || '',
+        text: '',
+        attachments: [],
+        receivedDateTime: ''
+      };
+    }
     if (!pane) {
       // A message is open (its id is in the address) but its body could not be found: say so, with what was on the page.
       // The subject is the id from the address, so Why not shown can name the message.
@@ -1997,6 +2007,9 @@
       const earlyProof = await livePromiseProof({
         text: pane.text,
         sender: { name: pane.senderName, email: pane.senderEmail },
+        messageId: pane.itemId || pane.pathId || pane.conversationId || '',
+        itemId: pane.itemId || null,
+        pathId: pane.pathId || null,
         threadId: pane.conversationId || '',
         outlookConversationId: pane.conversationId || ''
       });
@@ -2338,17 +2351,32 @@
     await FlowStorage.set({ suggestLog: log.slice(0, 40) });
   }
 
+  let lastGraphStatus = 0;
+
   async function attachmentListFor(id) {
     if (!id) return null;
     const spells = idSpellings(id);
     const prefers = [null, GRAPH_IMMUTABLE];
-    const select = '/attachments?$select=id,name,contentType,size,isInline,contentId';
-    for (let p = 0; p < prefers.length; p++) {
-      for (let i = 0; i < spells.length; i++) {
-        const rows = await graphValues('/me/messages/' + encodeURIComponent(spells[i]) + select, 'suggest-list', prefers[p]);
-        if (Array.isArray(rows)) return rows;
+    const paths = [
+      '/attachments?$select=id,name,contentType,size,isInline,contentId',
+      '/attachments'
+    ];
+    let saw = 0;
+    for (let pathIx = 0; pathIx < paths.length; pathIx++) {
+      for (let p = 0; p < prefers.length; p++) {
+        for (let i = 0; i < spells.length; i++) {
+          const r = await graphCall('/me/messages/' + encodeURIComponent(spells[i]) + paths[pathIx], 'suggest-list', prefers[p]);
+          const status = graphStatus(r);
+          if (status) saw = status;
+          lastGraphStatus = status || lastGraphStatus;
+          if (!r || !r.ok) continue;
+          let body = null;
+          try { body = JSON.parse(r.body || '{}'); } catch (e) { body = null; }
+          if (body && Array.isArray(body.value)) return body.value;
+        }
       }
     }
+    lastGraphStatus = saw || lastGraphStatus;
     return null;
   }
 
@@ -2358,37 +2386,83 @@
     const order = '$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc');
     const filteredPath = '/me/mailFolders/inbox/messages?' + order + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + select;
     const plainPath = '/me/mailFolders/inbox/messages?' + order + select;
-    let list = await graphValues(filteredPath, 'suggest-inbox', null);
-    if (!Array.isArray(list)) list = await graphValues(plainPath, 'suggest-inbox-plain', null);
-    return Array.isArray(list) ? list : [];
+    const filtered = await graphCall(filteredPath, 'suggest-inbox', null);
+    lastGraphStatus = graphStatus(filtered) || lastGraphStatus;
+    if (filtered && filtered.ok) {
+      try {
+        const body = JSON.parse(filtered.body || '{}');
+        if (Array.isArray(body.value)) return body.value;
+      } catch (e) { /* plain list next */ }
+    }
+    const plain = await graphCall(plainPath, 'suggest-inbox-plain', null);
+    lastGraphStatus = graphStatus(plain) || lastGraphStatus;
+    if (plain && plain.ok) {
+      try {
+        const body = JSON.parse(plain.body || '{}');
+        if (Array.isArray(body.value)) return body.value;
+      } catch (e) { return null; }
+    }
+    return null;
+  }
+
+  function suggestFail(reason) {
+    return { unresolved: true, reason: reason || 'suggest:unresolved' };
   }
 
   // A message id in the address is that message. A conversation address links
   // only through uniqueGraphMessage. Subject and "newest" are not a link.
+  // Each miss names the stage: no id, Graph status, no candidate, unresolved, empty list.
   async function suggestFiles(pane) {
     const id = pane.itemId || null;
+    const wantConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.conversationId) : '';
+    const wantNet = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.internetMessageId) : '';
+    if (!id && !wantConv && !wantNet) return suggestFail('suggest:no-message-id');
     if (id) {
       const direct = await attachmentListFor(id);
       if (Array.isArray(direct)) return direct;
+      if (!wantConv && !wantNet) {
+        const st = lastGraphStatus;
+        if (st && st !== 200) return suggestFail('suggest:graph-' + st);
+        return suggestFail('suggest:attachments-unread');
+      }
     }
-    if (typeof FlowOwaParse === 'undefined' || typeof FlowOwaParse.uniqueGraphMessage !== 'function') return { unresolved: true };
-    const wantConv = FlowOwaParse.canonId(pane.conversationId);
-    const wantNet = FlowOwaParse.canonId(pane.internetMessageId);
-    if (!wantConv && !wantNet) return { unresolved: true };
+    if (typeof FlowOwaParse === 'undefined' || typeof FlowOwaParse.uniqueGraphMessage !== 'function') return suggestFail('suggest:unresolved');
     const list = await recentInbox();
-    const enriched = [];
+    if (!Array.isArray(list)) {
+      const st = lastGraphStatus;
+      return suggestFail(st ? ('suggest:graph-' + st) : 'suggest:graph-0');
+    }
+    const hits = [];
     for (let i = 0; i < list.length; i++) {
       const m = list[i];
       if (!m || !m.id) continue;
       const convOk = wantConv && FlowOwaParse.canonId(m.conversationId) === wantConv;
       const netOk = wantNet && FlowOwaParse.canonId(m.internetMessageId) === wantNet;
-      if (!convOk && !netOk) continue;
-      const rows = await attachmentListFor(m.id);
-      enriched.push(Object.assign({}, m, { attachments: Array.isArray(rows) ? rows : [] }));
+      if (convOk || netOk) hits.push(m);
+    }
+    if (!hits.length) return suggestFail('suggest:no-candidate');
+    const enriched = [];
+    let unreadStatus = 0;
+    let anyRead = false;
+    for (let i = 0; i < hits.length; i++) {
+      const rows = await attachmentListFor(hits[i].id);
+      if (!Array.isArray(rows)) {
+        unreadStatus = lastGraphStatus || unreadStatus;
+        continue;
+      }
+      anyRead = true;
+      enriched.push(Object.assign({}, hits[i], { attachments: rows }));
+    }
+    if (!anyRead) {
+      if (unreadStatus && unreadStatus !== 200) return suggestFail('suggest:graph-' + unreadStatus);
+      return suggestFail('suggest:attachments-unread');
     }
     const linked = FlowOwaParse.uniqueGraphMessage(pane, enriched);
-    if (!linked || !linked.message) return { unresolved: true };
-    return Array.isArray(linked.message.attachments) ? linked.message.attachments : { unresolved: true };
+    if (!linked || !linked.message) return suggestFail((linked && linked.reason) || 'suggest:unresolved');
+    const files = linked.message.attachments;
+    if (!Array.isArray(files)) return suggestFail('suggest:attachments-unread');
+    if (!files.length) return suggestFail('suggest:attachments-empty');
+    return files;
   }
 
   // A mail that already has a card keeps suggest:other-card in the local log.
@@ -2571,22 +2645,34 @@
     }
   }
 
+  // A card for a different message is not "another card" on this one.
+  // An attachment mail with no ask still gets Save the file? on its own.
+  function chipForThisPane(pane) {
+    const host = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+    if (!host || !pane) return null;
+    const marked = String(host.getAttribute('data-glance-message') || '').split('|').filter(Boolean);
+    if (!marked.length) return host;
+    const ids = [pane.itemId, pane.pathId, pane.conversationId].filter(Boolean).map(String);
+    return ids.some((id) => marked.indexOf(id) !== -1) ? host : null;
+  }
+
   async function recordSuggestNote() {
     const pane = suggestNote;
     suggestNote = null;
     if (!pane || typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return;
-    const showed = lastOutcome === 'card' || Boolean(document.querySelector('#ReadingPaneContainerId .flow-chip-host'));
+    const sameChip = chipForThisPane(pane);
+    const showed = Boolean(sameChip);
     const messageId = pane.itemId || pane.conversationId || pane.pathId || '';
     let files = null;
-    let unresolved = false;
+    let stageReason = '';
     try {
       const read = await suggestFiles(pane);
-      if (read && read.unresolved) unresolved = true;
+      if (read && read.unresolved) stageReason = read.reason || 'suggest:unresolved';
       else files = read;
-    } catch (e) { files = null; }
-    if (unresolved && !showed) {
-      await appendSuggestLog({ messageId: messageId, reason: 'suggest:unresolved', surface: 'outlook' });
-      await pageReason('suggest:unresolved', pane);
+    } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
+    if (stageReason && !showed) {
+      await appendSuggestLog({ messageId: messageId, reason: stageReason, surface: 'outlook' });
+      await pageReason(stageReason, pane);
       return;
     }
     let bag = {};
@@ -2680,6 +2766,24 @@
     return host;
   }
 
+  // A stored Undo line stays only when this mail has no card. A promise
+  // mail gets its Do It; a silent mail keeps the confirmation.
+  async function paintStoredUndoneIfQuiet() {
+    if (document.querySelector('#ReadingPaneContainerId .flow-chip-host')) return;
+    let pane = null;
+    try {
+      const st = await FlowStorage.get();
+      pane = FlowOwaParse.readPane(document, location.href, { own: ownAddressesOf(st) });
+    } catch (e) { pane = null; }
+    if (!pane) return;
+    const banner = await undoneBannerFor(pane);
+    if (!banner || !banner.line) return;
+    const mount = mountPoint();
+    if (!mount) return;
+    if (document.querySelector('#ReadingPaneContainerId .flow-chip-host')) return;
+    paintUndoneStatus(mount, pane, banner.line);
+  }
+
   async function runScan() {
     timer = null;
     if (scanning) { again = true; return; }
@@ -2694,6 +2798,7 @@
     }
     finally {
       try { await recordSuggestNote(); } catch (e) { /* the note is not the card */ }
+      try { await paintStoredUndoneIfQuiet(); } catch (e) { /* the banner is not the card */ }
       scanning = false;
       if (again) { again = false; schedule(); }
     }
