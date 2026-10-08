@@ -871,10 +871,11 @@ const FlowFollow = (() => {
     await new Promise((r) => chrome.storage.local.set({ [UPSELL_KEY]: Date.now() }, r));
     track('follow_cap_hit');
     const h = card(false);
+    const proPublic = typeof FlowEntitlements !== 'undefined' && FlowEntitlements.PRO_PUBLIC === true;
     h.appendChild(el('div', 'flow-fu-title', 'You are following ' + active + ' of ' + cap + ' open loops'));
-    h.appendChild(el('div', 'flow-fu-line', (reopening ? 'To reopen this one, another has to close first. ' : 'This one looks like it needs chasing too. ') + 'Glance Pro stays on every loop until it is closed, and shows the money still owed to you.'));
+    h.appendChild(el('div', 'flow-fu-line', (reopening ? 'To reopen this one, another has to close first.' : 'This one looks like it needs chasing too.') + (proPublic ? ' Glance Pro stays on every loop until it is closed, and shows the money still owed to you.' : '')));
     const row = el('div', 'flow-fu-actions');
-    row.appendChild(button('See Glance Pro', 'primary', () => { window.open(FlowEntitlements.PRICING_URL, '_blank', 'noopener'); dismiss(); }));
+    if (proPublic) row.appendChild(button('See Glance Pro', 'primary', () => { window.open(FlowEntitlements.PRICING_URL.replace('from=glance', 'from=cap'), '_blank', 'noopener'); dismiss(); }));
     row.appendChild(button('Not now', 'ghost', dismiss));
     h.appendChild(row);
   }

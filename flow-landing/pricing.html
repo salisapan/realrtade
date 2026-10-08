@@ -324,6 +324,10 @@ footer.site a{color:var(--muted)}
   </div>
 </footer>
 <script>
+// Where a Pro visit came from: ?from=glance (the extension's Pro links) or ?from=cap (the "3 of 3" card in Gmail).
+// Anything else counts as a direct visit. Goes into the waitlist source, the analytics events, and checkout metadata.
+var FLOW_PRO_FROM=(function(){ try{ var f=new URLSearchParams(location.search).get('from'); return (f==='glance'||f==='cap')?f:''; }catch(e){ return ''; } })();
+var FLOW_PRO_SOURCE='pricing-pro'+(FLOW_PRO_FROM?'-'+FLOW_PRO_FROM:'');
 (function(){
   var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var form=document.getElementById('proNotifyForm');
@@ -353,12 +357,12 @@ footer.site a{color:var(--muted)}
     // Stored server-side, so a database failure is reported instead of
     // looking like success, and the confirmation email is only promised when
     // it was actually handed to the mail provider.
-    fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',email:v,lang:'en',source:'pricing-pro',kind:'pro',hp:honey?honey.value:''})})
+    fetch('/.netlify/functions/submit-waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',email:v,lang:'en',source:FLOW_PRO_SOURCE,kind:'pro',hp:honey?honey.value:''})})
       .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok&&j.ok!==false,j:j}; }); })
       .then(function(res){ done(res.ok,res.j.emailed); })
       .catch(function(){ done(false); });
 
-    if(typeof gtag==='function') gtag('event','pricing_pro_notify_submit');
+    if(typeof gtag==='function') gtag('event','pricing_pro_notify_submit',{from:FLOW_PRO_FROM||'direct'});
   });
 })();
 
@@ -408,8 +412,8 @@ footer.site a{color:var(--muted)}
   btn.addEventListener('click',function(){
     if(!offer) return;
     btn.disabled=true; var prev=label.textContent; label.textContent='Opening checkout…'; status.className='tier-notify-status'; status.textContent='';
-    if(typeof gtag==='function') gtag('event','pricing_pro_checkout_click',{interval:interval});
-    fetch('/.netlify/functions/create-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({interval:interval})})
+    if(typeof gtag==='function') gtag('event','pricing_pro_checkout_click',{interval:interval,from:FLOW_PRO_FROM||'direct'});
+    fetch('/.netlify/functions/create-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({interval:interval,source:FLOW_PRO_SOURCE})})
       .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {ok:r.ok,j:j}; }); })
       .then(function(res){
         if(res.ok && res.j.url){ window.location.href=res.j.url; return; }

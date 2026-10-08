@@ -54,6 +54,7 @@ import '../core/commitment-title.js'; // classic: sets globalThis.FlowCommitment
 import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same constant the page loads
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
+import '../core/entitlements.js'; // classic: sets globalThis.FlowEntitlements (PRO_PUBLIC)
 import { LADDER } from '../config/ladder.public.js';
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
@@ -3147,7 +3148,9 @@ async function openBillingPortal() {
 }
 
 function proRequiredError() {
-  const err = new Error('This is part of Glance Pro.');
+  const ent = typeof globalThis !== 'undefined' ? globalThis.FlowEntitlements : null;
+  const pub = ent && ent.PRO_PUBLIC === true;
+  const err = new Error(pub ? 'This is part of Glance Pro.' : 'This is not in this version.');
   err.code = 'pro_required';
   return err;
 }

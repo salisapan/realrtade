@@ -162,6 +162,13 @@ const signed = (payload, secret, ts) => {
   check('it sells the yearly price as a subscription with a 14 day trial', form.get('mode') === 'subscription' && form.get('line_items[0][price]') === 'price_y' && form.get('subscription_data[trial_period_days]') === '14', [...form]);
   check('it returns to the welcome page with the session id', form.get('success_url').endsWith('/pro-welcome.html?session_id={CHECKOUT_SESSION_ID}'), form.get('success_url'));
   check('the email is prefilled, lower-cased', form.get('customer_email') === 'new@person.com', [...form]);
+  check('no source from the page: recorded as the plain pricing page', form.get('metadata[source]') === 'pricing-pro' && form.get('subscription_data[metadata][source]') === 'pricing-pro' && form.get('cancel_url').endsWith('/pricing.html#glance-pro'), [...form]);
+  for (const [sent, want, back] of [['pricing-pro-glance', 'pricing-pro-glance', '/pricing.html?from=glance#glance-pro'], ['pricing-pro-cap', 'pricing-pro-cap', '/pricing.html?from=cap#glance-pro'], ['<script>x</script>', 'other', '/pricing.html#glance-pro'], [42, 'other', '/pricing.html#glance-pro']]) {
+    calls = [];
+    r = await checkout(ev('POST', { interval: 'month', source: sent }));
+    const fs = new URLSearchParams(calls.find((c) => c.url.includes('/v1/checkout/sessions')).body);
+    check('source ' + JSON.stringify(sent) + ' is stored as ' + want + ' on the session and the subscription', r.statusCode === 200 && fs.get('metadata[source]') === want && fs.get('subscription_data[metadata][source]') === want && fs.get('cancel_url').endsWith(back), [...fs]);
+  }
   r = await checkout(ev('POST', { interval: 'weekly' }));
   check('an unknown billing interval is rejected', r.statusCode === 400, r);
   r = await checkout(ev('POST', { interval: 'month', email: 'nope' }));

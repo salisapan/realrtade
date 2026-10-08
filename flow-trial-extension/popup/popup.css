@@ -311,6 +311,7 @@ main{padding:var(--space-5)}
 
 /* ---- Glance Pro card ---- */
 .pro-block{position:relative}
+.pro-block[hidden]{display:none !important}
 .pro-badge{display:inline-block; margin-left:var(--space-2); padding:1px 8px; border-radius:999px; font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--accent); background:var(--accent-wash); vertical-align:middle}
 .pro-block .recipe-row{flex-wrap:wrap}
 .pro-block.nudge{border:1px solid var(--accent); border-radius:12px; padding:var(--space-4); background:var(--accent-wash)}

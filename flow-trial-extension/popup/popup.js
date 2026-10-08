@@ -40,6 +40,20 @@
   // reach the Glance Pro section where these are used.
   const OFFER_URL = 'https://theflow-ai.com/.netlify/functions/create-checkout';
   let proOffer = { enabled: false, trialDays: 0 };
+  // PRO_PUBLIC is the same last switch as the server. Off: this panel draws no Pro card, price, or checkout link.
+  function proPublic() {
+    return typeof FlowEntitlements !== 'undefined' && FlowEntitlements.PRO_PUBLIC === true;
+  }
+  function capClosedLine(used, cap) {
+    return 'You are following ' + used + ' of ' + cap + ' open loops. Close one first' + (proPublic() ? ', or see Glance Pro.' : '.');
+  }
+  function ladderDetail(text) {
+    if (proPublic() || !text) return text || '';
+    return String(text)
+      .replace(/\s*Pro has about [\d,]+ times as many(?:, and a stronger reading for the hard sentences)?\.?/g, '')
+      .replace(/^Pro: about [\d,]+ a month, and a stronger reading for the hard sentences\.$/, '')
+      .trim();
+  }
   // Same trap again: renderWaiting() runs before a later `let` would initialise.
   let loopView = 'date';
 
@@ -123,6 +137,12 @@
   }
 
   function wirePro() {
+    const block = document.getElementById('proBlock');
+    if (!proPublic()) {
+      if (block) block.hidden = true;
+      return;
+    }
+    if (block) block.hidden = false;
     const keyRow = document.getElementById('proKeyRow');
     const input = document.getElementById('proKeyInput');
     document.getElementById('proHaveKey').addEventListener('click', () => {
@@ -909,7 +929,7 @@
       const status = await send({ type: 'flow:pro-status' });
       const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
       if (!loop) { go.disabled = false; return; }
-      if (!gate.allowed) { go.disabled = false; note.hidden = false; note.textContent = 'You are following ' + gate.used + ' of ' + gate.cap + ' open loops. Close one first, or see Glance Pro.'; return; }
+      if (!gate.allowed) { go.disabled = false; note.hidden = false; note.textContent = capClosedLine(gate.used, gate.cap); return; }
       const watch = FlowFollowUp.buildWatch(Object.assign({ ask: loop.ask, now: loop.now }, loop.base));
       watch.threadUrl = loop.base.threadUrl;
       if (!list.some((w) => w.id === watch.id && FlowFollowUp.isActive(w))) {
@@ -1211,7 +1231,8 @@
     top.appendChild(el('span', 'wait-state' + (state.kind === 'on' || state.kind === 'low' ? ' ok' : ''), state.kind === 'needs-consent' ? 'Off' : state.kind === 'used' ? 'Used up' : state.kind === 'paused' ? 'Resting' : 'On'));
     row.appendChild(top);
     row.appendChild(el('div', 'wait-what', c.title));
-    row.appendChild(el('div', 'wait-note', c.detail));
+    const detail = ladderDetail(c.detail);
+    if (detail) row.appendChild(el('div', 'wait-note', detail));
     const acts = el('div', 'wait-acts');
     const act = (label, cls, fn) => {
       const b = el('button', cls, label);
@@ -1222,7 +1243,7 @@
     if (state.kind === 'needs-consent') {
       act(c.primary, 'primary sm', () => send({ type: 'flow:ladder-consent', given: true }));
     } else {
-      if (c.primary === 'See Pro') act(c.primary, 'primary sm', async () => { chrome.tabs.create({ url: FlowEntitlements.PRICING_URL }); });
+      if (proPublic() && c.primary === 'See Pro') act(c.primary, 'primary sm', async () => { chrome.tabs.create({ url: FlowEntitlements.PRICING_URL }); });
       act(c.secondary, 'ghost sm', () => send({ type: 'flow:ladder-consent', given: false }));
     }
     row.appendChild(acts);
@@ -1507,7 +1528,7 @@
         const list = await FlowStorage.getWatches();
         const status = await send({ type: 'flow:pro-status' });
         const gate = FlowEntitlements.watchGate(list.filter(FlowFollowUp.isActive).length, status && status.record, Date.now());
-        if (!gate.allowed) { note.hidden = false; note.textContent = 'You are following ' + gate.used + ' of ' + gate.cap + ' open loops. Close one first, or see Glance Pro.'; return; }
+        if (!gate.allowed) { note.hidden = false; note.textContent = capClosedLine(gate.used, gate.cap); return; }
         let ask = FlowActiveQuestion.askFor(p, FlowFollowUp.chaseDate('reply', null, Date.now()));
         if (ask.direction === 'theirs') ask = FlowFollowUp.personalChase(ask, list, p.counterpart && p.counterpart.email, Date.now());
         const watch = FlowFollowUp.buildWatch({ ask, threadId: p.threadId, messageId: p.messageId, subject: p.subject, counterpart: p.counterpart, now: Date.now() });
@@ -1580,10 +1601,10 @@
 
     const upsell = document.getElementById('waitingUpsell');
     upsell.hidden = true;
-    if (payments.length && !pro) {
+    if (proPublic() && payments.length && !pro) {
       upsell.hidden = false;
       upsell.textContent = plural(payments.length, 'payment is', 'payments are') + ' being chased. Glance Pro shows the total owed to you.';
-    } else if (!pro && active.length >= FlowEntitlements.FREE_WATCH_CAP) {
+    } else if (proPublic() && !pro && active.length >= FlowEntitlements.FREE_WATCH_CAP) {
       upsell.hidden = false;
       upsell.textContent = 'You are following all ' + FlowEntitlements.FREE_WATCH_CAP + ' free open loops. Glance Pro stays on every one until it is closed.';
     }
@@ -1687,12 +1708,13 @@
       const level = FlowFollowUp.nextNudgeLevel(w);
       const gate = FlowEntitlements.nudgeGate(level, record, now);
       const base = nudgeLabel(level) || (state === 'overdue' ? 'Draft a nudge' : 'Nudge now');
-      const label = gate.allowed ? base : base + ' · Pro';
+      const label = gate.allowed ? base : (proPublic() ? base + ' · Pro' : base);
       const nudge = el('button', 'ghost sm', label);
       nudge.type = 'button';
       nudge.addEventListener('click', async () => {
         note.hidden = false;
         if (!gate.allowed) {
+          if (!proPublic()) { note.textContent = 'The firmer follow-ups stay off. The friendly first nudge stays free.'; return; }
           note.replaceChildren(document.createTextNode('The firmer follow-ups are part of Glance Pro. The friendly first nudge stays free. '));
           const a = el('a', null, 'See Glance Pro');
           a.href = FlowEntitlements.PRICING_URL; a.target = '_blank'; a.rel = 'noopener';
@@ -1715,11 +1737,12 @@
       const level = FlowFollowUp.nextNudgeLevel(w);
       const gate = FlowEntitlements.nudgeGate(level, record, now);
       const base = nudgeLabel(level) || 'Nudge now';
-      const copy = el('button', 'ghost sm', (gate.allowed ? 'Copy a ' : 'Copy a firmer ') + 'nudge' + (gate.allowed ? '' : ' · Pro'));
+      const copy = el('button', 'ghost sm', (gate.allowed ? 'Copy a ' : (proPublic() ? 'Copy a firmer ' : 'Copy a ')) + 'nudge' + (gate.allowed || !proPublic() ? '' : ' · Pro'));
       copy.type = 'button';
       copy.addEventListener('click', async () => {
         note.hidden = false;
         if (!gate.allowed) {
+          if (!proPublic()) { note.textContent = 'The firmer follow-ups stay off. The friendly first nudge stays free.'; return; }
           note.replaceChildren(document.createTextNode('The firmer follow-ups are part of Glance Pro. The friendly first nudge stays free. '));
           const a = el('a', null, 'See Glance Pro');
           a.href = FlowEntitlements.PRICING_URL; a.target = '_blank'; a.rel = 'noopener';
@@ -1843,7 +1866,7 @@
         const made = await createDebriefLoops(m, items, activeCount, record);
         await FlowStorage.updateMeeting(m.id, { done: true });
         send({ type: 'flow:track', event: 'follow_tracked', params: {} });
-        note.textContent = made.made + (made.made === 1 ? ' loop added.' : ' loops added.') + (made.capped ? ' The rest need Glance Pro (the free limit is ' + FlowEntitlements.FREE_WATCH_CAP + ' open loops).' : '');
+        note.textContent = made.made + (made.made === 1 ? ' loop added.' : ' loops added.') + (made.capped ? (proPublic() ? ' The rest need Glance Pro (the free limit is ' + FlowEntitlements.FREE_WATCH_CAP + ' open loops).' : ' The rest stay off until one of these closes (the free limit is ' + FlowEntitlements.FREE_WATCH_CAP + ' open loops).') : '');
         setTimeout(() => { renderWaiting(); }, 1400);
       });
       acts.appendChild(add);
@@ -1891,8 +1914,12 @@
     upsell.hidden = true;
     if (!predicted.length) return;
     if (!pro) {
-      upsell.hidden = false;
-      upsell.textContent = 'Glance noticed ' + plural(predicted.length, 'thing that comes', 'things that come') + ' around again. Glance Pro shows what and when.';
+      if (proPublic()) {
+        upsell.hidden = false;
+        upsell.textContent = 'Glance noticed ' + plural(predicted.length, 'thing that comes', 'things that come') + ' around again. Glance Pro shows what and when.';
+      } else {
+        block.hidden = true;
+      }
       return;
     }
     for (const p of predicted) {
@@ -1945,7 +1972,7 @@
         const gate = FlowEntitlements.watchGate(activeCount, record, Date.now());
         if (!gate.allowed) {
           note.hidden = false;
-          note.textContent = 'You are following ' + gate.used + ' of ' + gate.cap + ' open loops. Close one first, or see Glance Pro.';
+          note.textContent = capClosedLine(gate.used, gate.cap);
           return;
         }
         const patch = FlowFollowUp.reopenPatch(w, Date.now());
