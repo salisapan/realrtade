@@ -2,6 +2,8 @@
 
 Glance closes open loops. Gmail is where it starts today.
 
+**Supersedes the earlier narrow framing (owner lock 2026-10-08).** E1, E2, E4, E6, and C1 are no longer a minimum paid loop set. They are the reliability track. They run alongside breadth. They do not gate breadth, and they are not the product scope. Paid readiness is decided by `docs/glance-ai/paid-readiness-bar.md` (owned by the CoS).
+
 This page is Glance only. Flow, the org product, is separate. It does not change code, the release order in `docs/open-tasks.md`, or the yaml in `docs/glance-ai/paid-readiness-bar.md`. `charge` stays false until that yaml is green.
 
 ## Product definition (vision-locked)
@@ -54,15 +56,15 @@ The 0.9.40 Gate has not been run live (row 51). Headless CI is not that Gate.
 
 ---
 
-## 2. Minimum sellable Glance
+## 2. Reliability track (E1, E2, E4, E6, C1)
 
-Perfect, for a first payer, means five loops that finish with a read-back every time they are shown, on the mail the person already lives in. It does not mean 52 types, four surfaces, or a chat answer.
+E1, E2, E4, E6, and C1 are the reliability track: bugs to fix, running alongside breadth. They do not gate breadth, and they are not the product scope. Paid readiness is decided by `docs/glance-ai/paid-readiness-bar.md` (owned by the CoS).
 
-These five are the highest frequency that can be made true without a send and without a new site. Frequency figures are the judgments in the close map, not telemetry.
+The bugs on this track are the Outlook suggest-save `suggest:no-consent` read, Calendar without `fetchedBack`, one-click, Undo, and error copy. Frequency figures below are the judgments in the close map, not telemetry.
 
 | Order | Loop | Why this one | What "flawless" is |
 |---|---|---|---|
-| 1 | **E1** Dated ask becomes a task | Frequency 5. Already live on Google Tasks and Microsoft To Do. This is the wedge a payer can feel this week. | Same sentence, Hebrew or English, Gmail or Outlook: one task, GET, Handled, reload remounts, Undo deletes that task and Activity drops HANDLED. A second click does not create a second task. |
+| 1 | **E1** Dated ask becomes a task | Frequency 5. Already live on Google Tasks and Microsoft To Do. | Same sentence, Hebrew or English, Gmail or Outlook: one task, GET, Handled, reload remounts, Undo deletes that task and Activity drops HANDLED. A second click does not create a second task. |
 | 2 | **E2** Your own dated promise becomes a task | Frequency 5. Same writer as E1, different detector (`detectCommitmentSentence`). Splitting it keeps a promise from being graded as an ask. | "אחזור אליך ביום חמישי" and the English equivalent take the task path, not a reply draft. The 0.9.39 panel bug (a task-only close wrote a draft) stays dead. |
 | 3 | **E4** One attachment saved to OneDrive, when they asked | Frequency 4. The only proved file write. A payer who lives in Outlook loses contracts in the inbox. | One real file, GET, Undo. Two files, a refusal, and a shared-folder ask stay silent. Gmail that names OneDrive stays quiet. |
 | 4 | **E6** Suggest-save, accepted, then proved | Frequency 5, score 300, the top unfinished row. The unasked PDF is the daily loss. The engine exists. The card does not, and the Outlook consent read is wrong. | The suggestion is visible. Accept writes one file and Handled waits for GET. Dismiss writes nothing. No consent, or a missing scope, says reconnect and does not pretend the file was ineligible for another reason. |
@@ -70,9 +72,7 @@ These five are the highest frequency that can be made true without a send and wi
 
 E1 and E2 are one writer with two detectors. They are listed separately because a payer notices both, and a regression that turns a promise into a draft is a different bug from a missed ask.
 
-**Not in the five.** E3 (the reply) stays a draft and must not say Handled. F1 and Y1 close only when a sent message carries the file. That needs `Mail.Send` as a preview. M2 (the answer in the chat) is the locked scenario after that preview. It is the right north star and the wrong first payment: nothing in the chat path writes, and a wrong send is worse than a miss. Building it before E6 and C1 are boring spreads the same team across a new host.
-
-Six of nine weekly types, weight 0.60, and a chat surface remain the **charge** bar in `paid-readiness-bar.md`. Clearing the five does not flip `charge`. It is the smallest set on which a dogfood week can produce a honest close count.
+E3 (the reply) stays a draft and must not say Handled. F1 and Y1 close only when a sent message carries the file. That needs `Mail.Send` as a preview and one click. This track does not hold those loops, and it does not hold breadth. Clearing it does not flip `charge`. The charge bar stays `docs/glance-ai/paid-readiness-bar.md`.
 
 ---
 
@@ -87,7 +87,7 @@ Source of the bar: `docs/glance-ai/paid-readiness-bar.md` yaml, `updated: 2026-1
 | `surfaces` | Mail, calendar, files, and chat, each with one proved close | **yellow** | Mail: tasks, live. Files: OneDrive, live. Calendar: POST exists, no proof GET, and Handled is allowed without one. Chat: no composer (`docs/open-tasks.md` row 54). | Calendar proof on Google first. Chat only after an approved send exists. | Dima, then founder for the Outlook calendar scope | M, then L |
 | `weekly_closes` | Median active user, at least 5 proved closes in a week | **red** | `current: null`. No population counter is wired to this bar. Activity on the device can count Handled rows with `fetchedBack` (`core/proof-of-close.js`, `core/quiet-metrics.js`). Nobody has run the 14-day note. | Do not invent a dashboard. Run the note in §2 of the paid bar after scenario A passes. | Founder (the five people). Dima only if the Activity count is wrong. | S to read, founder time to run |
 | `minutes_saved` | At least 30 minutes a week, median, self-reported in week 2 | **red** | `current: null`. The 30 minutes is the $14 price test in `docs/monetization.md`. It is a bar, not a result. | Same note. A column, not a new feature. | Founder | S |
-| `wrong_do_it` | At most 2% of shown Do It cards, owner-checked, n at least 100 | **red** | `current: null`. Machine proxy 1.4% (82/5727) is marked `counts_as_current: false`. Owner labels 0/200. Real-mail gold n=8 asks, model labels, and the runner did not see a card (`docs/real-mail-eval/2026-10-08.md`). | Owner-check at least 100 shown cards on mail the person received, scored only on the five loops. Do not copy 1.4% into `current`. Do not promote v2 or v2.1. | AI Engineer prepares the set. Founder marks it (`labeledBy: sali`). | M |
+| `wrong_do_it` | At most 2% of shown Do It cards, owner-checked, n at least 100 | **red** | `current: null`. Machine proxy 1.4% (82/5727) is marked `counts_as_current: false`. Owner labels 0/200. Real-mail gold n=8 asks, model labels, and the runner did not see a card (`docs/real-mail-eval/2026-10-08.md`). | Owner-check at least 100 shown cards on mail the person received. The reliability track is where the known bugs are, and that sample is not the product scope. Do not copy 1.4% into `current`. Do not promote v2 or v2.1. | AI Engineer prepares the set. Founder marks it (`labeledBy: sali`). | M |
 | `silence_on_real_loops` | At most 20% of real asks that should show a card stay silent, owner-checked, n at least 100 | **red** | `current: null`. Machine missed-close 50.8%. Human blind ASK recall 0.74 on 35 asks is sent mail, model labels, no longer blind (`docs/human-eval.md` §3). The 17-row preview is not this set. | Same owner-checked sample. Silence stays the default when the on-device rules are unsure. A model must not be added to close the gap. | AI Engineer prepares. Founder marks. | M |
 | `scenario_gate_pass_rate` | Scenarios A–E all pass. Threshold 1.0. | **red** | `passed: 0`, `required: 5`. Single-action Gates (0.9.30, 0.9.31, 0.9.37, 0.9.39) are not these scenarios. Headless e2e does not run A–E. | Run A on the three proofs plus the steps list before any new type. B, C, D, E wait on send, chat, calendar proof, and the computer driver. | Dima runs A. Founder watches the live session. | M for A. L for B–E |
 | `setup_minutes` | One consent screen per ecosystem, first proved close in under 10 minutes | **red** | `current: null`. Not timed. Microsoft screen exists. Checked Calendar, Contacts, and Teams boxes fail until Entra lists the permissions (rows 44, 45). Google fallback live success is UNKNOWN. | Fix the Entra grants that the checkboxes already request. Time five people who did not build it. One consent each. Stopwatch to the first proved close. | Founder for Entra and the stopwatch. Dima if the screen itself is wrong. | S once the portal is updated |
@@ -100,7 +100,7 @@ Source of the bar: `docs/glance-ai/paid-readiness-bar.md` yaml, `updated: 2026-1
 
 ## 4. Reliability gaps
 
-These are how the five loops fail while looking fine. They are not new products.
+These are how the reliability track fails while looking fine. They are not the product scope.
 
 **Silent failures.**
 
@@ -113,7 +113,7 @@ These are how the five loops fail while looking fine. They are not new products.
 **Consent and permissions.**
 
 - Default Microsoft sign-in is `offline_access`, `User.Read`, `Mail.Read`, `Mail.ReadWrite` (`core/outlook-config.js`). To Do, Calendar, OneDrive, Contacts, and Teams are extra boxes. A mail-only token must say reconnect and must not say Handled. The To Do and OneDrive paths do this in the page copy (`Reconnect Outlook to allow To Do` / `OneDrive` in `src/content-outlook.js`). Calendar on Outlook cannot succeed until the founder adds the scope.
-- Google scopes in the manifest are narrower than the locked Instinct list. Adding a scope is a privacy-page change and a store-text change in the same commit. Do not add one for a loop that is not in the five.
+- Google scopes in the manifest are narrower than the locked Instinct list. Adding a scope is a privacy-page change and a store-text change in the same commit.
 - Optional hosts (WhatsApp Web, Graph, the three Outlook hosts, localhost) are not granted at install. A surface that is off is not a bug. A checked box whose consent fails is.
 
 **Token refresh.**
@@ -184,7 +184,7 @@ Taking a card also needs all of the following, and each one is missing or held:
 
 Paddle is not in the repository. Do not open an account. Do not put a price on the Chrome Web Store listing. A free listing for the five dogfood people can proceed (row 7) and stays free.
 
-Same-day value, when the bar is eventually green, is: the person pays, the webhook writes the hash, the welcome mail contains the key, the extension's verify call stores `proLicense`, and the cap lifts. That path is coded and unproven against live Stripe. It still would not be why they paid. The reason to pay is the five loops in §2, which are not behind the licence. Charging for Draft-It while the loops are thin sells the thing the identity says Glance is not.
+Same-day value, when the bar is eventually green, is: the person pays, the webhook writes the hash, the welcome mail contains the key, the extension's verify call stores `proLicense`, and the cap lifts. That path is coded and unproven against live Stripe. It still would not be why they paid. Paid readiness is `docs/glance-ai/paid-readiness-bar.md` (owned by the CoS). The reliability track in §2 is not the product scope, and those closes are not behind the licence. Charging for Draft-It while closes are thin sells the thing the identity says Glance is not.
 
 Do not move the proved closes behind a paywall to create a reason. Free stays useful. The paywall stays on the cap and the paid model calls until a dogfood week shows the closes are the habit. Then the founder decides what Pro adds. That decision is already open in `docs/open-tasks.md` ("Glance Pro redefined…"). This note does not close it.
 
@@ -192,9 +192,9 @@ Do not move the proved closes behind a paywall to create a reason. Free stays us
 
 ## 6. Ordered build queue for the next two weeks
 
-One stream. The next stream starts when the current Gate has passed live, on the build a person would install. Headless green is necessary and not sufficient. If stream 1 slips, streams 2–4 do not start.
+This queue is the reliability track in §2. It runs alongside breadth. It does not gate breadth, and it is not the product scope. Inside the track, the next stream starts when the current Gate has passed live, on the build a person would install. Headless green is necessary and not sufficient. If stream 1 slips, streams 2–4 of this track do not start. A breadth PR still proceeds: a live scenario Gate, then a squash-merge, and it does not touch a file an open Dima PR is changing.
 
-Another developer already has 0.9.41 in flight on this branch. This queue does not open a parallel stream beside that work. This checkout does not contain the steps list. The in-flight tree was not reviewed here. **UNKNOWN** how far that work is.
+Another developer already has 0.9.41 in flight on this branch. This checkout does not contain the steps list. The in-flight tree was not reviewed here. **UNKNOWN** how far that work is.
 
 ### Stream 1 — Finish the steps list, and make suggest-save tell the truth
 
@@ -232,11 +232,11 @@ Another developer already has 0.9.41 in flight on this branch. This queue does n
 
 **Size.** M.
 
-### Stream 4 — Owner-check the five loops, and start the note only if A passed
+### Stream 4 — Owner-check the reliability track, and start the note only if A passed
 
 **Gate.** None of A–E. This fills `wrong_do_it` and `silence_on_real_loops`, which stay null until the founder marks them.
 
-**Work.** AI Engineer assembles at least 100 real asks the person received, plus the shown cards from dogfood, restricted to E1, E2, E4, E6, and C1. Founder marks them. `labeledBy` is `sali`. Batch-001 (19 synthetic cases) can be the warm-up. It is not the 100. Do not promote a model. Do not rent a GPU. Do not change a precision gate.
+**Work.** AI Engineer assembles at least 100 real asks the person received, plus the shown cards from dogfood, for the reliability track (E1, E2, E4, E6, and C1). That sample is not the product scope. Founder marks them. `labeledBy` is `sali`. Batch-001 (19 synthetic cases) can be the warm-up. It is not the 100. Do not promote a model. Do not rent a GPU. Do not change a precision gate.
 
 The 14-day note (paid bar §2) starts only after stream 1's live Gate. It is not a build. If stream 1 has not passed, the note does not start.
 
@@ -248,16 +248,15 @@ The 14-day note (paid bar §2) starts only after stream 1's live Gate. It is not
 
 ### Defer or kill for this fortnight
 
-**Defer, in this order, after the five are live-gated:** `Mail.Send` as the steps-list preview (row 53), with the locked identity wording changed in the same commit. Then F1 and Y1, closed on the sent message (scenario B). Then scenario D's reply half. Then M2 / scenario C. Then the computer driver (row 48), one allowlisted page, before any local PDF or government site.
+**Alongside this track, not after it.** Breadth slices 1–3 run in parallel with this queue. Each of those PRs gets a live scenario Gate and is then squash-merged. No stream touches a file an open Dima PR is changing at the same time. `Mail.Send` stays a preview and one click (row 53), with the locked identity wording changed in the same commit. F1 and Y1 close on the sent message (scenario B). Scenario D's reply half, M2 / scenario C, and the computer driver (row 48, one allowlisted page, before any local PDF or government site) are breadth, not a gate this track holds.
 
-**Kill for this fortnight.** Do not start them.
+**Kill for this fortnight.** These holds are not the product scope. Breadth slices 1–3 are not on this list.
 
-- Messenger, Teams, Slack, LinkedIn, Monday.com, HubSpot, Salesforce (writers exist for several; hosts are not in `host_permissions`; they are not a personal close).
+- Teams, Slack, LinkedIn, Monday.com, HubSpot, Salesforce (writers exist for several; hosts are not in `host_permissions`).
 - Sheets rows, Slides, Doc comments, shared libraries, RSVP, inviting guests.
 - Morning / Green Invoice, and any Netlify production deploy.
 - `PRO_PUBLIC`, Stripe live keys, a paid store listing, Paddle.
 - GPU rental, v2.1 promotion, a new external model call, community learning.
-- Breadth toward 52 types. The extra rows do not move a first payment.
 
 E3 stays a draft until `Mail.Send` is the preview. Shipping the draft as if it were the close sells Superhuman's product.
 
