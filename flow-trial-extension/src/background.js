@@ -1053,7 +1053,19 @@ function googleTasksConfigured() {
 
 // Callback-based even inside an MV3 service worker — there is no Promise
 // form of this specific identity method.
+//
+// Headless regression only. The suite sets globalThis.__glanceE2e.googleAuthToken
+// inside this worker because chrome.identity cannot be replaced there.
+// Production never sets __glanceE2e, so the Chrome call below is unchanged.
+function glanceE2eGoogleAuth(interactive) {
+  const e2e = globalThis.__glanceE2e;
+  if (!e2e || typeof e2e.googleAuthToken !== 'function') return null;
+  return e2e.googleAuthToken(Boolean(interactive));
+}
+
 function getGoogleAuthToken(interactive) {
+  const hooked = glanceE2eGoogleAuth(interactive);
+  if (hooked && typeof hooked.then === 'function') return hooked;
   return new Promise((resolve, reject) => {
     chrome.identity.getAuthToken({ interactive: Boolean(interactive) }, (token) => {
       if (chrome.runtime.lastError || !token) {
@@ -1066,6 +1078,12 @@ function getGoogleAuthToken(interactive) {
 }
 
 function removeCachedGoogleAuthToken(token) {
+  const e2e = globalThis.__glanceE2e;
+  if (e2e && e2e.installed === true) {
+    e2e.authCalls = e2e.authCalls || [];
+    e2e.authCalls.push({ removeCached: true, at: Date.now() });
+    return Promise.resolve();
+  }
   return new Promise((resolve) => chrome.identity.removeCachedAuthToken({ token }, resolve));
 }
 

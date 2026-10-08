@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+flow-trial-extension/e2e-report/
+flow-trial-extension/test-results/
+flow-trial-extension/playwright-report/
 dist
 dist-ssr
 *.local

@@ -164,3 +164,7 @@ What Glance calls when it cannot recognise an intent (no external model by defau
 
 `docs/hybrid-execution-architecture.md`: the owner's three-tier plan for Do It / Draft It, what is built and tested, what is deliberately not claimed (no compliance or regulated-industry wording: `docs/product-architecture.md`), and the ordered activation checklist. Nothing in it is wired into the manifest, `background.js` or the content scripts yet; the server is never used without a one-time consent and only with masked text; a model's answer is a proposal and never closes or writes anything.
 
+## Testing and the live Gate
+
+Headless regression for the unpacked extension runs in CI on pull requests into `claude/install-uiux-pro-max-skill-a4agox` (`.github/workflows/glance-e2e.yml`, suite under `flow-trial-extension/e2e/`). It runs before the owner's live browser Gate. The live Gate stays; this suite does not replace it. The command and what "the tests pass" means: `docs/README.md` §4. Status: `docs/open-tasks.md` row 56.
+
