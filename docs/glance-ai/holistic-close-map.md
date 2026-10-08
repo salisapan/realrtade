@@ -55,7 +55,7 @@ There is no separate steps-list spec file in the repo. The list's save step is s
 
 ## 1. Catalog
 
-Fifty-two loop types. Chains at the end are compositions of these rows.
+Fifty-eight loop types. Chains at the end are compositions of these rows (58 rows plus 4 chains).
 
 ### Email (Gmail and Outlook)
 
@@ -291,10 +291,12 @@ Pass bar for E: the contract closes only on the sent file; the invoice produces 
 | The computer driver | Row 48 is a scaffold. The live page driver is not wired. Local files are a later gate | Wire the one allowlisted page and run that Gate before any local PDF or government page |
 | Model quality | v2 with the veto still misses about half of closes on machine labels, and wrong-Do-It is about 1.4% on that set (`docs/glance-ai/STATE.md`). Owner-verified labels are 0 of 200. Gated Qwen is offline and propose-only. A wrong send is worse than a miss | Keep silence when the on-device rules are unsure. Do not let a model close or send. Collect the 200 owner labels before a new close type depends on a model |
 
+**Priority.** Until the paid loop set E1, E2, E4, E6, C1 passes live Gates, Dima's queue (as ordered in `docs/glance-ai/CTO_PATH_TO_PAID_2026-10-08.md`) goes first. Breadth-routine PRs (Slices 1–3) stay in draft, with no Gate and no merge. Breadth runs skip any item that touches manifest/content_scripts, the steps card, or ProofOfClose paths.
+
 Order of work, from this map:
 
 1. Finish the steps list and run scenario A on the proofs that already pass.
-2. Put `fetchedBack` on the writes that already exist and are not proved: a calendar event GET, a Drive file GET.
+2. One Dima PR: add `fetchedBack` read-back for both Google Calendar create (C1) and the Drive file GET.
 3. `Mail.Send` as that list's preview, with the identity wording.
 4. Slice 1, the chat answer, on top of that preview.
 5. Slice 2, the meeting with a proved event and a proved confirmation.
