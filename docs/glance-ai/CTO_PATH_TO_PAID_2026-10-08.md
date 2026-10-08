@@ -1,6 +1,6 @@
 # CTO path to paid — Glance (personal), 2026-10-08
 
-Glance closes open loops. Gmail is where it starts today.
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 **Supersedes the earlier narrow framing (owner lock 2026-10-08).** E1, E2, E4, E6, and C1 are no longer a minimum paid loop set. They are the reliability track. They run alongside breadth. They do not gate breadth, and they are not the product scope. Paid readiness is decided by `docs/glance-ai/paid-readiness-bar.md` (owned by the CoS).
 
@@ -246,17 +246,17 @@ The 14-day note (paid bar §2) starts only after stream 1's live Gate. It is not
 
 **Size.** M of founder attention. S of code if the existing `apply-owner-answers.cjs` path is enough.
 
-### Defer or kill for this fortnight
+### Holds
 
 **Alongside this track, not after it.** Breadth slices 1–3 run in parallel with this queue. Each of those PRs gets a live scenario Gate and is then squash-merged. No stream touches a file an open Dima PR is changing at the same time. `Mail.Send` stays a preview and one click (row 53), with the locked identity wording changed in the same commit. F1 and Y1 close on the sent message (scenario B). Scenario D's reply half, M2 / scenario C, and the computer driver (row 48, one allowlisted page, before any local PDF or government site) are breadth, not a gate this track holds.
 
-**Kill for this fortnight.** These holds are not the product scope. Breadth slices 1–3 are not on this list.
+Teams, Slack, LinkedIn, Sheets rows, Slides, Doc comments, RSVP, and inviting guests are breadth, sequenced by the close map. The full Microsoft ecosystem covers create and edit for docs, tables and spreadsheets, calendar, mail, and Teams. Google gets the same treatment. Monday.com, HubSpot, and Salesforce are org tools: later, breadth.
 
-- Teams, Slack, LinkedIn, Monday.com, HubSpot, Salesforce (writers exist for several; hosts are not in `host_permissions`).
-- Sheets rows, Slides, Doc comments, shared libraries, RSVP, inviting guests.
-- Morning / Green Invoice, and any Netlify production deploy.
-- `PRO_PUBLIC`, Stripe live keys, a paid store listing, Paddle.
-- GPU rental, v2.1 promotion, a new external model call, community learning.
+**Holds.**
+
+- Morning / Green Invoice, and a Netlify production deploy, until the owner writes «מאשר».
+- `PRO_PUBLIC`, Stripe live keys, a paid store listing, and Paddle, until `docs/glance-ai/paid-readiness-bar.md` is green.
+- GPU rental, v2.1 promotion, a new external model call, and community learning. Owned by the AI Engineer.
 
 E3 stays a draft until `Mail.Send` is the preview. Shipping the draft as if it were the close sells Superhuman's product.
 
