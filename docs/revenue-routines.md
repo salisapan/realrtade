@@ -131,6 +131,7 @@
 
 **יומן:**
 - 2026-10-08: התשובה לאוניברסיטה הפתוחה (זיוה/אורי) אושרה על ידי סאלי ויוצאת בבוקר 10-08.
+- 2026-10-08 07:30, מתוך הסטנדאפ, כלשונו (הספירה הסופית ל-10-07 לא אומתה; וואטסאפ ולינקדאין לא נבדקו): Outreach: 36/50 as of 2026-10-07 15:38 IL (final day count not verified). Deals: Gabay (demo build pending), APM Yuval (no reply ~3 days, follow-up draft on file), Natoon/Hachshara no reply since 06/10, Howden back from OOO today, Rambam forwarded to successor (h_trau), Ichilov address bounced (needs alternate contact). זה מניין שליחות, לא נתון משתמשים, המרה או הכנסה. שורות 57-58 ב-`open-tasks.md`.
 
 ## 9. רוטינות CoS (חיסכון בטוקנים, 2026-10-07)
 

@@ -6,6 +6,7 @@ updated: 2026-10-08
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-08 · Standup 07:30 IL filed verbatim in [[sessions/2026-10-08]]. Recommends Netlify «מאשר» (not given) and closing or re-dating the August ClickUp tasks (not done) · standup · [[open-tasks]] decisions table, rows 57-59
 - 2026-10-08 · Netlify deploy and Morning (invoices) stay on HOLD until the owner writes «מאשר» · Sali · `CLAUDE.md` "Owner product locks", [[open-tasks]] rows 1, 43
 - 2026-10-08 · Attachment save: Glance suggests saving an attached document to OneDrive (Outlook) or Drive (Gmail), even unasked; the person approves, never automatic · Sali · `CLAUDE.md` "Owner product locks", [[open-tasks]] rows 51-52
 - 2026-10-08 · Release order: 0.9.38 narrow → Gate → merge → 0.9.40 steps list → Gate → merge → Mail.Send on that list · Sali · [[open-tasks]] "Glance release order", rows 50-53

@@ -1,6 +1,6 @@
 ---
 tags: [stream, outlook]
-updated: 2026-10-05
+updated: 2026-10-08
 source: docs/multi-platform.md, docs/open-tasks.md rows 21, 21b
 ---
 # Outlook — status stub
@@ -29,4 +29,5 @@ This note is a quick snapshot for a new chat; refresh the date when you touch it
 - Files: `core/outlook-config.js`, `outlook-auth.js`, `graph-mail.js`, `outlook-sync.js`, `src/outlook.js`; tests `outlook-*-corpus`.
 
 ## Log (newest first, one line each)
+- 2026-10-08 · Standup 07:30: last Gate PASS is 0.9.37 (~01:00 IL). OneDrive read-back, Microsoft To Do, and Google Tasks. Detail stays in [[open-tasks]] rows 46, 47, 49. `Mail.Send` was approved 2026-10-07 22:21 and ships only after 0.9.38 → 0.9.40 (row 53). The snapshot above is still the 2026-10-05 copy.
 - 2026-10-05 · vault note created from docs; no new facts.

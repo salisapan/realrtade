@@ -33,7 +33,7 @@ The vault is a view over these. Facts live only there.
 
 ## Process
 - [[when-to-write-to-vault]] — מתי כותבים ל־vault (and what goes to `docs/` in the same commit)
-- New session log: Daily note → `vault/sessions/YYYY-MM-DD.md` (template [[session]])
+- New session log: Daily note → `vault/sessions/YYYY-MM-DD.md` (template [[session]]). Latest: [[sessions/2026-10-08]] (standup 07:30, verbatim)
 - New decision: template [[decision]] → one line in [[decisions]] + the docs §2 files
 
 ## גשר Claude↔CoS
