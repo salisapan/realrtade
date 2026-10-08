@@ -324,6 +324,21 @@ console.log('\n--- OneDrive save reaches a card, and a drop still has a reason -
     ['od-flag-onedrive', 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks'],
     ['od-flag-drive', 'Please save the attached file to Drive.']
   ];
+  const itemOnly = theirs('od-item', SAVE, 0.1, 'Gate item attachment');
+  itemOnly.hasAttachments = true;
+  itemOnly.attachments = [{ id: 'item1', name: 'forwarded.eml', isInline: false, '@odata.type': '#microsoft.graph.itemAttachment' }];
+  const itemPlan = plan([itemOnly]);
+  const itemWhy = (itemPlan.diagnostics.find((d) => d.conversationId === 'od-item') || {}).reason;
+  check('an attached message is not a file', itemPlan.incoming.length === 0 && itemWhy !== 'outlook:attachments-unread', { why: itemWhy, incoming: itemPlan.incoming.length });
+  check('a page that could not count files keeps a mailbox file card',
+    S.keepMailboxFileCard(
+      { none: true, reason: 'page:attachment-count-unread' },
+      { messageId: 'm1', process: { steps: [{ kind: 'onedriveFile' }, { kind: 'outlookDraft' }] } }
+    ) === true);
+  check('a page miss without a file step does not keep a card',
+    S.keepMailboxFileCard({ none: true, reason: 'page:attachment-count-unread' }, { messageId: 'm1', process: { steps: [{ kind: 'outlookTask' }] } }) === false
+    && S.keepMailboxFileCard({ none: true, reason: 'intent-null' }, { messageId: 'm1', process: { steps: [{ kind: 'driveFile' }] } }) === false
+    && S.keepMailboxFileCard({ none: true, reason: 'page:attachment-count-unread' }, { process: { steps: [{ kind: 'onedriveFile' }] } }) === false);
   flagOnly.forEach((pair) => {
     const row = theirs(pair[0], pair[1], 0.1, 'Gate flag only');
     row.hasAttachments = true;

@@ -191,6 +191,49 @@ const FlowOutlook = (() => {
       try { return JSON.parse(text); } catch (e) { return null; }
     }
 
+    function attachmentMessageText(msg) {
+      const g = gm();
+      const raw = (msg && msg.body && msg.body.content) || (msg && msg.bodyPreview) || '';
+      const text = typeof raw === 'string' ? raw : '';
+      if (g && g.htmlToText) {
+        const plain = g.htmlToText(text);
+        return g.ownText ? g.ownText(plain) : plain;
+      }
+      return g && g.ownText ? g.ownText(text) : text;
+    }
+
+    function googleCloses() {
+      if (typeof FlowGoogleCloses !== 'undefined') return FlowGoogleCloses;
+      try {
+        if (typeof globalThis !== 'undefined' && globalThis.FlowGoogleCloses) return globalThis.FlowGoogleCloses;
+      } catch (e) { /* node tests inject the global; the page has the script binding */ }
+      return null;
+    }
+
+    // Mail.Read is already on the mail sign-in. This does not ask Files.ReadWrite.
+    // Only a save-shaped sentence is worth a per-message GET. Cap so one check
+    // cannot walk the whole mailbox. Overflow stays unread, same as a failed GET.
+    async function readMessageAttachments(token, messages) {
+      const closes = googleCloses();
+      const needs = closes && typeof closes.needsOneAttachment === 'function' ? closes.needsOneAttachment : null;
+      let reads = 0;
+      const CAP = 20;
+      for (const msg of messages || []) {
+        if (!msg || !msg.id || msg.isDraft || msg.hasAttachments !== true) continue;
+        if (Array.isArray(msg.attachments) || msg.attachmentsUnread) continue;
+        if (needs && !needs(attachmentMessageText(msg))) continue;
+        if (reads >= CAP) { msg.attachmentsUnread = true; continue; }
+        reads += 1;
+        const url = cfg.GRAPH + '/me/messages/' + encodeURIComponent(msg.id) + '/attachments?$select=id,name,contentType,size,isInline';
+        try {
+          const data = await graphGet(token, url);
+          msg.attachments = data && Array.isArray(data.value) ? data.value : [];
+        } catch (e) {
+          msg.attachmentsUnread = true;
+        }
+      }
+    }
+
     async function folder(token, name, sinceIso) {
       let url = cfg.GRAPH + '/me/mailFolders/' + name + '/messages?$top=' + cfg.PAGE_SIZE + '&$orderby=' + encodeURIComponent('receivedDateTime desc') + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + sinceIso) + '&$select=' + SELECT;
       const out = [];
@@ -520,6 +563,10 @@ const FlowOutlook = (() => {
           auth = await read(AUTH_KEY, null);
         }
         messages = inbox.concat(sent);
+        // A save-shaped message lists hasAttachments and not the files. Read
+        // that list here, before the planner, or a real file stays
+        // outlook:attachments-unread. A failed read marks that message only.
+        await readMessageAttachments(tok, messages);
       } catch (e) {
         // A 401 that survived one forced renewal: the session state was already written by ensureSession.
         const cur = await read(STATE_KEY, {});
