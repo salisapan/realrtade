@@ -23,6 +23,8 @@ node labeling/test-score.cjs
 node labeling/test-silence-prototype.cjs
 echo "== user-context profile (contrast pairs, empty-profile flips)"
 node profile/test-profile.cjs
+echo "== user-context held-out (frozen pairs, hand rule and learned scorer)"
+node profile/test-heldout.cjs
 echo "== Hebrew currency veto"
 node oss/veto/test-hebrew-amount.cjs
 echo "== suggest-save corpus (JS, then Python parity)"

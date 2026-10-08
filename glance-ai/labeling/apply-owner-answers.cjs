@@ -37,10 +37,10 @@ function renderPreview(rep) {
   const b = rep.banner;
   let md = '';
   md += '# Owner-label preview, 2026-10-08\n\n';
-  md += 'Glance closes open loops. Gmail is where it starts today.\n\n';
+  md += 'Glance closes open loops. Glance\'s entry point is any surface the user is on.\n\n';
   md += '**' + b + '.** Owner-verified labels are still 0. This page scores the chief of staff\'s proposed answers for batch-001. It is not owner gold.\n\n';
   md += '## Product definition\n\n';
-  md += 'Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Gmail is the current primary entry surface. Glance stays silent when it is uncertain, never sends, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.\n\n';
+  md += 'Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is detect, carry, execute, true close. Glance\'s entry point is any surface the user is on. Glance stays silent when it is uncertain, never sends, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.\n\n';
   md += '## Implementation status\n\n';
   md += 'Batch-001 is 19 synthetic cases (`v2syn-*` and two repo-test ids) where engine 0.9.35 and model v2 disagree, or where a rule needs the owner\'s call. The mail text is generated, not customer mail. Items 8 and 17 are marked unsure in this preview and are left out of every headline number. Item 17\'s note says the close is a save to OneDrive, not a task and not silence. That call is still the owner\'s.\n\n';
   const unsure = rep.excluded.filter((e) => e.reason !== 'context-dependent');

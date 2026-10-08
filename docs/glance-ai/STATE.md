@@ -140,6 +140,30 @@ Contrast set `glance-ai/labeling/contrast-v0.jsonl`: 40 synthetic pairs, 20 Hebr
 
 Empty profile on the shipped v2 held-out (`pred`, n=6982): 0 flips. Empty profile on the 40 contrast emails against live v2: 0 flips. Gated Qwen with a profile summary was not run. Qwen3.5-4B is not vendored, and 80 CPU prompts are not a cheap check. The report is `glance-ai/profile/out/contrast-report.json`.
 
+The 100% pair accuracy above is in-sample. The hand rule was written until it matched `contrast-v0`. It is not a held-out result.
+
+### contrast-heldout-v0 (frozen before the scorer)
+
+`glance-ai/labeling/contrast-heldout-v0.jsonl` is 60 new pairs (30 Hebrew, 30 English), `labeledBy` `synthetic-heldout`, owner-verified 0. sha256 `8dcc096806b0f59c9062be9f07caacf3ffe1c6b5102598c34e92ff5c2170322c` (`contrast-heldout-v0.sha256`). The file is not a training input. It includes approver-plus-FYI, a group ask aimed at a named other person, a role match that appears only in the attachment name, a lookalike of a vendor the user pays, and a preference revoked by later dismissals.
+
+| | pair accuracy | wrong Do It | missed close on relevant |
+|---|---|---|---|
+| Hand rule (`featurize` / `judge`) | 65.0% (39/60) | 16.7% (10/60) | 18.3% (11/60) |
+| L2 logistic regression | 58.3% (35/60) | 11.7% (7/60) | 25.0% (15/60) |
+
+The regression trains on `contrast-v0` plus `glance-ai/profile/generate-train.cjs` only. L2 is 0.01, chosen on a hash split of that training pool (validation relevance accuracy 0.975, which is not the held-out). Empty profile flips stay 0/6982 for both the hand rule and the learned scorer. Report: `glance-ai/profile/out/heldout-report.json`.
+
+Largest relevant-class weights: `history_approved` +0.88, `saves_always` +0.82, `group_rate` −0.64, `pref_offer` +0.57, `history_against` −0.57. `approver_on_thread` is about +0.03, so the linear model does not carry the approver bit. `group_rate` uses −1 for missing, and that sentinel is why the sign is not a clean "answers the group" effect.
+
+What the extension event log has to capture first, for Dima (open-tasks row 62):
+
+1. `approved` with `fetchedBack`, plus `partyKey`, `intentFamily`, and `at`.
+2. `dismissed` and `undo` on that same key, with `at`, so a later dismissal can outweigh an older preference.
+3. A real reply count next to `shown`, so a group reply rate is a count. Missing must stay missing, not a filled-in zero.
+4. `partyKey` is the exact address. A lookalike domain is a different party.
+
+`savesFiles` and role or department are onboarding fields, not mail events. They outweigh most of the mail features. Attachment-name topic (`role_topic_file` +0.25) is weaker than the body topic. The learned scorer does not replace the hand rule: it lowers wrong Do It and raises missed close on relevant mail.
+
 ## Next stages
 
 1. Keep v2 as the default shadow candidate. Keep v2.1 in shadow. Do not promote either on these reports alone.
