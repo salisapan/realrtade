@@ -321,7 +321,8 @@ const FlowActions = (() => {
     } else if (intent.type === FlowIntent.TYPES.SCHEDULED_EVENT) {
       id = sig.handoff ? 'schedule-confirm' : 'schedule';
     } else if (intent.type === FlowIntent.TYPES.REQUEST) {
-      id = 'reply-track';
+      // "No need to reply" is the task, not Reply & Track.
+      id = intent.noReplyDraft ? 'log-it' : 'reply-track';
     } else if (intent.type === FlowIntent.TYPES.COMMITMENT_OF_READER) {
       id = 'follow-through';
     } else {

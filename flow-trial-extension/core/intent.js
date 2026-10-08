@@ -388,12 +388,22 @@ const FlowIntent = (() => {
   // No To and no Cc is not that ask: the page did not show who it was for.
   // "Hi," is a greeting, not a person named Hi. "Hi Dana," names Dana.
   const OPEN_GREET = /^(?:good\s+(?:morning|afternoon|evening)|greetings|hi|hey|hello|dear)\b|^(?:בוקר\s+טוב|ערב\s+טוב|שלום|היי|הי)(?![\u0590-\u05FF])/i;
+  // "Hi all," is the group, not a person named All. A real name still counts.
+  const GROUP_ADDRESSEE = /^(?:all|team|everyone|everybody|there|folks|guys|y['’]all|colleagues|both|כולם|צוות|חברים|חבר['׳’]ה)$/i;
   function openingAddressee(text) {
     let raw = String(text || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
     const greet = raw.match(OPEN_GREET);
     if (greet) raw = raw.slice(greet[0].length).replace(/^[\s,،:!]+/, '');
     const named = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40}),/);
-    return named ? named[1] : '';
+    if (!named || GROUP_ADDRESSEE.test(named[1])) return '';
+    return named[1];
+  }
+  // A changed bank plus a payment is not a task. Quiet beats a wrong Do It.
+  const BANK_CHANGE = /\b(?:changed banks|new account|update (?:our |the )?(?:bank|account) details)\b|פרטי חשבון חדשים|החלפנו בנק/i;
+  const PAY_MOVE = /\b(?:pay|wire|transfer)\b|(?:תשלום|העברה)|(?:^|[^\u0590-\u05FF])(?:שלם|תשלם|להעביר)(?![\u0590-\u05FF])/i;
+  function bankChangePayment(text) {
+    const raw = String(text || '');
+    return BANK_CHANGE.test(raw) && PAY_MOVE.test(raw);
   }
   function replyDraftAllowed(text, ctx) {
     const c = ctx || {};
@@ -674,6 +684,13 @@ const FlowIntent = (() => {
           }
         }
       }
+      // The task names the work. "Reply requested" is the draft, and this mail declined one.
+      if (intent.noReplyDraft) {
+        const what = String((intent.entities && intent.entities.what) || '').replace(/\s+/g, ' ').trim();
+        const iso = intent.entities && intent.entities.dateIso;
+        const dateText = iso ? humanDateFallback({ iso: iso }) : '';
+        if (what) intent.label = what + (dateText ? ' by ' + dateText : '');
+      }
       return gateCreateWhenMissing(intent);
     }
     // A weak create-when-missing judgment stays silent. Field count does
@@ -815,6 +832,7 @@ const FlowIntent = (() => {
     // A family veto (cancel with no new slot, two file targets, a retraction,
     // a doc comment we cannot write) is silence. A reschedule that names
     // one new slot is that slot, not the old time the event gate would file.
+    if (bankChangePayment(text)) return stayQuiet('family');
     if (familyBox.hit && familyBox.hit.suppress) {
       if (ctx.debug) {
         let matched = familyBox.hit.matched || null;

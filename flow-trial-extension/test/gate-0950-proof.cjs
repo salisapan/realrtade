@@ -165,6 +165,22 @@ function lum(rgb) {
   check('Hi Dana stays hedge when the user is Sali',
     hiDana && hiDana.show !== true && hiDana.reason === 'quiet:hedge',
     { show: hiDana && hiDana.show, reason: hiDana && hiDana.reason });
+  for (const opener of ['Hi all', 'Hi team', 'Hi there']) {
+    const group = await page.evaluate((input) => window.__eng.judge.judge(input), {
+      text: opener + ',\n\nPlease reply with your availability for the launch checklist by Wednesday, October 14.\n\nCheers,\nDana',
+      subject: 'Launch checklist',
+      sender: { name: 'Dana', email: 'dana@acme.com' },
+      surface: 'outlook',
+      to: [ME],
+      ownAddresses: [ME],
+      userName: 'Sali',
+      inbound: true
+    });
+    const groupKinds = ((group && group.process && group.process.steps) || []).map((s) => s.kind);
+    check(opener + ' with Sali in To offers a draft',
+      group && group.show === true && groupKinds.indexOf('outlookDraft') >= 0 && String(group.reason || '').indexOf('hedge') < 0,
+      { show: group && group.show, reason: group && group.reason, kinds: groupKinds });
+  }
 
   const ccPane = await readPane(page, paneHtml({
     subject: q3.subject,
@@ -226,11 +242,29 @@ function lum(rgb) {
     inbound: true
   });
   const parkKinds = ((parkJudged && parkJudged.process && parkJudged.process.steps) || []).map((s) => s.kind);
+  const parkTask = ((parkJudged && parkJudged.process && parkJudged.process.steps) || []).find((s) => s.kind === 'outlookTask');
   check('gate049 parking is a To Do and not a draft',
     parkJudged && parkJudged.show === true && parkJudged.intent && parkJudged.intent.noReplyDraft === true &&
+    parkJudged.intent.label === 'Renew the parking permit by Oct 11' &&
+    parkJudged.intent.entities && parkJudged.intent.entities.dateIso === '2026-10-11' &&
+    parkTask && parkTask.params.title === 'Renew the parking permit by Oct 11' &&
     parkKinds.indexOf('outlookTask') >= 0 && parkKinds.indexOf('outlookDraft') < 0 &&
+    !/Drafting your reply/.test(String(parkJudged.process && parkJudged.process.closingLine || '')) &&
     String(parkJudged.reason || '') !== 'quiet:noise',
-    { show: parkJudged && parkJudged.show, reason: parkJudged && parkJudged.reason, type: parkJudged && parkJudged.intent && parkJudged.intent.type, kinds: parkKinds });
+    { show: parkJudged && parkJudged.show, reason: parkJudged && parkJudged.reason, label: parkJudged && parkJudged.intent && parkJudged.intent.label, title: parkTask && parkTask.params.title, name: parkJudged && parkJudged.process && parkJudged.process.name, line: parkJudged && parkJudged.process && parkJudged.process.closingLine, kinds: parkKinds });
+  const bec = await page.evaluate((input) => window.__eng.judge.judge(input), {
+    text: 'We changed banks. Please update our account details and pay invoice 4471 by Sunday, October 11. No need to reply.',
+    subject: 'Updated bank details',
+    sender: { name: 'Dana', email: 'dana@acme.com' },
+    surface: 'outlook',
+    to: [ME],
+    ownAddresses: [ME],
+    userName: 'Sali',
+    inbound: true
+  });
+  check('a bank-change payment stays quiet:family',
+    bec && bec.show !== true && bec.reason === 'quiet:family',
+    { show: bec && bec.show, reason: bec && bec.reason, type: bec && bec.intent && bec.intent.type });
 
   const quietLines = [
     ['no reply, no action', 'No need to reply. The office already has the form.', 'dana@city.gov'],

@@ -1315,6 +1315,14 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
     { type: q3hi.type, quiet: q3hi.quiet });
   check('opening Hi is not an addressee name', FlowIntent.openingAddressee(Q3_BODY) === '');
   check('Hi Dana names Dana', FlowIntent.openingAddressee('Hi Dana, can you reply and confirm whether the Q3 summary will include the October numbers?') === 'Dana');
+  ['all', 'team', 'everyone', 'everybody', 'there', 'folks', 'guys', "y'all", 'colleagues', 'both', 'כולם', 'צוות', 'חברים', "חבר'ה"].forEach((group) => {
+    const greet = /[\u0590-\u05FF]/.test(group) ? 'שלום ' : 'Hi ';
+    check('a group opener is not a name: ' + group, FlowIntent.openingAddressee(greet + group + ', please reply by Friday.') === '');
+  });
+  ['Hi all', 'Hi team', 'Hi there'].forEach((opener) => {
+    const intent = classify(opener + ',\n\nPlease reply with your availability for the launch checklist by Wednesday, October 14.\n\nCheers,\nDana', q3ctx);
+    check(opener + ' with Sali in To still drafts', intent.type === FlowIntent.TYPES.REQUEST && intent.quiet !== 'hedge', { type: intent.type, quiet: intent.quiet });
+  });
   const greetings = ['Hey,', 'Hello,', 'Dear,', 'Good morning,', 'Good afternoon,', 'Good evening,', 'Greetings,', 'שלום,', 'היי,', 'הי,', 'בוקר טוב,', 'ערב טוב,'];
   greetings.forEach((greet) => {
     const intent = classify(greet + '\n' + Q3, q3ctx);
@@ -1424,10 +1432,23 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
   const gatePark = classify(PARK_BODY, parkCtx);
   const gatePlan = FlowActions.planFor(gatePark, { threadUrl: 'x', hasThreadAttachment: false });
   const gateKinds = (gatePlan && gatePlan.steps || []).map((s) => s.kind);
+  const parkTask = (gatePlan && gatePlan.steps || []).find((s) => s.kind === 'googleTask');
   check('gate049 parking is a To Do and not a draft',
     gatePark && gatePark.type === FlowIntent.TYPES.REQUEST && gatePark.noReplyDraft === true &&
-    gateKinds.indexOf('googleTask') >= 0 && gateKinds.indexOf('gmailDraft') < 0,
-    { type: gatePark && gatePark.type, quiet: gatePark && gatePark.quiet, kinds: gateKinds });
+    gatePark.label === 'Renew the parking permit by Oct 11' &&
+    gatePark.entities && gatePark.entities.dateIso === '2026-10-11' &&
+    gatePlan && gatePlan.id === 'log-it' && gateKinds.indexOf('gmailDraft') < 0 &&
+    gateKinds.indexOf('googleTask') >= 0 && parkTask && parkTask.params.title === 'Renew the parking permit by Oct 11' &&
+    !/Drafting your reply/.test(String(gatePlan.closingLine || '')) && !/Reply & Track/.test(String(gatePlan.name || '')),
+    { label: gatePark && gatePark.label, id: gatePlan && gatePlan.id, name: gatePlan && gatePlan.name, line: gatePlan && gatePlan.closingLine, title: parkTask && parkTask.params.title, kinds: gateKinds });
+  const bec = classify('We changed banks. Please update our account details and pay invoice 4471 by Sunday, October 11. No need to reply.', {
+    now: parkCtx.now, senderEmail: 'dana@acme.com', to: ['glance.salisapan@outlook.com'], ownAddresses: ['glance.salisapan@outlook.com'], userName: 'Sali'
+  });
+  check('a bank-change payment stays quiet:family', bec && !bec.type && bec.quiet === 'family', { type: bec && bec.type, quiet: bec && bec.quiet });
+  const payOnly = classify('Please pay invoice 4471 by Sunday, October 11.', {
+    now: parkCtx.now, senderEmail: 'dana@acme.com', to: ['glance.salisapan@outlook.com'], ownAddresses: ['glance.salisapan@outlook.com'], userName: 'Sali'
+  });
+  check('a payment with no bank change still drafts', payOnly && payOnly.type === FlowIntent.TYPES.REQUEST && payOnly.quiet !== 'family', { type: payOnly && payOnly.type, quiet: payOnly && payOnly.quiet });
   const replyOnly = classify('No need to reply. The office already has the form from last week.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
   check('no need to reply with no action stays quiet:noise', replyOnly && !replyOnly.type && replyOnly.quiet === 'noise', replyOnly);
   const fyiRenew = classify('FYI, please renew the parking permit by Sunday.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
