@@ -180,4 +180,4 @@ The fee rule's one fix is item 11. The five new misses are Hebrew "מאשרת א
 
 Gated Qwen is not on this path. The prototype does not change it. Strict propose-gate, spec labels, wrong-Do-It stays 0/110 (CORE162), 0/167 (OSS 275), 0/218 (v2 held-out 400), 0/50 (adversarial), 0/29 (injection hand set), and 0/464 (pooled 786).
 
-Suggest-save is not on this path either. The prototype does not read `eval-data/suggest-save-v22.jsonl` and cannot add a chip. New chips from this change: 0.
+Suggest-save is not on this path either. The prototype does not read `eval-data/suggest-save-v22.jsonl` and cannot add a chip. New chips from this change: 0. `bash glance-ai/run-cpu-checks.sh` exited 0. The dataset check was 8191/8191 equal, new chips 0. Gated Qwen's pass bar stayed true (wrong-Do-It 0 on every strict spec set).
