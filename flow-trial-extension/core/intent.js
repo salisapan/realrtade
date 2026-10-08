@@ -347,6 +347,49 @@ const FlowIntent = (() => {
     if (/\breply and confirm\b/i.test(raw)) return true;
     return false;
   }
+  const AUTO_REPLY_TEXT = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|בחופשה עד|בחופשה|אעדר)/i;
+  function addressList(value) {
+    if (!value) return [];
+    const list = Array.isArray(value) ? value : [value];
+    const out = [];
+    list.forEach((a) => {
+      if (!a) return;
+      const email = typeof a === 'string' ? a : (a.email || a.address || (a.emailAddress && a.emailAddress.address) || '');
+      const norm = String(email || '').trim().toLowerCase();
+      if (norm) out.push(norm);
+    });
+    return out;
+  }
+  function autoReplyMail(text, senderEmail) {
+    if (typeof FlowFollowUp !== 'undefined' && typeof FlowFollowUp.isAutoReply === 'function') {
+      return FlowFollowUp.isAutoReply(text, senderEmail);
+    }
+    if (AUTO_REPLY_TEXT.test(String(text || '').slice(0, 600))) return true;
+    return /^(?:no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster)@/i.test(String(senderEmail || ''));
+  }
+  // A reply draft is offered only for an inbound ask addressed to the user.
+  // Missing audience fields stay allowed: the live Q3 mail has no To/Cc on
+  // the classify call. Positive evidence is what stays quiet.
+  function replyDraftAllowed(text, ctx) {
+    const c = ctx || {};
+    if (c.autoReply === true || c.noteToSelf === true || c.senderIsUser === true) return false;
+    if (c.inbound === false || c.direction === 'outbound' || c.inSent === true) return false;
+    const sender = String(c.senderEmail || '').toLowerCase();
+    const own = addressList(c.ownAddresses || c.own);
+    if (sender && own.indexOf(sender) !== -1) return false;
+    if (autoReplyMail(text, sender)) return false;
+    const to = addressList(c.to || c.toRecipients);
+    const cc = addressList(c.cc || c.ccRecipients);
+    if (own.length && (to.length || cc.length) && !to.some((a) => own.indexOf(a) !== -1)) return false;
+    const named = String(text || '').match(/^\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40}),/);
+    const userName = String(c.userName || '').trim().toLowerCase();
+    if (named && userName) {
+      const who = named[1].toLowerCase();
+      const first = userName.split(/\s+/)[0];
+      if (who !== userName && who !== first) return false;
+    }
+    return true;
+  }
   function readerDecisionAsk(text) {
     const raw = String(text || '');
     if (/\b(?:can|could|would|will) you\s+(?:please\s+)?(?:agree|accept)\b/i.test(raw)) return true;
@@ -939,9 +982,13 @@ const FlowIntent = (() => {
     if (requestEvidence && suppressed(TYPES.REQUEST)) return stayQuiet('calibrated');
     const familiesBlockAsk = typeof FlowCloseFamilies !== 'undefined' && FlowCloseFamilies.askBlocked(text);
     if (!quietHint && (askIsSoft || familiesBlockAsk) && requestEvidence) quietHint = 'hedge';
-    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text) && !explicitReplyAsk(text)) {
+    const replyAsk = explicitReplyAsk(text);
+    const replyOk = !replyAsk || replyDraftAllowed(text, ctx);
+    if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && readerDecisionAsk(text) && !replyAsk) {
       quietHint = quietHint || 'hedge';
-    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk) {
+    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyAsk && !replyOk) {
+      quietHint = quietHint || 'hedge';
+    } else if (!blocked && requestEvidence && !askIsSoft && !familiesBlockAsk && replyOk) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: whatText(text, REQUEST_PATTERNS) || labelFor(TYPES.REQUEST),

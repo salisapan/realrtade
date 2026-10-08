@@ -616,15 +616,16 @@ const FlowStorage = (() => {
     const resolved = new Set((state && state.resolvedMessageIds) || []);
     const pending = getPendingFrom(state).map((entry) => FlowStillOpen.fromLogEntry(entry));
     const seenMsg = new Set(pending.map((c) => c.messageId).filter(Boolean));
-    const seenThread = new Set(pending.map((c) => c.threadId).filter(Boolean));
+    const seenKey = new Set(pending.map((c) => FlowStillOpen.promiseKey(c)).filter(Boolean));
     const scan = [];
     for (const raw of (state && state.stillOpenScan) || []) {
       const c = FlowStillOpen.fromLogEntry(raw);
       if (!c.messageId || resolved.has(c.messageId)) continue;
       if (seenMsg.has(c.messageId)) continue;
-      if (c.threadId && seenThread.has(c.threadId)) continue;
+      const key = FlowStillOpen.promiseKey(c);
+      if (key && seenKey.has(key)) continue;
       seenMsg.add(c.messageId);
-      if (c.threadId) seenThread.add(c.threadId);
+      if (key) seenKey.add(key);
       scan.push(c);
     }
     return pending.concat(scan);
@@ -651,10 +652,11 @@ const FlowStorage = (() => {
   const upsertStillOpenScan = serialize(async function upsertStillOpenScan(candidate) {
     if (!candidate || !candidate.messageId || !candidate.process) return;
     const state = await get();
+    const candKey = (typeof FlowStillOpen.promiseKey === 'function') ? FlowStillOpen.promiseKey(candidate) : '';
     const scan = (state.stillOpenScan || []).filter((row) => {
       if (!row) return false;
       if (row.messageId === candidate.messageId) return false;
-      if (candidate.threadId && row.threadId === candidate.threadId) return false;
+      if (candKey && FlowStillOpen.promiseKey(row) === candKey) return false;
       return true;
     });
     scan.unshift(candidate);
@@ -1324,11 +1326,7 @@ const FlowStorage = (() => {
     const i = ids.indexOf(messageId);
     if (i === -1) return { ok: true, changed: false };
     ids.splice(i, 1);
-    const next = Object.assign({}, so, {
-      undoIds: ids,
-      undo: Math.max(0, (so.undo || 0) - 1),
-      recent: (so.recent || []).filter((r) => !(r && r.kind === 'undo' && r.id === messageId))
-    });
+    const next = Object.assign({}, so, { undoIds: ids });
     await set({ stillOpenMetrics: next });
     return { ok: true, changed: true };
   });
@@ -1481,6 +1479,7 @@ const FlowStorage = (() => {
       log[i] = Object.assign({}, e, {
         kind: 'undone',
         undone: true,
+        outlookReopen: true,
         connectorId: e.connectorId || 'outlookTask',
         url: null,
         ref: null,
@@ -1494,6 +1493,7 @@ const FlowStorage = (() => {
         ts: Date.now(),
         kind: 'undone',
         undone: true,
+        outlookReopen: true,
         label: 'To Do task removed.',
         messageId: messageId || null,
         threadId: threadId || null,
@@ -1504,7 +1504,8 @@ const FlowStorage = (() => {
       });
       hit = true;
     }
-    await set({ log: trimLog(log, new Set(state.resolvedMessageIds || [])) });
+    const resolved = (state.resolvedMessageIds || []).filter((id) => !messageId || id !== messageId);
+    await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
     return { ok: true, hit: hit };
   });
 

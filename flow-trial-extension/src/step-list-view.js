@@ -104,7 +104,7 @@ const FlowStepListView = (() => {
       suggested: row.suggested === true,
       added: row.added === true,
       checked: row.checked !== false,
-      tag: row.suggested ? 'Suggested' : (row.added ? 'Added' : ''),
+      tag: row.suggested ? 'Suggested' : (row.added ? 'Added' : (row.tag || '')),
       st: stateClass(row.state),
       kind: row.suggested ? 'suggested' : ''
     };

@@ -440,6 +440,10 @@
   // A $filter on conversationId often comes back empty on the live mailbox (the
   // filter is refused, or the spelling does not match). The recent inbox list is
   // the same read the mailbox check already uses, matched here instead of on the server.
+  function openInboxRows(list, want) {
+    return (Array.isArray(list) ? list : []).filter((m) => m && (FlowOwaParse.canonId(m.conversationId) === want || FlowOwaParse.canonId(m.id) === want));
+  }
+
   async function messageIdForConversation(convId, own) {
     const raw = String(convId || '');
     const want = FlowOwaParse.canonId(raw);
@@ -455,11 +459,20 @@
         }
       }
       const since = new Date(Date.now() - 14 * 24 * 3600 * 1000).toISOString();
-      const listPath = '/me/mailFolders/inbox/messages?$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc') + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+      const select = '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+      const order = '$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc');
+      const filteredPath = '/me/mailFolders/inbox/messages?' + order + '&$filter=' + encodeURIComponent('receivedDateTime ge ' + since) + select;
+      const plainPath = '/me/mailFolders/inbox/messages?' + order + select;
       for (let p = 0; p < prefers.length; p++) {
-        const hits = (await graphValues(listPath, 'inbox-list', prefers[p]) || []).filter((m) => m && (FlowOwaParse.canonId(m.conversationId) === want || FlowOwaParse.canonId(m.id) === want));
+        let list = await graphValues(filteredPath, 'inbox-list', prefers[p]);
+        let how = 'inbox-list';
+        if (!Array.isArray(list)) {
+          list = await graphValues(plainPath, 'inbox-list-plain', prefers[p]);
+          how = 'inbox-list-plain';
+        }
+        const hits = openInboxRows(list, want);
         const fromList = newestOther(hits, own);
-        if (fromList && fromList.id) return { id: fromList.id, how: 'inbox-list', immutable: Boolean(prefers[p]), from: fromAddress(fromList) };
+        if (fromList && fromList.id) return { id: fromList.id, how: how, immutable: Boolean(prefers[p]), from: fromAddress(fromList) };
       }
       return null;
     } catch (e) { return null; }
@@ -469,17 +482,33 @@
   // A conversation resolves to one message. The newest message from someone
   // else is not the open message. Return its from-address; on a mismatch the
   // result is unread and is never used as the open message.
-  async function resolveOutlookMessageId(pathId, convId, own, openSender) {
+  async function resolveOutlookMessageId(pathId, convId, own, openSender, subject) {
     const direct = await messageIdFromPathRest(pathId || convId);
     if (direct && direct.id) return direct;
-    if (!convId) return null;
-    const found = await messageIdForConversation(convId, own);
-    if (!found || !found.id) return null;
-    if (!sameOpenSender(found.from, openSender)) {
-      dbg('sender-mismatch', { how: found.how, from: found.from || null, open: String(openSender || '').toLowerCase() || null });
-      return { unread: true, reason: 'page:sender-mismatch', from: found.from || null };
+    const found = await messageIdForConversation(convId || pathId, own);
+    const resolved = found && found.id ? found : await messageBySubject(subject, openSender, own);
+    if (!resolved || !resolved.id) return null;
+    if (!sameOpenSender(resolved.from, openSender)) {
+      dbg('sender-mismatch', { how: resolved.how, from: resolved.from || null, open: String(openSender || '').toLowerCase() || null });
+      return { unread: true, reason: 'page:sender-mismatch', from: resolved.from || null };
     }
-    return found;
+    return resolved;
+  }
+
+  async function messageBySubject(subject, openSender, own) {
+    const sub = (typeof FlowOwaParse.norm === 'function') ? FlowOwaParse.norm(subject) : String(subject || '').toLowerCase().trim();
+    if (!sub) return null;
+    const select = '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
+    const plainPath = '/me/mailFolders/inbox/messages?$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc') + select;
+    const list = await graphValues(plainPath, 'inbox-subject', null);
+    const hits = (Array.isArray(list) ? list : []).filter((m) => {
+      if (!m) return false;
+      const msub = (typeof FlowOwaParse.norm === 'function') ? FlowOwaParse.norm(m.subject) : String(m.subject || '').toLowerCase().trim();
+      return msub === sub && sameOpenSender(fromAddress(m), openSender);
+    });
+    const row = newestOther(hits, own);
+    if (!row || !row.id) return null;
+    return { id: row.id, how: 'inbox-subject', immutable: false, from: fromAddress(row) };
   }
 
   async function ensureOutlookMessageId(ctx) {
@@ -847,6 +876,14 @@
           await FlowStorage.markOnedriveFileUndone(messageId, copy.ref, threadKey);
         } else if (typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
           await FlowStorage.markMicrosoftTodoUndone(messageId, copy.ref, threadKey);
+          await reopenTaskScan(row);
+          if (messageId) await FlowStorage.recordStillOpenMetric({ kind: 'undo', messageId: messageId });
+          try { host.remove(); } catch (e) { /* already gone */ }
+          lastKey = '';
+          lastSig = '';
+          lastOutcome = '';
+          schedule();
+          return;
         }
         const undoneIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean);
         host.setAttribute('data-glance-undone', '1');
@@ -1030,6 +1067,23 @@
     };
   }
 
+  async function reopenTaskScan(row) {
+    if (!row || !row.messageId || !row.process || typeof FlowStorage.upsertStillOpenScan !== 'function') return;
+    await FlowStorage.upsertStillOpenScan({
+      messageId: row.messageId,
+      threadId: row.threadId || row.outlookConversationId || null,
+      outlookConversationId: row.outlookConversationId || null,
+      threadUrl: row.threadUrl || null,
+      app: row.app || 'outlook',
+      ts: Date.now(),
+      sender: row.sender || null,
+      subject: row.subject || '',
+      text: row.text || row.bodyText || '',
+      intent: row.intent || null,
+      process: row.process
+    });
+  }
+
   async function livePromiseProof(item) {
     if (typeof FlowStillOpen === 'undefined' || typeof FlowStillOpen.activeProofFor !== 'function') return null;
     if (typeof FlowStorage === 'undefined' || typeof FlowStorage.get !== 'function') return null;
@@ -1129,7 +1183,13 @@
       writtenLine: r.written,
       processName: faceTitle(ctx),
       closedLine: ctx.process && ctx.process.closedLine,
-      receiptStatus: status
+      receiptStatus: status,
+      process: ctx.process,
+      intent: ctx.intent,
+      text: ctx.bodyText,
+      sender: ctx.sender,
+      subject: ctx.subject,
+      app: 'outlook'
     }, fields || {});
     if (mount) paintOutlookTodoReceipt(mount, row);
   }
@@ -1921,6 +1981,19 @@
         dbg('decision', { shown: true, reason: 'page:receipt-mounted', subject: pane.subject });
         return;
       }
+      const earlyProof = await livePromiseProof({
+        text: pane.text,
+        sender: { name: pane.senderName, email: pane.senderEmail },
+        threadId: pane.conversationId || '',
+        outlookConversationId: pane.conversationId || ''
+      });
+      if (earlyProof) {
+        const earlyMount = mountPoint();
+        if (earlyMount && paintOutlookTodoReceipt(earlyMount, earlyProof)) {
+          dbg('decision', { shown: true, reason: 'page:promise-proof', subject: pane.subject });
+          return;
+        }
+      }
     } catch (e) {
       glanceError('todo receipt', e);
       await pageReason('page:scan-error', pane);
@@ -2171,7 +2244,11 @@
     // terminal, so Do It must be eligible again after Undo.
     if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) { await pageReason('page:already-handled', pane); return; }
     const livePromise = await livePromiseProof(promiseItem(ctx, pane));
-    if (livePromise && livePromise.messageId && livePromise.messageId !== ctx.messageId) {
+    if (livePromise) {
+      if (mountPoint() && paintOutlookTodoReceipt(mountPoint(), livePromise)) {
+        dbg('decision', { shown: true, reason: 'page:promise-proof', subject: pane.subject });
+        return;
+      }
       await pageReason('page:same-promise', pane);
       return;
     }
@@ -2247,15 +2324,36 @@
     await FlowStorage.set({ suggestLog: log.slice(0, 40) });
   }
 
+  async function attachmentListFor(id) {
+    if (!id) return null;
+    const spells = idSpellings(id);
+    const prefers = [null, GRAPH_IMMUTABLE];
+    const select = '/attachments?$select=id,name,contentType,size,isInline,contentId';
+    for (let p = 0; p < prefers.length; p++) {
+      for (let i = 0; i < spells.length; i++) {
+        const rows = await graphValues('/me/messages/' + encodeURIComponent(spells[i]) + select, 'suggest-list', prefers[p]);
+        if (Array.isArray(rows)) return rows;
+      }
+    }
+    return null;
+  }
+
   async function suggestFiles(pane) {
     let id = pane.itemId || null;
-    if (!id) {
+    let rows = id ? await attachmentListFor(id) : null;
+    if (!Array.isArray(rows)) {
       const st = await FlowStorage.get();
-      const found = await resolveOutlookMessageId(pane.pathId || pane.conversationId, pane.conversationId, ownAddressesOf(st), pane.senderEmail);
+      const found = await resolveOutlookMessageId(
+        pane.pathId || pane.conversationId || pane.itemId,
+        pane.conversationId || pane.itemId,
+        ownAddressesOf(st),
+        pane.senderEmail,
+        pane.subject
+      );
       if (!found || found.unread || !found.id) return null;
-      id = found.id;
+      rows = await attachmentListFor(found.id);
     }
-    return graphValues('/me/messages/' + encodeURIComponent(id) + '/attachments?$select=id,name,contentType,size,isInline,contentId', 'suggest-list');
+    return Array.isArray(rows) ? rows : null;
   }
 
   // A mail that already has a card keeps suggest:other-card in the local log.
@@ -2509,7 +2607,32 @@
         return;
       }
     }
+    const skipped = decision.skipped || [];
+    if (!decision.eligible && skipped.length && paintSkippedOnly(pane, skipped)) {
+      lastOutcome = 'card';
+      await clearReason(pane);
+      return;
+    }
     await pageReason(decision.reason, pane, { fileCount: decision.fileCount, target: decision.target });
+  }
+
+  function paintSkippedOnly(pane, skipped) {
+    const mount = mountPoint();
+    if (!mount || !skipped || !skipped.length) return null;
+    const host = document.createElement('div');
+    host.className = 'flow-chip-host flow-skip-host';
+    host.setAttribute('dir', 'ltr');
+    skipped.forEach((file) => {
+      const line = document.createElement('div');
+      line.className = 'flow-skip-row';
+      line.textContent = (typeof FlowSuggestSave !== 'undefined' && typeof FlowSuggestSave.skippedLabel === 'function')
+        ? FlowSuggestSave.skippedLabel(file)
+        : ((file && file.name) ? (file.name + ' · skipped · ' + (file.why || 'not saved')) : 'File skipped');
+      host.appendChild(line);
+    });
+    if (mount.firstChild) mount.insertBefore(host, mount.firstChild);
+    else mount.appendChild(host);
+    return host;
   }
 
   async function runScan() {

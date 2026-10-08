@@ -2044,6 +2044,23 @@
     }
   }
 
+  async function reopenOutlookTask(entry) {
+    if (!entry || !entry.messageId || !entry.process || typeof FlowStorage.upsertStillOpenScan !== 'function') return;
+    await FlowStorage.upsertStillOpenScan({
+      messageId: entry.messageId,
+      threadId: entry.threadId || entry.outlookConversationId || null,
+      outlookConversationId: entry.outlookConversationId || null,
+      threadUrl: entry.threadUrl || null,
+      app: entry.app || 'outlook',
+      ts: Date.now(),
+      sender: entry.sender || null,
+      subject: entry.subject || '',
+      text: entry.text || '',
+      intent: entry.intent || null,
+      process: entry.process
+    });
+  }
+
   function outlookReceiptRow(entry) {
     const proof = entry && (entry.connectorId === 'outlookTask' || entry.connectorId === 'microsoftTodo' || entry.connectorId === 'onedriveFile' || entry.connectorId === 'attachmentSave' || entry.fetchedBack === true) && entry.connectorId !== 'outlookDraft';
     const item = el('div', 'log-item');
@@ -2087,6 +2104,7 @@
         await FlowStorage.markOnedriveFileUndone(entry.messageId, entry.ref, entry.threadId);
       } else if (proof && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
         await FlowStorage.markMicrosoftTodoUndone(entry.messageId, entry.ref, entry.threadId);
+        await reopenOutlookTask(entry);
       } else if (typeof FlowStorage.markOutlookDraftUndone === 'function') {
         await FlowStorage.markOutlookDraftUndone(entry.messageId, entry.ref);
       } else {
@@ -2586,6 +2604,7 @@
               await FlowStorage.markGoogleTaskUndone(e.messageId, e.ref, e.threadId);
             } else if ((e.connectorId === 'outlookTask' || e.connectorId === 'microsoftTodo' || e.system === 'microsoft/todo') && typeof FlowStorage.markMicrosoftTodoUndone === 'function') {
               await FlowStorage.markMicrosoftTodoUndone(e.messageId, e.ref, e.threadId);
+              await reopenOutlookTask(e);
             } else if ((e.connectorId === 'onedriveFile' || e.system === 'microsoft/onedrive') && typeof FlowStorage.markOnedriveFileUndone === 'function') {
               await FlowStorage.markOnedriveFileUndone(e.messageId, e.ref, e.threadId);
             } else {

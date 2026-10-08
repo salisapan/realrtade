@@ -274,7 +274,13 @@ const FlowStillOpen = (() => {
   }
 
   function normPiece(value) {
-    return String(value || '').toLowerCase().replace(/[^a-z0-9\u0590-\u05ff]+/gi, ' ').replace(/\s+/g, ' ').trim();
+    return String(value || '')
+      .replace(/\u05BE/g, ' ')
+      .replace(/[\u0591-\u05C7]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0590-\u05ff]+/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   function dueIsoOf(item) {
@@ -287,8 +293,9 @@ const FlowStillOpen = (() => {
     return String((sender && (sender.email || sender.address)) || '').toLowerCase();
   }
 
-  // Same promise, same day, same person: one Do It. A second mail in the
-  // thread, or another mail from that sender, does not open a second task.
+  // Same promise, same day, same person: one Do It. A second commitment in
+  // the same thread stays its own loop. The key is never empty when a
+  // commitment title exists, including when the mail names no due date.
   function commitmentDedupeKey(item) {
     let title = '';
     if (typeof FlowCommitmentTitle !== 'undefined' && item && item.text && typeof FlowCommitmentTitle.titleFromBody === 'function') {
@@ -299,13 +306,15 @@ const FlowStillOpen = (() => {
       const entities = intent.entities || {};
       title = normPiece(entities.what || intent.label || '');
     }
+    if (!title) return '';
     const due = dueIsoOf(item);
-    if (!title || !due) return '';
     const who = senderKeyOf(item);
-    if (who) return title + '\n' + due + '\n' + who;
     const thread = String((item && (item.threadId || item.outlookConversationId)) || '');
-    if (thread) return title + '\n' + due + '\nthread:' + thread;
-    return '';
+    const tail = who ? who : (thread ? ('thread:' + thread) : '');
+    if (due && tail) return title + '\n' + due + '\n' + tail;
+    if (due) return title + '\n' + due;
+    if (tail) return title + '\n' + tail;
+    return title;
   }
 
   function todoProofRow(row) {
@@ -331,26 +340,21 @@ const FlowStillOpen = (() => {
   }
 
   function select(candidates, now, log) {
-    const best = new Map();
+    const merged = new Map();
     const list = Array.isArray(candidates) ? candidates : [];
     for (const raw of list) {
       if (!raw || !raw.messageId || !raw.process || !raw.process.steps || !raw.process.steps.length) continue;
       if (activeProofFor(log, raw)) continue;
       const score = scoreOf(raw, now);
       if (!score) continue;
-      const key = raw.threadId || raw.messageId;
-      const prev = best.get(key);
-      if (!prev || score > prev.score) best.set(key, { item: raw, score: score });
-    }
-    const merged = new Map();
-    best.forEach((row) => {
-      const commit = commitmentDedupeKey(row.item);
-      const key = commit || ('id:' + row.item.messageId);
+      const commit = commitmentDedupeKey(raw);
+      const key = commit || ('id:' + raw.messageId);
+      const row = { item: raw, score: score };
       const prev = merged.get(key);
       if (!prev || row.score > prev.score || (row.score === prev.score && (row.item.ts || 0) > (prev.item.ts || 0))) {
         merged.set(key, row);
       }
-    });
+    }
     const ranked = Array.from(merged.values());
     ranked.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
@@ -465,7 +469,7 @@ const FlowStillOpen = (() => {
     }
 
     if (event.kind === 'doIt') {
-      if (!id || next.doItIds.indexOf(id) !== -1) return unchanged(next);
+      if (!id) return unchanged(next);
       next.doIt += 1;
       next.doItIds = remember(next.doItIds, id);
       const recorded = { kind: 'doIt', id: id, ts: ts, reason: null };
@@ -476,7 +480,7 @@ const FlowStillOpen = (() => {
     if (event.kind === 'undo') {
       let recorded = null;
       let changed = false;
-      if (id && next.undoIds.indexOf(id) === -1) {
+      if (id) {
         next.undo += 1;
         next.undoIds = remember(next.undoIds, id);
         recorded = { kind: 'undo', id: id, ts: ts, reason: 'undo' };

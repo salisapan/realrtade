@@ -213,6 +213,10 @@ function installE2EHooks() {
         return Promise.resolve(json(200, { value: [{ id: 'todo-list', wellknownListName: 'defaultList', displayName: 'Tasks' }] }));
       }
       if (path.indexOf('/me/mailFolders/inbox/messages') >= 0) {
+        const search = parsed.search || '';
+        if (scenario.inboxFilterFails && /\$orderby=/.test(search) && /\$filter=/.test(search)) {
+          return Promise.resolve(json(400, { error: { code: 'ErrorInvalidUrlQueryFilter', message: 'restriction or sort order too complex' } }));
+        }
         return Promise.resolve(json(200, { value: scenario.inbox || [] }));
       }
       if (path.indexOf('/me/mailFolders/sentitems/messages') >= 0) {

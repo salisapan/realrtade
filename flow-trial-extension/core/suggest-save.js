@@ -383,10 +383,12 @@ const FlowSuggestSave = (() => {
   }
 
   function pageResult(out) {
+    const skipped = (out && Array.isArray(out.excluded)) ? out.excluded : [];
     if (!out || out.suggest !== true) {
       return {
         eligible: false,
         files: [],
+        skipped: skipped,
         target: null,
         reason: (out && out.reason) || 'suggest:no-files',
         fileCount: 0,
@@ -403,6 +405,7 @@ const FlowSuggestSave = (() => {
       reason: 'suggest:eligible-hidden',
       fileCount: files.length,
       mode: out.mode || 'suggest',
+      skipped: skipped,
       step: {
         kind: KIND,
         id: KIND,

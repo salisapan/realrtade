@@ -117,6 +117,15 @@ console.log('\n--- rows 1-22 ---\n');
 
   check('15 an unread list is not guessed', S.suggestSave(mail({ attachments: null })).reason === 'suggest:attachments-unread');
 
+  const smallPdf = S.suggestSave(mail({
+    attachments: [file({ name: 'northwind-agreement-signed.pdf', size: 800 })]
+  }));
+  check('a too-small pdf is a named skipped row',
+    smallPdf.eligible === false && smallPdf.reason === 'suggest:no-files' &&
+    smallPdf.step === null && Array.isArray(smallPdf.skipped) && smallPdf.skipped.length === 1 &&
+    S.skippedLabel(smallPdf.skipped[0]) === 'northwind-agreement-signed.pdf · skipped · small-doc',
+    smallPdf);
+
   check('16 an attached message is not a file', S.suggestSave(mail({
     attachments: [{ id: 'm', name: 'Forwarded', size: 20 * KB, '@odata.type': '#microsoft.graph.itemAttachment' }]
   })).reason === 'suggest:no-files');
