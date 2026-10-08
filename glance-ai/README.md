@@ -20,7 +20,7 @@ Large generated data was left out on purpose and is reproducible from the genera
 | `oss/` | OSS LLM eval, veto, cached shadow-combined predictions, parked GPU fine-tune scripts |
 | `specs/` | suggest-save and related specs |
 | `eval-data/` | v2 held-out test, suggest-save v22, shadow-combined cases, SFT v2 val |
-| `labeling/` | Owner-gold schema, batch-001, answer ingest, strict scorer, CPU retrain dry-run. `owner-gold.jsonl` stays empty until the owner answers |
+| `labeling/` | Owner-gold schema, batch-001, answer ingest, strict scorer, CPU retrain dry-run. `owner-gold.jsonl` holds the CTO batch-001 labels (`labeledBy` `cto`, `ownerVerified` false). A row is owner-verified only when `labeledBy` is `sali` |
 | `paths.cjs`, `paths.py` | Repo-relative locations. No machine-specific absolute paths |
 
 ## Which engine

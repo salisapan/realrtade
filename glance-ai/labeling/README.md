@@ -5,9 +5,9 @@
 
 ## In this repository
 
-`owner-gold.jsonl` is the single owner-gold file. It is empty until the owner answers. A row is owner-verified only when `labeledBy` is `sali`.
+`owner-gold.jsonl` is the single owner-gold file. A row is owner-verified only when `labeledBy` is `sali`. The CTO labels for batch-001 are in that file (`batch-001-cto.answers.json`, `labeledBy` `cto`, not provisional). Every row has `ownerVerified` false. Owner-verified labels stay 0 until the owner answers.
 
-Batch-001 is the first sheet: `batch-001.md` (Hebrew), `batch-001.json` (machine form, `ownerAnswer` still null), and `batch-001-cos-prefill.md` (chief of staff proposal, not confirmed). The machine answers for that proposal are `batch-001-cos-prefill.answers.json`. Item 17 stays unsure. Item 17's note says the close is a save to OneDrive.
+Batch-001 is the first sheet: `batch-001.md` (Hebrew), `batch-001.json` (machine form, `ownerAnswer` still null), and `batch-001-cos-prefill.md` (chief of staff proposal, not confirmed). The machine answers for that proposal are `batch-001-cos-prefill.answers.json`. In that prefill, item 17 stays unsure. Item 17's note says the close is a save to OneDrive. The CTO file marks item 17 as an ask: `actionLabel` `onedrive-file|file_save`, `expectedAction` `file_save`. That label is an override (the engine side is a dated task and v2 is silence). A fresh ingest of the CTO file scores 14 binary rows and leaves items 8, 12, 13, 14, and 15 out as context-dependent.
 
 Items whose right answer depends on the person's profile are `answerType: "context-dependent"` with a `depends_on` field. They are excluded from the binary 200 and never increment `ownerVerified`, even if the mark is ✅, 🤫, or ❓, and even if `labeledBy` is `sali`. A missing `depends_on` fails ingest with code `DEPENDS`. There is no blanket "Hi all" silence rule (Sali, 2026-10-08).
 
