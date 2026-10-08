@@ -1,6 +1,16 @@
 # Holistic close map — Glance (personal)
 
-Glance closes open loops. Gmail is where it starts today.
+## Owner lock 2026-10-08: broad, does everything
+
+On 2026-10-08 the owner (Sali) locked this rule: Glance has to be broad and do everything. It must not be narrowed to a minimal set of loops.
+
+- 11:25: «חייב להיות פה הרבה מעבר לשמירה בדרייב והוספה למשימות... המוצר חייב להיות הרבה יותר הוליסטי»
+- 11:26: «אם המוצר לא יודע לעשות הכל הוא לא שווה כלום!»
+- 12:16: «זה כלל. הוא חייב להיות רחב ולעשות הכל!»
+
+A user's intent, wherever the user is (the floating extension on any site, plus the user's own computer), is closed end to end and proven. It is not enough for one kind of loop to work well. Red lines are unchanged: never auto-send (always a preview and one click), and every close needs ProofOfClose plus fetchedBack plus Undo. Netlify and Morning still require the owner's «מאשר».
+
+Glance closes open loops. Glance's entry point is any surface the user is on.
 
 This page is Glance only. Flow, the org product, is separate. This is an analysis of the personal product. It does not change the release order in `CLAUDE.md` or `docs/open-tasks.md`.
 
@@ -291,9 +301,9 @@ Pass bar for E: the contract closes only on the sent file; the invoice produces 
 | The computer driver | Row 48 is a scaffold. The live page driver is not wired. Local files are a later gate | Wire the one allowlisted page and run that Gate before any local PDF or government page |
 | Model quality | v2 with the veto still misses about half of closes on machine labels, and wrong-Do-It is about 1.4% on that set (`docs/glance-ai/STATE.md`). Owner-verified labels are 0 of 200. Gated Qwen is offline and propose-only. A wrong send is worse than a miss | Keep silence when the on-device rules are unsure. Do not let a model close or send. Collect the 200 owner labels before a new close type depends on a model |
 
-**Priority.** Until the paid loop set E1, E2, E4, E6, C1 passes live Gates, Dima's queue (as ordered in `docs/glance-ai/CTO_PATH_TO_PAID_2026-10-08.md`) goes first. Breadth-routine PRs (Slices 1–3) stay in draft, with no Gate and no merge. Breadth runs skip any item that touches manifest/content_scripts, the steps card, or ProofOfClose paths.
+**Priority.** The breadth slices (1–3) and Dima's queue (as ordered in `docs/glance-ai/CTO_PATH_TO_PAID_2026-10-08.md`) run in parallel. Each PR gets a live scenario Gate and is then squash-merged. The one constraint is that no stream touches a file that an open Dima PR is changing at the same time.
 
-Order of work, from this map:
+Order of work, from this map. This list does not hold slices 1–3 until Dima's queue is finished:
 
 1. Finish the steps list and run scenario A on the proofs that already pass.
 2. One Dima PR: add `fetchedBack` read-back for both Google Calendar create (C1) and the Drive file GET.

@@ -23,6 +23,7 @@ Owner decisions, recorded here as the one source. The block above stays as writt
 - **Mail.Send** is approved with a preview and a one-click approve. It never auto-sends. Not built yet: it comes after the steps list, as that list's preview. Until it ships, the code never asks `Mail.Send`. The block's "never sends on your behalf" changes only with the owner's wording in `docs/product-identity.md`.
 - **Next after Mail.Send: intent on any site.** Example: a friend asks on WhatsApp Web for last week's restaurant. Glance finds it in connected sources and drafts the reply. The person approves the send.
 - **Attachment save** (owner, 2026-10-08): Glance offers to save an email's attached document to OneDrive (Outlook) or Drive (Gmail), even when the body does not ask. It is a suggestion the person approves, never automatic.
+- **Broad, does everything** (owner, 2026-10-08): «חייב להיות פה הרבה מעבר לשמירה בדרייב והוספה למשימות... המוצר חייב להיות הרבה יותר הוליסטי» (11:25). «אם המוצר לא יודע לעשות הכל הוא לא שווה כלום!» (11:26). «זה כלל. הוא חייב להיות רחב ולעשות הכל!» (12:16). A user's intent, wherever the user is (the floating extension on any site, plus the user's own computer), is closed end to end and proven.
 - **On HOLD until the owner writes «מאשר»:** Morning (invoices) and Netlify deploy.
 
 ## Start here — the map of every document
