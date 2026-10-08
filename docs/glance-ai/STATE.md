@@ -111,7 +111,7 @@ Owner-verified labels are still 0. Batch-002 is 20 synthetic cases ready for the
 
 Batch-002 mix, 20/20: Hebrew 12/20, English 8/20. Cached gated Qwen on 15/20. Silence-candidate tags 6/20 (money 2, FYI 1, group 1, small talk 1, injection 1). Show/silent splits 19/20. The one agreed silence is the FYI row, the nearest all-silent case to tau 0.97. Drive save 1/20, OneDrive save 1/20. Draft, task, calendar, and file_save all appear.
 
-No silence rule was adopted. On the v2 held-out (n=6982, strict, machine reference) the shipped v2+veto stays 1.4% (82/5727) wrong-Do-It and 50.8% (637/1255) missed close. A group-address silence was measured and rejected: missed close would rise by 6.614 points, to 57.4% (720/1255). The other four lab post-filters stay unwired. Gated Qwen strict wrong-Do-It stays 0 on every spec set. Suggest-save is untouched, so the prototype adds 0 chips.
+No silence rule was adopted. On the v2 held-out (n=6982, strict, machine reference) the shipped v2+veto stays 1.4% (82/5727) wrong-Do-It and 50.8% (637/1255) missed close. A group-address silence was measured and rejected: missed close would rise by 6.614 points, to 57.4% (720/1255). The other four lab post-filters stay unwired. Gated Qwen strict wrong-Do-It stays 0 on every spec set. Suggest-save is untouched, so the prototype adds 0 chips. `bash glance-ai/run-cpu-checks.sh` on this change exited 0: owner-label tests passed, suggest-save new chips 0 (8191/8191 equal), gated Qwen pass bar true.
 
 ## Next stages
 
