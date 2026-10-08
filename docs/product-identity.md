@@ -80,7 +80,13 @@ cleverness.
 ## What a surface may and may not say
 
 May: "stays on it until it is closed", "closes it", "still open", "your turn",
-"nothing is ever sent for you", "runs on your device".
+"nothing is ever sent for you", "Glance never sends on its own", "every send is a preview plus one explicit approval", "runs on your device".
+
+### Send (owner, 2026-10-08)
+
+Glance never sends on its own. Every send is a preview plus one explicit approval.
+
+That sentence is the owner-approved send rule. It stays outside the locked block at the top of this file. The locked paragraph is quoted character for character by the source-of-truth files, and those quotes move only when every quoting file can change in the same commit.
 
 May not (Glance surfaces: `trial.html`, `pro-welcome.html`, the extension, the store
 listing): "AI-powered", "AI assistant", "AI inbox", "AI email", "smart inbox/email/

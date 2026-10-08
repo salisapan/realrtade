@@ -2,7 +2,8 @@
 // write is read back. A draft, an attachment, and a calendar hold are not
 // this proof. This slice speaks for Google Tasks, Microsoft To Do, and one
 // allowlisted page the floating extension already sees (`computer/<host>`),
-// and one OneDrive file (`microsoft/onedrive`).
+// one OneDrive file (`microsoft/onedrive`), and one approved chat send
+// (`whatsapp/web`) whose outgoing line was read back from the chat.
 //
 // Shape (execution architecture, decision 5):
 //   { system, externalId, url?, number?, fetchedBack: true, verifiedAt }
@@ -25,6 +26,7 @@ const FlowProofOfClose = (() => {
   const SYSTEM_GOOGLE_TASKS = 'google/tasks';
   const SYSTEM_MICROSOFT_TODO = 'microsoft/todo';
   const SYSTEM_MICROSOFT_ONEDRIVE = 'microsoft/onedrive';
+  const SYSTEM_WHATSAPP_WEB = 'whatsapp/web';
   const SYSTEM_COMPUTER_PREFIX = 'computer/';
   const LOCAL_FILE_PREFIX = 'computer/local/';
   const REASON_PENDING = 'proof_pending';
@@ -33,6 +35,9 @@ const FlowProofOfClose = (() => {
   const COMPUTER_UNDONE_LINE = 'Undone — that step was reversed on the page.';
   const COMPUTER_ACTIVITY_CLEARED = 'Undone — Activity no longer says Handled.';
   const COMPUTER_UNDO_UNAVAILABLE = 'Undo unavailable.';
+  const CHAT_UNDO_HINT = 'Undo deletes the chat message.';
+  const CHAT_UNDONE_LINE = 'Undone — the chat message was removed.';
+  const CHAT_UNDO_UNAVAILABLE = 'Undo unavailable';
   // One host, one deterministic action. Fixture stub: the reader is injected.
   // The live page driver is the next tip. Not a site, and not every site.
   const COMPUTER_ALLOWLIST = [
@@ -129,11 +134,20 @@ const FlowProofOfClose = (() => {
     return kind === 'onedriveFile';
   }
 
+  function isChatAnswerKind(kind) {
+    return kind === 'chatAnswer';
+  }
+
+  function isWhatsappSystem(system) {
+    return clean(system) === SYSTEM_WHATSAPP_WEB;
+  }
+
   // Writers that must be read back before Handled. Calendar, drafts,
   // and Google Drive are not in this list. One OneDrive file is.
   // A computer close is on this list: Handled only when fetchedBack is true.
+  // A chat answer is on this list: ok without a read-back is not Handled.
   function isProofTaskKind(kind) {
-    return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind) || isOnedriveKind(kind) || isComputerKind(kind);
+    return isGoogleTaskKind(kind) || isMicrosoftTodoKind(kind) || isOnedriveKind(kind) || isComputerKind(kind) || isChatAnswerKind(kind);
   }
 
   // One step of a Do It. A task counts only with a proof. Every other
@@ -241,6 +255,11 @@ const FlowProofOfClose = (() => {
       if (!isComputerSystem(computerSystemName)) return false;
       return computerHostAllowlisted(computerSystemName.slice(SYSTEM_COMPUTER_PREFIX.length));
     }
+    if (isWhatsappSystem(row.system)) {
+      if (row.fetchedBack !== true) return false;
+      if (!clean(row.verifiedAt) || Number.isNaN(Date.parse(clean(row.verifiedAt)))) return false;
+      return true;
+    }
     if (clean(row.system) === SYSTEM_GOOGLE_TASKS || clean(row.system) === SYSTEM_MICROSOFT_TODO || clean(row.system) === SYSTEM_MICROSOFT_ONEDRIVE) return true;
     return isGoogleTaskConnector(row) || isMicrosoftTodoConnector(row) || isOnedriveConnector(row);
   }
@@ -273,7 +292,7 @@ const FlowProofOfClose = (() => {
   function rowMessageIds(entry) {
     const ids = [];
     if (!entry) return ids;
-    [entry.messageId, entry.legacyMessageId, entry.gmailMessageId, entry.outlookIncomingId, entry.itemId, entry.pathId].forEach((id) => {
+    [entry.messageId, entry.questionId, entry.legacyMessageId, entry.gmailMessageId, entry.outlookIncomingId, entry.itemId, entry.pathId].forEach((id) => {
       const c = canonId(id);
       if (c) ids.push(c);
     });
@@ -304,8 +323,8 @@ const FlowProofOfClose = (() => {
       if (!entry || !rowMatches(entry, found.messageIds, found.threadIds)) continue;
       if (entry.kind === 'undone' || entry.kind === 'dismissed') {
         const sameMessage = rowMessageIds(entry).some((id) => found.messageIds.has(id));
-        const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry) || isOnedriveConnector(entry) || isComputerRow(entry)
-          || clean(entry.system) === SYSTEM_GOOGLE_TASKS || clean(entry.system) === SYSTEM_MICROSOFT_TODO || clean(entry.system) === SYSTEM_MICROSOFT_ONEDRIVE;
+        const taskUndo = isGoogleTaskConnector(entry) || isMicrosoftTodoConnector(entry) || isOnedriveConnector(entry) || isComputerRow(entry) || isChatAnswerRow(entry)
+          || clean(entry.system) === SYSTEM_GOOGLE_TASKS || clean(entry.system) === SYSTEM_MICROSOFT_TODO || clean(entry.system) === SYSTEM_MICROSOFT_ONEDRIVE || isWhatsappSystem(entry.system);
         if (sameMessage || taskUndo) return null;
         continue;
       }
@@ -343,6 +362,7 @@ const FlowProofOfClose = (() => {
   function remountCopy(row) {
     if (!isTaskReceiptRow(row)) return null;
     const externalId = externalIdOf(row);
+    if (isWhatsappSystem(row.system)) return chatRemountCopy(row, externalId);
     if (isComputerSystem(clean(row.system).toLowerCase())) return computerRemountCopy(row, externalId);
     if (isOnedriveRow(row)) return onedriveRemountCopy(row, externalId);
     const ref = { taskId: externalId, externalId: externalId };
@@ -751,10 +771,78 @@ const FlowProofOfClose = (() => {
     };
   }
 
+  function isChatAnswerRow(row) {
+    if (!row) return false;
+    if (isWhatsappSystem(row.system)) return true;
+    return row.connectorId === 'chatAnswer';
+  }
+
+  function chatRemountCopy(row, externalId) {
+    const available = row.undoAvailable !== false;
+    const url = clean(row.url);
+    return {
+      status: receiptStatusOf(row),
+      writtenLine: clip(row.writtenLine, 180),
+      processName: clip(row.processName, 80),
+      closedLine: clip(row.closedLine, 180),
+      undoHint: available ? CHAT_UNDO_HINT : CHAT_UNDO_UNAVAILABLE,
+      undoneLine: available ? CHAT_UNDONE_LINE : CHAT_UNDO_UNAVAILABLE,
+      undoAvailable: available,
+      url: url.slice(0, 8) === 'https://' ? url : '',
+      connectorId: 'chatAnswer',
+      externalId: externalId,
+      system: SYSTEM_WHATSAPP_WEB,
+      ref: { externalId: externalId }
+    };
+  }
+
+  function chatStillWritten(rows, found) {
+    for (let i = 0; i < rows.length; i++) {
+      const entry = rows[i];
+      if (!entry || entry.kind !== 'written' || !isChatAnswerRow(entry)) continue;
+      if (rowMatches(entry, found.messageIds, found.threadIds)) return true;
+    }
+    return false;
+  }
+
+  // mode 'deleted' rewrites the proved row after the message is gone.
+  // mode 'unavailable' rewrites it when the chat will not delete, so the
+  // row does not stay Handled. A click is not the read-back.
+  function applyChatUndo(log, messageIdOrQuery, mode) {
+    const found = queryIds(messageIdOrQuery);
+    const rows = Array.isArray(log) ? log.slice() : [];
+    const unavailable = mode === 'unavailable';
+    if (!found.messageIds.size && !found.threadIds.size) {
+      return { ok: false, hit: false, available: !unavailable, log: rows, stayedHandled: false };
+    }
+    let hit = false;
+    for (let i = 0; i < rows.length; i++) {
+      const entry = rows[i];
+      if (!entry || entry.kind !== 'written' || !isChatAnswerRow(entry)) continue;
+      if (!rowMatches(entry, found.messageIds, found.threadIds)) continue;
+      rows[i] = Object.assign({}, entry, {
+        kind: 'undone',
+        undone: true,
+        undoUnavailable: unavailable,
+        fetchedBack: false,
+        label: unavailable ? CHAT_UNDO_UNAVAILABLE : CHAT_UNDONE_LINE
+      });
+      hit = true;
+    }
+    return {
+      ok: hit,
+      hit: hit,
+      available: hit && !unavailable,
+      log: rows,
+      stayedHandled: chatStillWritten(rows, found)
+    };
+  }
+
   return {
     SYSTEM_GOOGLE_TASKS: SYSTEM_GOOGLE_TASKS,
     SYSTEM_MICROSOFT_TODO: SYSTEM_MICROSOFT_TODO,
     SYSTEM_MICROSOFT_ONEDRIVE: SYSTEM_MICROSOFT_ONEDRIVE,
+    SYSTEM_WHATSAPP_WEB: SYSTEM_WHATSAPP_WEB,
     SYSTEM_COMPUTER_PREFIX: SYSTEM_COMPUTER_PREFIX,
     LOCAL_FILE_PREFIX: LOCAL_FILE_PREFIX,
     REASON_PENDING: REASON_PENDING,
@@ -763,6 +851,9 @@ const FlowProofOfClose = (() => {
     COMPUTER_UNDONE_LINE: COMPUTER_UNDONE_LINE,
     COMPUTER_ACTIVITY_CLEARED: COMPUTER_ACTIVITY_CLEARED,
     COMPUTER_UNDO_UNAVAILABLE: COMPUTER_UNDO_UNAVAILABLE,
+    CHAT_UNDO_HINT: CHAT_UNDO_HINT,
+    CHAT_UNDONE_LINE: CHAT_UNDONE_LINE,
+    CHAT_UNDO_UNAVAILABLE: CHAT_UNDO_UNAVAILABLE,
     buildProof: buildProof,
     isProof: isProof,
     allowsHandled: allowsHandled,
@@ -770,6 +861,7 @@ const FlowProofOfClose = (() => {
     isMicrosoftTodoKind: isMicrosoftTodoKind,
     isComputerKind: isComputerKind,
     isOnedriveKind: isOnedriveKind,
+    isChatAnswerKind: isChatAnswerKind,
     isComputerSystem: isComputerSystem,
     isProofTaskKind: isProofTaskKind,
     stepCountsAsHandled: stepCountsAsHandled,
@@ -789,7 +881,8 @@ const FlowProofOfClose = (() => {
     verifyComputerDom: verifyComputerDom,
     computerClose: computerClose,
     localFileCloseShape: localFileCloseShape,
-    applyComputerUndo: applyComputerUndo
+    applyComputerUndo: applyComputerUndo,
+    applyChatUndo: applyChatUndo
   };
 })();
 
