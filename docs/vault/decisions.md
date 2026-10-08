@@ -6,6 +6,8 @@ updated: 2026-10-08
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-08 · Paid-readiness bar for Glance: charge only when the yaml `overall` is green. Until then pause Pro, Paddle, and a paid store listing. A free store listing for dogfood can proceed · Claude · `docs/glance-ai/paid-readiness-bar.md`, [[open-tasks]] rows 7, 11, 61
+- 2026-10-08 · Holistic close map for Glance (personal): loop catalog, coverage on this tip, three slices after the steps list, five scenario Gates. Analysis only; release order unchanged · Claude · `docs/glance-ai/holistic-close-map.md`, [[open-tasks]] rows 52-54
 - 2026-10-08 · #108 E2E rebased on 0.9.40 · Claude · CLAUDE.md "Testing and the live Gate", [[open-tasks]] row 56
 - 2026-10-08 · 0.9.40 = #106 normalize/recall + #110 rule fixes + outlookPageDiag default, on top of 0.9.39 · Claude · `CLAUDE.md` "Product facts and release order", [[open-tasks]] row 51
 - 2026-10-08 · 0.9.39 Gate: Outlook commitment Do It was a reply draft and OneDrive save stayed outlook:attachments-unread; panel task-only Do It now writes Microsoft To Do after read-back, and the mailbox check reads the attachment list before it plans. Google token fallback did not change the Microsoft grant. Live Gate passed on 2026-10-08 on cd524a30. · Claude · [[open-tasks]] rows 47, 49, 50
