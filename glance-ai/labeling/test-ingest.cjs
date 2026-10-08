@@ -125,7 +125,31 @@ try {
 assert.strictEqual(missingDepends, true);
 
 const goldBefore = fs.readFileSync(GOLD, 'utf8');
-assert.strictEqual(goldBefore.trim(), '');
+const committedGold = goldBefore.trim() ? goldBefore.trim().split('\n').map((l) => JSON.parse(l)) : [];
+assert.ok(committedGold.every((r) => r.ownerVerified === false));
+assert.ok(committedGold.every((r) => r.labeledBy !== 'sali'));
+
+const ctoAnswers = readJson(path.join(HERE, 'batch-001-cto.answers.json'));
+const cto = ingest({ batch, answers: ctoAnswers });
+assert.strictEqual(cto.provisional, false);
+assert.strictEqual(cto.labeledBy, 'cto');
+assert.strictEqual(cto.ownerVerifiedCount, 0);
+assert.strictEqual(cto.binaryCount, 14);
+assert.strictEqual(cto.contextDependentCount, 5);
+assert.deepStrictEqual(cto.excluded.map((e) => e.item).sort((a, b) => a - b), [8, 12, 13, 14, 15]);
+const item17 = cto.rows.find((r) => r.id === 'v2syn-24392');
+assert.strictEqual(item17.ownerLabel, 'ASK');
+assert.strictEqual(item17.actionLabel, 'onedrive-file|file_save');
+assert.strictEqual(item17.expectedAction, 'file_save');
+assert.strictEqual(item17.ownerVerified, false);
+assert.ok(cto.rows.every((r) => r.ownerVerified === false && r.labeledBy === 'cto' && r.consent === false));
+for (const row of cto.rows) assert.deepStrictEqual(validateRow(row), [], row.id);
+assert.strictEqual(committedGold.length, 14);
+assert.deepStrictEqual(committedGold.map((r) => r.id).sort(), cto.rows.map((r) => r.id).sort());
+const committed17 = committedGold.find((r) => r.id === 'v2syn-24392');
+assert.strictEqual(committed17.actionLabel, 'onedrive-file|file_save');
+assert.strictEqual(committed17.expectedAction, 'file_save');
+assert.strictEqual(committed17.ownerVerified, false);
 
 const b2 = loadBatch(path.join(HERE, 'batch-002.json'));
 assert.strictEqual(b2.length, 20);
