@@ -184,11 +184,15 @@ genuinely completed once, never speculatively.
 ## Set up Google (Tasks, Calendar, Gmail Drafts, Drive Picker) (needs the site owner)
 
 Google is the default connector — Calendar, Gmail Drafts, and Google Tasks
-all share one OAuth grant via `chrome.identity.getAuthToken` (Chrome's own
-native Google account chooser, not `launchWebAuthFlow` like the four
-connectors below). That means **no redirect URL, no client secret, and no
-Netlify environment variable** — the entire flow is client-side. The Drive
-picker needs one extra, unrelated credential: a plain API key (not OAuth)
+all share one OAuth grant. The primary path is `chrome.identity.getAuthToken`
+(Chrome's own account chooser, the Chrome-extension client in `manifest.json`).
+When that call fails because browser sign-in is off, or the identity API is
+unavailable and the user did not cancel, Glance uses
+`chrome.identity.launchWebAuthFlow` with the Web application client
+`WEB_OAUTH_CLIENT_ID` in `config/oauth.public.js` (implicit `response_type=token`
+to `https://<extension-id>.chromiumapp.org/`). That window opens only after
+an explicit Connect click. There is still **no client secret and no Netlify
+exchange**. The Drive picker needs one extra, unrelated credential: a plain API key (not OAuth)
 that authenticates Google's picker *widget*, separate from the OAuth token
 that authenticates *file access*.
 
@@ -245,6 +249,28 @@ which is the single most common way this gets half-configured:
    to keep server-side.
 4. Paste that Client ID into `manifest.json`'s `oauth2.client_id`, replacing
    the `YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com` placeholder.
+
+### Web application client (launchWebAuthFlow fallback)
+
+One Web application client in the same GCP project serves both extension
+IDs. It lives in `config/oauth.public.js` as `WEB_OAUTH_CLIENT_ID`:
+
+```
+93977330357-gstvm1m1h1iet49uhgq212jfjqu11s8n.apps.googleusercontent.com
+```
+
+Authorized redirect URIs on that client:
+
+```
+https://dnjhplgmnkabbjogfpbhofjedlkehkai.chromiumapp.org/
+https://lbihckfmoffgjjlnneoeaehbhoonfenh.chromiumapp.org/
+```
+
+The store build does not swap this id. It only swaps `manifest.json`'s
+`oauth2.client_id`, which is the Chrome-extension client `getAuthToken`
+uses. Unpacked id `dnjhplgmnkabbjogfpbhofjedlkehkai` and store id
+`lbihckfmoffgjjlnneoeaehbhoonfenh` both call `launchWebAuthFlow` with this
+same Web client. Do not put this Web client id into `oauth2.client_id`.
 
 ### 5. Create the Picker API key
 

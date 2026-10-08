@@ -499,7 +499,99 @@
     return who && what ? who + ' — ' + what : (what || who);
   }
 
+  // A task-only Outlook close is Microsoft To Do. A file step is OneDrive.
+  // Both wait for a read-back. A missing grant does not write a receipt
+  // and does not fall through to a reply draft. A draft step still drafts.
+  function outlookProofRoute(entry) {
+    const steps = (entry && entry.process && entry.process.steps) || [];
+    const file = steps.find((s) => s && s.kind === 'onedriveFile');
+    if (file) return { connectorId: 'onedriveFile', step: file };
+    const taskOnly = typeof FlowIncomingJudge !== 'undefined' && typeof FlowIncomingJudge.taskOnlyProcess === 'function'
+      && FlowIncomingJudge.taskOnlyProcess(entry && entry.process);
+    if (!taskOnly) return null;
+    const step = steps.find((s) => s && (s.kind === 'outlookTask' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
+    return { connectorId: 'outlookTask', step: step || { kind: 'outlookTask', params: {} } };
+  }
+
+  async function closeOutlookProofFromPopup(entry, route) {
+    const step = route.step || {};
+    const params = step.params || {};
+    const label = (entry.intent && entry.intent.label) || params.title || (route.connectorId === 'onedriveFile' ? 'File' : 'Task');
+    const payload = {
+      connectorId: route.connectorId,
+      params: params,
+      label: label,
+      senderName: entry.sender && entry.sender.name,
+      senderEmail: entry.sender && entry.sender.email,
+      subject: entry.subject || '',
+      text: entry.text || '',
+      threadUrl: entry.threadUrl || null,
+      facts: (entry.intent && entry.intent.facts) || null,
+      entities: (entry.intent && (entry.intent.entities || entry.intent.facts)) || null
+    };
+    if (route.connectorId === 'onedriveFile') {
+      payload.outlookIncomingId = entry.outlookIncomingId || entry.messageId;
+      payload.messageId = entry.messageId;
+    }
+    const r = await send({ type: 'flow:execute-action', payload: payload });
+    const proved = typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.allowsHandled
+      ? FlowProofOfClose.allowsHandled({ ok: !!(r && r.ok), proof: r && r.proof })
+      : false;
+    if (!proved) {
+      await renderOpen();
+      await renderOutlookCards();
+      return;
+    }
+    const fields = (typeof FlowProofOfClose !== 'undefined' && FlowProofOfClose.receiptLogFields)
+      ? FlowProofOfClose.receiptLogFields(r.proof, {
+        writtenLine: r.written,
+        processName: entry.process && entry.process.name,
+        closedLine: entry.process && entry.process.closedLine,
+        status: 'Handled.'
+      })
+      : null;
+    await FlowStorage.appendLog(Object.assign({
+      kind: 'written',
+      label: (entry.intent && entry.intent.label) || r.written,
+      messageId: entry.messageId,
+      app: 'outlook',
+      connectorId: route.connectorId,
+      ref: r.ref,
+      where: r.where,
+      url: r.url || null,
+      sender: entry.sender || null,
+      subject: entry.subject || null,
+      intent: entry.intent || null,
+      process: entry.process || null,
+      text: entry.text || '',
+      outlookIncomingId: entry.outlookIncomingId || entry.messageId
+    }, fields || {}));
+    if (entry.messageId) {
+      if (typeof FlowStorage.clearStillOpenUndoForMessage === 'function') {
+        await FlowStorage.clearStillOpenUndoForMessage(entry.messageId);
+      }
+      await FlowStorage.recordStillOpenMetric({ kind: 'doIt', messageId: entry.messageId });
+      await FlowStorage.recordCloseQuality({ kind: 'doIt', messageId: entry.messageId });
+    }
+    const o = outlook();
+    if (o && typeof o.dismissIncoming === 'function') {
+      try { await o.dismissIncoming(entry.key || entry.messageId); } catch (e) {}
+    }
+    if (typeof FlowStorage.forgetStillOpenScan === 'function' && entry.messageId) {
+      try { await FlowStorage.forgetStillOpenScan(entry.messageId); } catch (e) {}
+    }
+    await renderOpen();
+    await renderOutlookCards();
+  }
+
   async function closeStillOpenFromPopup(entry) {
+    if (entry && entry.app === 'outlook') {
+      const route = outlookProofRoute(entry);
+      if (route) {
+        await closeOutlookProofFromPopup(entry, route);
+        return;
+      }
+    }
     // Outlook incoming ask: Do It creates a reply draft in Outlook Drafts (never sends), plus a Google Task when connected.
     if (entry && (entry.app === 'outlook' || (entry.process && entry.process.steps && entry.process.steps.some((s) => s.kind === 'outlookDraft')))) {
       const o = outlook();

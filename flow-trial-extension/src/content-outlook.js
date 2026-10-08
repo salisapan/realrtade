@@ -1793,13 +1793,18 @@
           return;
         }
         if (!decided || decided.none) {
-          dropStuckCard();
-          const named = (decided && decided.reason) || 'intent-null';
-          const quiet = (planned && planned.reason && !fileSilenceReason(planned.reason))
-            ? planned.reason
-            : (String(named).indexOf('page:') === 0 ? named : ('page:' + named));
-          await pageReason(quiet, pane);
-          return;
+          const keepFile = typeof FlowOutlookSync !== 'undefined' && typeof FlowOutlookSync.keepMailboxFileCard === 'function'
+            && FlowOutlookSync.keepMailboxFileCard(decided, entry);
+          if (!keepFile) {
+            dropStuckCard();
+            const named = (decided && decided.reason) || 'intent-null';
+            const quiet = (planned && planned.reason && !fileSilenceReason(planned.reason))
+              ? planned.reason
+              : (String(named).indexOf('page:') === 0 ? named : ('page:' + named));
+            await pageReason(quiet, pane);
+            return;
+          }
+          decided = { intent: entry.intent, process: entry.process };
         }
       if (!entry || (entry.process && decided.process && entry.process.id !== decided.process.id)) {
         // createReply needs a Graph message id. The address gives one, or the conversation it belongs to.

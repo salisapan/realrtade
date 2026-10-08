@@ -52,6 +52,14 @@ function world(over) {
       w.drafts[id] = { id, isDraft: true, webLink: 'https://outlook.office.com/mail/draft/' + id, body: { content: body.comment || '' }, attachments: {} };
       return { ok: true, status: 201, json: async () => w.drafts[id], text: async () => JSON.stringify(w.drafts[id]) };
     }
+    const listAtt = u.match(/\/me\/messages\/([^/?]+)\/attachments(?:\?|$)/i);
+    if (listAtt && (init.method || 'GET').toUpperCase() === 'GET') {
+      const id = decodeURIComponent(listAtt[1]);
+      if (w.attachmentFail && w.attachmentFail[id]) return { ok: false, status: 403, json: async () => ({}) };
+      const rows = w.attachmentLists && w.attachmentLists[id];
+      if (!rows) return { ok: false, status: 404, json: async () => ({}) };
+      return { ok: true, status: 200, json: async () => ({ value: rows }) };
+    }
     const attMatch = u.match(/\/me\/messages\/([^/?]+)\/attachments$/i);
     if (attMatch && (init.method || 'GET').toUpperCase() === 'POST') {
       w.drafts = w.drafts || {};
@@ -519,6 +527,69 @@ const ASK = 'Could you please send me the signed lease by Friday? I need it to r
     check('that silence is own-sender or note-to-self', aliasDiag.some((d) => d && (d.reason === 'own-sender' || d.reason === 'note-to-self')), aliasDiag);
     delete global.FlowFileAttach;
     delete global.FlowCloseChains;
+  }
+
+  console.log('\n--- Google off, Instinct grant on: To Do and the file list ---\n');
+  {
+    const fs = require('fs'); const path = require('path'); const vm = require('vm');
+    const sandbox = { module: undefined, console, Date, Math, JSON, String, Array, Object, Number, Boolean, RegExp, Error, parseInt, parseFloat, isNaN, Infinity, undefined, NaN };
+    vm.createContext(sandbox);
+    for (const f of ['domains.js', 'extract.js', 'judgment.js', 'google-closes.js', 'close-families.js', 'fact-reply.js', 'intent.js', 'actions.js']) {
+      vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'core', f), 'utf8'), sandbox, { filename: f });
+    }
+    const FlowIntent = vm.runInContext('FlowIntent', sandbox);
+    const FlowActions = vm.runInContext('FlowActions', sandbox);
+    global.FlowGoogleCloses = vm.runInContext('FlowGoogleCloses', sandbox);
+    const SAVE = 'Hi, Please save the attachment to OneDrive by Friday, October 9. Thanks';
+    const COMMIT = 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate';
+    const pdf = { id: 'att1', name: 'signed-NDA.pdf', isInline: false, contentType: 'application/pdf', '@odata.type': '#microsoft.graph.fileAttachment' };
+    const save = inMsg('save1', 'csave', SAVE, 0);
+    save.subject = 'Gate 0.9.37 OneDrive save';
+    save.hasAttachments = true;
+    const other = inMsg('other1', 'cother', ASK, 0);
+    other.subject = 'Lease ask';
+    other.hasAttachments = true;
+    const commit = inMsg('todo1', 'ctodo', COMMIT, 0);
+    commit.subject = 'Gate 0.9.35 To Do title';
+    const scopes = ['offline_access', 'User.Read', 'Mail.Read', 'Mail.ReadWrite', 'Tasks.ReadWrite', 'Files.ReadWrite'];
+    function armed(over) {
+      const w = world(Object.assign({ inbox: [save, other, commit], sent: [], attachmentLists: { save1: [pdf] } }, over || {}));
+      const d = w.deps();
+      d.planDeps = { extract: FlowExtract, types: FlowRequestTypes, pipeline: FlowIntentPipeline, intent: FlowIntent, actions: FlowActions };
+      d.actions = FlowActions;
+      const o = O.create(d);
+      w.store.outlookAuth = { token: { accessToken: 'AT', refreshToken: 'RT', expiresAt: NOW + 3600000, rtIssuedAt: NOW, grantedScopes: scopes }, account: { address: ME }, ownAddresses: [ME] };
+      return { w, o };
+    }
+    const ok = armed();
+    const synced = await ok.o.sync({ force: true });
+    const incoming = (ok.w.store.outlookPending && ok.w.store.outlookPending.incoming) || [];
+    const diags = (ok.w.store.outlookSync && ok.w.store.outlookSync.diagnostics) || [];
+    const cardFor = (list, conv) => list.find((x) => x && (x.outlookConversationId === conv || x.conversationId === conv));
+    const saveCard = cardFor(incoming, 'csave');
+    const todoCard = cardFor(incoming, 'ctodo');
+    const saveKinds = saveCard && saveCard.process && saveCard.process.steps.map((s) => s.kind);
+    const todoKinds = todoCard && todoCard.process && todoCard.process.steps.map((s) => s.kind);
+    const attGets = ok.w.calls.filter((c) => /\/attachments/i.test(c.url) && c.method === 'GET');
+    check('the check reads the file list for the save, and not for a mail that is not a save',
+      synced.ok === true && attGets.length === 1 && /\/messages\/save1\/attachments/.test(attGets[0].url),
+      attGets.map((c) => c.url));
+    check('that save is the OneDrive card, not outlook:attachments-unread',
+      saveKinds && saveKinds[0] === 'onedriveFile' && saveKinds.indexOf('outlookDraft') >= 0 && !diags.some((d) => d && d.conversationId === 'csave' && d.reason === 'outlook:attachments-unread'),
+      { kinds: saveKinds, diags: diags.filter((d) => d && d.conversationId === 'csave') });
+    check('the commitment is Microsoft To Do only, with Google disconnected',
+      todoKinds && todoKinds.length === 1 && todoKinds[0] === 'outlookTask' && !ok.w.store.googleTasksAuth && !ok.w.calls.some((c) => /googleapis/.test(c.url)) && !ok.w.calls.some((c) => /createReply/.test(c.url)),
+      { kinds: todoKinds, sends: ok.w.sends });
+    delete save.attachments;
+    delete save.attachmentsUnread;
+    const bad = armed({ attachmentFail: { save1: true }, attachmentLists: {} });
+    await bad.o.sync({ force: true });
+    const badIn = (bad.w.store.outlookPending && bad.w.store.outlookPending.incoming) || [];
+    const badDiag = (bad.w.store.outlookSync && bad.w.store.outlookSync.diagnostics) || [];
+    check('a failed file read stays unread and does not invent a save card',
+      !cardFor(badIn, 'csave') && badDiag.some((d) => d && d.conversationId === 'csave' && d.reason === 'outlook:attachments-unread'),
+      badDiag.filter((d) => d && d.conversationId === 'csave'));
+    delete global.FlowGoogleCloses;
   }
 
   console.log('\n' + (failures ? 'FAILED: ' + failures : 'All passed'));

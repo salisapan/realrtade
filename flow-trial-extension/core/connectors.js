@@ -12,7 +12,8 @@
 //             which is why Notion works today with no app review and no server.
 //   'google' — chrome.identity.getAuthToken against the Google account the user
 //              is already signed into — the account chooser Chrome itself
-//              renders, not a redirect Flow has to build a page for. Still
+//              renders. When browser sign-in is off, background.js falls back
+//              to launchWebAuthFlow (same scopes, no client secret). Still
 //              gated on the owner registering an OAuth Client ID (manifest.json
 //              oauth2.client_id), same as an 'oauth' connector, but with no
 //              server-side exchange or Client Secret to hold at all.
@@ -34,9 +35,10 @@ const FLOW_CONNECTORS = [
     id: 'googleTasks',
     // Labeled 'Google', not 'Google Tasks' — see the accuracy note below.
     // 'Google Tasks' undersold what the single sign-in this card triggers
-    // actually grants: getGoogleAuthToken() in background.js calls
-    // chrome.identity.getAuthToken with no scopes override, so ONE consent
-    // here covers every scope in manifest.json's oauth2.scopes at once
+    // actually grants: getGoogleAccessToken() in background.js calls
+    // chrome.identity.getAuthToken with no scopes override (and, only if
+    // that fails because sign-in is off, a web flow with the same scopes),
+    // so ONE consent here covers every scope in manifest.json's oauth2.scopes at once
     // (tasks, calendar.events, gmail.compose, drive.readonly, drive.file),
     // not just Tasks.
     // A card titled 'Google Tasks' with a 'Connect Google Tasks' button

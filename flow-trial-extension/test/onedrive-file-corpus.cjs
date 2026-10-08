@@ -49,7 +49,7 @@ function background(opts) {
     },
     chrome: {
       runtime: {
-        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.37', content_scripts: [{ js: [] }] }),
+        getManifest: () => ({ oauth2: { client_id: 'x' }, version: '0.9.39', content_scripts: [{ js: [] }] }),
         onMessage: { addListener() {} }, onInstalled: { addListener() {} }, onStartup: { addListener() {} },
         lastError: null, getURL: (s) => s, id: 'ext'
       },

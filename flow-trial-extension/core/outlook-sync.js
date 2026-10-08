@@ -78,7 +78,7 @@ const FlowOutlookSync = (() => {
       if (!msg) return 0;
       if (msg.attachmentsUnread) return null;
       if (Array.isArray(msg.attachments)) {
-        return msg.attachments.filter((a) => a && a.isInline !== true).length;
+        return msg.attachments.filter((a) => a && a.isInline !== true && !/itemAttachment/i.test(String(a['@odata.type'] || ''))).length;
       }
       return msg.hasAttachments ? 1 : 0;
     }
@@ -180,8 +180,9 @@ const FlowOutlookSync = (() => {
           calibration: deps.calibration || null, calibrationByType: deps.calibrationByType || null,
           now, threadUrl: lastRaw.webLink || null, hasThreadAttachment: counted === 1, surface: 'outlook'
         }, { intent: deps.intent, actions: deps.actions, factReply: deps.factReply }) : { show: false, reason: 'no-judge' });
-      // The mailbox list carries hasAttachments, not the file list. A true flag
-      // is not one file. The open page reads the real list and decides the card.
+      // A flag without the file list is not one file. The runner reads that
+      // list before plan. A failed read, or a flag that was never read, stays
+      // outlook:attachments-unread.
       if (judged.show && !Array.isArray(lastRaw.attachments)) {
         const steps = (judged.process && judged.process.steps) || [];
         if (steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'))) {
@@ -294,7 +295,16 @@ const FlowOutlookSync = (() => {
     return out;
   }
 
-  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan };
+  // The open page could not count files (often a conversation id, no item id).
+  // Keep the mailbox card when that check already found one real file to save.
+  function keepMailboxFileCard(decided, entry) {
+    if (!decided || decided.none !== true || decided.reason !== 'page:attachment-count-unread') return false;
+    if (!entry || !entry.messageId) return false;
+    const steps = (entry.process && entry.process.steps) || [];
+    return steps.some((s) => s && (s.kind === 'onedriveFile' || s.kind === 'driveFile'));
+  }
+
+  return { MAX_OFFERS, MAX_ASKS, MAX_INCOMING, watchId, plan, keepMailboxFileCard };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOutlookSync };
