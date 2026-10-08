@@ -93,6 +93,18 @@ const FlowFollowUp = (() => {
 
   function words(text) { return (String(text || '').match(/\S+/g) || []).length; }
 
+  // A scheduling question too short for the four-word line filter, and nothing else.
+  function isShortScheduleAsk(s) {
+    return /^(?:מתי (?:נוח|מתאים) (?:לך|לכם|לי|לכן)|when (?:is|would be) (?:a )?good time)\s*\??$/i.test(String(s || '').trim());
+  }
+  // A suggestion to talk, with no delivery in it, is not the answer to the open ask.
+  const TALK_SUGGESTION = /(?:כדאי (?:שנדבר|לדבר|לשוחח)|בוא(?:ו|י)? נדבר|בואי נדבר)|\b(?:we should|let's|lets) (?:talk|discuss|speak|chat)\b|\bworth (?:a|us) (?:call|chat|talk)\b/i;
+  function talkSuggestion(body) {
+    if (words(body) > 24) return false;
+    if (DELIVERY_WORDS.test(body) || CONFIRM.test(body)) return false;
+    return TALK_SUGGESTION.test(body);
+  }
+
   function sentences(text) {
     return String(text || '')
       .replace(/\r/g, '')
@@ -219,7 +231,7 @@ const FlowFollowUp = (() => {
     const deadlineIso = date && date.iso ? date.iso : null;
 
     const lines = sentences(body);
-    const candidates = lines.filter((s) => words(s) >= 4 && !COURTESY.test(s));
+    const candidates = lines.filter((s) => !COURTESY.test(s) && (words(s) >= 4 || isShortScheduleAsk(s)));
     if (!candidates.length) return null;
 
     const he = hasHebrew(body);
@@ -434,7 +446,7 @@ const FlowFollowUp = (() => {
 
   // An out-of-office or automatic reply is not an answer. Treating it as one
   // would close a follow-up the person is still waiting on.
-  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon)\b|(?:מחוץ למשרד|תשובה אוטומטית|בחופשה עד|בחופשה)/i;
+  const AUTO_REPLY = /\b(?:out of (?:the )?office|automatic reply|auto-?reply|autoreply|away until|on (?:vacation|leave|holiday)|do not reply|undeliverable|delivery (?:status|failure)|mailer-daemon|message blocked|recipient address rejected)\b|(?:מחוץ למשרד|תשובה אוטומטית|בחופשה עד|בחופשה|אעדר)/i;
 
   function isAutoReply(text, senderEmail) {
     if (AUTO_REPLY.test(String(text || '').slice(0, 600))) return true;
@@ -582,6 +594,8 @@ const FlowFollowUp = (() => {
     if (!delivered && kind === KINDS.REPLY && n <= SHORT_UNSURE_MAX_WORDS && !answerEvidence(body, ex, c.now)) return { outcome: 'ack', promisedIso: null, basis: 'unsure', why: 'not clearly an answer' };
     // A contact line (name, title, "Phone:" / "טלפון:") is a signature, not the answer. A forward often leaves only that.
     if (!delivered && kind === KINDS.REPLY && contactSignature(body)) return { outcome: 'ack', promisedIso: null, basis: 'rule', why: 'a signature is not an answer' };
+    // "We should talk" / "כדאי שנדבר" moves nothing that was asked. A short note that is only that stays open.
+    if (!delivered && kind === KINDS.REPLY && talkSuggestion(body) && !answerEvidence(body, ex, c.now)) return { outcome: 'ack', promisedIso: null, basis: 'rule', why: 'a suggestion to talk is not an answer' };
     return { outcome: 'closed', promisedIso: null, basis: delivered ? 'rule' : 'default' };
   }
 
