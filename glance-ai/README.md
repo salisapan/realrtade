@@ -56,7 +56,7 @@ That runs, in order:
 4. Dataset: `git archive` of commit `8f8edae` (Glance 0.9.34 test corpora) and commit `db563fd` (engine 0.9.35) into temp directories. `build-dataset.cjs` then `v2/build-dataset-v2.cjs` regenerate `model/dataset/out-v2/all.jsonl`. Its sha256 must equal `model/dataset/v2/all.jsonl.sha256` (`d4aab097339b6cafde9708082ab87803e7de7527d40e51a64b4cb8169b536e48`). The file stays gitignored.
 5. Stripper: `node model/strip/test-strip.cjs` and `python3 model/strip/test_strip.py`. Stress-case hashes always run. With the regenerated dataset and engine 0.9.35, the gate is 767 raw flips, 767 removed, 0 left, 0 new. The current tip is measured in the same pass.
 6. Norm-flip: `node model/shadow/norm-flips-v21.cjs`. Engine 0.9.35 raw is 767; the full stripper leaves 0 and adds 0. Tip is recorded beside that gate.
-7. Shadow package: `bash model/shadow-pkg/run-tests.sh` (logging, feature parity, JS dense parity, Python decision parity against the checked-in sklearn preds, size under 871,000 bytes). Python parity is 6,977/6,982 (v2) and 6,976/6,982 (v2.1).
+7. Shadow package: `bash model/shadow-pkg/run-tests.sh` (logging, feature parity, JS dense parity, Python decision parity against the checked-in sklearn preds, size under 871,000 bytes). The script creates `test/out` and `bench/out` first; those directories are gitignored. Python parity is 6,977/6,982 (v2) and 6,976/6,982 (v2.1).
 8. Gated OSS score from cached predictions: `node oss/shadow-combined/gated/score-gated.cjs qwen3.5-4b`. No LLM is run.
 
 ## Regenerating datasets
