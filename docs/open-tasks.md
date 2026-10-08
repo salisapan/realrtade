@@ -7,7 +7,7 @@ changes status, this file is updated in the same turn.
 
 Statuses: `open` · `in progress` · `blocked` (needs the owner) · `decision` (waiting for an answer) · `done`
 
-Last updated: 2026-10-06 (owner approved merge of PR #91 to `main`; **Netlify deploy still waiting for separate OK**).
+Last updated: 2026-10-08 (legal demo copy: Flow "local" means company servers / Flow Edge, not the device; Edge and Masked secure cloud stay on the roadmap. **Netlify deploy still waiting for separate OK**).
 
 ## Open
 
@@ -75,6 +75,7 @@ Last updated: 2026-10-06 (owner approved merge of PR #91 to `main`; **Netlify de
 
 ## Done (recent)
 
+- 2026-10-08: Homepage legal demo no longer says Flow runs on the device, that a file is read with on-device OCR, or that transaction data never left the machine. The lead, step-1 caption, scan badge, and closing line say Flow Edge (company servers) and Masked secure cloud are on the roadmap. Not deployed.
 - 2026-10-06: Outlook file chain names why Drive did not run. The Q4 pricing-sheet stall `file-needs-drive` is no longer written. `file-chain-not-run` means the search has not been called; `drive-not-granted` means the Google token has no Drive read (one cached-token drop, then one more list); `drive-search-failed` is any other failed search. One found file still prepares an attach; none still drafts a holding reply. A hand-armed one-scan trace logs the decision, the gate, the query, the search result, the token scopes, and the final reason. OAuth scopes unchanged. Live retest remains row 41.
 - 2026-10-06: A deadline that mentions a meeting is not a request to schedule one. "Could you send me the Q4 pricing sheet (glance-pricing-q4) before tomorrow's meeting?" was a schedule card because the event gate treated the meeting noun plus "tomorrow" as the meeting. It is the file. "can we meet tomorrow at 10:00?" and "נפגש ביום חמישי ב-10:00?" stay a calendar hold. A file ask plus a choice of two times stays silent. The launch-checklist mail (a real time, and a pricing sheet) stays the meeting. Turn off in the Outlook row sits on its own line under Check now.
 - 2026-10-01: All five proposed loop dimensions built (`docs/open-loops.md` §9): meeting debrief, things that run out, aging of replies you owe, recurring rhythms (Pro), person view. New cores `expiry.js`, `meeting-debrief.js`, `recurrence.js`; new corpus `loop-dimensions-corpus.cjs`. Real-Gmail steps 15-19 added; still unverified in live Gmail.
