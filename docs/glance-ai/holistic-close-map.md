@@ -1,5 +1,23 @@
 # Holistic close map — Glance (personal)
 
+## Owner lock 2026-10-08 ~18:02 IL: who this person is
+
+On 2026-10-08, about 18:02 Israel, the owner (Sali) locked this in Hebrew. The filing recorded the intent and did not include a verbatim transcript, so the Hebrew is not quoted here.
+
+Glance keeps a profile of the person across the whole product: who they are, their role, how they handled similar mail, and how they work. Offer or quiet uses the mail and that profile together. This is the judgment for every loop, not a one-off rule for one kind of email.
+
+On group or broadcast mail, relevance decides. When the mail is relevant to this person, the mail has an explicit intent span, and a close is possible, Glance offers. When it is not relevant, Glance stays quiet. "Hi all", "היי לכולם", a distribution list, and Cc are profile features (approver for that group, reply rate on group mail, role matches the topic). They are not a blanket quiet.
+
+Relevance is an output: `relevant`, `not_relevant`, or `unknown`, with a reason. It can come from a proven role (Graph or Instinct onboarding), from history, or from work style. An empty history does not by itself block an offer. An earlier draft that required *k* prior closes before a quiet could become an offer is not the rule. `unknown` keeps today's behavior. Instinct onboarding fills role and department on the first day, so a missing role does not stay unknown for long.
+
+The floor is unchanged. Do It needs an explicit intent span in the mail. The profile decides relevance and does not invent a request. Negation, mass-mail footer noise, and injection stay quiet. Handled only after fetchedBack. A send is a preview and one click.
+
+Missed closes on relevant mail sit beside wrong Do It as a primary metric.
+
+Cc-only and addressed-to-other stay in the product until a contrast-pair shadow test passes. The same is true of the "no To and no Cc" hedge in PR #118. This lock does not remove them.
+
+Full framework: `docs/glance-ai/user-context-v0.md`. This page stays Glance only. It does not change the release order.
+
 ## Owner lock 2026-10-08: broad, does everything
 
 On 2026-10-08 the owner (Sali) locked this rule: Glance has to be broad and do everything. It must not be narrowed to a minimal set of loops.
