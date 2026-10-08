@@ -89,6 +89,10 @@ function lum(rgb) {
     popupSrc.indexOf("setAttribute('data-glance-section', which)") > 0 &&
     popupSrc.indexOf("which === 'added' ? 'Added' : 'Suggested'") > 0 &&
     popupSrc.indexOf('receipts.forEach') > 0);
+  const scoped = fs.readFileSync(path.join(ROOT, 'design/step-states-v1/scoped.css'), 'utf8');
+  check('dark theme hides the Do It glyph by class, whatever its URL',
+    scoped.indexOf('.flow-step-card[data-theme="dark"] img.chip-do,') >= 0 &&
+    scoped.indexOf('img.chip-do[src="do-it.png"]') < 0);
 
   const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const context = await browser.newContext({ colorScheme: 'light' });
@@ -196,12 +200,12 @@ function lum(rgb) {
     }
     const nwWhen = '2026-10-08T14:01:00.000Z';
     const north = parse.uniqueGraphMessage(
-      { subject: 'Northwind agreement - signed PDF', senderEmail: 'ai.local.flow@gmail.com', conversationId: 'AQQkStale', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: nwWhen, attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
+      { subject: 'Northwind agreement - signed PDF', senderEmail: 'ai.local.flow@gmail.com', conversationId: 'AQQkStale', idKind: 'conversation', idSource: 'url-unconfirmed', receivedDateTime: nwWhen, attachments: [{ name: '…hwind-agreement-signed.pdf', sizeLabel: '3 KB' }] },
       [msg('m-nw', 'AQQkNw', nwWhen, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
     );
     const twinAt = '2026-10-08T11:37:50.000Z';
     const alpha = parse.uniqueGraphMessage(
-      { subject: 'Q3 fund statement', conversationId: 'AQQkOld', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: twinAt, attachments: [{ name: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }] },
+      { subject: 'Q3 fund statement', conversationId: 'AQQkOld', idKind: 'conversation', idSource: 'url-unconfirmed', receivedDateTime: twinAt, attachments: [{ name: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }] },
       [
         msg('m-old', 'AQQkOld', '2026-10-01T14:37:00.000Z', [file('statement-q3-old.pdf', 1000)], 'Q3 fund statement'),
         msg('m-alpha', 'AQQkAlpha', twinAt, [file('statement-q3-alpha.pdf', 3072)], 'Q3 fund statement'),
@@ -219,6 +223,133 @@ function lum(rgb) {
     linked && linked.northId === 'm-nw', linked);
   check('Chromium links statement-q3-alpha.pdf when an older id is on the open mail',
     linked && linked.alphaId === 'm-alpha' && /time-file/.test(linked.alphaDetail || ''), linked);
+
+  const convId = 'AQQkAAAAAAFNPyybyE5TKbM3tgp2Qjp';
+  await page.setContent('<!doctype html><html lang="he" dir="rtl"><body><div role="main"><div id="ReadingPaneContainerId">' +
+    '<div class="SubjectLine allowTextSelection" role="heading" id="MSG_wAH0HSIHwAA_SUBJECT" aria-labelledby="CONV_KbM3tgp2Qjp_SUBJECT">Northwind agreement - signed PDF</div>' +
+    '<div id="focused"><div role="document" class="XbIp4">Please find the signed Northwind agreement attached.</div></div>' +
+    '</div></div></body></html>', { waitUntil: 'domcontentloaded' });
+  await loadEngine(page);
+  const bodyRoot = await page.evaluate((href) => {
+    const pane = window.__eng.parse.readPane(document, href, { own: ['glance.salisapan@outlook.com'], userName: 'Sali' });
+    const root = window.__eng.parse.openBodyRoot(window.__eng.parse.readingPaneRoots(document));
+    return {
+      text: pane && pane.text,
+      subject: pane && pane.subject,
+      conversationId: pane && pane.conversationId,
+      idSource: pane && pane.idSource,
+      role: root && root.getAttribute && root.getAttribute('role')
+    };
+  }, 'https://outlook.live.com/mail/0/inbox/id/' + convId);
+  check('the subject line is not the message body',
+    bodyRoot && /signed Northwind agreement attached/.test(bodyRoot.text) && bodyRoot.text !== bodyRoot.subject && bodyRoot.role === 'document',
+    bodyRoot);
+  check('a CONV_ tail on the heading keeps the URL conversation id',
+    bodyRoot && bodyRoot.conversationId === convId && bodyRoot.idSource === 'open-mail',
+    bodyRoot);
+
+  // Measured 2026-10-08 on the Gate 0.9.51 profile. The subject heading and
+  // the message are two allowTextSelection nodes. The prose is under
+  // visibility=hidden inside role=document. A visible crumb must not win.
+  const nwId = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEADWD1Rr89HKRZEoW5l2yyiY';
+  const q3Id = 'AQQkADAwATM0MDAAMS0wZTAwAC04MzYzLTAwAi0wMAoAEAAFNPyybyE5TKbM3tgp2Qjp';
+  const q3Body = 'Hi,\n\nCan you reply and confirm whether the Q3 summary will include the October numbers?\n\nThanks,\nFlow test';
+  const passBody = 'Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate';
+  function measuredPane(subject, convTail, bodyHtml, extra) {
+    return '<!doctype html><html lang="he" dir="rtl"><head><style>[visibility="hidden"]{visibility:hidden}</style></head><body><div role="main"><div id="ReadingPaneContainerId">' +
+      '<div class="adPpR mJflQ allowTextSelection"><div class="MshDW m41se"><div class="UUCdJ PKstT"><div class="f77rj">' +
+      '<span class="JdFsz" title="' + subject + '" role="heading" aria-level="3" id="CONV_' + convTail + '_SUBJECT">' + subject + '</span>' +
+      '</div></div></div></div>' +
+      '<span class="persona" title="flow &lt;ai.local.flow@gmail.com&gt;">flow</span>' +
+      '<div role="heading" aria-level="3" aria-label="אל: glance.salisapan@outlook.com"><span>אל:</span><span aria-label="glance.salisapan@outlook.com">glance.salisapan@outlook.com</span></div>' +
+      '<div class="XbIp4 jmmB7 customScrollBar GNqVo allowTextSelection">' +
+      '<div tabindex="0" aria-label="גוף ההודעה" role="document" aria-live="polite" class="OuGoX BIZfh" id="UniqueMessageBody_11">' +
+      '<span class="crumb">תרגם</span>' +
+      '<div visibility="hidden"><div class="rps_c22a"><div><div dir="auto">' + bodyHtml + '</div></div></div></div>' +
+      '</div></div>' + (extra || '') +
+      '</div></div></body></html>';
+  }
+  await page.setContent(measuredPane('Northwind agreement - signed PDF', 'ZEoW5l2yyiY', 'Hi,<br><br>The signed Northwind agreement is attached.<br><br>Thanks,<br>Flow',
+    '<button aria-label="northwind-agreement-signed.pdf 48 KB">northwind-agreement-signed.pdf 48 KB</button>'), { waitUntil: 'domcontentloaded' });
+  await loadEngine(page);
+  const measured = await page.evaluate((href) => {
+    const pane = window.__eng.parse.readPane(document, href, { own: ['glance.salisapan@outlook.com'], userName: 'Sali' });
+    const root = window.__eng.parse.openBodyRoot(window.__eng.parse.readingPaneRoots(document));
+    const doc = document.querySelector('[role="document"]');
+    return {
+      text: pane && pane.text,
+      subject: pane && pane.subject,
+      conversationId: pane && pane.conversationId,
+      idSource: pane && pane.idSource,
+      role: root && root.getAttribute && root.getAttribute('role'),
+      innerText: doc ? doc.innerText : ''
+    };
+  }, 'https://outlook.live.com/mail/0/inbox/id/' + nwId);
+  check('a hidden wrapper still yields the Northwind body, not the subject',
+    measured && measured.role === 'document' && measured.subject === 'Northwind agreement - signed PDF' &&
+    /The signed Northwind agreement is attached/.test(measured.text || '') &&
+    measured.text !== measured.subject && /\n/.test(measured.text) &&
+    measured.innerText.indexOf('The signed') < 0 &&
+    measured.conversationId === nwId && measured.idSource === 'open-mail',
+    measured);
+  await page.setContent(measuredPane('Gate A 0.9.41 – quick question on the Q3 summary', 'KbM3tgp2Qjp',
+    'Hi,<br><br>Can you reply and confirm whether the Q3 summary will include the October numbers?<br><br>Thanks,<br>Flow test'), { waitUntil: 'domcontentloaded' });
+  await loadEngine(page);
+  const q3Measured = await page.evaluate((href) => {
+    const pane = window.__eng.parse.readPane(document, href, { own: ['glance.salisapan@outlook.com'], userName: 'Sali' });
+    const judged = window.__eng.judge.judge({
+      text: pane && pane.text,
+      subject: pane && pane.subject,
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      surface: 'outlook',
+      to: pane && pane.to,
+      cc: [],
+      ownAddresses: ['glance.salisapan@outlook.com'],
+      userName: 'Sali',
+      inbound: true
+    });
+    return {
+      text: pane && pane.text,
+      conversationId: pane && pane.conversationId,
+      to: pane && pane.to,
+      show: judged && judged.show,
+      reason: judged && judged.reason,
+      kinds: ((judged && judged.process && judged.process.steps) || []).map((s) => s.kind)
+    };
+  }, 'https://outlook.live.com/mail/0/inbox/id/' + q3Id);
+  check('the Q3 seed under the hidden wrapper is a reply draft',
+    q3Measured && q3Measured.text === q3Body && q3Measured.conversationId === q3Id &&
+    q3Measured.to && q3Measured.to.indexOf('glance.salisapan@outlook.com') >= 0 &&
+    q3Measured.show === true && q3Measured.kinds.indexOf('outlookDraft') >= 0,
+    q3Measured);
+  const passJudged = await page.evaluate((text) => {
+    const r = window.__eng.judge.judge({
+      text: text,
+      subject: 'Gate 0.9.35 To Do title',
+      sender: { name: 'flow', email: 'ai.local.flow@gmail.com' },
+      now: '2026-10-08T13:34:00Z',
+      surface: 'outlook',
+      to: ['glance.salisapan@outlook.com'],
+      ownAddresses: ['glance.salisapan@outlook.com'],
+      userName: 'Sali',
+      inbound: true
+    });
+    return { show: r && r.show, reason: r && r.reason, type: r && r.intent && r.intent.type, label: r && r.intent && r.intent.label, kinds: ((r && r.process && r.process.steps) || []).map((s) => s.kind) };
+  }, passBody);
+  check('the passport 0.9.35 seed is read as an open loop',
+    passJudged && passJudged.show === true && passJudged.kinds.indexOf('outlookTask') >= 0,
+    passJudged);
+  await page.setContent('<!doctype html><html><head></head><body><div class="flow-step-card" data-theme="dark"><button class="do-halo"><img class="chip-do" src="chrome-extension://glance/design/step-states-v1/do-it.png" alt="Do It"><span class="doit-dark">[Do It]</span></button></div></body></html>');
+  await page.addStyleTag({ path: path.join(ROOT, 'design/step-states-v1/scoped.css') });
+  const doIts = await page.evaluate(() => {
+    const visible = (el) => getComputedStyle(el).display !== 'none';
+    return {
+      img: visible(document.querySelector('img.chip-do')),
+      span: visible(document.querySelector('.doit-dark'))
+    };
+  });
+  check('a full Do It image URL stays hidden while the dark label shows',
+    doIts && doIts.img === false && doIts.span === true, doIts);
 
   const ccPane = await readPane(page, paneHtml({
     subject: q3.subject,

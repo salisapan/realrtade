@@ -263,7 +263,11 @@ const FlowStillOpen = (() => {
     const intent = entry.intent && typeof entry.intent === 'object' ? entry.intent : {};
     return {
       messageId: entry.messageId || null,
-      threadId: entry.threadId || null,
+      threadId: entry.threadId || entry.outlookConversationId || null,
+      outlookConversationId: entry.outlookConversationId || entry.threadId || null,
+      itemId: entry.itemId || null,
+      pathId: entry.pathId || null,
+      outlookIncomingId: entry.outlookIncomingId || null,
       threadUrl: entry.threadUrl || null,
       sender: entry.sender || {},
       subject: entry.subject || '',

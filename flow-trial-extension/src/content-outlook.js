@@ -38,6 +38,34 @@
     return;
   }
   if (globalThis.__glanceOutlookPage) { try { globalThis.__glanceOutlookPage.rescan(); } catch (e) { /* old copy */ } return; }
+  // DevTools in this isolated world does not see the lexical FlowOwaParse
+  // binding. Read-only snapshot for a live check. It does not write storage.
+  globalThis.__flowDiag = Object.freeze({
+    readPane: function () {
+      try {
+        const pane = FlowOwaParse.readPane(document, location.href, {});
+        if (!pane) return null;
+        return {
+          subject: pane.subject || '',
+          text: String(pane.text || '').slice(0, 800),
+          conversationId: pane.conversationId || null,
+          idSource: pane.idSource || '',
+          senderEmail: pane.senderEmail || '',
+          to: pane.to || [],
+          attachments: (pane.attachments || []).map((a) => (a && (a.name || a.sizeLabel)) || '')
+        };
+      } catch (e) { return { error: String(e && e.message || e) }; }
+    },
+    roots: function () {
+      try {
+        return FlowOwaParse.readingPaneRoots(document).map((n) => ({
+          id: (n && n.id) || '',
+          role: (n && n.getAttribute && n.getAttribute('role')) || '',
+          className: String((n && n.className) || '').slice(0, 80)
+        }));
+      } catch (e) { return []; }
+    }
+  });
 
   const SCAN_EVERY_MS = 800;        // at most one scan per 0.8 s, and at least one 0.8 s after any change
   const PAGE_SYNC_MIN_MS = 60 * 1000;
@@ -1963,7 +1991,7 @@
   async function scan() {
     const st = await FlowStorage.get();
     const own = ownAddressesOf(st);
-    const pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
+    let pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
     const ids = FlowOwaParse.urlIds(location.href);
     const earlyPlanned = plannedRow(st, pane);
     const fileSig = pane && Array.isArray(pane.attachments)
@@ -2015,7 +2043,7 @@
       }
       return;
     }
-    dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, chars: (pane.text || '').length });
+    dbg('parsed', { subject: pane.subject, sender: pane.senderEmail, senderName: pane.senderName, itemId: pane.itemId, conversationId: pane.conversationId, idSource: pane.idSource, chars: (pane.text || '').length });
     // Outlook must be connected (token present); otherwise no card, and the reason says why.
     if (!st || !st.outlookAuth || !st.outlookAuth.token) { dropStuckCard(); await pageReason('page:not-connected', pane); return; }
     try {
@@ -2305,7 +2333,7 @@
       return;
     }
 
-    if (!receiptOnly && await promiseOwnedElsewhere(pane, decided && decided.intent)) {
+    if (!receiptOnly && await promiseOwnedElsewhere(pane, decided && decided.intent, [entry && entry.messageId, entry && entry.outlookIncomingId])) {
       dropStuckCard();
       await pageReason('page:same-promise', pane);
       return;
@@ -2390,13 +2418,18 @@
       subject: ctx.subject,
       text: ctx.bodyText,
       outlookIncomingId: ctx.outlookIncomingId,
+      threadId: (pane && pane.conversationId) || ctx.threadId || null,
+      outlookConversationId: (pane && pane.conversationId) || ctx.conversationId || null,
+      itemId: ctx.itemId || (pane && pane.itemId) || null,
+      pathId: ctx.pathId || (pane && pane.pathId) || null,
       threadUrl: ctx.threadUrl
     }).catch(() => {});
   }
 
   // The open message's body, or the reading pane around it: never the message list.
   function mountPoint() {
-    const root = FlowOwaParse.readingPaneRoots(document)[0];
+    const roots = FlowOwaParse.readingPaneRoots(document);
+    const root = typeof FlowOwaParse.openBodyRoot === 'function' ? FlowOwaParse.openBodyRoot(roots) : roots[0];
     if (root) return root.parentElement || root;
     return document.querySelector('#ReadingPaneContainerId') || null;
   }
@@ -2641,6 +2674,7 @@
   // "newest" are not a link. A failed attachment read stays unknown.
   // Each miss names the stage: no id, Graph status, no candidate, unresolved, empty list.
   async function suggestFiles(pane) {
+    if (pane && pane.idSource === 'url-stale') return suggestFail('suggest:pane-stale');
     const id = pane.itemId || null;
     const wantConv = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.conversationId) : '';
     const wantNet = (typeof FlowOwaParse !== 'undefined' && FlowOwaParse.canonId) ? FlowOwaParse.canonId(pane.internetMessageId) : '';
@@ -3082,7 +3116,7 @@
     for (let i = 0; i < open.length; i++) {
       const row = open[i];
       if (!row || !row.process) continue;
-      const rowIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
+      const rowIds = rowIdsOf(row);
       if (ids.some((id) => rowIds.some((rid) => sameExchangeId(id, rid)))) return row;
     }
     const paneRow = {
@@ -3102,13 +3136,17 @@
 
   // Loops already carries this promise on a different message. This mail
   // does not get a second Do It, and it does not borrow the other card.
-  async function promiseOwnedElsewhere(pane, intent) {
+  function rowIdsOf(row) {
+    return [row && row.messageId, row && row.itemId, row && row.pathId, row && row.threadId, row && row.outlookConversationId, row && row.outlookIncomingId].filter(Boolean).map(String);
+  }
+
+  async function promiseOwnedElsewhere(pane, intent, extraIds) {
     if (!pane || typeof FlowStorage.getStillOpen !== 'function' || typeof FlowStillOpen === 'undefined' || typeof FlowStillOpen.promiseKey !== 'function') return false;
     const open = await FlowStorage.getStillOpen();
     if (!open || !open.length) return false;
-    const ids = messageIdsOf(pane);
+    const ids = messageIdsOf(pane).concat((extraIds || []).filter(Boolean).map(String));
     function mine(row) {
-      const rowIds = [row && row.messageId, row && row.itemId, row && row.pathId, row && row.threadId, row && row.outlookConversationId].filter(Boolean).map(String);
+      const rowIds = rowIdsOf(row);
       return ids.some((id) => rowIds.some((rid) => sameExchangeId(id, rid)));
     }
     if (open.some(mine)) return false;

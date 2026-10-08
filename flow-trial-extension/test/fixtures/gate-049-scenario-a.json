@@ -73,6 +73,19 @@
    ]
   },
   {
+   "id": "gate049-passport-035",
+   "gmailId": "1a117eb1f0b7f60a",
+   "from": "ai.local.flow@gmail.com",
+   "fromName": "flow",
+   "to": [
+    "glance.salisapan@outlook.com"
+   ],
+   "sent": "2026-10-07T22:50:00+03:00",
+   "subject": "Gate 0.9.35 To Do title",
+   "body": "Hi, We agreed to renew the passport application by Friday. Thanks, Flow Gate",
+   "note": "Greeting is Hi, with no all/team/there. Seed measured 2026-10-08."
+  },
+  {
    "id": "gate049-loops-headers",
    "expected": "CTO product decision 2026-10-08 19:52 IL: Suggested and Added headings shown in every Loops list that has cards in that state, including single-step / Do-It / Handled rows with no step list. Gate requirement.",
    "shots": [

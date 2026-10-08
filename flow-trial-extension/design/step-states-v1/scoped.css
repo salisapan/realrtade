@@ -4344,7 +4344,7 @@
    Here everything is in em so smaller contexts keep the exact proportions.
    --------------------------------------------------------------- */
 .flow-step-card .doit-dark{display:none}
-.flow-step-card[data-theme="dark"] img.chip-do[src="do-it.png"],.flow-step-card[data-theme="dark"] img.doit-inline[src="do-it.png"]{display:none !important}
+.flow-step-card[data-theme="dark"] img.chip-do,.flow-step-card[data-theme="dark"] img.doit-inline{display:none !important}
 .flow-step-card[data-theme="dark"] .doit-dark{
   --fs:10.5px;
   display:inline-flex;align-items:center;justify-content:center;position:relative;flex:none;

@@ -55,6 +55,33 @@ const FlowOwaParse = (() => {
     return plainLine(el.innerText || el.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
   }
 
+  // The open message's prose. OWA puts it under a child with
+  // visibility="hidden" (and a stylesheet that actually hides it). innerText
+  // skips that child, and a short visible string in the same document would
+  // win the innerText || textContent fallback and drop the mail. Walk every
+  // text node, hidden or not, and keep <br> as a line break.
+  function proseOf(el) {
+    if (!el) return '';
+    if (!el.childNodes) return textOf(el);
+    const block = { DIV: 1, P: 1, LI: 1, TR: 1, BLOCKQUOTE: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, TABLE: 1, SECTION: 1 };
+    const parts = [];
+    function walk(n) {
+      if (!n) return;
+      if (n.nodeType === 3) { parts.push(n.nodeValue || ''); return; }
+      if (n.nodeType !== 1) return;
+      const tag = String(n.tagName || '').toUpperCase();
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return;
+      if (tag === 'BR') { parts.push('\n'); return; }
+      const isBlock = block[tag] === 1;
+      if (isBlock && parts.length && parts[parts.length - 1] !== '\n') parts.push('\n');
+      const kids = n.childNodes;
+      for (let i = 0; i < kids.length; i++) walk(kids[i]);
+      if (isBlock && parts.length && parts[parts.length - 1] !== '\n') parts.push('\n');
+    }
+    walk(el);
+    return plainLine(parts.join('')).replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
   // Normalize for matching against Graph/sync entries.
   function norm(s) {
     return String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
@@ -316,7 +343,7 @@ const FlowOwaParse = (() => {
   function idConflict(pane, m) {
     // A URL id that is not on the open mail is the previous message or a
     // search address. It is not evidence that this file is the wrong one.
-    if (pane && pane.idSource === 'url-unconfirmed') return '';
+    if (pane && (pane.idSource === 'url-unconfirmed' || pane.idSource === 'url-stale')) return '';
     const paneConv = canonId(pane && pane.conversationId);
     const msgConv = canonId(m && m.conversationId);
     if (paneConv && msgConv && paneConv !== msgConv) return 'conversation';
@@ -355,15 +382,11 @@ const FlowOwaParse = (() => {
       if (!one) return pack(null, why || 'no-hit');
       if (one.attachmentsUnread) return pack(null, 'attachments-unknown');
       const rel = fileRelation(pane && pane.attachments, one.attachments || one.files);
-      // A clock or an internet id still outweighs the filename. A conversation
-      // id that is not this message does not hide the only file the chip names.
-      const clock = clockConflict(pane, one, minute);
-      if (clock) return pack(null, (why || 'subject-unique') + ' conflict-' + clock);
-      const idWhy = idConflict(pane, one);
-      if (rel === 'yes' && idWhy !== 'internet') return pack(one, why || 'subject-unique');
-      if (idWhy) return pack(null, (why || 'subject-unique') + ' conflict-' + idWhy);
+      // A confirmed id that differs, or a clock that differs, outweighs the filename.
+      const conflict = idConflict(pane, one) || clockConflict(pane, one, minute);
+      if (conflict) return pack(null, (why || 'subject-unique') + ' conflict-' + conflict);
       if (rel === 'no') return pack(null, (why || 'subject-unique') + ' file-disagree');
-      if (idHit(pane, one)) return pack(one, why || 'subject-unique');
+      if (idHit(pane, one) || rel === 'yes') return pack(one, why || 'subject-unique');
       return pack(null, (why || 'subject-unique') + ' unconfirmed');
     }
     const sub = subjectKey(pane && pane.subject);
@@ -412,13 +435,7 @@ const FlowOwaParse = (() => {
     let agreedId = pool.filter((m) => !idConflict(pane, m));
     if (pool.length && !agreedId.length) {
       const seen = idEvidence(pane, list);
-      if (seen.convReal || seen.netReal) {
-        // The id names a different row. The file on this chip still links
-        // when exactly one message in this minute carries it.
-        const byFile = pool.filter((m) => fileRelation(pane && pane.attachments, m.attachments || m.files) === 'yes');
-        if (byFile.length === 1) return pack(byFile[0], 'time-file');
-        return pack(null, 'id-conflict');
-      }
+      if (seen.convReal || seen.netReal) return pack(null, 'id-conflict');
       agreedId = pool;
     }
     pool = agreedId;
@@ -486,6 +503,39 @@ const FlowOwaParse = (() => {
       if (pane && !(pane.closest && pane.closest('[role="listbox"], [role="list"], [role="grid"], [role="tree"]'))) out.push(pane);
     }
     return out;
+  }
+
+  function documentOrder(a, b) {
+    if (!a || !b || a === b || typeof a.compareDocumentPosition !== 'function') return 0;
+    const pos = a.compareDocumentPosition(b);
+    if (pos & 4) return -1;
+    if (pos & 2) return 1;
+    return 0;
+  }
+
+  // The open message's body among the reading-pane candidates. readingPaneRoots
+  // is in selector order, and on live Outlook Web it also returns the
+  // conversation subject block (the node holding span#CONV_<tail>_SUBJECT).
+  // Keep real bodies only (role=document, or a node that holds one), never a
+  // node that holds the CONV_ heading; prefer the focused message; take the
+  // last in document order. No visibility filter: the prose wrapper's
+  // visibility="hidden" attribute has no style and still renders.
+  function openBodyRoot(roots) {
+    const list = (roots || []).filter(Boolean);
+    const isSubject = (n) => /^CONV_.*_SUBJECT$/.test(n.id || '') ||
+      Boolean(n.querySelector && n.querySelector('[id^="CONV_"][id$="_SUBJECT"]'));
+    const isBody = (n) => (n.getAttribute && n.getAttribute('role') === 'document') ||
+      Boolean(n.querySelector && n.querySelector('[role="document"]'));
+    let pool = list.filter((n) => isBody(n) && !isSubject(n));
+    if (!pool.length) pool = list.filter((n) => !isSubject(n));
+    if (!pool.length) return list.find((n) => n.id === 'ReadingPaneContainerId') || null;
+    const focused = pool.filter((n) => n.closest && n.closest('#focused'));
+    if (focused.length) pool = focused;
+    pool = pool.slice().sort((a, b) => {
+      const ord = documentOrder(a, b);
+      return ord || (a === b ? 0 : 1);
+    });
+    return pool[pool.length - 1];
   }
 
   // Which anchor found the body, for the debug log.
@@ -688,6 +738,28 @@ const FlowOwaParse = (() => {
     return '';
   }
 
+  // Outlook Web does not render the full conversation id. The open
+  // conversation's subject heading is span#CONV_<last 11 chars>_SUBJECT, and
+  // the message item's span#MSG_<key>_SUBJECT points at it with
+  // aria-labelledby. 'match' confirms the URL id. 'mismatch' means the page
+  // names another conversation (the pane is mid-navigation). 'absent' means
+  // there is nothing to compare.
+  function convTailState(d, bodyRoot, id) {
+    const want = canonId(id);
+    if (!want || want.length < 11 || !d || !d.querySelectorAll) return 'absent';
+    const tailOf = (s) => { const m = String(s || '').match(/^CONV_(.+)_SUBJECT$/); return m ? canonId(m[1]) : ''; };
+    const judge = (t) => (!t || t.length < 11) ? 'absent' : (want.slice(-t.length) === t ? 'match' : 'mismatch');
+    let n = bodyRoot;
+    for (let i = 0; n && i < 14; i++, n = n.parentElement) {
+      const msg = n.querySelector && n.querySelector('[id^="MSG_"][id$="_SUBJECT"][aria-labelledby^="CONV_"]');
+      if (msg) return judge(tailOf(msg.getAttribute('aria-labelledby')));
+    }
+    const tails = Array.prototype.slice.call(d.querySelectorAll('[id^="CONV_"][id$="_SUBJECT"]')).filter((h) => !inList(h)).map((h) => tailOf(h.id)).filter(Boolean);
+    const uniq = tails.filter((t, i) => tails.indexOf(t) === i);
+    if (!uniq.length) return 'absent';
+    return uniq.length === 1 ? judge(uniq[0]) : 'mismatch';
+  }
+
   // The open mail's own header, not the rest of the thread and not the URL.
   function idOnOpenMail(header, id) {
     const raw = String(id || '');
@@ -714,8 +786,7 @@ const FlowOwaParse = (() => {
     const d = doc || (typeof document !== 'undefined' ? document : null);
     if (!d) return null;
     const roots = readingPaneRoots(d);
-    // Document order is oldest first. The open message is the last body.
-    const bodyRoot = roots.length ? roots[roots.length - 1] : null;
+    const bodyRoot = openBodyRoot(roots);
     if (!bodyRoot) return null; // no message body on screen: stay silent rather than read the message list
     const head = headerOf(bodyRoot, d);
     const container = head.container;
@@ -731,7 +802,11 @@ const FlowOwaParse = (() => {
     // The persona/name element wins over a heading nearer the body (that nearer heading is often the date row).
     const senderName = personaName(header, bodyRoot) || fromWho || fromHead || '';
     const inner = innerMessage(bodyRoot);
-    const body = textOf(inner) || textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
+    // The longer read wins. A visible "translate" crumb is shorter than the
+    // prose sitting under the hidden wrapper.
+    const fromInner = proseOf(inner);
+    const fromRoot = proseOf(bodyRoot);
+    const body = (fromRoot.length > fromInner.length + 12) ? fromRoot : (fromInner || fromRoot);
     if (roots.length > 1) {
       const nearSubject = headingBefore(bodyRoot);
       if (nearSubject) subject = nearSubject;
@@ -744,12 +819,13 @@ const FlowOwaParse = (() => {
     let idKind = ids.kind || '';
     let idSource = ids.kind ? 'url' : '';
     if (ids.conversationId) {
-      if (idOnOpenMail(header, ids.conversationId)) {
+      const tailState = convTailState(d, bodyRoot, ids.conversationId);
+      if (idOnOpenMail(header, ids.conversationId) || tailState === 'match') {
         idKind = 'conversation';
         idSource = 'open-mail';
       } else {
         idKind = 'conversation';
-        idSource = 'url-unconfirmed';
+        idSource = tailState === 'mismatch' ? 'url-stale' : 'url-unconfirmed';
         conversationId = null;
       }
     }
@@ -1186,7 +1262,7 @@ const FlowOwaParse = (() => {
     return out;
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, clockToIso, clockPair, pageProves24h, stripReadingChrome, readingPaneRoots, openBodyRoot, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };
