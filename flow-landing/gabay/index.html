@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>תאום פגישה לעובד חדש — סוכנות גבאי</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&family=Heebo:wght@500;700&display=swap" rel="stylesheet">
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+<style>
+html,body{margin:0;background:#ebe8e2;color:#1c1917}
+#boot-error{display:none;position:fixed;inset:0;z-index:9;background:#ebe8e2;color:#8c2f2f;font:14px/1.5 Assistant,sans-serif;padding:24px;white-space:pre-wrap;direction:ltr;text-align:left}
+#boot-status{position:fixed;top:8px;left:8px;z-index:8;color:#1f4e79;font:13px Assistant,sans-serif}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="boot-status">טוען את התיק…</div>
+<div id="boot-error"></div>
+<script>
+window.onerror=function(m,s,l,c){var e=document.getElementById("boot-error");e.style.display="block";e.textContent=m+"\n"+(s||"")+":"+l+":"+c;};
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+const LOGO = "../logo-header.png";
+const DOIT = "do-it-inline.png";
+
+const C = {
+  agency: "סוכנות גבאי",
+  coord: "שירה אלון",
+  agent: "יואב שמש",
+  emp: "נווה תעשיות בע״מ",
+  empId: "515882401",
+  hr: "רחל אדרי",
+  who: "אורי מלכה",
+  first: "אורי",
+  id: "314552191",
+  start: "02.11.2026",
+  spouse: "נועה מלכה",
+  spouseId: "314552209",
+  child: "איתי מלכה",
+  childBorn: "14.06.2018",
+  q2: "ליה נחום",
+  q2id: "025887316",
+  q2start: "09.11.2026",
+  q3: "תומר ביטון",
+  q3id: "408221117",
+  q3start: "16.11.2026",
+  room: "חדר הישיבות אצל הסוכן",
+  slot: "חמישי 12.11.2026, 10:30–11:15",
+  remind: "רביעי 11.11.2026, 16:00",
+  atid: "AT-2026-18442",
+  alg: "ALG-104482",
+  pw: "PW-88421",
+  ms: "MS-551902",
+  scan: "SC-2217",
+};
+
+const POL = [
+  { ins: "הראל", num: "44821093", kind: "בריאות", prem: "186 ש״ח", file: "הראל 44821093.pdf", raw: "scan_001.pdf" },
+  { ins: "מנורה", num: "77190214", kind: "פנסיה", prem: "צבירה 18,400 ש״ח", file: "מנורה 77190214.pdf", raw: "scan_002.pdf" },
+  { ins: "מגדל", num: "22018455", kind: "אובדן כושר", prem: "94 ש״ח", file: "מגדל 22018455.pdf", raw: "scan_003.pdf" },
+];
+
+const PHASES = [
+  { t: "הודעת מעסיק", a: 1, b: 1 },
+  { t: "עתיד ושדר", a: 2, b: 3 },
+  { t: "חתימות", a: 4, b: 8 },
+  { t: "סריקה ומסלקה", a: 9, b: 12 },
+  { t: "זימון", a: 13, b: 15 },
+  { t: "יומן", a: 16, b: 16 },
+];
+
+const STEPS = [
+  { n: 1, t: "הודעת מעסיק נקלטה" },
+  { n: 2, t: "כרטיס לקוח בעתיד" },
+  { n: 3, t: "שדר פתיחה לאלמגור" },
+  { n: 4, t: "בקשת חתימה בפוליוויז" },
+  { n: 5, t: "תזכורת: פרטים לא הושלמו" },
+  { n: 6, t: "תיוק שתי הרשאות" },
+  { n: 7, t: "תזכורת: הרשאה חסרה" },
+  { n: 8, t: "תיוק הרשאה ואקסל הר הביטוח" },
+  { n: 9, t: "שמות קבצים לסריקה" },
+  { n: 10, t: "שדר קבצים לאלמגור" },
+  { n: 11, t: "הזמנת מסלקה מאלמגור" },
+  { n: 12, t: "תוכניות נפתחו באלמגור" },
+  { n: 13, t: "מועד חלופי ביומן הסוכן" },
+  { n: 14, t: "זימון למייל הלקוח" },
+  { n: 15, t: "תזכורת וואטסאפ" },
+  { n: 16, t: "יומן הטיפול" },
+];
+
+const LAST = 16;
+
+const TRAIL = [
+  ["08.10.2026 09:40", "קליטה", "אושר: הודעת עובד חדש. הטיפול עכשיו באורי מלכה"],
+  ["08.10.2026 09:46", "עתיד", "נפתח AT-2026-18442. צילום הת״ז תויק"],
+  ["08.10.2026 09:51", "שדר", "שדר פתיחה לאלמגור. נפתח ALG-104482"],
+  ["08.10.2026 10:05", "פוליוויז", "לינק PW-88421 יצא מפוליוויז, אחרי השיחה"],
+  ["11.10.2026 10:20", "פוליוויז", "יצאה תזכורת. הפרטים לא הושלמו"],
+  ["13.10.2026 08:55", "עתיד", "תויקו הרשאה למסלקה והרשאה להר הביטוח"],
+  ["14.10.2026 09:10", "פוליוויז", "יצאה תזכורת על הרשאת העתקי הפוליסות"],
+  ["15.10.2026 11:02", "עתיד", "תויקו ההרשאה השלישית והאקסל של הר הביטוח"],
+  ["15.10.2026 11:18", "שדר", "אושרו שמות הסריקה SC-2217"],
+  ["15.10.2026 11:24", "שדר", "שדר שני: אקסל הר הביטוח ושלוש הפוליסות"],
+  ["15.10.2026 11:40", "אלמגור", "הוזמנה מסלקה MS-551902 מאלמגור"],
+  ["16.10.2026 08:40", "אלמגור", "נפתחו שתי תוכניות. קבצי טרום הייעוץ בתיק"],
+  ["19.10.2026 15:12", "יומן", "אושר מועד 12.11.2026 10:30 אחרי בקשת הדחייה"],
+  ["19.10.2026 15:16", "יומן", "הזימון נשלח למייל הלקוח עם הקבצים בשמם"],
+  ["19.10.2026 15:18", "וואטסאפ", "אושרה תזכורת ל־11.11.2026 16:00"],
+];
+
+const CSS = `
+*{box-sizing:border-box}
+html,body{margin:0;background:#ebe8e2;color:#1c1917}
+button{font-family:inherit}
+.app{min-height:100vh;font-family:Assistant,Heebo,Arial,sans-serif;font-size:15.5px;line-height:1.45}
+.top{background:#f7f6f3;border-bottom:1px solid #d4d0c8;padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:8px;font-family:Heebo,Assistant,sans-serif;font-weight:700;font-size:15px}
+.brand img{height:26px;background:#fff;border:1px solid #d4d0c8;padding:3px 6px}
+.case{color:#5c574e;font-size:13.5px}
+.rail{display:flex;gap:0;overflow:auto;background:#f7f6f3;border-bottom:1px solid #d4d0c8;padding:0 8px}
+.rail button{appearance:none;background:transparent;border:0;border-bottom:2px solid transparent;color:#5c574e;font-weight:600;font-size:13.5px;padding:10px 12px;min-height:40px;white-space:nowrap;cursor:pointer}
+.rail button.on{color:#1f4e79;border-bottom-color:#1f4e79}
+.rail button.done{color:#1c1917}
+.rail button:disabled{color:#8a847a;cursor:default}
+.wrap{max-width:1120px;margin:0 auto;padding:16px 16px 92px}
+.work{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin:0 0 10px}
+.work h1{font-family:Heebo,Assistant,sans-serif;font-size:20px;font-weight:700;margin:0;line-height:1.3}
+.work span{color:#5c574e;font-size:13px;white-space:nowrap}
+.desk{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;align-items:start}
+.desk.solo{grid-template-columns:minmax(0,1fr)}
+@media(max-width:900px){.desk,.desk.solo{grid-template-columns:1fr}}
+.win{background:#fff;border:1px solid #cfcabe;color:#1c1917}
+.tb{display:flex;justify-content:space-between;gap:8px;align-items:baseline;background:#f3f1ec;border-bottom:1px solid #d4d0c8;padding:7px 10px;font-size:13.5px}
+.tb b{font-family:Heebo,Assistant,sans-serif;font-weight:700}
+.tb span,.menu span{color:#5c574e}
+.menu{display:flex;gap:14px;padding:4px 10px;border-bottom:1px solid #e4e0d8;font-size:13px;background:#faf9f6}
+.bd{padding:12px}
+.mast{margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid #e4e0d8;font-size:14.5px}
+.mast b{font-weight:700}
+.mast em{font-style:normal;color:#1f4e79;font-weight:700}
+.form{display:grid;grid-template-columns:128px 1fr;border:1px solid #d4d0c8;margin:8px 0}
+@media(min-width:720px){.form.wide{grid-template-columns:128px 1fr 128px 1fr}}
+.form div{padding:6px 8px;border-bottom:1px solid #e4e0d8;font-size:14px}
+.form .lab{background:#f3f1ec;color:#3f3a33;font-weight:600}
+.num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0}
+th{text-align:right;font-weight:700;background:#f3f1ec;border:1px solid #d4d0c8;padding:6px 8px}
+td{border:1px solid #e4e0d8;padding:6px 8px;vertical-align:top}
+tr.hot td{background:#f7f5f0}
+tr.miss td{background:#f8f1f1;color:#6e2424}
+.rowline{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid #e4e0d8;font-size:14px}
+.rowline span{color:#5c574e}
+.lock{display:flex;justify-content:space-between;gap:8px;padding:8px;border:1px solid #e4c8c8;background:#f8f1f1;color:#6e2424;font-size:14px;margin:8px 0}
+.quote{margin:8px 0;padding:8px 10px;border-right:3px solid #1f4e79;background:#f7f6f3;font-size:14.5px}
+.sheet{background:#fff;border:1px solid #cfcabe;padding:16px 18px}
+.sheet h2{font-family:Heebo,Assistant,sans-serif;font-size:18px;margin:14px 0 6px}
+.fine{color:#5c574e;font-size:13px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:800px){.two{grid-template-columns:1fr}.form.wide{grid-template-columns:128px 1fr}}
+.wait{position:fixed;inset-inline:0;bottom:0;z-index:5;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin:0;padding:10px 20px;background:#f7f6f3;border-top:1px solid #cfcabe}
+.wait p{margin:0;font-weight:600;color:#1c1917;font-size:14.5px;flex:1;min-width:200px}
+.acts{display:flex;gap:8px;align-items:center}
+.doit{display:inline-flex;align-items:center;justify-content:center;min-height:40px;min-width:96px;padding:8px 14px;border:1px solid #1f4e79;background:#fff;cursor:pointer}
+.doit img{height:16px;width:auto;display:block}
+.inl{height:1em;width:auto;vertical-align:-.15em}
+.ghost{min-height:40px;padding:8px 12px;border:1px solid #cfcabe;background:#fff;color:#1c1917;font-weight:600;cursor:pointer}
+.doit:focus-visible,.ghost:focus-visible,.rail button:focus-visible{outline:3px solid #1f4e79;outline-offset:2px}
+.dossier{background:#f7f6f3;border:1px solid #d4d0c8;padding:10px 12px;position:sticky;top:8px}
+.dossier h2{font-family:Heebo,Assistant,sans-serif;font-size:14px;margin:0 0 8px}
+.dossier dl{margin:0;display:grid;grid-template-columns:72px 1fr;gap:3px 8px;font-size:13px}
+.dossier dt{color:#5c574e}
+.dossier dd{margin:0;font-weight:600}
+.dossier ol{margin:8px 0 0;padding:0 18px 0 0;font-size:12.5px;color:#3f3a33}
+.dossier li{margin:0 0 6px}
+.msg{border:1px solid #d4d0c8;margin:0 0 10px}
+.msg .mh{display:flex;justify-content:space-between;gap:8px;background:#f3f1ec;padding:6px 8px;font-size:13px}
+.msg .mb{padding:8px 10px;font-size:14.5px}
+.att{display:flex;justify-content:space-between;gap:8px;border-top:1px solid #e4e0d8;padding:6px 8px;font-size:13px;background:#faf9f6}
+.wa{background:#efeae2;border:1px solid #d4d0c8;padding:12px}
+.wa .bar{font-size:13px;font-weight:700;margin-bottom:8px}
+.bub{background:#d9fdd3;border:1px solid #b7e2b0;padding:8px 10px;max-width:460px;margin-inline-start:auto;font-size:14.5px}
+.bub time{display:block;text-align:left;color:#3f3a33;font-size:12px;margin-top:4px}
+.cal{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.cal div{border:1px solid #e4e0d8;padding:6px;min-height:64px;font-size:13px;background:#fff}
+.cal .h{min-height:0;background:#f3f1ec;font-weight:700;border-color:#d4d0c8}
+.old{color:#6e2424;text-decoration:line-through}
+.neu{color:#1f4e79;font-weight:700}
+.cover{max-width:760px;margin:18px auto}
+.cover h1{font-family:Heebo,Assistant,sans-serif;font-size:28px;line-height:1.25;margin:8px 0}
+.cover ol{margin:6px 0 0;padding-right:18px}
+.cover li{margin:0 0 6px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+`;
+
+function DoIt(props) {
+  return (
+    <button type="button" className="doit" onClick={props.onClick} aria-label="Do It">
+      <img src={DOIT} alt="" />
+    </button>
+  );
+}
+function Word() { return <img className="inl" src={DOIT} alt="Do It" />; }
+function Win(props) {
+  return (
+    <section className="win" aria-label={props.sys}>
+      <div className="tb"><b>{props.sys}</b><span>{props.sub}</span></div>
+      {props.menu ? <div className="menu">{props.menu.map(function (m) { return <span key={m}>{m}</span>; })}</div> : null}
+      <div className="bd">{props.children}</div>
+    </section>
+  );
+}
+function Mast(props) {
+  return (
+    <p className="mast"><b>{props.sys}.</b> {props.what} <em>ממתין: {props.wait}</em></p>
+  );
+}
+function Field(props) {
+  return (
+    <div className={props.wide ? "form wide" : "form"}>
+      {props.rows.map(function (r) {
+        return (
+          <React.Fragment key={r[0]}>
+            <div className="lab">{r[0]}</div>
+            <div>{r[1]}</div>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+function Wait(props) {
+  return (
+    <div className="wait">
+      <p>{props.children}</p>
+      <div className="acts">
+        <button type="button" className="ghost" onClick={props.back}>מסך קודם</button>
+        <DoIt onClick={props.next} />
+      </div>
+    </div>
+  );
+}
+function Dossier(props) {
+  const s = props.step;
+  return (
+    <aside className="dossier" aria-label="תיק הטיפול">
+      <h2>תיק הטיפול</h2>
+      <dl>
+        <dt>עובד</dt><dd>{C.who}</dd>
+        <dt>ת״ז</dt><dd className="num">{C.id}</dd>
+        <dt>עתיד</dt><dd className="num">{s < 3 ? "טיוטה" : C.atid}</dd>
+        <dt>אלמגור</dt><dd className="num">{s < 4 ? "לא קיים" : C.alg}</dd>
+        <dt>פוליוויז</dt><dd className="num">{s < 4 ? "—" : C.pw}</dd>
+        <dt>מסלקה</dt><dd className="num">{s < 11 ? "לא הוזמנה" : C.ms}</dd>
+      </dl>
+      {s > 1 ? (
+        <div>
+          <h2 style={{ marginTop: 12 }}>אושר בתיק</h2>
+          <ol>
+            {TRAIL.slice(0, s - 1).map(function (t, i) { return <li key={i}>{t[2]}</li>; })}
+          </ol>
+        </div>
+      ) : null}
+    </aside>
+  );
+}
+
+function App() {
+  const q0 = parseInt(new URLSearchParams(location.search).get("step") || "0", 10);
+  const [step, setStep] = useState(isNaN(q0) ? 0 : Math.max(0, Math.min(LAST, q0)));
+  const live = useRef(null);
+  useEffect(function () {
+    var b = document.getElementById("boot-status"); if (b) b.style.display = "none";
+  }, []);
+  useEffect(function () {
+    var u = new URL(location.href);
+    if (step === 0) u.searchParams.delete("step"); else u.searchParams.set("step", String(step));
+    history.replaceState(null, "", u.pathname + u.search);
+    if (live.current) live.current.textContent = step === 0 ? "פתיחת תיק" : STEPS[step - 1].t;
+    scrollTo(0, 0);
+  }, [step]);
+  function go(n) { setStep(n); }
+  function next() { setStep(function (s) { return Math.min(LAST, s + 1); }); }
+  function back() { setStep(function (s) { return Math.max(0, s - 1); }); }
+  const ph = PHASES.filter(function (p) { return step >= p.a && step <= p.b; })[0];
+
+  let body = null;
+  let side = null;
+
+  if (step === 0) body = (
+    <article className="sheet cover">
+      <div className="brand"><img src={LOGO} alt="Flow" /><span> · {C.agency}</span></div>
+      <p className="fine">תיק הדגמה · אין חיבור לעתיד, לאלמגור, לפוליוויז, ליומן או לוואטסאפ</p>
+      <h1>תאום פגישה לעובד חדש</h1>
+      <Field rows={[
+        ["עובד לטיפול", C.who + " · ת״ז " + C.id],
+        ["מעסיק", C.emp + " · ח.פ " + C.empId],
+        ["מתאמת", C.coord],
+        ["סוכן ששובץ", C.agent],
+        ["משפחה", C.spouse + " · " + C.child],
+        ["בתור, לא בטיפול", C.q2 + " · " + C.q3],
+      ]} />
+      <h2>נוהל הטיפול</h2>
+      <ol>
+        <li>הודעה מהמעסיק: מהנייד או מהמייל, בגוף ההודעה או כקובץ, על אדם אחד או על רשימה.</li>
+        <li>פתיחה בעתיד, תיוק צילום ת״ז, ושדר לאלמגור עם המשפחה. אין טפסים חתומים מהמעסיק.</li>
+        <li>שלוש הרשאות נחתמות רק דרך פוליוויז: מסלקה, הר הביטוח, העתקי פוליסות. הלינק לא יוצא מעתיד.</li>
+        <li>העתקי הפוליסות נסרקים לשדר. שם הקובץ: חברת הביטוח ומספר הפוליסה.</li>
+        <li>הזמנת המסלקה מאלמגור בלבד. הקבצים פותחים את התוכניות, ואם הלקוח חסר — גם אותו. נוספים קבצי טרום ייעוץ.</li>
+        <li>כשהתיק מלא: זימון מיומן הסוכן אל מייל הלקוח, עם הקבצים בשמם. תזכורת בוואטסאפ יום לפני, או X זמן לפני.</li>
+      </ol>
+      <p>Flow מכין את הרשומה ועוצר לפני כל שליחה, חתימה וזימון. {C.coord} מאשרת עם <Word />. בלי האישור הרשומה נשארת טיוטה.</p>
+      <div className="wait"><p>פתיחת תיק אורי מלכה.</p><DoIt onClick={function () { go(1); }} /></div>
+      <p className="fine">פריסה אפשרית: Flow Edge על שרתי הסוכנות, או ענן מוסווה. שתיהן זמינות. אין במסך הזה SSO ואין יומן ביקורת. הזמנים ביומן הטיפול הם המחשה, לא מדידה. השמות בדויים, ואין בתיק מספר טלפון.</p>
+    </article>
+  );
+
+  if (step === 1) {
+    side = <Dossier step={1} />;
+    body = (
+      <Win sys="דואר נכנס" sub={C.coord + " · 08.10.2026"} menu={["נכנס", "עובדים חדשים"]}>
+        <Mast sys="דואר נכנס" what={"שלוש הודעות מ" + C.hr + ", " + C.emp + ". אף אחת לא כוללת טופס חתום. הטיפול המוצע: " + C.who + ". " + C.q2 + " ו" + C.q3 + " נשארים בתור."} wait="אישור שזו הודעת עובד חדש, ושאורי הוא התיק שנפתח עכשיו" />
+        <article className="msg">
+          <div className="mh"><b>נייד · מבוטח אחד · מלל וקובץ</b><span className="num">08.10.2026 09:14</span></div>
+          <div className="mb">
+            <div>מאת: {C.hr}, משאבי אנוש, {C.emp}</div>
+            <p>היי {C.coord.split(" ")[0]}, עובד חדש להסדר.<br />{C.who}<br />ת״ז <span className="num">{C.id}</span><br />תחילת עבודה {C.start}<br />סוכן: {C.agent}<br />בת זוג: {C.spouse}, ת״ז <span className="num">{C.spouseId}</span><br />ילד: {C.child}, יליד {C.childBorn}<br />מצורף צילום תעודת זהות. אין טפסים חתומים.</p>
+          </div>
+          <div className="att"><span>מצורף</span><b>{C.who}.jpg · 1.8MB</b></div>
+        </article>
+        <article className="msg">
+          <div className="mh"><b>מייל · מבוטח אחד · מלל בגוף, בלי קובץ</b><span className="num">08.10.2026 09:22</span></div>
+          <div className="mb">נושא: עובד חדש — {C.who}. בגוף ההודעה בלבד: ת״ז <span className="num">{C.id}</span>, תחילה {C.start}, סוכן {C.agent}. אין צרופה.</div>
+        </article>
+        <article className="msg">
+          <div className="mh"><b>מייל · רשימה בקובץ</b><span className="num">08.10.2026 09:31</span></div>
+          <div className="mb">נושא: עובדים חדשים לנובמבר. מצורף רשימת-עובדים.xlsx.</div>
+          <table>
+            <thead><tr><th>שם</th><th>ת״ז</th><th>תחילה</th><th>סוכן</th><th>משפחה בהודעה</th></tr></thead>
+            <tbody>
+              <tr className="hot"><td>{C.who}</td><td className="num">{C.id}</td><td>{C.start}</td><td>{C.agent}</td><td>{C.spouse}, {C.child}</td></tr>
+              <tr><td>{C.q2}</td><td className="num">{C.q2id}</td><td>{C.q2start}</td><td>{C.agent}</td><td>לא פורט</td></tr>
+              <tr><td>{C.q3}</td><td className="num">{C.q3id}</td><td>{C.q3start}</td><td>{C.agent}</td><td>לא פורט</td></tr>
+            </tbody>
+          </table>
+        </article>
+        <Wait next={next} back={back}>לאשר את הקליטה ולפתוח את אורי מלכה. ליה ותומר לא נפתחים. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 2) {
+    side = <Dossier step={2} />;
+    body = (
+      <Win sys="עתיד" sub="כרטיס חדש · עדיין לא נשמר" menu={["קובץ", "לקוח", "משפחה", "מסמכים", "ממשקים"]}>
+        <Mast sys="עתיד" what="הכרטיס מולא מההודעות. צילום הת״ז יושב במסמכים ומסומן לתיוק. טפסים חתומים לא הגיעו." wait="שמירת הלקוח ותיוק הצילום" />
+        <Field wide rows={[
+          ["מס׳ לקוח", "יוקצה בשמירה"],
+          ["סטטוס", "טיוטה"],
+          ["שם", C.who],
+          ["ת״ז", <span className="num" key="id">{C.id}</span>],
+          ["מעסיק", C.emp],
+          ["ח.פ", <span className="num" key="hp">{C.empId}</span>],
+          ["תחילת עבודה", C.start],
+          ["סוכן מטפל", C.agent],
+          ["בת זוג", C.spouse],
+          ["ת״ז בת זוג", <span className="num" key="sp">{C.spouseId}</span>],
+          ["ילד", C.child + " · יליד " + C.childBorn],
+          ["מסמך שהגיע", "צילום ת״ז בלבד"],
+        ]} />
+        <table>
+          <thead><tr><th>מסמך</th><th>מקור</th><th>תאריך</th><th>סטטוס בתיק</th></tr></thead>
+          <tbody>
+            <tr className="hot"><td>{C.who}.jpg</td><td>הודעת נייד של המעסיק</td><td className="num">08.10.2026</td><td>ממתין לתיוק</td></tr>
+            <tr className="miss"><td>טפסים חתומים מהמעסיק</td><td>—</td><td>—</td><td>לא התקבלו. החתימות ייצאו מפוליוויז</td></tr>
+          </tbody>
+        </table>
+        <Wait next={next} back={back}>לשמור את הכרטיס בעתיד ולתייק את צילום הת״ז. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 3) {
+    side = <Dossier step={3} />;
+    body = (
+      <Win sys="עתיד · ממשק שדר" sub={"יעד: אלמגור · אצווה 2026-10-08-014 · לקוח " + C.atid} menu={["ממשקים", "שדר לאלמגור", "יומן שידורים"]}>
+        <Mast sys="עתיד" what={"הלקוח " + C.atid + " שמור. השדר מרכיב רק מה שכבר בתיק. אלמגור עדיין בלי הרשומה."} wait="אישור השידור. השידור פותח את הלקוח באלמגור" />
+        <table>
+          <thead><tr><th>#</th><th>מה עובר</th><th>ערך</th><th>בשידור</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>פרטי לקוח</td><td>{C.who} · <span className="num">{C.id}</span> · {C.emp}</td><td>מוכן</td></tr>
+            <tr><td>2</td><td>בן משפחה</td><td>{C.spouse} · <span className="num">{C.spouseId}</span></td><td>מוכן</td></tr>
+            <tr><td>3</td><td>ילד</td><td>{C.child} · יליד {C.childBorn}</td><td>מוכן</td></tr>
+            <tr><td>4</td><td>צילום ת״ז</td><td>{C.who}.jpg</td><td>מוכן</td></tr>
+            <tr><td>5</td><td>אקסל הר הביטוח</td><td>—</td><td>אין בתיק. אחרי הרשאה</td></tr>
+            <tr><td>6</td><td>העתקי פוליסות</td><td>—</td><td>אין בתיק. אחרי סריקה</td></tr>
+            <tr><td>7</td><td>קבצי מסלקה, טרום ייעוץ</td><td>—</td><td>אין בתיק. אחרי הזמנה מאלמגור</td></tr>
+          </tbody>
+        </table>
+        <p className="fine">אקסל הר הביטוח, הפוליסות וקבצי הטרום ייעוץ ייכנסו לשדר אחר, כשיהיו בתיק. השדר הזה לא ממציא אותם.</p>
+        <Wait next={next} back={back}>לשדר לאלמגור ולפתוח את הלקוח שם. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 4) {
+    side = <Dossier step={4} />;
+    body = (
+      <div className="two">
+        <Win sys="פוליוויז" sub={"בקשת חתימה " + C.pw + " · טיוטה"} menu={["בקשות", "חתימה", "ייפוי כוח"]}>
+          <Mast sys="פוליוויז" what={C.coord + " מסבירה לאורי מה נדרש לפגישה. הלינק ובו ייפוי הכוח יוצאים מהבקשה הזו, לא מעתיד."} wait="שליחת הלינק" />
+          <Field rows={[
+            ["בקשה", <span className="num" key="pw">{C.pw}</span>],
+            ["נמען", C.who],
+            ["סטטוס", "טיוטה. לא נשלח"],
+            ["מה נחתם", "מסלקה, הר הביטוח, העתקי פוליסות"],
+            ["ייפוי כוח", "מצורף לאותו לינק"],
+          ]} />
+          <table>
+            <thead><tr><th>מסמך בלינק</th><th>סטטוס</th></tr></thead>
+            <tbody>
+              <tr><td>הרשאה למסלקה</td><td>בטיוטה</td></tr>
+              <tr><td>הרשאה להר הביטוח</td><td>בטיוטה</td></tr>
+              <tr><td>הרשאה להעתקי פוליסות</td><td>בטיוטה</td></tr>
+              <tr><td>ייפוי כוח</td><td>באותו לינק</td></tr>
+            </tbody>
+          </table>
+          <p className="fine">פוליוויז אוספת את הר הביטוח, את הפוליסות ואת המסלקה, ומפיקה דוח לתיק. השיחה נשארת אצל {C.coord}.</p>
+          <Wait next={next} back={back}>לשלוח את הלינק מפוליוויז, אחרי ההסבר לעובד. <Word /></Wait>
+        </Win>
+        <Win sys="עתיד" sub={C.atid + " · ממשקים"} menu={["ממשקים"]}>
+          <p className="mast"><b>עתיד.</b> באלמגור הלקוח <span className="num">{C.alg}</span> כבר פתוח, עם {C.spouse} ועם {C.child}, וצילום הת״ז עבר בשדר.</p>
+          <div className="lock"><span>הפעלת פוליוויז מתוך עתיד</span><b>חסום</b></div>
+          <p className="fine">הלינק לא יוצא מכאן, ולכן מה שיחזור לא יתויק לבד. התיוק יהיה אחרי אישור, מסמך־מסמך.</p>
+        </Win>
+      </div>
+    );
+  }
+
+  if (step === 5) {
+    side = <Dossier step={5} />;
+    body = (
+      <Win sys="פוליוויז" sub={C.pw + " · יומן מעקב"} menu={["בקשות", "מעקב", "הודעות"]}>
+        <Mast sys="פוליוויז" what="עברו שלושה ימים. אורי פתח את הלינק ולא השלים תאריך לידה ופרטי בת הזוג לאימות. שלוש ההרשאות לא נחתמו. חוזרים לאותו תיק, לא פותחים מסלול חדש." wait="שליחת התזכורת" />
+        <table>
+          <thead><tr><th>תאריך</th><th>פעולה</th><th>תוצאה</th></tr></thead>
+          <tbody>
+            <tr><td className="num">08.10.2026 10:05</td><td>לינק נשלח</td><td>נמסר</td></tr>
+            <tr><td className="num">11.10.2026 10:05</td><td>שיחה יוצאת, {C.coord}</td><td>לא ענה</td></tr>
+            <tr className="hot"><td className="num">11.10.2026 10:20</td><td>טיוטת הודעה</td><td>לא נשלחה</td></tr>
+          </tbody>
+        </table>
+        <div className="quote">שלום {C.first}, הלינק לחתימה עדיין פתוח באמצע. בלי הפרטים ובלי שלוש ההרשאות אי אפשר להוציא את הר הביטוח, את העתקי הפוליסות ואת המסלקה, ואי אפשר לקבוע פגישה עם {C.agent}.</div>
+        <Wait next={next} back={back}>לשלוח את התזכורת. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 6) {
+    side = <Dossier step={6} />;
+    body = (
+      <Win sys="עתיד" sub={C.atid + " · מסמכי לקוח"} menu={["מסמכים", "חתימות"]}>
+        <Mast sys="עתיד" what="חזרו שתי הרשאות חתומות מפוליוויז. השלישית, העתקי פוליסות, לא נחתמה. צילום הת״ז כבר בתיק מהפתיחה." wait="תיוק שתי ההרשאות שחזרו" />
+        <table>
+          <thead><tr><th>מסמך</th><th>מקור</th><th>נחתם</th><th>בתיק עתיד</th></tr></thead>
+          <tbody>
+            <tr className="hot"><td>הרשאה למסלקה</td><td className="num">{C.pw}</td><td className="num">13.10.2026</td><td>ממתין לתיוק</td></tr>
+            <tr className="hot"><td>הרשאה להר הביטוח</td><td className="num">{C.pw}</td><td className="num">13.10.2026</td><td>ממתין לתיוק</td></tr>
+            <tr className="miss"><td>הרשאה להעתקי פוליסות</td><td className="num">{C.pw}</td><td>—</td><td>לא נחתמה. בלי זה אין סריקה</td></tr>
+          </tbody>
+        </table>
+        <Wait next={next} back={back}>לתייק את שתי ההרשאות. את השלישית לא ממציאים. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 7) {
+    side = <Dossier step={7} />;
+    body = (
+      <Win sys="פוליוויז" sub={C.pw + " · מסמך חסר"} menu={["בקשות", "מעקב"]}>
+        <Mast sys="פוליוויז" what="בתיק שתי הרשאות. חסרה הרשאה להעתקי פוליסות. הפגישה נשארת סגורה." wait="שליחת תזכורת על המסמך החסר" />
+        <table>
+          <thead><tr><th>הרשאה</th><th>מצב</th></tr></thead>
+          <tbody>
+            <tr><td>מסלקה</td><td>חתומה, בתיק עתיד</td></tr>
+            <tr><td>הר הביטוח</td><td>חתומה, בתיק עתיד</td></tr>
+            <tr className="miss"><td>העתקי פוליסות</td><td>חסרה</td></tr>
+          </tbody>
+        </table>
+        <div className="quote">שלום {C.first}, נשארה חתימה אחת: הרשאה להעתקי פוליסות. שתי האחרות כבר אצלנו. ברגע שזו תיחתם נוכל להמשיך לפגישה עם {C.agent}.</div>
+        <p className="fine">טיוטה מ־14.10.2026 09:10. לא נשלחה.</p>
+        <Wait next={next} back={back}>לשלוח את התזכורת. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 8) {
+    side = <Dossier step={8} />;
+    body = (
+      <Win sys="עתיד" sub={C.atid + " · הר הביטוח"} menu={["מסמכים", "הר הביטוח"]}>
+        <Mast sys="עתיד" what={"הרשאת העתקי הפוליסות נחתמה ב־15.10.2026. בעקבות הרשאת הר הביטוח חזר הקובץ «הר הביטוח — " + C.who + ".xlsx»."} wait="תיוק ההרשאה ותיוק האקסל" />
+        <table>
+          <thead><tr><th>מבטח</th><th>סוג</th><th>פוליסה</th><th>סכום בדוח</th><th>סטטוס</th></tr></thead>
+          <tbody>
+            {POL.map(function (p) {
+              return <tr key={p.num}><td>{p.ins}</td><td>{p.kind}</td><td className="num">{p.num}</td><td>{p.prem}</td><td>פעילה</td></tr>;
+            })}
+            <tr><td>כלל</td><td>ביטוח מנהלים ישן</td><td className="num">90331127</td><td>צבירה 6,200 ש״ח</td><td>לא פעיל. לא נסרק לזימון</td></tr>
+          </tbody>
+        </table>
+        <Wait next={next} back={back}>לתייק את ההרשאה השלישית ואת האקסל. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 9) {
+    side = <Dossier step={9} />;
+    body = (
+      <Win sys="שדר · סריקות" sub={"אצווה " + C.scan + " · 15.10.2026 11:18"} menu={["סריקה", "שמות קבצים", "לשידור"]}>
+        <Mast sys="שדר" what="ההעתקים הגיעו כסריקות, לא כקובץ שירד לבד. השם המוצע לכל קובץ: חברת הביטוח ומספר הפוליסה, כדי שיואב יזהה אותו בזימון." wait="אישור השמות והכנסה לשדר" />
+        <table>
+          <thead><tr><th>סריקה גולמית</th><th>מה זוהה</th><th>שם אחרי אישור</th></tr></thead>
+          <tbody>
+            {POL.map(function (p) {
+              return <tr key={p.num}><td className="num">{p.raw}</td><td>{p.ins} · {p.kind} · <span className="num">{p.num}</span></td><td><b>{p.file}</b></td></tr>;
+            })}
+          </tbody>
+        </table>
+        <p className="fine">כלל 90331127 לא פעילה ולא נכנסת לאצווה.</p>
+        <Wait next={next} back={back}>לאשר את השמות ולסרוק לשדר. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 10) {
+    side = <Dossier step={10} />;
+    body = (
+      <Win sys="עתיד · ממשק שדר" sub={"השלמה · לקוח אלמגור " + C.alg + " כבר קיים"} menu={["ממשקים", "שדר לאלמגור"]}>
+        <Mast sys="עתיד" what="השדר השני מעביר את מה שלא היה בפתיחה: אקסל הר הביטוח ושלושת העתקי הפוליסות בשם שאושר." wait="אישור השידור" />
+        <table>
+          <thead><tr><th>פריט</th><th>בשדר הזה</th></tr></thead>
+          <tbody>
+            <tr><td>פרטי לקוח, בת זוג, ילד</td><td>כבר הועברו ב־08.10, אצווה 2026-10-08-014</td></tr>
+            <tr><td>צילום ת״ז</td><td>כבר הועבר</td></tr>
+            <tr><td>אקסל הר הביטוח</td><td>הר הביטוח — {C.who}.xlsx</td></tr>
+            <tr><td>העתקי פוליסות</td><td>{POL.map(function (p) { return p.file; }).join(" · ")}</td></tr>
+            <tr><td>קבצי מסלקה</td><td>לא בשדר. יוזמנו מאלמגור</td></tr>
+          </tbody>
+        </table>
+        <Wait next={next} back={back}>לשדר את הקבצים לאלמגור. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 11) {
+    side = <Dossier step={11} />;
+    body = (
+      <div className="two">
+        <Win sys="אלמגור" sub={"הזמנת מסלקה · " + C.alg} menu={["לקוח", "מסלקה", "הזמנות"]}>
+          <Mast sys="אלמגור" what="ההרשאה למסלקה חתומה ומתויקת. ההזמנה מוכנה על הלקוח הקיים ולא יצאה." wait="שידור ההזמנה מאלמגור" />
+          <Field rows={[
+            ["הזמנה", <span className="num" key="ms">{C.ms}</span>],
+            ["לקוח", C.who + " · " + C.alg],
+            ["ת״ז", <span className="num" key="id">{C.id}</span>],
+            ["הרשאה", "חתומה 13.10.2026, בתיק"],
+            ["סטטוס", "מוכנה. לא שודרה"],
+          ]} />
+          <p className="fine">אחרי השידור הקבצים עולים ללקוח. אם הלקוח לא היה קיים, אותם קבצים היו פותחים גם אותו.</p>
+          <Wait next={next} back={back}>להזמין את המסלקה מאלמגור. <Word /></Wait>
+        </Win>
+        <Win sys="עתיד" sub={C.atid + " · ממשקים"} menu={["ממשקים"]}>
+          <div className="lock"><span>הזמנת מסלקה מתוך עתיד</span><b>חסום</b></div>
+          <p className="fine">ההזמנה יוצאת מאלמגור בלבד. אין ממשק שמעביר את הקובץ מעתיד.</p>
+        </Win>
+      </div>
+    );
+  }
+
+  if (step === 12) {
+    side = <Dossier step={12} />;
+    body = (
+      <Win sys="אלמגור" sub={C.alg + " · " + C.who} menu={["לקוח", "משפחה", "תוכניות", "מסמכים"]}>
+        <Mast sys="אלמגור" what={"הזמנה " + C.ms + " חזרה ב־16.10.2026 08:40. התוכניות נפתחו מהקובץ. קבצי טרום הייעוץ בתיק. אין כאן שליחה."} wait="אין שליחה במסך הזה. האישור הבא הוא קביעת המועד" />
+        <table>
+          <thead><tr><th>תוכנית שנפתחה</th><th>מקור</th><th>צבירה</th></tr></thead>
+          <tbody>
+            <tr><td>פנסיה מקיפה · מנורה · <span className="num">77190214</span></td><td>קובץ מסלקה</td><td>18,400 ש״ח</td></tr>
+            <tr><td>ביטוח מנהלים קודם · כלל · <span className="num">90331127</span></td><td>קובץ מסלקה</td><td>6,200 ש״ח</td></tr>
+          </tbody>
+        </table>
+        <table>
+          <thead><tr><th>קובץ שחזר</th><th>סוג</th><th>בתיק</th></tr></thead>
+          <tbody>
+            <tr><td className="num">MS-551902_314552191.pdf</td><td>קובץ מסלקה</td><td>נקלט</td></tr>
+            <tr><td>טרום ייעוץ — פנסיה מקיפה.pdf</td><td>טרום ייעוץ</td><td>בתיק</td></tr>
+            <tr><td>טרום ייעוץ — ביטוח מנהלים.pdf</td><td>טרום ייעוץ</td><td>בתיק</td></tr>
+          </tbody>
+        </table>
+        <p className="fine">{C.q2}, ת״ז <span className="num">{C.q2id}</span>, לא פתוחה באלמגור. קובץ מסלקה על הת״ז שלה היה פותח גם את הלקוח וגם את התוכניות. אצל {C.who} הלקוח כבר היה קיים, אז נפתחו התוכניות בלבד.</p>
+        <p className="fine">התיק מלא: צילום ת״ז, שלוש הרשאות, אקסל הר הביטוח, שלוש פוליסות בשם שאושר, תוכניות, וקבצי טרום ייעוץ.</p>
+        <Wait next={next} back={back}>להמשיך לתיאום מול הלקוח. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 13) {
+    side = <Dossier step={13} />;
+    body = (
+      <Win sys={"יומן " + C.agent} sub="נובמבר 2026 · בקשת דחייה" menu={["יומן", "פגישות", "זמינות"]}>
+        <Mast sys={"יומן " + C.agent} what={C.coord + " חזרה אל " + C.who + " לקבוע. הוא ענה ב־19.10.2026: «שלישי בבוקר לא מסתדר. אפשר חמישי?» המועד הישן ירד. הזימון עדיין לא נשלח."} wait="אישור המועד החלופי" />
+        <div className="cal">
+          <div className="h">א׳ 8.11</div><div className="h">ב׳ 9.11</div><div className="h">ג׳ 10.11</div><div className="h">ד׳ 11.11</div><div className="h">ה׳ 12.11</div>
+          <div>חסום</div><div>14:00 תפוס</div><div><span className="old">09:00 הוצע ובוטל</span></div><div>פנוי אחה״צ</div><div className="neu">10:30 פנוי</div>
+        </div>
+        <Field wide rows={[
+          ["מועד חדש", C.slot],
+          ["מקום", C.room],
+          ["סוג", "פגישת קליטה — הסדר פנסיוני"],
+          ["סוכן", C.agent],
+        ]} />
+        <Wait next={next} back={back}>לאשר את חמישי 12.11 ב־10:30. עדיין אין זימון שנשלח. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 14) {
+    side = <Dossier step={14} />;
+    body = (
+      <Win sys="זימון" sub="טיוטה · מיומן הסוכן אל מייל הלקוח" menu={["יומן", "זימון", "קבצים"]}>
+        <Mast sys={"יומן " + C.agent} what="הזימון בנוי ולא נשלח. הקבצים מצורפים בשמות שאושרו בסריקה, כדי שהסוכן ידע מה כל קובץ בלי לפתוח אותו." wait="שליחת הזימון" />
+        <Field rows={[
+          ["מאת", C.agent + " · " + C.agency],
+          ["אל", C.who],
+          ["מתאמת", C.coord],
+          ["נושא", "פגישת קליטה — הסדר פנסיוני"],
+          ["מתי", C.slot],
+          ["איפה", C.room],
+        ]} />
+        <table>
+          <thead><tr><th>קובץ מצורף</th><th>מה הסוכן רואה</th></tr></thead>
+          <tbody>
+            <tr><td>הראל 44821093.pdf</td><td>פוליסת בריאות</td></tr>
+            <tr><td>מנורה 77190214.pdf</td><td>פוליסת פנסיה</td></tr>
+            <tr><td>מגדל 22018455.pdf</td><td>אובדן כושר</td></tr>
+            <tr><td>דוח פוליוויז — {C.who}.pdf</td><td>דוח מרכז</td></tr>
+            <tr><td>הר הביטוח — {C.who}.xlsx</td><td>אקסל הר הביטוח</td></tr>
+            <tr><td>טרום ייעוץ — פנסיה מקיפה.pdf</td><td>טרום ייעוץ</td></tr>
+          </tbody>
+        </table>
+        <Wait next={next} back={back}>לשלוח את הזימון למייל של אורי. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 15) {
+    side = <Dossier step={15} />;
+    body = (
+      <Win sys="וואטסאפ" sub={"טיוטה אל " + C.who + " · לא נשלחה"}>
+        <Mast sys="וואטסאפ" what={"התזכורת נקבעה ליום שלפני הפגישה, " + C.remind + ". זו שעת ה־X שסוכמה בתיק. אחרי האישור זו שליחה בתוך ההדגמה, לא חיבור לוואטסאפ."} wait="אישור התזכורת" />
+        <div className="wa">
+          <div className="bar">{C.who}</div>
+          <div className="bub">
+            שלום {C.first}, תזכורת: מחר {C.slot}, {C.room}. זו פגישת קליטה להסדר פנסיוני עם {C.agent}. נתראה.
+            <time>{C.remind} · טיוטה</time>
+          </div>
+        </div>
+        <p className="fine">אין בתיק מספר טלפון. המועד, המקום וסוג הפגישה כתובים בהודעה.</p>
+        <Wait next={next} back={back}>לאשר את התזכורת ל־11.11 ב־16:00. <Word /></Wait>
+      </Win>
+    );
+  }
+
+  if (step === 16) {
+    body = (
+      <Win sys="יומן הטיפול" sub={C.who + " · " + C.atid + " · " + C.alg}>
+        <Mast sys="התיק" what="כל השליחות, החתימות והזימון יצאו רק אחרי אישור של שירה. המערכות שמופיעות כאן לא מחוברות באמת." wait="אין פעולה פתוחה" />
+        <table>
+          <thead><tr><th>מתי</th><th>מערכת</th><th>מה אושר</th></tr></thead>
+          <tbody>
+            {TRAIL.map(function (t, i) { return <tr key={i}><td className="num">{t[0]}</td><td>{t[1]}</td><td>{t[2]}</td></tr>; })}
+          </tbody>
+        </table>
+        <h2 style={{ fontFamily: "Heebo, Assistant, sans-serif", fontSize: 16 }}>הערכת זמן, לא מדידה</h2>
+        <table>
+          <thead><tr><th>שורה</th><th>זמן</th><th>מה זה</th></tr></thead>
+          <tbody>
+            <tr><td>טיפול ידני משוער לעובד אחד, כולל שלושת הסבבים</td><td>כ־50 דק׳</td><td>המחשה</td></tr>
+            <tr><td>זמן המתאמת בהדגמה: האישורים, לא המעבר בין המערכות</td><td>כ־12 דק׳</td><td>המחשה</td></tr>
+            <tr><td>ההפרש לעובד</td><td>כ־38 דק׳</td><td>המחשה. לא נמדד בסוכנות גבאי ולא הבטחה</td></tr>
+          </tbody>
+        </table>
+        <p className="fine">פריסה: Flow Edge על שרתי הסוכנות, או ענן מוסווה. שתיהן זמינות. אין כאן SSO, אין יומן ביקורת, ואין חיבור אמיתי לעתיד, לאלמגור, לפוליוויז, ליומן או לוואטסאפ.</p>
+        <div className="wait">
+          <p>אין פעולה פתוחה בתיק.</p>
+          <div className="acts">
+            <button type="button" className="ghost" onClick={back}>מסך קודם</button>
+            <button type="button" className="ghost" onClick={function () { go(1); }}>מההתחלה</button>
+          </div>
+        </div>
+      </Win>
+    );
+  }
+
+  return (
+    <div className="app">
+      <style>{CSS}</style>
+      <div className="sr" ref={live} aria-live="polite" />
+      {step > 0 ? (
+        <header className="top">
+          <div className="brand"><img src={LOGO} alt="Flow" /><span>{C.agency}</span></div>
+          <div className="case">תאום פגישה לעובד חדש · {C.who} · ת״ז <span className="num">{C.id}</span></div>
+        </header>
+      ) : null}
+      {step > 0 ? (
+        <nav className="rail" aria-label="שלבי הטיפול">
+          {PHASES.map(function (p) {
+            const on = ph && ph.t === p.t;
+            const done = step > p.b;
+            return <button key={p.t} type="button" className={on ? "on" : done ? "done" : ""} onClick={function () { if (step >= p.a) go(p.a); }} disabled={step < p.a}>{p.t}</button>;
+          })}
+        </nav>
+      ) : null}
+      <div className="wrap">
+        {step > 0 ? (
+          <div className="work">
+            <h1>{STEPS[step - 1].t}</h1>
+            <span>מסך {step} מתוך {LAST}</span>
+          </div>
+        ) : null}
+        {step === 0 ? body : (
+          <div className={side ? "desk" : "desk solo"}>
+            <div>{body}</div>
+            {side}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
