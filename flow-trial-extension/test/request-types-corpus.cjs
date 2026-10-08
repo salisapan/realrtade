@@ -37,6 +37,7 @@ const yes = [
   ['Can you finalize the design mockups this week?', 'complete', 'design'],
   ['I need you to fill out the tax forms.', 'complete', 'document'],
   ['Could you send the signed contract?', 'send', 'contract'],
+  ['תשמור את הקובץ המצורף ב-One Drive עד יום ראשון.', 'send', 'document'],
   ['Please share the Q3 numbers with me.', 'send', 'report'],
   ['Can you forward the invoice to accounting?', 'send', 'invoice'],
   ['Please upload the passport scan to the portal.', 'send', 'details'],
@@ -85,7 +86,9 @@ const no = [
   'חתמתי על ההסכם אתמול.',
   'תודה על הפגישה, היה מעולה.',
   'הפגישה נקבעה ליום שלישי בשלוש.',
-  'שבוע טוב וסופ"ש נעים.'
+  'שבוע טוב וסופ"ש נעים.',
+  'לסיוע ותמיכה ניתן לפנות במייל [EMAIL]',
+  'תשמור על עצמך ונתראה.'
 ];
 for (const text of no) check('silent: ' + text.slice(0, 56), T.detectRequest(text) === null, T.detectRequest(text));
 
@@ -118,7 +121,9 @@ const mine = [
   ['Let me look into it and confirm the date next week.', 'confirm'],
   ['אשלח לך את החוזה עד יום חמישי.', 'send'],
   ['אחזור אליך מחר עם תשובה.', 'reply'],
-  ['נעדכן אותך ברגע שנדע, אבדוק את זה השבוע.', 'reply']
+  ['נעדכן אותך ברגע שנדע, אבדוק את זה השבוע.', 'reply'],
+  ['We agreed to renew the passport application by Friday.', 'complete'],
+  ['Hi, We agreed to renew the passport application by Friday. Thanks, [NAME]', 'complete']
 ];
 for (const [text, action] of mine) {
   const c = T.detectCommitmentSentence(text);
@@ -141,6 +146,8 @@ check('a dated promise is a loop you owe, due that day', m && m.direction === 'm
 m = F.classifyCommitment('Let me check with the team and get back to you on the rollout plan.', { now: NOW, extract: FlowExtract, types: T, pipeline: P });
 check('an undated promise is due in two business days', m && m.direction === 'mine' && m.deadlineIso === null && m.chaseIso === '2026-10-05', m);
 check('an ask of THEM is not your promise', F.classifyCommitment('Could you please send the signed contract by Monday so we can start?', { now: NOW, extract: FlowExtract, types: T, pipeline: P }) === null);
+const rm105 = F.classifyOutgoing('תודה על השאלה. [ORG] לא מחליפה מערכת לניהול קריאות ולא מנהלת מלאי וחלפים בעצמה. בשיחה קצרה נבין אילו מערכות יש אצלכם לקריאות ולמלאי, ונראה איפה [ORG] חוסכת הכי הרבה עבודה ביניהן. מתי נוח לך?', { now: NOW, extract: FlowExtract, types: T, pipeline: P });
+check('rm-105 a short מתי נוח לך still opens a waiting loop', rm105 && rm105.kind === 'reply', rm105);
 check('a courtesy line is not a promise', F.classifyCommitment('Thanks so much, let me know if you have any other questions and I will be happy to help.', { now: NOW, extract: FlowExtract, types: T, pipeline: P }) === null);
 check('no lexicon, no promise (silent)', F.classifyCommitment("I'll send you the numbers by Friday.", { now: NOW, extract: FlowExtract }) === null);
 

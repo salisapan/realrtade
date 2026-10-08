@@ -123,3 +123,42 @@ What changed, each one a general rule, each failing sentence added to an existin
 Still open: rm-003, a feminine singular imperative ("עדכני" / "אשרי") the model names as an ask to approve. The masked sentence does not say who is addressed; the name in it is the person who would receive a green light, not the addressee. Suppressing feminine imperatives would be wrong for a reader the imperative does address, and there is no account-holder identity on the sentence. Left as a miss rather than a special case.
 
 No precision gate was lowered. On the sets those gates measure, pipeline precision and recall were the same before and after the reply-cue change: teacher-eval ASK 1.00 / 0.92 and PROMISE 1.00 / 0.87; the second evaluation set ASK 0.97 / 0.82 and PROMISE 1.00 / 0.75; the blind set ASK 1.00 / 0.94 and PROMISE 1.00 / 0.83.
+
+### Run of 2026-10-08
+
+Measured with `node scripts/intent/real-mail-eval.cjs` after appending 26 masked sentences from mail of 2026-10-06 and 2026-10-07 (`docs/real-mail-eval/2026-10-08.md`). The file is now 48 sentences: 32 real, 16 dogfood. Two are confidence `unsure` (rm-116, dg-103) and are left out of every headline number. Labels are still model-assigned and not owner-checked. **n is still small.** Nothing here was used to train. The second read, whole-message classification, the hybrid path and community learning stayed off.
+
+The 22 sentences from the run above scored the same after the new rules (the legacy line). The one miss on that set is still rm-003.
+
+Headline on the grown set, unsure excluded. Real is 31 sentences (15 from the first run plus 16 new clear real sentences). Dogfood is 15 (7 plus 8).
+
+| Slice | ASK P / R (n) | PROMISE P / R (n) | HOLD P / R (n) | CLOSE P / R (n) | SILENT P / R (n) |
+|---|---|---|---|---|---|
+| All headline (46) | 0.947 / 0.9 (20) | 1 / 1 (2) | 1 / 1 (7) | 1 / 1 (4) | 0.857 / 0.923 (13) |
+| Real-only (31) | 0.889 / 1 (8) | 1 / 1 (1) | 1 / 1 (7) | 1 / 1 (4) | 1 / 0.909 (11) |
+| Dogfood (15) | 1 / 0.833 (12) | 1 / 1 (1) | — | — | 0.5 / 1 (2) |
+| Hebrew headline (28) | 0.9 / 1 (9) | 1 / 1 (1) | 1 / 1 (4) | 1 / 1 (4) | 1 / 0.9 (10) |
+| English headline (18) | 1 / 0.818 (11) | 1 / 1 (1) | 1 / 1 (3) | — | 0.6 / 1 (3) |
+| Hebrew real-only (25) | 0.889 / 1 (8) | 1 / 1 (1) | 1 / 1 (4) | 1 / 1 (4) | 1 / 0.875 (8) |
+| English real-only (6) | — | — | 1 / 1 (3) | — | 1 / 1 (3) |
+| Hebrew dogfood (3) | 1 / 1 (1) | — | — | — | 1 / 1 (2) |
+| English dogfood (12) | 1 / 0.818 (11) | 1 / 1 (1) | — | — | n=0, two false SILENT |
+
+Most source families have one sentence. A recall on n=1 is not a measurement. The runner's per-family precision also mixes every other family that uses the same label, so it is not a separate number. Where a family has more than one sentence: real `asked_of_others` 4/4, real `silent_negative` 3/3, real `reply_redirect / true_close` 2/2, dogfood `asked_of_you (save file)` 2/3 (dg-105 is the miss). The three auto-reply sentences are all hits on their own labels (two HOLD, one SILENT); the family rollup looks like a miss only because those labels differ.
+
+What changed, each one a general rule, each failing sentence added to an existing corpus:
+
+- A redirect releases the loop as declined, not as done (`core/reply-meaning.js`). "Not my job, please contact X" and "I retired" (rm-101, rm-102). "Please direct this to …" is the same rule in English. A message that also delivers stays a delivery.
+- A bare "לא" declines only when it is the whole sentence. "לא הבנתי" is not a no (rm-104).
+- A short "we should talk" / "כדאי שנדבר" does not close the loop (`core/follow-up.js`, rm-103).
+- "אעדר" is an auto-reply, and a bounce ("message blocked", "recipient address rejected") is an auto-reply (rm-111, rm-113, rm-114). The loop stays open. A separate "undelivered" state was not added.
+- "ניתן לפנות" is not a request frame. "לסיוע … ניתן לפנות" stays silent (rm-113).
+- "תשמור את הקובץ" / "לשמור את הקובץ" is a send ask (dg-101). "תשמור על עצמך" stays silent.
+- "מתי נוח לך?" still opens a waiting loop when the rest of the message is an answer (rm-105).
+- "We agreed to renew …" is a commitment. A later "Thanks" does not erase it (dg-104).
+
+Already right, so no change: the sign ask (rm-107), the amount note (rm-108), the attach-a-document ask (rm-109), the English out-of-office (rm-112), the owner's meeting ask (rm-115), the security notification (rm-117), and an empty body with one attachment (rm-110), which already closes a reply loop. The quoted thread was not in the case, so quote-stripping was not scored.
+
+Still open: rm-003 (unchanged; the masked sentence does not say who the feminine imperative addresses). dg-105 ("save it to our shared files") stays silent; that phrase is not an OneDrive write. dg-108 (put a file on the calendar) stays silent in this pipeline; the calendar card lives in `core/intent.js`, which another open pull request is editing. rm-116 and dg-103 are unsure and are not in the headline; both were silent.
+
+No precision gate was lowered. After these rules the same gates read: teacher-eval ASK 1.00 / 0.92 and PROMISE 1.00 / 0.87; the second evaluation set ASK 0.97 / 0.82 and PROMISE 1.00 / 0.75; the blind pipeline ASK 1.00 / 0.94 and PROMISE 1.00 / 0.83.
