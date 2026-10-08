@@ -27,6 +27,9 @@ const MARK = {
   '🤫': 'silent',
   '❓': 'unsure',
   '?': 'unsure',
+  'context-dependent': 'context',
+  context: 'context',
+  '⧉': 'context',
   model: 'model',
   engine: 'engine',
   silent: 'silent',
@@ -68,7 +71,8 @@ function loadBatch(p) {
   const items = readJson(p);
   if (!Array.isArray(items) || !items.length) throw new Error('batch file is empty: ' + p);
   const batchName = path.basename(p, '.json');
-  return items.map((r, i) => Object.assign({ item: i + 1, batchName }, r));
+  const { stampRow } = require('./context-tags.cjs');
+  return items.map((r, i) => stampRow(Object.assign({ item: i + 1, batchName }, r)));
 }
 
 function loadBatches(paths) {

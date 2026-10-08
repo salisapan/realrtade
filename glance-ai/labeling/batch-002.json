@@ -79,7 +79,9 @@
   "reference": {
    "ownerVerified": false
   },
-  "ownerAnswer": null
+  "ownerAnswer": null,
+  "answerType": "context-dependent",
+  "depends_on": "work_style.files"
  },
  {
   "id": "v2syn-12865",
@@ -120,7 +122,9 @@
   "reference": {
    "ownerVerified": false
   },
-  "ownerAnswer": null
+  "ownerAnswer": null,
+  "answerType": "context-dependent",
+  "depends_on": "user_is_approver_for"
  },
  {
   "id": "v2rtest-follow-up-corpus-696",

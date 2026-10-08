@@ -1,0 +1,38 @@
+{
+ "generatedAt": "2026-10-08",
+ "pairs": 40,
+ "sides": 80,
+ "hebrewPairs": 20,
+ "englishPairs": 20,
+ "groupPairsWithAnOffer": 8,
+ "before": {
+  "system": "v2 without profile features",
+  "pairAccuracy": "0.0% (0/40)",
+  "wrongDoIt": "15.0% (6/40)",
+  "missedClose": "85.0% (34/40)",
+  "missedCloseOnRelevant": "85.0% (34/40)",
+  "wrongAction": "0.0% (0/40)",
+  "sameAnswerPairs": 40
+ },
+ "after": {
+  "system": "v2 plus profile features",
+  "pairAccuracy": "100.0% (40/40)",
+  "wrongDoIt": "0.0% (0/40)",
+  "missedClose": "0.0% (0/40)",
+  "missedCloseOnRelevant": "0.0% (0/40)",
+  "wrongAction": "0.0% (0/40)",
+  "sameAnswerPairs": 0
+ },
+ "emptyProfileFlips": {
+  "heldout": 0,
+  "heldoutN": 6982,
+  "contrastEmails": 0,
+  "contrastEmailsN": 40
+ },
+ "qwen": {
+  "ran": false,
+  "reason": "Skipped. Qwen3.5-4B is not vendored here, llama.cpp is not installed, and scoring 80 contrast prompts on CPU is not a cheap check. Cached predictions do not cover contrast-v0 ids."
+ },
+ "ownerVerified": 0,
+ "labeledBy": "synthetic-contrast"
+}

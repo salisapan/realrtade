@@ -10,6 +10,8 @@ The owner's labeling time is the bottleneck, so the next 20 cases are the ones t
 
 No weights were changed. `model/artifacts/v2.gate.weights.json` and `model/shadow-pkg/weights/` are untouched. No rule from this audit was wired into the runtime veto.
 
+Later the same day (Sali, 2026-10-08): there is no blanket "Hi all" silence rule. The group-vocative veto measured below stays rejected. Relevance is a profile output, not a group veto. Items 12, 13 and 14 below, and batch-002 items 2 and 3, are `context-dependent` and out of the binary count. The spec is `docs/glance-ai/user-context-v0.md`.
+
 ## Batch-002
 
 Files: `glance-ai/labeling/batch-002.md` (the sheet), `batch-002.json`, `batch-002.selection.json`, and `batch-002.answers.json`. The answers file has `labeledBy: ""` and `mark: null` on all 20 rows. `ownerAnswer` is null and `reference.ownerVerified` is false on every case.

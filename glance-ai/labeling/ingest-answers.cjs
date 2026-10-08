@@ -1,7 +1,8 @@
 'use strict';
 // Turn a small answers file into schema-valid owner-gold rows.
 // ✅ take the model's action, ⚙️ take the engine's action, 🤫 silent, ❓ unsure.
-// ❓ rows are returned as excluded and are not gold. ownerVerified is true only when labeledBy is sali.
+// ❓ rows are excluded and are not gold. answerType context-dependent is excluded too
+// and does not count toward the binary 200. ownerVerified is true only when labeledBy is sali.
 // Usage: node ingest-answers.cjs --answers answers.json [--batch batch-001.json] [--out owner-gold.jsonl]
 const fs = require('fs');
 const path = require('path');
@@ -83,6 +84,16 @@ function ingest(opts) {
     if (!item) fail('answer does not match a batch case', 'UNKNOWN');
     if (seen.has(item.id)) fail('duplicate answer for ' + item.id, 'DUP');
     seen.add(item.id);
+    const context = item.answerType === 'context-dependent' || mark === 'context';
+    if (context) {
+      const depends = a.depends_on || item.depends_on;
+      if (!depends) fail('item ' + item.item + ' (' + item.id + '): context-dependent needs depends_on', 'DEPENDS');
+      excluded.push({
+        id: item.id, item: item.item, mark: a.mark || 'context-dependent', note: a.note || '',
+        reason: 'context-dependent', answerType: 'context-dependent', depends_on: depends
+      });
+      continue;
+    }
     const choice = choose(mark, item, a);
     if (!choice) {
       excluded.push({ id: item.id, item: item.item, mark: '❓', note: a.note || '', reason: 'unsure' });
@@ -119,7 +130,14 @@ function ingest(opts) {
   }
   const missing = batch.filter((r) => !seen.has(r.id));
   if (missing.length) fail('missing answers for ' + missing.map((r) => r.item + ':' + r.id).join(', '), 'INCOMPLETE');
-  return { rows, excluded, labeledBy, ownerVerifiedCount: rows.filter((r) => r.ownerVerified).length, provisional, consent };
+  const contextDependent = excluded.filter((e) => e.reason === 'context-dependent');
+  return {
+    rows, excluded, labeledBy,
+    ownerVerifiedCount: rows.filter((r) => r.ownerVerified).length,
+    binaryCount: rows.length,
+    contextDependentCount: contextDependent.length,
+    provisional, consent
+  };
 }
 
 function cli(argv) {
