@@ -84,11 +84,13 @@ async function main() {
     intent
   });
 
-  assert.strictEqual(await FlowStorage.hasTerminalOutcome('graph-AAA'), true, 'written is terminal');
+  assert.strictEqual(await FlowStorage.hasTerminalOutcome('graph-AAA'), false, 'a draft write without fetchedBack is not a close');
+  assert.strictEqual(FlowStorage.verifyGateFrom(await FlowStorage.get(), 'graph-AAA'), 'verifying', 'the read-back window holds the card');
   assert.ok(
     !(await FlowStorage.getPending()).some((e) => e.messageId === 'graph-AAA'),
-    'pending empty while draft receipt is active'
+    'pending stays empty while the write is verifying'
   );
+  assert.strictEqual((await FlowStorage.getActiveOutlookReceipts()).length, 1, 'the draft receipt stays on the panel');
 
   await FlowStorage.markOutlookDraftUndone('graph-AAA', 'draft-1');
 
@@ -183,7 +185,8 @@ async function main() {
     ref: { eventId: 'ev-hold-1' },
     where: 'Outlook Calendar',
     url: 'https://outlook.live.com/calendar/item/ev-hold-1',
-    app: 'outlook'
+    app: 'outlook',
+    fetchedBack: true
   });
   assert.strictEqual(await FlowStorage.hasTerminalOutcome('cal-1'), true, 'calendar write is handled');
   const beforeDraftUndo = (await FlowStorage.get()).log.filter((e) => e.messageId === 'cal-1' && e.kind === 'written');

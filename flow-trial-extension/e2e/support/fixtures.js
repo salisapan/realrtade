@@ -50,14 +50,24 @@ function outlookHtml(opts) {
     const size = f && f.size != null ? f.size : '';
     if (o.live) {
       const label = (f && (f.sizeLabel || f.sizeText)) || '';
-      return '<div role="group" aria-label="Attachments"><div role="option" class="attachmentChip"><span>' + esc(name) + '</span><span>' + esc(label) + '</span></div></div>';
+      const shown = (f && f.shownName) || name;
+      const title = (f && f.titleName) || '';
+      const titleAttr = title ? (' title="' + esc(title) + '" aria-label="' + esc(title) + '"') : '';
+      return '<div role="group" aria-label="Attachments"><div role="option" class="attachmentChip"' + titleAttr + '><span>' + esc(shown) + '</span><span>' + esc(label) + '</span></div></div>';
     }
     return '<div class="attachment" data-name="' + esc(name) + '" data-size="' + esc(size) + '">' + esc(name) + '</div>';
   }).join('');
   const unread = o.unread
     ? '<div role="list"><div role="listitem" class="unread" aria-label="לא נקרא">לא נקרא</div></div>'
     : '';
-  const ccLine = ccList.length ? ('<div class="cc">Cc: ' + ccList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>') : '';
+  const ccLine = ccList.length
+    ? (o.hebrewCc
+      ? ('<div class="cc"><span>עותק</span> <span title="' + esc(ccList[0]) + '">' + esc(o.ccName || ccList[0]) + '</span></div>')
+      : ('<div class="cc">Cc: ' + ccList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>'))
+    : '';
+  const toLine = o.hebrewTo
+    ? ('<div class="to"><span>אל</span> <span title="' + esc(toList[0] || '') + '">' + esc(o.toName || 'sali sapan') + '</span></div>')
+    : ('<div class="to">To: ' + toList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>');
   return '<!doctype html><html lang="en"><head><title>Mail - Glance - Outlook</title></head><body>' +
     '<div id="app"><div role="main">' +
     unread +
@@ -66,7 +76,7 @@ function outlookHtml(opts) {
     '<div class="hdr"><span title="' + esc(title) + '">' + esc(senderName) + '</span>' +
     received +
     clock +
-    '<div class="to">To: ' + toList.map((a) => '<span>' + esc(a) + '</span>').join(', ') + '</div>' +
+    toLine +
     ccLine +
     fileRows +
     '</div>' +

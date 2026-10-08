@@ -921,6 +921,8 @@
       const last = Number(chainHost.getAttribute('data-checked-at') || 0);
       if (Date.now() - last < 60000) return;
       chainHost.remove();
+    } else if (message.querySelector('.flow-chip-host[data-glance-verifying]')) {
+      // The read-back is still open. A later pass offers Do It if it fails.
     } else if (message.querySelector('.flow-chip-host')) {
       void noteSuggestShown(currentContext && currentContext.messageId);
       return;
@@ -974,7 +976,27 @@
       }
       return;
     }
-    if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) return;
+    if (typeof FlowStorage.verifyGateFrom === 'function' && FlowStorage.verifyGateFrom(settled, messageId) === 'verifying') {
+      if (!message.querySelector('[data-glance-verifying]')) {
+        const host = document.createElement('div');
+        host.className = 'flow-chip-host';
+        host.setAttribute('data-glance-verifying', '1');
+        const label = document.createElement('span');
+        label.className = 'flow-chip-label';
+        label.textContent = 'Verifying…';
+        host.appendChild(label);
+        if (message.firstChild) message.insertBefore(host, message.firstChild);
+        else message.appendChild(host);
+      }
+      return;
+    }
+    if (FlowStorage.hasTerminalOutcomeFrom(settled, messageId)) {
+      const verifying = message.querySelector('.flow-chip-host[data-glance-verifying]');
+      if (verifying) verifying.remove();
+      return;
+    }
+    const verifyingHost = message.querySelector('.flow-chip-host[data-glance-verifying]');
+    if (verifyingHost) verifyingHost.remove();
 
     // ownMessageText (not a bare .innerText) both guards against Gmail
     // detaching or replacing this exact node between the synchronous work

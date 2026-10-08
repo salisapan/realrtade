@@ -184,44 +184,117 @@ const FlowOwaParse = (() => {
     return rows;
   }
 
-  function filesAgree(paneList, graphList) {
+  // A chip that OWA has cut down ("…hwind-agreement-signed.pdf", "t-q3-alpha.pdf")
+  // still names the Graph file when the visible piece is a prefix or a suffix.
+  function nameFragment(name) {
+    return norm(String(name || '')).replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '').trim();
+  }
+
+  function namesAgree(a, b) {
+    const left = nameFragment(a);
+    const right = nameFragment(b);
+    if (!left || !right) return false;
+    if (left === right) return true;
+    const short = left.length <= right.length ? left : right;
+    const long = left.length <= right.length ? right : left;
+    if (short.length < 12) return false;
+    return long.endsWith(short) || long.startsWith(short);
+  }
+
+  // 'yes' names and sizes agree, including a KB label and a truncated name.
+  // 'no' they disagree. 'unknown' the pane did not show a file.
+  // A missing size is not a disagreement: the chip could not be read.
+  function fileRelation(paneList, graphList) {
     const pane = fileRows(paneList);
     const graph = fileRows(graphList);
-    if (!pane.length || pane.length !== graph.length) return false;
+    if (!pane.length) return 'unknown';
+    if (!graph.length || pane.length !== graph.length) return 'no';
     for (let i = 0; i < pane.length; i++) {
-      if (pane[i].name !== graph[i].name) return false;
+      if (!namesAgree(pane[i].name, graph[i].name)) return 'no';
       if (pane[i].size != null) {
-        if (pane[i].size !== graph[i].size) return false;
+        if (pane[i].size !== graph[i].size) return 'no';
         continue;
       }
-      if (!pane[i].label || graph[i].size == null) return false;
+      if (!pane[i].label) continue;
+      if (graph[i].size == null) return 'no';
       const forms = shownSizeLabels(graph[i].size).map((s) => norm(s).replace(/\s+/g, ''));
-      if (forms.indexOf(pane[i].label) < 0) return false;
+      if (forms.indexOf(pane[i].label) < 0) return 'no';
     }
+    return 'yes';
+  }
+
+  function filesAgree(paneList, graphList) {
+    return fileRelation(paneList, graphList) === 'yes';
+  }
+
+  function subjectKey(s) {
+    return norm(stripPrefix(s));
+  }
+
+  function graphSender(m) {
+    return normEmail(
+      (m && m.from && m.from.emailAddress && m.from.emailAddress.address)
+      || (m && m.senderEmail)
+      || (m && m.sender && (m.sender.email || m.sender.address))
+      || ''
+    );
+  }
+
+  function sameSubject(pane, m) {
+    const ps = subjectKey(pane && pane.subject);
+    const ms = subjectKey(m && m.subject);
+    if (!ps || ps !== ms) return false;
+    const open = normEmail(pane && pane.senderEmail);
+    const from = graphSender(m);
+    if (open && from && open !== from) return false;
     return true;
   }
 
-  // A pane links to a Graph message only when exactly one candidate has the
-  // same conversation or internet message id, the same minute, and the same
-  // attachment names and sizes. A page that shows "3 KB" matches the byte
-  // count that displays as that label. Anything else is suggest:unresolved.
-  function uniqueGraphMessage(pane, messages) {
-    const list = (messages || []).filter(Boolean);
+  function idHit(pane, m) {
     const paneConv = canonId(pane && pane.conversationId);
     const paneNet = canonId(pane && pane.internetMessageId);
-    const paneMinute = minuteKey(pane && (pane.receivedDateTime || pane.date));
-    const paneHasFiles = fileRows(pane && pane.attachments).length > 0;
-    if ((!paneConv && !paneNet) || !paneMinute || !paneHasFiles) return { message: null, reason: 'suggest:unresolved' };
-    const hits = list.filter((m) => {
-      const convOk = paneConv && canonId(m.conversationId) === paneConv;
-      const netOk = paneNet && canonId(m.internetMessageId) === paneNet;
-      if (!convOk && !netOk) return false;
-      if (minuteKey(m.receivedDateTime) !== paneMinute) return false;
-      if (!filesAgree(pane.attachments, m.attachments || m.files)) return false;
-      return true;
-    });
-    if (hits.length !== 1) return { message: null, reason: 'suggest:unresolved' };
-    return { message: hits[0], reason: null };
+    const convOk = paneConv && canonId(m.conversationId) === paneConv;
+    const netOk = paneNet && canonId(m.internetMessageId) === paneNet;
+    return Boolean(convOk || netOk);
+  }
+
+  // One subject (+ sender, when both sides have it) is that mail, even when
+  // the clock or the size could not be read. Several mails with that subject
+  // are split by the minute and the attachment. A file that does not match
+  // is never the one saved. detail is what was compared, not file content.
+  function uniqueGraphMessage(pane, messages) {
+    const list = (messages || []).filter(Boolean);
+    const minute = minuteKey(pane && (pane.receivedDateTime || pane.date)) || '';
+    function pack(message, why) {
+      const detail = why + ' minute=' + (minute || 'none') + ' n=' + list.length;
+      if (!message) return { message: null, reason: 'suggest:unresolved', detail: detail };
+      return { message: message, reason: null, detail: detail };
+    }
+    const sub = subjectKey(pane && pane.subject);
+    const bySubject = sub ? list.filter((m) => sameSubject(pane, m)) : [];
+    if (bySubject.length === 1) {
+      const rel = fileRelation(pane && pane.attachments, bySubject[0].attachments || bySubject[0].files);
+      if (rel === 'no') return pack(null, 'subject-unique file-disagree');
+      return pack(bySubject[0], 'subject-unique');
+    }
+    let pool = bySubject.length ? bySubject : list.filter((m) => idHit(pane, m));
+    if (!pool.length) return pack(null, 'no-hit');
+    // A clock was on the page and did not parse (a one-digit hour with no
+    // AM/PM). Several mails stay unresolved. The file must not guess.
+    if (pane && pane.clockUnread && pool.length > 1) return pack(null, 'clock-unread');
+    if (minute) {
+      const timed = pool.filter((m) => minuteKey(m.receivedDateTime) === minute);
+      if (!timed.length) return pack(null, 'minute-miss');
+      pool = timed;
+    }
+    if (fileRows(pane && pane.attachments).length) {
+      const agreed = pool.filter((m) => fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
+      if (agreed.length === 1) return pack(agreed[0], 'time-file');
+      if (!agreed.length) return pack(null, 'file-miss');
+      return pack(null, 'file-ambiguous');
+    }
+    if (pool.length === 1) return pack(pool[0], 'single');
+    return pack(null, 'ambiguous');
   }
 
   function matchEntry(pane, entries) {
@@ -252,6 +325,9 @@ const FlowOwaParse = (() => {
       '[role="main"] [data-app-section="MessageBody"]',
       '[role="main"] [aria-label="Message body"]',
       '[role="main"] [aria-label*="Message body"]',
+      '[aria-label="גוף ההודעה"]',
+      '#ReadingPaneContainerId [aria-label="גוף ההודעה"]',
+      '#ReadingPaneContainerId [class*="MessageBody"]',
       '[role="main"] .ReadingPaneContents',
       'div[aria-label="Message body"]',
       '[data-testid="message-body"]'
@@ -270,6 +346,10 @@ const FlowOwaParse = (() => {
         out.push(n);
       });
     });
+    if (!out.length) {
+      const pane = d.querySelector('#ReadingPaneContainerId');
+      if (pane && !(pane.closest && pane.closest('[role="listbox"], [role="list"], [role="grid"], [role="tree"]'))) out.push(pane);
+    }
     return out;
   }
 
@@ -348,7 +428,15 @@ const FlowOwaParse = (() => {
   })();
   function looksLikeDateTime(s) {
     const t = String(s || '').replace(BIDI_RE, '').replace(/\s+/g, ' ').trim();
-    return Boolean(t) && DATE_RE.test(t);
+    if (!t) return false;
+    if (DATE_RE.test(t)) return true;
+    const stripped = t.replace(/[\u05f3\u05f4\u2018\u2019\u201c\u201d"'`]/g, '');
+    if (!/(?:לפנהצ|אחהצ|לפני הצהריים|לפני הצהרים|אחרי הצהריים|אחרי הצהרים|אחר הצהרים)/.test(stripped)) return false;
+    const rest = stripped
+      .replace(/לפני הצהריים|לפני הצהרים|אחרי הצהריים|אחרי הצהרים|אחר הצהרים|לפנהצ|אחהצ/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return DATE_RE.test(rest);
   }
   function inList(n) { return Boolean(n && n.closest && n.closest(LISTS)); }
   function signature(n) { return (n.getAttribute && n.getAttribute('aria-level') || '') + '|' + (n.tagName || '') + '|' + (n.className && typeof n.className === 'string' ? n.className : ''); }
@@ -428,7 +516,7 @@ const FlowOwaParse = (() => {
     const body = textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
     if (!subject && !body) return null;
     const ids = urlIds(href || (typeof location !== 'undefined' ? location.href : ''));
-    const whoTo = recipientsOf(container, bodyRoot);
+    const whoTo = recipientsOf(container, bodyRoot, opts);
     return {
       itemId: ids.itemId,
       conversationId: ids.conversationId,
@@ -440,7 +528,8 @@ const FlowOwaParse = (() => {
       text: body,
       to: whoTo.to,
       cc: whoTo.cc,
-      receivedDateTime: receivedOf(container, bodyRoot),
+      receivedDateTime: receivedInfo(container, bodyRoot).iso,
+      clockUnread: receivedInfo(container, bodyRoot).unread,
       attachments: attachmentsOf(container, bodyRoot)
     };
   }
@@ -449,40 +538,113 @@ const FlowOwaParse = (() => {
     return String(text || '').toLowerCase().match(/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/g) || [];
   }
 
-  function recipientsOf(container, bodyRoot) {
+  function recipientsOf(container, bodyRoot, opts) {
     const to = [];
     const cc = [];
     if (!container || !container.querySelectorAll) return { to: to, cc: cc };
-    const nodes = container.querySelectorAll('div, p, li, span');
+    const own = ((opts && (opts.own || opts.ownAddresses)) || []).map((a) => String(a || '').toLowerCase()).filter(Boolean);
+    const userName = String((opts && opts.userName) || '').trim().toLowerCase();
+    function push(bucket, email) {
+      const e = String(email || '').toLowerCase();
+      if (!e || bucket.indexOf(e) >= 0) return;
+      bucket.push(e);
+    }
+    function harvest(node, bucket) {
+      if (!node) return;
+      const bits = [textOf(node)];
+      if (node.getAttribute) bits.push(node.getAttribute('title') || '', node.getAttribute('aria-label') || '');
+      if (node.querySelectorAll) {
+        const marked = node.querySelectorAll('[title], [aria-label]');
+        for (let i = 0; i < marked.length; i++) {
+          bits.push(marked[i].getAttribute('title') || '', marked[i].getAttribute('aria-label') || '', textOf(marked[i]));
+        }
+      }
+      emailsIn(bits.join(' ')).forEach((e) => push(bucket, e));
+      if (userName && userName.indexOf(' ') >= 0 && own.length && bits.join(' ').toLowerCase().indexOf(userName) >= 0) push(bucket, own[0]);
+    }
+    const nodes = container.querySelectorAll('div, p, li, span, button');
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
-      const t = textOf(n);
+      const t = textOf(n).replace(/\s+/g, ' ').trim();
       if (!t || t.length > 400) continue;
-      const bucket = /^\s*(to|אל)\b/i.test(t) ? to : (/^\s*(cc|עותק)\b/i.test(t) ? cc : null);
+      let bucket = /^\s*(to|אל)\b/i.test(t) ? to : (/^\s*(cc|עותק)\b/i.test(t) ? cc : null);
+      let target = n;
+      if (!bucket && /^(to|אל|cc|עותק)$/i.test(t)) {
+        bucket = /^(to|אל)$/i.test(t) ? to : cc;
+        target = n.nextElementSibling || n;
+      }
       if (!bucket) continue;
-      emailsIn(t).forEach((e) => { if (bucket.indexOf(e) < 0) bucket.push(e); });
+      harvest(target, bucket);
+      if (target !== n) harvest(n, bucket);
     }
     return { to: to, cc: cc };
   }
 
+  // English a.m./p.m. as its own token, and the Hebrew markers OWA prints
+  // (לפנה"צ / אחה"צ, with gershayim or a straight quote, and the long forms).
+  // Both markers on one clock is not a time.
+  function meridianOf(text) {
+    const raw = String(text || '');
+    let am = false;
+    let pm = false;
+    const en = /(?:^|[^A-Za-z])([ap])\.?\s*m\.?(?![A-Za-z])/gi;
+    let hit;
+    while ((hit = en.exec(raw))) {
+      if (hit[1].toLowerCase() === 'a') am = true;
+      else pm = true;
+    }
+    const he = raw.replace(/[\u05f3\u05f4\u2018\u2019\u201c\u201d"'`]/g, '');
+    if (/לפנהצ|לפני הצהריים|לפני הצהרים/.test(he)) am = true;
+    if (/אחהצ|אחרי הצהריים|אחרי הצהרים|אחר הצהרים/.test(he)) pm = true;
+    if (am && pm) return 'both';
+    if (am) return 'am';
+    if (pm) return 'pm';
+    return '';
+  }
+
+  // A meridian wins: 12 AM is 00, 12 PM is 12, and any other PM hour adds 12.
+  // With no marker, a two-digit hour 00–23 is the 24-hour clock OWA prints
+  // (14:01, 12:53, 00:46, 03:05). A one-digit hour with no marker is not guessed.
+  function hourOnClock(hourText, meridian) {
+    const token = String(hourText == null ? '' : hourText);
+    if (!/^\d{1,2}$/.test(token)) return null;
+    const hour = +token;
+    if (meridian === 'both') return null;
+    if (meridian === 'am' || meridian === 'pm') {
+      if (hour < 1 || hour > 12) return null;
+      if (hour === 12) return meridian === 'am' ? 0 : 12;
+      return meridian === 'pm' ? hour + 12 : hour;
+    }
+    if (token.length >= 2 && hour <= 23) return hour;
+    return null;
+  }
+
   // Day/month, the order the Hebrew mailbox prints (08/10/2026 is 8 October).
   // A time[datetime] or data-received value is used as-is when it has a minute.
+  // Returns '' when the visible clock is a one-digit hour with no AM/PM marker.
   function clockToIso(text) {
     const t = String(text || '').replace(BIDI_RE, ' ').replace(/\s+/g, ' ').trim();
+    const meridian = meridianOf(t);
+    if (meridian === 'both') return '';
     const iso = t.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
     if (iso) {
-      const d = new Date(+iso[1], +iso[2] - 1, +iso[3], +iso[4], +iso[5], 0, 0);
+      const hour = hourOnClock(iso[4], meridian);
+      if (hour == null) return '';
+      const d = new Date(+iso[1], +iso[2] - 1, +iso[3], hour, +iso[5], 0, 0);
       if (!isNaN(d.getTime())) return d.toISOString();
+      return '';
     }
     const date = t.match(/(\d{1,2})[./](\d{1,2})[./](\d{4})/);
     const time = t.match(/(\d{1,2}):(\d{2})/);
     if (!date || !time) return '';
+    const hour = hourOnClock(time[1], meridian);
+    if (hour == null) return '';
     let day = +date[1];
     let month = +date[2];
     const year = +date[3];
     if (day <= 12 && month > 12) { const swap = day; day = month; month = swap; }
-    const d = new Date(year, month - 1, day, +time[1], +time[2], 0, 0);
+    const d = new Date(year, month - 1, day, hour, +time[2], 0, 0);
     if (isNaN(d.getTime()) || d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return '';
     return d.toISOString();
   }
@@ -501,26 +663,35 @@ const FlowOwaParse = (() => {
     return out;
   }
 
-  function receivedOf(container, bodyRoot) {
-    if (!container || !container.querySelector) return '';
+  function receivedInfo(container, bodyRoot) {
+    const none = { iso: '', unread: false };
+    if (!container || !container.querySelector) return none;
     const marked = container.querySelector('[data-received]');
     if (marked && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(marked))) {
       const raw = marked.getAttribute('data-received') || '';
-      if (minuteKey(raw)) return raw;
+      if (minuteKey(raw)) return { iso: raw, unread: false };
     }
     const timed = container.querySelector('time[datetime]');
     if (timed && !(bodyRoot && bodyRoot.contains && bodyRoot.contains(timed))) {
       const raw = timed.getAttribute('datetime') || '';
-      if (minuteKey(raw)) return raw;
+      if (minuteKey(raw)) return { iso: raw, unread: false };
     }
     const bits = [];
+    let sawClock = false;
     const nodes = headerTextNodes(container, bodyRoot);
     for (let i = 0; i < nodes.length; i++) {
+      if (/\d{1,2}:\d{2}/.test(nodes[i].text)) sawClock = true;
       const iso = clockToIso(nodes[i].text);
-      if (iso) return iso;
-      if (/\d{1,2}:\d{2}/.test(nodes[i].text) || /\d{1,2}[./]\d{1,2}[./]\d{4}/.test(nodes[i].text)) bits.push(nodes[i].text);
+      if (iso) return { iso: iso, unread: false };
+      if (sawClock || /\d{1,2}[./]\d{1,2}[./]\d{4}/.test(nodes[i].text)) bits.push(nodes[i].text);
     }
-    return clockToIso(bits.join(' '));
+    const joined = clockToIso(bits.join(' '));
+    if (/\d{1,2}:\d{2}/.test(bits.join(' '))) sawClock = true;
+    return { iso: joined || '', unread: Boolean(sawClock && !joined) };
+  }
+
+  function receivedOf(container, bodyRoot) {
+    return receivedInfo(container, bodyRoot).iso;
   }
 
   const FILE_NAME_RE = /([^\s\\/:"<>|]+\.(?:pdf|docx?|xlsx?|pptx?|csv|txt|rtf|png|jpe?g|heic|zip))/i;
@@ -547,13 +718,23 @@ const FlowOwaParse = (() => {
       const n = nodes[i];
       if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
       if (inList(n)) continue;
-      const blob = ((n.getAttribute && (n.getAttribute('aria-label') || '')) + ' ' + textOf(n)).replace(/\s+/g, ' ').trim();
-      if (!blob || blob.length > 180) continue;
-      const nameM = blob.match(FILE_NAME_RE);
+      const blob = ((n.getAttribute && ((n.getAttribute('title') || '') + ' ' + (n.getAttribute('aria-label') || ''))) + ' ' + textOf(n)).replace(/\s+/g, ' ').trim();
+      if (!blob || blob.length > 240) continue;
       const sizeM = blob.match(SIZE_LABEL_RE);
-      if (!nameM || !sizeM) continue;
+      if (!sizeM) continue;
       if (n.querySelector && n.querySelector('[role="option"], .attachmentChip')) continue;
-      const name = nameM[1];
+      const bits = [blob];
+      if (n.parentElement && n.parentElement.getAttribute) {
+        bits.push(n.parentElement.getAttribute('title') || '', n.parentElement.getAttribute('aria-label') || '');
+      }
+      let name = '';
+      for (let b = 0; b < bits.length; b++) {
+        const nameM = String(bits[b] || '').match(FILE_NAME_RE);
+        if (!nameM) continue;
+        const cleaned = nameM[1].replace(/^[\u2026\u2025.]+/, '').replace(/[\u2026\u2025.]+$/, '');
+        if (cleaned.length > name.length) name = cleaned;
+      }
+      if (!name) continue;
       const label = sizeM[1].replace(',', '.') + ' ' + sizeM[2].toUpperCase();
       const key = norm(name) + '|' + norm(label).replace(/\s+/g, '');
       if (seen[key]) continue;
@@ -563,7 +744,7 @@ const FlowOwaParse = (() => {
     return out;
   }
 
-  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
+  return { itemIdFromUrl, urlIds, canonId, matchEntry, matchEntryHow, uniqueGraphMessage, minuteKey, clockToIso, readingPaneRoots, rootsReport, readPane, senderOf, looksLikeDateTime, norm, normEmail, textOf, dayKey };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowOwaParse };

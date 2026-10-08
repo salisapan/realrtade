@@ -89,7 +89,7 @@ body{
 .tab:hover{color:var(--ink-2)}
 .tab[aria-selected="true"]{color:var(--accent); border-bottom-color:var(--accent)}
 
-main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto}
+main{padding:var(--space-5); flex:1; min-height:0; overflow-y:auto; overflow-anchor:none}
 .panel{display:none}
 .panel.active{display:block}
 

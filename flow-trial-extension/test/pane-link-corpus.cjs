@@ -73,8 +73,66 @@ const subjectOnly = FlowOwaParse.uniqueGraphMessage(
   { subject: 'Invoice', senderEmail: 'a@b.com', receivedDateTime: SEPT, attachments: [file('invoice-sept.pdf', 3072)] },
   [oct, sept]
 );
-check('subject and sender alone do not link a message',
-  !subjectOnly.message && subjectOnly.reason === 'suggest:unresolved');
+check('the same subject with one matching minute and file links that file',
+  subjectOnly.message && subjectOnly.message.id === 'm-sept' && !subjectOnly.reason, subjectOnly);
+
+const noSplit = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Invoice', senderEmail: 'a@b.com' },
+  [oct, sept]
+);
+check('two mails with the same subject and no clock or file stay unresolved',
+  !noSplit.message && noSplit.reason === 'suggest:unresolved' && /ambiguous|minute|file/.test(noSplit.detail || ''), noSplit);
+
+const onlyNorth = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com' },
+  [msg('m-nw', 'AQQkNw', '', [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
+);
+check('one subject links even when the clock was not read',
+  onlyNorth.message && onlyNorth.message.id === 'm-nw', onlyNorth);
+
+const wrongOnly = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Northwind agreement - signed PDF', senderEmail: 'flow@x.com', attachments: [file('other.pdf', 3072)] },
+  [msg('m-nw', 'AQQkNw', SEPT, [file('northwind-agreement-signed.pdf', 3072)], 'Northwind agreement - signed PDF')]
+);
+check('one subject does not save a different file',
+  !wrongOnly.message && wrongOnly.reason === 'suggest:unresolved', wrongOnly);
+
+const alphaWhen = '2026-10-08T14:37:00.000Z';
+const betaWhen = '2026-10-08T14:38:00.000Z';
+const alpha = msg('m-alpha', 'AQQkQ3', alphaWhen, [file('statement-q3-alpha.pdf', 3072)], 'Q3 fund statement');
+const beta = msg('m-beta', 'AQQkQ3', betaWhen, [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement');
+const linkedAlpha = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', receivedDateTime: alphaWhen, attachments: [{ name: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }] },
+  [beta, alpha]
+);
+const linkedBeta = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', receivedDateTime: betaWhen, attachments: [{ name: '…nt-q3-beta.pdf', sizeLabel: '4 KB' }] },
+  [alpha, beta]
+);
+check('14:37 and a truncated alpha chip link statement-q3-alpha',
+  linkedAlpha.message && linkedAlpha.message.id === 'm-alpha', linkedAlpha);
+check('14:38 and a truncated beta chip link statement-q3-beta',
+  linkedBeta.message && linkedBeta.message.id === 'm-beta', linkedBeta);
+
+const pm = FlowOwaParse.clockToIso('08/10/2026 3:05 PM');
+const afternoon = FlowOwaParse.clockToIso('08/10/2026 15:05');
+const morning = FlowOwaParse.clockToIso('08/10/2026 03:05');
+const bare = FlowOwaParse.clockToIso('08/10/2026 3:05');
+check('3:05 PM is 15:05, not 03:05', pm && pm === afternoon && pm !== morning, { pm: pm, afternoon: afternoon, morning: morning });
+check('a one-digit hour with no marker is not a time', bare === '');
+check('a two-digit 24-hour clock is that hour',
+  FlowOwaParse.clockToIso('08/10/2026 14:01') &&
+  FlowOwaParse.clockToIso('08/10/2026 12:53') &&
+  FlowOwaParse.clockToIso('08/10/2026 00:46') &&
+  FlowOwaParse.clockToIso('ה 08/10/2026 14:01') === FlowOwaParse.clockToIso('08/10/2026 14:01'));
+check('Hebrew אחה"צ is PM and לפנה"צ is AM',
+  FlowOwaParse.clockToIso('08/10/2026 3:05 אחה"צ') === afternoon &&
+  FlowOwaParse.clockToIso('08/10/2026 3:05 לפנה"צ') === morning);
+check('both meridians are not a time', FlowOwaParse.clockToIso('08/10/2026 3:05 AM PM') === '');
+
+const outlookSrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'content-outlook.js'), 'utf8');
+check('newest-by-subject is not a file link',
+  outlookSrc.indexOf('function messageBySubject') < 0 && outlookSrc.indexOf('inbox-subject') < 0 && outlookSrc.indexOf('uniqueGraphMessage') > 0);
 
 const one = FlowOwaParse.uniqueGraphMessage(
   pane('AQQkGlanceE2ENorthwindConv', '2026-10-08T14:01:00.000Z', [file('northwind-agreement-signed.pdf', 3072)]),

@@ -50,6 +50,10 @@ test('the Loops tab shows Suggested and Added on a loop that has steps', async (
   const list = popup.locator('#open-list');
   await expect(list.locator('.act-tag', { hasText: 'Suggested' })).toHaveCount(2);
   await expect(list.locator('.act-tag', { hasText: 'Added' })).toHaveCount(1);
+  await expect(list.locator('[data-glance-section="added"]')).toHaveText('Added');
+  const addedStep = list.locator('li.act-added');
+  await expect(addedStep).toHaveCount(1);
+  await expect(addedStep.getByText('Call Noa Thursday')).toBeVisible();
 });
 
 test('the Q3 reply ask offers a draft and a save refusal stays quiet', async ({ glance }) => {

@@ -499,33 +499,16 @@
   // A conversation resolves to one message. The newest message from someone
   // else is not the open message. Return its from-address; on a mismatch the
   // result is unread and is never used as the open message.
-  async function resolveOutlookMessageId(pathId, convId, own, openSender, subject) {
+  async function resolveOutlookMessageId(pathId, convId, own, openSender) {
     const direct = await messageIdFromPathRest(pathId || convId);
     if (direct && direct.id) return direct;
     const found = await messageIdForConversation(convId || pathId, own);
-    const resolved = found && found.id ? found : await messageBySubject(subject, openSender, own);
-    if (!resolved || !resolved.id) return null;
-    if (!sameOpenSender(resolved.from, openSender)) {
-      dbg('sender-mismatch', { how: resolved.how, from: resolved.from || null, open: String(openSender || '').toLowerCase() || null });
-      return { unread: true, reason: 'page:sender-mismatch', from: resolved.from || null };
+    if (!found || !found.id) return null;
+    if (!sameOpenSender(found.from, openSender)) {
+      dbg('sender-mismatch', { how: found.how, from: found.from || null, open: String(openSender || '').toLowerCase() || null });
+      return { unread: true, reason: 'page:sender-mismatch', from: found.from || null };
     }
-    return resolved;
-  }
-
-  async function messageBySubject(subject, openSender, own) {
-    const sub = (typeof FlowOwaParse.norm === 'function') ? FlowOwaParse.norm(subject) : String(subject || '').toLowerCase().trim();
-    if (!sub) return null;
-    const select = '&$select=id,conversationId,receivedDateTime,from,subject,internetMessageId';
-    const plainPath = '/me/mailFolders/inbox/messages?$top=40&$orderby=' + encodeURIComponent('receivedDateTime desc') + select;
-    const list = await graphValues(plainPath, 'inbox-subject', null);
-    const hits = (Array.isArray(list) ? list : []).filter((m) => {
-      if (!m) return false;
-      const msub = (typeof FlowOwaParse.norm === 'function') ? FlowOwaParse.norm(m.subject) : String(m.subject || '').toLowerCase().trim();
-      return msub === sub && sameOpenSender(fromAddress(m), openSender);
-    });
-    const row = newestOther(hits, own);
-    if (!row || !row.id) return null;
-    return { id: row.id, how: 'inbox-subject', immutable: false, from: fromAddress(row) };
+    return found;
   }
 
   async function ensureOutlookMessageId(ctx) {
@@ -1943,7 +1926,7 @@
   async function scan() {
     const st = await FlowStorage.get();
     const own = ownAddressesOf(st);
-    const pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own }));
+    const pane = keepSender(FlowOwaParse.readPane(document, location.href, { own: own, userName: userNameOf(st) }));
     const ids = FlowOwaParse.urlIds(location.href);
     const earlyPlanned = plannedRow(st, pane);
     const fileSig = pane && Array.isArray(pane.attachments)
@@ -1960,7 +1943,9 @@
       dbg('decision', { shown: true, reason: 'page:do-it-in-flight' });
       return;
     }
-    if (sig === lastSig && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && document.querySelector('.flow-chip-host')))) {
+    const earlyHost = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+    const undoneOnly = earlyHost && earlyHost.getAttribute('data-glance-undone') === '1';
+    if (sig === lastSig && !(armed && tracedSig !== sig) && (lastOutcome === 'reason' || (lastOutcome === 'card' && earlyHost && !undoneOnly))) {
       if (lastOutcome === 'reason' && !lastReasonStored) {
         await pageReason(lastLoggedReason || 'page:same-signature', pane || { subject: (ids && (ids.raw || ids.conversationId || ids.itemId)) || '' });
       }
@@ -2036,6 +2021,19 @@
       }
     } catch (e) {
       glanceError('draft receipt', e);
+    }
+
+    // The mail and Loops read the same still-open list. An older undone row
+    // stays one Do It here, matched by id or by the promise key, and the
+    // stored Undone line does not take the card's place.
+    try {
+      const loop = await openLoopForPane(pane);
+      if (loop && await showOpenLoopCard(pane, loop)) {
+        dbg('decision', { shown: true, reason: 'page:still-open', subject: pane.subject });
+        return;
+      }
+    } catch (e) {
+      glanceError('still open', e);
     }
 
     // A file placed on the calendar is judged before note-to-self. The gate
@@ -2267,6 +2265,27 @@
     const receipts = typeof FlowStorage.getActiveOutlookReceipts === 'function'
       ? await FlowStorage.getActiveOutlookReceipts() : [];
     const hasReceipt = receipts.some((r) => r.messageId === ctx.messageId);
+    const verifyMount = mountPoint();
+    if (!hasReceipt && typeof FlowStorage.verifyGateFrom === 'function') {
+      const gate = FlowStorage.verifyGateFrom(await FlowStorage.get(), ctx.messageId);
+      if (gate === 'verifying') {
+        if (verifyMount && !verifyMount.querySelector('[data-glance-verifying]')) {
+          const host = document.createElement('div');
+          host.className = 'flow-chip-host';
+          host.setAttribute('data-glance-verifying', '1');
+          const label = document.createElement('span');
+          label.className = 'flow-chip-label';
+          label.textContent = 'Verifying…';
+          host.appendChild(label);
+          if (verifyMount.firstChild) verifyMount.insertBefore(host, verifyMount.firstChild);
+          else verifyMount.appendChild(host);
+        }
+        lastOutcome = 'card';
+        return;
+      }
+      const verifying = verifyMount && verifyMount.querySelector('.flow-chip-host[data-glance-verifying]');
+      if (verifying) verifying.remove();
+    }
     // Same still-open rule as the popup: draft-only undo (outlookReopen) is NOT
     // terminal, so Do It must be eligible again after Undo.
     if (await FlowStorage.hasTerminalOutcome(ctx.messageId) && !hasReceipt) { await pageReason('page:already-handled', pane); return; }
@@ -2405,8 +2424,21 @@
     return null;
   }
 
-  function suggestFail(reason) {
-    return { unresolved: true, reason: reason || 'suggest:unresolved' };
+  function suggestFail(reason, detail) {
+    return { unresolved: true, reason: reason || 'suggest:unresolved', detail: detail || '' };
+  }
+
+  function sameSubjectRow(pane, m) {
+    const norm = (typeof FlowOwaParse !== 'undefined' && typeof FlowOwaParse.norm === 'function')
+      ? FlowOwaParse.norm
+      : ((s) => String(s || '').toLowerCase().trim());
+    const ps = norm(pane && pane.subject);
+    const ms = norm(m && m.subject);
+    if (!ps || ps !== ms) return false;
+    const open = String((pane && pane.senderEmail) || '').toLowerCase();
+    const from = fromAddress(m);
+    if (open && from && open !== from) return false;
+    return true;
   }
 
   // A message id in the address is that message. A conversation address links
@@ -2438,27 +2470,28 @@
       if (!m || !m.id) continue;
       const convOk = wantConv && FlowOwaParse.canonId(m.conversationId) === wantConv;
       const netOk = wantNet && FlowOwaParse.canonId(m.internetMessageId) === wantNet;
-      if (convOk || netOk) hits.push(m);
+      if (convOk || netOk || sameSubjectRow(pane, m)) hits.push(m);
     }
-    if (!hits.length) return suggestFail('suggest:no-candidate');
+    if (!hits.length) return suggestFail('suggest:no-candidate', 'inbox=' + list.length + ' subject=' + String((pane && pane.subject) || '').slice(0, 80));
+    const shortlist = hits.slice(0, 8);
     const enriched = [];
     let unreadStatus = 0;
     let anyRead = false;
-    for (let i = 0; i < hits.length; i++) {
-      const rows = await attachmentListFor(hits[i].id);
+    for (let i = 0; i < shortlist.length; i++) {
+      const rows = await attachmentListFor(shortlist[i].id);
       if (!Array.isArray(rows)) {
         unreadStatus = lastGraphStatus || unreadStatus;
         continue;
       }
       anyRead = true;
-      enriched.push(Object.assign({}, hits[i], { attachments: rows }));
+      enriched.push(Object.assign({}, shortlist[i], { attachments: rows }));
     }
     if (!anyRead) {
       if (unreadStatus && unreadStatus !== 200) return suggestFail('suggest:graph-' + unreadStatus);
       return suggestFail('suggest:attachments-unread');
     }
     const linked = FlowOwaParse.uniqueGraphMessage(pane, enriched);
-    if (!linked || !linked.message) return suggestFail((linked && linked.reason) || 'suggest:unresolved');
+    if (!linked || !linked.message) return suggestFail((linked && linked.reason) || 'suggest:unresolved', (linked && linked.detail) || ('candidates=' + enriched.length));
     const files = linked.message.attachments;
     if (!Array.isArray(files)) return suggestFail('suggest:attachments-unread');
     if (!files.length) return suggestFail('suggest:attachments-empty');
@@ -2665,14 +2698,15 @@
     const messageId = pane.itemId || pane.conversationId || pane.pathId || '';
     let files = null;
     let stageReason = '';
+    let read = null;
     try {
-      const read = await suggestFiles(pane);
+      read = await suggestFiles(pane);
       if (read && read.unresolved) stageReason = read.reason || 'suggest:unresolved';
       else files = read;
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
       await appendSuggestLog({ messageId: messageId, reason: stageReason, surface: 'outlook' });
-      await pageReason(stageReason, pane);
+      await pageReason(stageReason, pane, { detail: (read && read.detail) || '' });
       return;
     }
     let bag = {};
@@ -2766,15 +2800,72 @@
     return host;
   }
 
-  // A stored Undo line stays only when this mail has no card. A promise
-  // mail gets its Do It; a silent mail keeps the confirmation.
+  // Same row Loops is showing: the exchange id, or the promise key when an
+  // older mail used another id for the same commitment.
+  async function openLoopForPane(pane) {
+    if (!pane || typeof FlowStorage.getStillOpen !== 'function' || typeof FlowStillOpen === 'undefined' || typeof FlowStillOpen.promiseKey !== 'function') return null;
+    const open = await FlowStorage.getStillOpen();
+    if (!open || !open.length) return null;
+    const ids = messageIdsOf(pane);
+    const probe = {
+      text: pane.text,
+      subject: pane.subject,
+      sender: { email: pane.senderEmail, name: pane.senderName },
+      threadId: pane.conversationId || '',
+      outlookConversationId: pane.conversationId || '',
+      messageId: pane.itemId || pane.pathId || pane.conversationId || ''
+    };
+    const key = FlowStillOpen.promiseKey(probe);
+    for (let i = 0; i < open.length; i++) {
+      const row = open[i];
+      if (!row || !row.process) continue;
+      const rowIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
+      if (ids.some((id) => rowIds.indexOf(String(id)) >= 0)) return row;
+      const rowKey = FlowStillOpen.promiseKey(row);
+      if (key && rowKey && rowKey === key) return row;
+    }
+    return null;
+  }
+
+  async function showOpenLoopCard(pane, loop) {
+    const mount = mountPoint();
+    if (!mount || !loop || !loop.process) return false;
+    const existing = mount.querySelector('.flow-chip-host');
+    if (existing && existing.getAttribute('data-glance-undone') !== '1' && existing.getAttribute('data-glance-verifying') !== '1') return true;
+    if (existing) existing.remove();
+    const ctx = buildCtx(loop, pane, { intent: loop.intent, process: loop.process });
+    if (!ctx || !ctx.messageId) return false;
+    const host = FlowChipHost.inject(mount, ctx, {
+      onDoIt: (h, chip, c) => { onDoIt(h, chip, c); },
+      onDismiss: (h, c) => { onDismiss(h, c); }
+    });
+    if (!host) return false;
+    const tagged = [ctx.messageId, pane.itemId, pane.pathId, pane.conversationId].filter(Boolean);
+    if (tagged.length) host.setAttribute('data-glance-message', tagged.join('|'));
+    lastOutcome = 'card';
+    lastKey = ctx.messageId + '|' + ((ctx.intent && ctx.intent.label) || '');
+    await clearReason(pane);
+    return true;
+  }
+
+  // A stored Undo line stays only when this mail has no card and no open loop.
+  // A promise mail gets its Do It; a silent mail keeps the confirmation.
   async function paintStoredUndoneIfQuiet() {
-    if (document.querySelector('#ReadingPaneContainerId .flow-chip-host')) return;
     let pane = null;
     try {
       const st = await FlowStorage.get();
-      pane = FlowOwaParse.readPane(document, location.href, { own: ownAddressesOf(st) });
+      pane = FlowOwaParse.readPane(document, location.href, { own: ownAddressesOf(st), userName: userNameOf(st) });
     } catch (e) { pane = null; }
+    if (pane) {
+      const loop = await openLoopForPane(pane);
+      if (loop) {
+        const host = document.querySelector('#ReadingPaneContainerId .flow-chip-host');
+        if (host && host.getAttribute('data-glance-undone') === '1') host.remove();
+        if (!document.querySelector('#ReadingPaneContainerId .flow-chip-host')) await showOpenLoopCard(pane, loop);
+        return;
+      }
+    }
+    if (document.querySelector('#ReadingPaneContainerId .flow-chip-host')) return;
     if (!pane) return;
     const banner = await undoneBannerFor(pane);
     if (!banner || !banner.line) return;

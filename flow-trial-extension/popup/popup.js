@@ -43,6 +43,7 @@
   // Same trap again: renderWaiting() runs before a later `let` would initialise.
   let loopView = 'date';
   let whyNotShownAll = false;
+  let whyDetailsOpen = false;
   const tabScroll = { setup: 0, open: 0, log: 0 };
   let scrollLock = false;
   let renderDepth = 0;
@@ -1115,6 +1116,24 @@
           ? FlowDisplay.whyNotShownHeader(diags.length, shown.length)
           : ('Why not shown (' + shown.length + ')');
         details.appendChild(sum);
+        if (whyDetailsOpen) details.open = true;
+        const holdOpen = () => { rememberScroll(); scrollLock = true; };
+        sum.addEventListener('pointerdown', holdOpen);
+        sum.addEventListener('mousedown', holdOpen);
+        sum.addEventListener('click', holdOpen, true);
+        details.addEventListener('toggle', () => {
+          whyDetailsOpen = details.open;
+          const scroller = panelScroller();
+          const y = tabScroll[activeTabId()] || 0;
+          scrollLock = true;
+          let left = 4;
+          const pin = () => {
+            if (scroller) scroller.scrollTop = y;
+            if (left > 0) { left -= 1; requestAnimationFrame(pin); }
+            else scrollLock = false;
+          };
+          pin();
+        });
         const list = el('div', 'wait-note');
         // Safe local-only readout: subject + reason code, no body text.
         shown.forEach((d) => {
@@ -1123,13 +1142,28 @@
             : ((d.subject && String(d.subject).indexOf('/mail/') !== 0) ? String(d.subject).slice(0, 80) : 'Untitled message');
           const who2 = d.counterpart ? (' · ' + d.counterpart) : '';
           const files = (d.fileCount && d.target) ? (' · ' + d.fileCount + ' ' + d.target) : '';
-          list.appendChild(el('div', 'wait-note', d.reason + ' — “' + sub + '”' + who2 + files));
+          const detail = d.detail ? (' (' + String(d.detail).slice(0, 160) + ')') : '';
+          list.appendChild(el('div', 'wait-note', d.reason + detail + ' — “' + sub + '”' + who2 + files));
         });
         details.appendChild(list);
         if (diags.length > shown.length) {
           const more = el('button', 'ghost sm', 'Show all');
           more.type = 'button';
-          more.addEventListener('click', () => { whyNotShownAll = true; renderSurfaces().catch(() => {}); });
+          more.addEventListener('click', () => {
+            rememberScroll();
+            whyNotShownAll = true;
+            whyDetailsOpen = true;
+            scrollLock = true;
+            renderSurfaces().then(() => {
+              const scroller = panelScroller();
+              const y = tabScroll[activeTabId()] || 0;
+              if (scroller) scroller.scrollTop = y;
+              requestAnimationFrame(() => {
+                if (scroller) scroller.scrollTop = y;
+                requestAnimationFrame(() => { scrollLock = false; });
+              });
+            }).catch(() => { scrollLock = false; });
+          });
           details.appendChild(more);
         }
         row.appendChild(details);

@@ -336,3 +336,195 @@ test('the side panel keeps its scroll across a re-render', async ({ glance }) =>
   await expect.poll(async () => popup.locator('#log-list').getByText('One more passport row').count()).toBe(1);
   await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(160);
 });
+
+test('3:05 PM saves the afternoon file, and a bare 3:05 does not', async ({ glance }) => {
+  test.setTimeout(90000);
+  const conv = 'AQQKGlanceE2EClock';
+  const morningId = 'AQMkGlanceE2EMorning';
+  const afternoonId = 'AQMkGlanceE2EAfternoon';
+  await glance.seedOutlook();
+  await glance.setScenario({
+    inboxFilterFails: true,
+    inbox: [
+      inboxRow(morningId, conv, 'Clock check', localIso(2026, 10, 8, 3, 5)),
+      inboxRow(afternoonId, conv, 'Clock check', localIso(2026, 10, 8, 15, 5))
+    ],
+    sent: [],
+    messages: {},
+    attachments: {
+      [morningId]: pdf('att-am', 'morning.pdf', 3072),
+      [afternoonId]: pdf('att-pm', 'afternoon.pdf', 4096)
+    },
+    conversation: []
+  });
+  const page = await glance.openOutlook({
+    live: true,
+    id: conv,
+    subject: 'Clock check',
+    senderEmail: S.SENDER,
+    body: NORTHWIND,
+    receivedLabel: '08/10/2026 3:05 PM',
+    attachments: [{ name: 'afternoon.pdf', sizeLabel: '4 KB' }]
+  });
+  await expect(page.locator('#ReadingPaneContainerId').getByText('Save afternoon.pdf to OneDrive?')).toBeVisible();
+  await expect(page.locator('#ReadingPaneContainerId').getByText('morning.pdf')).toHaveCount(0);
+
+  const bare = await glance.openOutlook({
+    live: true,
+    id: conv,
+    subject: 'Clock check',
+    senderEmail: S.SENDER,
+    body: NORTHWIND,
+    receivedLabel: '08/10/2026 3:05',
+    attachments: [{ name: 'afternoon.pdf', sizeLabel: '4 KB' }]
+  });
+  await expect(bare.locator('#ReadingPaneContainerId').getByText('Save the file?')).toHaveCount(0);
+  await expect.poll(async () => {
+    const bag = await glance.storage();
+    return (bag.outlookPageDiag || []).some((d) => d && d.reason === 'suggest:unresolved');
+  }).toBe(true);
+});
+
+test('a Hebrew 24-hour pane links one subject, and 14:37 is not 14:38', async ({ glance }) => {
+  test.setTimeout(90000);
+  const northConv = 'AQQKGlanceE2EHebrewNorth';
+  const northMsg = 'AQMkGlanceE2EHebrewNorth';
+  await glance.seedOutlook();
+  await glance.setScenario({
+    inboxFilterFails: true,
+    inbox: [inboxRow(northMsg, northConv, 'Northwind agreement - signed PDF', localIso(2026, 10, 8, 14, 1))],
+    sent: [],
+    messages: {},
+    attachments: { [northMsg]: pdf('att-nw', 'northwind-agreement-signed.pdf', 3072) },
+    conversation: []
+  });
+  const north = await glance.openOutlook({
+    live: true,
+    id: northConv,
+    subject: 'Northwind agreement - signed PDF',
+    senderEmail: S.SENDER,
+    body: NORTHWIND,
+    receivedLabel: 'ה 08/10/2026 14:01',
+    attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
+  });
+  await expect(north.locator('#ReadingPaneContainerId').getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
+
+  const alphaWhen = localIso(2026, 10, 8, 14, 37);
+  const betaWhen = localIso(2026, 10, 8, 14, 38);
+  await glance.setScenario({
+    inboxFilterFails: true,
+    inbox: [
+      inboxRow(ALPHA_MSG, Q3_CONV, 'Q3 fund statement', alphaWhen),
+      inboxRow(BETA_MSG, Q3_CONV, 'Q3 fund statement', betaWhen)
+    ],
+    sent: [],
+    messages: {},
+    attachments: {
+      [ALPHA_MSG]: pdf('att-alpha', 'statement-q3-alpha.pdf', 3072),
+      [BETA_MSG]: pdf('att-beta', 'statement-q3-beta.pdf', 4096)
+    },
+    conversation: []
+  });
+  const alpha = await glance.openOutlook({
+    live: true,
+    id: Q3_CONV,
+    subject: 'Q3 fund statement',
+    senderEmail: S.SENDER,
+    body: Q3,
+    receivedLabel: '08/10/2026 14:37',
+    attachments: [{ shownName: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }]
+  });
+  await expect(alpha.locator('#ReadingPaneContainerId').getByText('Save statement-q3-alpha.pdf to OneDrive?')).toBeVisible();
+  await expect(alpha.locator('#ReadingPaneContainerId').getByText('statement-q3-beta.pdf')).toHaveCount(0);
+
+  const beta = await glance.openOutlook({
+    live: true,
+    id: Q3_CONV,
+    subject: 'Q3 fund statement',
+    senderEmail: S.SENDER,
+    body: Q3,
+    receivedLabel: '08/10/2026 14:38',
+    attachments: [{ shownName: '…nt-q3-beta.pdf', sizeLabel: '4 KB' }]
+  });
+  await expect(beta.locator('#ReadingPaneContainerId').getByText('Save statement-q3-beta.pdf to OneDrive?')).toBeVisible();
+  await expect(beta.locator('#ReadingPaneContainerId').getByText('statement-q3-alpha.pdf')).toHaveCount(0);
+});
+
+test('a Hebrew To line that names the user offers the Q3 draft', async ({ glance }) => {
+  test.setTimeout(60000);
+  await glance.seedOutlook();
+  const page = await glance.openOutlook({
+    id: 'AQMkGlanceE2EHebrewTo',
+    subject: 'Gate A 0.9.41 - quick question on the Q3 summary',
+    senderEmail: S.SENDER,
+    body: 'Can you reply and confirm whether the Q3 summary will include the October numbers?',
+    hebrewTo: true,
+    to: [S.ME],
+    toName: 'sali sapan'
+  });
+  await expect(page.locator('#ReadingPaneContainerId button.flow-chip')).toHaveCount(1);
+});
+
+test('an older undone promise shows one Do It on a mail with the same words', async ({ glance }) => {
+  test.setTimeout(60000);
+  const cores = loadCores();
+  const intent = cores.intent.classify(DANA, { now: new Date() });
+  const process = cores.actions.planFor(intent, { threadUrl: 'https://outlook.live.com/mail/', hasThreadAttachment: false });
+  const line = 'Undone — the To Do task was removed.';
+  await glance.seedOutlook({
+    glanceUndoneBanners: {
+      AQMkPassport35: { line: line, ids: ['AQMkPassport35'], at: Date.now() }
+    },
+    log: [{
+      kind: 'undone',
+      messageId: 'AQMkPassport35',
+      itemId: 'AQMkPassport35',
+      text: DANA,
+      subject: 'Gate 0.9.35 To Do title',
+      app: 'outlook',
+      ts: Date.now()
+    }, {
+      kind: 'shown',
+      messageId: 'AQMkPassport35',
+      itemId: 'AQMkPassport35',
+      app: 'outlook',
+      ts: Date.now() - 1000,
+      sender: { name: 'flow', email: S.SENDER },
+      subject: 'Gate 0.9.35 To Do title',
+      text: DANA,
+      intent: intent,
+      process: process
+    }]
+  });
+  const page = await glance.openOutlook({
+    id: 'AQMkPassport34',
+    subject: 'Gate 0.9.34 To Do title',
+    senderEmail: S.SENDER,
+    body: DANA
+  });
+  const pane = page.locator('#ReadingPaneContainerId');
+  await expect(pane.locator('button.flow-chip')).toHaveCount(1);
+  await expect(pane.getByText(line)).toHaveCount(0);
+});
+
+test('Show all keeps the side panel scroll', async ({ glance }) => {
+  test.setTimeout(60000);
+  const diags = [];
+  for (let i = 0; i < 25; i++) {
+    diags.push({ key: 'page:quiet|' + i, reason: 'page:quiet-' + i, subject: 'Quiet mail ' + i, at: i });
+  }
+  await glance.seedOutlook({ outlookPageDiag: diags });
+  const popup = await glance.openPopup();
+  await popup.locator('button[data-tab="setup"]').click();
+  await popup.setViewportSize({ width: 380, height: 420 });
+  const before = await popup.locator('main').evaluate((el) => {
+    el.scrollTop = 140;
+    return el.scrollTop;
+  });
+  expect(before).toBe(140);
+  await popup.locator('#surface-list summary').evaluate((el) => el.click());
+  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
+  await popup.locator('#surface-list').getByRole('button', { name: 'Show all' }).evaluate((el) => el.click());
+  await expect.poll(async () => popup.locator('main').evaluate((el) => el.scrollTop)).toBe(140);
+  await expect(popup.locator('#surface-list').getByText('page:quiet-24')).toBeVisible();
+});

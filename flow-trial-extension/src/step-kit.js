@@ -139,10 +139,23 @@ const FlowStepKit = (() => {
       '<p class="gs-intent flow-chip-process-name">' + esc(cfg.intent || '') + '</p>';
   }
 
+  function rowsHTML(rows) {
+    let html = '';
+    let addedHead = false;
+    (rows || []).forEach(function (a) {
+      if (a && a.added && !addedHead) {
+        addedHead = true;
+        html += '<li class="act-section" data-glance-section="added"><span class="acts-label">Added</span></li>';
+      }
+      html += rowHTML(a);
+    });
+    return html;
+  }
+
   function stageHTML(cfg) {
     const L = langOf(cfg.he);
     const label = cfg.label === 'done' ? L.done : cfg.label === 'prepared' ? L.prepared : L.will;
-    const rows = (cfg.rows || []).map(rowHTML).join('');
+    const rows = rowsHTML(cfg.rows);
     return '<div class="stage stage-live ss-stage" data-state="' + esc(cfg.state || 'propose') + '">' +
       '<div class="glance-surface g19 ss-gs"' + (cfg.he ? ' dir="rtl" lang="he"' : '') + '>' +
       headHTML(cfg, L) +
@@ -160,7 +173,7 @@ const FlowStepKit = (() => {
     const txt = stage.querySelector('.chip-txt');
     if (!txt) return;
     if (cfg.chip.mode === 'count') {
-      const rows = Array.prototype.slice.call(stage.querySelectorAll('li.act:not(.act-close):not(.act-manual)'));
+      const rows = Array.prototype.slice.call(stage.querySelectorAll('li.act:not(.act-close):not(.act-manual):not(.act-section)'));
       const sel = rows.filter(function (li) {
         const cb = li.querySelector('.act-check');
         return cb && cb.checked;
