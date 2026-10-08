@@ -301,7 +301,7 @@ const FlowProofOfClose = (() => {
   function rowMessageIds(entry) {
     const ids = [];
     if (!entry) return ids;
-    [entry.messageId, entry.legacyMessageId, entry.gmailMessageId, entry.outlookIncomingId, entry.itemId, entry.pathId].forEach((id) => {
+    [entry.messageId, entry.legacyMessageId, entry.gmailMessageId, entry.outlookIncomingId, entry.itemId, entry.pathId, entry.graphMessageId].forEach((id) => {
       const c = canonId(id);
       if (c) ids.push(c);
     });
@@ -335,6 +335,42 @@ const FlowProofOfClose = (() => {
   // or dismiss of this task means the banner stays down. A later shown
   // line does not hide a proved task. A different hash after reload still
   // matches the legacy message id or the thread id stored on the row.
+  // A proved file for this mail and this filename. A later undo of that
+  // file offers Save again. A different filename does not count.
+  function savedFileReceipt(log, query) {
+    const q = query || {};
+    const names = Array.isArray(q.fileNames) ? q.fileNames : [];
+    if (!names.length) return null;
+    const subject = String(q.subject || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    const ids = new Set();
+    (q.messageIds || []).forEach((id) => {
+      const c = canonId(id);
+      if (c) ids.add(c);
+    });
+    const rows = Array.isArray(log) ? log : [];
+    for (let i = 0; i < rows.length; i++) {
+      const entry = rows[i];
+      if (!entry || !isFileReceiptRow(entry)) continue;
+      const saved = savedFileName(entry);
+      let nameHit = false;
+      for (let n = 0; n < names.length; n++) {
+        if (fileNameAgrees(saved, names[n])) nameHit = true;
+      }
+      if (!nameHit) continue;
+      const rowIds = rowMessageIds(entry);
+      let idHit = false;
+      for (let k = 0; k < rowIds.length; k++) {
+        if (ids.has(rowIds[k])) idHit = true;
+      }
+      const rowSubject = String(entry.subject || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const subjectHit = Boolean(subject) && rowSubject === subject;
+      if (!idHit && !subjectHit) continue;
+      if (entry.kind === 'undone' || entry.kind === 'dismissed' || entry.undone === true) return null;
+      if (entry.kind === 'written' && entry.fetchedBack === true && isTaskReceiptRow(entry)) return entry;
+    }
+    return null;
+  }
+
   function taskReceiptFromLog(log, messageIdOrQuery) {
     const found = queryIds(messageIdOrQuery);
     if (!found.messageIds.size && !found.threadIds.size) return null;
@@ -817,6 +853,7 @@ const FlowProofOfClose = (() => {
     activityFields: activityFields,
     canonId: canonId,
     taskReceiptFromLog: taskReceiptFromLog,
+    savedFileReceipt: savedFileReceipt,
     scanReceiptDecision: scanReceiptDecision,
     remountCopy: remountCopy,
     receiptLogFields: receiptLogFields,

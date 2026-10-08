@@ -171,7 +171,7 @@ const FlowStepListView = (() => {
     }
     const root = document.createElement('div');
     root.className = 'flow-step-card flow-step-list';
-    if (themeDark()) root.setAttribute('data-theme', 'dark');
+    if (o.theme === 'dark' || themeDark()) root.setAttribute('data-theme', 'dark');
     root.setAttribute('data-glance-states', 'queued');
     root.setAttribute('data-glance-state', 'queued');
     host.appendChild(root);

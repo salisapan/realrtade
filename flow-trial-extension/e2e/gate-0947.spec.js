@@ -128,8 +128,16 @@ test('an older undone promise still matches when OWA adds a translation line', a
     translateBanner: true
   });
   const pane = page.locator('#ReadingPaneContainerId');
-  await expect(pane.locator('button.flow-chip')).toHaveCount(1);
+  await expect(pane.locator('button.flow-chip')).toHaveCount(0);
   await expect(pane.getByText(line)).toHaveCount(0);
+  const same = await glance.openOutlook({
+    id: 'AQMkPassport35',
+    subject: 'Gate 0.9.35 To Do title',
+    senderEmail: S.SENDER,
+    body: DANA,
+    translateBanner: true
+  });
+  await expect(same.locator('#ReadingPaneContainerId button.flow-chip')).toHaveCount(1);
 });
 
 test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', async ({ glance }) => {

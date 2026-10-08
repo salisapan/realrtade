@@ -303,8 +303,8 @@ check('a file save is not injected as a draft receipt',
   /connectorId !== 'outlookDraft'/.test(outlookSrc) && /entry\.connectorId === 'outlookDraft'/.test(outlookSrc));
 check('a missing sender still queries when the subject or conversation is on the page',
   outlookSrc.indexOf('function hydratePane') > 0 && /!pane\.subject && !wantConv && !wantNet/.test(outlookSrc));
-check('an undone task with the same subject reopens Do It',
-  /taskRow && paneSub && rowSub && paneSub === rowSub/.test(outlookSrc));
+check('an undone task reopens Do It by exchange id, not by a shared subject',
+  /promiseOwnedElsewhere/.test(outlookSrc) && !/taskRow && paneSub && rowSub && paneSub === rowSub/.test(outlookSrc));
 
 const one = FlowOwaParse.uniqueGraphMessage(
   pane('AQQkGlanceE2ENorthwindConv', '2026-10-08T14:01:00.000Z', [file('northwind-agreement-signed.pdf', 3072)]),
@@ -347,6 +347,38 @@ const exact = FlowOwaParse.matchEntryHow(
   [{ messageId: 'graph-AAA', subject: 'Pilot proposal', sender: { email: 'ai.local.flow@gmail.com' }, receivedDateTime: '2026-10-05T09:55:00Z' }]
 );
 check('one exact subject and sender still matches', exact && exact.entry && exact.entry.messageId === 'graph-AAA', exact);
+
+const falseSearch = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', conversationId: 'AQQkSearchNotGraph', receivedDateTime: betaWhen, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
+  [alpha, beta]
+);
+check('a search id that matches no Graph row still links the unique beta file',
+  falseSearch.message && falseSearch.message.id === 'm-beta' && !/id-conflict/.test(falseSearch.detail || ''), falseSearch);
+const alphaOther = msg('m-alpha', 'AQQkAlpha', alphaWhen, [file('statement-q3-alpha.pdf', 3072)], 'Q3 fund statement');
+const betaOther = msg('m-beta', 'AQQkBeta', betaWhen, [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement');
+const realBeat = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', conversationId: 'AQQkAlpha', idKind: 'conversation', idSource: 'open-mail', receivedDateTime: betaWhen, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
+  [alphaOther, betaOther]
+);
+check('a conversation id that is the other row still beats the beta filename',
+  !realBeat.message && /id-conflict/.test(realBeat.detail || '') && /kind=conversation/.test(realBeat.detail || '') && /source=open-mail/.test(realBeat.detail || ''), realBeat);
+
+const twinAt = '2026-10-08T11:37:50.000Z';
+const twinBt = '2026-10-08T11:37:59.000Z';
+const twinAlpha = msg('m-alpha', 'AQQkAlpha', twinAt, [file('statement-q3-alpha.pdf', 3072)], 'Q3 fund statement');
+const twinBeta = msg('m-beta', 'AQQkBeta', twinBt, [file('statement-q3-beta.pdf', 4096)], 'Q3 fund statement');
+const gateBeta = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', conversationId: null, idSource: 'url-unconfirmed', idKind: 'conversation', receivedDateTime: twinBt, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
+  [twinAlpha, twinBeta]
+);
+check('gate049 beta at the same minute links statement-q3-beta.pdf',
+  gateBeta.message && gateBeta.message.id === 'm-beta' && /time-file/.test(gateBeta.detail || ''), gateBeta);
+const staleAlpha = FlowOwaParse.uniqueGraphMessage(
+  { subject: 'Q3 fund statement', conversationId: 'AQQkAlpha', idSource: 'url-unconfirmed', idKind: 'conversation', receivedDateTime: twinBt, attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }] },
+  [twinAlpha, twinBeta]
+);
+check('a stale url conversation id is not a conflict against beta.pdf',
+  staleAlpha.message && staleAlpha.message.id === 'm-beta' && !/id-conflict/.test(staleAlpha.detail || ''), staleAlpha);
 
 const receiptLeak = FlowOwaParse.matchEntryHow(
   { subject: 'Q3 fund statement', senderEmail: 'dana@acme.com' },

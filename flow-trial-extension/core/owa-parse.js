@@ -44,9 +44,15 @@ const FlowOwaParse = (() => {
     return s.replace(/^ol:/, '').replace(/[+\-]/g, '-').replace(/[/_]/g, '_').replace(/=+$/, '').trim();
   }
 
+  // Bidi marks and NBSP sit in front of Hebrew "אל:" and are not \s, so a
+  // To line that starts with them never matched. Strip them before any read.
+  const INLINE_MARKS = /[\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c\ufeff\u200b\u200c\u200d]/g;
+  function plainLine(s) {
+    return String(s || '').replace(INLINE_MARKS, '').replace(/[\u00a0\u202f]/g, ' ');
+  }
   function textOf(el) {
     if (!el) return '';
-    return String(el.innerText || el.textContent || '').replace(/\s+\n/g, '\n').trim();
+    return plainLine(el.innerText || el.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
   }
 
   // Normalize for matching against Graph/sync entries.
@@ -292,7 +298,25 @@ const FlowOwaParse = (() => {
   }
 
   // A missing id is not a conflict. Both sides have to carry it, and differ.
+  // True when the open id is actually on one of these Graph rows.
+  // A search URL that merely looks like a conversation id is not.
+  function idEvidence(pane, messages) {
+    const conv = canonId(pane && pane.conversationId);
+    const net = canonId(pane && pane.internetMessageId);
+    let convHit = false;
+    let netHit = false;
+    (messages || []).forEach((m) => {
+      if (!m) return;
+      if (conv && canonId(m.conversationId) === conv) convHit = true;
+      if (net && canonId(m.internetMessageId) === net) netHit = true;
+    });
+    return { convReal: Boolean(conv && convHit), netReal: Boolean(net && netHit) };
+  }
+
   function idConflict(pane, m) {
+    // A URL id that is not on the open mail is the previous message or a
+    // search address. It is not evidence that this file is the wrong one.
+    if (pane && pane.idSource === 'url-unconfirmed') return '';
     const paneConv = canonId(pane && pane.conversationId);
     const msgConv = canonId(m && m.conversationId);
     if (paneConv && msgConv && paneConv !== msgConv) return 'conversation';
@@ -320,7 +344,10 @@ const FlowOwaParse = (() => {
     const list = (messages || []).filter(Boolean);
     const minute = minuteKey(pane && (pane.receivedDateTime || pane.date)) || '';
     function pack(message, why) {
-      const detail = why + ' minute=' + (minute || 'none') + ' n=' + list.length;
+      let detail = why + ' minute=' + (minute || 'none') + ' n=' + list.length;
+      if (String(why).indexOf('conflict') >= 0) {
+        detail += ' kind=' + String((pane && pane.idKind) || 'none') + ' source=' + String((pane && pane.idSource) || 'none');
+      }
       if (!message) return { message: null, reason: 'suggest:unresolved', detail: detail };
       return { message: message, reason: null, detail: detail };
     }
@@ -374,8 +401,15 @@ const FlowOwaParse = (() => {
     }
     // The hour gate has already kept both halves of an ambiguous clock.
     // An id that disagrees is still a conflict, and it outweighs a filename.
-    const agreedId = pool.filter((m) => !idConflict(pane, m));
-    if (pool.length && !agreedId.length) return pack(null, 'id-conflict');
+    // A pane id that is on none of these rows is not that evidence: a search
+    // address can carry a conversation-shaped id that is not the Graph id.
+    // One row whose id really differs still stays unresolved above.
+    let agreedId = pool.filter((m) => !idConflict(pane, m));
+    if (pool.length && !agreedId.length) {
+      const seen = idEvidence(pane, list);
+      if (seen.convReal || seen.netReal) return pack(null, 'id-conflict');
+      agreedId = pool;
+    }
     pool = agreedId;
     if (fileRows(pane && pane.attachments).length) {
       const agreed = pool.filter((m) => fileRelation(pane.attachments, m.attachments || m.files) === 'yes');
@@ -584,12 +618,93 @@ const FlowOwaParse = (() => {
     return { container, subject: subjectHead ? headingText(subjectHead) : '', senderName: senderHead ? headingText(senderHead) : '' };
   }
 
+  // The prose of this message, not the header chips OWA nests in the same document.
+  function innerMessage(bodyRoot) {
+    if (!bodyRoot || !bodyRoot.querySelector) return null;
+    return bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"], [class*="allowTextSelection"], [id^="UniqueMessageBody"]');
+  }
+
+  // Header siblings that belong to this body, stopping at the previous message.
+  // The first address in the whole thread is often a different mail.
+  function messageHeader(bodyRoot, fallback) {
+    const chunks = [];
+    let n = bodyRoot && bodyRoot.previousElementSibling;
+    while (n) {
+      const role = n.getAttribute && n.getAttribute('role');
+      if (role === 'document') break;
+      if (n.querySelector && n.querySelector('[role="document"]')) break;
+      chunks.push(n);
+      n = n.previousElementSibling;
+    }
+    if (!chunks.length) return fallback;
+    return {
+      querySelectorAll: function (sel) {
+        const out = [];
+        chunks.forEach((c) => {
+          try {
+            if (c.matches && c.matches(sel)) out.push(c);
+          } catch (e) { /* selector not for elements */ }
+          if (!c.querySelectorAll) return;
+          let found = [];
+          try { found = c.querySelectorAll(sel); } catch (e2) { found = []; }
+          for (let i = 0; i < found.length; i++) out.push(found[i]);
+        });
+        return out;
+      },
+      querySelector: function (sel) {
+        const all = this.querySelectorAll(sel);
+        return all.length ? all[0] : null;
+      }
+    };
+  }
+
+  function headingBefore(bodyRoot) {
+    let n = bodyRoot && bodyRoot.previousElementSibling;
+    while (n) {
+      const role = n.getAttribute && n.getAttribute('role');
+      if (role === 'document') break;
+      if (n.querySelector && n.querySelector('[role="document"]')) break;
+      const heads = [];
+      if (n.matches && HEADINGS.split(', ').some((s) => { try { return n.matches(s); } catch (e) { return false; } }) && usable(n)) heads.push(n);
+      if (n.querySelectorAll) {
+        let found = [];
+        try { found = n.querySelectorAll(HEADINGS); } catch (e) { found = []; }
+        for (let i = 0; i < found.length; i++) if (usable(found[i])) heads.push(found[i]);
+      }
+      if (heads.length) return headingText(heads[heads.length - 1]);
+      n = n.previousElementSibling;
+    }
+    return '';
+  }
+
+  // The open mail's own header, not the rest of the thread and not the URL.
+  function idOnOpenMail(header, id) {
+    const raw = String(id || '');
+    const want = canonId(raw);
+    if (!want || want.length < 8 || !header || !header.querySelectorAll) return false;
+    let nodes = [];
+    try { nodes = header.querySelectorAll('a, span, div, [data-convid], [data-conversation-id]'); } catch (e) { nodes = []; }
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const bits = [textOf(n)];
+      if (n.getAttribute) {
+        bits.push(n.getAttribute('href') || '', n.getAttribute('data-convid') || '', n.getAttribute('data-conversation-id') || '', n.getAttribute('title') || '');
+      }
+      const blob = bits.join(' ');
+      if (blob.indexOf(raw) >= 0) return true;
+      const flat = canonId(blob);
+      if (flat && flat.indexOf(want) >= 0) return true;
+    }
+    return false;
+  }
+
   // opts: { own: [addresses] } so the person's own address in the header is never taken for the sender.
   function readPane(doc, href, opts) {
     const d = doc || (typeof document !== 'undefined' ? document : null);
     if (!d) return null;
     const roots = readingPaneRoots(d);
-    const bodyRoot = roots[0] || null;
+    // Document order is oldest first. The open message is the last body.
+    const bodyRoot = roots.length ? roots[roots.length - 1] : null;
     if (!bodyRoot) return null; // no message body on screen: stay silent rather than read the message list
     const head = headerOf(bodyRoot, d);
     const container = head.container;
@@ -598,27 +713,51 @@ const FlowOwaParse = (() => {
       const fallback = d.querySelector('[role="main"] [role="heading"]') || d.querySelector('[role="main"] h1, [role="main"] h2');
       subject = fallback && !inList(fallback) ? headingText(fallback) : '';
     }
-    const who = senderOf(container, bodyRoot, opts && opts.own);
+    const header = messageHeader(bodyRoot, container);
+    const who = senderOf(header, bodyRoot, opts && opts.own);
     const fromWho = who.name && !looksLikeDateTime(who.name) ? who.name : '';
     const fromHead = head.senderName && !looksLikeDateTime(head.senderName) ? head.senderName : '';
     // The persona/name element wins over a heading nearer the body (that nearer heading is often the date row).
-    const senderName = personaName(container, bodyRoot) || fromWho || fromHead || '';
-    const body = textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
+    const senderName = personaName(header, bodyRoot) || fromWho || fromHead || '';
+    const inner = innerMessage(bodyRoot);
+    const body = textOf(inner) || textOf(bodyRoot.querySelector('.AllowTextSelection, [class*="UniqueMessageBody"]')) || textOf(bodyRoot);
+    if (roots.length > 1) {
+      const nearSubject = headingBefore(bodyRoot);
+      if (nearSubject) subject = nearSubject;
+    }
     if (!subject && !body) return null;
     const ids = urlIds(href || (typeof location !== 'undefined' ? location.href : ''));
-    const whoTo = recipientsOf(container, bodyRoot, opts);
+    // The URL id counts only when this open message's header also shows it.
+    // The previous mail's AQQk, or a search id, is not this message.
+    let conversationId = ids.conversationId;
+    let idKind = ids.kind || '';
+    let idSource = ids.kind ? 'url' : '';
+    if (ids.conversationId) {
+      if (idOnOpenMail(header, ids.conversationId)) {
+        idKind = 'conversation';
+        idSource = 'open-mail';
+      } else {
+        idKind = 'conversation';
+        idSource = 'url-unconfirmed';
+        conversationId = null;
+      }
+    }
+    const whoTo = recipientsOf(container, bodyRoot, Object.assign({}, opts, { senderEmail: who.email }));
     const when = receivedInfo(container, bodyRoot);
     return {
       itemId: ids.itemId,
-      conversationId: ids.conversationId,
+      conversationId: conversationId,
       pathId: ids.raw || null,
-      idKind: ids.kind,
+      idKind: idKind,
+      idSource: idSource,
+      rawUrlId: ids.raw || null,
       subject: subject === senderName && head.senderName ? '' : subject,
       senderEmail: who.email,
       senderName: senderName.slice(0, 80),
       text: stripReadingChrome(body),
       to: whoTo.to,
       cc: whoTo.cc,
+      rawToLine: whoTo.rawToLine || '',
       receivedDateTime: when.iso,
       clockUnread: when.unread,
       clockAmbiguous: when.ambiguous === true,
@@ -670,16 +809,21 @@ const FlowOwaParse = (() => {
       if (userName && userName.indexOf(' ') >= 0 && own.length && bits.join(' ').toLowerCase().indexOf(userName) >= 0) push(bucket, own[0]);
     }
     function lineKind(raw) {
-      const t = String(raw || '').replace(/\s+/g, ' ').trim();
+      const t = plainLine(raw).replace(/\s+/g, ' ').trim();
       if (!t || t.length > 400) return '';
       if (/^\s*to\b/i.test(t) || /^\s*אל(?:\s|:|$)/.test(t)) return 'to';
       if (/^\s*cc\b/i.test(t) || /^\s*עותק(?:\s|:|$)/.test(t)) return 'cc';
       return '';
     }
+    let rawToLine = '';
     const nodes = container.querySelectorAll('div, p, li, span, button');
+    const prose = innerMessage(bodyRoot);
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
-      if (bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
+      // The letter itself is not the envelope. A To chip OWA nests in the
+      // same role=document as the prose still counts.
+      if (prose && prose.contains && prose.contains(n)) continue;
+      if (!prose && bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
       const t = textOf(n).replace(/\s+/g, ' ').trim();
       if (!t || t.length > 400) continue;
       // \b is ASCII-only, so "אל sali sapan" in one text node is not a To line
@@ -695,8 +839,35 @@ const FlowOwaParse = (() => {
       const before = bucket.length;
       harvest(n, bucket);
       if (bucket.length === before) harvest(n.nextElementSibling, bucket);
+      if (kind === 'to' && !rawToLine) {
+        rawToLine = plainLine((textOf(n) + ' ' + textOf(n.nextElementSibling))).replace(/\s+/g, ' ').trim().slice(0, 180);
+      }
     }
-    return { to: to, cc: cc };
+    // The address is in the header and not on From. A To label the line
+    // walker missed still names the reader.
+    if (!to.length && own.length) {
+      const from = String((opts && opts.senderEmail) || '').toLowerCase();
+      const nodes = container.querySelectorAll('div, p, li, span, button, a');
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (prose && prose.contains && prose.contains(n)) continue;
+        if (prose && n.contains && n.contains(prose)) continue;
+        if (!prose && bodyRoot && bodyRoot.contains && bodyRoot.contains(n)) continue;
+        if (bodyRoot && n.contains && n.contains(bodyRoot)) continue;
+        const aria = n.getAttribute ? String(n.getAttribute('aria-label') || '') : '';
+        const title = n.getAttribute ? String(n.getAttribute('title') || '') : '';
+        const href = n.getAttribute ? String(n.getAttribute('href') || '') : '';
+        const blob = plainLine([textOf(n), aria, title, href].join(' ')).replace(/\s+/g, ' ').trim();
+        if (!blob || lineKind(blob) === 'cc') continue;
+        if (/^(?:from\b|מאת)(?:\s|:|$)/i.test(blob)) continue;
+        const found = emailsIn(blob).filter((e) => own.indexOf(e) >= 0 && e !== from);
+        if (!found.length) continue;
+        push(to, found[0]);
+        if (!rawToLine) rawToLine = blob.slice(0, 180);
+        break;
+      }
+    }
+    return { to: to, cc: cc, rawToLine: rawToLine };
   }
 
   // English a.m./p.m. as its own token, and the Hebrew markers OWA prints

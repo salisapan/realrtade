@@ -310,7 +310,24 @@ const FlowIntent = (() => {
   // The sender said not to act. A dated agreement or a figure underneath
   // is context, not a close. Hard gates never read the score, so "FYI, we
   // agreed…" chipped at 17.
-  const INFO_ONLY = /\b(?:fyi|for your information|no action (?:needed|required|necessary)|no reply needed|no need to (?:reply|respond|do anything)|informational only|for visibility only|for (?:your )?awareness|looping you(?: in)? for (?:visibility|awareness))\b|(?:^|\s)(?:לידיעתך|לידיעה בלבד|אין צורך בפעולה|אין צורך להגיב)|לא נדרש(?:ת|ים)?\s+(?:ממך\s+)?(?:פעולה|דבר|כלום|ממך)/i;
+  // "No need to reply" cancels the draft. It does not cancel the work.
+  // fyi / no action needed / no need to do anything / לידיעתך still quiet the whole mail.
+  const INFO_FULL = /\b(?:fyi|for your information|no action (?:needed|required|necessary)|no need to do anything|informational only|for visibility only|for (?:your )?awareness|looping you(?: in)? for (?:visibility|awareness))\b|(?:^|\s)(?:לידיעתך|לידיעה בלבד|אין צורך בפעולה)|לא נדרש(?:ת|ים)?\s+(?:ממך\s+)?(?:פעולה|דבר|כלום|ממך)/i;
+  const REPLY_CANCEL = /\b(?:no reply needed|no need to (?:reply|respond))\b|(?:^|\s)אין צורך להגיב/i;
+  const ACTION_PLEASE = /\bplease\s+[a-z]{2,}\b/i;
+  const JUST_DO = /\bjust get it done\b/i;
+  const DUE_CUE = /\b(?:today|tomorrow|tonight|monday|tuesday|wednesday|thursday|friday|saturday|sunday|by|before|due|expires?)\b|\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b|\b\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?\b/i;
+  function replyCancelOnly(text) {
+    const raw = String(text || '');
+    if (INFO_FULL.test(raw) || !REPLY_CANCEL.test(raw)) return false;
+    if (ACTION_PLEASE.test(raw)) return true;
+    return JUST_DO.test(raw) && DUE_CUE.test(raw);
+  }
+  function infoOnlyMail(text) {
+    const raw = String(text || '');
+    if (INFO_FULL.test(raw)) return true;
+    return REPLY_CANCEL.test(raw) && !replyCancelOnly(raw);
+  }
   // Bumps and calendar-acceptance mail the existing noise list does not
   // name. "Just following up — could you share the contract" is not in
   // here; that ask still chips.
@@ -369,6 +386,15 @@ const FlowIntent = (() => {
   }
   // A reply draft is offered only for an inbound ask addressed to the user.
   // No To and no Cc is not that ask: the page did not show who it was for.
+  // "Hi," is a greeting, not a person named Hi. "Hi Dana," names Dana.
+  const OPEN_GREET = /^(?:good\s+(?:morning|afternoon|evening)|greetings|hi|hey|hello|dear)\b|^(?:בוקר\s+טוב|ערב\s+טוב|שלום|היי|הי)(?![\u0590-\u05FF])/i;
+  function openingAddressee(text) {
+    let raw = String(text || '').replace(/^\uFEFF/, '').replace(/^[\s\u00a0\u202f]+/, '');
+    const greet = raw.match(OPEN_GREET);
+    if (greet) raw = raw.slice(greet[0].length).replace(/^[\s,،:!]+/, '');
+    const named = raw.match(/^([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40}),/);
+    return named ? named[1] : '';
+  }
   function replyDraftAllowed(text, ctx) {
     const c = ctx || {};
     if (c.autoReply === true || c.noteToSelf === true || c.senderIsUser === true) return false;
@@ -381,12 +407,12 @@ const FlowIntent = (() => {
     const cc = addressList(c.cc || c.ccRecipients);
     if (!to.length && !cc.length) return false;
     if (own.length && (to.length || cc.length) && !to.some((a) => own.indexOf(a) !== -1)) return false;
-    const named = String(text || '').match(/^\s*([A-Za-z\u0590-\u05FF][A-Za-z\u0590-\u05FF'’-]{0,40}),/);
+    const who = openingAddressee(text);
     const userName = String(c.userName || '').trim().toLowerCase();
-    if (named && userName) {
-      const who = named[1].toLowerCase();
+    if (who && userName) {
+      const named = who.toLowerCase();
       const first = userName.split(/\s+/)[0];
-      if (who !== userName && who !== first) return false;
+      if (named !== userName && named !== first) return false;
     }
     return true;
   }
@@ -626,6 +652,8 @@ const FlowIntent = (() => {
       };
       if (personalClose) intent.personalClose = personalClose;
       if (googleClose) intent.googleClose = googleClose;
+      // "No need to reply, just get it done" still does the work. The draft stays off.
+      if (replyCancelOnly(text)) intent.noReplyDraft = true;
       const fam = familyBox.hit;
       if (familyAgrees(type, fam)) {
         intent.closeFamily = fam.family;
@@ -694,7 +722,7 @@ const FlowIntent = (() => {
     // scorer's own list does not name yet (FYI, a quick bump, "Accepted:").
     // It also stops the score path below: a FYI wrapped around a strong
     // approval would otherwise clear 50 after the hard gates declined.
-    const infoOrNoise = INFO_ONLY.test(text) || EXTRA_NOISE.test(text);
+    const infoOrNoise = infoOnlyMail(text) || EXTRA_NOISE.test(text);
     const blocked = s.flags.noise || infoOrNoise;
     // Softness is about the ask that would actually chip. The quoted
     // sentence is the first handoff, so a conditional opener ("במידה
@@ -980,8 +1008,11 @@ const FlowIntent = (() => {
     // when it names the receipt; the old due date is not what made it real.
     // A clean parking-permit renew is the work. A mass-mail footer stays
     // quiet, including when the subject is that ask.
-    const parkingAsk = typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.parkingPermitAsk === 'function' && FlowCloseFamilies.parkingPermitAsk(text);
-    if (parkingAsk && !blocked) {
+    const parkingBody = typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.parkingPermitAsk === 'function' && FlowCloseFamilies.parkingPermitAsk(text);
+    const parkingSubject = typeof FlowCloseFamilies !== 'undefined' && typeof FlowCloseFamilies.parkingPermitAsk === 'function' && FlowCloseFamilies.parkingPermitAsk(ctx.subject || '');
+    // The ask is often the subject. A mass-mail footer in the body still blocks it.
+    const parkingAsk = (parkingBody || parkingSubject) && !blocked;
+    if (parkingAsk) {
       return finish(TYPES.REQUEST, 'medium', {
         who, amount,
         what: 'Renew the parking permit',
@@ -1135,7 +1166,7 @@ const FlowIntent = (() => {
     return intent.confidence !== 'low';
   }
 
-  return { TYPES, classify, shouldShowChip };
+  return { TYPES, classify, shouldShowChip, openingAddressee };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowIntent };

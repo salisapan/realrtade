@@ -115,6 +115,17 @@
     if (key === lastReasonKey && lastReasonStored) return;
     const quiet = quietReason(reason);
     const quietId = pane && (pane.itemId || pane.conversationId);
+    if (/hedge/.test(String(reason || '')) && pane) {
+      const named = (typeof FlowIntent !== 'undefined' && typeof FlowIntent.openingAddressee === 'function')
+        ? FlowIntent.openingAddressee(pane.text || '')
+        : '';
+      extra = Object.assign({
+        addresseeName: String(named || '').slice(0, 80),
+        toCount: Array.isArray(pane.to) ? pane.to.length : 0,
+        ccCount: Array.isArray(pane.cc) ? pane.cc.length : 0,
+        rawToLine: String(pane.rawToLine || '').slice(0, 180)
+      }, extra || {});
+    }
     if (quiet && quietId && typeof FlowStorage !== 'undefined' && typeof FlowStorage.recordSilence === 'function') {
       FlowStorage.recordSilence({ messageId: String(quietId), reason: quiet }).catch(() => {});
     }
@@ -753,7 +764,7 @@
   function outlookOnedriveRow(row) {
     if (!row) return false;
     if (row.system === 'microsoft/onedrive') return true;
-    return row.connectorId === 'onedriveFile';
+    return row.connectorId === 'onedriveFile' || row.connectorId === 'attachmentSave';
   }
 
   function outlookProofRow(row) {
@@ -899,6 +910,7 @@
     done.appendChild(actionsRow);
     done.appendChild(hint);
     if (manuals) done.appendChild(el('span', 'flow-chip-label', manuals + (manuals === 1 ? ' manual step left for you' : ' manual steps left for you')));
+    host.__glanceSteps = null;
     host.replaceChildren(done);
     if (stateTrail) host.setAttribute('data-glance-states', stateTrail);
     if (scope.querySelectorAll) {
@@ -1024,9 +1036,31 @@
     try { bag = await FlowStorage.get(); } catch (e) { return false; }
     const log = (bag && bag.log) || [];
     const todoLog = log.filter((e) => outlookProofRow(e));
-    const fileNames = (pane.attachments || []).map((a) => a && (a.name || a.filename)).filter(Boolean);
+    let fileNames = (pane.attachments || []).map((a) => a && (a.name || a.filename)).filter(Boolean);
+    if (typeof FlowProofOfClose.savedFileReceipt === 'function' && fileNames.length) {
+      const provedFile = FlowProofOfClose.savedFileReceipt(todoLog, {
+        messageIds: [pane.itemId, pane.pathId, pane.conversationId].concat(pane.graphMessageId ? [pane.graphMessageId] : []),
+        fileNames: fileNames,
+        subject: pane.subject || ''
+      });
+      if (provedFile && paintOutlookTodoReceipt(mount, provedFile)) {
+        lastOutcome = 'card';
+        lastKey = (provedFile.messageId || 'open') + '|task-proof';
+        return true;
+      }
+    }
+    let graphId = '';
+    try {
+      const linked = await suggestFiles(pane);
+      if (linked && linked.messageId && !linked.unresolved) {
+        graphId = linked.messageId;
+        if (!fileNames.length && Array.isArray(linked.files)) {
+          fileNames = linked.files.map((a) => a && (a.name || a.filename)).filter(Boolean);
+        }
+      }
+    } catch (e) { /* a miss stays on the ids the page already has */ }
     const row = FlowProofOfClose.taskReceiptFromLog(todoLog, {
-      messageIds: [pane.itemId, pane.pathId, pane.conversationId],
+      messageIds: [pane.itemId, pane.pathId, pane.conversationId].concat(graphId ? [graphId] : []),
       threadIds: [pane.conversationId],
       fileNames: fileNames
     });
@@ -2271,6 +2305,12 @@
       return;
     }
 
+    if (!receiptOnly && await promiseOwnedElsewhere(pane, decided && decided.intent)) {
+      dropStuckCard();
+      await pageReason('page:same-promise', pane);
+      return;
+    }
+
     const ctx = buildCtx(entry, pane, decided);
     if (!ctx || !ctx.messageId) { await pageReason('page:no-process', pane); return; }
     const receipts = typeof FlowStorage.getActiveOutlookReceipts === 'function'
@@ -2473,6 +2513,11 @@
     if (!pane) return pane;
     const needSender = !pane.senderEmail;
     const needAudience = !(pane.to && pane.to.length) && !(pane.cc && pane.cc.length);
+    const mailKey = [pane.subject || '', ((pane.attachments || []).map((a) => a && (a.name || a.filename)).filter(Boolean).join(',')), String(pane.text || '').slice(0, 48)].join('|');
+    if (hydratePane.mailKey && hydratePane.mailKey !== mailKey) {
+      Object.keys(hydrateCache).forEach((k) => { delete hydrateCache[k]; });
+    }
+    hydratePane.mailKey = mailKey;
     if (!needSender && !needAudience && pane.subject) return pane;
     const conv = String(pane.conversationId || '').trim();
     const item = pane.itemId && !isConversationId(pane.itemId) ? String(pane.itemId) : '';
@@ -2488,6 +2533,10 @@
       const filter = "conversationId eq '" + odataQuote(conv) + "'";
       const body = await graphJson('/me/messages?$filter=' + encodeURIComponent(filter) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate', null);
       rows = body && Array.isArray(body.value) ? body.value : [];
+    }
+    if (!rows.length && pane.subject) {
+      const bySubject = await graphJson('/me/messages?$filter=' + encodeURIComponent(subjectFilter(pane.subject)) + '&$top=20&$select=' + encodeURIComponent(select), 'pane-hydrate-subject', null);
+      rows = bySubject && Array.isArray(bySubject.value) ? bySubject.value : [];
     }
     if (!rows.length) return pane;
     const minute = minuteOf(pane.receivedDateTime);
@@ -2819,16 +2868,18 @@
           status: 'Handled.'
         })
         : null;
+      const graphId = ctx.graphMessageId && !isConversationId(ctx.graphMessageId) ? ctx.graphMessageId : '';
       await FlowStorage.appendLog(Object.assign({
         kind: 'written',
         label: title,
         actionTitle: title,
         messageId: ctx.messageId,
-        itemId: ctx.itemId || null,
+        itemId: graphId || ctx.itemId || null,
         pathId: ctx.pathId || null,
+        graphMessageId: graphId || null,
         threadId: ctx.conversationId || null,
         outlookConversationId: ctx.conversationId || null,
-        outlookIncomingId: ctx.messageId,
+        outlookIncomingId: graphId || ctx.messageId,
         app: 'outlook',
         connectorId: 'attachmentSave',
         ref: r.ref,
@@ -2843,8 +2894,9 @@
         paintOutlookTodoReceipt(mount, Object.assign({
           kind: 'written',
           messageId: ctx.messageId,
-          itemId: ctx.itemId || null,
+          itemId: graphId || ctx.itemId || null,
           pathId: ctx.pathId || null,
+          graphMessageId: graphId || null,
           threadId: ctx.conversationId || null,
           outlookConversationId: ctx.conversationId || null,
           connectorId: 'attachmentSave',
@@ -2878,6 +2930,23 @@
     suggestNote = null;
     if (!pane || typeof FlowSuggestSave === 'undefined' || typeof FlowSuggestSave.suggestSave !== 'function') return;
     const sameChip = chipForThisPane(pane);
+    if (sameChip && sameChip.classList.contains('flow-chip-settled') && sameChip.getAttribute('data-glance-chain') === 'task-proof') return;
+    if (typeof FlowProofOfClose !== 'undefined' && typeof FlowProofOfClose.savedFileReceipt === 'function') {
+      let bagNow = null;
+      try { bagNow = await FlowStorage.get(); } catch (e0) { bagNow = null; }
+      const namesNow = (pane.attachments || []).map((a) => a && (a.name || a.filename)).filter(Boolean);
+      const provedNow = FlowProofOfClose.savedFileReceipt(((bagNow && bagNow.log) || []).filter(outlookProofRow), {
+        messageIds: [pane.itemId, pane.pathId, pane.conversationId].concat(pane.graphMessageId ? [pane.graphMessageId] : []),
+        fileNames: namesNow,
+        subject: pane.subject || ''
+      });
+      const mountNow = mountPoint();
+      if (provedNow && mountNow && paintOutlookTodoReceipt(mountNow, provedNow)) {
+        lastOutcome = 'card';
+        await clearReason(pane);
+        return;
+      }
+    }
     const showed = Boolean(sameChip);
     const messageId = pane.itemId || pane.conversationId || pane.pathId || '';
     let files = null;
@@ -2890,6 +2959,21 @@
       else if (read && Array.isArray(read.files)) {
         files = read.files;
         graphMessageId = read.messageId || '';
+        if (graphMessageId && typeof FlowProofOfClose !== 'undefined' && typeof FlowProofOfClose.taskReceiptFromLog === 'function') {
+          let bagNow = null;
+          try { bagNow = await FlowStorage.get(); } catch (e2) { bagNow = null; }
+          const proved = FlowProofOfClose.taskReceiptFromLog(((bagNow && bagNow.log) || []).filter(outlookProofRow), {
+            messageIds: [graphMessageId],
+            threadIds: [],
+            fileNames: files.map((a) => a && (a.name || a.filename)).filter(Boolean)
+          });
+          const mountNow = mountPoint();
+          if (proved && mountNow && paintOutlookTodoReceipt(mountNow, proved)) {
+            lastOutcome = 'card';
+            await clearReason(pane);
+            return;
+          }
+        }
       } else files = read;
     } catch (e) { files = null; stageReason = 'suggest:attachments-unread'; }
     if (stageReason && !showed) {
@@ -2995,35 +3079,40 @@
     const open = await FlowStorage.getStillOpen();
     if (!open || !open.length) return null;
     const ids = messageIdsOf(pane);
-    const clean = (typeof FlowOwaParse.stripReadingChrome === 'function')
-      ? FlowOwaParse.stripReadingChrome(pane.text)
-      : pane.text;
-    const probe = {
-      text: clean,
-      subject: pane.subject,
-      sender: { email: pane.senderEmail, name: pane.senderName },
-      threadId: pane.conversationId || '',
-      outlookConversationId: pane.conversationId || '',
-      messageId: pane.itemId || pane.pathId || pane.conversationId || ''
-    };
-    const key = FlowStillOpen.promiseKey(probe);
     for (let i = 0; i < open.length; i++) {
       const row = open[i];
       if (!row || !row.process) continue;
       const rowIds = [row.messageId, row.itemId, row.pathId, row.threadId, row.outlookConversationId].filter(Boolean).map(String);
       if (ids.some((id) => rowIds.some((rid) => sameExchangeId(id, rid)))) return row;
-      const steps = (row.process && row.process.steps) || [];
-      const taskRow = steps.some((s) => s && (s.kind === 'outlookTask' || s.kind === 'microsoftTodo' || s.kind === 'googleTask' || s.kind === 'googleTasks'));
-      const paneSub = String(pane.subject || '').replace(/^\s*((re|fw|fwd|השב|העבר|תשובה)\s*:\s*)+/i, '').trim().toLowerCase();
-      const rowSub = String(row.subject || '').replace(/^\s*((re|fw|fwd|השב|העבר|תשובה)\s*:\s*)+/i, '').trim().toLowerCase();
-      if (taskRow && paneSub && rowSub && paneSub === rowSub) return row;
-      const rowKey = FlowStillOpen.promiseKey(row);
-      if (key && rowKey && rowKey === key) return row;
-      const rowText = String(row.text || '');
-      const live = String(clean || '');
-      if (live.length >= 24 && rowText.length >= 24 && (live.indexOf(rowText) >= 0 || rowText.indexOf(live) >= 0)) return row;
     }
     return null;
+  }
+
+  // Loops already carries this promise on a different message. This mail
+  // does not get a second Do It, and it does not borrow the other card.
+  async function promiseOwnedElsewhere(pane, intent) {
+    if (!pane || typeof FlowStorage.getStillOpen !== 'function' || typeof FlowStillOpen === 'undefined' || typeof FlowStillOpen.promiseKey !== 'function') return false;
+    const open = await FlowStorage.getStillOpen();
+    if (!open || !open.length) return false;
+    const ids = messageIdsOf(pane);
+    function mine(row) {
+      const rowIds = [row && row.messageId, row && row.itemId, row && row.pathId, row && row.threadId, row && row.outlookConversationId].filter(Boolean).map(String);
+      return ids.some((id) => rowIds.some((rid) => sameExchangeId(id, rid)));
+    }
+    if (open.some(mine)) return false;
+    const clean = (typeof FlowOwaParse.stripReadingChrome === 'function')
+      ? FlowOwaParse.stripReadingChrome(pane.text)
+      : pane.text;
+    const key = FlowStillOpen.promiseKey({
+      text: clean,
+      subject: pane.subject,
+      sender: { email: pane.senderEmail, name: pane.senderName },
+      threadId: pane.conversationId || '',
+      outlookConversationId: pane.conversationId || '',
+      intent: intent || null
+    });
+    if (!key) return false;
+    return open.some((row) => row && FlowStillOpen.promiseKey(row) === key && !mine(row));
   }
 
   async function showOpenLoopCard(pane, loop) {

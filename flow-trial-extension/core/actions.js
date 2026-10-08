@@ -519,9 +519,11 @@ const FlowActions = (() => {
     const memoryForProcess = ctx.executionMemory ? ctx.executionMemory[proc.id] : null;
     const orderedKinds = applyMemory(proc.stepKinds, proc.anchor, memoryForProcess).slice(0, MAX_ACTIONS);
 
-    const steps = orderedKinds
+    let steps = orderedKinds
       .map((kind) => buildStep(kind, intent, e, ctx, hasAttachment))
       .filter(Boolean);
+    // "No need to reply" drops the draft. The task stays.
+    if (intent.noReplyDraft) steps = steps.filter((s) => s && s.kind !== 'gmailDraft' && s.kind !== 'outlookDraft');
     if (!steps.length) return null; // every non-anchor step demoted AND no anchor in this catalog entry — never happens today, but never silently propose nothing described
 
     return { id: proc.id, name: proc.name, closingLine: proc.closingLine, closedLine: proc.closedLine, steps };

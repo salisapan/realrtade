@@ -1,0 +1,95 @@
+{
+ "source": "דוד live Gate 0.9.49 scenario A via CTO, 2026-10-08. Screenshots: /workspace/flow/glance-close-fabric/gate/0.9.49-scenarioA/",
+ "fixtures": [
+  {
+   "id": "gate049-parking",
+   "gmailId": "1a11bb98624b3db3",
+   "from": "ai.local.flow@gmail.com",
+   "fromName": "flow",
+   "to": [
+    "glance.salisapan@outlook.com"
+   ],
+   "sent": "2026-10-08T16:34:00+03:00",
+   "subject": "Parking permit - please renew by Sunday",
+   "body": "Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office",
+   "gate": "quiet:noise",
+   "expected": "request / To Do (renew by Sun Oct 11)",
+   "shots": [
+    "16-parking-permit-mail-opened-no-todo-card-after-20s.webp",
+    "36-parking-permit-reopened-no-todo-card.webp"
+   ]
+  },
+  {
+   "id": "gate049-q3",
+   "gmailId": "1a11aeed863bd8ea",
+   "from": "ai.local.flow@gmail.com",
+   "fromName": "flow",
+   "to": [
+    "glance.salisapan@outlook.com"
+   ],
+   "owaToLine": "אל: glance.salisapan@outlook.com (Hebrew OWA UI, address only)",
+   "sent": "2026-10-08T12:53:00+03:00",
+   "subject": "Gate A 0.9.41 – quick question on the Q3 summary",
+   "body": "Hi,\nCan you reply and confirm whether the Q3 summary will include the October numbers?\nThanks,\nFlow test",
+   "gate": "page:quiet:hedge",
+   "expected": "show outlookDraft",
+   "shots": [
+    "15-q3-summary-mail-opened-no-draft-offer-after-25s.webp"
+   ],
+   "requiredWhyNot": [
+    "toCount",
+    "ccCount",
+    "rawToLine"
+   ]
+  },
+  {
+   "id": "gate049-alpha",
+   "gmailId": "1a11b4e2a81e4629",
+   "from": "ai.local.flow@gmail.com",
+   "sent": "2026-10-08T14:37:50+03:00",
+   "subject": "Q3 fund statement",
+   "body": "Hi, The Q3 statement is attached. Best, Flow",
+   "attachments": [
+    "statement-q3-alpha.pdf"
+   ]
+  },
+  {
+   "id": "gate049-beta",
+   "gmailId": "1a11b4e4e38d03ed",
+   "from": "ai.local.flow@gmail.com",
+   "sent": "2026-10-08T14:37:59+03:00",
+   "subject": "Q3 fund statement",
+   "body": "Hi, The Q3 statement is attached. Best, Flow",
+   "attachments": [
+    "statement-q3-beta.pdf"
+   ],
+   "paneConversationId": null,
+   "gate": "suggest:unresolved (id-conflict) + intent-null",
+   "expected": "save card for beta.pdf (file name is the only discriminator; both at 14:37)",
+   "shots": [
+    "14-beta-opened-no-save-card-after-16s-no-receipt.webp",
+    "42-beta-reopened-no-card-no-receipt-no-alpha-name.webp",
+    "31-why-not-shown-scrolled-reasons-parking-northwind-office-move-q3-summary.webp"
+   ]
+  },
+  {
+   "id": "gate049-loops-headers",
+   "expected": "CTO product decision 2026-10-08 19:52 IL: Suggested and Added headings shown in every Loops list that has cards in that state, including single-step / Do-It / Handled rows with no step list. Gate requirement.",
+   "shots": [
+    "19-loops-middle-oct9-do-it-and-oct12-draft-reply-no-section-headings.webp",
+    "20-loops-bottom-oct12-draft-reply-do-it-no-suggested-or-added-heading.webp",
+    "21-loops-top-no-suggested-or-added-headings-statement-and-northwind-handled.webp"
+   ]
+  },
+  {
+   "id": "gate049-resave",
+   "expected": "after Handled save, reopened mail must not offer Save again",
+   "gate": "save offer reappears",
+   "shots": [
+    "13-alpha-after-approve-loops-handled-pane-still-queued.webp",
+    "40-alpha-mail-reopened-save-offer-reappears-after-handled-DO-NOT-CLICK.webp",
+    "43-northwind-reopened-after-save-save-offer-reappears-DO-NOT-CLICK.webp"
+   ]
+  }
+ ]
+}

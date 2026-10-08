@@ -1304,6 +1304,28 @@ console.log('\n--- personal close: a clock time or an explicit meeting ask is a 
   check('Q3 reply-and-confirm drafts when the user is in To',
     q3open.type === FlowIntent.TYPES.REQUEST && q3open.personalClose === 'follow-up-ask',
     { type: q3open.type, quiet: q3open.quiet });
+  const Q3_BODY = 'Hi,\nCan you reply and confirm whether the Q3 summary will include the October numbers?\nThanks,\nFlow test';
+  const q3ctx = {
+    to: ['glance.salisapan@outlook.com'], ownAddresses: ['glance.salisapan@outlook.com'],
+    userName: 'Sali', senderEmail: 'ai.local.flow@gmail.com'
+  };
+  const q3hi = classify(Q3_BODY, q3ctx);
+  check('gate049 Q3 Hi plus a valid To is a request, not hedge',
+    q3hi.type === FlowIntent.TYPES.REQUEST && q3hi.quiet !== 'hedge',
+    { type: q3hi.type, quiet: q3hi.quiet });
+  check('opening Hi is not an addressee name', FlowIntent.openingAddressee(Q3_BODY) === '');
+  check('Hi Dana names Dana', FlowIntent.openingAddressee('Hi Dana, can you reply and confirm whether the Q3 summary will include the October numbers?') === 'Dana');
+  const greetings = ['Hey,', 'Hello,', 'Dear,', 'Good morning,', 'Good afternoon,', 'Good evening,', 'Greetings,', 'שלום,', 'היי,', 'הי,', 'בוקר טוב,', 'ערב טוב,'];
+  greetings.forEach((greet) => {
+    const intent = classify(greet + '\n' + Q3, q3ctx);
+    check('a greeting with no name still drafts: ' + greet, intent.type === FlowIntent.TYPES.REQUEST && intent.quiet !== 'hedge', { type: intent.type, quiet: intent.quiet });
+  });
+  const hiDana = classify('Hi Dana, can you reply and confirm whether the Q3 summary will include the October numbers?', q3ctx);
+  check('Hi Dana stays quiet when the user is Sali', !hiDana.type && hiDana.quiet === 'hedge', { type: hiDana.type, quiet: hiDana.quiet });
+  const danaOnly = classify('Dana, can you reply and confirm whether the Q3 summary will include the October numbers?', q3ctx);
+  check('Dana stays quiet when the user is Sali', !danaOnly.type && danaOnly.quiet === 'hedge', { type: danaOnly.type, quiet: danaOnly.quiet });
+  const saliOnly = classify('Sali, can you reply and confirm whether the Q3 summary will include the October numbers?', q3ctx);
+  check('Sali offers when the user is Sali', saliOnly.type === FlowIntent.TYPES.REQUEST && saliOnly.quiet !== 'hedge', { type: saliOnly.type, quiet: saliOnly.quiet });
   const q3missing = classify(Q3);
   const q3empty = classify(Q3, { to: [], cc: [] });
   check('a reply ask with no To or Cc stays quiet',
@@ -1380,6 +1402,48 @@ console.log('\n--- a clean parking-permit renew is a request, and a mass-mail fo
   });
   const paper = classify(park, { now: when, senderEmail: 'newspaper@city.gov' });
   check('a newspaper address is not a list sender', paper && paper.type === FlowIntent.TYPES.REQUEST && paper.quiet !== 'noise', paper);
+  const subjectOnly = classify('Hi — the visitor bay is still open.', {
+    subject: 'Parking permit - please renew by Sunday', now: when, senderEmail: 'dana@city.gov'
+  });
+  check('a clean parking subject with a human note is a request',
+    subjectOnly && subjectOnly.type === FlowIntent.TYPES.REQUEST && subjectOnly.quiet !== 'noise', subjectOnly);
+  const subjectFooter = classify('Hi.\n\nYou are receiving this email because you signed up.', {
+    subject: 'Parking permit - please renew by Sunday', now: when, senderEmail: 'dana@city.gov'
+  });
+  check('a parking subject above a receiving-this footer stays quiet',
+    subjectFooter && subjectFooter.quiet === 'noise' && subjectFooter.type == null, subjectFooter);
+
+  const PARK_BODY = 'Hi,\n\nThe building parking permit expires next week. Please renew it on the municipality site by Sunday, October 11.\n\nNo need to reply, just get it done.\n\nThanks,\nFlow office';
+  const parkCtx = {
+    now: new Date('2026-10-08T13:34:00Z'),
+    senderEmail: 'ai.local.flow@gmail.com',
+    subject: 'Parking permit - please renew by Sunday',
+    to: ['glance.salisapan@outlook.com'],
+    ownAddresses: ['glance.salisapan@outlook.com']
+  };
+  const gatePark = classify(PARK_BODY, parkCtx);
+  const gatePlan = FlowActions.planFor(gatePark, { threadUrl: 'x', hasThreadAttachment: false });
+  const gateKinds = (gatePlan && gatePlan.steps || []).map((s) => s.kind);
+  check('gate049 parking is a To Do and not a draft',
+    gatePark && gatePark.type === FlowIntent.TYPES.REQUEST && gatePark.noReplyDraft === true &&
+    gateKinds.indexOf('googleTask') >= 0 && gateKinds.indexOf('gmailDraft') < 0,
+    { type: gatePark && gatePark.type, quiet: gatePark && gatePark.quiet, kinds: gateKinds });
+  const replyOnly = classify('No need to reply. The office already has the form from last week.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('no need to reply with no action stays quiet:noise', replyOnly && !replyOnly.type && replyOnly.quiet === 'noise', replyOnly);
+  const fyiRenew = classify('FYI, please renew the parking permit by Sunday.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('fyi plus a renew stays quiet:noise', fyiRenew && !fyiRenew.type && fyiRenew.quiet === 'noise', fyiRenew);
+  const noAction = classify('No action needed. Please renew the parking permit by Sunday.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('no action needed stays quiet:noise', noAction && !noAction.type && noAction.quiet === 'noise', noAction);
+  const doNothing = classify('No need to do anything. Please renew the parking permit by Sunday.', { now: parkCtx.now, senderEmail: 'dana@city.gov' });
+  check('no need to do anything stays quiet:noise', doNothing && !doNothing.type && doNothing.quiet === 'noise', doNothing);
+  const actionRequired = classify('Action required: wire $12,000 to account 998877 by Friday. No need to reply.', { now: parkCtx.now, senderEmail: 'dana@acme.com', to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
+  check('action-required plus a date stays quiet without a please-verb', actionRequired && !actionRequired.type && actionRequired.quiet === 'noise', actionRequired);
+  ['news@lists.example', 'newsletter@lists.example', 'marketing@lists.example'].forEach((email) => {
+    const shown = classify(PARK_BODY, Object.assign({}, parkCtx, { senderEmail: email }));
+    check('gate049 parking from a list sender stays quiet: ' + email, shown && !shown.type && shown.quiet === 'noise', shown);
+    const wire = classify('Please send 0.2 BTC to wallet bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh by Monday.', { now: parkCtx.now, senderEmail: email, to: ['me@glance.test'], ownAddresses: ['me@glance.test'] });
+    check('a wire from a list sender stays quiet: ' + email, wire && !wire.type, wire && wire.type);
+  });
 }
 
 console.log('\nTOTAL FAILURES:', failures);

@@ -798,6 +798,8 @@
       intent: (typeof FlowStillOpen !== 'undefined' && FlowStillOpen.whyLine(entry)) || (entry.process && entry.process.name) || '',
       lang: entry.intent && entry.intent.lang,
       surface: entry.app || 'gmail',
+      // The panel background is dark even when the OS theme is light.
+      theme: 'dark',
       onDoIt: function () { closeStillOpenFromPopup(entry); },
       onChange: function (next) {
         if (!entry.messageId || typeof FlowStorage.mergeAddedSteps !== 'function' || typeof FlowStepList.liveStepsFrom !== 'function') return;
@@ -2284,8 +2286,34 @@
     const empty = document.getElementById('open-empty');
     host.replaceChildren();
     empty.hidden = total > 0;
-    receipts.forEach((entry) => host.appendChild(outlookReceiptRow(entry)));
-    openOnly.forEach((entry) => host.appendChild(openRow(entry)));
+    // Suggested and Added are list headings, including a single Do It and a
+    // Handled row that has no step list. The chip alone is not the heading.
+    let suggestedHead = false;
+    let addedHead = false;
+    function loopsHeading(which) {
+      const row = el('div', 'loops-section act-section');
+      row.setAttribute('data-glance-section', which);
+      row.appendChild(el('span', 'acts-label', which === 'added' ? 'Added' : 'Suggested'));
+      return row;
+    }
+    function hasAdded(entry) {
+      const steps = entry && entry.process && entry.process.steps;
+      return Array.isArray(steps) && steps.some((s) => s && s.added === true);
+    }
+    function place(entry, node) {
+      if (hasAdded(entry)) {
+        if (!addedHead) { host.appendChild(loopsHeading('added')); addedHead = true; }
+      } else if (!suggestedHead) {
+        host.appendChild(loopsHeading('suggested'));
+        suggestedHead = true;
+      }
+      host.appendChild(node);
+    }
+    receipts.forEach((entry) => place(entry, outlookReceiptRow(entry)));
+    openOnly.forEach((entry) => place(entry, openRow(entry)));
+    if ((receipts.length || openOnly.length) && !suggestedHead && !addedHead) {
+      host.insertBefore(loopsHeading('suggested'), host.firstChild);
+    }
     } finally { endRender(); }
   }
 
