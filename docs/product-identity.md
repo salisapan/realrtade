@@ -1,4 +1,4 @@
-# Product identity: AI is the engine, closure is the product
+# Product identity: an AI product; the close is what we sell
 
 > Written 2026-10-02. Companion to `docs/local-first-principle.md` (how we
 > recognise) and `docs/open-loops.md` (what Glance does). This file is about how
@@ -30,7 +30,7 @@ Forbidden as the full product definition: "Chrome extension for Gmail", "Gmail a
 ### Standing constraints (the anti-drift list)
 
 1. Glance is not only a Gmail add-on. Gmail is the entry surface.
-2. Glance is not an AI email product. AI is under the hood; outcomes are what we sell.
+2. Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven. It is never "an AI email assistant" that writes for you or "a smart inbox". (Owner, 2026-10-09; it replaces «Glance is not an AI email product». Plan: `docs/glance-ai/ai-product.md`.)
 3. Pro is the personal depth layer: more loops, the money owed, firmer nudges, Draft-It and summaries, and, once the server switch is on, a larger allowance and a stronger second reading. It is not a team or enterprise tier and carries no compliance claim. That is Flow, and it is separate.
 4. Waiting or tracking alone is not success. True close is: the original intention completed in fact, or released on purpose by the person.
 5. Free must stay genuinely useful: Do It without limit, loops that close on the outcome, and, once the server switch is on, the second reading within its allowance. Never a dead demo.
@@ -50,9 +50,9 @@ Forbidden as the full product definition: "Chrome extension for Gmail", "Gmail a
 
 ## The rule
 
-Glance is built with AI techniques and must not be sold, worded or felt as "an AI
-email product". It competes on what stays open until it is closed, not on
-cleverness.
+Glance is an AI product (owner, 2026-10-09). Its own model understands each intention and plans the close, and Glance may say so plainly. It still
+competes on what stays open until it is closed, not on cleverness: the AI is named as what understands and plans, the close is the promise. Never "an AI email
+assistant" that writes for you, never "a smart inbox", and never AI in place of the outcome.
 
 | Under the hood | On the surface |
 |---|---|

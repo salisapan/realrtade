@@ -62,7 +62,7 @@ In order, each with a corpus of misses and of what must stay silent:
 ## 4. Identity and copy
 
 Rule, written into `docs/product-identity.md` and `CLAUDE.md`: Glance sells
-what stays open until it is closed. AI is the engine and is not the headline.
+what stays open until it is closed. AI is the engine; the close is the headline (owner 2026-10-09: Glance is an AI product, `docs/glance-ai/ai-product.md`).
 
 - No "AI assistant / AI inbox / smart email / understands your inbox" on any
   Glance surface (site, extension, store text). A copy test enforces it.

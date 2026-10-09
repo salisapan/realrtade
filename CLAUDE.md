@@ -4,7 +4,7 @@
 **Glance closes open loops. Gmail is where it starts today.** Glance is a system for unfinished intentions: what you asked someone for, what you promised, what someone asked of you. Its loop is **detect → carry → execute → true close**. It starts in Gmail, the current primary entry surface, and executes through the places a close really happens (Google Tasks, Gmail drafts and Drive today; more surfaces later, only ever in service of closure). It stays silent when it is uncertain, never sends on your behalf, treats preparation as not completion, and counts a loop closed only on real completion or a deliberate release. Flow, the enterprise product, is separate.
 <!-- LOCKED-IDENTITY:END -->
 
-**Standing constraints.** Glance is not only a Gmail add-on (Gmail is the entry surface). Glance is not an AI email product (AI is under the hood; outcomes are what we sell). Pro is the personal depth
+**Standing constraints.** Glance is not only a Gmail add-on (Gmail is the entry surface). Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven. It is never "an AI email assistant" that writes for you or "a smart inbox" (owner, 2026-10-09). Pro is the personal depth
 layer, not team or enterprise (that is Flow). Waiting or tracking alone is not success; true close is. Free must stay genuinely useful, never a dead demo. Zero-Prompt is sacred. Multi-platform means
 execution across the surfaces where a close really happens, in service of closure: never a connector marketplace, inbox-zero or integrations for their own sake. Do not describe Glance as "a Chrome
 extension for Gmail", "an AI email assistant" or "a smart inbox", and never describe tracking or a prepared draft as completion. Full rules, required framing and before/after examples: `docs/product-identity.md`.
@@ -101,20 +101,14 @@ terms cover all five of §5.8's questions. Read whichever level you need
 before proposing new features, new data paths, or new UI surfaces — not
 just once.
 
-## Local-first recognition — the base rule, apply to everything
+## Device first, then Glance's model — the base rule, apply to everything
 
-Our own code recognises requests, promises, answers and tasks BEFORE any
-external model is involved, and no feature may depend on a model to work. Build
-recognition as data (lexicons, frames) in `flow-trial-extension/core/`, with
-corpus tests, and stay silent when unsure. A model is an optional, masked,
-last resort (Free with an allowance, Pro with more: `docs/ai-ladder.md`) that never closes or writes anything alone. Full rule:
+Our own code runs first, on the device: normalize, hard quiets, masking, lexicons and frames in `flow-trial-extension/core/`, the small model, the per-user profile. It settles the clear cases and keeps the safety floor (quiets, veto, strict gate), with corpus tests, and stays silent when unsure. **Owner, 2026-10-09:** Glance's own model (device model when present, Glance cloud on masked text) becomes the main reader of everything the device does not settle, and plans the close (`docs/glance-ai/ai-product.md`). A model's answer is a proposal that cites its evidence; it never closes, writes or sends alone, and a feature still works, more quietly, with the model off. Until the owner approves the new privacy and consent copy, that path stays behind its off switch and today's one-sentence deeper read (`docs/ai-ladder.md`) is the only external step. Full rule:
 `docs/local-first-principle.md`.
 
-## Product identity — AI is the engine, closure is the product
+## Product identity — an AI product; the close is what we sell
 
-Glance is not sold or worded as "an AI email product" or as "a Gmail extension". Copy on any Glance
-surface talks about loops that are open, chased, yours or closed, and money at
-risk, never about cleverness. `docs/product-identity.md` has the rule and the
+Glance is an AI product (owner, 2026-10-09): its own model understands each intention and plans the close, and it may say so. It is never worded as "an AI email assistant" that writes for you, "a smart inbox" or "a Gmail extension". Copy leads with the outcome: loops that are open, chased, yours or closed, and money at risk; the AI is named as what understands and plans, not as cleverness for its own sake. `docs/product-identity.md` has the rule and the
 list of phrases a Glance surface may not use (enforced by
 `flow-trial-extension/test/identity-copy-corpus.cjs`).
 
@@ -153,7 +147,7 @@ the persona inline.
 
 ## The local intent engine — read before touching recognition
 
-`docs/intent-model.md` describes the on-device recognition stack (lexicon tier, learned model, pipeline), how it is measured and what the numbers do not prove. Retrain with `node scripts/train-intent-model.cjs` after changing `scripts/intent/generate.cjs` or the features; `flow-trial-extension/test/intent-model-corpus.cjs` enforces the precision and recall gates. Never lower a precision gate to raise recall. The one external step on this path is the owner-approved "deeper read" (`docs/ai-ladder.md`: one masked sentence, two askings, Free allowance and Pro allowance counted on the server, a proposal only, off until the owner measures it with `scripts/ai-ladder/eval.cjs`); do not add any other external model call to recognition, and never widen that one without the same measurement and a privacy-page change in the same commit. How a loop earns a true close and why a short reply is held open: `docs/true-close.md`.
+`docs/intent-model.md` describes the on-device recognition stack (lexicon tier, learned model, pipeline), how it is measured and what the numbers do not prove. Retrain with `node scripts/train-intent-model.cjs` after changing `scripts/intent/generate.cjs` or the features; `flow-trial-extension/test/intent-model-corpus.cjs` enforces the precision and recall gates. Never lower a precision gate to raise recall. The one external step on this path is the owner-approved "deeper read" (`docs/ai-ladder.md`: one masked sentence, two askings, Free allowance and Pro allowance counted on the server, a proposal only, off until the owner measures it with `scripts/ai-ladder/eval.cjs`); do not add any other external model call to recognition except the model-first path of `docs/glance-ai/ai-product.md` (owner 2026-10-09), which ships behind its off switch and goes live only with the measurement and the privacy-page change in the same commit. How a loop earns a true close and why a short reply is held open: `docs/true-close.md`.
 
 How the engine learns (teacher data, per-person timing, labels from outcomes, an on-device language-model tier, the learning ledger, the one active question, voice-matched drafts, closes from outside the thread), how it is measured, and what the numbers do not prove: `docs/ai-engine-upgrade.md`. Numbers on real mail, and every disclosure about them: `docs/human-eval.md`. How a reply is judged to finish a request (and why a model may only hold a loop open): `docs/reply-model.md`. Other apps (WhatsApp Web, right-click capture, Outlook through Graph), the identity graph and cross-app closing: `docs/multi-platform.md` — read it before adding a surface; every surface is opt-in and stricter than Gmail; surfaces are read-only except the Outlook reply draft created on the person's Do It (owner decision 2026-10-05; never sending), and a surface change updates the privacy page and store permissions in the same commit. The private human-text sentences are gitignored and must never be committed.
 Community (cross-user) learning is built but DORMANT and its on-device wiring is deliberately not built: read `docs/community-learning.md` before touching it, and never switch it on without the privacy copy changing in the same commit.

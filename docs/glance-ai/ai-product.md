@@ -1,8 +1,8 @@
 # Glance as an AI product: the plan (levels 2 and 3, cloud + device)
 
 > Written 2026-10-09 at the owner's request. **Direction decided by the owner (2026-10-09):** «רמה 2 ו־3, שילוב של ענן ומקומי».
-> This spec itself **waits for the owner's approval**. Until then the locked identity sentence in `CLAUDE.md` and `docs/product-identity.md` is unchanged (§8 has the proposed wording),
-> nothing here sends mail text off the device, and every new path ships behind an off switch. Built by the daily Claude routine (§9); progress log in §10.
+> **Approved by the owner 2026-10-09** («מאשר את כל מה שהצעת»), including the identity wording in §8, now applied. Still owner decisions (§7): where the cloud model is served and its spend,
+> the privacy and consent copy, labels, the allowance. Until the privacy copy is approved nothing here sends mail text off the device, and every new path ships behind an off switch. Built by the daily Claude routine (§9); progress log in §10.
 
 ## בעברית, בקצרה
 
@@ -87,20 +87,20 @@ Today the site promises judgment on the device, with one masked sentence for the
 
 | # | Decision | Why it blocks |
 |---|---|---|
-| 1 | Approve this spec, and the identity wording in §8 | The locked block changes only with the owner's say-so |
+| 1 | ~~Approve this spec, and the identity wording in §8~~ **done 2026-10-09** | - |
 | 2 | Where Glance cloud model is served, and the monthly spend cap | Tier 2 cannot go live without a host |
 | 3 | 200 owner-verified labels (`glance-ai/labeling/`, row 60) | Promotion of any model and any fine-tune needs them |
 | 4 | The new privacy and consent copy (§6) | Nothing leaves the device under the new rule before it |
 | 5 | Free/Pro allowance for model-first reading, after M6 numbers | Cost per user |
 
-## 8. Proposed identity change (not applied)
+## 8. Identity change (approved and applied 2026-10-09)
 
 Replace in `CLAUDE.md` "Standing constraints" and `docs/product-identity.md` rule 2:
 
 - **Now:** «Glance is not an AI email product (AI is under the hood; outcomes are what we sell).»
 - **Proposed:** «Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven. It is never "an AI email assistant" that writes for you or "a smart inbox".»
 
-The locked first sentence («Glance closes open loops…») stays. The change lands in one commit with every file the consistency test names, after the owner approves.
+The locked first sentence («Glance closes open loops…») stays. Applied in `CLAUDE.md`, `docs/product-identity.md`, `docs/local-first-principle.md`, `docs/local-detection-plan.md`, `docs/README.md` and the consistency test. Public site copy is unchanged until the owner approves new copy (it ships with a Netlify deploy, which is on HOLD).
 
 ## 9. Milestones (what the daily routine builds, in order)
 
@@ -118,4 +118,5 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
 
 ## 10. Progress log
 
-- 2026-10-09: spec written; direction decided by the owner; spec awaiting approval. Daily routine set (Sun–Thu, 10:52 Israel).
+- 2026-10-09: spec written; direction decided by the owner; daily routine set (Sun–Thu, 10:52 Israel).
+- 2026-10-09: the owner approved the spec and the identity wording; applied in the identity files. The old 07:47 open-tasks routine was switched off at the owner's request.
