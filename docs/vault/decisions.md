@@ -1,11 +1,12 @@
 ---
 tags: [decisions]
-updated: 2026-10-08
+updated: 2026-10-09
 ---
 # Decisions log (newest first)
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-09 · Glance becomes an AI product, levels 2 and 3 (the model understands every mail; it plans, prepares and answers), cloud + device. Spec [[glance-ai/ai-product]] awaits owner approval; the identity sentence changes only after it.
 - 2026-10-08 · Profile relevance lab: Glance offers when the email is relevant to the user and the close is feasible, and stays silent when it is not. There is no blanket "Hi all" / "היי לכולם" / DL / Cc silence. Unknown falls back to today's behavior; Instinct fills role and department on day one. Lab only, not wired into the extension · Sali · `docs/glance-ai/user-context-v0.md`, `CLAUDE.md` "Owner product locks", [[open-tasks]] row 62
 - 2026-10-08 · UserContext v0: offer or quiet uses a per-user profile. Relevance is relevant, not_relevant, or unknown. No blanket quiet on group mail. Relevance can come from role, history, or work style; a k-prior-closes gate is not the rule. Cc-only, addressed-to-other, and the #118 no-To/Cc hedge stay until a contrast-pair shadow test. Not built · Sali · `CLAUDE.md` "Owner product locks", `docs/glance-ai/user-context-v0.md`, `docs/glance-ai/holistic-close-map.md`
 - 2026-10-08 · Glance is broad and does everything: not a minimal loop set. Breadth slices 1–3 and Dima's queue run in parallel; each PR gets a live scenario Gate, then a squash-merge; no stream touches a file an open Dima PR is changing. E1, E2, E4, E6, C1 are the reliability track, not the product scope. Paid readiness stays the CoS bar · Sali · `CLAUDE.md` "Owner product locks", `docs/glance-ai/holistic-close-map.md`, `docs/glance-ai/CTO_PATH_TO_PAID_2026-10-08.md`
