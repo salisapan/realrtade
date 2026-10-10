@@ -4,7 +4,7 @@
 //
 // Feeding it from Gmail by itself (a sent request opens one, a client's reply with files moves its items) is the host's job:
 // ingestOutgoing() and ingestIncoming() are the two calls, and they run only when CLIENT_REQUESTS.feed is on
-// (config/client-requests.public.js). Until then the clients page is fed by hand: paste a request, mark what came.
+// (config/client-requests.public.js). Until then nothing feeds it, and no surface shows it.
 const FlowClientRequestStore = (() => {
   const KEY = 'glanceClientRequests';
   const MAX_CLOSED = 200;

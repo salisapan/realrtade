@@ -12,10 +12,9 @@ The locked block in `CLAUDE.md` and `docs/product-identity.md` is the definition
 |---|---|---|
 | Engine: document types (bank and card statements, invoices, receipts, payslips, Form 106/867, annual savings statements, ID copy, power of attorney, fee agreement, signed agreement, affidavit, land registry extract, tax assessment, payment), periods (months, ranges, quarters, tax years, "last month"), multi-item requests, arrivals with proof, partial arrivals by month, "check", "claimed", "none", reminders (three levels, Hebrew and English), Israeli business days, recurring checklists (bi-monthly VAT, monthly bookkeeping, payroll, annual report, a law firm's new-client file), the board | `flow-trial-extension/core/client-requests.js` | built, 85 corpus checks |
 | The ledger on the device (chrome.storage.local, or a stub in tests) | `flow-trial-extension/src/client-requests-store.js` | built, store corpus |
-| The page "מה חסר ממי": the board, one click per item (received / not needed / it is the document / not it), a reminder per client that becomes a Gmail draft in the thread through the existing `flow:follow-draft` path, recurring checklists, an example to load | `flow-trial-extension/clients/clients.html`, `clients.js`, `clients.css` | built; runs inside the unpacked extension at `chrome-extension://dnjhplgmnkabbjogfpbhofjedlkehkai/clients/clients.html` |
+| Surface | none | **removed 2026-10-10**: a standalone page with forms was built and the owner rejected it as far from Glance (against Zero-Prompt and the card/steps-list design). The surface is Glance's own card in the thread ("tracking: …", what arrived, one Do It for the reminder) and the side panel's open loops. Built after #118, shown to the owner as a mock first, nothing enters without the owner's approval |
 | Switch | `config/client-requests.public.js` `CLIENT_REQUESTS.feed` | **off**: nothing reads mail by itself yet |
 | Reading Gmail by itself (a sent request opens one; a client's reply with files moves its items) | `src/follow.js` + `manifest.json` | **not wired**: both files are inside the open steps-list PR #118. Wired right after it merges |
-| A link from the side panel to the page, and the page in the downloadable zip | `popup/*`, `manifest.json` | after #118 (the packager only bundles what the manifest references) |
 
 ## The rules (why it can be trusted)
 
@@ -23,7 +22,7 @@ The locked block in `CLAUDE.md` and `docs/product-identity.md` is the definition
 - Anything unsure is **check** (one click by the person): a file with no period for a dated item, one unnamed file for the only open item, a file the host did not read back.
 - "I sent it on WhatsApp" with no file is **claimed**, never received. "No invoices this month" is **none** (an answer). "Not yet" is neither.
 - A payment closes on the client's own words that it was paid (close map Y3), never on a promise to pay.
-- A signed document closes on the file; the signature itself is for the person to look at, and the page says so.
+- A signed document closes on the file; the signature itself is for the person to look at, and the card says so.
 - The request closes only when every item is received, none or released. A reminder never closes anything. Glance never sends.
 
 ## What it needs to work by itself (owner decisions and the order)
