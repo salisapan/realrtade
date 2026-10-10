@@ -1,11 +1,12 @@
 ---
 tags: [decisions]
-updated: 2026-10-09
+updated: 2026-10-10
 ---
 # Decisions log (newest first)
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-10 · Owner approved three more Claude routines: breadth builder (Mon/Tue/Thu, one loop type of the close map up one state), scenario rehearsal A–E (Fri), red team (Fri). Per-user context is milestone M8 of the AI plan. Rows 65–67.
 - 2026-10-09 · Owner approved the AI-product spec and the new identity rule: «Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven». Applied in CLAUDE.md and docs/product-identity.md. The 07:47 open-tasks routine is off.
 - 2026-10-09 · Glance becomes an AI product, levels 2 and 3 (the model understands every mail; it plans, prepares and answers), cloud + device. Spec [[glance-ai/ai-product]] awaits owner approval; the identity sentence changes only after it.
 - 2026-10-08 · Profile relevance lab: Glance offers when the email is relevant to the user and the close is feasible, and stays silent when it is not. There is no blanket "Hi all" / "היי לכולם" / DL / Cc silence. Unknown falls back to today's behavior; Instinct fills role and department on day one. Lab only, not wired into the extension · Sali · `docs/glance-ai/user-context-v0.md`, `CLAUDE.md` "Owner product locks", [[open-tasks]] row 62

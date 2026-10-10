@@ -115,8 +115,10 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
 | M5 | **Plan object** + the gate for steps; hand-off contract to the steps list (coordinate with Dima on #77) | Steps render from a Plan in the harness; nothing runs without a click |
 | M6 | **Measurement**: shadow run of model-first over `glance-ai/eval-data/` (cached predictions, no paid calls), cost and latency model; numbers into `docs/glance-ai/STATE.md` | A table the owner can decide §7 rows 2 and 5 on |
 | M7 | **«Ask Glance» answer engine** over the person's loops, answers only from cited sources | Corpus of questions with right answers and refusals |
+| M8 | **Per-user context in the engine** (`docs/glance-ai/user-context-v0.md`, owner lock 2026-10-08): the profile (role, history, work style) feeds the Understanding's `relevant` field; group and Cc mail decided by relevance, `unknown` keeps today's behaviour; contrast-pair shadow test before any product quiet is removed | The lab scorer runs inside the router behind the switch; the contrast-pair shadow test reports wrong-Do-It and missed-close on relevant mail |
 
 ## 10. Progress log
 
 - 2026-10-09: spec written; direction decided by the owner; daily routine set (Sun–Thu, 10:52 Israel).
 - 2026-10-09: the owner approved the spec and the identity wording; applied in the identity files. The old 07:47 open-tasks routine was switched off at the owner's request.
+- 2026-10-10: M8 (per-user context) added at the owner's request. Three more routines set: breadth builder (open-tasks row 65), scenario rehearsal (66), red team (67).
