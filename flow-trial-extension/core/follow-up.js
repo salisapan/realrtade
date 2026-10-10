@@ -307,7 +307,7 @@ const FlowFollowUp = (() => {
   // when it really arrived), and only the whole set closes it. Without the switch nothing here runs: same object as before.
   function itemsOf(text, c) {
     if (!c || c.items !== true || !clientRequests) return null;
-    const r = clientRequests.classifyOutgoingRequest(text, { now: c.now });
+    const r = clientRequests.classifyOutgoingRequest(text, { now: c.now, generic: true });
     return r && r.items && r.items.length ? r : null;
   }
   function classifyOutgoing(text, ctx) {
@@ -317,7 +317,9 @@ const FlowFollowUp = (() => {
     if (!it) return base;
     if (base) return Object.assign({}, base, { items: it.items, deadlineIso: base.deadlineIso || it.deadlineIso || null });
     // The item engine found an explicit ask for named documents that the fixed phrasings missed.
+    // A message that hands things over ("Please find attached the signed agreement") is not an ask.
     const body = String(text || '').trim();
+    if (DELIVERS.test(body) || RECEIPT.test(body)) return null;
     const line = sentences(body).find((s) => !COURTESY.test(s)) || body;
     return {
       weight: { score: 3, level: 'real', signals: ['items'] },
@@ -974,7 +976,7 @@ const FlowFollowUp = (() => {
   function nudgeText(w, level, now) {
     // A loop with items asks only for what is still missing, and thanks for what came.
     if (hasItems(w)) {
-      const d = clientRequests.reminderDraft(asRequest(w), { level: Math.min(MAX_NUDGE_LEVEL, Math.max(1, level || nextNudgeLevel(w))), lang: w.lang });
+      const d = clientRequests.reminderDraft(asRequest(w), { level: Math.min(MAX_NUDGE_LEVEL, Math.max(1, level || nextNudgeLevel(w))), lang: w.lang, voice: 'me' });
       if (d) return d;
     }
     const base = nudgeBase(w, level, now);

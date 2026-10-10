@@ -42,6 +42,7 @@ check('a Hebrew list opens one loop with three items', he && he.items && he.item
 const en = on(TEXTS[3]);
 check('an English ask for two documents opens one loop with two items', en && en.items && en.items.length === 2, en && en.items && en.items.map((i) => i.key));
 check('the deadline of the ask is kept', en && en.deadlineIso === '2026-10-15', en && en.deadlineIso);
+check('handing over ("Please find attached the signed agreement") opens nothing', on('Please find attached the signed agreement for your records.') === null);
 check('a courtesy line still opens nothing', on(TEXTS[4]) === null && on(TEXTS[5]) === null);
 const plain = on(TEXTS[1]);
 check('an ask with no named documents keeps its old shape and gets no items', plain && plain.items === undefined);
@@ -96,6 +97,33 @@ check('"send me your user ID" and "the ID scan feature" are not document asks', 
 const auto = F.applyReplyItems(w0, { outcome: 'auto' }, { messageId: 'm8', from, text: 'Out of office', attachments: [], fetchedBack: true }, NOW);
 check('an out-of-office changes nothing', auto.none === true);
 check('a watch without items falls back to the old applyReply', JSON.stringify(F.applyReplyItems(offWatch, { outcome: 'closed' }, null, NOW)) === JSON.stringify(F.applyReply(offWatch, { outcome: 'closed' }, NOW)));
+
+
+console.log('--- things that are not a known document ---');
+const g = on('Hi Dana, could you send me the deck, the Q3 numbers and the signed NDA by Thursday?');
+check('"the deck, the Q3 numbers and the signed NDA" is one loop with three things', g && g.items && g.items.length === 3 && g.items.every((i) => i.type === 'thing'), g && g.items && g.items.map((i) => i.key));
+const gh = on('היי רוני, תשלח לי את המצגת, את הנתונים של הרבעון ואת הלוגו עד חמישי');
+check('Hebrew: the deck, the quarter numbers and the logo are three things', gh && gh.items && gh.items.length === 3, gh && gh.items && gh.items.map((i) => i.key));
+check('"send it and your thoughts" opens no items (nothing could prove it arrived)', (on('Please send it and your thoughts by Monday.') || {}).items === undefined);
+check('"the deck and your feedback" opens no items (one real thing is a plain loop)', (on('Could you send the deck and your feedback by Friday?') || {}).items === undefined);
+check('"the details and an update" opens no items', (on('Can you share the details and an update by Friday?') || {}).items === undefined);
+check('a message that hands things over ("I attached the deck and the numbers") opens nothing', on('I attached the deck and the numbers for your review.') === null);
+const gw = F.buildWatch({ threadId: 't9', messageId: 'm1', ask: g, counterpart: { email: 'dana@x.com', name: 'Dana Cohen' }, now: NOW });
+const dana = { email: 'dana@x.com' };
+const g1 = F.applyReplyItems(gw, F.classifyReply('Here you go!', gw, { now: NOW }), { messageId: 'g1', from: dana, text: 'Here you go!', attachments: [{ id: 'f1', name: 'Glance_Pitch_v4.pptx', size: 900000 }, { id: 'f2', name: 'q3_numbers.xlsx', size: 40000 }], fetchedBack: true }, NOW);
+const gw1 = Object.assign({}, gw, g1.patch);
+check('a .pptx is the deck and q3_numbers.xlsx is the numbers; the NDA is still missing, so it stays open', !g1.close && F.itemCounts(gw1).done === 2 && F.itemCounts(gw1).missing.length === 1 && /nda/.test(F.itemCounts(gw1).missing[0]), F.itemCounts(gw1));
+const gn = F.nudgeText(gw1, 2, NOW);
+check('the reminder is in one person\'s voice and asks only for the NDA', /I'm still waiting for/.test(gn) && /signed NDA/.test(gn) && !/\bwe\b/i.test(gn) && /Thanks, I received: deck, Q3 numbers/.test(gn), gn);
+const g2 = F.applyReplyItems(gw1, F.classifyReply('Attached', gw1, { now: NOW }), { messageId: 'g2', from: dana, text: 'Attached', attachments: [{ id: 'f3', name: 'random.pdf', size: 90000 }, { id: 'f4', name: 'other.pdf', size: 90000 }], fetchedBack: true }, NOW);
+check('two unnamed files never close the NDA', !g2.close);
+const g3 = F.applyReplyItems(gw1, F.classifyReply('Signed', gw1, { now: NOW }), { messageId: 'g3', from: dana, text: 'Signed', attachments: [{ id: 'f5', name: 'NDA_signed.pdf', size: 90000 }], fetchedBack: true }, NOW);
+check('the signed NDA arrives and the loop closes with three read-back proofs', g3.close && g3.patch.proof.length === 3, g3);
+const ghw = F.buildWatch({ threadId: 't10', ask: gh, counterpart: { email: 'roni@x.co.il', name: 'רוני' }, now: NOW });
+const ghn = F.nudgeText(ghw, 1, NOW);
+check('Hebrew reminder in one person\'s voice: "חסר לי", no "אנחנו"/"לנו"', /עדיין חסר לי/.test(ghn) && !/לנו|אנחנו|קיבלנו/.test(ghn) && /המצגת/.test(ghn), ghn);
+const gh1 = F.applyReplyItems(ghw, F.classifyReply('מצורף', ghw, { now: NOW }), { messageId: 'h1', from: { email: 'roni@x.co.il' }, text: 'מצורף', attachments: [{ id: 'h', name: 'מצגת משקיעים.pdf', size: 900000 }], fetchedBack: true }, NOW);
+check('a Hebrew file name "מצגת משקיעים" is the deck', F.itemCounts(Object.assign({}, ghw, gh1.patch)).done === 1, gh1.changes);
 
 console.log(failures ? '\nTOTAL FAILURES: ' + failures : '\nTOTAL FAILURES: 0');
 process.exit(failures ? 1 : 0);

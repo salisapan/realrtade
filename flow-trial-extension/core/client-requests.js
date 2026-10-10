@@ -250,6 +250,74 @@ const FlowClientRequests = (() => {
     };
   }
 
+  // ---- things that are not a known document ("the deck and the Q3 numbers") -----------------------------------------
+  // Used only with ctx.generic === true (the general follow loop, switch CLIENT_REQUESTS.items). One ask line with a
+  // hand-over verb and a list of at least two things: each thing becomes an item. A vague word ("details", "your thoughts")
+  // or a pronoun ("it", "them") is never an item: nothing could prove it arrived.
+  const GIVE_EN = /\b(?:send|share|forward|attach|provide|upload|get me|pass (?:me|us|along)|email)\b(?:\s+(?:me|us|over|across|along|back))*\s+/i;
+  const GIVE_HE = new RegExp('(?<![' + HE + '])(?:תשלח(?:י|ו)?|שלח(?:י|ו)?|לשלוח|תעביר(?:י|ו)?|העביר(?:י|ו)?|להעביר|תצרפ?(?:י|ו)?|לצרף|צרפ(?:י|ו)|תעלה|להעלות)(?![' + HE + '])(?:\\s+(?:לי|לנו|אליי|אלינו))?\\s+');
+  const STOP_EN = new Set(['the', 'a', 'an', 'me', 'us', 'your', 'my', 'our', 'his', 'her', 'their', 'please', 'also', 'both', 'copy', 'copies', 'of', 'for', 'to', 'over', 'back', 'latest', 'final', 'updated', 'new', 'current', 'version', 'file', 'files', 'with', 'from', 'on', 'in', 'and', 'by', 'when', 'you', 'can']);
+  const STOP_HE = new Set(['את', 'של', 'לי', 'לנו', 'גם', 'עם', 'על', 'עד', 'מה', 'כל', 'קובץ', 'עותק', 'האחרון', 'האחרונה', 'המעודכן', 'המעודכנת', 'הסופי', 'הסופית']);
+  const VAGUE = /^(?:it|them|this|that|these|those|everything|anything|something|details?|info(?:rmation)?|updates?|answers?|thoughts?|feedback|comments?|input|confirmation|response|reply|news|status|זה|אותו|אותה|אותם|הכל|פרטים|הפרטים|מידע|המידע|עדכון|תשובה|משוב|הערות|אישור|האישור|סטטוס)$/i;
+  // A few things have well-known file names in the other language.
+  const SYN = [
+    [/^(?:deck|slides?|presentation|מצגת|המצגת)$/i, ['deck', 'slide', 'presentation', 'pitch', 'מצגת', '.pptx', '.key']],
+    [/^(?:numbers|figures|data|spreadsheet|sheet|נתונים|הנתונים|גיליון|הגיליון|האקסל|אקסל)$/i, ['numbers', 'data', 'figures', 'sheet', 'נתונים', '.xlsx', '.csv', '.xls']],
+    [/^(?:quote|proposal|offer|הצעת|הצעה|ההצעה)$/i, ['quote', 'proposal', 'offer', 'הצעה', 'הצעת']],
+    [/^(?:cv|resume|קורות|קו"ח)$/i, ['cv', 'resume', 'קורות', 'קו"ח']],
+    [/^(?:photos?|pictures?|images?|תמונות|התמונות|תמונה)$/i, ['photo', 'picture', 'image', 'img', 'תמונ', '.jpg', '.jpeg', '.png', '.heic']],
+    [/^(?:logo|לוגו|הלוגו)$/i, ['logo', 'לוגו']],
+    [/^(?:report|דוח|הדוח|דו"ח|הדו"ח)$/i, ['report', 'דוח', 'דו"ח']],
+    [/^(?:plan|plans|תוכנית|התוכנית|תכנית|התכנית|שרטוט|השרטוט)$/i, ['plan', 'drawing', 'תוכנית', 'תכנית', 'שרטוט', '.dwg']]
+  ];
+  function stripHe(w) { return w.length > 3 ? w.replace(/^(?:ו?ה|ו|ב|ל|מ)(?=[֐-׿]{2})/, '') : w; }
+  function termsOf(phrase) {
+    const out = new Set();
+    String(phrase).toLowerCase().split(/[^\p{L}\p{N}"]+/u).filter(Boolean).forEach((w) => {
+      if (STOP_EN.has(w) || STOP_HE.has(w) || w.length < 2) return;
+      out.add(hasHebrew(w) ? stripHe(w) : w.replace(/s$/, ''));
+      SYN.forEach(([re, alts]) => { if (re.test(w)) alts.forEach((a) => out.add(a)); });
+    });
+    return Array.from(out);
+  }
+  function genericItems(body) {
+    const items = [];
+    for (const line of lines(body)) {
+      if (typesIn(line).length > 1) continue;
+      const m = GIVE_EN.exec(line) || GIVE_HE.exec(line);
+      if (!m) continue;
+      let rest = line.slice(m.index + m[0].length);
+      // The list ends at the deadline, the reason, or the end of the sentence.
+      rest = rest.split(/\s+(?:by|before|until|no later than|so (?:that|i|we)|for the|asap|today|tomorrow|when you)\b|\s+(?:עד|לפני|כדי|בשביל|היום|מחר)(?=\s|$)|[.?!;:]/i)[0];
+      const parts = rest.split(/\s*,\s*(?:and\s+|ו(?=את\s|ה))?|\s+(?:and|&|as well as|plus)\s+|\s+ו(?=את\s|ה[֐-׿])/i).map((x) => x.trim().replace(/^(?:את|the|a|an)\s+/i, '').trim()).filter(Boolean);
+      if (parts.length < 2) continue;
+      for (const part of parts) {
+        const words = part.split(/\s+/);
+        if (words.length > 6) { items.length = 0; break; }
+        const core = part.replace(/^(?:me|us|your|my|our|his|her|their|את)\s+/i, '');
+        if (VAGUE.test(core) || core.split(/\s+/).every((w) => VAGUE.test(w) || STOP_EN.has(w.toLowerCase()) || STOP_HE.has(w))) continue;
+        const known = typesIn(part);
+        if (known.length) { items.push({ known: known[0] }); continue; }
+        const terms = termsOf(part);
+        if (!terms.length) continue;
+        const label = part.replace(/^(?:me|us|your|my|our)\s+/i, '');
+        const slug = terms.filter((t) => !/^\./.test(t)).slice(0, 3).join('-') || 'item';
+        items.push({ key: 'thing:' + slug, type: 'thing', label: { he: label, en: label }, terms, months: null, year: null, amount: null, status: 'missing', got: [], proof: [], note: null, signed: /signed|חתו?מ/i.test(part) });
+      }
+      // A list is at least two real things, one of them not a known document (those are read above).
+      if (items.length >= 2 && items.filter((i) => !i.known).length) return items;
+      items.length = 0;
+    }
+    return [];
+  }
+  function thingFits(item, name) {
+    const n = String(name || '').toLowerCase();
+    const ext = (n.match(/\.[a-z0-9]{2,5}$/) || [''])[0];
+    const words = item.terms.filter((t) => !/^\./.test(t));
+    const exts = item.terms.filter((t) => /^\./.test(t));
+    return words.some((t) => t.length >= 3 && n.indexOf(t) >= 0) || (ext && exts.indexOf(ext) >= 0);
+  }
+
   // text: the professional's OWN message to a client (quoted history removed by the host).
   // Returns null (no request) or { items, deadlineIso, lang, why }.
   function classifyOutgoingRequest(text, ctx) {
@@ -306,6 +374,13 @@ const FlowClientRequests = (() => {
         if (!seen.has(it.key)) { seen.add(it.key); items.push(it); }
         break;
       }
+    }
+    if (c.generic === true) {
+      genericItems(body).forEach((g) => {
+        const it = g.known ? itemFor(g.known, parsePeriod(body, c.now)) : g;
+        if (seen.has(it.key)) return;
+        seen.add(it.key); items.push(it); anyAsk = true;
+      });
     }
     if (!items.length || !anyAsk) return null;
     let deadlineIso = null;
@@ -425,7 +500,19 @@ const FlowClientRequests = (() => {
         const it = open[0]; if (it.status !== 'check') { change(it, 'check', 'one unnamed file for the only open item'); it.status = 'check'; it.proof.push(proofOf(att)); }
         return;
       }
-      if (!t) { out.unmatched.push(att.name); return; }
+      // A name no open document item wants may still be one of the things asked for ("NDA_signed.pdf").
+      if (!t || !open.some((i) => i.type === t.id && !isDone(i))) {
+        const things = open.filter((i) => i.type === 'thing' && !isDone(i) && thingFits(i, att.name));
+        if (things.length === 1) {
+          const it = things[0];
+          if (msg.fetchedBack !== true) { change(it, 'check', 'not read back'); it.status = 'check'; it.proof.push(proofOf(att)); return; }
+          const before = it.status;
+          setReceived(it, proofOf(att), null);
+          out.changes.push({ key: it.key, from: before, to: it.status, why: it.signed ? 'file received; the signature is for you to look at' : 'file received' });
+          return;
+        }
+        if (!t) { out.unmatched.push(att.name); return; }
+      }
       const cands = open.filter((i) => i.type === t.id && !isDone(i));
       if (!cands.length) { out.unmatched.push(att.name); return; }
       // An item for the right document; is it the right period?
@@ -526,6 +613,7 @@ const FlowClientRequests = (() => {
     const name = request.client && request.client.name ? (String(request.client.name).replace(/\([^)]*\)/g, ' ').split(/\s+/).map((w) => w.replace(/[^\p{L}'"-]/gu, '')).filter(Boolean)[0] || '') : '';
     const due = o.dueIso || request.deadlineIso;
     const list = miss.map((i) => '• ' + labelOf(i, lang) + (i.status === 'claimed' ? (lang === 'he' ? ' (כתבת ששלחת, אבל לא קיבלנו קובץ)' : ' (you mentioned sending it, but no file reached us)') : '')).join('\n');
+    if (o.voice === 'me') return personalReminder({ name, got, list, due, level, lang, one: miss.length === 1, senderName: o.senderName });
     if (lang === 'he') {
       const hi = name ? 'שלום ' + name + ',' : 'שלום,';
       const thanks = got.length ? '\n\nתודה, קיבלנו: ' + got.map((i) => labelOf(i, 'he')).join(', ') + '.' : '';
@@ -538,6 +626,24 @@ const FlowClientRequests = (() => {
     const ask = level === 1 ? 'A quick reminder: we are still missing' : level === 2 ? 'We are still waiting for' : 'To finish the work on time, we still need';
     const by = due ? (level === 3 ? '\n\nWe need them by ' + dayText(due, 'en') + ' at the latest.' : '\n\nCould you send them by ' + dayText(due, 'en') + '?') : (level === 3 ? '\n\nPlease send them today, or tell us when they will arrive.' : '');
     return hi + thanks + '\n\n' + ask + ':\n' + list + by + '\n\nIf you already sent them, please ignore this note.\n\nThanks' + (o.senderName ? ',\n' + o.senderName : ',');
+  }
+  // The same reminder in one person's voice (the general follow loop): "I", not "we".
+  function personalReminder(a) {
+    const he = a.lang === 'he';
+    const sign = a.senderName ? ',\n' + a.senderName : ',';
+    if (he) {
+      const hi = a.name ? 'היי ' + a.name + ',' : 'היי,';
+      const thanks = a.got.length ? '\n\nתודה, קיבלתי: ' + a.got.map((i) => labelOf(i, 'he')).join(', ') + '.' : '';
+      const ask = a.level === 1 ? 'תזכורת קטנה, עדיין חסר לי' : a.level === 2 ? 'אני עדיין מחכה ל' : 'כדי שאוכל להתקדם, עדיין חסר לי';
+      const by = a.due ? (a.level === 3 ? '\n\nזה נחוץ לי עד ' + dayText(a.due, 'he') + ' לכל המאוחר.' : '\n\nאשמח לקבל עד ' + dayText(a.due, 'he') + '.') : (a.level === 3 ? '\n\nאשמח לקבל עוד היום, או לדעת מתי זה יגיע.' : '');
+      return hi + thanks + '\n\n' + ask + ':\n' + a.list + by + '\n\nאם כבר שלחת, אפשר להתעלם.\n\nתודה' + sign;
+    }
+    const hi = a.name ? 'Hi ' + a.name + ',' : 'Hi,';
+    const it = a.one ? 'it' : 'them';
+    const thanks = a.got.length ? '\n\nThanks, I received: ' + a.got.map((i) => labelOf(i, 'en')).join(', ') + '.' : '';
+    const ask = a.level === 1 ? "A quick reminder, I'm still missing" : a.level === 2 ? "I'm still waiting for" : 'So I can move forward, I still need';
+    const by = a.due ? (a.level === 3 ? '\n\nI need ' + it + ' by ' + dayText(a.due, 'en') + ' at the latest.' : '\n\nCould you send ' + it + ' by ' + dayText(a.due, 'en') + '?') : (a.level === 3 ? '\n\nCould you send ' + it + ' today, or let me know when ' + (a.one ? 'it' : 'they') + ' will arrive?' : '');
+    return hi + thanks + '\n\n' + ask + ':\n' + a.list + by + '\n\nIf you already sent ' + it + ', please ignore this.\n\nThanks' + sign;
   }
   function reminderSubject(request, lang) {
     const l = lang || request.lang || 'he';
