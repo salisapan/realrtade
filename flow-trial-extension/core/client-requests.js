@@ -69,7 +69,7 @@ const FlowClientRequests = (() => {
         /\bannual (?:pension|provident|insurance|savings) (?:statement|report)s?\b/i],
       file: [/pension|gemel|hishtalmut|provident|פנסיה|גמל|השתלמות|הפקדות/i] },
     { id: 'id-copy', per: null, he: 'צילום תעודת זהות (עם ספח)', en: 'a copy of the ID card',
-      ask: [heRe('(?:צילום\\s*)?(?:תעודת\\s*(?:ה)?זהות|ת"ז|ת\\.ז\\.?)(?:\\s*(?:\\+|עם|כולל|ו)\\s*(?:ה)?ספח)?'), /\b(?:copy of (?:your|the) )?(?:ID card|identity card|passport)\b/i],
+      ask: [heRe('(?:צילום\\s*)?(?:תעודת\\s*(?:ה)?זהות|ת"ז|ת\\.ז\\.?)(?:\\s*(?:\\+|עם|כולל|ו)\\s*(?:ה)?ספח)?'), /\b(?:copy of (?:your|the) )?(?:ID card|identity card|passport)\b|\b(?:copy|scan|photo) of (?:your|the|his|her|their) ID\b|\bID copy\b/i],
       file: [/(?:^|[^a-z])id(?:[^a-z]|$)|teudat|zehut|passport|ת"?ז|זהות|דרכון|ספח/i] },
     { id: 'power-of-attorney', per: null, he: 'ייפוי כוח חתום', en: 'a signed power of attorney', signed: true,
       ask: [heRe('י?יפוי[\\s-]*(?:ה)?כו?ח'), /\bpower of attorney\b|\bPOA\b/],

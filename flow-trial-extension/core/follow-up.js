@@ -56,6 +56,8 @@ const FlowFollowUp = (() => {
   const replyModel = sibling(typeof FlowReplyModel !== 'undefined' ? FlowReplyModel : null, './reply-model.js', 'FlowReplyModel');
   const personModel = sibling(typeof FlowPersonModel !== 'undefined' ? FlowPersonModel : null, './person-model.js', 'FlowPersonModel');
   const requestTypes = sibling(typeof FlowRequestTypes !== 'undefined' ? FlowRequestTypes : null, './request-types.js', 'FlowRequestTypes');
+  // Item by item (core/client-requests.js): used only when the caller passes items: true (CLIENT_REQUESTS.items, off).
+  const clientRequests = sibling(typeof FlowClientRequests !== 'undefined' ? FlowClientRequests : null, './client-requests.js', 'FlowClientRequests');
   const KINDS = { REPLY: 'reply', PAYMENT: 'payment' };
   const NOT_ANSWER_MAX_WORDS = 18;
   const NOT_ANSWER_MIN = 0.9;   // how sure core/reply-model.js must be that a reply is not an answer before it holds a loop open
@@ -218,7 +220,7 @@ const FlowFollowUp = (() => {
   // ctx:  { now?, extract? } — `extract` is core/extract.js's FlowExtract; passed in
   //       so this file stays free of load-order assumptions.
   // Returns null (silence) or { kind, what, amount, deadlineIso, chaseIso, lang }.
-  function classifyOutgoing(text, ctx) {
+  function classifyOutgoingBase(text, ctx) {
     const c = ctx || {};
     const body = String(text || '').trim();
     if (!body) return null;
@@ -297,6 +299,98 @@ const FlowFollowUp = (() => {
       subtypeLabel: req ? req.label : null,
       direction: 'theirs'
     };
+  }
+
+  // ---- items: one request, several things (switch: items, off) ------------------------------------------------
+  // "Send me the signed contract, your ID copy and the invoice" is one loop with three things in it. Two of three is
+  // not done. With ctx.items === true the loop carries its items (core/client-requests.js decides what each one is and
+  // when it really arrived), and only the whole set closes it. Without the switch nothing here runs: same object as before.
+  function itemsOf(text, c) {
+    if (!c || c.items !== true || !clientRequests) return null;
+    const r = clientRequests.classifyOutgoingRequest(text, { now: c.now });
+    return r && r.items && r.items.length ? r : null;
+  }
+  function classifyOutgoing(text, ctx) {
+    const c = ctx || {};
+    const base = classifyOutgoingBase(text, c);
+    const it = itemsOf(text, c);
+    if (!it) return base;
+    if (base) return Object.assign({}, base, { items: it.items, deadlineIso: base.deadlineIso || it.deadlineIso || null });
+    // The item engine found an explicit ask for named documents that the fixed phrasings missed.
+    const body = String(text || '').trim();
+    const line = sentences(body).find((s) => !COURTESY.test(s)) || body;
+    return {
+      weight: { score: 3, level: 'real', signals: ['items'] },
+      tier: 'items',
+      file: null,
+      kind: KINDS.REPLY,
+      what: clip(line, MAX_WHAT),
+      amount: null,
+      deadlineIso: it.deadlineIso || null,
+      chaseIso: chaseDate(KINDS.REPLY, it.deadlineIso || null, c.now),
+      lang: it.lang,
+      subtype: 'items',
+      subtypeLabel: null,
+      direction: 'theirs',
+      items: it.items
+    };
+  }
+  function hasItems(w) { return Boolean(w) && Array.isArray(w.items) && w.items.length > 0 && Boolean(clientRequests); }
+  // The watch, seen as a request the item engine understands.
+  function asRequest(w) {
+    return {
+      id: w.id, status: 'open', channel: w.channel || 'gmail', lang: w.lang || 'en', deadlineIso: w.deadlineIso || null, nudges: w.nudges || 0,
+      client: { email: w.counterpart && w.counterpart.email ? String(w.counterpart.email).toLowerCase() : null, name: (w.counterpart && w.counterpart.name) || null },
+      items: w.items
+    };
+  }
+  function itemProof(items) {
+    const out = [];
+    items.forEach((i) => (i.proof || []).forEach((p) => { if (p && p.fetchedBack === true) out.push(Object.assign({ item: i.key }, p)); }));
+    return out;
+  }
+  function itemCounts(w) {
+    if (!hasItems(w)) return null;
+    const done = w.items.filter(clientRequests.isDone).length;
+    return { total: w.items.length, done, missing: clientRequests.missingItems(asRequest(w)).map((i) => i.key) };
+  }
+  // A reply on a loop with items. msg: { messageId, from:{email}, text, attachments:[{id,name,size}], fetchedBack, channel }.
+  // Closes only when every item is received (a file read back), answered "none", or released; or when they decline.
+  // "Got it, here is the first one" moves one item and keeps the loop open, chasing only what is still missing.
+  function applyReplyItems(watch, reply, msg, now) {
+    if (!hasItems(watch)) return applyReply(watch, reply, now);
+    const t = typeof now === 'number' ? now : Date.now();
+    if (watch.status !== 'waiting' || isMine(watch) || isClock(watch)) return { none: true };
+    if (reply && reply.outcome === 'auto') return { none: true };
+    const arr = msg ? clientRequests.applyArrival(asRequest(watch), Object.assign({}, msg, { now: t })) : { request: asRequest(watch), changes: [] };
+    const items = arr.request.items;
+    const allDone = items.every(clientRequests.isDone);
+    const base = reply ? applyReply(watch, reply, t) : { none: true };
+    const seen = { lastReplyAt: t, items };
+    if (reply && reply.outcome === 'declined') return Object.assign({}, base, { patch: Object.assign({}, base.patch, { items }), changes: arr.changes });
+    if (allDone) {
+      return { patch: Object.assign({}, seen, { status: 'resolved', resolvedAt: t, resolvedBy: 'reply', closedAs: 'delivered', proof: itemProof(items) }), close: true, changes: arr.changes };
+    }
+    if (base.none && !arr.changes.length) return { none: true };
+    if (base.close) {
+      // The reply reads as an answer, but something asked for has not arrived: hold it open, and chase only the rest.
+      return { patch: Object.assign({}, seen, { stage: 'partial', chaseIso: rechaseDate(watch.kind, t, null) }), partial: true, rescheduled: true, changes: arr.changes };
+    }
+    const patch = Object.assign({}, base.patch || { lastReplyAt: t }, { items });
+    if (arr.changes.length && !base.rescheduled && !base.yours) { patch.stage = 'partial'; patch.chaseIso = rechaseDate(watch.kind, t, null); }
+    return Object.assign({}, base.none ? {} : base, { patch, changes: arr.changes, partial: arr.changes.length > 0 });
+  }
+  // The person settles one item by hand: 'confirm' / 'reject' a file Glance was unsure of, 'release' (no longer needed),
+  // 'received' (it came another way), 'reopen'. Returns { patch, close }.
+  function decideItem(watch, key, verdict, now) {
+    if (!hasItems(watch)) return { none: true };
+    const t = typeof now === 'number' ? now : Date.now();
+    const items = clientRequests.decide(asRequest(watch), key, verdict, t).items;
+    if (watch.status === 'waiting' && items.every(clientRequests.isDone)) {
+      const allReleased = items.every((i) => i.status === 'released');
+      return { patch: { items, status: 'resolved', resolvedAt: t, resolvedBy: 'person', closedAs: allReleased ? 'released' : 'delivered', proof: itemProof(items) }, close: true };
+    }
+    return { patch: { items } };
   }
 
   // ---- the mirror: what YOU promised ---------------------------------------------
@@ -426,6 +520,7 @@ const FlowFollowUp = (() => {
       resolution: ask.resolution || null,
       // How the loop was recognised ('model' = the on-device model alone, no word-list frame).
       tier: ask.tier || null,
+      ...(Array.isArray(ask.items) && ask.items.length ? { items: JSON.parse(JSON.stringify(ask.items)) } : {}),
       stage: 'waiting',
       nudges: 0,
       nudgedAt: null,
@@ -877,6 +972,11 @@ const FlowFollowUp = (() => {
 
   // The firmer nudges name the deadline the person actually set.
   function nudgeText(w, level, now) {
+    // A loop with items asks only for what is still missing, and thanks for what came.
+    if (hasItems(w)) {
+      const d = clientRequests.reminderDraft(asRequest(w), { level: Math.min(MAX_NUDGE_LEVEL, Math.max(1, level || nextNudgeLevel(w))), lang: w.lang });
+      if (d) return d;
+    }
     const base = nudgeBase(w, level, now);
     const lvl = Math.min(MAX_NUDGE_LEVEL, Math.max(1, level || nextNudgeLevel(w)));
     if (lvl < 2 || !deadlinePassed(w, now)) return base;
@@ -957,7 +1057,8 @@ const FlowFollowUp = (() => {
   return {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, fromProposal, deliversPromise, deliversFor, closeAsKept, closeFromTask, taskRefsToCheck, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
-    nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay
+    nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay,
+    applyReplyItems, decideItem, itemCounts, hasItems
   };
 })();
 
