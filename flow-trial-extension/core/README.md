@@ -91,6 +91,7 @@ it, not touching the module.
 | `local-lm-audit.js` | The fixed sentences an on-device language model must pass on THIS device before core/local-lm.js lets it propose anything. |
 | `local-lm-server.js` | A language model the person runs ON THEIR OWN COMPUTER (Ollama, LM Studio, or anything that speaks the same two HTTP dialects), as another source for the session core/local-lm.js already knows how to use. |
 | `local-lm.js` | A language model that runs on THIS device, as the third recognition tier. |
+| `local-file.js` | A file asked for that is on the person's own computer, not in the cloud (close map U2). One clear file ask, the cloud search empty, exactly one match in a folder the person granted once: read the bytes, save a copy to their OneDrive (never overwriting), read the item back by id (size and hash) for `microsoft/onedrive` ProofOfClose, Undo deletes that item. The ask still closes only on a sent message. Switch `LOCAL_FILE_CLOSE`, off. The folder, Graph and hashing are injected; no src/ file calls it yet. |
 | `mask-ids.js` | Masks identifiers that core/privacyShield.js does not (national ID numbers, policy / case / account / claim numbers, IBANs, passport numbers) and composes it with the shield into the one masking pass that runs before ANY text may leave the device. |
 | `meeting-debrief.js` | After a meeting: what came out of it — portable, no chrome.*, no DOM, no network, no model. |
 | `model-store.js` | Fetches, verifies and keeps an on-device model's files, quietly and politely. |
