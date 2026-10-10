@@ -6,6 +6,7 @@ updated: 2026-10-10
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-10 · Owner chose the first wedge: accountants and lawyers. Client requests engine, ledger and page built (not wired to Gmail yet; switch off). docs/glance-ai/client-requests.md, open-tasks row 68.
 - 2026-10-10 · Auto-merge for Claude routines into the working branch (never main) on three conditions: all green, behind an off switch, no conflict with David's agents. Recorded in CLAUDE.md owner locks.
 - 2026-10-10 · Owner approved three more Claude routines: breadth builder (Mon/Tue/Thu, one loop type of the close map up one state), scenario rehearsal A–E (Fri), red team (Fri). Per-user context is milestone M8 of the AI plan. Rows 65–67.
 - 2026-10-09 · Owner approved the AI-product spec and the new identity rule: «Glance is an AI product: its own model understands each intention and plans the close; what we sell is the close, proven». Applied in CLAUDE.md and docs/product-identity.md. The 07:47 open-tasks routine is off.

@@ -93,6 +93,7 @@ deletes anything that was already there.
 | **True close**: a short reply with no answer in it never closes a loop; a draft is not a delivery | `docs/true-close.md`, `docs/resolution-paths.md` |
 | Receipts and documents (contract, quote, proposal, signed copy) as a path to a real delivery | `docs/resolution-paths.md`, `docs/true-close.md` §4 |
 | Other apps (WhatsApp Web, Outlook through Graph + Outlook on the web Do It card, right-click capture), opt-in; Outlook drafts on Do It (never send) | Store listing + `src/content-outlook.js` |
+| **Client requests** for accountants and lawyers: what is missing from whom, reminders as drafts (page `clients/clients.html`; reading mail by itself is **off**, `config/client-requests.public.js`) | `docs/glance-ai/client-requests.md` |
 | Hybrid on-device model + masked server for Do It proposals (**dormant**, `config/hybrid.public.js`) | `docs/hybrid-execution-architecture.md` |
 | Pro (Stripe, licence key, server-enforced paid features) | `docs/monetization.md`, `docs/revenue-routines.md` |
 | What is open, blocked or decided | `docs/open-tasks.md` |
