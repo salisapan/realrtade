@@ -4,7 +4,7 @@ Glance closes open loops. Gmail is where it starts today.
 
 ## Product definition (vision-locked)
 
-The locked block in `CLAUDE.md` and `docs/product-identity.md` is the definition. This page is the first focused use of it: the loops between a professional (an accountant, a bookkeeper, a lawyer) and their clients. The owner chose this wedge on 2026-10-10 («רואי חשבון ועורכי דין»). The firm asks for documents, signatures and payments, and the requests come back one by one, late, partial, sometimes for the wrong month. Glance keeps every item open until it really arrived, prepares the reminder that lists only what is missing, and never sends it: the person does.
+The locked block in `CLAUDE.md` and `docs/product-identity.md` is the definition. This page is the first focused use of it: the loops between a professional (an accountant, a bookkeeper, a lawyer) and their clients. The owner chose this wedge on 2026-10-10 («רואי חשבון ועורכי דין»). Later the same day the owner widened it: no narrow audience. What matters is carry until closed for everyone, so this engine folds into the general follow loop (`core/follow-up.js`); accountants and lawyers are the hardest test case, not the market (open-tasks row 68). The firm asks for documents, signatures and payments, and the requests come back one by one, late, partial, sometimes for the wrong month. Glance keeps every item open until it really arrived, prepares the reminder that lists only what is missing, and never sends it: the person does.
 
 ## Current implementation status (code reality, 2026-10-10)
 
