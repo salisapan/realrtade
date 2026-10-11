@@ -48,3 +48,4 @@ One line per decision: `date · decision · who · where it is written in docs/`
 - 2026-10-04 · Deeper read: free for everyone with a monthly allowance, local first · Sali · [[ai-ladder]], [[open-tasks]] row 25
 - 2026-10-03 · WhatsApp Web ships as experimental opt-in, read-only, 1:1 · Sali · [[multi-platform]] §5, [[open-tasks]] row 17
 - 2026-10-11 · Own-model track: grounded SFT v3 builder and the promotion gate (glance-ai/oss/finetune/MODEL-TRACK.md). Audit: 207 of 476 act rows of SFT v2 val disagree with the device; 86 teach a wrong date ("tomorrow" labelled a day late). GPU run still parked (200 owner labels, spend).
+- 2026-10-11 · Small on-device model v2.3 (shadow candidate, not wired): trained on the rules engine's blind spots (dated asks addressed to the person). After the engine: blind spots caught 96/315 vs 46, wrong Do It 9 vs 10 of 4,938. Labels are template intent, not owner-verified. glance-ai/model/V23.md.
