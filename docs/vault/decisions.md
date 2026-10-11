@@ -47,3 +47,4 @@ One line per decision: `date · decision · who · where it is written in docs/`
 - 2026-10-05 · Product identity: "Glance closes open loops. Gmail is where it starts today." · Sali · [[product-identity]], [[open-tasks]] row 39
 - 2026-10-04 · Deeper read: free for everyone with a monthly allowance, local first · Sali · [[ai-ladder]], [[open-tasks]] row 25
 - 2026-10-03 · WhatsApp Web ships as experimental opt-in, read-only, 1:1 · Sali · [[multi-platform]] §5, [[open-tasks]] row 17
+- 2026-10-11 · Own-model track: grounded SFT v3 builder and the promotion gate (glance-ai/oss/finetune/MODEL-TRACK.md). Audit: 207 of 476 act rows of SFT v2 val disagree with the device; 86 teach a wrong date ("tomorrow" labelled a day late). GPU run still parked (200 owner labels, spend).
