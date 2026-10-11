@@ -141,9 +141,82 @@ const FlowPmfMetrics = (() => {
     };
   }
 
+
+  // ---- real-user A/B (dormant: CARRY.abLive in config/carry.public.js is off) -----------------------
+  // One experiment arm per install, decided on the device from the install id alone, so the same install
+  // always lands in the same arm and nothing needs to be stored or sent to decide it. Per-arm numbers are
+  // COUNTS only: an event name and a variant, never text, an address, a subject or a name. Nothing here
+  // sends anything; a future upload of these counts goes through the same anonymous install-id pipe as
+  // the weekly habit, and turning it on is the owner's decision with the privacy page changed in the same commit.
+  const EXPERIMENTS = { 'carry-next-move': { arms: ['A', 'B'] } };
+  // Each event is one counter. A move's type is part of the name so the fold never needs free text.
+  const AB_EVENTS = [
+    'loop_stuck',              // a loop reached its fourth chase day with no answer (both arms)
+    'move_channel', 'move_colleague', 'move_release',            // B: a move was proposed
+    'move_accepted', 'move_dismissed',                           // B: the person's answer to it
+    'answered_after_move',     // B: the loop got its real answer after a move was done
+    'answered_after_stuck',    // both: the loop got its real answer after it was stuck
+    'released',                // both: the person let it go (B by the question, A by hand)
+    'reopened_after_release',  // the person reopened a loop they released: the early-release signal
+    'open_at_day_90'           // both: still open 90 days after it opened
+  ];
+  function fnv(str) {
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h;
+  }
+  // 'A' | 'B' | null. null when the switch is off, the experiment is unknown, or there is no install id:
+  // the caller then behaves exactly as today (arm A) and counts nothing.
+  function assignVariant(installId, experiment, opts) {
+    if (!opts || opts.enabled !== true) return null;
+    const ex = EXPERIMENTS[experiment];
+    const id = typeof installId === 'string' ? installId.trim() : '';
+    if (!ex || id.length < 8) return null;
+    return ex.arms[fnv(experiment + ':' + id) % ex.arms.length];
+  }
+  // Pure fold: returns a new state; an unknown experiment, arm or event changes nothing.
+  // state: { [experiment]: { A: { loop_stuck: n, ... }, B: {...} } }
+  function foldAbEvent(state, experiment, variant, event) {
+    const ex = EXPERIMENTS[experiment];
+    if (!ex || ex.arms.indexOf(variant) < 0 || AB_EVENTS.indexOf(event) < 0) return state || {};
+    const next = Object.assign({}, state || {});
+    const exState = Object.assign({}, next[experiment] || {});
+    const arm = Object.assign({}, exState[variant] || {});
+    arm[event] = (arm[event] || 0) + 1;
+    exState[variant] = arm;
+    next[experiment] = exState;
+    return next;
+  }
+  // Per-arm rates with their n. A rate on zero is null, never 0.
+  function abSnapshot(state, experiment) {
+    const ex = EXPERIMENTS[experiment];
+    if (!ex) return null;
+    const exState = (state && state[experiment]) || {};
+    const rate = (a, b) => (b > 0 ? Math.round((a / b) * 1000) / 1000 : null);
+    const out = {};
+    ex.arms.forEach((v) => {
+      const c = exState[v] || {};
+      const g = (k) => c[k] || 0;
+      const proposed = g('move_channel') + g('move_colleague') + g('move_release');
+      out[v] = {
+        stuck: g('loop_stuck'),
+        answeredAfterStuck: rate(g('answered_after_stuck'), g('loop_stuck')),
+        released: rate(g('released'), g('loop_stuck')),
+        openAtDay90: rate(g('open_at_day_90'), g('loop_stuck')),
+        earlyRelease: rate(g('reopened_after_release'), g('released')),
+        movesProposed: proposed,
+        moveAccepted: rate(g('move_accepted'), proposed),
+        answeredAfterMove: rate(g('answered_after_move'), g('move_accepted')),
+        counts: Object.assign({}, c)
+      };
+    });
+    return out;
+  }
+
   return {
     computeClosureRate, computeWeeklyActivity, computeRetention, computeWeeklyHabit, computeSnapshot,
-    weekKey, HABIT_MIN_ACTIVE_DAYS, HABIT_MIN_CLOSES, DEFAULT_RETENTION_WEEKS
+    weekKey, HABIT_MIN_ACTIVE_DAYS, HABIT_MIN_CLOSES, DEFAULT_RETENTION_WEEKS,
+    assignVariant, foldAbEvent, abSnapshot, AB_EVENTS, EXPERIMENTS
   };
 })();
 
