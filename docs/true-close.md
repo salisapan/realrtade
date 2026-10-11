@@ -109,3 +109,5 @@ Glance closes open loops. Gmail is where it starts today. A reply that says the 
 **Tests.** `test/follow-up-corpus.cjs` ("progress and preparation are not completion"): twelve progress replies stay open, seven real deliveries still close, `applyReply` never closes a progress reply. No precision gate moved; the 22 quiet texts stay quiet.
 
 **Not verified.** This is the on-device rule on text. Real threads (quoted history, signatures, forwarded mail) are the live Gate.
+
+**Deferred completion, read better (same day).** «I'll send it Thursday», «עד חמישי», «עד יום ה׳», «בשבוע הבא», «עד סוף השבוע» (Thursday), «20/10» (day/month, Israel), "by the end of the month" now give the loop its next look on the day they named (`laterWords` in `core/follow-up.js`; `core/extract.js` is untouched because open PRs change it). A past day is never returned. Without a readable day the loop keeps the normal two-business-day chase.

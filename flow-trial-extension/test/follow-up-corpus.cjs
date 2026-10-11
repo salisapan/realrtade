@@ -274,5 +274,18 @@ check('"Not transferred yet" is not', outcome('Not transferred yet', payW) !== '
 check('an unfinished payment still does not close it', outcome('Will pay once the invoice is corrected.', payW) !== 'paid');
 check('applyReply keeps a progress reply open and moves the next look, never closes', (() => { const r = cr('Found it in the shared folder, sending shortly.', replyW); const a = F.applyReply(replyW, r, NOW); return !a.close && a.rescheduled && a.patch.stage === 'promised' && !a.patch.status; })());
 
+console.log('\n--- deferred completion: the day they name, in the ways people say it ---\n');
+const dayOf = (t) => cr(t, replyW).promisedIso;
+check('a bare weekday: "I will send it Thursday" (today is Thursday: next week)', dayOf('I will send it Thursday') === '2026-10-08', dayOf('I will send it Thursday'));
+check('«אחזור אליך עד חמישי»', dayOf('אחזור אליך עד חמישי') === '2026-10-08', dayOf('אחזור אליך עד חמישי'));
+check('«אחזור אליך עד יום ה׳» (letter form)', dayOf('אחזור אליך עד יום ה׳') === '2026-10-08', dayOf('אחזור אליך עד יום ה׳'));
+check('«אשלח בשבוע הבא» is a week out', dayOf('אשלח בשבוע הבא') === '2026-10-08', dayOf('אשלח בשבוע הבא'));
+check('«אשלח עד סוף השבוע» on a Thursday is today', dayOf('אשלח עד סוף השבוע') === '2026-10-01', dayOf('אשלח עד סוף השבוע'));
+check('«אשלח עד 20/10» reads day/month with no year', dayOf('אשלח עד 20/10') === '2026-10-20', dayOf('אשלח עד 20/10'));
+check('"3/11" is read day/month (Israel), the next one that is not in the past', dayOf('Thanks, I will revert on 3/11') === '2026-11-03', dayOf('Thanks, I will revert on 3/11'));
+check('"by the end of the month"', dayOf('I will send it by the end of the month') === '2026-10-31', dayOf('I will send it by the end of the month'));
+check('a past day is never returned (31/12 passed is next year only if it already passed)', (dayOf('אשלח עד 15/09') || '2027-09-15') >= '2026-10-01');
+check('no day named stays without a day', dayOf('Will look into it later and revert.') === null);
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

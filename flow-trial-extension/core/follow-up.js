@@ -630,6 +630,36 @@ const FlowFollowUp = (() => {
       x.setDate(x.getDate() + ((5 - x.getDay() + 7) % 7));
       return isoDay(x);
     }
+    return laterWords(text, t0);
+  }
+  // The ways people say "later" that core/extract.js does not read (kept here so extract.js, which open PRs change, is untouched):
+  // a bare weekday ("I'll send it Thursday", «עד חמישי», «עד יום ה׳»), "next week" / «בשבוע הבא», «סוף השבוע», "end of the month", and a
+  // day/month with no year («20/10»). Only a future day is returned; anything else is null and the loop keeps its normal chase day.
+  const WEEKDAYS_EN = { sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6 };
+  const WEEKDAYS_HE = [['ראשון', 0], ['שני', 1], ['שלישי', 2], ['רביעי', 3], ['חמישי', 4], ['שישי', 5], ['שבת', 6]];
+  const LETTER_HE = { 'א': 0, 'ב': 1, 'ג': 2, 'ד': 3, 'ה': 4, 'ו': 5 };
+  function nextWeekday(t0, wd) { const x = new Date(t0.getTime()); let k = (wd - x.getDay() + 7) % 7; if (k === 0) k = 7; x.setDate(x.getDate() + k); return isoDay(x); }
+  function laterWords(text, t0) {
+    const t = String(text || '');
+    let m = t.match(/\b(?:on |by |until |before |this |next )?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i);
+    if (m) return nextWeekday(t0, WEEKDAYS_EN[m[1].toLowerCase()]);
+    m = t.match(/(?:^|[^֐-׿])(?:עד |ב|ליום |לקראת )?יום (ראשון|שני|שלישי|רביעי|חמישי|שישי)|(?:^|[^֐-׿])(?:עד |ב)(ראשון|שני|שלישי|רביעי|חמישי|שישי)(?![֐-׿])/);
+    if (m) { const name = m[1] || m[2]; return nextWeekday(t0, WEEKDAYS_HE.find((w) => w[0] === name)[1]); }
+    m = t.match(/יום ([אבגדהו])['׳]/);
+    if (m) return nextWeekday(t0, LETTER_HE[m[1]]);
+    if (/\bnext week\b|בשבוע הבא|שבוע הבא/i.test(t)) { const x = new Date(t0.getTime()); x.setDate(x.getDate() + 7); return isoDay(x); }
+    if (/סוף (?:ה)?שבוע/.test(t)) { const x = new Date(t0.getTime()); x.setDate(x.getDate() + ((4 - x.getDay() + 7) % 7)); return isoDay(x); }
+    if (/\bend of (?:the )?month\b|סוף (?:ה)?חודש/i.test(t)) { const x = new Date(t0.getFullYear(), t0.getMonth() + 1, 0); return isoDay(x) >= isoDay(t0) ? isoDay(x) : null; }
+    m = t.match(/(?<!\d)(\d{1,2})[\/.](\d{1,2})(?![\d\/.])/);
+    if (m) {
+      let dd = +m[1], mm = +m[2];
+      if (mm > 12 && dd <= 12) { const z = dd; dd = mm; mm = z; }
+      if (dd >= 1 && dd <= 31 && mm >= 1 && mm <= 12) {
+        let y = t0.getFullYear(); let d = new Date(y, mm - 1, dd);
+        if (isoDay(d) < isoDay(t0)) d = new Date(y + 1, mm - 1, dd);
+        if (d.getMonth() === mm - 1) return isoDay(d);
+      }
+    }
     return null;
   }
 
