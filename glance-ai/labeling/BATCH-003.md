@@ -24,3 +24,19 @@ Files: `batch-003.json` (full record), `batch-003.blind.jsonl` (what the labeler
 On labels that did not come from the engine, v2.3 on top of the engine misses 41 closes instead of 48 (Hebrew 26 instead of 33), with the same wrong Do Its and two more wrong-kind actions.
 
 The reference itself carries errors: 13 of the engine's 23 wrong Do Its are not about undated asks, among them a webinar invitation, an out-of-office reply and a meeting that already happened offered as calendar events (items 65, 95, 97), a thank-you for today's meeting as a calendar event (71), asks addressed by name to someone else (64, 73, 79), a Google Drive save on an Outlook mailbox (93, 100) and a figure due in the past (103). They are listed in `batch-003.comparison.jsonl` for the red team to check on the full browser path.
+
+## Second pass and agreement (2026-10-11)
+
+A separate session labelled the same 200 cases from a prompt that carried only the cases and the labelling rules, on a checkout older than this batch (so it could not read pass 1). `merge-passes.cjs` keeps the cases both passes decided the same way.
+
+| | count |
+|---|---|
+| agreement labels (`agreement-gold.jsonl`) | 174 (silent 101, draft 32, calendar 21, task 16, file_save 4) |
+| disagreements (`agreement-gold.disagree.jsonl`) | 13 (agreement rate 93% of 187 decided by both) |
+| left out: CONTEXT in both | 12 |
+| left out: one pass unsure | 1 |
+
+Seven of the 13 disagreements are "a confirmed amount or approved budget is a task" (items 2, 62, 74, 85, 87, 92, 105): a product rule (`confirmed-amount|task`) that pass 1 applied and the pass-2 prompt did not state. The next pass should state it. The rest: a promise to answer by a date read as task or draft (1), a cancelled meeting (101, 122), an undated "send me your availability" (112), a callback ask (29) and a save-to-Drive with an attachment (63).
+
+Gate (`promote_gate.cjs`, labels = agreement-gold, 174 rows): in the product order (engine + veto, then the model) v2.3 has the same wrong Do Its as v2 (24 of 101), 37 missed against 44, and 4 wrong actions against 2, so the verdict is HOLD. Alone: 57 missed against 62 but 2 more English misses and 1 more wrong action: HOLD. 174 labels are below the 200 the gate needs, so it could not promote either way. v2 stays the default.
+
