@@ -871,6 +871,8 @@ const FlowFollowUp = (() => {
   const CARRY_RELEASE_MIN_AGE = 10;     // ... and never before this many business days
   const CARRY_RELEASE_AGE = 20;         // business days open, three nudges and no personal evidence: ask
   const CARRY_APPS = ['gmail', 'outlook', 'whatsapp'];
+  const MAIL_APPS = ['gmail', 'outlook'];
+  const COLLEAGUE_NO_DAYS = 90;         // "don't ask Yossi" about this person is remembered this long, across loops
   const APP_NAME = { gmail: 'Gmail', outlook: 'Outlook', whatsapp: 'WhatsApp', teams: 'Teams' };
   const APP_NAME_HE = { gmail: 'ג׳ימייל', outlook: 'אאוטלוק', whatsapp: 'וואטסאפ', teams: 'טימס' };
 
@@ -888,6 +890,28 @@ const FlowFollowUp = (() => {
     const out = [];
     (Array.isArray(watches) ? watches : []).forEach((x) => {
       if (closedForReal(x) && !isMine(x) && !isClock(x) && carryKey(x, opts) === key && (x.kind === KINDS.PAYMENT) === false) out.push(bizBetween(x.createdAt, x.resolvedAt));
+    });
+    return out;
+  }
+  // Real closes with one colleague, by address or by the identity key the caller maps that address to.
+  function colleagueCloses(watches, email, opts) {
+    const key = carryKey({ counterpart: { email } }, opts);
+    let n = 0;
+    (Array.isArray(watches) ? watches : []).forEach((x) => {
+      if (!closedForReal(x) || isMine(x) || isClock(x)) return;
+      const xe = String((x.counterpart && x.counterpart.email) || '').toLowerCase();
+      if (xe === email || (key && carryKey(x, opts) === key)) n++;
+    });
+    return n;
+  }
+  // Colleagues the person already said no to, for loops with this same counterpart, in the last 90 days.
+  function colleaguesDismissed(watches, key, now) {
+    const out = {};
+    (Array.isArray(watches) ? watches : []).forEach((x) => {
+      if (!x || !Array.isArray(x.moves)) return;
+      const cp = (x.counterpart && x.counterpart.email) || '';
+      if (key && String(x.personKey || cp).toLowerCase() !== key && String(cp).toLowerCase() !== key) return;
+      x.moves.forEach((m) => { if (m && m.type === 'colleague' && m.dismissed && m.to && now - (m.at || 0) <= COLLEAGUE_NO_DAYS * DAY_MS) out[String(m.to).toLowerCase()] = true; });
     });
     return out;
   }
@@ -950,7 +974,7 @@ const FlowFollowUp = (() => {
     if (!opts || opts.enabled !== true) return null;
     const t = typeof now === 'number' ? now : Date.now();
     if (!isActive(w) || isMine(w) || isClock(w) || isYours(w) || hasItems(w)) return null;
-    if (stageOf(w) === 'promised') return null;                 // they gave a day: wait for it
+    if (stageOf(w) === 'promised' && (!w.promisedIso || w.promisedIso >= isoDay(today(t)))) return null; // they gave a day: wait for it
     if ((w.nudges || 0) < MAX_NUDGE_LEVEL) return null;         // the three nudges come first
     if (!w.chaseIso || w.chaseIso > isoDay(today(t))) return null; // not due today
     const tried = {};
@@ -967,6 +991,7 @@ const FlowFollowUp = (() => {
       let best = null;
       Object.keys(by).forEach((a) => {
         if (a === app || can.indexOf(a) < 0) return;
+        if (MAIL_APPS.indexOf(a) >= 0 && MAIL_APPS.indexOf(app) >= 0) return;   // two mail apps are the same way to reach them
         const s = by[a];
         if (s.closes < CARRY_MIN_CLOSES) return;
         if (here.closes > 0 && !(here.closes < s.closes && (here.typical === null || s.typical * 2 <= here.typical))) return;
@@ -979,13 +1004,14 @@ const FlowFollowUp = (() => {
       const cpEmail = String((w.counterpart && w.counterpart.email) || '').toLowerCase();
       const org = orgOf(cpEmail);
       if (org) {
-        const fits = opts.threadPeople.filter((p) => {
+        const saidNo = colleaguesDismissed(watches, key, t);
+        const scored = opts.threadPeople.map((p) => {
           const e = String((p && p.email) || '').toLowerCase();
-          if (!e || e === cpEmail || orgOf(e) !== org) return false;
-          const by = closesByApp(watches, e, null);
-          return Object.keys(by).reduce((s, a) => s + by[a].closes, 0) >= CARRY_MIN_CLOSES;
-        });
-        if (fits.length === 1) move = { type: 'colleague', to: { email: String(fits[0].email).toLowerCase(), name: fits[0].name || null }, evidence: { closes: Object.values(closesByApp(watches, String(fits[0].email).toLowerCase(), null)).reduce((s, x) => s + x.closes, 0) } };
+          if (!e || e === cpEmail || orgOf(e) !== org || saidNo[e]) return null;
+          const closes = colleagueCloses(watches, e, opts);
+          return closes >= CARRY_MIN_CLOSES ? { p, e, closes } : null;
+        }).filter(Boolean);
+        if (scored.length === 1) move = { type: 'colleague', to: { email: scored[0].e, name: scored[0].p.name || null }, evidence: { closes: scored[0].closes } };
       }
     }
     // 3. "Still need this?" Never for money. With personal evidence (>= 3 real closes): the silence is now three times the
@@ -1015,7 +1041,7 @@ const FlowFollowUp = (() => {
   // The person said no to a move: never proposed again on this loop; the old chase rhythm goes on.
   function moveDismissPatch(w, move, now) {
     const t = typeof now === 'number' ? now : Date.now();
-    return { moves: (Array.isArray(w.moves) ? w.moves : []).concat([{ type: move.type, app: move.app || null, at: t, dismissed: true }]) };
+    return { moves: (Array.isArray(w.moves) ? w.moves : []).concat([{ type: move.type, app: move.app || null, to: move.to ? move.to.email : null, at: t, dismissed: true }]) };
   }
   // "Let it go": a deliberate release by the person. A true close of the loop, never Glance's own.
   function releasePatch(w, now) {
