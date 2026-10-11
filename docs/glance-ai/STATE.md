@@ -60,6 +60,10 @@ Strict gate, spec labels, wrong-Do-It is 0 on every set:
 
 The same file's no-gate propose-only row on the v2 held-out is 3.7% (8/218) wrong-Do-It on spec labels and 4.5% (10/220) on v2 labels. The gate is what brings that to zero.
 
+### Understanding validator (M1), 2026-10-11
+
+`flow-trial-extension/core/understanding.js` (switch `aiUnderstandingV1`, off) on the same cached answers. Scorer: `glance-ai/oss/shadow-combined/gated/score-understanding.cjs`; tables in `understanding-tables.md`. Pooled 786, spec labels: no gate 8/464 wrong Do It; validator alone 3/464; validator + strict gate 0/464 with 40/322 missed (strict gate alone 37/322). Model cards with a wrong date: 8/8 without the validator (all Hebrew weekdays, the strict gate included), 0/5 with it. Confidence is not in the cache and is not measured.
+
 The strict gate treats a save proposal as unread (`suggest:attachments-unread`) because the case file has counts and names only. The SENSITIVITY row models declared files as 240KB PDFs. That row is not a result.
 
 ## Blocked

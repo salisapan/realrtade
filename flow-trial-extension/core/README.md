@@ -116,6 +116,7 @@ it, not touching the module.
 | `resolution.js` | Resolution paths: finishing an intention that takes more than one step (define "done", find what exists, verify the precondition, prepare or ask, close ONLY on a real delivery). Receipts and transfer proofs, and the documents the person sends (contract, quote, proposal, signed copy). `docs/resolution-paths.md`, `docs/true-close.md`. Never sends, issues or signs. |
 | `story.js` | One story, many messages — portable, no chrome.*, no DOM, no network. |
 | `suggest-save.js` | Which attached files could be saved, and the `attachmentSave` step a later steps list can append. Rules and reason codes: suggest-save spec §1–§9. 0.9.38 records the decision and does not draw it. The steps-list UI is 0.9.40, before Mail.Send. |
+| `understanding.js` | **The Understanding contract** (M1 of `docs/glance-ai/ai-product.md`): the device-side validator for a model's answer about one masked text. Every claim must quote words that are really in the text, or it is dropped with a reason. The device reads the due date from the quoted words itself, so a model's misread date is corrected. `proposal()` gives at most one step or silence, and never closes, writes or sends. Off switch `aiUnderstandingV1` (default off); nothing calls it yet (router wiring is M2). Corpus: `test/understanding-corpus.cjs`. |
 | `style-profile.js` | How YOU write, as counts. Portable: no chrome.*, no DOM, no network, no model. |
 
 Notably absent: **storage.js stays in `src/`.** It is Glance's own choice of

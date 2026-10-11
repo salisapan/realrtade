@@ -122,3 +122,14 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
 - 2026-10-09: spec written; direction decided by the owner; daily routine set (Sun–Thu, 10:52 Israel).
 - 2026-10-09: the owner approved the spec and the identity wording; applied in the identity files. The old 07:47 open-tasks routine was switched off at the owner's request.
 - 2026-10-10: M8 (per-user context) added at the owner's request. Three more routines set: breadth builder (open-tasks row 65), scenario rehearsal (66), red team (67).
+- 2026-10-11: **M1 built** (branch `claude/ai-engine-2026-10-11`, switch `aiUnderstandingV1`, default off). `core/understanding.js` validates a model's Understanding against the masked text. Every claim must quote real words; the device reads the due date from the quoted words itself; `proposal()` gives at most one step. Corpus `test/understanding-corpus.cjs`. Measured offline on the 786 cached Qwen3.5-4B shadow cases (`glance-ai/oss/shadow-combined/gated/score-understanding.cjs`, no model run, spec labels):
+
+  | system | wrong Do It | missed (HE / EN) | model card with a wrong date |
+  |---|---|---|---|
+  | model, no gate | 8/464 | 23/322 (11/153, 12/169) | 8/8 |
+  | model + validator (no gate) | **3/464** | 26/322 (14/153, 12/169) | **0/5** |
+  | model + strict gate (today's lab best) | 0/464 | 37/322 (21/153, 16/169) | 8/8 |
+  | model + validator + strict gate | 0/464 | 40/322 (24/153, 16/169) | **0/5** |
+
+  Finding: every Hebrew weekday date the model put on a card was wrong (8/8; for example «ביום רביעי» said on a Wednesday read as tomorrow). The strict gate let all 8 through, and the validator corrects or stops all of them. Cost: 3 Hebrew promise cards (they already carried a wrong date) go silent, because `core/extract.js` does not read «עד רביעי» or «עד שלישי» without «יום». That parser fix is the next step; it waits because `extract.js` is in an open PR. The cached answers carry no spans or confidence, so the scorer gives each claim the span the text offers and every act a confidence of 0.9. The confidence floor is not measured here.
+- 2026-10-11 review: `test/outlook-calendar-corpus.cjs` has been red on the working branch since 2026-10-08, with or without this change. Cause: `core/outlook-calendar.js:119` checks `i.now instanceof Date`, which is false for a Date from another realm (the test's vm sandbox), so the code falls back to the real clock, and the fixture's 2026-10-08 is now in the past. Clock-dependent, not a code commit (bisect lands on the docs-only #105). Fix: read `now` through `getTime()`. Also red on the base without this change: `glance-ai/run-cpu-checks.sh` step 4 (regenerated `all.jsonl` sha256 `d7961f08…` against the pinned `d4aab097…`), so steps 5–7 did not run. The gated score and the new Understanding score were run directly and pass.
