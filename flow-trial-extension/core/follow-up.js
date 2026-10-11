@@ -852,6 +852,177 @@ const FlowFollowUp = (() => {
   // Which nudge comes next: 1 (friendly), 2 (firmer), 3 (last, direct).
   function nextNudgeLevel(w) { return Math.min(MAX_NUDGE_LEVEL, ((w && w.nudges) || 0) + 1); }
 
+  // ---- carry until closed: the next move when chasing stopped working (CARRY.nextMove, off) ----------
+  // After the last, direct nudge the loop used to sit and repeat that nudge. Here Glance picks ONE
+  // other way to get it closed, from evidence it already has, and proposes it. A move is a proposal:
+  // it never closes, writes or sends. The loop still closes only on their real answer (any app, read
+  // back) or on the person's own "Let it go" (closedAs 'released', a deliberate release).
+  //   channel    this person answers you in another app (>= 2 real closes there, none or slow here)
+  //   colleague  one person on this thread, at the same organisation, who has really answered you before
+  //   release    "Still need this?" when the silence is far longer than this person ever took, or very long
+  // No evidence, no move: the caller repeats the last nudge exactly as before. Each move is proposed at
+  // most once per loop, and a dismissed move is never proposed again on that loop. Money is never released
+  // by a question: a payment loop gets channel or colleague only.
+  // opts: { enabled: true (the switch), keyOf(w) -> one key per person across apps, threadPeople: [{email,name}],
+  //         apps: the apps the surface can prepare a message in (default gmail, outlook, whatsapp) }
+  const CARRY_MIN_CLOSES = 2;           // real closes with this person in the other app, or with the colleague
+  const CARRY_PERSONAL_CLOSES = 3;      // real closes with this person before their own pace sets the release question
+  const CARRY_RELEASE_FACTOR = 3;       // ... asked when the silence is this many times the longest they ever took
+  const CARRY_RELEASE_MIN_AGE = 10;     // ... and never before this many business days
+  const CARRY_RELEASE_AGE = 20;         // business days open, three nudges and no personal evidence: ask
+  const CARRY_APPS = ['gmail', 'outlook', 'whatsapp'];
+  const APP_NAME = { gmail: 'Gmail', outlook: 'Outlook', whatsapp: 'WhatsApp', teams: 'Teams' };
+  const APP_NAME_HE = { gmail: 'ג׳ימייל', outlook: 'אאוטלוק', whatsapp: 'וואטסאפ', teams: 'טימס' };
+
+  function carryKey(w, opts) {
+    const keyOf = opts && typeof opts.keyOf === 'function' ? opts.keyOf : null;
+    const cp = (w && w.counterpart) || {};
+    return String((keyOf && keyOf(w)) || (w && w.personKey) || cp.email || (cp.phone ? 'phone:' + cp.phone : '') || '').toLowerCase();
+  }
+  function closedForReal(w) { return Boolean(w) && w.status === 'resolved' && ['replied', 'paid', 'delivered', 'declined'].indexOf(w.closedAs) >= 0 && w.resolvedAt > (w.createdAt || 0); }
+  function bizBetween(a, b) {
+    if (personModel && personModel.bizDays) return personModel.bizDays(a, b);
+    return Math.max(0, (b - a) / DAY_MS);
+  }
+  function realCloseDays(watches, key, opts) {
+    const out = [];
+    (Array.isArray(watches) ? watches : []).forEach((x) => {
+      if (closedForReal(x) && !isMine(x) && !isClock(x) && carryKey(x, opts) === key && (x.kind === KINDS.PAYMENT) === false) out.push(bizBetween(x.createdAt, x.resolvedAt));
+    });
+    return out;
+  }
+  function medianOf(xs) { const s = xs.slice().sort((a, b) => a - b); return s.length ? s[Math.floor((s.length - 1) / 2)] : null; }
+  function orgOf(email) {
+    const m = String(email || '').toLowerCase().match(/@([^@\s>]+)>?$/);
+    if (!m) return null;
+    if (personModel && personModel.domainOf) return personModel.domainOf(String(email).toLowerCase());
+    return m[1];
+  }
+
+  // Real closes with one person, by app: { app: { closes, typical (business days) } }.
+  function closesByApp(watches, key, opts) {
+    const out = {};
+    (Array.isArray(watches) ? watches : []).forEach((x) => {
+      if (!closedForReal(x) || isMine(x) || isClock(x) || carryKey(x, opts) !== key) return;
+      const app = x.channel || 'gmail';
+      const s = out[app] || (out[app] = { closes: 0, days: [] });
+      s.closes++; s.days.push(bizBetween(x.createdAt, x.resolvedAt));
+    });
+    Object.keys(out).forEach((a) => { out[a].typical = Math.round(medianOf(out[a].days) * 10) / 10; delete out[a].days; });
+    return out;
+  }
+
+  function moveDraft(w, move) {
+    const he = w.lang === 'he';
+    const who = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
+    const subj = w.subject ? clip(w.subject, 60) : '';
+    if (move.type === 'channel') {
+      const from = (he ? APP_NAME_HE : APP_NAME)[w.channel || 'gmail'] || (w.channel || 'gmail');
+      if (he) return (who ? 'היי ' + who + ',' : 'היי,') + ' שלחתי לך הודעה ב' + from + (subj ? ' לגבי ' + subj : '') + ' ועוד לא קיבלתי תשובה. אפשר להציץ?';
+      return (who ? 'Hi ' + who + ',' : 'Hi,') + ' I sent you a message on ' + from + (subj ? ' about ' + subj : '') + " and haven't heard back. Could you take a look?";
+    }
+    if (move.type === 'colleague') {
+      const to = firstName(move.to && move.to.name, move.to && move.to.email);
+      if (he) return (to ? 'היי ' + to + ',' : 'שלום,') + ' פניתי ל' + (who || 'צוות') + ' כמה פעמים' + (subj ? ' לגבי ' + subj : '') + ' ולא קיבלתי תשובה. אפשר לעזור לי לקבל תשובה?';
+      return (to ? 'Hi ' + to + ',' : 'Hi,') + " I've asked " + (who || 'your team') + ' a few times' + (subj ? ' about ' + subj : '') + " and haven't heard back. Could you help me get an answer?";
+    }
+    return null;
+  }
+  function moveQuestion(w, move, now) {
+    const he = w.lang === 'he';
+    const who = firstName(w.counterpart && w.counterpart.name, w.counterpart && w.counterpart.email);
+    const n = (w.nudges || 0);
+    const days = daysOpen(w, now);
+    if (move.type === 'channel') {
+      const app = (he ? APP_NAME_HE : APP_NAME)[move.app] || move.app;
+      return he ? 'את התשובות ' + (who ? 'מ' + who : 'מהצד השני') + ' קיבלת ב' + app + '. לשאול שם?' : (who || 'They') + ' usually answer' + (who ? 's' : '') + ' you on ' + app + '. Ask there?';
+    }
+    if (move.type === 'colleague') {
+      const to = firstName(move.to && move.to.name, move.to && move.to.email);
+      return he ? 'לבקש מ' + to + ' לעזור?' : 'Ask ' + to + ' to help?';
+    }
+    return he
+      ? 'אין תשובה מ' + (who || 'הצד השני') + ' אחרי ' + n + ' תזכורות ו־' + days + ' ימים. עדיין צריך את זה?'
+      : 'No answer from ' + (who || 'them') + ' after ' + n + ' reminders and ' + days + ' days. Still need this?';
+  }
+
+  function nextMove(watches, w, now, opts) {
+    if (!opts || opts.enabled !== true) return null;
+    const t = typeof now === 'number' ? now : Date.now();
+    if (!isActive(w) || isMine(w) || isClock(w) || isYours(w) || hasItems(w)) return null;
+    if (stageOf(w) === 'promised') return null;                 // they gave a day: wait for it
+    if ((w.nudges || 0) < MAX_NUDGE_LEVEL) return null;         // the three nudges come first
+    if (!w.chaseIso || w.chaseIso > isoDay(today(t))) return null; // not due today
+    const tried = {};
+    (Array.isArray(w.moves) ? w.moves : []).forEach((m) => { if (m && m.type) tried[m.type] = true; });
+    const key = carryKey(w, opts);
+    const app = w.channel || 'gmail';
+    const can = Array.isArray(opts.apps) ? opts.apps : CARRY_APPS;
+
+    let move = null;
+    // 1. Another app where this person really answers you.
+    if (!tried.channel && key) {
+      const by = closesByApp(watches, key, opts);
+      const here = by[app] || { closes: 0, typical: null };
+      let best = null;
+      Object.keys(by).forEach((a) => {
+        if (a === app || can.indexOf(a) < 0) return;
+        const s = by[a];
+        if (s.closes < CARRY_MIN_CLOSES) return;
+        if (here.closes > 0 && !(here.closes < s.closes && (here.typical === null || s.typical * 2 <= here.typical))) return;
+        if (!best || s.closes > best.closes || (s.closes === best.closes && s.typical < best.typical)) best = { app: a, closes: s.closes, typical: s.typical };
+      });
+      if (best) move = { type: 'channel', app: best.app, evidence: { closes: best.closes, typicalDays: best.typical, closesHere: here.closes } };
+    }
+    // 2. Exactly one colleague on this thread who has really answered you. Two: silence for this move.
+    if (!move && !tried.colleague && Array.isArray(opts.threadPeople)) {
+      const cpEmail = String((w.counterpart && w.counterpart.email) || '').toLowerCase();
+      const org = orgOf(cpEmail);
+      if (org) {
+        const fits = opts.threadPeople.filter((p) => {
+          const e = String((p && p.email) || '').toLowerCase();
+          if (!e || e === cpEmail || orgOf(e) !== org) return false;
+          const by = closesByApp(watches, e, null);
+          return Object.keys(by).reduce((s, a) => s + by[a].closes, 0) >= CARRY_MIN_CLOSES;
+        });
+        if (fits.length === 1) move = { type: 'colleague', to: { email: String(fits[0].email).toLowerCase(), name: fits[0].name || null }, evidence: { closes: Object.values(closesByApp(watches, String(fits[0].email).toLowerCase(), null)).reduce((s, x) => s + x.closes, 0) } };
+      }
+    }
+    // 3. "Still need this?" Never for money. With personal evidence (>= 3 real closes): the silence is now three times the
+    //    longest they ever took, and at least 10 business days. Without it: 20 business days.
+    if (!move && !tried.release && w.kind !== KINDS.PAYMENT) {
+      const age = bizBetween(w.createdAt || t, t);
+      const took = key ? realCloseDays(watches, key, opts) : [];
+      const longest = took.length ? Math.max.apply(null, took) : null;
+      const personal = took.length >= CARRY_PERSONAL_CLOSES;
+      const bar = personal ? Math.max(CARRY_RELEASE_MIN_AGE, CARRY_RELEASE_FACTOR * longest) : CARRY_RELEASE_AGE;
+      if (age >= bar) move = { type: 'release', evidence: { ageBizDays: Math.round(age), closes: took.length, longestDays: longest === null ? null : Math.round(longest * 10) / 10, level: personal ? 'personal' : 'none' } };
+    }
+    if (!move) return null;
+    move.needsClick = true;
+    move.closes = false;
+    move.question = moveQuestion(w, move, t);
+    move.draft = moveDraft(w, move);      // null for release: that one is a question to the person, not a message
+    return move;
+  }
+
+  // The person did the move (sent the message themselves in that app, or asked the colleague):
+  // remember it, and look again in two business days. The loop stays open.
+  function moveDonePatch(w, move, now) {
+    const t = typeof now === 'number' ? now : Date.now();
+    return { moves: (Array.isArray(w.moves) ? w.moves : []).concat([{ type: move.type, app: move.app || null, at: t }]), chaseIso: rechaseDate(w.kind, t, null) };
+  }
+  // The person said no to a move: never proposed again on this loop; the old chase rhythm goes on.
+  function moveDismissPatch(w, move, now) {
+    const t = typeof now === 'number' ? now : Date.now();
+    return { moves: (Array.isArray(w.moves) ? w.moves : []).concat([{ type: move.type, app: move.app || null, at: t, dismissed: true }]) };
+  }
+  // "Let it go": a deliberate release by the person. A true close of the loop, never Glance's own.
+  function releasePatch(w, now) {
+    const t = typeof now === 'number' ? now : Date.now();
+    return { status: 'resolved', resolvedAt: t, resolvedBy: 'person', closedAs: 'released' };
+  }
+
   // ---- the money view ----------------------------------------------------------
   // What is owed to you across tracked payment chases, by currency. Never mixes
   // currencies into one number.
@@ -1060,7 +1231,8 @@ const FlowFollowUp = (() => {
     KINDS, MAX_NUDGE_LEVEL, classifyOutgoing, classifyCommitment, fromProposal, deliversPromise, deliversFor, closeAsKept, closeFromTask, taskRefsToCheck, isMine, isClock, chaseDate, rechaseDate, buildWatch, watchState, stageOf, daysOpen,
     repliedSince, isAutoReply, isActive, isYours, handBackPatch, yoursDate, classifyReply, applyReply, looksLikeChase, recordNudge, reopenPatch, canReopen,
     nextNudgeLevel, missedAskIn, missedPromiseIn, personalChase, riskOf, typicalDays, afterDays, deadlinePassed, replyDraft, promiseDraft, intentionWeight, summarize, groupByPerson, recentlyClosed, formatMoney, nudgeText, taskTitle, firstName, isoDay,
-    applyReplyItems, decideItem, itemCounts, hasItems
+    applyReplyItems, decideItem, itemCounts, hasItems,
+    nextMove, moveDonePatch, moveDismissPatch, releasePatch
   };
 })();
 
