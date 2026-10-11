@@ -30,7 +30,25 @@ check('a candidate that closes more and never acts wrongly is better, but not pr
 check('ANY / AMBIGUOUS gold rows are left out', r1.base.all.n === 4);
 const owner = w('owner.jsonl', Array.from({ length: 200 }, (_, i) => ({ id: 'o' + i, step: 'SILENT', ownerVerified: true })));
 const r2 = G.run({ base, cand: better, cases, labels: owner });
-check('with 200 owner-verified labels the same candidate is promoted', r2.promote && r2.verdict === 'PROMOTE', r2.verdict);
+check('with 200 owner-verified labels the same candidate is promoted', r2.promote && r2.basis === 'owner-verified' && /^PROMOTE \(basis: 200 owner-verified/.test(r2.verdict), r2.verdict);
+// Two-pass agreement (owner's decision 2026-10-11: he does not label by hand). Never counts as owner-verified; the verdict says so.
+const agreedRows = (n, extra) => Array.from({ length: n }, (_, i) => Object.assign({ id: 'g' + i, step: 'SILENT', agreed: true, passes: 2 }, extra));
+const agreed = w('agreed.jsonl', agreedRows(200));
+const ra = G.run({ base, cand: better, cases, labels: agreed });
+check('200 two-pass-agreement labels promote a better candidate, and the verdict names that basis', ra.promote && ra.basis === 'two-pass-agreement' && ra.ownerVerified === 0 && ra.agreed === 200 && /NOT owner-verified/.test(ra.verdict), ra);
+const agree199 = w('agree199.jsonl', agreedRows(199));
+check('199 are not enough', !G.run({ base, cand: better, cases, labels: agree199 }).promote);
+const onePass = w('onepass.jsonl', agreedRows(200, { passes: 1 }));
+check('one pass is not agreement', !G.run({ base, cand: better, cases, labels: onePass }).promote);
+const notAgreed = w('notagreed.jsonl', agreedRows(200, { agreed: false }));
+check('rows that are not marked agreed do not count', !G.run({ base, cand: better, cases, labels: notAgreed }).promote);
+const rAL = G.run({ base, cand: louder, cases, labels: agreed });
+check('agreement labels never override the safety rules: one more wrong Do It still holds', !rAL.promote && rAL.verdict === 'HOLD', rAL.reasons);
+const both = G.run({ base, cand: better, cases, labels: agreed + ',' + owner });
+check('several label files are read; with both kinds present the owner basis wins', both.promote && both.basis === 'owner-verified', both.basis);
+const agreedAsOwner = w('forged.jsonl', agreedRows(200, { ownerVerified: true, agreed: false, passes: 0 }));
+const rF = G.run({ base, cand: better, cases, labels: agreedAsOwner });
+check('an owner-verified flag still counts as owner-verified (the labeling tools refuse it unless labeledBy is sali)', rF.basis === 'owner-verified');
 const r3 = G.run({ base, cand: louder, cases, labels: owner });
 check('one more wrong Do It holds it, even though it closes more', !r3.promote && r3.verdict === 'HOLD' && r3.reasons.some((x) => /more wrong Do Its \(all: 0 -> 1\)/.test(x)), r3.reasons);
 check('the wrong Do It is reported in Hebrew too', r3.reasons.some((x) => /he: 0 -> 1/.test(x)));
@@ -42,6 +60,27 @@ const r6 = G.run({ base, cand: base, cases, labels: owner });
 check('the same model is never "promoted" over itself', !r6.promote && r6.verdict === 'HOLD');
 const cli = cp.spawnSync(process.execPath, [path.join(__dirname, 'promote_gate.cjs'), '--base', base, '--cand', louder, '--cases', cases, '--strict']);
 check('--strict exits 1 when the verdict is not PROMOTE', cli.status === 1, cli.status);
+
+console.log('--- merging two blind passes (labeling/merge-passes.cjs) ---');
+const { merge } = require('../../labeling/merge-passes.cjs');
+const p1 = [
+  { item: 1, id: 'a', lang: 'he', step: 'draft', labeledBy: 'claude' }, { item: 2, id: 'b', lang: 'en', step: 'SILENT', undatedAsk: true, labeledBy: 'claude' },
+  { item: 3, id: 'c', lang: 'en', step: 'task', labeledBy: 'claude' }, { item: 4, id: 'd', lang: 'he', step: 'CONTEXT', labeledBy: 'claude' },
+  { item: 5, id: 'e', lang: 'en', step: 'calendar', labeledBy: 'claude' }, { item: 6, id: 'f', lang: 'en', step: 'draft', labeledBy: 'claude' }
+];
+const p2 = [
+  { item: 1, step: 'draft', labeledBy: 'claude-pass2' }, { item: 2, step: 'SILENT', undatedAsk: false, labeledBy: 'claude-pass2' },
+  { item: 3, step: 'SILENT', labeledBy: 'claude-pass2' }, { item: 4, step: 'CONTEXT', labeledBy: 'claude-pass2' },
+  { item: 5, step: 'UNSURE', labeledBy: 'claude-pass2' }
+];
+const m = merge(p1, p2);
+check('only cases both passes gave the same step become agreement labels', m.agreed.map((x) => x.id).join() === 'a,b', m.agreed);
+check('a disagreement is reported, not gold', m.disagree.length === 1 && m.disagree[0].id === 'c');
+check('CONTEXT, UNSURE and a case the second pass never saw are skipped', m.skipped.context === 1 && m.skipped.unsure === 1 && m.skipped.missing === 1, m.skipped);
+check('an agreement label is never owner-verified and says so', m.agreed.every((x) => x.ownerVerified === false && x.agreed === true && x.passes === 2 && /^agreement:/.test(x.labeledBy)));
+check('an undated ask flagged by either pass stays flagged', m.agreed.find((x) => x.id === 'b').undatedAsk === true);
+check('the same labeller twice is not two passes', merge([{ item: 1, id: 'a', lang: 'en', step: 'draft', labeledBy: 'claude' }], [{ item: 1, step: 'draft', labeledBy: 'claude' }]).agreed.length === 0);
+check('a pass labelled as the owner is refused as an agreement input', merge([{ item: 1, id: 'a', lang: 'en', step: 'draft', labeledBy: 'sali' }], [{ item: 1, step: 'draft', labeledBy: 'claude-pass2' }]).agreed.length === 0);
 
 console.log('--- grounded SFT v3 ---');
 const uArg = process.argv.indexOf('--understanding');

@@ -42,7 +42,11 @@ The train split (`data/v2/sft_train.jsonl`, about 11k rows, gitignored) comes fr
 
 `node promote_gate.cjs --base <pred.jsonl> --cand <pred.jsonl> [--cases f] [--labels f] [--understanding f] [--strict]`
 
-A new model replaces the current one only when, on the same cases: no more wrong Do Its (total, Hebrew, English), no more wrong actions, no more missed closes in either language and fewer in total, and at least 200 owner-verified labels among the labels it is judged on. Until there are 200, the best verdict is "better on spec labels" and `promote` is false. Predictions may be in the judge format or the Understanding format; an Understanding goes through the validator and `proposal()`, so the score is what the person would see.
+A new model replaces the current one only when, on the same cases: no more wrong Do Its (total, Hebrew, English), no more wrong actions, no more missed closes in either language and fewer in total, and a label basis that does not come from the system under test. Two bases count (owner's decision, 2026-10-11, he does not label by hand):
+- **owner-verified**: 200 rows with `ownerVerified: true` (only `labeledBy: sali` can produce them);
+- **two-pass-agreement**: 200 rows with `agreed: true` and `passes >= 2`, made by `labeling/merge-passes.cjs` from two independent blind passes by separate sessions that agree. They are never owner-verified, the verdict says "NOT owner-verified", and they only move a model into the lab's "best so far": wiring a model into the extension or replacing the default still needs the owner's «מאשר». Both passes come from the same model family, so a shared blind spot passes unseen; that is the price of not labelling by hand.
+
+Until one basis reaches 200, the best verdict is "better on spec labels" and `promote` is false. `--labels` takes several comma-separated files (a later file wins for the same id), for example `agreement-gold.jsonl,owner-gold.jsonl`. Predictions may be in the judge format or the Understanding format; an Understanding goes through the validator and `proposal()`, so the score is what the person would see.
 
 ## What waits on the owner
 
