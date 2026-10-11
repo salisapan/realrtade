@@ -5,4 +5,7 @@
 //           "Still need this?". A proposal only: it never closes, writes or sends; the person does the move. FALSE in this build:
 //           nothing calls it yet, the surface is Glance's own card and steps list (mock to the owner first), and turning it on is
 //           the owner's decision. With it off the follow loop is byte-identical.
-export const CARRY = { nextMove: false };
+// abLive: the real-user A/B (core/pmf-metrics.js assignVariant / foldAbEvent / abSnapshot): one arm per install, decided on
+//         the device from the install id, per-arm COUNTS only, no text. FALSE: nothing is assigned, counted or sent. Turning it
+//         on is the owner's decision, with the privacy page changed in the same commit.
+export const CARRY = { nextMove: false, abLive: false };
