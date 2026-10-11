@@ -95,3 +95,17 @@ Glance closes open loops. Gmail is where it starts today. The floating extension
 Undo prefers the inverse page action (`mark-open`) when a re-read shows that inverse. If there is no inverse, the line is Undo unavailable. Either way the Activity row is rewritten and does not stay Handled. A reload mounts the banner again from the message id or the thread id.
 
 The live page driver is not wired. Corpus tests inject the DOM reader (`test/computer-proof-corpus.cjs`). The CoS checklist is `docs/computer-proof-gate.md`. `computer/local/<app>` is a later gate and is not a proof in this tip. Google Tasks and Microsoft To Do are unchanged. Nothing is sent.
+
+## 9. Progress and preparation are not completion (2026-10-11)
+
+Glance closes open loops. Gmail is where it starts today. A reply that says the thing is under way is not the thing. Before this slice, a short reply with no delivery cue fell through to "they wrote back, so it is answered" and closed the loop: «I started on it; half done», «Found it in the shared folder, sending shortly», «All set on my side», «זה אצל עורך הדין כרגע», «מוכן, רק צריך לקבל אישור», «כמעט סיימתי».
+
+**Rule (`core/follow-up.js`, `classifyReplyText`).** For a request for a reply, a message of at most 25 words that says the work is started, partly done, almost done, found, drafted, prepared, ready pending an approval, or with someone else, and carries no delivery evidence, is `promised` with `progress: true`. The loop stays owned, moves to the `promised` stage (visible, minimal), and the next look is the day they named (when `extract.js` reads one) or two business days out. It never closes, and it never asks the person anything.
+
+**What beats it (the normal rules decide instead).** Delivery words (attached, enclosed, here is, done, sent it, signed, «מצורף», «סיימתי»); a number, an amount or a link in the same message; the asker settling it themselves («never mind, found it», «לא משנה, מצאתי בעצמי»). Negated delivery is removed first, so «half done» and «not sent yet» are not delivery.
+
+**Payments.** «Transferred» or «wired» at the start of a reply is a payment claim, like «Paid»: the loop then asks the person once whether it arrived, and does not close on its own. «Not transferred yet» is not a claim.
+
+**Tests.** `test/follow-up-corpus.cjs` ("progress and preparation are not completion"): twelve progress replies stay open, seven real deliveries still close, `applyReply` never closes a progress reply. No precision gate moved; the 22 quiet texts stay quiet.
+
+**Not verified.** This is the on-device rule on text. Real threads (quoted history, signatures, forwarded mail) are the live Gate.

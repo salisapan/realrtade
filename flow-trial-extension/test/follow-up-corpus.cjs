@@ -255,5 +255,24 @@ console.log('\n--- a reminder ticked done in Google Tasks ---\n');
   check('only waiting loops with a reminder are asked about, and not again within ten minutes', F.taskRefsToCheck([w, { id: 'x', status: 'waiting' }, { id: 'y', status: 'resolved', taskRef: { taskId: 'Y' } }], NOW, {}).length === 1 && F.taskRefsToCheck([w], NOW, { t1: NOW - 60000 }).length === 0 && F.taskRefsToCheck([w], NOW, { t1: NOW - 11 * 60000 }).length === 1);
 }
 
+console.log('\n--- progress and preparation are not completion ---\n');
+const PROGRESS_OPEN = [
+  'I started on it; half done.', 'Found it in the shared folder, sending shortly.', 'Almost there, a couple more days.', 'All set on my side.',
+  "It's all drafted, I just need an approval.", 'Prepared the document, waiting for approval from Dana.', 'It is with the lawyer right now.',
+  'כמעט סיימתי', 'זה אצל עורך הדין כרגע', 'מוכן, רק צריך לקבל אישור', 'מצאתי, שולח עוד מעט', 'התחלתי'
+];
+PROGRESS_OPEN.forEach((t) => { const o = outcome(t, replyW); check('stays open (not closed): ' + t, o === 'promised' || o === 'ack' || o === 'yours', o); });
+check('progress is visible and minimal: it becomes "promised" with the day they named, or none', (() => { const r = cr('Drafted it, will send tomorrow.', replyW); return r.outcome === 'promised' && r.progress === true && r.promisedIso === '2026-10-02'; })(), cr('Drafted it, will send tomorrow.', replyW));
+check('"half done" is not delivery just because it contains "done"', outcome('Half done, will finish tomorrow.', replyW) === 'promised');
+const STILL_CLOSES = [
+  'Here is the signed lease, attached.', 'Found it, attached.', 'Done, sent it this morning.', 'Yes, I found it and the amount is $500.',
+  'מצורף ההסכם החתום', 'סיימתי', 'Approved. The figure is $12,400.'
+];
+STILL_CLOSES.forEach((t) => check('a real delivery or answer still closes: ' + t, outcome(t, replyW) === 'closed', outcome(t, replyW)));
+check('a payment claim "Transferred, confirmation attached." is a payment claim (the person is then asked once)', outcome('Transferred, confirmation attached.', payW) === 'paid');
+check('"Not transferred yet" is not', outcome('Not transferred yet', payW) !== 'paid');
+check('an unfinished payment still does not close it', outcome('Will pay once the invoice is corrected.', payW) !== 'paid');
+check('applyReply keeps a progress reply open and moves the next look, never closes', (() => { const r = cr('Found it in the shared folder, sending shortly.', replyW); const a = F.applyReply(replyW, r, NOW); return !a.close && a.rescheduled && a.patch.stage === 'promised' && !a.patch.status; })());
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

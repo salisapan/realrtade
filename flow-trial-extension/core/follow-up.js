@@ -590,7 +590,7 @@ const FlowFollowUp = (() => {
   const PROMISE_HE = /(?:העבר(?:תי|נו) (?:את )?(?:זה |הכל )?ל(?:חשבות|הנה"ח|הנהלת|מנהל|עמית|גורם|אחראי|עורך)|אעביר|נעביר|אשלח|נשלח|אחזור אל|נחזור אל|אחזור|נחזור|אעדכן|נעדכן|אבדוק|נבדוק|אטפל|נטפל|אברר|נברר|אאשר|נאשר|יועבר|ישולם|יישלח|מחר|השבוע|בשבוע הבא|בחודש הבא)/;
   // "I paid" / "payment was sent" — and the sentence-level guards that turn it
   // into a hypothetical or a negative ("not paid", "once it is paid").
-  const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^paid\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
+  const PAID_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just |already )?(?:paid|wired|transferred)|(?:i|we)(?:'ve| have)? (?:just |already )?sent (?:the |your )?(?:payment|transfer|wire|funds|money)|^(?:paid|transferred|wired)\b|(?:payment|transfer|wire)(?: of [^.]{0,30})? (?:was |has been |just |already )?(?:sent|made|done|completed|processed|released|initiated|went out|has gone out)|(?:has|have) been (?:paid|wired|transferred)|was (?:paid|wired|transferred)|already paid|paid (?:in full|today|yesterday)|funds (?:were |have been )?(?:sent|transferred))\b/i;
   const PAID_HE = /(?:העברה בוצעה|שילמתי|שילמנו|העברתי|העברנו|שולם|התשלום (?:בוצע|הועבר|נשלח)|בוצעה העברה|הועבר)/;
   const GUARD_EN = /\b(?:not|never|once|if|when|unless|until)\b|n't\b/i;
   const GUARD_HE = /(?:^|\s)(?:לא|טרם|אם|כש\S*|ברגע)(?=\s|$)/;
@@ -668,6 +668,14 @@ const FlowFollowUp = (() => {
 
     // Waiting on someone else is an interim, not a delivery, unless the message also hands something over.
     if (kind === KINDS.REPLY && (WAITING_EN.test(body) || WAITING_HE.test(body)) && !DELIVERY_WORDS.test(body)) return { outcome: 'ack', promisedIso: null, basis: 'rule', why: 'waiting on someone else' };
+    // Progress and preparation are not completion: "I started", "half done", "found it, sending shortly", "it is ready, I just need an
+    // approval", «מוכן, רק צריך אישור». The thing asked for has not been handed over, so the loop stays owned: it moves to 'promised'
+    // (visible, minimal) and the next look is a couple of business days out, or the day they named. Delivery evidence in the same
+    // message (attached, here is, sent it, a number, a date) wins and the normal rules decide.
+    if (kind === KINDS.REPLY && n <= PROGRESS_MAX_WORDS && inProgress(body)) {
+      const pIso = (PROMISE_EN.test(body) || PROMISE_HE.test(body)) ? promisedDay(body, c.now, c.extract || (typeof FlowExtract !== 'undefined' ? FlowExtract : null)) : null;
+      return { outcome: 'promised', promisedIso: pIso, progress: true, basis: 'rule', why: 'in progress or prepared, not delivered' };
+    }
     // For a request for a reply, "confirmed / attached / signed" means the thing
     // was delivered even if a promise about something else is in the message.
     const delivered = kind === KINDS.REPLY && CONFIRM.test(body);
@@ -699,6 +707,23 @@ const FlowFollowUp = (() => {
   // A reply that says the thing is WITH someone else, or in progress, is an interim, even when it names the act ("waiting for the CFO to approve"). Delivery words win.
   const WAITING_EN = /\b(?:waiting (?:for|on)|awaiting|pending (?:approval|signature|review|legal)|(?:it|this) is (?:still )?with|still with|in progress|being (?:reviewed|processed|worked on))\b/i;
   const WAITING_HE = /(?:ממתין|ממתינה|ממתינים|מחכה ל|מחכים ל|בהמתנה|בטיפול|בבדיקה|מטפל בזה|מטפלת בזה)/;
+  const PROGRESS_MAX_WORDS = 25;
+  const PROGRESS_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just )?(?:started|begun)|(?:half|partly|partially|mostly) (?:done|finished|ready|there)|halfway|(?:almost|nearly) (?:there|done|finished|ready|complete|set)|close to (?:done|finished|ready)|(?:i|we)(?:'ve| have)? (?:just |now )?(?:found|located|dug up|tracked down) (?:it|them|the \w+)|(?:found|located) (?:it|them)|(?:it|this|that|they|everything)(?:'s| is| are)? (?:all )?(?:ready|prepared|drafted|set)\b[^.!?]{0,30}\b(?:need|waiting|pending|once|after|just)|(?:drafted|prepared|put together|pulled together|gathered|compiled) (?:it|them|the \w+)|(?:all )?(?:set|ready) on my (?:side|end)|got most of it|just need(?:s)? (?:an? )?(?:approval|signature|sign[- ]?off|confirmation|a few))\b/i;
+  const PROGRESS_HE = /(?:התחלתי|התחלנו|כמעט (?:סיימתי|סיימנו|גמרתי|מוכן|מוכנה|שם)|חצי (?:מוכן|גמור)|באמצע(?: העבודה| זה)?|מצאתי(?: את)?|(?:זה|הכל|הוא|היא|ההסכם|המסמך|החוזה|הקובץ|החשבונית) (?:אצל|מוכן|מוכנה)|מוכן(?:ה)?,? (?:רק|אבל)|רק צריך(?: לקבל)? (?:אישור|חתימה)|הכנתי(?: טיוטה| את)?)/;
+  // "half done" and "almost done" contain "done" but are the opposite of it: removed before looking for delivery words.
+  const NOT_YET_DONE = /\b(?:half|partly|partially|mostly|almost|nearly|not|not yet) (?:done|finished|completed|sent)\b|\bnot (?:yet )?(?:attached|signed)\b|כמעט (?:סיימתי|סיימנו|גמרתי|שלחתי|חתמתי)|(?:עוד )?לא (?:סיימתי|סיימנו|שלחתי|חתמתי)/gi;
+  function inProgress(body) {
+    if (!(PROGRESS_EN.test(body) || PROGRESS_HE.test(body))) return false;
+    // "Never mind, found it" / «לא משנה, מצאתי בעצמי»: the asker settled it themselves. That is the end of the request, not progress on it.
+    if (/\b(?:never ?mind|no longer (?:need|needed)|figured (?:it )?out|sorted (?:it )?out|already (?:have|found)|solved|resolved)\b|לא משנה|מצאתי בעצמי|כבר מצאתי|כבר יש לי|פתרתי/i.test(body)) return false;
+    const cleaned = body.replace(NOT_YET_DONE, ' ');
+    if (DELIVERY_WORDS.test(cleaned) || CONFIRM.test(cleaned)) return false;
+    // An answer in the same breath (an amount, a number, a link) is not "still working on it".
+    // A day named for the next step ("will attach it tomorrow") is a promise, not an answer.
+    const namesDay = /\b(?:tomorrow|today|monday|tuesday|wednesday|thursday|friday|sunday|next week|end of (?:the )?week)\b|מחר|היום|יום (?:ראשון|שני|שלישי|רביעי|חמישי|שישי)|שבוע הבא/i.test(cleaned);
+    if (/\d|https?:\/\/|@/.test(cleaned) && !namesDay) return false;
+    return true;
+  }
   const DELIVERY_WORDS = /\b(?:attached|enclosed|here(?:'s| is| are)|done|signed and|sent it|completed)\b|(?:מצורף|צירפתי|שלחתי|סיימתי|בוצע)/i;
   // Under this many words, a reply that carries no answer at all (no yes or no, no date, no amount, no number, no link) is "they wrote back", not "they answered".
   // Held open and silent: the loop stays, the next chase day decides. A one-word "Perfect" can be a yes or a courtesy; a wrong close is never reminded about again.
