@@ -118,8 +118,8 @@ const FlowCloseFamilies = (() => {
   const PAST_HE = /(?:כבר|שלחתי|שילמתי|נשלחה אתמול|שול(?:מה|מו|ם)\s+אתמול)/;
   const RETRACT_EN = /^\s*(?:never mind|forget it|disregard|ignore that)[.!]?\s*$/i;
   const RETRACT_HE = /^\s*(?:עזוב|תשכח מזה|לא משנה)[.!]?\s*$/;
-  const NOISE_EN = /\b(?:unsubscribe|newsletter|hope this (?:email )?finds you well|book a demo|free trial|just bumping this|circling back|quick bump|for your information|no action needed|fyi)\b/i;
-  const NOISE_HE = /(?:לידיעתך|אין צורך בפעולה|ניוזלטר)/;
+  const NOISE_EN = /\b(?:unsubscribe|newsletter|you are receiving this|you(?:'|’)re receiving this|you received this email because|hope this (?:email )?finds you well|book a demo|free trial|just bumping this|circling back|quick bump|for your information|no action needed|fyi)\b/i;
+  const NOISE_HE = /(?:לידיעתך|אין צורך בפעולה|ניוזלטר|קיבלת מייל זה|להסרה מרשימת התפוצה|הנך רשום)/;
   const VENT_EN = /\b(?:so frustrated|ridiculous|just venting|this is a mess)\b/i;
 
   const TARGET_CAL = /\b(?:(?:on(?:to)?|to|in) the calendar|in the (?:calendar |event |invite )?description|calendar invite|calendar note)\b|בתיאור (?:האירוע|הפגישה)|[בל]יומן/i;
@@ -893,6 +893,11 @@ const FlowCloseFamilies = (() => {
   // completed act, or a status question. The bare handoff regex cannot
   // see "don't" or "maybe" in front of "could you", and a chip there is a
   // wrong close. A past day on the thing being asked for is not this.
+  function parkingPermitAsk(text) {
+    const t = String(text || '');
+    return /\bparking permits?\b/i.test(t) && /\b(?:please|can you|could you|would you|send|need|renew|attach|forward)\b/i.test(t);
+  }
+
   function askBlocked(text) {
     if (typeof FlowJudgment !== 'undefined' && FlowJudgment.newContent) text = FlowJudgment.newContent(text || '');
     text = stripQuotedAsks(text);
@@ -946,7 +951,7 @@ const FlowCloseFamilies = (() => {
     return { surface: 'doit', slots: [] };
   }
 
-  return { assess, askBlocked, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE };
+  return { assess, askBlocked, parkingPermitAsk, route, detailSurface, stripQuotedAsks, readSlot, FILE_EN, FILE_HE };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowCloseFamilies };

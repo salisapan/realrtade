@@ -284,7 +284,35 @@ const FlowStorage = (() => {
     };
   }
 
-  const TERMINAL_KINDS = new Set(['dismissed', 'written', 'undone']);
+  // A written row is a close only after the read-back. Same rule as
+  // still-open.js todoProofRow. Anything else is still the loop.
+  const VERIFY_MS = 60 * 1000;
+
+  function writeFetched(entry) {
+    if (!entry) return null;
+    if (entry.fetchedBack === true || (entry.proof && entry.proof.fetchedBack === true)) return true;
+    if (entry.fetchedBack === false || (entry.proof && entry.proof.fetchedBack === false)) return false;
+    return null;
+  }
+
+  // 'proved' is final. 'verifying' is the short window with no answer yet.
+  // 'open' is a failed read-back, a missing answer that has timed out, or a
+  // row with no timestamp to measure.
+  function writeGate(entry, now) {
+    const got = writeFetched(entry);
+    if (got === true) return 'proved';
+    if (got === false) return 'open';
+    const ts = entry && entry.ts;
+    const t = now == null ? Date.now() : now;
+    if (ts && (t - ts) < VERIFY_MS) return 'verifying';
+    return 'open';
+  }
+
+  function countsAsClosedRow(entry) {
+    if (!entry || !entry.messageId) return false;
+    if (entry.kind === 'dismissed' || entry.kind === 'undone') return true;
+    return entry.kind === 'written' && writeFetched(entry) === true;
+  }
 
   // How many entries the Activity feed keeps. Unchanged — this is a display
   // window, and the popup only ever renders 40 rows out of it anyway.
@@ -334,12 +362,13 @@ const FlowStorage = (() => {
     // A draft-only Outlook undo (outlookReopen) is not a trusted close: the ask
     // must be eligible again for the popup Still Open list AND the in-page card.
     // Clear any durable resolve from the prior write; do not count a close.
-    const reopenUndone = row.kind === 'undone' && row.outlookReopen;
+    const reopenUndone = isReopenUndone(row);
+    const provedWrite = row.kind === 'written' && writeFetched(row) === true;
     if (reopenUndone && row.messageId) {
       if (resolved.has(row.messageId)) {
         patch.resolvedMessageIds = (state.resolvedMessageIds || []).filter((id) => id !== row.messageId);
       }
-    } else if (row.messageId && TERMINAL_KINDS.has(row.kind) && !resolved.has(row.messageId)) {
+    } else if (row.messageId && (row.kind === 'dismissed' || provedWrite) && !resolved.has(row.messageId)) {
       resolved.add(row.messageId);
       patch.resolvedMessageIds = [row.messageId, ...(state.resolvedMessageIds || [])].slice(0, RESOLVED_CAP);
       // The one moment a process's fate is settled for good, whichever of
@@ -448,34 +477,41 @@ const FlowStorage = (() => {
   // unrecoverable even though nothing about it had actually been resolved:
   // the chip was gone and no rescan would ever bring it back.
   //
-  // What should actually stay gone is a message the user took a final action
-  // on. The log is prepended (newest first), so the first matching entry for
-  // a messageId is its most recent outcome; only 'dismissed', 'written', and
-  // 'undone' are terminal. A message that only ever logged 'shown' has no
-  // recorded user decision, so it's safe — and correct — to judge and show
-  // again after Gmail rebuilds its node.
-  // Draft-only Outlook undo: the loop is still owed. Same rule getPendingFrom
-  // uses for Still Open / popup Do It — the in-page card must agree.
+  // What should actually stay gone is a proved close or a dismissal. A
+  // 'written' row is that close only when fetchedBack is true. Until the
+  // read-back answers, the page says Verifying…. A failed or timed-out
+  // read-back is open again, with one Do It. The log is prepended (newest
+  // first), so the first matching entry for a messageId is its most recent
+  // outcome. A message that only ever logged 'shown' has no recorded user
+  // decision, so it's safe — and correct — to judge and show again after
+  // Gmail rebuilds its node.
+  // Undo returns the loop to open. A dismissed chip stays closed. An older
+  // UNDONE row is the same reopen: close memory must not keep the Do It hidden.
   function isReopenUndone(entry) {
-    return !!(entry && entry.kind === 'undone' && entry.outlookReopen);
+    return !!(entry && entry.kind === 'undone');
+  }
+
+  // 'proved' | 'verifying' | 'open'. Newest log row for this message wins.
+  // An id left in resolvedMessageIds still means proved when the log no
+  // longer has a row (a dismissal or a proved write that rolled off).
+  function verifyGateFrom(state, messageId, now) {
+    if (!messageId) return 'open';
+    const log = (state && state.log) || [];
+    for (const entry of log) {
+      if (!entry || entry.messageId !== messageId) continue;
+      if (isReopenUndone(entry)) return 'open';
+      if (entry.kind === 'dismissed') return 'proved';
+      if (entry.kind === 'written') return writeGate(entry, now);
+      return 'open';
+    }
+    if (((state && state.resolvedMessageIds) || []).includes(messageId)) return 'proved';
+    return 'open';
   }
 
   // Pure over a fetched state so corpora and content scripts share one definition
   // with getPendingFrom (popup still-open) and hasTerminalOutcome (page card).
-  function hasTerminalOutcomeFrom(state, messageId) {
-    if (!messageId) return false;
-    const log = (state && state.log) || [];
-    // Newest first. A reopen undone means the ask may show again even if an
-    // older written row is still in the log (appendLog fallback) or a stale
-    // id lingered in resolvedMessageIds.
-    for (const entry of log) {
-      if (!entry || entry.messageId !== messageId) continue;
-      if (isReopenUndone(entry)) return false;
-      if (TERMINAL_KINDS.has(entry.kind)) return true;
-      // shown / clicked / etc. — not a final decision
-      return false;
-    }
-    return ((state && state.resolvedMessageIds) || []).includes(messageId);
+  function hasTerminalOutcomeFrom(state, messageId, now) {
+    return verifyGateFrom(state, messageId, now) === 'proved';
   }
 
   async function hasTerminalOutcome(messageId) {
@@ -553,32 +589,52 @@ const FlowStorage = (() => {
   // The core logic, taking an already-fetched state so callers that already
   // hold one (consumeWeeklySummaryTrigger, below) don't pay for a second
   // chrome.storage.local round trip inside their own serialized transaction.
-  function getPendingFrom(state) {
-    const resolved = new Set(state.resolvedMessageIds || []);
+  function getPendingFrom(state, now) {
+    const resolved = new Set((state && state.resolvedMessageIds) || []);
     const listed = new Set();
     const open = [];
-    // Newest first (how the log is stored). Only a TERMINAL entry closes a
-    // message. Taking the first entry of any kind used to close it too, which
-    // meant a Do It whose writes all FAILED — a 'clicked' row with no
-    // 'written' after it — dropped the process out of the Brief even though
-    // nothing had been written and hasTerminalOutcome still said it was open.
-    // The two functions claimed to share one definition of "still open" and
-    // did not. Non-terminal rows are now simply passed over.
-    // messageIds whose newest terminal-ish row was a draft-only undo. An older
-    // written twin must not close them (appendLog fallback leaves written in place).
+    // Newest first (how the log is stored). A proved write or a dismissal
+    // closes a message. A written row without fetchedBack does not: while
+    // the read-back is still in the window the shown row stays on this list
+    // marked verifying (the page says Verifying…), and a failed or timed-out
+    // read-back lists that row with Do It again. An id already sitting in
+    // resolvedMessageIds must not hide that row.
+    // Taking the first entry of any kind used to close it too, which meant
+    // a Do It whose writes all FAILED — a 'clicked' row with no 'written'
+    // after it — dropped the process out of the Brief even though nothing
+    // had been written and hasTerminalOutcome still said it was open.
     const reopened = new Set();
-    for (const entry of state.log) {
-      if (!entry.messageId || resolved.has(entry.messageId)) continue;
-      // A prepared Outlook draft that was undone is not a trusted close: the ask
-      // may reappear in Loops (outlookReopen). Do not treat that undone as terminal.
-      if (TERMINAL_KINDS.has(entry.kind)) {
-        if (isReopenUndone(entry)) {
-          reopened.add(entry.messageId);
-          continue;
-        }
-        if (reopened.has(entry.messageId) && entry.kind === 'written') continue;
-        resolved.add(entry.messageId); continue;
+    const unproved = new Set();
+    const verifying = new Set();
+    const t = now == null ? Date.now() : now;
+    for (const entry of (state && state.log) || []) {
+      if (!entry || !entry.messageId) continue;
+      // Newest row wins. An undone row reopens even when an older write left
+      // the id in resolvedMessageIds.
+      if (isReopenUndone(entry)) {
+        reopened.add(entry.messageId);
+        continue;
       }
+      if (reopened.has(entry.messageId)) {
+        if (entry.kind === 'written' || entry.kind === 'dismissed') continue;
+      } else if (entry.kind === 'written') {
+        const gate = writeGate(entry, t);
+        if (gate === 'proved') { resolved.add(entry.messageId); continue; }
+        if (gate === 'verifying') { verifying.add(entry.messageId); continue; }
+        unproved.add(entry.messageId);
+        continue;
+      } else if (entry.kind === 'dismissed') {
+        resolved.add(entry.messageId);
+        continue;
+      }
+      if (verifying.has(entry.messageId)) {
+        if (entry.kind !== 'shown' || !entry.process) continue;
+        if (listed.has(entry.messageId)) continue;
+        listed.add(entry.messageId);
+        open.push(Object.assign({}, entry, { verifying: true }));
+        continue;
+      }
+      if (!reopened.has(entry.messageId) && !unproved.has(entry.messageId) && resolved.has(entry.messageId)) continue;
       if (entry.kind !== 'shown' || !entry.process) continue;
       if (listed.has(entry.messageId)) continue;
       listed.add(entry.messageId);
@@ -587,9 +643,39 @@ const FlowStorage = (() => {
     return open.reverse(); // oldest-still-open first
   }
 
-  async function getPending() {
-    return getPendingFrom(await get());
+  async function getPending(now) {
+    return getPendingFrom(await get(), now);
   }
+
+  // A step the person typed stays on the shown loop, marked added, so Loops
+  // draws it under Added after the card is gone.
+  const mergeAddedSteps = serialize(async function mergeAddedSteps(messageId, steps) {
+    if (!messageId) return { ok: false };
+    const added = (steps || []).filter((s) => s && s.added === true);
+    const state = await get();
+    function merge(row) {
+      if (!row || !row.process || String(row.messageId || '') !== String(messageId)) return row;
+      const base = (row.process.steps || []).filter((s) => s && s.added !== true);
+      return Object.assign({}, row, {
+        process: Object.assign({}, row.process, { steps: base.concat(added) })
+      });
+    }
+    let hit = false;
+    const log = (state.log || []).map((row) => {
+      if (!row || row.kind !== 'shown') return row;
+      const next = merge(row);
+      if (next !== row) hit = true;
+      return next;
+    });
+    const scan = (state.stillOpenScan || []).map((row) => {
+      const next = merge(row);
+      if (next !== row) hit = true;
+      return next;
+    });
+    if (!hit) return { ok: true, changed: false };
+    await set({ log: log, stillOpenScan: scan });
+    return { ok: true, changed: true };
+  });
 
   // A decision already recorded under a different id for the same matter
   // (the inbox scan's scan:<threadId> id, once the real message is open).
@@ -612,19 +698,44 @@ const FlowStorage = (() => {
   // A shown entry wins over a scan row for the same message or thread —
   // the chip saw the full text. Resolved messages are already gone from
   // getPending; scan rows are filtered here because they are not log entries.
-  function candidatesFromState(state) {
+  function candidatesFromState(state, now) {
     const resolved = new Set((state && state.resolvedMessageIds) || []);
-    const pending = getPendingFrom(state).map((entry) => FlowStillOpen.fromLogEntry(entry));
+    const reopenedIds = new Set();
+    const verifyingIds = new Set();
+    const unprovedIds = new Set();
+    const t = now == null ? Date.now() : now;
+    for (const entry of (state && state.log) || []) {
+      if (!entry || !entry.messageId || reopenedIds.has(entry.messageId)) continue;
+      if (isReopenUndone(entry)) { reopenedIds.add(entry.messageId); continue; }
+      if (verifyingIds.has(entry.messageId) || unprovedIds.has(entry.messageId) || resolved.has('seen:' + entry.messageId)) continue;
+      if (entry.kind === 'dismissed') {
+        resolved.add(entry.messageId);
+        resolved.add('seen:' + entry.messageId);
+      } else if (entry.kind === 'written') {
+        const gate = writeGate(entry, t);
+        if (gate === 'proved') {
+          resolved.add(entry.messageId);
+          resolved.add('seen:' + entry.messageId);
+        } else if (gate === 'verifying') verifyingIds.add(entry.messageId);
+        else unprovedIds.add(entry.messageId);
+      }
+    }
+    const pending = getPendingFrom(state, now).map((entry) => FlowStillOpen.fromLogEntry(entry));
     const seenMsg = new Set(pending.map((c) => c.messageId).filter(Boolean));
-    const seenThread = new Set(pending.map((c) => c.threadId).filter(Boolean));
+    const seenKey = new Set(pending.map((c) => FlowStillOpen.promiseKey(c)).filter(Boolean));
     const scan = [];
     for (const raw of (state && state.stillOpenScan) || []) {
       const c = FlowStillOpen.fromLogEntry(raw);
-      if (!c.messageId || resolved.has(c.messageId)) continue;
+      if (!c.messageId) continue;
+      if (verifyingIds.has(c.messageId)) {
+        if (seenMsg.has(c.messageId)) continue;
+        c.verifying = true;
+      } else if (resolved.has(c.messageId) && !reopenedIds.has(c.messageId) && !unprovedIds.has(c.messageId)) continue;
       if (seenMsg.has(c.messageId)) continue;
-      if (c.threadId && seenThread.has(c.threadId)) continue;
+      const key = FlowStillOpen.promiseKey(c);
+      if (key && seenKey.has(key)) continue;
       seenMsg.add(c.messageId);
-      if (c.threadId) seenThread.add(c.threadId);
+      if (key) seenKey.add(key);
       scan.push(c);
     }
     return pending.concat(scan);
@@ -635,7 +746,8 @@ const FlowStorage = (() => {
   // backlog is not a stand-in for Still Open.
   async function getStillOpen(now) {
     if (typeof FlowStillOpen === 'undefined') return [];
-    return FlowStillOpen.select(candidatesFromState(await get()), now || Date.now());
+    const state = await get();
+    return FlowStillOpen.select(candidatesFromState(state, now), now || Date.now(), state.log);
   }
 
   // Weekly summary's "still open" count. Hosts that have not loaded
@@ -643,17 +755,18 @@ const FlowStorage = (() => {
   // can exercise the trigger without the morning filter. The extension
   // always loads the module, and then this number matches the Brief.
   function stillOpenCountFrom(state, now) {
-    if (typeof FlowStillOpen === 'undefined') return getPendingFrom(state).length;
-    return FlowStillOpen.select(candidatesFromState(state), now || Date.now()).length;
+    if (typeof FlowStillOpen === 'undefined') return getPendingFrom(state, now).length;
+    return FlowStillOpen.select(candidatesFromState(state, now), now || Date.now(), state && state.log).length;
   }
 
   const upsertStillOpenScan = serialize(async function upsertStillOpenScan(candidate) {
     if (!candidate || !candidate.messageId || !candidate.process) return;
     const state = await get();
+    const candKey = (typeof FlowStillOpen.promiseKey === 'function') ? FlowStillOpen.promiseKey(candidate) : '';
     const scan = (state.stillOpenScan || []).filter((row) => {
       if (!row) return false;
       if (row.messageId === candidate.messageId) return false;
-      if (candidate.threadId && row.threadId === candidate.threadId) return false;
+      if (candKey && FlowStillOpen.promiseKey(row) === candKey) return false;
       return true;
     });
     scan.unshift(candidate);
@@ -713,8 +826,8 @@ const FlowStorage = (() => {
 
   // The Weekly Closing Summary's "closed" number — same shape and same
   // never-goes-down/legacy-log-fallback guarantees as writeCountsFrom right
-  // above, just over closeStats/TERMINAL_KINDS instead of writeStats/
-  // 'written'. Kept as a genuinely separate function rather than a filtered
+  // above, just over closeStats and a proved write, a dismissal, or an undo,
+  // instead of writeStats/'written'. Kept as a genuinely separate function rather than a filtered
   // call into writeCountsFrom: "closed" and "written" are different claims
   // (a dismiss closes a process without ever writing anything), and folding
   // them into one function with a mode flag is how two callers quietly start
@@ -722,12 +835,12 @@ const FlowStorage = (() => {
   function closeCountsFrom(state) {
     const cs = (state && state.closeStats) || { total: 0, recent: [] };
     const log = (state && state.log) || [];
-    const legacy = new Set(log.filter((e) => TERMINAL_KINDS.has(e.kind) && e.messageId).map((e) => e.messageId));
+    const legacy = new Set(log.filter(countsAsClosedRow).map((e) => e.messageId));
 
     const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const week = new Set((cs.recent || []).filter((w) => w && w.ts >= weekAgo).map((w) => w.id));
     for (const e of log) {
-      if (TERMINAL_KINDS.has(e.kind) && e.messageId && e.ts >= weekAgo) week.add(e.messageId);
+      if (countsAsClosedRow(e) && e.ts >= weekAgo) week.add(e.messageId);
     }
 
     return { total: Math.max(cs.total || 0, legacy.size), week: week.size };
@@ -1291,9 +1404,11 @@ const FlowStorage = (() => {
     }
     const out = [];
     const seen = new Set();
+    const panelReceipt = (typeof FlowDisplay !== 'undefined' && FlowDisplay.isPanelReceipt)
+      ? FlowDisplay.isPanelReceipt
+      : function (e) { return e && e.kind === 'written' && e.connectorId === 'outlookDraft' && e.messageId && !e.undone && e.outlookReceipt !== false && !e.outlookSent; };
     for (const e of log) {
-      if (!e || e.kind !== 'written' || e.connectorId !== 'outlookDraft' || !e.messageId) continue;
-      if (e.undone || e.outlookSent || e.outlookReceipt === false) continue;
+      if (!panelReceipt(e)) continue;
       const wts = e.ts || 0;
       if (e.ref && undoByRef[e.messageId + '|' + e.ref] != null && undoByRef[e.messageId + '|' + e.ref] >= wts) continue;
       if (undoTsByMsg[e.messageId] != null && undoTsByMsg[e.messageId] >= wts) continue;
@@ -1321,11 +1436,7 @@ const FlowStorage = (() => {
     const i = ids.indexOf(messageId);
     if (i === -1) return { ok: true, changed: false };
     ids.splice(i, 1);
-    const next = Object.assign({}, so, {
-      undoIds: ids,
-      undo: Math.max(0, (so.undo || 0) - 1),
-      recent: (so.recent || []).filter((r) => !(r && r.kind === 'undo' && r.id === messageId))
-    });
+    const next = Object.assign({}, so, { undoIds: ids });
     await set({ stillOpenMetrics: next });
     return { ok: true, changed: true };
   });
@@ -1478,6 +1589,7 @@ const FlowStorage = (() => {
       log[i] = Object.assign({}, e, {
         kind: 'undone',
         undone: true,
+        outlookReopen: true,
         connectorId: e.connectorId || 'outlookTask',
         url: null,
         ref: null,
@@ -1491,6 +1603,7 @@ const FlowStorage = (() => {
         ts: Date.now(),
         kind: 'undone',
         undone: true,
+        outlookReopen: true,
         label: 'To Do task removed.',
         messageId: messageId || null,
         threadId: threadId || null,
@@ -1501,7 +1614,8 @@ const FlowStorage = (() => {
       });
       hit = true;
     }
-    await set({ log: trimLog(log, new Set(state.resolvedMessageIds || [])) });
+    const resolved = (state.resolvedMessageIds || []).filter((id) => !messageId || id !== messageId);
+    await set({ log: trimLog(log, new Set(resolved)), resolvedMessageIds: resolved });
     return { ok: true, hit: hit };
   });
 
@@ -1593,14 +1707,21 @@ const FlowStorage = (() => {
     const state = await get();
     const log0 = state.log || [];
     const dropIds = new Set();
+    const dropRow = (typeof FlowDisplay !== 'undefined' && FlowDisplay.dropOutlookLoopRow)
+      ? FlowDisplay.dropOutlookLoopRow
+      : function (e) { return e && e.app === 'outlook'; };
+    const dropDiag = (typeof FlowDisplay !== 'undefined' && FlowDisplay.dropAlreadyHandledDiag)
+      ? FlowDisplay.dropAlreadyHandledDiag
+      : function (d) { return d && d.reason === 'page:already-handled'; };
     const log = [];
     for (const e of log0) {
       if (!e) continue;
-      if (e.connectorId === 'outlookDraft' || (e.app === 'outlook' && (e.outlookReceipt || e.kind === 'written' || e.kind === 'undone' || e.kind === 'shown'))) {
+      if (dropRow(e)) {
         if (e.messageId) dropIds.add(e.messageId);
-        // Keep non-draft outlook rows? Drop draft written/undone receipts; keep shown so asks can return after migrate reopen.
-        if (e.kind === 'written' && (e.connectorId === 'outlookDraft' || e.connectorId === 'outlookCalendar')) continue;
-        if (e.kind === 'undone' && (e.connectorId === 'outlookDraft' || e.outlookReopen || dropIds.has(e.messageId))) continue;
+        if (e.itemId) dropIds.add(e.itemId);
+        if (e.pathId) dropIds.add(e.pathId);
+        if (e.outlookConversationId) dropIds.add(e.outlookConversationId);
+        continue;
       }
       log.push(e);
     }
@@ -1614,12 +1735,25 @@ const FlowStorage = (() => {
       so = scrub.stillOpenMetrics || so;
     }
     const resolved = (state.resolvedMessageIds || []).filter((id) => !dropIds.has(id));
+    const scan = (state.stillOpenScan || []).filter((row) => {
+      if (!row) return false;
+      if (row.app === 'outlook') return false;
+      if (row.messageId && dropIds.has(row.messageId)) return false;
+      return true;
+    });
+    const pageDiag = (state.outlookPageDiag || []).filter((d) => d && !dropDiag(d));
+    const sync = state.outlookSync && typeof state.outlookSync === 'object' ? Object.assign({}, state.outlookSync) : {};
+    if (Array.isArray(sync.diagnostics)) sync.diagnostics = sync.diagnostics.filter((d) => d && !dropDiag(d));
     await set({
       log: trimLog(log, new Set(resolved)),
       resolvedMessageIds: resolved,
       outlookPending: { offers: [], asks: [], incoming: [] },
       closeQuality: cq,
-      stillOpenMetrics: so
+      stillOpenMetrics: so,
+      stillOpenScan: scan,
+      outlookPageDiag: pageDiag,
+      outlookSync: sync,
+      glanceUndoneBanners: {}
     });
     return { ok: true, dropped: dropIds.size };
   });
@@ -1668,7 +1802,7 @@ const FlowStorage = (() => {
     return { ok: true, hit: hit };
   });
 
-  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
+  return { get, set, writeCountsFrom, getWriteCounts, closeCountsFrom, getCloseCounts, appendLog, markSeen, wasSeen, hasTerminalOutcome, hasTerminalOutcomeFrom, verifyGateFrom, VERIFY_MS, isReopenUndone, markAlreadyClosed, getPending, getPendingFrom, mergeAddedSteps, getStillOpen, candidatesFromState, upsertStillOpenScan, forgetStillOpenScan, recordStillOpenMetric, getActiveOutlookReceipts, getActiveOutlookReceiptsFrom, markOutlookDraftUndone, markOutlookCalendarUndone, markGoogleTaskUndone, markMicrosoftTodoUndone, markOnedriveFileUndone, markComputerUndone, clearStillOpenUndoForMessage, migrateOutlookDraftState, markOutlookDraftSent, clearOutlookLoopsState, consumeDailyBriefTrigger, consumeDailyActiveTrigger, consumeWeeklySummaryTrigger, consumeWeeklyHabitTrigger, upsertWatch, updateWatch, getWatches, getWatch, recordMeeting, updateMeeting, getMeetings, recordLoopOpen, getLoopHistory, ackRecurrence, getIntentAdapt, setIntentAdapt, getLedger, appendLedger, resetLearning, getStyleProfile, observeStyle, getLocalLm, setLocalLm, getLadder, setLadder, getLocalLmServer, setLocalLmServer, getIdentityGraph, recordPaymentSeen, getPaymentsSeen, getIssuer, setIssuer, observeIdentity, answerIdentity, getActiveQuestion, setActiveQuestion, getRecognitionStats, recordRecognition, getOutcomeLabels, recordOutcomeLabel, markMemoryInsightSeen, markPrecisionAutoTuned, wasPrecisionAutoTuned, calibrate, getInstallId, getPmfSnapshot, recordClassificationOutcome, getClassificationSnapshot, recordCloseQuality, getCloseQualitySnapshot, recordSilence, getQuietSnapshot, DEFAULTS };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowStorage };
