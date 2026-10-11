@@ -3,7 +3,9 @@
 // What it does: when the newest message in the open chat is yours and asks for something, the same small card as in Gmail offers to
 // stay on it; when the other person answers, the same rules close it (or not). An answer here can also settle a loop you opened by
 // email (core/cross-channel.js), and the other way round.
-// What it never does: type, send, react, mark as read, open a chat, or touch a group, a broadcast list, a channel or a status.
+// The follow path never types, sends, reacts, marks as read, opens a chat, or touches a group, a broadcast list, a channel or a status.
+// When src/whatsapp-composer.js is loaded, a place question in this 1:1 chat can show one draft. That script types the line only
+// after the approve click. This file does not send on its own.
 //
 // Honesty: WhatsApp Web's page structure is not a public interface and changes without notice. This file reads message ids
 // (data-id), the chat title and the message text spans, and checks on every pass that it can still make sense of the page.
@@ -77,6 +79,21 @@
       attachmentsOf: () => []
     };
     FlowFollow.consider(ctx).catch((e) => console.error('[Glance] WhatsApp follow-up check failed', e));
+    try {
+      if (typeof FlowWhatsAppComposer !== 'undefined' && FlowWhatsAppComposer.consider) {
+        FlowWhatsAppComposer.consider({
+          main: main,
+          oneToOne: true,
+          host: location.hostname,
+          messages: list.map((n) => ({
+            id: idOf(n),
+            fromMe: Boolean(P.parseDataId(idOf(n)) && P.parseDataId(idOf(n)).fromMe),
+            text: textOf(n),
+            node: n
+          }))
+        });
+      }
+    } catch (e) { /* the answer card is absent until its script is registered */ }
   }
 
   function schedule() { clearTimeout(timer); timer = setTimeout(scan, DEBOUNCE_MS); }
