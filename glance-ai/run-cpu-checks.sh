@@ -65,4 +65,6 @@ echo "== gated OSS score from cached predictions"
 node oss/shadow-combined/gated/score-gated.cjs qwen3.5-4b
 echo "== Understanding validator (M1) on cached predictions"
 node oss/shadow-combined/gated/score-understanding.cjs > /dev/null && echo "understanding: PASS"
+echo "== Router v2 (M2) end to end, real device mask, cached predictions"
+node oss/shadow-combined/gated/score-router.cjs > /dev/null && echo "router: PASS"
 echo "== cpu checks done"

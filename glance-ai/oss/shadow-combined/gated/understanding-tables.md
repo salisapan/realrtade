@@ -8,9 +8,9 @@ No LLM was run. Spec labels. Confidence not measured (cached answers carry none)
 |---|---|---|---|---|---|---|---|---|
 | engine+veto (today) | 275 | 0/167 | 21/108 | 18/50 | 3/58 | 0 / 0 | 1 | 0/0 |
 | model, no gate | 275 | 0/167 | 9/108 | 7/50 | 2/58 | 0 / 0 | 1 | 8/8 |
-| model + Understanding validator (M1) | 275 | 0/167 | 12/108 | 10/50 | 2/58 | 0 / 0 | 1 | 0/5 |
+| model + Understanding validator (M1) | 275 | 0/167 | 9/108 | 7/50 | 2/58 | 0 / 0 | 1 | 0/8 |
 | model + strict propose-gate | 275 | 0/167 | 13/108 | 10/50 | 3/58 | 0 / 0 | 1 | 8/8 |
-| model + Understanding validator + strict gate | 275 | 0/167 | 16/108 | 13/50 | 3/58 | 0 / 0 | 1 | 0/5 |
+| model + Understanding validator + strict gate | 275 | 0/167 | 13/108 | 10/50 | 3/58 | 0 / 0 | 1 | 0/8 |
 
 ### v2 held-out 400
 
@@ -48,17 +48,14 @@ No LLM was run. Spec labels. Confidence not measured (cached answers carry none)
 |---|---|---|---|---|---|---|---|---|
 | engine+veto (today) | 786 | 0/464 | 46/322 | 30/153 | 16/169 | 0 / 0 | 8 | 0/0 |
 | model, no gate | 786 | 8/464 | 23/322 | 11/153 | 12/169 | 4 / 4 | 9 | 8/8 |
-| model + Understanding validator (M1) | 786 | 3/464 | 26/322 | 14/153 | 12/169 | 3 / 0 | 9 | 0/5 |
+| model + Understanding validator (M1) | 786 | 3/464 | 23/322 | 11/153 | 12/169 | 3 / 0 | 9 | 0/8 |
 | model + strict propose-gate | 786 | 0/464 | 37/322 | 21/153 | 16/169 | 0 / 0 | 9 | 8/8 |
-| model + Understanding validator + strict gate | 786 | 0/464 | 40/322 | 24/153 | 16/169 | 0 / 0 | 9 | 0/5 |
+| model + Understanding validator + strict gate | 786 | 0/464 | 37/322 | 21/153 | 16/169 | 0 / 0 | 9 | 0/8 |
 
-## What the validator changed (8 model proposals)
+## What the validator changed (5 model proposals)
 
 | id | set/lang | gold | model | no gate | with validator | effect |
 |---|---|---|---|---|---|---|
-| oss-he-promise-044 | oss/he | task | task/2026-10-10 | task | SILENT (understanding:promise-without-date) | lost a right Do It |
-| oss-he-promise-046 | oss/he | task | task/2026-10-10 | task | SILENT (understanding:promise-without-date) | lost a right Do It |
-| oss-B-prom-01 | oss/he | task | task/2026-10-10 | task | SILENT (understanding:promise-without-date) | lost a right Do It |
 | v2syn-3656 | v2test/en | SILENT | task/- | task | SILENT (understanding:promise-without-date) | prevented wrong Do It |
 | v2syn-3698 | v2test/en | SILENT | task/2026-10-07 | task | SILENT (understanding:promise-without-date) | prevented wrong Do It |
 | v2syn-9516 | v2test/he | SILENT | task/- | task | SILENT (understanding:promise-without-date) | prevented wrong Do It |

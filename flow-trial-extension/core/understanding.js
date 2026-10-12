@@ -67,6 +67,37 @@ const FlowUnderstanding = (() => {
     if (typeof today === 'string' && ISO.test(today)) return new Date(today + 'T12:00:00');
     return new Date();
   }
+  // A Hebrew weekday needs its prefix («עד», «ב», «יום»): bare «שני» / «שלישי» / «רביעי» are also two / third / fourth.
+  // A bare weekday that core/extract.js leaves unread («עד שלישי», «עד יום ה׳», "by Thursday"). One named day only: the next one, never
+  // today (said on a Wednesday, «עד רביעי» is next week, the same reading extract.js gives «ביום רביעי»). Ranges ("next week", "end of
+  // the month") are not a day and stay unread. Kept here so extract.js, which other open work changes, is untouched.
+  const WD_EN = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+  const WD_HE = { 'ראשון': 0, 'שני': 1, 'שלישי': 2, 'רביעי': 3, 'חמישי': 4, 'שישי': 5 };
+  const WD_LETTER = { 'א': 0, 'ב': 1, 'ג': 2, 'ד': 3, 'ה': 4, 'ו': 5 };
+  function bareWeekday(text, now) {
+    const t = String(text || '');
+    let wd = null, m;
+    const en = t.match(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/ig);
+    const he = t.match(/(?:^|[^\u0590-\u05FF])(?:עד (?:יום )?|ביום |ליום |יום |ב)(ראשון|שני|שלישי|רביעי|חמישי|שישי)(?![\u0590-\u05FF])/g);
+    const letters = t.match(/יום ([אבגדהו])['׳]/g);
+    const heAny = t.match(/(?:^|[^\u0590-\u05FF])(?:עד |ב|ל|ו|או )?(?:יום )?(ראשון|שני|שלישי|רביעי|חמישי|שישי)(?![\u0590-\u05FF])/g);
+    const found = (en ? en.length : 0) + (he ? he.length : 0) + (letters ? letters.length : 0);
+    // Two weekdays is two alternatives, not a day; a second bare name («עד שלישי או רביעי») counts too.
+    if (found !== 1 || (he && heAny && heAny.length > 1)) return null;
+    if (en) wd = WD_EN[en[0].toLowerCase()];
+    else if (he) { m = he[0].match(/(ראשון|שני|שלישי|רביעי|חמישי|שישי)$/); wd = WD_HE[m[1]]; }
+    else { m = letters[0].match(/יום ([אבגדהו])/); wd = WD_LETTER[m[1]]; }
+    if (/\b(?:last|past)\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b|(?:ראשון|שני|שלישי|רביעי|חמישי|שישי) (?:ה)?(?:קודם|שעבר)/i.test(t)) return null;
+    const x = new Date(now.getTime()); let k = (wd - x.getDay() + 7) % 7; if (k === 0) k = 7; x.setDate(x.getDate() + k);
+    return { raw: t, iso: isoOf(x) };
+  }
+
+  // The device's one date reader for a quoted span: core/extract.js first, then a bare weekday.
+  function readDate(text, now) {
+    now = nowFrom(now);
+    return (extract && extract.parseDate ? extract.parseDate(String(text || ''), now) : null) || bareWeekday(text, now);
+  }
+
   function isoOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
 
   // validate(raw, maskedText, opts?) -> { ok, understanding, drops:[{path, reason}] } | { ok:false, reason, drops }
@@ -124,7 +155,8 @@ const FlowUnderstanding = (() => {
           if (!d.ok) drop(at + '.due', 'span-' + d.reason);
           else {
             // The device reads the words; the model's ISO is only a cross-check.
-            const read = extract && extract.parseDate ? extract.parseDate(String(unmask(it.due_span)), now) : null;
+            const spanText = String(unmask(it.due_span));
+            const read = readDate(spanText, now);
             if (!read || !read.iso) drop(at + '.due', 'span-has-no-date');
             else if (read.iso < todayIso) drop(at + '.due', 'past');
             else {
@@ -191,7 +223,7 @@ const FlowUnderstanding = (() => {
     return { used: true, ok: true, understanding: v.understanding, proposal: proposal(v.understanding, ctx), drops: v.drops };
   }
 
-  return { SWITCH, DEFAULTS, RELEVANT, STATES, NEEDS, KINDS, ACTORS, MIN_CONFIDENCE, validate, proposal, gate, enabled, norm };
+  return { SWITCH, DEFAULTS, readDate, RELEVANT, STATES, NEEDS, KINDS, ACTORS, MIN_CONFIDENCE, validate, proposal, gate, enabled, norm };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowUnderstanding };

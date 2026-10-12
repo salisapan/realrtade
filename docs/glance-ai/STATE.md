@@ -64,6 +64,8 @@ The same file's no-gate propose-only row on the v2 held-out is 3.7% (8/218) wron
 
 `flow-trial-extension/core/understanding.js` (switch `aiUnderstandingV1`, off) on the same cached answers. Scorer: `glance-ai/oss/shadow-combined/gated/score-understanding.cjs`; tables in `understanding-tables.md`. Pooled 786, spec labels: no gate 8/464 wrong Do It; validator alone 3/464; validator + strict gate 0/464 with 40/322 missed (strict gate alone 37/322). Model cards with a wrong date: 8/8 without the validator (all Hebrew weekdays, the strict gate included), 0/5 with it. Confidence is not in the cache and is not measured.
 
+2026-10-12: with the bare-weekday reader, validator + strict gate is 0/464 wrong Do It and 37/322 missed (the same as the strict gate alone), with 0/8 wrong-date model cards (gate alone 8/8). The Router v2 (`core/understanding-router.js`, switch `aiPrimary` off) gives the same numbers end to end with the device's real mask in front of Tier 2 (`score-router.cjs`, `router-tables.md`). 150 of 796 mails (19%) reach Tier 2.
+
 The strict gate treats a save proposal as unread (`suggest:attachments-unread`) because the case file has counts and names only. The SENSITIVITY row models declared files as 240KB PDFs. That row is not a result.
 
 ## Blocked

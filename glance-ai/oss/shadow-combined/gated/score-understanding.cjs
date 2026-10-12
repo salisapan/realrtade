@@ -14,7 +14,6 @@ const { EVAL } = require('../../../paths.cjs');
 const { capVeto } = require('../../../model/runtime/veto-v2.cjs');
 const ROOT = path.join(__dirname, '..', '..', '..', '..');
 const { FlowUnderstanding: U } = require(path.join(ROOT, 'flow-trial-extension/core/understanding.js'));
-const { FlowExtract: X } = require(path.join(ROOT, 'flow-trial-extension/core/extract.js'));
 const read = (p) => fs.readFileSync(p, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
 const cases = read(EVAL.shadowCases());
 const LLM = Object.fromEntries(read(path.join(__dirname, '..', 'llm-qwen3.5-4b.jsonl')).map((r) => [r.id, r]));
@@ -40,8 +39,8 @@ function toUnderstanding(c, p) {
   // The value is the device's reading of that place, not the model's ISO (a disagreement is corrected and counted).
   let dueSpan;
   if (p.due) {
-    const hit = ss.find((s) => { const d = X.parseDate(s, now); return d && d.iso === p.due; });
-    dueSpan = hit || ss.find((s) => { const d = X.parseDate(s, now); return d && d.iso; });
+    const hit = ss.find((s) => { const d = U.readDate(s, now); return d && d.iso === p.due; });
+    dueSpan = hit || ss.find((s) => { const d = U.readDate(s, now); return d && d.iso; });
   }
   let askSpan = dueSpan || null;
   if (!askSpan) {

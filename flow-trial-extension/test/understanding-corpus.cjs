@@ -60,6 +60,18 @@ check('a masked date placeholder is not readable without the device restoring it
 r = v({ intentions: [ask({ due_span: '[DATE_1]', ask_span: 'send me the signed lease', evidence_span: 'We need it for the bank.' })] }, 'Could you send me the signed lease by [DATE_1]? We need it for the bank.', { unmask: (s) => s.replace('[DATE_1]', 'October 14') });
 check('...and is read once the device restores it', r.understanding.intentions[0].due === '2026-10-14', r);
 
+console.log('\n--- a bare weekday the date parser leaves unread ---\n');
+const prom = (txt, span) => U.validate({ intentions: [{ kind: 'promise_to_me', ask_span: span, evidence_span: span, due: '2026-10-10', due_span: span, confidence: 0.9 }] }, txt, { today });
+check('«עד רביעי» said on a Wednesday is next Wednesday (a cached model said Saturday)', prom('עדכון קצר: אכין את החשבונית עד רביעי בבוקר.', 'אכין את החשבונית עד רביעי בבוקר').understanding.intentions[0].due === '2026-10-14');
+check('«עד שלישי» is the coming Tuesday, and the promise proposes a task', (() => { const r = prom('אשלח לך את החוזה עד שלישי', 'אשלח לך את החוזה עד שלישי'); return r.understanding.intentions[0].due === '2026-10-13' && U.proposal(r.understanding).step === 'task'; })());
+check('«ביום ה׳» is Thursday', prom('אשלח את הטופס ביום ה׳', 'אשלח את הטופס ביום ה׳').understanding.intentions[0].due === '2026-10-08');
+check('two weekdays are two alternatives, not a day', !prom('אשלח עד שלישי או רביעי', 'אשלח עד שלישי או רביעי').understanding.intentions[0].due);
+check('"last Monday" is not a deadline', !prom('Got it last Monday and will send it', 'Got it last Monday').understanding.intentions[0].due);
+check('«בשבוע הבא» is a range, not a day: no due', !prom('אשלח לך את זה בשבוע הבא', 'אשלח לך את זה בשבוע הבא').understanding.intentions[0].due);
+check('«שני הקבצים» is "the two files", not Monday', !prom('אשלח לך את שני הקבצים', 'אשלח לך את שני הקבצים').understanding.intentions[0].due);
+check('«בשני» is Monday', prom('אשלח לך את זה בשני', 'אשלח לך את זה בשני').understanding.intentions[0].due === '2026-10-12');
+check('a weekday inside another Hebrew word is not a weekday («שנית»)', !prom('אשלח שנית את המסמך', 'אשלח שנית את המסמך').understanding.intentions[0].due);
+
 console.log('\n--- schema: enums, confidence, unknown keys ---\n');
 r = v({ relevant: 'maybe', state: 'closed', needs: ['file', 'wire_money'], intentions: [ask()], close: true });
 check('a bad relevant falls back to unknown', r.understanding.relevant === 'unknown' && has(r, 'relevant', 'bad-enum'));

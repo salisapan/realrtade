@@ -49,9 +49,9 @@
    "n": 275,
    "wdi": 0,
    "sil": 167,
-   "miss": 12,
+   "miss": 9,
    "show": 108,
-   "heMiss": 10,
+   "heMiss": 7,
    "heShow": 50,
    "enMiss": 2,
    "enShow": 58,
@@ -59,7 +59,7 @@
    "enWdi": 0,
    "wact": 1,
    "wdiIds": [],
-   "dated": 5,
+   "dated": 8,
    "wrongDate": 0,
    "wrongDateIds": []
   },
@@ -94,9 +94,9 @@
    "n": 275,
    "wdi": 0,
    "sil": 167,
-   "miss": 16,
+   "miss": 13,
    "show": 108,
-   "heMiss": 13,
+   "heMiss": 10,
    "heShow": 50,
    "enMiss": 3,
    "enShow": 58,
@@ -104,7 +104,7 @@
    "enWdi": 0,
    "wact": 1,
    "wdiIds": [],
-   "dated": 5,
+   "dated": 8,
    "wrongDate": 0,
    "wrongDateIds": []
   }
@@ -457,9 +457,9 @@
    "n": 786,
    "wdi": 3,
    "sil": 464,
-   "miss": 26,
+   "miss": 23,
    "show": 322,
-   "heMiss": 14,
+   "heMiss": 11,
    "heShow": 153,
    "enMiss": 12,
    "enShow": 169,
@@ -471,7 +471,7 @@
     "v2syn-24190",
     "v2rtest-judgment-corpus-1252"
    ],
-   "dated": 5,
+   "dated": 8,
    "wrongDate": 0,
    "wrongDateIds": []
   },
@@ -506,9 +506,9 @@
    "n": 786,
    "wdi": 0,
    "sil": 464,
-   "miss": 40,
+   "miss": 37,
    "show": 322,
-   "heMiss": 24,
+   "heMiss": 21,
    "heShow": 153,
    "enMiss": 16,
    "enShow": 169,
@@ -516,42 +516,12 @@
    "enWdi": 0,
    "wact": 9,
    "wdiIds": [],
-   "dated": 5,
+   "dated": 8,
    "wrongDate": 0,
    "wrongDateIds": []
   }
  },
  "changed": [
-  {
-   "id": "oss-he-promise-044",
-   "set": "oss",
-   "lang": "he",
-   "gold": "task",
-   "model": "task/2026-10-10",
-   "noGate": "task",
-   "withU": "SILENT (understanding:promise-without-date)",
-   "effect": "lost a right Do It"
-  },
-  {
-   "id": "oss-he-promise-046",
-   "set": "oss",
-   "lang": "he",
-   "gold": "task",
-   "model": "task/2026-10-10",
-   "noGate": "task",
-   "withU": "SILENT (understanding:promise-without-date)",
-   "effect": "lost a right Do It"
-  },
-  {
-   "id": "oss-B-prom-01",
-   "set": "oss",
-   "lang": "he",
-   "gold": "task",
-   "model": "task/2026-10-10",
-   "noGate": "task",
-   "withU": "SILENT (understanding:promise-without-date)",
-   "effect": "lost a right Do It"
-  },
   {
    "id": "v2syn-3656",
    "set": "v2test",
