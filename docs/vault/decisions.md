@@ -6,6 +6,7 @@ updated: 2026-10-10
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-12 · Breadth F2 built: a file asked for on Outlook that is in the person's own OneDrive is attached to the reply draft and read back by id (item and attachment); Undo removes the attachment (`core/onedrive-find.js`, switch `ONEDRIVE_FIND` off, not wired). Gate: not run · Claude routine · [[open-tasks]] row 65
 - 2026-10-10 · Owner chose the first wedge: accountants and lawyers. Client requests engine, ledger and page built (not wired to Gmail yet; switch off). docs/glance-ai/client-requests.md, open-tasks row 68.
 - 2026-10-10 · Owner rejected the standalone "מה חסר ממי" page (not Glance). Removed; engine and ledger stay, unwired, switch off. No existing file or behavior changed.
 - 2026-10-10 · Owner: no narrow audience. The edge is carry until closed: Glance stays on a loop until it really closes and makes it happen. Client-requests engine folds into the general follow loop (open-tasks row 68).
