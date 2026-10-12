@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const S = require('./support/sentences');
+const { testDay } = require('./support/fixtures');
+const TD = testDay();
 
 const DANA = "I'll send Dana the numbers by Thursday.";
 const NORTHWIND = 'The signed Northwind Supplies agreement is attached.';
@@ -77,8 +79,8 @@ function shownRow(text, id, intent, process, ts) {
 
 test('a live unread pane names the open PDF, and a small chip is a skipped row', async ({ glance }) => {
   test.setTimeout(90000);
-  const when = localIso(2026, 10, 8, 14, 1);
-  const whenSkip = localIso(2026, 10, 8, 13, 46);
+  const when = localIso(TD.y, TD.m, TD.d, 14, 1);
+  const whenSkip = localIso(TD.y, TD.m, TD.d, 13, 46);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -102,7 +104,7 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   const pane = page.locator('#ReadingPaneContainerId');
@@ -116,7 +118,7 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
     subject: 'Northwind agreement - small PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 13:46',
+    receivedLabel: TD.dmy + ' 13:46',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '800 B' }]
   });
   const skipPane = skipped.locator('#ReadingPaneContainerId');
@@ -126,8 +128,8 @@ test('a live unread pane names the open PDF, and a small chip is a skipped row',
 
 test('a no-ask attachment mail shows the file that is open', async ({ glance }) => {
   test.setTimeout(90000);
-  const alphaWhen = localIso(2026, 10, 8, 14, 37);
-  const betaWhen = localIso(2026, 10, 8, 14, 38);
+  const alphaWhen = localIso(TD.y, TD.m, TD.d, 14, 37);
+  const betaWhen = localIso(TD.y, TD.m, TD.d, 14, 38);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -151,7 +153,7 @@ test('a no-ask attachment mail shows the file that is open', async ({ glance }) 
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:37',
+    receivedLabel: TD.dmy + ' 14:37',
     attachments: [{ name: 'statement-q3-alpha.pdf', sizeLabel: '3 KB' }]
   });
   const alphaPane = alpha.locator('#ReadingPaneContainerId');
@@ -165,7 +167,7 @@ test('a no-ask attachment mail shows the file that is open', async ({ glance }) 
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:38',
+    receivedLabel: TD.dmy + ' 14:38',
     attachments: [{ name: 'statement-q3-beta.pdf', sizeLabel: '4 KB' }]
   });
   const betaPane = beta.locator('#ReadingPaneContainerId');
@@ -191,7 +193,7 @@ test('a live pane with no Graph candidate records suggest:no-candidate', async (
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ name: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   await expect.poll(async () => {
@@ -346,8 +348,8 @@ test('3:05 PM saves the afternoon file, and a bare 3:05 does not', async ({ glan
   await glance.setScenario({
     inboxFilterFails: true,
     inbox: [
-      inboxRow(morningId, conv, 'Clock check', localIso(2026, 10, 8, 3, 5)),
-      inboxRow(afternoonId, conv, 'Clock check', localIso(2026, 10, 8, 15, 5))
+      inboxRow(morningId, conv, 'Clock check', localIso(TD.y, TD.m, TD.d, 3, 5)),
+      inboxRow(afternoonId, conv, 'Clock check', localIso(TD.y, TD.m, TD.d, 15, 5))
     ],
     sent: [],
     messages: {},
@@ -363,7 +365,7 @@ test('3:05 PM saves the afternoon file, and a bare 3:05 does not', async ({ glan
     subject: 'Clock check',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 3:05 PM',
+    receivedLabel: TD.dmy + ' 3:05 PM',
     attachments: [{ name: 'afternoon.pdf', sizeLabel: '4 KB' }]
   });
   await expect(page.locator('#ReadingPaneContainerId').getByText('Save afternoon.pdf to OneDrive?')).toBeVisible();
@@ -375,7 +377,7 @@ test('3:05 PM saves the afternoon file, and a bare 3:05 does not', async ({ glan
     subject: 'Clock check',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 3:05',
+    receivedLabel: TD.dmy + ' 3:05',
     attachments: [{ name: 'afternoon.pdf', sizeLabel: '4 KB' }]
   });
   await expect(bare.locator('#ReadingPaneContainerId').getByText('Save the file?')).toHaveCount(0);
@@ -392,7 +394,7 @@ test('a Hebrew 24-hour pane links one subject, and 14:37 is not 14:38', async ({
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
-    inbox: [inboxRow(northMsg, northConv, 'Northwind agreement - signed PDF', localIso(2026, 10, 8, 14, 1))],
+    inbox: [inboxRow(northMsg, northConv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 14, 1))],
     sent: [],
     messages: {},
     attachments: { [northMsg]: pdf('att-nw', 'northwind-agreement-signed.pdf', 3072) },
@@ -404,13 +406,13 @@ test('a Hebrew 24-hour pane links one subject, and 14:37 is not 14:38', async ({
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: 'ה 08/10/2026 14:01',
+    receivedLabel: TD.heDay + ' ' + TD.dmy + ' 14:01',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   await expect(north.locator('#ReadingPaneContainerId').getByText('Save northwind-agreement-signed.pdf to OneDrive?')).toBeVisible();
 
-  const alphaWhen = localIso(2026, 10, 8, 14, 37);
-  const betaWhen = localIso(2026, 10, 8, 14, 38);
+  const alphaWhen = localIso(TD.y, TD.m, TD.d, 14, 37);
+  const betaWhen = localIso(TD.y, TD.m, TD.d, 14, 38);
   await glance.setScenario({
     inboxFilterFails: true,
     inbox: [
@@ -431,7 +433,7 @@ test('a Hebrew 24-hour pane links one subject, and 14:37 is not 14:38', async ({
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:37',
+    receivedLabel: TD.dmy + ' 14:37',
     attachments: [{ shownName: '…t-q3-alpha.pdf', sizeLabel: '3 KB' }]
   });
   await expect(alpha.locator('#ReadingPaneContainerId').getByText('Save statement-q3-alpha.pdf to OneDrive?')).toBeVisible();
@@ -443,7 +445,7 @@ test('a Hebrew 24-hour pane links one subject, and 14:37 is not 14:38', async ({
     subject: 'Q3 fund statement',
     senderEmail: S.SENDER,
     body: Q3,
-    receivedLabel: '08/10/2026 14:38',
+    receivedLabel: TD.dmy + ' 14:38',
     attachments: [{ shownName: '…nt-q3-beta.pdf', sizeLabel: '4 KB' }]
   });
   await expect(beta.locator('#ReadingPaneContainerId').getByText('Save statement-q3-beta.pdf to OneDrive?')).toBeVisible();

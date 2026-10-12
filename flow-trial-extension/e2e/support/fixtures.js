@@ -96,4 +96,16 @@ function gmailUrl(messageId) {
   return 'https://mail.google.com/mail/u/0/#inbox/' + encodeURIComponent(messageId || 'm-1');
 }
 
-module.exports = { gmailHtml, outlookHtml, outlookUrl, gmailUrl };
+// The day the date-bound fixtures live on: today, local time. Fixtures that said 2026-10-08 stopped matching the extension's own
+// recency checks once that day passed (gate-0945 and gate-0947 failed from the next day on). The Hebrew letter is the weekday
+// (א ראשון … ו שישי, ש שבת) as the OWA list row shows it before the date.
+function testDay() {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const d = { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
+  d.dmy = pad(d.d) + '/' + pad(d.m) + '/' + d.y;
+  d.heDay = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'][now.getDay()];
+  return d;
+}
+
+module.exports = { gmailHtml, outlookHtml, outlookUrl, gmailUrl, testDay };

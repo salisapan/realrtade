@@ -2316,12 +2316,15 @@
     }
     receipts.forEach((entry) => place(entry, outlookReceiptRow(entry)));
     openOnly.forEach((entry) => place(entry, openRow(entry)));
+    // A row that carries a step list already starts with its own Suggested or Added heading (src/step-kit.js). The Loops heading is
+    // for lists that have none (one Do It, one Handled row), so the same heading never shows twice.
+    const ownsHeading = (node, which) => Boolean(node && node.querySelector && node.querySelector('[data-glance-section="' + which + '"]'));
     if (suggested.length) {
-      host.appendChild(loopsHeading('suggested'));
+      if (!ownsHeading(suggested[0], 'suggested')) host.appendChild(loopsHeading('suggested'));
       suggested.forEach((node) => host.appendChild(node));
     }
     if (added.length) {
-      host.appendChild(loopsHeading('added'));
+      if (!ownsHeading(added[0], 'added')) host.appendChild(loopsHeading('added'));
       added.forEach((node) => host.appendChild(node));
     }
     } finally { endRender(); }
