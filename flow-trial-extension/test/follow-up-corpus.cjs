@@ -255,5 +255,37 @@ console.log('\n--- a reminder ticked done in Google Tasks ---\n');
   check('only waiting loops with a reminder are asked about, and not again within ten minutes', F.taskRefsToCheck([w, { id: 'x', status: 'waiting' }, { id: 'y', status: 'resolved', taskRef: { taskId: 'Y' } }], NOW, {}).length === 1 && F.taskRefsToCheck([w], NOW, { t1: NOW - 60000 }).length === 0 && F.taskRefsToCheck([w], NOW, { t1: NOW - 11 * 60000 }).length === 1);
 }
 
+console.log('\n--- progress and preparation are not completion ---\n');
+const PROGRESS_OPEN = [
+  'I started on it; half done.', 'Found it in the shared folder, sending shortly.', 'Almost there, a couple more days.', 'All set on my side.',
+  "It's all drafted, I just need an approval.", 'Prepared the document, waiting for approval from Dana.', 'It is with the lawyer right now.',
+  'כמעט סיימתי', 'זה אצל עורך הדין כרגע', 'מוכן, רק צריך לקבל אישור', 'מצאתי, שולח עוד מעט', 'התחלתי'
+];
+PROGRESS_OPEN.forEach((t) => { const o = outcome(t, replyW); check('stays open (not closed): ' + t, o === 'promised' || o === 'ack' || o === 'yours', o); });
+check('progress is visible and minimal: it becomes "promised" with the day they named, or none', (() => { const r = cr('Drafted it, will send tomorrow.', replyW); return r.outcome === 'promised' && r.progress === true && r.promisedIso === '2026-10-02'; })(), cr('Drafted it, will send tomorrow.', replyW));
+check('"half done" is not delivery just because it contains "done"', outcome('Half done, will finish tomorrow.', replyW) === 'promised');
+const STILL_CLOSES = [
+  'Here is the signed lease, attached.', 'Found it, attached.', 'Done, sent it this morning.', 'Yes, I found it and the amount is $500.',
+  'מצורף ההסכם החתום', 'סיימתי', 'Approved. The figure is $12,400.'
+];
+STILL_CLOSES.forEach((t) => check('a real delivery or answer still closes: ' + t, outcome(t, replyW) === 'closed', outcome(t, replyW)));
+check('a payment claim "Transferred, confirmation attached." is a payment claim (the person is then asked once)', outcome('Transferred, confirmation attached.', payW) === 'paid');
+check('"Not transferred yet" is not', outcome('Not transferred yet', payW) !== 'paid');
+check('an unfinished payment still does not close it', outcome('Will pay once the invoice is corrected.', payW) !== 'paid');
+check('applyReply keeps a progress reply open and moves the next look, never closes', (() => { const r = cr('Found it in the shared folder, sending shortly.', replyW); const a = F.applyReply(replyW, r, NOW); return !a.close && a.rescheduled && a.patch.stage === 'promised' && !a.patch.status; })());
+
+console.log('\n--- deferred completion: the day they name, in the ways people say it ---\n');
+const dayOf = (t) => cr(t, replyW).promisedIso;
+check('a bare weekday: "I will send it Thursday" (today is Thursday: next week)', dayOf('I will send it Thursday') === '2026-10-08', dayOf('I will send it Thursday'));
+check('«אחזור אליך עד חמישי»', dayOf('אחזור אליך עד חמישי') === '2026-10-08', dayOf('אחזור אליך עד חמישי'));
+check('«אחזור אליך עד יום ה׳» (letter form)', dayOf('אחזור אליך עד יום ה׳') === '2026-10-08', dayOf('אחזור אליך עד יום ה׳'));
+check('«אשלח בשבוע הבא» is a week out', dayOf('אשלח בשבוע הבא') === '2026-10-08', dayOf('אשלח בשבוע הבא'));
+check('«אשלח עד סוף השבוע» on a Thursday is today', dayOf('אשלח עד סוף השבוע') === '2026-10-01', dayOf('אשלח עד סוף השבוע'));
+check('«אשלח עד 20/10» reads day/month with no year', dayOf('אשלח עד 20/10') === '2026-10-20', dayOf('אשלח עד 20/10'));
+check('"3/11" is read day/month (Israel), the next one that is not in the past', dayOf('Thanks, I will revert on 3/11') === '2026-11-03', dayOf('Thanks, I will revert on 3/11'));
+check('"by the end of the month"', dayOf('I will send it by the end of the month') === '2026-10-31', dayOf('I will send it by the end of the month'));
+check('a past day is never returned (31/12 passed is next year only if it already passed)', (dayOf('אשלח עד 15/09') || '2027-09-15') >= '2026-10-01');
+check('no day named stays without a day', dayOf('Will look into it later and revert.') === null);
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);

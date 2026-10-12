@@ -77,7 +77,17 @@ const FlowIncomingJudge = (() => {
       calibration: i.calibration || null,
       calibrationByType: i.calibrationByType || null,
       attachmentCount: i.attachmentCount || 0,
-      now
+      now,
+      to: i.to || i.toRecipients || null,
+      cc: i.cc || i.ccRecipients || null,
+      ownAddresses: i.ownAddresses || i.own || null,
+      userName: i.userName || null,
+      autoReply: i.autoReply === true,
+      noteToSelf: i.noteToSelf === true,
+      senderIsUser: i.senderIsUser === true,
+      inbound: i.inbound,
+      direction: i.direction || null,
+      inSent: i.inSent === true
     });
     if (!intent || !intent.type) {
       return { show: false, reason: intent && intent.quiet ? 'quiet:' + intent.quiet : 'intent-null', intent: intent || null };

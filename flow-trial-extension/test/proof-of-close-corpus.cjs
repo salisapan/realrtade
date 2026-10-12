@@ -207,7 +207,7 @@ console.log('\n--- Handled survives a thread reload ---\n');
   check('a proved write stores the banner lines on the Activity row',
     gmail.indexOf('FlowProofOfClose.receiptLogFields') > 0);
   const manifest = fs.readFileSync(path.join(__dirname, '..', 'manifest.json'), 'utf8');
-  check('the extension version is 0.9.40', /"version": "0\.9\.40"/.test(manifest));
+  check('the extension version is 0.9.55', /"version": "0\.9\.55"/.test(manifest));
 
   // Live 0.9.29: Do It stored a hash of the message text. After reload that
   // hash changed (the clock line in the row changed) and the scan treated
@@ -322,6 +322,59 @@ console.log('\n--- Microsoft To Do ---\n');
   const reload = { messageIds: ['AAMkNEW', 'path_9', conv], threadIds: [conv] };
   check('an Outlook reload finds the To Do receipt by conversation id, not the old item id',
     FlowProofOfClose.taskReceiptFromLog([storedTodo], reload) === storedTodo);
+  const storedFile = {
+    kind: 'written',
+    messageId: 'AQMkAlpha',
+    threadId: conv,
+    outlookConversationId: conv,
+    connectorId: 'onedriveFile',
+    system: 'microsoft/onedrive',
+    externalId: 'drive_1',
+    verifiedAt: VERIFIED,
+    fetchedBack: true,
+    writtenLine: 'Saved statement-q3-alpha.pdf to OneDrive',
+    receiptStatus: 'Handled.'
+  };
+  const betaFile = { messageIds: ['AQMkBeta', conv], threadIds: [conv], fileNames: ['statement-q3-beta.pdf'] };
+  const alphaFile = { messageIds: ['AQMkAlpha', conv], threadIds: [conv], fileNames: ['…t-q3-alpha.pdf'] };
+  const convFile = { messageIds: [conv], threadIds: [conv], fileNames: ['…t-q3-alpha.pdf'] };
+  check('a file receipt does not remount on a sibling in the same conversation',
+    FlowProofOfClose.taskReceiptFromLog([storedFile], betaFile) === null);
+  check('a file receipt remounts on its own message id',
+    FlowProofOfClose.taskReceiptFromLog([storedFile], alphaFile) === storedFile);
+  check('a file receipt remounts on the conversation when the open file name agrees',
+    FlowProofOfClose.taskReceiptFromLog([storedFile], convFile) === storedFile);
+  const otherName = {
+    kind: 'written', messageId: 'AQMkOther', threadId: conv, outlookConversationId: conv,
+    connectorId: 'onedriveFile', system: 'microsoft/onedrive', externalId: 'drive_2',
+    verifiedAt: VERIFIED, fetchedBack: true, writtenLine: 'Saved agreement-signed.pdf to OneDrive'
+  };
+  const graphSaved = {
+    kind: 'written', messageId: conv, itemId: 'AQMkAlpha', graphMessageId: 'AQMkAlpha',
+    threadId: conv, outlookConversationId: conv, connectorId: 'attachmentSave',
+    system: 'microsoft/onedrive', externalId: 'drive_graph',
+    verifiedAt: VERIFIED, fetchedBack: true, writtenLine: 'Saved statement-q3-alpha.pdf to OneDrive'
+  };
+  check('the Graph message id remounts a proved save when the chip name was not read',
+    FlowProofOfClose.taskReceiptFromLog([graphSaved], { messageIds: ['AQMkAlpha'], threadIds: [conv], fileNames: [] }) === graphSaved);
+  check('a sibling Graph id does not remount that proved save',
+    FlowProofOfClose.taskReceiptFromLog([graphSaved], { messageIds: ['AQMkBeta'], threadIds: [conv], fileNames: ['statement-q3-beta.pdf'] }) === null);
+  const alphaSaved = Object.assign({}, graphSaved, { subject: 'Q3 fund statement' });
+  check('a proved save for this mail and filename remounts when the pane id is stale',
+    FlowProofOfClose.savedFileReceipt([alphaSaved], {
+      messageIds: ['AQQkStale'], fileNames: ['statement-q3-alpha.pdf'], subject: 'Q3 fund statement'
+    }) === alphaSaved);
+  check('the same proved save does not remount for beta.pdf',
+    FlowProofOfClose.savedFileReceipt([alphaSaved], {
+      messageIds: ['AQQkStale'], fileNames: ['statement-q3-beta.pdf'], subject: 'Q3 fund statement'
+    }) === null);
+  const undoneSave = Object.assign({}, alphaSaved, { kind: 'undone', undone: true });
+  check('undo of that file offers Save again',
+    FlowProofOfClose.savedFileReceipt([undoneSave], {
+      messageIds: [conv], fileNames: ['statement-q3-alpha.pdf'], subject: 'Q3 fund statement'
+    }) === null);
+  check('a shorter full filename does not remount the longer file',
+    FlowProofOfClose.taskReceiptFromLog([otherName], { messageIds: [conv], threadIds: [conv], fileNames: ['northwind-agreement-signed.pdf'] }) === null);
   check('terminal with no chip mounts the To Do receipt',
     FlowProofOfClose.scanReceiptDecision({
       log: [storedTodo], messageIds: ['AAMkNEW'], threadIds: [conv], hasHost: false, terminal: true

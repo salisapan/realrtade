@@ -122,7 +122,9 @@ const FlowStillOpen = (() => {
 
   function freshIntent(text, item, now) {
     if (!text || typeof FlowIntent === 'undefined' || !FlowIntent.classify) return null;
-    return FlowIntent.classify(text, {
+    const prepared = (typeof FlowCommitmentTitle !== 'undefined' && typeof FlowCommitmentTitle.prepareText === 'function')
+      ? FlowCommitmentTitle.prepareText(text) : text;
+    return FlowIntent.classify(prepared, {
       now: clockOf(now),
       senderEmail: item && item.sender && item.sender.email
     });
@@ -261,7 +263,11 @@ const FlowStillOpen = (() => {
     const intent = entry.intent && typeof entry.intent === 'object' ? entry.intent : {};
     return {
       messageId: entry.messageId || null,
-      threadId: entry.threadId || null,
+      threadId: entry.threadId || entry.outlookConversationId || null,
+      outlookConversationId: entry.outlookConversationId || entry.threadId || null,
+      itemId: entry.itemId || null,
+      pathId: entry.pathId || null,
+      outlookIncomingId: entry.outlookIncomingId || null,
       threadUrl: entry.threadUrl || null,
       sender: entry.sender || {},
       subject: entry.subject || '',
@@ -269,22 +275,122 @@ const FlowStillOpen = (() => {
       ts: entry.ts || 0,
       app: entry.app || 'gmail',
       intent: intent,
-      process: entry.process || null
+      process: entry.process || null,
+      verifying: entry.verifying === true
     };
   }
 
-  function select(candidates, now) {
-    const best = new Map();
+  function normPiece(value) {
+    return String(value || '')
+      .replace(/\u05BE/g, ' ')
+      .replace(/[\u0591-\u05C7]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\u0590-\u05ff]+/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function dueIsoOf(item) {
+    const date = item && item.intent && item.intent.facts && item.intent.facts.date;
+    return date && date.iso ? String(date.iso) : '';
+  }
+
+  function senderKeyOf(item) {
+    const sender = item && item.sender;
+    return String((sender && (sender.email || sender.address)) || '').toLowerCase();
+  }
+
+  // The words of the promise, without the day or the person. Two ids of one
+  // mail share this. Two closes in one thread do not.
+  function promiseTitle(item) {
+    const intent = (item && item.intent) || {};
+    const entities = intent.entities || {};
+    const raw = (item && item.text) || entities.what || intent.label || '';
+    let title = '';
+    if (typeof FlowCommitmentTitle !== 'undefined' && item && item.text && typeof FlowCommitmentTitle.titleFromBody === 'function') {
+      title = normPiece(FlowCommitmentTitle.titleFromBody(item.text));
+    }
+    if (!title && typeof FlowCommitmentTitle !== 'undefined' && typeof FlowCommitmentTitle.keyText === 'function') {
+      title = normPiece(String(FlowCommitmentTitle.keyText(raw) || '').replace(/\s+עד(?:\s|$).*$/, ''));
+    }
+    if (!title) title = normPiece(entities.what || intent.label || '');
+    return title;
+  }
+
+  // Same promise, same day, same person: one Do It. A second commitment in
+  // the same thread stays its own loop. The key is never empty when a
+  // commitment title exists, including when the mail names no due date.
+  function commitmentDedupeKey(item) {
+    const title = promiseTitle(item);
+    if (!title) return '';
+    const due = dueIsoOf(item);
+    const who = senderKeyOf(item);
+    const thread = String((item && (item.threadId || item.outlookConversationId)) || '');
+    const tail = who ? who : (thread ? ('thread:' + thread) : '');
+    if (due && tail) return title + '\n' + due + '\n' + tail;
+    if (due) return title + '\n' + due;
+    if (tail) return title + '\n' + tail;
+    return title;
+  }
+
+  function todoProofRow(row) {
+    if (!row || row.kind !== 'written' || row.undone === true) return false;
+    const todo = row.connectorId === 'outlookTask' || row.connectorId === 'microsoftTodo' || row.system === 'microsoft/todo'
+      || row.connectorId === 'googleTask' || row.connectorId === 'googleTasks';
+    if (!todo) return false;
+    return row.fetchedBack === true || (row.proof && row.proof.fetchedBack === true);
+  }
+
+  function matterIds(row) {
+    if (!row) return [];
+    return [row.messageId, row.itemId, row.pathId, row.outlookIncomingId].filter(Boolean).map(String);
+  }
+
+  // Same promise key, or the same Outlook item. A newer undone row wins
+  // even when an older fetched-back write is still in the log, and even
+  // when that undone row has no outlookReopen flag.
+  function sameMatter(row, item, key) {
+    if (!row) return false;
+    if (key && commitmentDedupeKey(row) === key) return true;
+    const want = matterIds(item);
+    const have = matterIds(row);
+    for (let i = 0; i < want.length; i++) {
+      if (have.indexOf(want[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  // A fetched-back task for this promise is already the close. Undo clears
+  // that row, and then one Do It may create the task again.
+  function activeProofFor(log, item) {
+    const key = commitmentDedupeKey(item);
+    const rows = Array.isArray(log) ? log : [];
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (!sameMatter(row, item, key)) continue;
+      if (row.kind === 'undone') return null;
+      if (todoProofRow(row)) return row;
+    }
+    return null;
+  }
+
+  function select(candidates, now, log) {
+    const merged = new Map();
     const list = Array.isArray(candidates) ? candidates : [];
     for (const raw of list) {
       if (!raw || !raw.messageId || !raw.process || !raw.process.steps || !raw.process.steps.length) continue;
+      if (activeProofFor(log, raw)) continue;
       const score = scoreOf(raw, now);
       if (!score) continue;
-      const key = raw.threadId || raw.messageId;
-      const prev = best.get(key);
-      if (!prev || score > prev.score) best.set(key, { item: raw, score: score });
+      const commit = commitmentDedupeKey(raw);
+      const key = commit || ('id:' + raw.messageId);
+      const row = { item: raw, score: score };
+      const prev = merged.get(key);
+      if (!prev || row.score > prev.score || (row.score === prev.score && (row.item.ts || 0) > (prev.item.ts || 0))) {
+        merged.set(key, row);
+      }
     }
-    const ranked = Array.from(best.values());
+    const ranked = Array.from(merged.values());
     ranked.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       const ad = deadlineMs(a.item);
@@ -294,7 +400,77 @@ const FlowStillOpen = (() => {
       if (ad == null && bd != null) return 1;
       return (a.item.ts || 0) - (b.item.ts || 0);
     });
-    return ranked.slice(0, CAP).map((row) => row.item);
+    // One mail stored under two ids (a scan id and the open id) is one Do It.
+    // A different subject stays its own card.
+    const kept = [];
+    ranked.forEach((row) => {
+      const sig = cardSig(row.item);
+      const prev = kept.find((k) => sameCard(cardSig(k.item), sig));
+      if (!prev) kept.push(row);
+    });
+    return kept.slice(0, CAP).map((row) => row.item);
+  }
+
+  function cardKind(item) {
+    const intent = (item && item.intent) || {};
+    if (intent.personalClose) return String(intent.personalClose);
+    if (intent.type === 'commitment') return 'dated-commitment';
+    return '';
+  }
+
+  function cardSig(item) {
+    const intent = (item && item.intent) || {};
+    let title = '';
+    if (intent.noReplyDraft && intent.label) title = normPiece(intent.label);
+    else title = promiseTitle(item);
+    return {
+      title: title,
+      due: dueIsoOf(item),
+      subject: normPiece(item && item.subject),
+      who: senderKeyOf(item),
+      kind: cardKind(item)
+    };
+  }
+
+  function titlesSame(a, b) {
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const short = a.length <= b.length ? a : b;
+    const long = a.length <= b.length ? b : a;
+    return long.indexOf(short + ' by ') === 0;
+  }
+
+  // One mail stored twice (a scan id and the open id, one of them missing
+  // the sender) is one card. A confirmed amount and a dated promise on the
+  // same subject stay two. A missing due is not the other row's due.
+  function sameCard(a, b) {
+    if (!a || !b || !a.title) return false;
+    if (a.kind && b.kind && a.kind !== b.kind) return false;
+    if (!titlesSame(a.title, b.title)) return false;
+    if (a.due !== b.due) return false;
+    if (a.who && b.who && a.who !== b.who) return false;
+    if (a.subject && b.subject && a.subject !== b.subject) return false;
+    return true;
+  }
+
+  // The open mail and the Loops row are one card when the subject and the
+  // promise agree, even if Outlook used another id for the row. The pane
+  // often has the body and no stored date; the title is the match.
+  function sameSubjectPromise(row, pane) {
+    if (!row || !pane) return false;
+    const left = normPiece(row.subject);
+    const right = normPiece(pane.subject);
+    if (!left || !right || left !== right) return false;
+    const a = promiseTitle(row);
+    const b = promiseTitle(pane);
+    if (!a || a !== b) return false;
+    const dueA = dueIsoOf(row);
+    const dueB = dueIsoOf(pane);
+    if (dueA && dueB && dueA !== dueB) return false;
+    const whoA = senderKeyOf(row);
+    const whoB = senderKeyOf(pane);
+    if (whoA && whoB && whoA !== whoB) return false;
+    return true;
   }
 
   function humanDate(iso, now) {
@@ -318,6 +494,11 @@ const FlowStillOpen = (() => {
     if (kind === 'dated-commitment') {
       if (he) return when ? 'התחייבת עד ' + when : 'התחייבות עם תאריך עדיין פתוחה';
       return when ? 'You promised this by ' + when : 'A dated promise is still open';
+    }
+    // "No need to reply" already named the work. The line is that title.
+    if (item.intent && item.intent.noReplyDraft) {
+      const named = String(item.intent.label || '').replace(/\s+/g, ' ').trim();
+      if (named) return named;
     }
     if (kind === 'follow-up-ask') return he ? 'עדיין חייבים תשובה' : 'A reply is still owed';
     if (kind === 'confirmed-amount') return he ? 'סכום שסוכם עדיין פתוח' : 'A confirmed amount is still open';
@@ -398,7 +579,7 @@ const FlowStillOpen = (() => {
     }
 
     if (event.kind === 'doIt') {
-      if (!id || next.doItIds.indexOf(id) !== -1) return unchanged(next);
+      if (!id) return unchanged(next);
       next.doIt += 1;
       next.doItIds = remember(next.doItIds, id);
       const recorded = { kind: 'doIt', id: id, ts: ts, reason: null };
@@ -409,7 +590,7 @@ const FlowStillOpen = (() => {
     if (event.kind === 'undo') {
       let recorded = null;
       let changed = false;
-      if (id && next.undoIds.indexOf(id) === -1) {
+      if (id) {
         next.undo += 1;
         next.undoIds = remember(next.undoIds, id);
         recorded = { kind: 'undo', id: id, ts: ts, reason: 'undo' };
@@ -484,6 +665,9 @@ const FlowStillOpen = (() => {
     scoreOf: scoreOf,
     fromLogEntry: fromLogEntry,
     select: select,
+    promiseKey: commitmentDedupeKey,
+    sameSubjectPromise: sameSubjectPromise,
+    activeProofFor: activeProofFor,
     whyLine: whyLine,
     notificationText: notificationText,
     emptyMetrics: emptyMetrics,

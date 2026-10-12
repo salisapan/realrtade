@@ -472,7 +472,9 @@ const FlowJudgment = (() => {
     const marketing = MARKETING.test(text);
     const solicitation = SOLICITATION.test(text);
     const calendarNoise = CALENDAR_NOISE.test(text);
-    const noise = automated || calendarNoise || PITCH_VETO.test(text) || MARKETING_VETO.test(text);
+    const automatedNoise = automated;
+    const marketingNoise = MARKETING_VETO.test(text);
+    const noise = automatedNoise || calendarNoise || PITCH_VETO.test(text) || marketingNoise;
     if (automated) add('automated', -60, 'The sender looks automated');
     if (marketing) add('marketing', -45, 'Reads like a mailing list, not a person');
     if (solicitation) add('solicitation', -55, 'Reads like a cold pitch, not your work');
