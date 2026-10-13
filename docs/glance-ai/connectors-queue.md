@@ -1,6 +1,6 @@
 # Connectors queue (read this first, every run of the connector builder)
 
-Glance closes open loops. Gmail is where it starts today. A connector exists only where a close really finishes and can be read back as proof (`ProofOfClose`, `docs/true-close.md` §7). It is never a connector marketplace.
+Glance closes open loops. Gmail is where it starts today. A connector exists only where a close really finishes and can be read back as proof (`ProofOfClose`, `docs/true-close.md` §7). It is never a connector marketplace. This page is Glance (the personal product). Flow, the enterprise product, is separate.
 
 ## OWNER DIRECTIVE 2026-10-13 (binding, overrides any earlier "skip it" in the routine prompt)
 
@@ -11,13 +11,14 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 3. **Approval is given in principle** for the relay design. Privacy-page text and store permission text are still drafted, not edited, in any merge-eligible PR. A change to `manifest.json` hosts or scopes, to `flow-landing/` (the relay function included) or to privacy text keeps the PR a DRAFT: that is the owner's «מאשר».
 4. **A row blocked by an owner action** (app registration, vendor review) is built as far as it can go, marked "ready, waiting for owner" below, and the next row is taken the next day.
 5. **Nothing is deployed** (the relay included) and no switch is turned on without the owner.
-6. **Every connector must also feed Glance's learning** (owner, 2026-10-13: "the AI model must learn through the connectors and draw conclusions relevant to the model"). See "Learning from connectors" below. A connector without its learning hook is not done.
+6. **Every connector must also feed Glance's learning.** The owner approved four learning paths on 2026-10-13 («מאשר את כולם»): read `docs/glance-ai/learning-from-use.md` first. Path A (the owner's own use as owner-verified labels), B (training on closing plans that really finished) and C (per-user calibration on the device) are to be built; path D (opt-in federated contribution) is a dormant specification. A connector without its learning hook is not done.
 
 ## The queue
 
 | # | Connector | The close it makes real | Auth | State |
 |---|---|---|---|---|
 | 0 | FOUNDATION: token relay + consent catalogue + learning hook (build once, with row 1) | - | - | not started |
+| 0b | LEARNING: per-user calibration (path C), then the path D design and its dormant code, one slice per run, after the foundation | - | - | not started |
 | 1 | Notion | a task or a page row exists | OAuth2 + secret (relay) | not started |
 | 2 | Asana | a task exists | OAuth2 PKCE | not started |
 | 3 | Jira | an issue exists | OAuth2 3LO + secret (relay) | not started |
@@ -41,23 +42,11 @@ The owner (Sali) decided: "do everything possible so that all of them work, with
 
 HOLD (owner «מאשר» only): Morning (invoices).
 
-## Learning from connectors (owner 2026-10-13; on device first, nothing shared)
+## Learning hook every connector must emit (summary; the full plan is `docs/glance-ai/learning-from-use.md`)
 
-The owner wants Glance's model to learn through the connectors and to draw conclusions that are relevant to the model. A connector is the place where a close is PROVEN, so it is the best source of honest labels Glance has. Three levels, and only the first is live in the code path; the other two are specified and stay off.
+One outcome event per decision, with NO text, address or title: `{connector, closeType, proposed, approved|edited|ignored, handled (fetchedBack), undone, latencyMs, destinationSystem, lang, at}`. It feeds `core/outcome-labels.js`, `core/execution-memory.js`, `core/person-model.js` and `core/learning-ledger.js`. Conclusions to draw, each a pure function with a corpus test: destination preference (offer Asana first if that is where this person approves tasks), close-type trust (undone often = offered less or not at all), timing per tool and person, per-vendor failure memory (a failed read-back is never "Handled"), profile signals for `docs/glance-ai/user-context-v0.md` (relevance only; never the intent floor or the hard quiets). On device, with the model off it still works.
 
-**Level 1: this person's own device (build with every connector).** Each connector emits one small outcome event into the existing learning modules, with NO text: `{connector, closeType, proposed: true, approved|edited|ignored, handled (fetchedBack), undone, latencyMs, destinationSystem, lang, at}`. Feed it to `core/outcome-labels.js` (labels earned from what happens next), `core/execution-memory.js` (accept / remove / undo / pin per step), `core/person-model.js` (how long each person and each tool takes) and `core/learning-ledger.js` ("what Glance learned from you", one plain line per change). Conclusions that must be drawn, each as a pure function with a corpus test:
-- **Destination preference:** this person's tasks go to Asana, not Google Tasks, so the steps list offers Asana first. Learned from approvals, never assumed.
-- **Close-type trust:** a close type this person undoes more than it keeps is offered less, quieter, or not at all (silence beats a wrong Do It).
-- **Timing per tool and person:** how long a signature, a payment or a reply really takes, so the next look is set from reality.
-- **Per-vendor failure memory:** a connector that failed the read-back is not offered again until it works (never say Handled without fetchedBack).
-- **Profile signals** for `docs/glance-ai/user-context-v0.md`: which tools the person works in, which apps they never approve. A profile signal changes relevance, never the explicit-intent floor, never the hard quiets.
-Everything here stays in device storage. Nothing leaves the device. It works with the model off.
-
-**Level 2: aggregate product measurement (specified, OFF).** Per-connector counts only (offered, approved, undone, read-back failed, median latency), no text, no identifiers, through the existing `pmf-metrics` and the dormant A/B layer. Turning it on needs the owner and a privacy-page change in the same commit.
-
-**Level 3: training Glance's shared model (specified, OFF).** Outcome events from many people could become labels for the lab's small model (a proven close is a stronger label than a spec rule). That is cross-user learning: it is governed by `docs/community-learning.md`, stays DORMANT, and never switches on without the owner and new consent and privacy copy in the same commit. Until then the lab learns only from labels the owner approved or from the two-pass agreement set. A connector run may add a section "what this connector teaches the model" to its doc (which labels it would yield, how many per close, how noisy) so the decision is ready when the owner wants it. It must NOT export any real user data anywhere.
-
-**Acceptance for the learning hook (every connector):** the outcome event is emitted on offer, approve, edit, undo, handled and read-back failure; a corpus proves each conclusion above changes the next offer in the expected direction; a test proves the event carries no text, no address and no title; with the connector off nothing is emitted; the docs name the three levels and what is live.
+**Acceptance (every connector):** the event is emitted on offer, approve, edit, undo, handled and read-back failure; a corpus proves each conclusion moves the next offer in the expected direction; a test proves the event carries no text, address or title; with the connector off nothing is emitted; nothing leaves the device (levels 2 and 3 of the older plan are now paths D and the dormant aggregate counts in `learning-from-use.md`).
 
 ## The token relay (design; build once in run 1, reuse for every connector)
 
@@ -69,7 +58,7 @@ Everything here stays in device storage. Nothing leaves the device. It works wit
 
 ## The consent catalogue (design; build once in run 1)
 
-A pure, portable `core/` module (listed in `core/README.md`, no UI). A catalogue of services: id, label, one-line honest description, group (google, microsoft, chat, tasks, files, sign, meetings, payments), the permission steps it needs (OAuth scopes, optional browser host permissions, relay vendor), and its state (built / experimental / coming). One function: from the ids the person ticked, return exactly the permission steps to run and nothing else. "Select all" means every service that is built or experimental, never one marked coming. The owner designs the screen separately. Each connector adds one catalogue entry. Unit-tested.
+A pure, portable `core/` module (listed in `core/README.md`, no UI). A catalogue of services: id, label, one-line honest description, group (google, microsoft, chat, tasks, files, sign, meetings, payments), the permission steps it needs (OAuth scopes, optional browser host permissions, relay vendor), and its state (built / experimental / coming). One function: from the ids the person ticked, return exactly the permission steps to run and nothing else. "Select all" means every service that is built or experimental, never one marked coming. The owner designs the screen separately. Each connector adds one catalogue entry. Unit-tested. The contribution checkbox of path D belongs here too, off by default.
 
 ## The owner pack (one per connector, in `docs/glance-ai/connectors/<name>.md`)
 
