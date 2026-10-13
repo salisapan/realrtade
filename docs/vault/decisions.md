@@ -6,6 +6,7 @@ updated: 2026-10-10
 
 One line per decision: `date · decision · who · where it is written in docs/`. This is a log, not the truth: each line links to the truth file (`CLAUDE.md`, [[README]], [[open-tasks]], [[revenue-routines]]), and that file wins. Full status stays in [[open-tasks]].
 
+- 2026-10-13 · Breadth D4 built: "log the ₪3,850 in the payments sheet" appends one row under the sheet's own headers and reads that range back; Undo only while the row is unchanged (`core/sheet-row.js`, switch `SHEET_ROW` off, not wired, needs the `spreadsheets` scope). Gate: not run · Claude routine · [[open-tasks]] row 65
 - 2026-10-10 · Owner chose the first wedge: accountants and lawyers. Client requests engine, ledger and page built (not wired to Gmail yet; switch off). docs/glance-ai/client-requests.md, open-tasks row 68.
 - 2026-10-10 · Owner rejected the standalone "מה חסר ממי" page (not Glance). Removed; engine and ledger stay, unwired, switch off. No existing file or behavior changed.
 - 2026-10-10 · Owner: no narrow audience. The edge is carry until closed: Glance stays on a loop until it really closes and makes it happen. Client-requests engine folds into the general follow loop (open-tasks row 68).
