@@ -6,6 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const S = require('./support/sentences');
+const { testDay } = require('./support/fixtures');
+const TD = testDay();
 
 const NORTHWIND = 'The signed Northwind Supplies agreement is attached.';
 const DANA = "I'll send Dana the numbers by Thursday.";
@@ -36,7 +38,7 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
   test.setTimeout(90000);
   const conv = 'AQQKGlanceE2ESave0947';
   const msg = 'AQMkGlanceE2ESave0947';
-  const when = localIso(2026, 10, 8, 14, 1);
+  const when = localIso(TD.y, TD.m, TD.d, 14, 1);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -53,7 +55,7 @@ test('a connected Outlook save goes Verifying then Handled on the Graph message'
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   const pane = page.locator('#ReadingPaneContainerId');
@@ -150,8 +152,8 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
     inboxFilterFails: true,
     mailboxSettings: { timeFormat: 'h:mm tt' },
     inbox: [
-      inboxRow(morning, conv, 'Northwind agreement - signed PDF', localIso(2026, 10, 8, 10, 5)),
-      inboxRow(evening, conv, 'Northwind agreement - signed PDF', localIso(2026, 10, 8, 22, 5))
+      inboxRow(morning, conv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 10, 5)),
+      inboxRow(evening, conv, 'Northwind agreement - signed PDF', localIso(TD.y, TD.m, TD.d, 22, 5))
     ],
     sent: [],
     messages: {},
@@ -167,7 +169,7 @@ test('10:05 and 22:05 on one subject stay unresolved without a 24-hour proof', a
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 10:05',
+    receivedLabel: TD.dmy + ' 10:05',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   await expect(page.locator('#ReadingPaneContainerId').getByText('Save the file?')).toHaveCount(0);
@@ -195,7 +197,7 @@ test('a OneDrive save with no file permission says reconnect and does not offer 
   test.setTimeout(90000);
   const conv = 'AQQKGlanceE2ESaveOff';
   const msg = 'AQMkGlanceE2ESaveOff';
-  const when = localIso(2026, 10, 8, 14, 1);
+  const when = localIso(TD.y, TD.m, TD.d, 14, 1);
   await glance.seedOutlook();
   await glance.setScenario({
     inboxFilterFails: true,
@@ -213,7 +215,7 @@ test('a OneDrive save with no file permission says reconnect and does not offer 
     subject: 'Northwind agreement - signed PDF',
     senderEmail: S.SENDER,
     body: NORTHWIND,
-    receivedLabel: '08/10/2026 14:01',
+    receivedLabel: TD.dmy + ' 14:01',
     attachments: [{ shownName: '…hwind-agreement-signed.pdf', titleName: 'northwind-agreement-signed.pdf', sizeLabel: '3 KB' }]
   });
   const pane = page.locator('#ReadingPaneContainerId');

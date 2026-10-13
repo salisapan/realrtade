@@ -735,7 +735,7 @@ const FlowFollowUp = (() => {
   }
 
   // A reply that says the thing is WITH someone else, or in progress, is an interim, even when it names the act ("waiting for the CFO to approve"). Delivery words win.
-  const WAITING_EN = /\b(?:waiting (?:for|on)|awaiting|pending (?:approval|signature|review|legal)|(?:it|this) is (?:still )?with|still with|in progress|being (?:reviewed|processed|worked on))\b/i;
+  const WAITING_EN = /\b(?:waiting (?:for|on)|awaiting|pending (?:approval|signature|review|legal)|(?:it|this) is (?:still )?with|still with|in progress|being (?:reviewed|processed|worked on)|(?:check|try) (?:back|again)(?: again)? (?:in|after|later|within)|(?:wait|allow) (?:a )?(?:few|some|\d+) (?:more )?(?:days|hours|weeks))\b/i;
   const WAITING_HE = /(?:ממתין|ממתינה|ממתינים|מחכה ל|מחכים ל|בהמתנה|בטיפול|בבדיקה|מטפל בזה|מטפלת בזה)/;
   const PROGRESS_MAX_WORDS = 25;
   const PROGRESS_EN = /\b(?:(?:i|we)(?:'ve| have)? (?:just )?(?:started|begun)|(?:half|partly|partially|mostly) (?:done|finished|ready|there)|halfway|(?:almost|nearly) (?:there|done|finished|ready|complete|set)|close to (?:done|finished|ready)|(?:i|we)(?:'ve| have)? (?:just |now )?(?:found|located|dug up|tracked down) (?:it|them|the \w+)|(?:found|located) (?:it|them)|(?:it|this|that|they|everything)(?:'s| is| are)? (?:all )?(?:ready|prepared|drafted|set)\b[^.!?]{0,30}\b(?:need|waiting|pending|once|after|just)|(?:drafted|prepared|put together|pulled together|gathered|compiled) (?:it|them|the \w+)|(?:all )?(?:set|ready) on my (?:side|end)|got most of it|just need(?:s)? (?:an? )?(?:approval|signature|sign[- ]?off|confirmation|a few))\b/i;

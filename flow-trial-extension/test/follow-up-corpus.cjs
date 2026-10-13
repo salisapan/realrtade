@@ -287,5 +287,15 @@ check('"by the end of the month"', dayOf('I will send it by the end of the month
 check('a past day is never returned (31/12 passed is next year only if it already passed)', (dayOf('אשלח עד 15/09') || '2027-09-15') >= '2026-10-01');
 check('no day named stays without a day', dayOf('Will look into it later and revert.') === null);
 
+console.log('\n--- a reply that hands you a task is not a close (found on real mail, 2026-10-12; sentences here are invented) ---\n');
+const open_ = (t) => cr(t, replyW).outcome !== 'closed';
+check('«נא לצרף צילום של הרישיון» is the ball back with you', open_('קיבלנו את בקשתך. נא לצרף בהודעה חוזרת צילום של הרישיון ואז נטפל.'));
+check('«אנא הגש עד 26/7» is not a close', open_('המטלות פתוחות. אנא הגש את שתיהן עד 26/7. אם אתה זקוק לזמן נוסף עדכן אותי.'));
+check('«אין צורך (ואי אפשר) לאשר» is a no, not a close', open_('בשלב הזה אין צורך (ואי אפשר) לאשר מועד מיוחד. אודה לך אם תעדכן אותי בתאריכים.'));
+check('"please attach the ID photo and we will proceed" is not a close', open_('Please attach the ID photo and we will proceed.'));
+check('"it arrived, please check back in a few days" waits, never closes', cr('The package has arrived and is in transit. Please check back again in a few days.', replyW).outcome === 'ack');
+check('a real confirmation still closes («הפרופיל הוסר»)', cr('הבקשה טופלה. הפרופיל הוסר והמסמך נמחק.', replyW).outcome === 'closed');
+check('a plain yes with "please let me know if anything else" still closes', cr('Approved. Please let me know if you need anything else.', replyW).outcome === 'closed', cr('Approved. Please let me know if you need anything else.', replyW));
+
 console.log('\nTOTAL FAILURES: ' + failures);
 process.exit(failures ? 1 : 0);
