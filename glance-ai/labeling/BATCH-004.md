@@ -137,3 +137,39 @@ cd model && GLANCE_NOW=2026-10-07T12:00:00+03:00 node train/gap-labels-v24.cjs
 .venv/bin/python train/compare-v2n.py v23=artifacts/v23.test-preds.jsonl v24=v24/export/v24.test-preds.jsonl t20=v24/t20/v24t20.test-preds.jsonl
 cd .. && node labeling/score-batches.cjs --models v2=model/v23/base/base.test-preds.jsonl,v23=model/artifacts/v23.test-preds.jsonl,v24=model/v24/export/v24.test-preds.jsonl
 ```
+
+## Second pass and agreement (2026-10-13): the gate's 200 is reached
+
+The owner asked for a way to verify without labelling by hand. A second labeller labelled the same 100 cases blind.
+
+How the second pass was set up:
+- The labeller was a fresh agent with its own context.
+- Its prompt held only the labelling rules (the ones above, with the confirmed-amount-as-task rule stated, as BATCH-003 asked).
+- It was told to make exactly one tool call: read a scratch copy of the blind cases. That copy has no labels, engine or model answers.
+- It reported **2** tool calls, not 1. What the second call was cannot be seen from here. Treat this pass as somewhat less isolated than the batch-003 pass 2, which was a separate session on an older checkout.
+
+The file is `batch-004.pass2-labels.jsonl` (`labeledBy: claude-pass2`). `merge-passes.cjs` merged the two passes:
+
+| | count |
+|---|---|
+| agreement labels added to `agreement-gold.jsonl` | 91 (silent 52, draft 17, task 13, calendar 6, file_save 3) |
+| disagreements (`batch-004.disagree.jsonl`) | 2 (agreement 97.8% of 93) |
+| left out: CONTEXT in a pass | 7 |
+
+The two disagreements are the open rules this file already names:
+- item 37: your own proposal in a note to self (pass 1 silent, pass 2 calendar);
+- item 47: "I will call the bank October 19 at 9am" (pass 1 calendar, pass 2 task).
+
+**Agreement labels: 265 (174 from batch-003 + 91), so the gate's two-pass-agreement basis (200) is met for the first time.** The verdicts below are therefore decisions, not "better on spec labels". They are NOT owner-verified, and both passes come from the same model family. A promote on this basis would only move a model into the lab's best so far; wiring or replacing the default still needs «מאשר».
+
+Gate on all 265 agreement labels (`promote_gate.cjs`, inputs from `gate-inputs.cjs`):
+
+| base → candidate | product order | model alone |
+|---|---|---|
+| v2 → v2.3 | HOLD: wrong actions 4 → 6 (missed 72 → 62, same 30/153 wrong Do Its) | HOLD: EN missed 45 → 47, wrong actions 1 → 2 |
+| v2.3 → v2.4 | HOLD: HE missed 30 → 32 (total 62 → 61, EN 32 → 29) | HOLD: HE missed 39 → 40 (total 86 → 81) |
+| v2.3 → v2.4 tau 0.20% | HOLD: missed 62 → 65 | HOLD: HE missed 39 → 42 |
+
+So on a basis the gate accepts, v2 stays the default and v2.3 stays a shadow candidate. v2.3's two extra wrong actions are both a Hebrew promise read back to the person: «התחייבת לשלוח את הקבלות… עד ה-15 באוקטובר» and «התחייבת להעביר את אישור ניכוי מס במקור עד יום שני». The label is task; v2.3 offers a reply draft. That is the next run's concrete fix: the chooser follows the verb "send" instead of "you committed".
+
+`merge-passes.cjs` used to overwrite `<out>.disagree.jsonl`, which erased batch-003's list. It now takes `--disagree <file>`, and batch-003's file is restored unchanged.

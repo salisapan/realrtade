@@ -12,6 +12,8 @@
 //
 // usage: node glance-ai/labeling/merge-passes.cjs --pass1 batch-003.claude-labels.jsonl --pass2 batch-003.pass2-labels.jsonl
 //                                                 [--out agreement-gold.jsonl]   (appends new ids; an id already there is kept)
+//                                                 [--disagree <file>]  (default <out>.disagree.jsonl; it is overwritten, so a later
+//                                                 batch passes its own file, e.g. batch-004.disagree.jsonl)
 // Both inputs: JSONL with { item, step, labeledBy }; pass1 also carries { id, lang, undatedAsk }. Nothing leaves the machine.
 const fs = require('fs'), path = require('path');
 const args = process.argv.slice(2), get = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : undefined; };
@@ -44,7 +46,7 @@ if (require.main === module) {
   const have = new Set(fs.existsSync(OUT) ? read(OUT).map((x) => x.id) : []);
   const fresh = r.agreed.filter((x) => !have.has(x.id));
   if (fresh.length) fs.appendFileSync(OUT, fresh.map((x) => JSON.stringify(x)).join('\n') + '\n');
-  fs.writeFileSync(OUT.replace(/\.jsonl$/, '') + '.disagree.jsonl', r.disagree.map((x) => JSON.stringify(x)).join('\n') + (r.disagree.length ? '\n' : ''));
+  fs.writeFileSync(get('--disagree') ? rel(get('--disagree')) : OUT.replace(/\.jsonl$/, '') + '.disagree.jsonl', r.disagree.map((x) => JSON.stringify(x)).join('\n') + (r.disagree.length ? '\n' : ''));
   const rate = (r.agreed.length + r.disagree.length) ? r.agreed.length / (r.agreed.length + r.disagree.length) : 0;
   console.log(JSON.stringify({ agreed: r.agreed.length, newlyWritten: fresh.length, disagreed: r.disagree.length, agreementRate: Math.round(rate * 1000) / 1000, skipped: r.skipped,
     byStep: r.agreed.reduce((m, x) => { m[x.step] = (m[x.step] || 0) + 1; return m; }, {}) }, null, 1));
