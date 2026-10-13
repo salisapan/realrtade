@@ -40,6 +40,31 @@ function isOwner(labeledBy) {
   return String(labeledBy || '').trim() === OWNER;
 }
 
+// Own-use labels (owner decision 2026-10-13, docs/glance-ai/learning-from-use.md, path A): a decision the owner makes on his own
+// accounts, with the connector's read-back proof, is owner-verified by action. It is a separate, named source: labeledBy
+// "sali:action" and source "own-use". It never makes a Claude or two-pass-agreement label owner-verified, and a row that says
+// "sali:action" without this exact shape does not qualify (so nobody can mint one by writing the string).
+const OWN_USE = 'sali:action';
+const OWN_USE_DECISIONS = ['approved', 'edited', 'undone'];
+function isOwnUse(row) {
+  const r = row || {};
+  if (String(r.labeledBy || '').trim() !== OWN_USE || r.source !== 'own-use') return false;
+  if (OWN_USE_DECISIONS.indexOf(r.decision) < 0) return false;
+  const p = r.proof;
+  if (!p || typeof p.system !== 'string' || !p.system || typeof p.externalId !== 'string' || !p.externalId) return false;
+  if (typeof p.verifiedAt !== 'string' || !p.verifiedAt) return false;
+  // an approval or an edit is a label only when the close was read back; an undo is a label by itself (the person took it back)
+  if (r.decision !== 'undone' && p.fetchedBack !== true) return false;
+  return true;
+}
+// One rule for "this row counts as owner-verified": the owner's hand label, or a qualifying own-use row.
+function isOwnerVerified(row) {
+  const r = row || {};
+  if (r.ownerVerified !== true) return false;
+  if (String(r.labeledBy || '').trim().indexOf(OWN_USE) === 0) return isOwnUse(r);
+  return true;   // unchanged: the flag is set only by the validated ingest path (validateRow, ingest-answers)
+}
+
 function normMark(mark) {
   const s = String(mark || '').trim().replace(/\uFE0F/g, '');
   const m = MARK[s];
@@ -157,7 +182,7 @@ function validateRow(row, schema) {
   }
   if (row.ownerLabel === 'SILENT' && row.expectedAction != null) errors.push('SILENT requires expectedAction null');
   if (row.ownerLabel === 'ASK' && (typeof row.expectedAction !== 'string' || !row.expectedAction)) errors.push('ASK requires expectedAction');
-  if (row.ownerVerified === true && !isOwner(row.labeledBy)) errors.push('ownerVerified true but labeledBy is not the owner');
+  if (row.ownerVerified === true && !isOwner(row.labeledBy) && !isOwnUse(row)) errors.push('ownerVerified true but labeledBy is not the owner');
   return errors;
 }
 
@@ -198,6 +223,6 @@ function parseSheet(md) {
 }
 
 module.exports = {
-  OWNER, HERE, SCHEMA_PATH, ACTION_CLOSE,
+  OWNER, OWN_USE, isOwnUse, isOwnerVerified, HERE, SCHEMA_PATH, ACTION_CLOSE,
   isOwner, normMark, readJson, readJsonl, writeJsonl, loadBatch, loadBatches, rate, stepOf, metricsOf, validateRow, parseSheet
 };

@@ -233,4 +233,18 @@ fs.rmSync(path.join(HERE, 'preview', 'batch-002-provisional-rows.jsonl'), { forc
 fs.rmSync(path.join(HERE, 'preview', 'batch-002-excluded-unsure.jsonl'), { force: true });
 fs.rmSync(path.join(HERE, 'dry-run', 'batch-002-heldout-before-after.json'), { force: true });
 
+
+// Own-use rows (path A): validateRow accepts ownerVerified true only for the owner's hand label or a qualifying own-use row.
+const L = require('./lib.cjs');
+const okUse = { labeledBy: 'sali:action', source: 'own-use', decision: 'approved', proof: { system: 'google/tasks', externalId: 'T1', fetchedBack: true, verifiedAt: '2026-10-13T10:00:00Z' } };
+assert.strictEqual(L.isOwnUse(okUse), true);
+assert.strictEqual(L.isOwnUse(Object.assign({}, okUse, { labeledBy: 'claude' })), false);
+assert.strictEqual(L.isOwnUse(Object.assign({}, okUse, { source: 'batch' })), false);
+assert.strictEqual(L.isOwnUse(Object.assign({}, okUse, { proof: Object.assign({}, okUse.proof, { fetchedBack: false }) })), false);
+assert.strictEqual(L.isOwnUse(Object.assign({}, okUse, { decision: 'undone', proof: Object.assign({}, okUse.proof, { fetchedBack: false }) })), true);
+assert.strictEqual(L.isOwnerVerified(Object.assign({ ownerVerified: true }, okUse)), true);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'sali:action' }), false, 'the string alone never counts');
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: true, labeledBy: 'sali' }), true);
+assert.strictEqual(L.isOwnerVerified({ ownerVerified: false, labeledBy: 'sali' }), false);
+
 console.log('ingest tests passed');
