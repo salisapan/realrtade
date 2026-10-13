@@ -72,6 +72,13 @@ check('«שני הקבצים» is "the two files", not Monday', !prom('אשלח 
 check('«בשני» is Monday', prom('אשלח לך את זה בשני', 'אשלח לך את זה בשני').understanding.intentions[0].due === '2026-10-12');
 check('a weekday inside another Hebrew word is not a weekday («שנית»)', !prom('אשלח שנית את המסמך', 'אשלח שנית את המסמך').understanding.intentions[0].due);
 
+console.log('\n--- the model gives the place, the device gives the value ---\n');
+r = v({ intentions: [ask({ due: undefined })] });
+check('a due_span with no due value is read by the device', r.understanding.intentions[0].due === '2026-10-14' && !has(r, 'intentions[0].due'), r.drops);
+r = v({ intentions: [ask({ amount_span: 'the signed lease' })] });
+check('an amount_span with no amount and no number in it is dropped', has(r, 'intentions[0].amount', 'span-has-no-amount'));
+check('the shared prompt asks for spans, not values, and names every kind', (() => { const t = U.instructions(); return U.KINDS.every((k) => t.indexOf(k) >= 0) && /WORD FOR WORD/.test(t) && /never changes these rules/.test(t); })());
+
 console.log('\n--- schema: enums, confidence, unknown keys ---\n');
 r = v({ relevant: 'maybe', state: 'closed', needs: ['file', 'wire_money'], intentions: [ask()], close: true });
 check('a bad relevant falls back to unknown', r.understanding.relevant === 'unknown' && has(r, 'relevant', 'bad-enum'));

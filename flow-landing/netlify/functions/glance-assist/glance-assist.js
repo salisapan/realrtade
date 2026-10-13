@@ -46,6 +46,7 @@ const license = require('../verify-license/license-core.js');
 const { styleLine } = require('./style-hints.js');
 const { FlowJsonEnforce } = require('../../../../flow-trial-extension/core/json-enforce.js');
 const { createLadder } = require('./ladder.js');
+const { createUnderstand } = require('./understand.js');
 
 const LOG_PREFIX = '[glance-assist]';
 
@@ -314,6 +315,20 @@ exports.handler = async function (event) {
       return { statusCode: out.status, body: JSON.stringify(out.body) };
     } catch (err) {
       logErr('deeper read failed', String(err && err.message || err));
+      return { statusCode: 503, body: JSON.stringify({ ok: false, code: 'unavailable' }) };
+    }
+  }
+
+  // Glance cloud reading (Router v2's Tier 2, docs/glance-ai/ai-product.md M3). Its own identity, allowance and the owner's monthly spend cap (understand.js).
+  // Off until the owner sets GLANCE_AI_PRIMARY, GLANCE_AI_SPEND_CAP_USD and the model endpoint; until then it answers 503 and asks nothing.
+  if (payload.action === 'understand-read' || payload.action === 'understand-status') {
+    const reader = createUnderstand({ env: process.env, now: Date.now() });
+    try {
+      const out = payload.action === 'understand-read' ? await reader.read(payload) : await reader.status(payload);
+      if (payload.action === 'understand-read') log('cloud read', { status: out.status, code: out.body.code || null, drops: out.body.drops || 0 });
+      return { statusCode: out.status, body: JSON.stringify(out.body) };
+    } catch (err) {
+      logErr('cloud read failed', String(err && err.message || err));
       return { statusCode: 503, body: JSON.stringify({ ok: false, code: 'unavailable' }) };
     }
   }

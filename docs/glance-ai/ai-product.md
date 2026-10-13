@@ -140,6 +140,15 @@ Each milestone is a draft PR into the working branch, behind an off switch, with
   - Cost input for M6 and owner decisions 2 and 5: **150 of 796 mails (19%) reach Tier 2**. The rest are settled on the device with no model call.
   - Corpora: `test/understanding-corpus.cjs` and `test/understanding-router-corpus.cjs`.
 - 2026-10-12 (after the owner's «תעשה הכל»): **M6 cost model** (`glance-ai/oss/cost/cost-model.cjs`, tables in `cost-tables.md`). It uses the measured 19% Tier 2 share and assumes a 1,500-character mail. At 100 mails a day, Glance cloud costs about $0.05–0.20 per person per month on pay-per-use hosts; an always-on L4 is about $281 a month fixed. Prices come from a web search and are not verified on the providers' pages. The three owner decisions (host and cap, privacy and consent copy, batch-001 labels) are prepared as one-word approvals in `docs/glance-ai/proposals/2026-10-12-owner-decisions.md`.
+- 2026-10-13: **M3 built** (same branch, PR #128). `flow-landing/netlify/functions/glance-assist/understand.js` adds the actions `understand-read` and `understand-status`.
+  - Off until all three are set: `GLANCE_AI_PRIMARY` (languages), `GLANCE_AI_SPEND_CAP_USD` (the owner's monthly cap for everyone together, counted per read at `GLANCE_AI_CALL_MICROUSD`, default $0.0004) and the model endpoint (`GLANCE_MODEL_URL` + `GLANCE_MODEL_KEY`, any OpenAI-compatible server; the host is still the owner's §7 row 2).
+  - Each person also has a monthly allowance (`GLANCE_AI_PRIMARY_FREE`/`_PRO`, placeholders 300/3,000 until §7 row 5).
+  - The server refuses text that still holds a contact detail, an amount or a date, with no call and no charge. It grounds every quote with `validate(..., { placesOnly: true })` and returns no model text.
+  - A model that never answered is refunded; an answered read is charged.
+  - The one shared prompt is `core/understanding.js` `instructions()`.
+  - Bug found and fixed while building: the server read values it cannot read (the placeholders) and lowercased the quotes, so a date never reached the device. Now the server keeps the quote as written and the device reads it.
+  - Tests: `glance-assist/understand.test.cjs` (switch, cap, masking, allowance, refunds, wire format, and one pass device mask → server → device router).
+  - Lab: `score-router.cjs --via-server`: 0/464 wrong Do It, 37/322 missed, 0/8 wrong dates, the same as in-process. 150/150 cloud reads answered; $0.06 counted against the cap.
 - 2026-10-12 review, red on the working-branch tip without this change:
   - `outlook-calendar-corpus` is still red (the `instanceof Date` defect, see 10-11).
   - `glance-ai/profile/test-heldout.cjs:36` expects the learned profile scorer at 58.3% (35/60) and gets 60.0% (36/60). It is green on the first parent of `f8f57a6` and red from the #118 merge, so the 0.9.41–0.9.55 engine moved one pair. The number needs re-pinning by the lab owner. It also stops `run-cpu-checks.sh` before its later steps; both M1/M2 scorers were run directly and pass.

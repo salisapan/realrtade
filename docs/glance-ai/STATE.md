@@ -66,6 +66,8 @@ The same file's no-gate propose-only row on the v2 held-out is 3.7% (8/218) wron
 
 2026-10-12: with the bare-weekday reader, validator + strict gate is 0/464 wrong Do It and 37/322 missed (the same as the strict gate alone), with 0/8 wrong-date model cards (gate alone 8/8). The Router v2 (`core/understanding-router.js`, switch `aiPrimary` off) gives the same numbers end to end with the device's real mask in front of Tier 2 (`score-router.cjs`, `router-tables.md`). 150 of 796 mails (19%) reach Tier 2.
 
+2026-10-13: the same run with Tier 2 through the Glance cloud server path (`glance-assist/understand.js`, mock provider = cached answers, `score-router.cjs --via-server`) gives the same numbers. 150/150 reads answered; $0.06 counted against the spend cap.
+
 The strict gate treats a save proposal as unread (`suggest:attachments-unread`) because the case file has counts and names only. The SENSITIVITY row models declared files as 240KB PDFs. That row is not a result.
 
 ## Blocked
