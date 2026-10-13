@@ -197,6 +197,8 @@ chrome.runtime.onInstalled.addListener(() => { ensureCaptureMenu(); });
 // it here. Turning it off removes both the scripts and the permission. See docs/multi-platform.md.
 const SURFACES = {
   whatsapp: { label: 'WhatsApp Web', origins: ['https://web.whatsapp.com/*'], extra: ['src/whatsapp-parse.js', 'src/content-whatsapp.js'] },
+  slack: { label: 'Slack', origins: ['https://app.slack.com/*'], extra: ['src/slack-parse.js', 'src/content-slack.js'] },
+  telegram: { label: 'Telegram Web', origins: ['https://web.telegram.org/*'], extra: ['src/telegram-parse.js', 'src/content-telegram.js'] },
   // Outlook on the web: same chip + engine as Gmail; Graph write adapter only.
   outlook: {
     label: 'Outlook on the web',

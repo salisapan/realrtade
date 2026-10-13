@@ -15,6 +15,8 @@ const FlowChannel = (() => {
     gmail: { label: 'Gmail', kind: 'mail', canDraft: true },
     outlook: { label: 'Outlook', kind: 'mail', canDraft: false },
     whatsapp: { label: 'WhatsApp', kind: 'chat', canDraft: false },
+    slack: { label: 'Slack', kind: 'chat', canDraft: false },
+    telegram: { label: 'Telegram', kind: 'chat', canDraft: false },
     web: { label: 'a web page', kind: 'capture', canDraft: false }
   };
   const DEFAULT_CC = '972';   // a number written with a leading 0 is read as an Israeli number unless told otherwise

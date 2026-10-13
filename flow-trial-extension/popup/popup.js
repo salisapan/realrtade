@@ -1575,7 +1575,9 @@
   // nothing is asked at install), Glance registers its reader for it, and you can turn it off again at any time. A function
   // with a property for its wiring, not a let: it runs during init.
   const SURFACE_COPY = {
-    whatsapp: 'Reads your one-to-one chats, only to see whether something you asked was answered. Never sends, types or opens anything; groups, lists and channels are ignored. Experimental: WhatsApp can change its page without notice, and Glance goes quiet if it cannot read it.'
+    whatsapp: 'Reads your one-to-one chats, only to see whether something you asked was answered. Never sends, types or opens anything; groups, lists and channels are ignored. Experimental: WhatsApp can change its page without notice, and Glance goes quiet if it cannot read it.',
+    slack: 'Reads your one-to-one direct messages, only to see whether something you asked was answered. Never sends, types or opens anything; channels, group messages and threads are ignored. Experimental: Slack can change its page without notice, and Glance goes quiet if it cannot read it.',
+    telegram: 'Reads your one-to-one chats with people, only to see whether something you asked was answered. Never sends, types or opens anything; groups, channels and bots are ignored. Experimental: Telegram can change its page without notice, and Glance goes quiet if it cannot read it.'
   };
   async function renderSurfaces() {
     const host = document.getElementById('surface-list');
@@ -1888,7 +1890,7 @@
         }
       });
       acts.appendChild(nudge);
-    } else if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && !FlowFollowUp.isYours(w) && w.counterpart && !w.counterpart.email && (w.counterpart.phone || w.channel === 'whatsapp')) {
+    } else if (!FlowFollowUp.isMine(w) && !FlowFollowUp.isClock(w) && !FlowFollowUp.isYours(w) && w.counterpart && !w.counterpart.email && (w.counterpart.phone || w.channel === 'whatsapp' || w.channel === 'slack' || w.channel === 'telegram')) {
       // A chat has no draft folder: the nudge is copied, and you paste it yourself. Glance never types or sends in another app.
       const level = FlowFollowUp.nextNudgeLevel(w);
       const gate = FlowEntitlements.nudgeGate(level, record, now);
