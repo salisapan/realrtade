@@ -135,17 +135,19 @@ Claim no number the repo does not hold. You decide the week's priority file; you
 ### mcp-watch (Monday 08:00)
 
 ```
-NAME: mcp-watch. Goal: keep Glance's dormant loops MCP server correct — and fix it when the specification moved.
+NAME: mcp-watch. Goal: keep Glance's dormant loops bridge (docs/glance-ai/loops-mcp.md) correct against the public Model Context Protocol docs — and patch the repo when those docs moved.
 
-Read docs/glance-ai/loops-mcp.md, scripts/glance-loops-mcp.cjs, flow-trial-extension/core/loop-bridge.js, flow-trial-extension/test/loop-bridge-corpus.cjs.
-Fetch the current MCP specification (modelcontextprotocol.io: latest protocol version, transports, authorization and security best practices, tool annotations, structured output) and the release notes since 2025-06-18.
+TOOLS FOR THIS ROUTINE: web fetch / browse + shell only. Do NOT add, configure, or connect any "MCP Server" tool, and do not call Glance's own loops bridge. This routine reads documentation pages and edits repo files; it is not an MCP client.
+
+Read: docs/glance-ai/loops-mcp.md, scripts/glance-loops-mcp.cjs, flow-trial-extension/core/loop-bridge.js, flow-trial-extension/test/loop-bridge-corpus.cjs.
+Fetch https://modelcontextprotocol.io (latest protocol version, transports, authorization and security best practices, tool annotations, structured output) and release notes since 2025-06-18.
 
 ACTIONS:
-1. Compare the server to the spec (PROTOCOLS, tool annotations, structuredContent, stdio framing, DNS-rebinding / Origin / token guidance).
+1. Compare the repo bridge to those docs (PROTOCOLS in scripts/glance-loops-mcp.cjs, tool annotations, structuredContent, stdio framing, DNS-rebinding / Origin / token guidance).
 2. If nothing material changed since your last run: write nothing and end.
-3. If the server is wrong, unsafe, or unable to connect: on cursor/routine-mcp-watch, patch ONLY these files as needed — scripts/glance-loops-mcp.cjs, flow-trial-extension/core/loop-bridge.js, flow-trial-extension/test/loop-bridge-corpus.cjs, docs/glance-ai/loops-mcp.md — add or update permanent tests, run node flow-trial-extension/test/loop-bridge-corpus.cjs, and push the draft PR. Skip any file another open PR already touches; say so in the receipt.
+3. If the bridge is wrong, unsafe, or unable to speak the current protocol: on cursor/routine-mcp-watch, patch ONLY these files as needed — scripts/glance-loops-mcp.cjs, flow-trial-extension/core/loop-bridge.js, flow-trial-extension/test/loop-bridge-corpus.cjs, docs/glance-ai/loops-mcp.md — add or update permanent tests, run `node flow-trial-extension/test/loop-bridge-corpus.cjs`, and push the draft PR. Skip any file another open PR already touches; say so in the receipt.
 4. Never wire the bridge into the manifest, worker, popup, or privacy page. Never describe it as live. Never turn it on.
-5. Receipt lists the spec sections and the files you changed (or that you skipped for collision).
+5. Receipt lists the doc sections and the files you changed (or that you skipped for collision).
 ```
 
 ### builder (Tue–Thu 11:00) — the proactive product slice
