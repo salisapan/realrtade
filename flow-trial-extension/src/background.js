@@ -55,6 +55,9 @@ import '../core/build-stamp.js'; // classic: sets globalThis.FlowBuild — same 
 import '../core/onedrive-file.js'; // classic: sets globalThis.FlowOnedriveFile
 import '../core/suggest-save.js'; // classic: sets globalThis.FlowSuggestSave
 import { LADDER } from '../config/ladder.public.js';
+import { CONNECTORS } from '../config/connectors.public.js';
+import '../core/notion-close.js'; // classic: sets globalThis.FlowNotionClose
+import '../core/connector-outcome.js'; // classic: sets globalThis.FlowConnectorOutcome
 
 const HUBSPOT_CLIENT_ID = publicClientId(OAUTH_PUBLIC.hubspotClientId);
 
@@ -1279,7 +1282,8 @@ async function disconnectConnector(connectorId) {
     await enqueueGoogleWebAuthWrite(() => chrome.storage.local.remove([key, GOOGLE_WEB_AUTH_STORAGE_KEY]));
     return { ok: true };
   }
-  await chrome.storage.local.remove(key);
+  // Notion also forgets the one-page-per-loop ledger (it holds clipped titles) with the token.
+  await chrome.storage.local.remove(connectorId === 'notion' ? [key, 'notionLedger'] : key);
   return { ok: true };
 }
 
@@ -3023,6 +3027,122 @@ async function notionUndo(ref) {
   return { ok: res.ok || res.status === 404 };
 }
 
+/* ---------------------------------------------------- Notion, with a proof */
+// docs/glance-ai/connectors/notion.md. Everything here is behind config/connectors.public.js (notionReadBack, notionOAuth), both off.
+
+const NOTION_RELAY_URL = 'https://theflow-ai.com/.netlify/functions/token-relay';
+const NOTION_AUTH_BASE = 'https://api.notion.com/v1/oauth/authorize';
+const NOTION_OUTCOME_KEY = 'connectorOutcomes';
+const NOTION_LEDGER_KEY = 'notionLedger';
+
+async function relayInstallId() {
+  const { glanceInstallId } = await chrome.storage.local.get('glanceInstallId');
+  if (glanceInstallId) return glanceInstallId;
+  const id = randomOAuthState();
+  await chrome.storage.local.set({ glanceInstallId: id });
+  return id;
+}
+
+async function relayTokenRequest(body) {
+  const res = await fetch(NOTION_RELAY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(Object.assign({ vendor: 'notion', install_id: await relayInstallId() }, body))
+  });
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (!res.ok || !data || typeof data.access_token !== 'string') return { ok: false, status: res.status, error: (data && data.error) || 'relay-failed' };
+  return { ok: true, data: data };
+}
+
+// "Sign in with Notion": the one-time code goes to the relay (which adds the secret); the token comes back and lives only on this device.
+async function connectNotionOAuth(databaseInput) {
+  if (!CONNECTORS.notionOAuth) throw new Error('Sign in with Notion is not switched on in this build.');
+  const clientId = publicClientId(OAUTH_PUBLIC.notionClientId);
+  if (!clientId) throw new Error('Notion sign-in isn’t configured on this build yet.');
+  const databaseId = parseNotionDatabaseId(databaseInput);
+  if (!databaseId) throw new Error('That doesn’t look like a Notion database link — open the database as a full page and copy the URL.');
+  const redirectUri = chrome.identity.getRedirectURL();
+  const code = await runOAuthFlow(NOTION_AUTH_BASE + '?client_id=' + encodeURIComponent(clientId) + '&response_type=code&owner=user&redirect_uri=' + encodeURIComponent(redirectUri), 'Notion');
+  const got = await relayTokenRequest({ grant: 'code', code: code, redirect_uri: redirectUri });
+  if (!got.ok) throw new Error('Notion connection failed (' + got.error + ').');
+  const res = await fetch(NOTION_API + '/databases/' + databaseId, { headers: notionHeaders(got.data.access_token) });
+  if (res.status === 404) throw new Error('Notion signed you in but that database was not shared with Glance — pick it on the Notion screen, or open it, click ⋯ › Connections and add Glance.');
+  if (!res.ok) throw new Error('Notion returned ' + res.status + '.');
+  const db = await res.json();
+  const title = (db.title || []).map((t) => t.plain_text).join('') || 'Untitled database';
+  await chrome.storage.local.set({ notionAuth: { token: got.data.access_token, refreshToken: got.data.refresh_token || null, databaseId, dbTitle: title, schema: db.properties || {}, via: 'oauth' } });
+  return { title };
+}
+
+async function notionRefreshToken(auth) {
+  if (!auth || !auth.refreshToken) return null;
+  const got = await relayTokenRequest({ grant: 'refresh', refresh_token: auth.refreshToken });
+  if (!got.ok) return null;
+  return { token: got.data.access_token, refreshToken: got.data.refresh_token || auth.refreshToken };
+}
+
+// The learning hook (core/connector-outcome.js): ids and enums only — never a title, address or text. Off with the switch.
+async function noteConnectorOutcome(stage, startedAt, extra) {
+  const O = globalThis.FlowConnectorOutcome;
+  if (!O || !CONNECTORS.notionReadBack) return;
+  const ev = O.buildEvent(Object.assign({ connector: 'notion', closeType: 'task', stage: stage, at: Date.now(), latencyMs: startedAt ? Date.now() - startedAt : 0, destinationSystem: 'notion/page' }, extra || {}), { enabled: CONNECTORS.notionReadBack });
+  if (!ev) return;
+  try {
+    const cur = (await chrome.storage.local.get(NOTION_OUTCOME_KEY))[NOTION_OUTCOME_KEY];
+    await chrome.storage.local.set({ [NOTION_OUTCOME_KEY]: O.append(cur, ev) });
+  } catch (e) { /* a learning note never blocks a close */ }
+}
+
+function notionCloseEngine() {
+  return globalThis.FlowNotionClose.create({
+    fetch: (url, init) => fetch(url, init),
+    getAuth: getNotionAuth,
+    saveAuth: async (a) => { await chrome.storage.local.set({ notionAuth: a }); },
+    refresh: notionRefreshToken,
+    buildProof: globalThis.FlowProofOfClose && globalThis.FlowProofOfClose.buildProof,
+    ledger: {
+      get: async (k) => { const m = (await chrome.storage.local.get(NOTION_LEDGER_KEY))[NOTION_LEDGER_KEY] || {}; return m[k] || null; },
+      set: async (k, v) => {
+        const m = (await chrome.storage.local.get(NOTION_LEDGER_KEY))[NOTION_LEDGER_KEY] || {};
+        m[k] = v;
+        const keys = Object.keys(m);
+        if (keys.length > 200) keys.sort((a, b) => (m[a].at || 0) - (m[b].at || 0)).slice(0, keys.length - 200).forEach((x) => { delete m[x]; });
+        await chrome.storage.local.set({ [NOTION_LEDGER_KEY]: m });
+      }
+    }
+  });
+}
+
+function notionLoopKey(p, title) {
+  const base = String((p && (p.messageId || p.outlookIncomingId || p.incomingId || p.threadUrl)) || '');
+  let h = 0;
+  const s = String(title || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return 'notion:' + base + ':' + h.toString(36);
+}
+
+async function notionReadBackWrite(p) {
+  const started = Date.now();
+  const title = googleTaskTitle(p);
+  const close = taskClosePayload(p);
+  const r = await notionCloseEngine().write({ key: notionLoopKey(p, title), title: title, dueIso: close.dueIso || null });
+  const lang = /[֐-׿]/.test(title) ? 'he' : 'en';
+  if (r.ok) {
+    await noteConnectorOutcome('approved', started, { lang: lang });
+    await noteConnectorOutcome('handled', started, { lang: lang });
+    return { ok: true, where: 'Notion', target: 'your database', written: 'Added to Notion.', ref: r.ref, proof: r.proof, url: r.url || null };
+  }
+  if (r.reason === 'verify_failed' || r.reason === 'proof_pending') await noteConnectorOutcome('readback_failed', started, { lang: lang });
+  return { ok: false, reason: r.reason, ref: r.ref || null, proof: null, where: 'Notion' };
+}
+
+async function notionReadBackUndo(ref) {
+  const r = await notionCloseEngine().undo(ref);
+  if (r.ok) await noteConnectorOutcome('undone', 0, {});
+  return r;
+}
+
 /* ------------------------------------------------------------- glance-assist */
 //
 // Feature 2 (Draft-It) and Feature 3 (attachment X-ray) both need real
@@ -4125,7 +4245,7 @@ async function attachmentSaveUndo(ref) {
 }
 
 const WRITERS = {
-  hubspot: hubspotWrite, notion: notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
+  hubspot: hubspotWrite, notion: CONNECTORS.notionReadBack ? notionReadBackWrite : notionWrite, salesforce: salesforceWrite, slack: slackWrite, monday: mondayWrite,
   googleTasks: googleTasksWrite, googleTask: googleTasksWrite,
   calendar: googleCalendarWrite, gmailDraft: gmailDraftWrite,
   driveDoc: googleDriveCreateDoc, driveSheet: googleDriveCreateSheet, driveFile: googleDriveCopyFile,
@@ -4135,7 +4255,7 @@ const WRITERS = {
   attachmentSave: attachmentSaveWrite
 };
 const UNDOERS = {
-  hubspot: hubspotUndo, notion: notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
+  hubspot: hubspotUndo, notion: CONNECTORS.notionReadBack ? notionReadBackUndo : notionUndo, salesforce: salesforceUndo, slack: slackUndo, monday: mondayUndo,
   googleTasks: googleTasksUndo, googleTask: googleTasksUndo,
   calendar: googleCalendarUndo, gmailDraft: gmailDraftUndo,
   driveDoc: googleDriveTrash, driveSheet: googleDriveTrash, driveFile: googleDriveTrash,
@@ -4207,6 +4327,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'flow:connect') {
     if (msg.connectorId === 'googleTasks') return reply(sendResponse, connectGoogleTasks(googleConnectWantsInteractive(sender)).then(() => ({ ok: true })));
     if (msg.connectorId === 'hubspot') return reply(sendResponse, connectHubspot().then(() => ({ ok: true })));
+    if (msg.connectorId === 'notion' && CONNECTORS.notionOAuth && msg.oauth === true) return reply(sendResponse, connectNotionOAuth(msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'notion') return reply(sendResponse, connectNotion(msg.token, msg.database).then((r) => ({ ok: true, detail: r.title })));
     if (msg.connectorId === 'salesforce') return reply(sendResponse, connectSalesforce().then(() => ({ ok: true })));
     if (msg.connectorId === 'slack') return reply(sendResponse, connectSlack(msg.channel).then((r) => ({ ok: true, detail: r.title })));
