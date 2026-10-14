@@ -12,79 +12,120 @@ const FlowMessengerParse = (() => {
   }
 
   // TODO-LIVE-DOM: David, save a real messenger.com and facebook.com/messages
-  // header here: test/fixtures/chat/TODO-LIVE-DOM.html. One one-to-one thread
-  // and one group. These checks use signals observers have published. A title
-  // is not one of them. If none of the signals below are on the page, this
-  // returns false and no draft is written.
+  // header in test/fixtures/chat/TODO-LIVE-DOM.html. The parsers do not read
+  // that file. Until it holds a snapshot, the open thread is classified from
+  // the first region in this chain. A later region is not consulted.
   //
-  // Selectors, each with the page that shows it:
-  // - [aria-label="Conversation information"]
-  //   The conversation-info control (the ellipsis). Any tag: the published
-  //   selector does not name one. Matched case-insensitively because the
-  //   panel heading is title case.
-  //   Source: https://gist.github.com/ariankordi/bae839598cd20680a5b2f85cd565336e
-  //   Source: https://bugzilla.mozilla.org/show_bug.cgi?id=1620508
-  //   (`<h3>Conversation Information</h3>`). We never click this control.
-  //   The chat-name link `[role="main"] a[role="link"][tabindex="0"][aria-label]`
-  //   in that gist is the title, so it is not proof.
-  // - header img
-  //   How many avatars are already in the header. Exactly one, together with
-  //   the info control and no group wording, is the one-to-one proof. Two or
-  //   more is a group. Zero is not proof.
-  //   Source: bug 1620508 (senders are thumbnails, not only the h5). The exact
-  //   img-versus-background node is TODO-LIVE-DOM. A single composite group
-  //   image is not distinguished until that snapshot.
-  // - header text and aria-label: /\bmembers\b/i, /\bparticipants\b/i,
-  //   /\bgroup chat\b/i, /\bgroup conversation\b/i, and משתתפים
-  //   A group word on the header or on the info control is a group.
-  //   Source: the conversation-info panel is where Messenger lists the people
-  //   (same gist; the blacklist script reads "Conversation Information" as
-  //   that panel: https://greasyfork.org/en/scripts/384707-messenger-blacklist/code).
-  //   The exact live string ("members" versus another word) is TODO-LIVE-DOM.
+  // 1. aria-label. [aria-label="Conversation information"]
+  //    The conversation-info control. Any tag: the published selector names
+  //    none. Matched case-insensitively ("Conversation Information").
+  //    Source: https://gist.github.com/ariankordi/bae839598cd20680a5b2f85cd565336e
+  //    Source: https://bugzilla.mozilla.org/show_bug.cgi?id=1620508
+  //    (`<h3>Conversation Information</h3>`). We never click this control.
+  //    The chat-name link `[role="main"] a[role="link"][tabindex="0"][aria-label]`
+  //    in that gist is the title, so it is not this control.
+  // 2. [role="banner"]
+  //    The header landmark, used when the info control is absent.
+  //    Source: https://www.w3.org/TR/wai-aria-1.2/#banner
+  //    There is no live Messenger snapshot of this node (TODO-LIVE-DOM).
+  // 3. h1, h2, h3 inside [role="main"]
+  //    The chat-name heading, used when neither control nor banner is present.
+  //    Source: bug 1620508 (`<h2>` is the chat name). A heading alone is not
+  //    one-to-one proof.
+  //
+  // Inside the chosen region, img elements that are not inside a message row
+  // are the avatars. Exactly one, and no group wording, is one-to-one. Two or
+  // more, or a group word, is a group. Anything else is unknown.
+  // Group words: /\bmembers\b/i, /\bparticipants\b/i, /\bgroup chat\b/i,
+  // /\bgroup conversation\b/i, and משתתפים.
+  // Source: the conversation-info panel lists the people (same gist; the
+  // blacklist script reads that panel as "Conversation Information":
+  // https://greasyfork.org/en/scripts/384707-messenger-blacklist/code).
+  // The exact live string is TODO-LIVE-DOM.
+  // Unknown and group both refuse a draft.
 
   const GROUP_WORD = /\bmembers\b|\bparticipants\b|\bgroup chat\b|\bgroup conversation\b|משתתפים/i;
+  const SKIP_HEADING = /^(conversation information|messages|chat details)$/i;
 
-  function headerOf(root) {
-    return root.querySelector('header');
+  function inRow(el) {
+    return Boolean(el && el.closest && el.closest('[role="row"]'));
   }
 
   function infoControl(root) {
     const nodes = Array.from(root.querySelectorAll('[aria-label]'));
-    return nodes.find((el) => /^conversation information$/i.test(String(el.getAttribute('aria-label') || '').trim())) || null;
+    return nodes.find((el) => !inRow(el) && /^conversation information$/i.test(String(el.getAttribute('aria-label') || '').trim())) || null;
   }
 
-  function headerAvatars(header) {
-    if (!header) return [];
-    return Array.from(header.querySelectorAll('img'));
+  function isThread(el, root) {
+    if (!el || el === root) return true;
+    return el.getAttribute && el.getAttribute('role') === 'main';
   }
 
-  function groupWording(header, info) {
-    const nodes = [];
-    if (header) nodes.push(header);
-    if (info && (!header || !header.contains(info))) nodes.push(info);
-    for (let i = 0; i < nodes.length; i++) {
-      const node = nodes[i];
-      const own = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
-      if (GROUP_WORD.test(own) || GROUP_WORD.test(node.textContent || '')) return true;
-      const labelled = node.querySelectorAll ? Array.from(node.querySelectorAll('[aria-label]')) : [];
-      for (let j = 0; j < labelled.length; j++) {
-        if (GROUP_WORD.test(labelled[j].getAttribute('aria-label') || '')) return true;
-      }
+  function scopeFor(el, root) {
+    if (el.closest) {
+      const box = el.closest('header, [role="banner"]');
+      if (box && !isThread(box, root)) return box;
+    }
+    const parent = el.parentElement;
+    if (!isThread(parent, root)) return parent;
+    return el;
+  }
+
+  function headingIn(root) {
+    const main = root.getAttribute && root.getAttribute('role') === 'main' ? root : (root.querySelector('[role="main"]') || root);
+    const list = Array.from(main.querySelectorAll('h1, h2, h3'));
+    for (let i = 0; i < list.length; i++) {
+      const h = list[i];
+      if (inRow(h)) continue;
+      const text = String(h.textContent || '').replace(/\s+/g, ' ').trim();
+      if (SKIP_HEADING.test(text)) continue;
+      return h;
+    }
+    return null;
+  }
+
+  function imgsIn(node) {
+    if (!node || typeof node.querySelectorAll !== 'function') return [];
+    return Array.from(node.querySelectorAll('img')).filter((img) => !inRow(img));
+  }
+
+  function groupWording(node) {
+    if (!node || node.nodeType !== 1) return false;
+    if (node.getAttribute && node.getAttribute('role') === 'row') return false;
+    const label = node.getAttribute ? (node.getAttribute('aria-label') || '') : '';
+    if (GROUP_WORD.test(label)) return true;
+    const kids = node.childNodes ? Array.from(node.childNodes) : [];
+    for (let i = 0; i < kids.length; i++) {
+      const kid = kids[i];
+      if (kid.nodeType === 3) {
+        if (GROUP_WORD.test(kid.textContent || '')) return true;
+      } else if (kid.nodeType === 1 && groupWording(kid)) return true;
     }
     return false;
   }
 
-  // One-to-one only when the live header proves it. A title does not. A
-  // missing signal does not. Fixture-only attributes are ignored.
-  function isOneToOne(root) {
-    if (!root || typeof root.querySelector !== 'function') return false;
-    const header = headerOf(root);
+  function decide(scope, via) {
+    const avatars = imgsIn(scope);
+    if (avatars.length >= 2 || groupWording(scope)) return { kind: 'group', via: via };
+    if (avatars.length === 1) return { kind: 'one-to-one', via: via };
+    return { kind: 'unknown', via: via };
+  }
+
+  // First matching region wins. No positive one-to-one or group signal there
+  // is unknown, and the next region is not tried. A title is not proof.
+  function classify(root) {
+    if (!root || typeof root.querySelector !== 'function') return { kind: 'unknown', via: null };
     const info = infoControl(root);
-    const avatars = headerAvatars(header);
-    if (avatars.length >= 2) return false;
-    if (groupWording(header, info)) return false;
-    if (!info || avatars.length !== 1) return false;
-    return true;
+    if (info) return decide(scopeFor(info, root), 'aria');
+    const banner = root.querySelector('[role="banner"]');
+    if (banner && !inRow(banner)) return decide(banner, 'banner');
+    const heading = headingIn(root);
+    if (heading) return decide(heading.parentElement || heading, 'heading');
+    return { kind: 'unknown', via: null };
+  }
+
+  function isOneToOne(root) {
+    return classify(root).kind === 'one-to-one';
   }
 
   function authorOf(row) {
@@ -110,7 +151,7 @@ const FlowMessengerParse = (() => {
     return 'ms:' + (path || name || 'open');
   }
 
-  return { page, isOneToOne, authorOf, joinText, threadIdFor };
+  return { page, isOneToOne, classify, authorOf, joinText, threadIdFor };
 })();
 
 if (typeof module !== 'undefined') module.exports = { FlowMessengerParse };

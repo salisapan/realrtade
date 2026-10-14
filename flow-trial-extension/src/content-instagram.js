@@ -18,7 +18,13 @@
   }
 
   function titleOf(main) {
-    const h = main.querySelector('header h2, header h1, header span[title], [data-glance-title]');
+    const marked = main.querySelector('[data-glance-title]');
+    if (marked) {
+      const text = (marked.getAttribute('title') || marked.textContent || '').trim();
+      if (text) return text;
+    }
+    const list = Array.from(main.querySelectorAll('header h1, header h2, header h3, [role="banner"] h1, [role="banner"] h2, [role="banner"] h3, h1, h2, h3'));
+    const h = list.find((n) => !n.closest('[role="row"]') && !/^(conversation information|messages|chat details)$/i.test((n.textContent || '').trim()));
     if (!h) return '';
     return (h.getAttribute('title') || h.textContent || '').trim();
   }

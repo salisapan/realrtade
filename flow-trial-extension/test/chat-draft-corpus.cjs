@@ -151,8 +151,8 @@ function chatEl(html) {
 }
 const messengerParse = fs.readFileSync(path.join(ROOT, 'src/messenger-parse.js'), 'utf8');
 const instagramParse = fs.readFileSync(path.join(ROOT, 'src/instagram-parse.js'), 'utf8');
-check('messenger names the conversation-information source', /gist\.github\.com\/ariankordi\/bae839598cd20680a5b2f85cd565336e/.test(messengerParse) && /bugzilla\.mozilla\.org\/show_bug\.cgi\?id=1620508/.test(messengerParse) && /TODO-LIVE-DOM/.test(messengerParse));
-check('instagram names the chat-details source', /github\.com\/otterai\/IG-GroupBot\/blob\/main\/main\.py/.test(instagramParse) && /TODO-LIVE-DOM/.test(instagramParse));
+check('messenger names the conversation-information source', /gist\.github\.com\/ariankordi\/bae839598cd20680a5b2f85cd565336e/.test(messengerParse) && /bugzilla\.mozilla\.org\/show_bug\.cgi\?id=1620508/.test(messengerParse) && /\[role="banner"\]/.test(messengerParse) && /h1, h2, h3/.test(messengerParse) && /TODO-LIVE-DOM/.test(messengerParse));
+check('instagram names the chat-details source', /github\.com\/otterai\/IG-GroupBot\/blob\/main\/main\.py/.test(instagramParse) && /\[role="banner"\]/.test(instagramParse) && /h1, h2, h3/.test(instagramParse) && /TODO-LIVE-DOM/.test(instagramParse));
 check('the live snapshot slot is waiting for David', /TODO-LIVE-DOM/.test(fs.readFileSync(path.join(__dirname, 'fixtures/chat/TODO-LIVE-DOM.html'), 'utf8')));
 check('executable parser code ignores fixture thread types', !/data-thread-type/.test(stripComments(messengerParse)) && !/data-thread-type/.test(stripComments(instagramParse)));
 check('a title is not proof of a direct chat', ['Dana, Noa', 'Dana & Noa', 'Family 🏠'].every((title) => {
@@ -163,11 +163,30 @@ const directHeader = '<div role="main"><header><img alt="" src="data:,"><h2>Dana
 check('one header image and Conversation information is a direct chat', FlowMessengerParse.isOneToOne(chatEl(directHeader)) === true);
 check('a fixture thread type is not proof', FlowMessengerParse.isOneToOne(chatEl('<div role="main" data-thread-type="one-to-one"><header><h2>Dana</h2></header></div>')) === false);
 check('members text blocks the draft', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt="" src="data:,"><a aria-label="Conversation information">Conversation information</a><span>3 members</span></header></div>')) === false);
-check('a group aria-label blocks the draft', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt="" src="data:,"><a aria-label="Group conversation">Group conversation</a></header></div>')) === false);
+check('a group aria-label blocks the draft', (() => {
+  const got = FlowMessengerParse.classify(chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Group conversation">Group conversation</a></header></div>'));
+  return got.kind === 'group' && got.via === 'heading' && FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt="" src="data:,"><h2>Dana</h2><a aria-label="Group conversation">Group conversation</a></header></div>')) === false;
+})());
 check('two header images block the draft', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><img alt=""><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false);
 check('Chat details with one header image is a direct chat', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><img alt="Dana\'s profile picture"><h2>Dana</h2><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === true);
-check('Chat details alone is not proof', FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false);
-check('one image alone is not proof', FlowMessengerParse.isOneToOne(chatEl('<div role="main"><header><img alt=""><h2>Dana</h2></header></div>')) === false);
+check('Chat details alone is unknown', (() => {
+  const got = FlowInstagramParse.classify(chatEl('<div role="main"><header><button type="button" aria-label="Chat details">Chat details</button></header></div>'));
+  return got.kind === 'unknown' && got.via === 'aria' && FlowInstagramParse.isOneToOne(chatEl('<div role="main"><header><button type="button" aria-label="Chat details">Chat details</button></header></div>')) === false;
+})());
+check('one image with no region is unknown', FlowMessengerParse.classify(chatEl('<div role="main"><img alt=""></div>')).kind === 'unknown' && FlowMessengerParse.isOneToOne(chatEl('<div role="main"><img alt=""></div>')) === false);
+const fallbackKind = { direct: 'one-to-one', group: 'group', unknown: 'unknown' };
+['messenger', 'instagram'].forEach((app) => {
+  const parse = app === 'messenger' ? FlowMessengerParse : FlowInstagramParse;
+  ['aria', 'banner', 'heading'].forEach((level) => {
+    ['direct', 'group', 'unknown'].forEach((kind) => {
+      const file = app + '-' + level + '-' + kind + '.html';
+      const html = fs.readFileSync(path.join(__dirname, 'fixtures/chat/fallback', file), 'utf8');
+      const root = new JSDOM(html).window.document.querySelector('[role="main"]');
+      const got = parse.classify(root);
+      check(file + ' is ' + kind + ' via ' + level, got.kind === fallbackKind[kind] && got.via === level && parse.isOneToOne(root) === (kind === 'direct'), got);
+    });
+  });
+});
 
 console.log('\n--- insert never sends ---\n');
 function box(text) {
@@ -332,6 +351,18 @@ console.log('\n--- calendar evidence ---\n');
     ['instagram-family.html', 'https://www.instagram.com/direct/t/family/', 'src/content-instagram.js', false],
     ['instagram-avatars.html', 'https://www.instagram.com/direct/t/avatars/', 'src/content-instagram.js', false]
   ];
+  ['messenger', 'instagram'].forEach((app) => {
+    ['aria', 'banner', 'heading'].forEach((level) => {
+      ['direct', 'group', 'unknown'].forEach((kind) => {
+        const file = 'fallback/' + app + '-' + level + '-' + kind + '.html';
+        const url = app === 'messenger'
+          ? 'https://www.messenger.com/t/' + level + '-' + kind
+          : 'https://www.instagram.com/direct/t/' + level + '-' + kind + '/';
+        const surface = app === 'messenger' ? 'src/content-messenger.js' : 'src/content-instagram.js';
+        pages.push([file, url, surface, kind === 'direct']);
+      });
+    });
+  });
   for (const [name, url, surface, expect] of pages) {
     const page = await open(name, url, surface);
     const keyboard = keys.filter((e) => e.type === 'keydown' || e.type === 'keypress' || e.type === 'keyup' || e.key === 'Enter');
