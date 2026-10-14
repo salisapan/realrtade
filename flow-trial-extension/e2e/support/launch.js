@@ -410,6 +410,10 @@ function installE2EHooks() {
         if (row && row.id) return Promise.resolve(json(200, row));
         return Promise.resolve(json(404, { error: { code: 'ErrorItemNotFound' } }));
       }
+      if (path.indexOf('/me/chats') >= 0) {
+        if (method !== 'GET') return Promise.resolve(json(403, { error: { code: 'never-post' } }));
+        return Promise.resolve(json(200, { value: scenario.chats || [] }));
+      }
       if (path.indexOf('/me/contacts') >= 0 && method === 'GET') {
         return Promise.resolve(json(200, { value: scenario.contacts || [] }));
       }

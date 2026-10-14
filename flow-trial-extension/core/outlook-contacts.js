@@ -138,11 +138,13 @@ const LANE_PAGE_FILES = [
   'core/outlook-contacts.js',
   'core/outlook-word.js',
   'core/outlook-excel.js',
+  'core/teams-chat.js',
   'src/lane-ms-page.js'
 ];
 const LANE_WORKER_FILES = [
   'core/outlook-word.js',
-  'core/outlook-excel.js'
+  'core/outlook-excel.js',
+  'core/teams-chat.js'
 ];
 const LANE_IDS = {
   outlookContacts: 'FlowOutlookContacts',
